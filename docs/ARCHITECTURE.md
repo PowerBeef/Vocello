@@ -1162,8 +1162,8 @@ values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
-substantive removal condition for every exception and caps unreviewed growth at the registered 33
-`@unchecked Sendable` and 6 `nonisolated(unsafe)` declarations (`budget` in
+substantive removal condition for every exception and caps unreviewed growth at the registered 28
+`@unchecked Sendable` and 2 `nonisolated(unsafe)` declarations (`budget` in
 `config/concurrency-safety.json`). The CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core
 while MLX/Metal runtime execution stays in its single-owner deterministic suite (the injectable XPC

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Debug-only benchmark hook: force an explicit model unload immediately before the next
 /// generation so telemetry records `warmState=cold`. Honored only when durable telemetry
@@ -6,8 +7,7 @@ import Foundation
 /// `QWENVOICE_DEBUG`) and the explicit runtime master gate is active.
 public enum BenchForceColdPolicy {
     private static let environmentKey = "QWENVOICE_BENCH_FORCE_COLD"
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var consumed = false
+    private static let consumed = Mutex(false)
 
     public static var shouldUnloadBeforeGeneration: Bool {
         guard isRequested(
@@ -18,11 +18,11 @@ public enum BenchForceColdPolicy {
         // A cold benchmark launch must unload exactly once. The same process then
         // owns the warm repetitions; re-reading a permanently set environment key
         // for every request would silently turn the entire block into cold takes.
-        lock.lock()
-        defer { lock.unlock() }
-        guard !consumed else { return false }
-        consumed = true
-        return true
+        return consumed.withLock { consumed in
+            guard !consumed else { return false }
+            consumed = true
+            return true
+        }
     }
 
     /// Pure resolution seam for deterministic tests. Forcing an unload changes

@@ -3,8 +3,8 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 33,
-    "maximumNonisolatedUnsafeDeclarations": 6,
+    "maximumUncheckedSendableDeclarations": 28,
+    "maximumNonisolatedUnsafeDeclarations": 2,
     "reviewCadenceDays": 365
   },
   "sourceRoots": [
@@ -21,37 +21,6 @@
       "invariant": "The URLSession reference is assigned once during init and invalidated only after terminal processing. The retained foreground configuration and serial delegate queue are checked Sendable constants and no longer require unsafe isolation escapes.",
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove these escapes when URLSession ownership can be expressed through immutable initialization without nonisolated storage or when the downloader is isolated behind one actor-compatible delegate boundary."
-    },
-    {
-      "source": "Sources/QwenVoiceCore/TelemetryGate.swift",
-      "names": [
-        "handshakeOverride",
-        "handshakeMode"
-      ],
-      "owner": "TelemetryGate lock",
-      "invariant": "All reads and writes occur while the process-local lock is held.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove when the diagnostic handshake can be immutable after process launch or isolated in a concurrency-checked actor without synchronous call-site regressions."
-    },
-    {
-      "source": "Sources/QwenVoiceCore/BenchForceColdPolicy.swift",
-      "names": [
-        "consumed"
-      ],
-      "owner": "BenchForceColdPolicy lock",
-      "invariant": "The benchmark-only one-shot flag is read and written only while locked.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove when benchmark cold-start consumption is carried as request-local immutable state instead of a process-wide one-shot latch."
-    },
-    {
-      "source": "Sources/VocelloCLI/Support.swift",
-      "names": [
-        "_verbosity"
-      ],
-      "owner": "CLIOutput lock",
-      "invariant": "Verbosity is read and written only through the lock-protected property.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove when CLI verbosity is injected immutably into every command context and the process-wide compatibility accessor can be retired."
     },
     {
       "source": "Sources/iOS/TTSEngineStore.swift",
@@ -184,30 +153,24 @@
       "id": "core-lock-protected-utilities",
       "sources": [
         "Sources/QwenVoiceCore/NativeMemoryPressureMonitor.swift",
-        "Sources/QwenVoiceCore/ModelAssets.swift",
         "Sources/QwenVoiceCore/LatestEventCoalescer.swift",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
         "Sources/QwenVoiceCore/GenerationEventDeliveryProbe.swift",
         "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift"
       ],
       "types": [
         "NativeMemoryPressureMonitor",
-        "IntegrityHashCache",
         "LatestEventCoalescer",
-        "DiagnosticAppSupportBox",
-        "GenerationFailureDiagnosticLogger",
         "GenerationScopedEventRouter",
         "ModelDownloadDiagnosticsStore"
       ],
       "owner": "per-type locks or immutable capture boxes",
-      "invariant": "Each utility confines mutation to its documented lock, actor, queue, or immutable capture lifetime; the memory-pressure snapshot uses OSAllocatedUnfairLock for cross-domain reads while dispatch-source lifecycle stays queue-confined.",
+      "invariant": "Each utility confines mutation to its documented lock, actor, queue, or immutable capture lifetime; the memory-pressure snapshot uses OSAllocatedUnfairLock for cross-domain reads while dispatch-source lifecycle stays queue-confined; the model-download diagnostics store keeps every mutable field in one Mutex and stays unchecked only for its injected FileManager, which it uses only while holding that Mutex.",
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove individual utility escapes as their framework callbacks and lock-protected state migrate to checked Sendable primitives without weakening synchronous diagnostics.",
       "tests": [
         "Tests/VocelloCoreTests/GenerationEventDeliveryProbeTests.swift",
-        "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift",
-        "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
+        "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift",
+        "Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift"
       ]
     },
     {
@@ -229,23 +192,18 @@
       "id": "platform-callback-bridges",
       "sources": [
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
-        "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
-        "Sources/iOSSupport/Services/IOSCrashObserver.swift",
-        "Sources/iOSSupport/Services/IOSMetricKitMemoryReporter.swift"
+        "Sources/iOSSupport/Services/IOSCrashObserver.swift"
       ],
       "types": [
         "SpeechRecognitionTaskHandle",
-        "MainThreadStallWatchdog",
-        "IOSCrashObserver",
-        "IOSMetricKitMemoryReporter"
+        "IOSCrashObserver"
       ],
       "owner": "framework callback lifetime plus lock, actor, or main-queue isolation",
       "invariant": "Framework callbacks mutate only the registered synchronized state and are invalidated before owner teardown.",
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove each callback bridge escape when the corresponding Apple framework offers checked Sendable callbacks or ownership can remain in one actor for its full lifetime.",
       "tests": [
-        "Tests/VocelloCoreTests/MainThreadStallWatchdogTests.swift",
-        "Tests/VocelloCoreTests/MemoryTelemetryV8Tests.swift"
+        "Tests/VocelloCoreTests/GenerationFailureDiagnosticLoggerTests.swift"
       ]
     },
     {

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import VocelloQwen3Core
 
 /// Privacy-reduced, bounded diagnostics for generation failures.
@@ -6,13 +7,15 @@ import VocelloQwen3Core
 /// The log deliberately stores an allowlisted classification rather than error text,
 /// stack symbols, prompts, transcripts, paths, URLs, or arbitrary metadata. It is
 /// enabled only with the normal telemetry gate and is intended for local support.
-public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
+public final class GenerationFailureDiagnosticLogger: Sendable {
     public static let shared = GenerationFailureDiagnosticLogger()
 
     public static let defaultMaxBytes = 256 * 1_024
     public static let defaultMaxEntries = 200
 
-    private let lock = NSLock()
+    /// Serializes every append, prune, read and removal of the journal file; it
+    /// guards no in-memory state.
+    private let journalLock = Mutex(())
     private let encoder: JSONEncoder
     private let fixedFileURL: URL?
     private let maxBytes: Int
@@ -72,52 +75,51 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
             requestReceipt: receipt
         )
 
-        lock.lock()
-        defer { lock.unlock() }
-
-        do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            Self.excludeFromBackup(url.deletingLastPathComponent())
-            var line = try encoder.encode(entry)
-            line.append(0x0A)
-            if FileManager.default.fileExists(atPath: url.path) {
-                let handle = try FileHandle(forWritingTo: url)
-                defer { try? handle.close() }
-                try handle.seekToEnd()
-                try handle.write(contentsOf: line)
-            } else {
-                try line.write(to: url, options: .atomic)
+        journalLock.withLock { _ in
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                Self.excludeFromBackup(url.deletingLastPathComponent())
+                var line = try encoder.encode(entry)
+                line.append(0x0A)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    let handle = try FileHandle(forWritingTo: url)
+                    defer { try? handle.close() }
+                    try handle.seekToEnd()
+                    try handle.write(contentsOf: line)
+                } else {
+                    try line.write(to: url, options: .atomic)
+                }
+                Self.excludeFromBackup(url)
+                try pruneLocked(at: url)
+                // Atomic retention rewrites replace the inode and therefore its
+                // resource values. Re-apply the backup exclusion afterward.
+                Self.excludeFromBackup(url)
+            } catch {
+                // Best-effort: diagnostics must never alter generation behavior.
             }
-            Self.excludeFromBackup(url)
-            try pruneLocked(at: url)
-            // Atomic retention rewrites replace the inode and therefore its
-            // resource values. Re-apply the backup exclusion afterward.
-            Self.excludeFromBackup(url)
-        } catch {
-            // Best-effort: diagnostics must never alter generation behavior.
         }
     }
 
     /// Removes the bounded local support log without requiring telemetry to be enabled.
     public func clear(appSupportDirectory: URL? = nil) {
         guard let url = resolvedFileURL(appSupportDirectory: appSupportDirectory) else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        try? FileManager.default.removeItem(at: url)
+        journalLock.withLock { _ in
+            _ = try? FileManager.default.removeItem(at: url)
+        }
     }
 
     public func read(appSupportDirectory: URL? = nil) -> [GenerationFailureJournalEntry] {
         guard let url = resolvedFileURL(appSupportDirectory: appSupportDirectory) else { return [] }
-        lock.lock()
-        defer { lock.unlock() }
-        guard let data = try? Data(contentsOf: url) else { return [] }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return data.split(separator: 0x0A).compactMap {
-            try? decoder.decode(GenerationFailureJournalEntry.self, from: Data($0))
+        return journalLock.withLock { _ -> [GenerationFailureJournalEntry] in
+            guard let data = try? Data(contentsOf: url) else { return [] }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return data.split(separator: 0x0A).compactMap {
+                try? decoder.decode(GenerationFailureJournalEntry.self, from: Data($0))
+            }
         }
     }
 

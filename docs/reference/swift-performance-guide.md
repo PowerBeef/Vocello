@@ -84,7 +84,7 @@ Vocello's concurrency design is intentionally coarse-grained:
 - **`actor NativeEngineRuntime`** — the engine's mutable runtime state and MLX call serialization.
 - **`actor NativePreparedCloneConditioningCache`** — mutable clone-conditioning cache with LRU eviction.
 - **Background `Task` / `Task.detached`** — telemetry sampler, chunk forwarding, audio decoding consumer.
-- **`@unchecked Sendable` + manual locking** — `MainThreadStallWatchdog` uses `NSLock` because it predates `Mutex` and is reviewed for correctness.
+- **`Mutex` (Synchronization)** — small synchronous state shared across threads (`MainThreadStallWatchdog`, the `TelemetryGate` latch, the diagnostics loggers) lives in a `Mutex`, so those types stay checked `Sendable`; every remaining `@unchecked Sendable` is registered in `config/concurrency-safety.json`.
 
 This keeps data-race checking tractable and matches the natural boundaries of the app.
 

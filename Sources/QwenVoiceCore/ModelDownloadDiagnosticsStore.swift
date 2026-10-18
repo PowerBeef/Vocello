@@ -1,8 +1,12 @@
 import Foundation
+import Synchronization
 
 /// Compact local-only diagnostics for model delivery. The allowlisted schema cannot contain
 /// request URLs, filesystem paths, device identity, model prompts, or user content: a failure
 /// is recorded as its `DiagnosticPrivacy` summary, never as error text (AUD-08).
+///
+/// Unchecked only because Foundation has not annotated `FileManager` as Sendable: every
+/// mutable field lives in `state`, whose mutex also serializes each use of `fileManager`.
 public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// Schema-versioned, privacy-safe event used by the model-management diagnostic lane. The
     /// schema deliberately has no URL or filesystem-path field.
@@ -166,21 +170,41 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// primary cannot be pulled for triage (see `IOSPullableDiagnosticsMirror`).
     public let mirrorDirectory: URL?
     private let fileManager: FileManager
-    private let lock = NSLock()
-    private var runStartedAt: Date?
-    private var verificationStartedAt: Date?
-    private var installationStartedAt: Date?
-    private var lastPhase: String?
-    private var maximumRetryCount = 0
-    private var rangeRetryCount = 0
-    private var accumulatedWireBytes: Int64 = 0
-    private var accumulatedControlBytes: Int64 = 0
-    private var observedProtocols: Set<String> = []
-    private var terminalRecorded = false
+    /// The run's accounting and the trace's counters. The same mutex is held across every
+    /// record and trace write, so the files are written one record at a time.
+    private let state = Mutex(State())
     private let processInstanceID = UUID().uuidString.lowercased()
-    private var traceRunID: String?
-    private var traceSequence: UInt64 = 0
-    private var traceBytesWritten: Int64 = 0
+    private let traceRunID: String?
+
+    private struct State: Sendable {
+        var runStartedAt: Date?
+        var verificationStartedAt: Date?
+        var installationStartedAt: Date?
+        var lastPhase: String?
+        var maximumRetryCount = 0
+        var rangeRetryCount = 0
+        var accumulatedWireBytes: Int64 = 0
+        var accumulatedControlBytes: Int64 = 0
+        var observedProtocols: Set<String> = []
+        var terminalRecorded = false
+        var traceSequence: UInt64 = 0
+        var traceBytesWritten: Int64 = 0
+
+        /// A run ends at `recordSuccess`; the next record after it starts a fresh run. The
+        /// trace counters span the process.
+        mutating func resetRun() {
+            runStartedAt = nil
+            verificationStartedAt = nil
+            installationStartedAt = nil
+            lastPhase = nil
+            maximumRetryCount = 0
+            rangeRetryCount = 0
+            accumulatedWireBytes = 0
+            accumulatedControlBytes = 0
+            observedProtocols.removeAll()
+            terminalRecorded = false
+        }
+    }
 
     public convenience init(
         directory: URL,
@@ -233,14 +257,11 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         errorClassification: String? = nil,
         error: (any Error)? = nil
     ) {
-        lock.lock()
-        guard let runID = traceRunID else {
-            lock.unlock()
-            return
+        guard let runID = traceRunID else { return }
+        let sequence = state.withLock { state -> UInt64 in
+            state.traceSequence &+= 1
+            return state.traceSequence
         }
-        traceSequence &+= 1
-        let sequence = traceSequence
-        lock.unlock()
 
         let record = DeliveryEvent(
             schemaVersion: 1,
@@ -275,23 +296,25 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
 
     public func record(metrics: HuggingFaceDownloader.TransferMetrics) {
         let relativePath = sanitizeRelativePath(metrics.relativePath)
-        lock.lock()
-        if relativePath == nil {
-            // Catalog and other control-plane requests are useful network evidence, but are not
-            // model payload and therefore must not inflate duplicate artifact bytes.
-            accumulatedControlBytes += max(0, metrics.transferredBytes)
-        } else {
-            accumulatedWireBytes += max(0, metrics.transferredBytes)
+        let transferredBytes = max(0, metrics.transferredBytes)
+        let protocolName = sanitizeToken(metrics.protocolName)
+        state.withLock { state in
+            if relativePath == nil {
+                // Catalog and other control-plane requests are useful network evidence, but are
+                // not model payload and therefore must not inflate duplicate artifact bytes.
+                state.accumulatedControlBytes += transferredBytes
+            } else {
+                state.accumulatedWireBytes += transferredBytes
+            }
+            if let protocolName, !protocolName.isEmpty {
+                state.observedProtocols.insert(protocolName)
+            }
         }
-        if let protocolName = sanitizeToken(metrics.protocolName), !protocolName.isEmpty {
-            observedProtocols.insert(protocolName)
-        }
-        lock.unlock()
         persist(Record(
             capturedAtUTC: ISO8601DateFormatter().string(from: Date()),
             kind: "task-metrics",
             relativePath: relativePath,
-            protocolName: sanitizeToken(metrics.protocolName),
+            protocolName: protocolName,
             redirectCount: metrics.redirectCount,
             reusedConnection: metrics.reusedConnection,
             cellular: metrics.cellular,
@@ -308,20 +331,22 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     public func record(progress: HuggingFaceDownloader.RepositoryProgress) {
         let now = Date()
         let phase = progress.phase.rawValue
-        lock.lock()
-        if terminalRecorded {
-            resetRunStateLocked()
+        let retryCount = progress.retryCount
+        let isVerifying = progress.phase == .verifying
+        let isInstalling = progress.phase == .installing
+        let isNewPhase = state.withLock { state -> Bool in
+            if state.terminalRecorded {
+                state.resetRun()
+            }
+            if state.runStartedAt == nil { state.runStartedAt = now }
+            state.maximumRetryCount = max(state.maximumRetryCount, retryCount)
+            guard state.lastPhase != phase else { return false }
+            state.lastPhase = phase
+            if isVerifying { state.verificationStartedAt = now }
+            if isInstalling { state.installationStartedAt = now }
+            return true
         }
-        if runStartedAt == nil { runStartedAt = now }
-        maximumRetryCount = max(maximumRetryCount, progress.retryCount)
-        guard lastPhase != phase else {
-            lock.unlock()
-            return
-        }
-        lastPhase = phase
-        if progress.phase == .verifying { verificationStartedAt = now }
-        if progress.phase == .installing { installationStartedAt = now }
-        lock.unlock()
+        guard isNewPhase else { return }
 
         persist(Record(
             capturedAtUTC: ISO8601DateFormatter().string(from: now),
@@ -347,13 +372,13 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// `recordSuccess` (`recordFailure` never ends it), so the count and the cap span
     /// every attempt since this process's previous success, matching `wireBytes`.
     public func record(rangeRetry event: HuggingFaceDownloader.RangeRetryEvent) {
-        lock.lock()
-        if terminalRecorded {
-            resetRunStateLocked()
+        let shouldPersist = state.withLock { state -> Bool in
+            if state.terminalRecorded {
+                state.resetRun()
+            }
+            state.rangeRetryCount += 1
+            return state.rangeRetryCount <= Self.maxRangeRetryRecordsPerRun
         }
-        rangeRetryCount += 1
-        let shouldPersist = rangeRetryCount <= Self.maxRangeRetryRecordsPerRun
-        lock.unlock()
         guard shouldPersist else { return }
 
         persist(Record(
@@ -370,22 +395,25 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
 
     public func recordSuccess(expectedBytes: Int64, reusedBytes: Int64 = 0) {
         let now = Date()
-        lock.lock()
-        let networkSeconds = verificationStartedAt.flatMap { start in
-            runStartedAt.map { max(0, start.timeIntervalSince($0)) }
+        // The run as it stood when it ended; the next record starts a fresh one.
+        let run = state.withLock { state -> State in
+            let snapshot = state
+            state.terminalRecorded = true
+            return snapshot
         }
-        let verificationSeconds = installationStartedAt.flatMap { end in
-            verificationStartedAt.map { max(0, end.timeIntervalSince($0)) }
+        let networkSeconds = run.verificationStartedAt.flatMap { start in
+            run.runStartedAt.map { max(0, start.timeIntervalSince($0)) }
         }
-        let installationSeconds = installationStartedAt.map { max(0, now.timeIntervalSince($0)) }
-        let wireBytes = accumulatedWireBytes
+        let verificationSeconds = run.installationStartedAt.flatMap { end in
+            run.verificationStartedAt.map { max(0, end.timeIntervalSince($0)) }
+        }
+        let installationSeconds = run.installationStartedAt.map { max(0, now.timeIntervalSince($0)) }
+        let wireBytes = run.accumulatedWireBytes
         let reusedBytes = max(0, reusedBytes)
-        let controlBytes = accumulatedControlBytes
-        let retryCount = maximumRetryCount
-        let rangeRetries = rangeRetryCount
-        let protocols = observedProtocols.sorted()
-        terminalRecorded = true
-        lock.unlock()
+        let controlBytes = run.accumulatedControlBytes
+        let retryCount = run.maximumRetryCount
+        let rangeRetries = run.rangeRetryCount
+        let protocols = run.observedProtocols.sorted()
 
         persist(Record(
             capturedAtUTC: ISO8601DateFormatter().string(from: now),
@@ -417,70 +445,73 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         ))
     }
 
+    /// Writes under `state`'s mutex, which serializes every file write; `prune` and
+    /// `appendLine` run inside it and never take it themselves.
     private func persist(_ record: Record) {
-        lock.lock()
-        defer { lock.unlock() }
-        let fileName = "attempt-\(UUID().uuidString).json"
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(record) else { return }
-        for root in [directory, mirrorDirectory].compactMap({ $0 }) {
-            do {
-                try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-                try data.write(
-                    to: root.appendingPathComponent(fileName),
-                    options: [.atomic]
-                )
-                try prune(in: root)
-                if let runID = traceRunID {
-                    let journalRoot = root
-                        .appendingPathComponent("attempts", isDirectory: true)
-                        .appendingPathComponent(runID, isDirectory: true)
-                    try fileManager.createDirectory(
-                        at: journalRoot,
-                        withIntermediateDirectories: true
+        state.withLock { _ in
+            let fileName = "attempt-\(UUID().uuidString).json"
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            guard let data = try? encoder.encode(record) else { return }
+            for root in [directory, mirrorDirectory].compactMap({ $0 }) {
+                do {
+                    try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+                    try data.write(
+                        to: root.appendingPathComponent(fileName),
+                        options: [.atomic]
                     )
-                    try appendLine(
-                        data,
-                        to: journalRoot.appendingPathComponent(
-                            "records-\(processInstanceID).jsonl",
-                            isDirectory: false
+                    try prune(in: root)
+                    if let runID = traceRunID {
+                        let journalRoot = root
+                            .appendingPathComponent("attempts", isDirectory: true)
+                            .appendingPathComponent(runID, isDirectory: true)
+                        try fileManager.createDirectory(
+                            at: journalRoot,
+                            withIntermediateDirectories: true
                         )
-                    )
+                        try appendLine(
+                            data,
+                            to: journalRoot.appendingPathComponent(
+                                "records-\(processInstanceID).jsonl",
+                                isDirectory: false
+                            )
+                        )
+                    }
+                } catch {
+                    // Diagnostics must never interfere with model delivery.
                 }
-            } catch {
-                // Diagnostics must never interfere with model delivery.
             }
         }
     }
 
+    /// Writes under `state`'s mutex, like `persist`, and charges the trace byte budget there.
     private func persistTrace(_ record: DeliveryEvent) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard record.sequence <= UInt64(Self.maxRetainedTraceEvents) else { return }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(record) else { return }
-        let lineBytes = Int64(data.count + 1)
-        guard traceBytesWritten + lineBytes <= Self.maxRetainedTraceBytes else { return }
-        for root in [directory, mirrorDirectory].compactMap({ $0 }) {
-            let traceRoot = root
-                .appendingPathComponent("trace", isDirectory: true)
-                .appendingPathComponent(record.runID, isDirectory: true)
-            do {
-                try fileManager.createDirectory(at: traceRoot, withIntermediateDirectories: true)
-                try appendLine(
-                    data,
-                    to: traceRoot.appendingPathComponent(
-                        "events-\(record.processInstanceID).jsonl",
-                        isDirectory: false
+        state.withLock { state in
+            guard record.sequence <= UInt64(Self.maxRetainedTraceEvents) else { return }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            guard let data = try? encoder.encode(record) else { return }
+            let lineBytes = Int64(data.count + 1)
+            guard state.traceBytesWritten + lineBytes <= Self.maxRetainedTraceBytes else { return }
+            for root in [directory, mirrorDirectory].compactMap({ $0 }) {
+                let traceRoot = root
+                    .appendingPathComponent("trace", isDirectory: true)
+                    .appendingPathComponent(record.runID, isDirectory: true)
+                do {
+                    try fileManager.createDirectory(at: traceRoot, withIntermediateDirectories: true)
+                    try appendLine(
+                        data,
+                        to: traceRoot.appendingPathComponent(
+                            "events-\(record.processInstanceID).jsonl",
+                            isDirectory: false
+                        )
                     )
-                )
-            } catch {
-                // Diagnostics must never interfere with model delivery.
+                } catch {
+                    // Diagnostics must never interfere with model delivery.
+                }
             }
+            state.traceBytesWritten += lineBytes
         }
-        traceBytesWritten += lineBytes
     }
 
     private func appendLine(_ data: Data, to fileURL: URL) throws {
@@ -562,19 +593,6 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
         guard trimmed.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
         return trimmed
-    }
-
-    private func resetRunStateLocked() {
-        runStartedAt = nil
-        verificationStartedAt = nil
-        installationStartedAt = nil
-        lastPhase = nil
-        maximumRetryCount = 0
-        rangeRetryCount = 0
-        accumulatedWireBytes = 0
-        accumulatedControlBytes = 0
-        observedProtocols.removeAll()
-        terminalRecorded = false
     }
 
     private func thermalStateToken() -> String {

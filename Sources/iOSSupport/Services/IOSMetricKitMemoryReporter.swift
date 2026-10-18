@@ -2,28 +2,27 @@ import Foundation
 import MetricKit
 import QwenVoiceCore
 import OSLog
+import Synchronization
 
 /// Registers early and keeps the legacy iOS 26 MetricKit subscriber alive for
 /// the process lifetime. MetricKit is delayed field evidence, not a per-take
 /// sampler; only bounded allowlisted aggregates are forwarded to local storage.
-final class IOSMetricKitMemoryReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
+final class IOSMetricKitMemoryReporter: NSObject, MXMetricManagerSubscriber, Sendable {
     static let shared = IOSMetricKitMemoryReporter()
 
-    private let stateLock = NSLock()
-    private var isStarted = false
+    private let isStarted = Mutex(false)
 
     private override init() {
         super.init()
     }
 
     func start() {
-        stateLock.lock()
-        guard !isStarted else {
-            stateLock.unlock()
-            return
+        let claimed = isStarted.withLock { started in
+            guard !started else { return false }
+            started = true
+            return true
         }
-        isStarted = true
-        stateLock.unlock()
+        guard claimed else { return }
         MXMetricManager.shared.add(self)
     }
 

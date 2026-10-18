@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Measures main-thread responsiveness during generation — the project's
 /// "does the UI lag under engine load" KPI.
@@ -28,7 +29,7 @@ import Foundation
 /// heartbeat count and each delayed heartbeat's completion time and delay, so the
 /// checker can scope heartbeat statistics to a measured window instead of the
 /// launch. The shared generation session never records intervals.
-final class MainThreadStallWatchdog: @unchecked Sendable {
+final class MainThreadStallWatchdog: Sendable {
     /// One heartbeat that ran more than 50 ms late: when it completed (wall-clock
     /// epoch milliseconds, the probe's block clock) and by how much.
     struct DelayedHeartbeat: Sendable {
@@ -80,24 +81,47 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
 
     static let shared = MainThreadStallWatchdog()
 
-    private let lock = NSLock()
-    private let queue = DispatchQueue(label: "com.qwenvoice.ui-watchdog", qos: .utility)
-    private var timer: DispatchSourceTimer?
-    private var activeSessions = 0
-    private var sessionToken: UInt64 = 0
+    /// The session's timer and counters, read and written only inside `state.withLock`.
+    private struct State {
+        var timer: DispatchSourceTimer?
+        var activeSessions = 0
+        var sessionToken: UInt64 = 0
 
-    private var delayedHeartbeatCount50 = 0
-    private var delayedHeartbeatCount250 = 0
-    private var maximumDelayedHeartbeatMS = 0
-    private var scheduledHeartbeatCount = 0
-    private var completedHeartbeatCount = 0
-    /// Send instants of this session's heartbeats that have not run yet.
-    private var pendingSentAt: [UInt64: ContinuousClock.Instant] = [:]
-    private var nextHeartbeatID: UInt64 = 0
+        var delayedHeartbeatCount50 = 0
+        var delayedHeartbeatCount250 = 0
+        var maximumDelayedHeartbeatMS = 0
+        var scheduledHeartbeatCount = 0
+        var completedHeartbeatCount = 0
+        /// Send instants of this session's heartbeats that have not run yet.
+        var pendingSentAt: [UInt64: ContinuousClock.Instant] = [:]
+        var nextHeartbeatID: UInt64 = 0
+        var intervalCompletedCount = 0
+        var intervalDelayed: [DelayedHeartbeat] = []
+        var intervalDroppedCount = 0
+
+        mutating func recordInterval(_ ms: Int) {
+            intervalCompletedCount += 1
+            guard ms > 50 else { return }
+            guard intervalDelayed.count < MainThreadStallWatchdog.intervalEventLimit else {
+                intervalDroppedCount += 1
+                return
+            }
+            intervalDelayed.append(DelayedHeartbeat(
+                completedEpochMS: Int64((Date().timeIntervalSince1970 * 1_000).rounded()),
+                delayMS: ms
+            ))
+        }
+
+        mutating func recordDelay(_ ms: Int) {
+            if ms > 50 { delayedHeartbeatCount50 += 1 }
+            if ms > 250 { delayedHeartbeatCount250 += 1 }
+            if ms > maximumDelayedHeartbeatMS { maximumDelayedHeartbeatMS = ms }
+        }
+    }
+
+    private let state = Mutex(State())
+    private let queue = DispatchQueue(label: "com.qwenvoice.ui-watchdog", qos: .utility)
     private let recordsIntervals: Bool
-    private var intervalCompletedCount = 0
-    private var intervalDelayed: [DelayedHeartbeat] = []
-    private var intervalDroppedCount = 0
 
     init(recordsIntervals: Bool = false) {
         self.recordsIntervals = recordsIntervals
@@ -105,35 +129,37 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
 
     /// Start (or join) a measurement session.
     func begin() {
-        lock.lock()
-        defer { lock.unlock() }
-        activeSessions += 1
-        guard timer == nil else { return }
+        state.withLock { state in
+            state.activeSessions += 1
+            guard state.timer == nil else { return }
 
-        sessionToken &+= 1
-        let token = sessionToken
-        delayedHeartbeatCount50 = 0
-        delayedHeartbeatCount250 = 0
-        maximumDelayedHeartbeatMS = 0
-        scheduledHeartbeatCount = 0
-        completedHeartbeatCount = 0
-        pendingSentAt.removeAll(keepingCapacity: true)
-        intervalCompletedCount = 0
-        intervalDelayed.removeAll(keepingCapacity: true)
-        intervalDroppedCount = 0
+            state.sessionToken &+= 1
+            let token = state.sessionToken
+            state.delayedHeartbeatCount50 = 0
+            state.delayedHeartbeatCount250 = 0
+            state.maximumDelayedHeartbeatMS = 0
+            state.scheduledHeartbeatCount = 0
+            state.completedHeartbeatCount = 0
+            state.pendingSentAt.removeAll(keepingCapacity: true)
+            state.intervalCompletedCount = 0
+            state.intervalDelayed.removeAll(keepingCapacity: true)
+            state.intervalDroppedCount = 0
 
-        let source = DispatchSource.makeTimerSource(queue: queue)
-        source.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            let sentAt = ContinuousClock.now
-            guard let completion = self.makeHeartbeatCompletion(token: token, sentAt: sentAt) else {
-                return
+            // The handler runs on `queue`, never inside this critical section, so its
+            // `makeHeartbeatCompletion` call takes the mutex afresh.
+            let source = DispatchSource.makeTimerSource(queue: queue)
+            source.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
+            source.setEventHandler { [weak self] in
+                guard let self else { return }
+                let sentAt = ContinuousClock.now
+                guard let completion = self.makeHeartbeatCompletion(token: token, sentAt: sentAt) else {
+                    return
+                }
+                DispatchQueue.main.async(execute: completion)
             }
-            DispatchQueue.main.async(execute: completion)
+            source.resume()
+            state.timer = source
         }
-        source.resume()
-        timer = source
     }
 
     /// Leave the session; returns the accumulated report when the last
@@ -141,40 +167,38 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
     /// or when `end()` is called without a matching `begin()`).
     @discardableResult
     func end() -> Report? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard activeSessions > 0 else { return nil }
-        activeSessions -= 1
-        guard activeSessions == 0 else { return nil }
+        state.withLock { state -> Report? in
+            guard state.activeSessions > 0 else { return nil }
+            state.activeSessions -= 1
+            guard state.activeSessions == 0 else { return nil }
 
-        timer?.cancel()
-        timer = nil
-        sessionToken &+= 1
-        // Heartbeats still queued behind the main thread are late by at least
-        // their age. The token bump drops their completions, so this lower
-        // bound is the only observation of them.
-        let now = ContinuousClock.now
-        let censoredHeartbeatCount = pendingSentAt.count
-        for sentAt in pendingSentAt.values {
-            recordDelayLocked(Self.milliseconds(from: sentAt, to: now))
+            state.timer?.cancel()
+            state.timer = nil
+            state.sessionToken &+= 1
+            // Heartbeats still queued behind the main thread are late by at least
+            // their age. The token bump drops their completions, so this lower
+            // bound is the only observation of them.
+            let now = ContinuousClock.now
+            let censoredHeartbeatCount = state.pendingSentAt.count
+            for sentAt in state.pendingSentAt.values {
+                state.recordDelay(Self.milliseconds(from: sentAt, to: now))
+            }
+            state.pendingSentAt.removeAll(keepingCapacity: true)
+            return Report(
+                delayedHeartbeatCount50: state.delayedHeartbeatCount50,
+                delayedHeartbeatCount250: state.delayedHeartbeatCount250,
+                maximumDelayedHeartbeatMS: state.maximumDelayedHeartbeatMS,
+                scheduledHeartbeatCount: state.scheduledHeartbeatCount,
+                completedHeartbeatCount: state.completedHeartbeatCount,
+                censoredHeartbeatCount: censoredHeartbeatCount
+            )
         }
-        pendingSentAt.removeAll(keepingCapacity: true)
-        return Report(
-            delayedHeartbeatCount50: delayedHeartbeatCount50,
-            delayedHeartbeatCount250: delayedHeartbeatCount250,
-            maximumDelayedHeartbeatMS: maximumDelayedHeartbeatMS,
-            scheduledHeartbeatCount: scheduledHeartbeatCount,
-            completedHeartbeatCount: completedHeartbeatCount,
-            censoredHeartbeatCount: censoredHeartbeatCount
-        )
     }
 
     /// Test seam for deterministically delivering a callback after its owning
     /// session has retired. Production heartbeat accounting uses the same path.
     func heartbeatCompletionForTesting() -> (@Sendable () -> Void)? {
-        lock.lock()
-        let token = sessionToken
-        lock.unlock()
+        let token = state.withLock { $0.sessionToken }
         return makeHeartbeatCompletion(token: token, sentAt: ContinuousClock.now)
     }
 
@@ -182,69 +206,49 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
         token: UInt64,
         sentAt: ContinuousClock.Instant
     ) -> (@Sendable () -> Void)? {
-        lock.lock()
-        guard sessionToken == token, activeSessions > 0 else {
-            lock.unlock()
-            return nil
+        let scheduledID = state.withLock { state -> UInt64? in
+            guard state.sessionToken == token, state.activeSessions > 0 else {
+                return nil
+            }
+            state.scheduledHeartbeatCount += 1
+            state.nextHeartbeatID &+= 1
+            let heartbeatID = state.nextHeartbeatID
+            state.pendingSentAt[heartbeatID] = sentAt
+            return heartbeatID
         }
-        scheduledHeartbeatCount += 1
-        nextHeartbeatID &+= 1
-        let heartbeatID = nextHeartbeatID
-        pendingSentAt[heartbeatID] = sentAt
-        lock.unlock()
+        guard let heartbeatID = scheduledID else { return nil }
         return { [weak self] in
             guard let self else { return }
             let ms = MainThreadStallWatchdog.milliseconds(from: sentAt, to: ContinuousClock.now)
-            self.lock.lock()
-            guard self.sessionToken == token, self.activeSessions > 0 else {
-                self.lock.unlock()
-                return
+            let recordsIntervals = self.recordsIntervals
+            self.state.withLock { state in
+                guard state.sessionToken == token, state.activeSessions > 0 else {
+                    return
+                }
+                state.pendingSentAt.removeValue(forKey: heartbeatID)
+                state.completedHeartbeatCount += 1
+                state.recordDelay(ms)
+                if recordsIntervals {
+                    state.recordInterval(ms)
+                }
             }
-            self.pendingSentAt.removeValue(forKey: heartbeatID)
-            self.completedHeartbeatCount += 1
-            self.recordDelayLocked(ms)
-            if self.recordsIntervals {
-                self.recordIntervalLocked(ms)
-            }
-            self.lock.unlock()
         }
     }
 
     /// The heartbeats completed since the previous drain (an interval-recording
     /// watchdog; empty otherwise), and a fresh interval.
     func drainInterval() -> IntervalHeartbeats {
-        lock.lock()
-        defer { lock.unlock() }
-        let interval = IntervalHeartbeats(
-            completedHeartbeatCount: intervalCompletedCount,
-            delayedHeartbeats: intervalDelayed,
-            droppedEventCount: intervalDroppedCount
-        )
-        intervalCompletedCount = 0
-        intervalDelayed.removeAll(keepingCapacity: true)
-        intervalDroppedCount = 0
-        return interval
-    }
-
-    /// Callers hold `lock`.
-    private func recordIntervalLocked(_ ms: Int) {
-        intervalCompletedCount += 1
-        guard ms > 50 else { return }
-        guard intervalDelayed.count < Self.intervalEventLimit else {
-            intervalDroppedCount += 1
-            return
+        state.withLock { state -> IntervalHeartbeats in
+            let interval = IntervalHeartbeats(
+                completedHeartbeatCount: state.intervalCompletedCount,
+                delayedHeartbeats: state.intervalDelayed,
+                droppedEventCount: state.intervalDroppedCount
+            )
+            state.intervalCompletedCount = 0
+            state.intervalDelayed.removeAll(keepingCapacity: true)
+            state.intervalDroppedCount = 0
+            return interval
         }
-        intervalDelayed.append(DelayedHeartbeat(
-            completedEpochMS: Int64((Date().timeIntervalSince1970 * 1_000).rounded()),
-            delayMS: ms
-        ))
-    }
-
-    /// Callers hold `lock`.
-    private func recordDelayLocked(_ ms: Int) {
-        if ms > 50 { delayedHeartbeatCount50 += 1 }
-        if ms > 250 { delayedHeartbeatCount250 += 1 }
-        if ms > maximumDelayedHeartbeatMS { maximumDelayedHeartbeatMS = ms }
     }
 
     private static func milliseconds(

@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import Synchronization
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -203,18 +204,17 @@ enum CLIPaths {
 /// CLI output verbosity, set once at command start from `--quiet` / `--verbose`.
 /// stdout (machine-readable surface) is never affected — only the human notes on
 /// stderr are gated.
-enum CLIVerbosity: Int, Comparable {
+enum CLIVerbosity: Int, Comparable, Sendable {
     case quiet = 0, normal = 1, verbose = 2
     static func < (l: CLIVerbosity, r: CLIVerbosity) -> Bool { l.rawValue < r.rawValue }
 }
 
 enum CLIOutput {
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var _verbosity: CLIVerbosity = .normal
+    private static let storedVerbosity = Mutex(CLIVerbosity.normal)
 
     static var verbosity: CLIVerbosity {
-        get { lock.lock(); defer { lock.unlock() }; return _verbosity }
-        set { lock.lock(); defer { lock.unlock() }; _verbosity = newValue }
+        get { storedVerbosity.withLock { $0 } }
+        set { storedVerbosity.withLock { $0 = newValue } }
     }
 
     /// Configure from parsed args (call once at the start of each command).

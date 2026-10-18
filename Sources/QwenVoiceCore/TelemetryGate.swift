@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Process-portable runtime gate for durable generation telemetry.
 ///
@@ -29,21 +30,24 @@ public enum TelemetryGate {
     /// Resolved once per process from the environment.
     public static let isEnabled: Bool = resolve()
 
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var handshakeOverride = false
-    nonisolated(unsafe) private static var handshakeMode: NativeTelemetryMode?
+    /// What `applyHandshakeMode(_:)` latched: the mode, and whether it is a non-off one.
+    private struct Latch: Sendable {
+        var enabled = false
+        var mode: NativeTelemetryMode?
+    }
+    private static let latch = Mutex(Latch())
 
     /// Master on/off for durable telemetry persistence in this process.
     /// True if the environment enabled it, or a host latched a non-off mode
     /// through `applyHandshakeMode(_:)`; false whenever a host latched `.off`.
     public static var resolvedEnabled: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return resolve(
-            environmentEnabled: isEnabled,
-            latchedEnabled: handshakeOverride,
-            latchedMode: handshakeMode
-        )
+        latch.withLock { latched in
+            resolve(
+                environmentEnabled: isEnabled,
+                latchedEnabled: latched.enabled,
+                latchedMode: latched.mode
+            )
+        }
     }
 
     /// Pure precedence seam for deterministic tests: a latched `.off` wins,
@@ -63,17 +67,15 @@ public enum TelemetryGate {
     /// the engine — this carries it. `.off` latches telemetry off for the rest of the
     /// process, even when `QWENVOICE_DEBUG` resolved it on first.
     public static func applyHandshakeMode(_ mode: NativeTelemetryMode) {
-        lock.lock()
-        defer { lock.unlock() }
-        handshakeOverride = mode != .off
-        handshakeMode = mode
+        latch.withLock { latched in
+            latched.enabled = mode != .off
+            latched.mode = mode
+        }
     }
 
     /// The latched mode, or nil when no host latched one.
     public static var handshakeResolvedMode: NativeTelemetryMode? {
-        lock.lock()
-        defer { lock.unlock() }
-        return handshakeMode
+        latch.withLock { $0.mode }
     }
 
     /// The telemetry **mode** for this process — `NativeTelemetryMode.current()` (the

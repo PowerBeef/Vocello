@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
 public enum ModelAssetScope: String, Codable, Hashable, Sendable {
     case shared
@@ -520,15 +521,14 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
     /// Thread-safe, process-lifetime cache of verified file SHA-256 digests, keyed by
     /// path + size + modification date. Keeps `deepIntegrity` from re-hashing multi-GB
     /// model files on every status refresh once a file has been verified.
-    private final class IntegrityHashCache: @unchecked Sendable {
-        private struct Entry {
+    private final class IntegrityHashCache: Sendable {
+        private struct Entry: Sendable {
             let size: Int64
             let modificationDate: Date
             let sha256: String
         }
 
-        private var entries: [String: Entry] = [:]
-        private let lock = NSLock()
+        private let entries = Mutex<[String: Entry]>([:])
 
         /// Returns the cached SHA-256 for `url` when its size + modification date match a
         /// prior computation; otherwise hashes the file (once) and caches the result.
@@ -543,22 +543,26 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
             let modificationDate = values.contentModificationDate ?? .distantPast
             let key = url.path
 
-            lock.lock()
-            if let entry = entries[key], entry.size == size, entry.modificationDate == modificationDate {
-                let cached = entry.sha256
-                lock.unlock()
+            let cached = entries.withLock { entries -> String? in
+                guard let entry = entries[key],
+                      entry.size == size,
+                      entry.modificationDate == modificationDate else {
+                    return nil
+                }
+                return entry.sha256
+            }
+            if let cached {
                 return cached
             }
-            lock.unlock()
 
             // Hash outside the lock — this is the expensive multi-GB read.
             guard let computed = try? LocalModelAssetStore.sha256Hex(for: url) else {
                 return nil
             }
 
-            lock.lock()
-            entries[key] = Entry(size: size, modificationDate: modificationDate, sha256: computed)
-            lock.unlock()
+            entries.withLock { entries in
+                entries[key] = Entry(size: size, modificationDate: modificationDate, sha256: computed)
+            }
             return computed
         }
 
@@ -596,13 +600,14 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                       == (attributes[.systemFileNumber] as? NSNumber)?.uint64Value else {
                 return false
             }
-            lock.lock()
-            entries[url.path] = Entry(
+            let entry = Entry(
                 size: Int64(fileSize),
                 modificationDate: values.contentModificationDate ?? .distantPast,
                 sha256: sha256
             )
-            lock.unlock()
+            entries.withLock { entries in
+                entries[url.path] = entry
+            }
             return true
         }
     }

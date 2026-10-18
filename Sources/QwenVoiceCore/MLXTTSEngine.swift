@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import Foundation
 @preconcurrency import MLX
+import Synchronization
 import VocelloQwen3Core
 
 /// Engine-protocol-level error type. Adopted by every conformer of
@@ -2693,20 +2694,15 @@ private struct NativeDiagnosticEventRecord: Codable {
     let details: [String: String]
 }
 
-final class DiagnosticAppSupportBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: URL?
+final class DiagnosticAppSupportBox: Sendable {
+    private let storage = Mutex<URL?>(nil)
 
     var url: URL? {
         get {
-            lock.lock()
-            defer { lock.unlock() }
-            return storage
+            storage.withLock { $0 }
         }
         set {
-            lock.lock()
-            storage = newValue
-            lock.unlock()
+            storage.withLock { $0 = newValue }
         }
     }
 }

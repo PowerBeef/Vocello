@@ -1,6 +1,6 @@
 import CryptoKit
 import Foundation
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 
 public enum GenerationTerminalReason: String, Hashable, Codable, Sendable {
     case eos

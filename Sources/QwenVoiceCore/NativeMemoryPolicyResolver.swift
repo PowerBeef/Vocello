@@ -1,7 +1,7 @@
 import Foundation
 import MLX
 import os
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 
 public enum NativeMemoryPolicyResolver {
     private static let oneGB = 1_024 * 1_024 * 1_024

@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 
 /// Privacy-reduced, bounded diagnostics for generation failures.
 ///

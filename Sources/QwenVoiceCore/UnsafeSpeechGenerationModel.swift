@@ -1,6 +1,6 @@
 import Foundation
-@preconcurrency import QwenVoiceBackendCore
-@preconcurrency import VocelloQwen3Core
+import QwenVoiceBackendCore
+import VocelloQwen3Core
 
 /// Host-boundary resolver for immutable request-local sampling policy.
 /// Environment values are read only through `RuntimeDebugGate`; the resulting

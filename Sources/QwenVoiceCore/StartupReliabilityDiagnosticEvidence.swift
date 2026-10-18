@@ -1,6 +1,6 @@
 import CryptoKit
 import Foundation
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 
 /// Privacy-safe description of one untracked startup-reliability artifact.
 /// The local path and artifact bytes never enter telemetry or retained JSON.

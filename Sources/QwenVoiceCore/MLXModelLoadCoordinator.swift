@@ -1,6 +1,6 @@
 import Foundation
 @preconcurrency import MLX
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 import CoreFoundation
 import CryptoKit
 

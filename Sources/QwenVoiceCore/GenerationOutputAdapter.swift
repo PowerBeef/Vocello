@@ -3,8 +3,8 @@ import CryptoKit
 import Darwin
 import Foundation
 import MLX
-@preconcurrency import VocelloQwen3Core
-@preconcurrency import QwenVoiceBackendCore
+import VocelloQwen3Core
+import QwenVoiceBackendCore
 import OSLog
 
 // MARK: - QwenVoiceCore Runtime Ownership

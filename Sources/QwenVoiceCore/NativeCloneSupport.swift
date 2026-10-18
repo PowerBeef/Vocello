@@ -2,7 +2,7 @@ import CryptoKit
 @preconcurrency import AVFoundation
 import Foundation
 @preconcurrency import MLX
-@preconcurrency import VocelloQwen3Core
+import VocelloQwen3Core
 
 enum ResolvedCloneTranscriptMode: String, Sendable {
     case inline

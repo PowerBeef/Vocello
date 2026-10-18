@@ -31,7 +31,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   every validator runs; `--python all|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full
   suite locally while `scripts/` and `config/` are clean. Add a check only when it protects a product
   invariant, with its inputs in `contract_gate.py`; never a check that asserts the wording of another
-  script or workflow.
+  script or workflow, except an exact check in `repo_invariants.sh` for an invariant that lives in a
+  phone- or UI-only lane no test can run (each such check says so). Lane behaviour is tested by
+  running the shipped shell over the recorded stand-ins in `scripts/tests/shell_stubs.py`.
 - `ci.yml`: pushes to `main` gate; `pull_request` (never `pull_request_target`) runs only the Linux jobs
   for Dependabot and outside PRs with a read-only token, and their runs never become a lane's green base.
   `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last

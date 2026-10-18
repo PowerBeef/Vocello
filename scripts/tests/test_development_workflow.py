@@ -119,6 +119,7 @@ class CheckPlanTests(unittest.TestCase):
                         "scripts/lib/build_paths.sh": SANDBOX_BUILD_PATHS,
                         "scripts/lib/build_cache.sh": (
                             'xcb_run() { qv_record xcb_run "$@"; echo "SwiftCompile normal arm64 Fixture.swift"; }\n'
+                            "QVOICE_OWNED_DEV_SETTINGS=(QVOICE_OWNED_SWIFT_OPTIMIZATION=-Onone)\n"
                             "qv_stub ensure_project_regenerated\nqv_stub ensure_spm_resolved\n"
                             "qv_stub require_ios_xcode_platform\n"
                         ),

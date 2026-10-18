@@ -285,6 +285,8 @@ SIMCTL_READS = {"list", "help"}
 SEARCH_TOOLS = {"grep", "egrep", "fgrep", "zgrep", "rg", "ag", "ack"}
 GIT_SEARCHES = {"grep", "log", "show", "shortlog", "rev-list", "whatchanged", "reflog"}
 GIT_MESSAGE_COMMANDS = {"commit", "tag", "merge", "notes", "stash"}
+# `$(...)` (one level of nested parentheses) and backticks.
+SUBSTITUTION = re.compile(r"\$\(((?:[^()]|\([^()]*\))*)\)|`([^`]*)`")
 
 
 def _simctl_violation(words: list[str]) -> str:
@@ -348,6 +350,12 @@ def simulator_policy(command: str, depth: int = 0) -> str:
     stripped, bodies = shell_fed_bodies(command)
     for body in bodies:
         reason = simulator_policy(body, depth + 1)
+        if reason:
+            return reason
+    # A command substitution runs wherever it appears, even inside a search pattern or a commit
+    # message that is otherwise read as text.
+    for match in SUBSTITUTION.finditer(stripped):
+        reason = simulator_policy(match.group(1) if match.group(1) is not None else match.group(2), depth + 1)
         if reason:
             return reason
     for words in _simple_commands(stripped):

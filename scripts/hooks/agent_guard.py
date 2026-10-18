@@ -6,9 +6,9 @@ pass straight through. A subagent may read, edit its assigned files, run the
 deterministic Python and lint checks and commit in its own worktree. It never pushes,
 commits in the main checkout, runs native builds, tests, devices, models or measured
 lanes, or edits the roadmap or the checkpoint; the lane scripts' usage text and the
-reporting `xcodebuild -version`, `-showsdks` and `-list` stay open. Exit 2 with the
-reason on stderr blocks the call. Parser defects fail open, like the policy guard; the
-lead still integrates and reviews every agent commit. Hooks run the host's bare
+reporting `xcodebuild -version` and `-showsdks` stay open (`-list` can resolve
+packages). Exit 2 with the reason on stderr blocks the call. Parser defects fail open,
+like the policy guard; the lead still integrates and reviews every agent commit. Hooks run the host's bare
 `python3`, often the macOS system Python 3.9: keep this file importable there. Never
 execute or persist input.
 """
@@ -35,8 +35,10 @@ DEV_NATIVE_VERBS = {"build", "run", "ios", "test", "ci"}
 HELP_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "dev.sh"}
 HELP_WORDS = {"help", "--help", "-h"}
 # `xcodebuild` actions that only report the version, the SDKs or a project's targets and schemes.
-XCODEBUILD_REPORTS = {"-version", "-showsdks", "-list"}
-XCODEBUILD_REPORT_VALUES = {"-project", "-workspace", "-sdk"}
+# `-list` is not one of them: on a project with packages it can resolve them outside the native lock
+# and the owned caches.
+XCODEBUILD_REPORTS = {"-version", "-showsdks"}
+XCODEBUILD_REPORT_VALUES = {"-sdk"}
 QC_MODEL_VERBS = {"run", "language-bench"}
 CLI_MODEL_VERBS = {"generate", "gen", "custom", "design", "clone", "batch", "bench", "benchmark"}
 PYTHONS = re.compile(r"^python(3(\.\d+)?)?$")
@@ -50,7 +52,7 @@ def _script(word: str) -> str:
 
 
 def _xcodebuild_reports_only(args: list[str]) -> bool:
-    """`xcodebuild -version`, `-showsdks [-json]`, `-list [-json] [-project P | -workspace W]`: no action runs."""
+    """`xcodebuild -version [-sdk S]`, `-showsdks [-json]`: no action runs."""
     reports = False
     index = 0
     while index < len(args):

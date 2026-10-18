@@ -109,6 +109,8 @@ AGENT_REFUSED = (
     "bash scripts/dev.sh check", "xcodebuild -list build", "xcodebuild -sdk -list",
     "xcodebuild -list -scheme QwenVoice", "xcodebuild -version && xcodebuild -scheme QwenVoice build",
     "xcodebuild -showsdks -destination generic/platform=iOS", "xcrun xcodebuild -scheme QwenVoice build",
+    # -list can resolve the project's packages outside the native lock and the owned caches.
+    "xcodebuild -list", "xcodebuild -list -project QwenVoice.xcodeproj", "xcodebuild -list -json -workspace W.xcworkspace",
 )
 AGENT_ALLOWED = (
     "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
@@ -124,10 +126,12 @@ AGENT_ALLOWED = (
     "./scripts/macos_test.sh --help", "bash scripts/ios_device.sh -h", "scripts/ios_device.sh help 2>&1 | head -40",
     "scripts/dev.sh help", "scripts/dev.sh --help", "bash scripts/dev.sh check --dry-run --json",
     "xcodebuild -version", "/usr/bin/xcodebuild -version", "xcrun xcodebuild -version",
-    "xcodebuild -version -sdk iphoneos", "xcodebuild -showsdks", "xcodebuild -showsdks -json", "xcodebuild -list",
-    "xcodebuild -list -project QwenVoice.xcodeproj", "xcodebuild -list -json -workspace W.xcworkspace",
+    "xcodebuild -version -sdk iphoneos", "xcodebuild -showsdks", "xcodebuild -showsdks -json",
 )
 SIMULATOR_REFUSED = (
+    # A command substitution runs even inside a commit message or a search pattern.
+    'git commit -m "notes $(xcrun simctl boot 1234)"', 'rg "$(xcrun simctl boot 1234)" docs',
+    "git commit -m \"notes `xcrun simctl boot 1234`\"",
     f"xcodebuild test -scheme VocelloiOSUI -destination 'platform=iOS {SIM},name=iPhone 17 Pro'",
     "xcrun simctl boot 1234", "xcrun simctl create test-device com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
     f"xcodebuild -scheme VocelloiOS -sdk {SDK} build", f"xcodebuild build -destination 'platform=iOS{SIM}'",
@@ -148,6 +152,7 @@ SIMULATOR_REFUSED = (
     f"bash <<'EOF'\nxcodebuild -destination 'platform=iOS {SIM}'\nEOF\n",
 )
 SIMULATOR_ALLOWED = (
+    'git commit -m "notes $(date +%F)"', "rg -n 'xcrun\\(' docs",
     "xcodebuild -scheme VocelloiOS -sdk iphoneos build", "xcrun simctl list\nnpm install",
     "xcrun simctl list devices\necho boot done", "xcrun simctl list devices | grep Booted; echo install done",
     f"gh issue list --search 'ios-{SIM.lower()} crash'", "echo open -a Preview",

@@ -134,11 +134,14 @@ syntax errors (`E9`) and pyflakes (`F`) selected in `ruff.toml` (Python 3.10; 3.
 `excluded` list leaves in (`Sources/`, `Tests/` and `scripts/`; not `Packages/`). All three are
 SHA-pinned in `config/toolchain.json` (`artifactPins`; the runner installs the `-linux-x86_64`
 entries, for SwiftLint its fully static binary, which needs no Swift toolchain because none of the
-rules uses SourceKit). Only a finding absent from `config/lint-baseline/<tool>.json` fails; the
+rules uses SourceKit). Pyright follows in `pyrightconfig.json`'s basic mode over the tracked
+`scripts/` Python, at the npm version in `npmPins`, against a fresh interpreter with no packages so
+its findings never depend on the host; its import-resolution rules are therefore not judged. Only a
+finding absent from `config/lint-baseline/<tool>.json` fails; the
 SwiftLint baseline was empty when its gate began (DW-03), so any finding of its rules fails. A
 finding is keyed by file, rule and the text of its line, not its line number, so editing a line that
 carries a baselined finding makes it new: fix it then. The baselines only shrink: `python3
-scripts/lint_baseline.py shellcheck|ruff|swiftlint` reproduces the gate locally and names entries
+scripts/lint_baseline.py shellcheck|ruff|swiftlint|pyright` reproduces the gate locally and names entries
 that no longer occur, `--update` removes them, and nothing adds one.
 
 ## Python tests

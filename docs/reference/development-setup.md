@@ -69,7 +69,7 @@ whenever their generation stamp under `build/` is missing; `rg` is required by
 `scripts/repo_invariants.sh` and the contract gate. `node@24` is keg-only, hence its `PATH` entry.
 SwiftLint and ruff are optional locally and pinned the same way (installed only when named):
 `scripts/dev.sh lint` runs SwiftLint on changed files and reports it missing or not the pinned
-version, and `python3 scripts/lint_baseline.py <shellcheck|ruff|swiftlint>` runs the gate CI's
+version, and `python3 scripts/lint_baseline.py <shellcheck|ruff|swiftlint|pyright>` runs the gate CI's
 `contracts` job runs against `config/lint-baseline/`. `gh` is the CI and release interface (`gh run watch`).
 
 ## 3. Python

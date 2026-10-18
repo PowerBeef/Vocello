@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Gate shellcheck, ruff and SwiftLint on new findings only, against a baseline that may only shrink.
+"""Gate shellcheck, ruff, SwiftLint and Pyright on new findings only, against a baseline that may only shrink.
 
     python3 scripts/lint_baseline.py shellcheck            lint every tracked shell script and compare
     python3 scripts/lint_baseline.py ruff                  lint every tracked Python file and compare
     python3 scripts/lint_baseline.py swiftlint             lint every tracked Swift file .swiftlint.yml covers
+    python3 scripts/lint_baseline.py pyright               type-check every tracked Python file under scripts/
     python3 scripts/lint_baseline.py ruff --input out.json compare a saved run instead of running the tool
     python3 scripts/lint_baseline.py ruff --update         also drop baseline entries that no longer occur
     python3 scripts/lint_baseline.py ruff --seed           write the first baseline (refused once one exists)
@@ -11,7 +12,10 @@
 shellcheck runs as `shellcheck -x -S warning` (the severity `scripts/dev.sh lint` uses), ruff with
 the repository's ruff.toml and SwiftLint with .swiftlint.yml's rules over the tracked Swift files its
 `included` and `excluded` lists select; all three use the versions pinned in config/toolchain.json
-`artifactPins` (`scripts/install_pinned_tools.sh shellcheck ruff swiftlint` installs them). The
+`artifactPins` (`scripts/install_pinned_tools.sh shellcheck ruff swiftlint` installs them). Pyright
+runs with pyrightconfig.json at the npm version pinned in `npmPins` (`npm install --global
+pyright@<version>`), against a fresh interpreter with no packages installed, so its findings never
+depend on what the host has installed; for the same reason import resolution is not judged. The
 baselines live in config/lint-baseline/<tool>.json.
 
 A finding's key is its file, its rule code and a fingerprint of the offending line's text with
@@ -33,6 +37,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -71,7 +76,16 @@ TOOLS: dict[str, ToolSpec] = {
          "--force-exclude"),
         frozenset({0, 2}), ("swiftlint", "version"), per_file=False, introduced_by="DW-03",
     ),
+    # 0: no errors, 1: errors; 2 a fatal error, 3 an invalid configuration, 4 invalid arguments.
+    # run_tool adds `--pythonpath` to an empty interpreter.
+    "pyright": ToolSpec(
+        ("pyright", "--outputjson"), frozenset({0, 1}), ("pyright", "--version"), per_file=False,
+        introduced_by="DW-04",
+    ),
 }
+# Pyright rules about resolving an import: against an empty interpreter every third-party import
+# is unresolved, so judging them would fail a new, correct `import numpy`.
+PYRIGHT_IMPORT_RULES = frozenset({"reportMissingImports", "reportMissingModuleSource"})
 
 
 class LintBaselineError(Exception):
@@ -103,9 +117,11 @@ def _relative(root: Path, filename: str) -> str:
 
 
 def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
-    """Findings from shellcheck's `-f json1`, ruff's `--output-format json` or SwiftLint's `--reporter json`."""
+    """Findings from shellcheck's `-f json1`, ruff's `--output-format json`, SwiftLint's `--reporter json`
+    or Pyright's `--outputjson`."""
+    empty: object = {"comments": []} if tool == "shellcheck" else {"generalDiagnostics": []} if tool == "pyright" else []
     try:
-        payload = json.loads(output) if output.strip() else ({"comments": []} if tool == "shellcheck" else [])
+        payload = json.loads(output) if output.strip() else empty
     except json.JSONDecodeError as error:
         raise LintBaselineError(f"{tool} output is not JSON: {error}") from error
     findings: list[Finding] = []
@@ -130,6 +146,17 @@ def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
                 findings.append(Finding(
                     _relative(root, item["file"]), int(item.get("line") or 0), int(item.get("character") or 0),
                     str(item["rule_id"]), str(item.get("reason", "")),
+                ))
+        elif tool == "pyright":
+            for item in payload["generalDiagnostics"]:
+                rule = str(item.get("rule") or "")
+                if item["severity"] not in ("error", "warning") or rule in PYRIGHT_IMPORT_RULES:
+                    continue
+                start = item["range"]["start"]
+                findings.append(Finding(
+                    # Zero-based positions; a syntax error carries no rule.
+                    _relative(root, item["file"]), int(start["line"]) + 1, int(start["character"]) + 1,
+                    rule or "pyright", str(item.get("message", "")).splitlines()[0] if item.get("message") else "",
                 ))
         else:
             raise LintBaselineError(f"unknown tool: {tool}")
@@ -281,6 +308,10 @@ def tracked_files(root: Path, tool: str) -> list[str]:
         if tool == "ruff":
             if relative.endswith(".py"):
                 selected.append(relative)
+        elif tool == "pyright":
+            # pyrightconfig.json's `include`; its execution environments apply to files named here too.
+            if relative.endswith(".py") and relative.startswith("scripts/"):
+                selected.append(relative)
         elif tool == "swiftlint":
             if (relative.endswith(".swift") and not any(_under(relative, entry) for entry in excluded)
                     and (not included or any(_under(relative, entry) for entry in included))):
@@ -307,7 +338,8 @@ def check_version(root: Path, tool: str) -> None:
     """The baseline is only meaningful for the pinned version: CI fails on drift, local runs warn."""
     try:
         manifest = json.loads((root / "config/toolchain.json").read_text(encoding="utf-8"))
-        pinned = str(manifest["artifactPins"][tool]["version"])
+        pins = manifest["npmPins"] if tool == "pyright" else manifest["artifactPins"]
+        pinned = str(pins[tool]["version"])
     except (OSError, ValueError, KeyError, TypeError):
         return
     try:
@@ -320,37 +352,55 @@ def check_version(root: Path, tool: str) -> None:
     installed = match.group(0) if match else None
     if installed == pinned:
         return
+    installer = (f"npm install --global pyright@{pinned}" if tool == "pyright"
+                 else f"scripts/install_pinned_tools.sh {tool}")
     message = (f"{tool} {installed or 'of unknown version'} is not the pinned {pinned}; its findings can "
-               f"differ from the baseline (scripts/install_pinned_tools.sh {tool} installs the pin)")
+               f"differ from the baseline ({installer} installs the pin)")
     if _in_ci():
         raise LintBaselineError(message)
     print(f"warning: {message}", file=sys.stderr)
 
 
+def _empty_interpreter(directory: Path) -> str:
+    """A virtual environment with no packages, not even pip, so Pyright sees the standard library only."""
+    try:
+        subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(directory)],
+                       capture_output=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise LintBaselineError(f"could not create an empty interpreter for pyright: {error}") from error
+    return str(directory / "bin" / "python")
+
+
 def run_tool(root: Path, tool: str, files: list[str]) -> list[str]:
     """The tool's JSON output, one document per invocation."""
     spec = TOOLS[tool]
-
-    def invoke(batch: list[str]) -> str:
-        try:
-            completed = subprocess.run(
-                [*spec.command, *batch], cwd=root, capture_output=True, text=True, check=False,
-            )
-        except OSError as error:
-            raise LintBaselineError(
-                f"{tool} is not runnable ({error}); scripts/install_pinned_tools.sh {tool} installs the pin"
-            ) from error
-        if completed.returncode not in spec.accepted_exit_codes:
-            tail = "\n".join(completed.stderr.strip().splitlines()[-10:])
-            raise LintBaselineError(f"{tool} exited {completed.returncode} on {len(batch)} file(s):\n{tail}")
-        return completed.stdout
-
+    if tool == "pyright" and files:
+        with tempfile.TemporaryDirectory(prefix="lint-baseline-pyright-") as scratch:
+            interpreter = _empty_interpreter(Path(scratch) / "venv")
+            return _invoke(root, tool, (*spec.command, "--pythonpath", interpreter), files)
     if not files:
         return []
     if not spec.per_file:
-        return [invoke(files)]
+        return [_invoke(root, tool, spec.command, files)[0]]
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as pool:
-        return list(pool.map(invoke, [[file] for file in files]))
+        return [output for outputs in pool.map(lambda file: _invoke(root, tool, spec.command, [file]), files)
+                for output in outputs]
+
+
+def _invoke(root: Path, tool: str, command: tuple[str, ...], batch: list[str]) -> list[str]:
+    spec = TOOLS[tool]
+    try:
+        completed = subprocess.run(
+            [*command, *batch], cwd=root, capture_output=True, text=True, check=False,
+        )
+    except OSError as error:
+        installer = "npm install --global pyright@<npmPins version>" if tool == "pyright" else (
+            f"scripts/install_pinned_tools.sh {tool}")
+        raise LintBaselineError(f"{tool} is not runnable ({error}); {installer} installs the pin") from error
+    if completed.returncode not in spec.accepted_exit_codes:
+        tail = "\n".join(completed.stderr.strip().splitlines()[-10:])
+        raise LintBaselineError(f"{tool} exited {completed.returncode} on {len(batch)} file(s):\n{tail}")
+    return [completed.stdout]
 
 
 def _escape(value: str, property_value: bool = False) -> str:

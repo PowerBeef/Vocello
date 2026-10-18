@@ -127,7 +127,7 @@ jobs:
   contracts:
     name: Repository contracts
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -179,6 +179,27 @@ jobs:
       - name: SwiftLint fails on new findings
         if: ${{ !cancelled() && steps.lint-tools.outcome == 'success' }}
         run: python3 scripts/lint_baseline.py swiftlint
+
+      # Pyright (DW-04, audit P3-4) in pyrightconfig.json's basic mode over the tracked scripts,
+      # against an empty interpreter so the findings never depend on installed packages; its
+      # npm version is pinned in config/toolchain.json `npmPins`.
+      - name: Select Node 24 for Pyright
+        if: ${{ !cancelled() }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install the pinned Pyright
+        id: pyright
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          PYRIGHT_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['npmPins']['pyright']['version'])")"
+          npm install --global --no-audit --no-fund "pyright@${PYRIGHT_PIN}"
+
+      - name: Pyright fails on new findings
+        if: ${{ !cancelled() && steps.pyright.outcome == 'success' }}
+        run: python3 scripts/lint_baseline.py pyright
 
   # The Python suite on Linux, every module included: the benchmark publisher's
   # host probes are mocked in its tests, so nothing here needs the macOS host.

@@ -47,6 +47,20 @@ def swiftlint_output(root: Path, *items: tuple[str, int | None, int | None, str,
     ], indent=2)
 
 
+def pyright_output(root: Path, *items: tuple[str, int, int, str, str | None]) -> str:
+    """pyright --outputjson, as 1.1.414 prints it (absolute files, zero-based positions)."""
+    diagnostics = []
+    for file, line, character, severity, rule in items:
+        diagnostic = {"file": str(root / file), "severity": severity, "message": f"{rule} here\n  detail",
+                      "range": {"start": {"line": line, "character": character},
+                                "end": {"line": line, "character": character + 3}}}
+        if rule:
+            diagnostic["rule"] = rule
+        diagnostics.append(diagnostic)
+    return json.dumps({"version": "1.1.414", "generalDiagnostics": diagnostics,
+                       "summary": {"filesAnalyzed": 2, "errorCount": len(diagnostics)}})
+
+
 SWIFTLINT_CONFIG = """# Lint scope (a comment)
 only_rules:
   - empty_count
@@ -334,6 +348,53 @@ class LintBaselineTests(unittest.TestCase):
         with mock.patch.object(MODULE.subprocess, "run", side_effect=failing_run):
             with self.assertRaisesRegex(MODULE.LintBaselineError, "exited 1"):
                 MODULE.run_tool(self.root, "swiftlint", ["Sources/A.swift"])
+
+    def test_pyright_findings_skip_import_resolution_and_information(self) -> None:
+        output = pyright_output(self.root, ("scripts/b.py", 3, 4, "error", "reportOptionalMemberAccess"),
+                                ("scripts/b.py", 0, 7, "error", "reportMissingImports"),
+                                ("scripts/b.py", 1, 0, "warning", "reportMissingModuleSource"),
+                                ("scripts/b.py", 2, 0, "information", "reportUnusedVariable"),
+                                ("scripts/c.py", 9, 0, "error", None))
+        self.assertEqual(MODULE.parse_findings("pyright", output, self.root), [
+            MODULE.Finding("scripts/b.py", 4, 5, "reportOptionalMemberAccess", "reportOptionalMemberAccess here"),
+            MODULE.Finding("scripts/c.py", 10, 1, "pyright", "None here"),
+        ])
+        self.assertEqual(MODULE.parse_findings("pyright", "", self.root), [])
+        with self.assertRaises(MODULE.LintBaselineError):
+            MODULE.parse_findings("pyright", json.dumps({"generalDiagnostics": [{"file": "x.py"}]}), self.root)
+
+    def test_pyright_checks_scripts_once_against_an_empty_interpreter(self) -> None:
+        listing = "\0".join(["scripts/b.py", "website/x.py", "tools/y.py", "scripts/a.sh"]) + "\0"
+        completed = subprocess.CompletedProcess([], 0, stdout=listing.encode(), stderr=b"")
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            self.assertEqual(MODULE.tracked_files(self.root, "pyright"), ["scripts/b.py"])
+        calls: list[list[str]] = []
+
+        def fake_run(command, **_):
+            calls.append(list(command))
+            if command[1:3] == ["-m", "venv"]:
+                return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
+            interpreter = Path(command[command.index("--pythonpath") + 1])
+            self.assertEqual(interpreter.name, "python")
+            return subprocess.CompletedProcess(command, 1, stdout=pyright_output(
+                self.root, ("scripts/b.py", 0, 0, "error", "reportCallIssue")), stderr="")
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run):
+            outputs = MODULE.run_tool(self.root, "pyright", ["scripts/b.py", "scripts/c.py"])
+        self.assertEqual([call[1:4] for call in calls if "venv" in call], [["-m", "venv", "--without-pip"]])
+        pyright_calls = [call for call in calls if call[0] == "pyright"]
+        self.assertEqual(len(pyright_calls), 1)
+        self.assertEqual(pyright_calls[0][-2:], ["scripts/b.py", "scripts/c.py"])
+        self.assertEqual([f.code for output in outputs for f in MODULE.parse_findings("pyright", output, self.root)],
+                         ["reportCallIssue"])
+
+    def test_pyright_version_comes_from_the_npm_pin(self) -> None:
+        self.write("config/toolchain.json", json.dumps({"npmPins": {"pyright": {"version": "1.1.414"}},
+                                                        "artifactPins": {}}))
+        drifted = subprocess.CompletedProcess([], 0, stdout="pyright 1.1.400\n", stderr="")
+        with mock.patch.object(MODULE.subprocess, "run", return_value=drifted), \
+                mock.patch.dict("os.environ", {"CI": "true"}):
+            with self.assertRaisesRegex(MODULE.LintBaselineError, "npm install --global pyright@1.1.414"):
+                MODULE.check_version(self.root, "pyright")
 
     def test_committed_baselines_are_valid(self) -> None:
         for tool in MODULE.TOOLS:

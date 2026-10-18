@@ -8,6 +8,7 @@
     "**/node_modules"
   ],
   "typeCheckingMode": "basic",
+  "pythonPlatform": "Darwin",
   "reportMissingModuleSource": "none",
   "executionEnvironments": [
     {

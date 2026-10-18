@@ -88,10 +88,25 @@ model catalog and host availability, iOS storage protection, supply chain, relea
 history, README charts, the text-level delivery-instruction copy and audio QC take inputs (script
 pool, calibration-take policy), the roadmap, the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
+`scripts/lib/contract_gate.py` lists the validators and runs them in parallel, one per core, printing
+each one's output as one block in their fixed order; every validator runs even after one fails, and
+any failure fails the gate (about 3 s, where running them one after another took about 11 s).
+
+With `--local`, a validator runs only when a changed path falls under the inputs `contract_gate.py`
+declares for it (its script, the modules it imports, the files and directories it reads or tests for
+existence), and one line says how many were skipped. A validator whose result also depends on every
+tracked file, git history or the date declares no inputs and always runs: the build-output policy,
+runtime security, `roadmap.py validate`, `repo_invariants.sh` and the privacy scan. Everything runs on
+a clean tree, when git cannot list the changes or when the gate itself changed; a roadmap-only change
+runs six validators in about 2 s. The changed paths are the dirty tree (renames as both sides) plus
+`check --since` work, or `QVOICE_CHANGED_PATHS` (one path per line) when a caller sets it. CI, the
+release and `scripts/dev.sh ci` never pass `--local`, so they run every validator. A validator that
+starts reading a new path updates its entry in `contract_gate.py` in the same change.
 
 `--python all|selected|none` picks the Python lane: `all` (the default) runs the whole suite;
 `selected` runs the modules the dirty tree affects; `none` runs the contracts without the suite.
-`--local` is `selected` plus a refusal to run when `CI` or `GITHUB_ACTIONS` is set. This is also how
+`--local` is `selected` plus the validator selection above, and is refused when `CI` or
+`GITHUB_ACTIONS` is set. This is also how
 `scripts/dev.sh check` gets its Python tests: it never calls pytest itself but runs
 `./scripts/check_project_inputs.sh --local`, whose `selected` lane calls
 `scripts/development_workflow.py py`. `QVOICE_GATES=quick` makes the `all` lane skip the suite outside

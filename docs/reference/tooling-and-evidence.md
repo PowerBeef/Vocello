@@ -24,10 +24,14 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - `./scripts/check_project_inputs.sh` is the deterministic contract gate: product contracts,
   `scripts/repo_invariants.sh` (exact greps for product invariants), `scripts/privacy_scan.py`, the
   roadmap validator and the Python suite (`pytest -n auto`, on Linux and macOS alike; the `research`
-  lane by marker in `scripts/tests/conftest.py`). `--local` selects Python tests from the dirty tree and
-  is refused in CI; `--python all|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full suite
-  locally while `scripts/` and `config/` are clean. Add a check only when it protects a product
-  invariant; never a check that asserts the wording of another script or workflow.
+  lane by marker in `scripts/tests/conftest.py`). `scripts/lib/contract_gate.py` runs the validators in
+  parallel with grouped output and declares the inputs each reads. `--local` skips a validator none of
+  whose inputs the dirty tree touches (one that depends on every tracked file, git history or the date
+  declares none and always runs), selects Python tests from the dirty tree and is refused in CI, where
+  every validator runs; `--python all|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full
+  suite locally while `scripts/` and `config/` are clean. Add a check only when it protects a product
+  invariant, with its inputs in `contract_gate.py`; never a check that asserts the wording of another
+  script or workflow.
 - `ci.yml`: pushes to `main` gate; `pull_request` (never `pull_request_target`) runs only the Linux jobs
   for Dependabot and outside PRs with a read-only token, and their runs never become a lane's green base.
   `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last

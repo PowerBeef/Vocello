@@ -3,7 +3,7 @@
 # exact product-invariant greps, the privacy scan, and the Python suite.
 #
 #   ./scripts/check_project_inputs.sh                       complete gate (release, scripts/dev.sh ci)
-#   ./scripts/check_project_inputs.sh --local               same contracts; Python tests selected by the dirty tree
+#   ./scripts/check_project_inputs.sh --local               contracts and Python tests selected by the dirty tree
 #   ./scripts/check_project_inputs.sh --python none         same contracts; no Python suite (CI runs it in its own job)
 #
 # Every check here is deterministic and needs no model, phone or UI. Anything
@@ -32,58 +32,17 @@ fi
 
 echo "==> Validating checked-in project inputs..."
 
-# Build-output ownership first: later validators rely on its exported paths.
-python3 "$SCRIPT_DIR/build_output_policy.py" validate
-
-# Generated project surfaces and product identity.
-python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
-python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
-# The in-app copy of the Chinese fold table the language verdicts score with (AQ-02).
-python3 "$SCRIPT_DIR/generate_hant_hans_fold_swift.py" --check
-python3 "$SCRIPT_DIR/cli_version_contract.py" validate
-python3 "$SCRIPT_DIR/localization_contract.py" validate
-python3 "$SCRIPT_DIR/saved_voice_lifecycle_contract.py" validate
-python3 "$SCRIPT_DIR/entitlement_contract.py" validate
-python3 "$SCRIPT_DIR/support_contact_contract.py" validate
-python3 "$SCRIPT_DIR/public_facts_contract.py" validate
-python3 "$SCRIPT_DIR/attribution_manifest.py" rebuild --check
-python3 "$SCRIPT_DIR/attribution_manifest.py" validate
-
-# Runtime, concurrency and backend contracts.
-python3 "$SCRIPT_DIR/runtime_security_contract.py"
-python3 "$SCRIPT_DIR/qwen3_core_contract.py" validate
-"$SCRIPT_DIR/check_backend_resource_contract.sh" --project
-"$SCRIPT_DIR/check_qwen3_backend_only.sh"
-python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"
-
-# Model delivery and App Store readiness.
-python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
-python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
-python3 "$SCRIPT_DIR/model_host_availability.py" validate
-python3 "$SCRIPT_DIR/ios_storage_protection_policy.py" validate
-python3 "$SCRIPT_DIR/ios_device_eligibility.py" validate
-python3 "$SCRIPT_DIR/ios_release_analyzer_warnings.py" validate
-
-# Release evidence, supply chain and benchmark history.
-python3 "$SCRIPT_DIR/supply_chain_contract.py"
-python3 "$SCRIPT_DIR/required_step_ledger.py" validate-contract
-python3 "$SCRIPT_DIR/quality_promotion.py" validate-contract
-python3 "$SCRIPT_DIR/benchmark_history.py" validate --all
-python3 "$SCRIPT_DIR/benchmark_history.py" rebuild-index --check
-python3 "$SCRIPT_DIR/generate_readme_charts.py" --check
-
-# Delivery copy and the audio QC take inputs (text-level; audio never gates ordinary CI).
-python3 "$SCRIPT_DIR/check_delivery_instructions.py"
-python3 "$SCRIPT_DIR/audio_qc_script_pool.py" validate
-python3 "$SCRIPT_DIR/audio_qc_calibration_takes.py" validate-policy
-
-# Work authority: schema, blockers and a fresh render.
-python3 "$SCRIPT_DIR/roadmap.py" validate
-python3 "$SCRIPT_DIR/roadmap.py" render --check
-
-# Exact product-invariant greps and the privacy scan.
-"$SCRIPT_DIR/repo_invariants.sh"
-python3 "$SCRIPT_DIR/privacy_scan.py"
+# Every product, release and repository contract, the exact product-invariant
+# greps (scripts/repo_invariants.sh) and the privacy scan. They are independent
+# read-only checks, so scripts/lib/contract_gate.py runs them in parallel and
+# prints each one's output as one block in a fixed order; it lists them with
+# the inputs each reads. --local skips a validator whose inputs the change does
+# not touch; without it (CI, release, scripts/dev.sh ci) every validator runs.
+if [[ "$LOCAL_MODE" == 1 ]]; then
+    python3 "$SCRIPT_DIR/lib/contract_gate.py" --local
+else
+    python3 "$SCRIPT_DIR/lib/contract_gate.py"
+fi
 
 # Python suite (pytest, parallel). selected: the modules the dirty tree affects;
 # all: everything.

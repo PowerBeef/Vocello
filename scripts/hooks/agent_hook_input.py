@@ -8,8 +8,9 @@ canonical absolute path per line. The git-actions mode prints every
 `git commit`/`git push` with the directory it runs in (the payload cwd, which
 follows an agent worktree unlike $CLAUDE_PROJECT_DIR and the hook installation,
 then `cd`, subshells and `git -C`); git-policy prints the first forbidden git
-invocation. Both use git_commands.py. Never execute or persist tool input. This
-is a guardrail adapter, not a sandbox.
+invocation. Both use git_commands.py. simulator-policy prints why a simple command
+uses a Simulator. Never execute or persist tool input. This is a guardrail adapter,
+not a sandbox.
 """
 
 from __future__ import annotations
@@ -270,6 +271,127 @@ def file_policy(command: str, cwd: Path, root: Path, depth: int = 0) -> str:
     return ""
 
 
+# Physical iPhone only. The unsupported-destination words are assembled from fragments so this file never
+# holds the literal spellings scripts/repo_invariants.sh rejects across the active tree.
+_SIM = "sim" + "ulator"
+SIM_DESTINATION = re.compile(r"platform=(ios|watchos|tvos|visionos|xros)\\?\s*" + _SIM)
+SIM_SDK = re.compile(r"iphone" + _SIM + r"|apple-(ios|watchos|tvos|xros)[0-9.]*-" + _SIM + r"([^a-z]|$)")
+SIM_TOOLS = re.compile(r"(build_run|test|launch|boot|install_app)_" + "sim" + r"([^a-z_]|$)")
+SIM_APP = re.compile(r"(^|[\s/])open\s.*(-[a-z]*a\s+([^\s]*/)?" + _SIM + "|" + _SIM + r"\.app|core" + _SIM + ")")
+# Simulator maintenance that never selects a destination: inventories, runtime cleanup, `shutdown all`.
+SIMCTL_GLOBAL_VALUES = {"--set", "--profiles"}
+SIMCTL_READS = {"list", "help"}
+# Searches read text and never run it: their patterns, paths and messages are not destinations.
+SEARCH_TOOLS = {"grep", "egrep", "fgrep", "zgrep", "rg", "ag", "ack"}
+GIT_SEARCHES = {"grep", "log", "show", "shortlog", "rev-list", "whatchanged", "reflog"}
+GIT_MESSAGE_COMMANDS = {"commit", "tag", "merge", "notes", "stash"}
+
+
+def _simctl_violation(words: list[str]) -> str:
+    """`simctl <subcommand>` for a simctl word in these words that is not maintenance, else ''."""
+    for index, word in enumerate(words):
+        if word.strip("`'\"$();").rsplit("/", 1)[-1] != "simctl":
+            continue
+        rest = [w.strip("`'\"();") for w in words[index + 1:]]
+        while rest and (rest[0] in SIMCTL_GLOBAL_VALUES or rest[0] == "--noxpc"):
+            rest = rest[1:] if rest[0] == "--noxpc" else rest[2:]
+        if not rest or rest[0] in SIMCTL_READS:
+            continue
+        sub, operands = rest[0], [w for w in rest[1:] if not w.startswith("-")]
+        if sub == "runtime" and operands[:1] in (["list"], ["delete"]):
+            continue
+        if (sub, operands) in (("delete", ["unavailable"]), ("shutdown", ["all"])):
+            continue
+        return f"simctl {sub}"
+    return ""
+
+
+def _shell_script_index(args: list[str]) -> int:
+    """Where a shell's `-c` script text is among its arguments (`-c`, `-lc`, `-ec`), else -1."""
+    for index, word in enumerate(args):
+        if not word.startswith("-") or word.startswith("--"):
+            return -1
+        if "c" in word[1:]:
+            return index + 1 if index + 1 < len(args) else -1
+    return -1
+
+
+def _without_messages(args: list[str]) -> list[str]:
+    """A git command's arguments without `-m`/`--message`/`-F`/`--file` values, attached or separate."""
+    kept: list[str] = []
+    skip = False
+    for word in args:
+        if skip:
+            skip = False
+            continue
+        if word.startswith("--"):
+            name = word.split("=", 1)[0]
+            if len(name) > 2 and ("--message".startswith(name) or "--file".startswith(name)):
+                skip = "=" not in word
+                continue
+        elif word.startswith("-") and len(word) > 1:
+            letters = word[1:]
+            spots = [i for i, letter in enumerate(letters) if letter in "mF"]
+            if spots:
+                skip = spots[0] == len(letters) - 1  # `-m msg`, `-am msg`; `-mmsg` carries its value
+                continue
+        kept.append(word)
+    return kept
+
+
+def simulator_policy(command: str, depth: int = 0) -> str:
+    """Why a simple command in this shell text uses a Simulator, else ''. Each command is judged on its
+    own words: a search tool's patterns, a git commit, tag or merge message and a heredoc body never count;
+    a heredoc fed to a shell, `sh -c` text and `eval` are commands."""
+    if depth > 3:
+        return ""
+    stripped, bodies = shell_fed_bodies(command)
+    for body in bodies:
+        reason = simulator_policy(body, depth + 1)
+        if reason:
+            return reason
+    for words in _simple_commands(stripped):
+        start = 0
+        while start < len(words) and (words[start].rsplit("/", 1)[-1] in WRAPPERS | git_commands.TRANSPARENT_PREFIXES
+                                      or git_commands.ASSIGNMENT.match(words[start])):
+            start += 1
+        if start == len(words):
+            continue
+        name = words[start].rsplit("/", 1)[-1]
+        args = words[start + 1:]
+        if name in SEARCH_TOOLS:
+            continue
+        script = _shell_script_index(args) if name in git_commands.SHELLS else -1
+        if script >= 0:
+            reason = simulator_policy(args[script], depth + 1)
+            if reason:
+                return reason
+            words = words[:start + 1 + script] + words[start + 2 + script:]
+        elif name == "eval":
+            reason = simulator_policy(" ".join(args), depth + 1)
+            if reason:
+                return reason
+            continue
+        elif name == "git":
+            cursor = 0
+            while cursor < len(args) and args[cursor].startswith("-"):
+                cursor += 2 if args[cursor] in git_commands.GLOBAL_VALUE_OPTIONS else 1
+            subcommand = args[cursor] if cursor < len(args) else ""
+            if subcommand in GIT_SEARCHES:
+                continue
+            if subcommand in GIT_MESSAGE_COMMANDS:
+                words = words[:start + 2 + cursor] + _without_messages(args[cursor + 1:])
+        text = " ".join(words).lower()
+        for pattern, reason in ((SIM_DESTINATION, "a Simulator destination"), (SIM_SDK, "a Simulator SDK"),
+                                (SIM_TOOLS, "a Simulator tool route"), (SIM_APP, "the Simulator app")):
+            if pattern.search(text):
+                return reason
+        reason = _simctl_violation(text.split())
+        if reason:
+            return f"`{reason}`"
+    return ""
+
+
 def git_policy(payload: dict, root: Path) -> str:
     """`category<TAB>reason` for the first forbidden git invocation, else empty."""
     cwd = Path(payload.get("cwd") or root)
@@ -333,6 +455,15 @@ def main() -> int:
                     violation = file_policy(command, cwd if cwd.is_absolute() else root, root)
                 except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
                     print(f"policy guard: file parser error ignored: {error!r}", file=sys.stderr)
+                    violation = ""
+                if violation:
+                    print(violation)
+                return 0
+            if mode == "simulator-policy":
+                try:
+                    violation = simulator_policy(command)
+                except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
+                    print(f"policy guard: simulator parser error ignored: {error!r}", file=sys.stderr)
                     violation = ""
                 if violation:
                     print(violation)

@@ -5,10 +5,12 @@ Only a subagent's hook input carries `agent_id`; the lead's never does, so lead 
 pass straight through. A subagent may read, edit its assigned files, run the
 deterministic Python and lint checks and commit in its own worktree. It never pushes,
 commits in the main checkout, runs native builds, tests, devices, models or measured
-lanes, or edits the roadmap or the checkpoint. Exit 2 with the reason on stderr blocks
-the call. Parser defects fail open, like the policy guard; the lead still integrates
-and reviews every agent commit. Hooks run the host's bare `python3`, often the macOS
-system Python 3.9: keep this file importable there. Never execute or persist input.
+lanes, or edits the roadmap or the checkpoint; the lane scripts' usage text and the
+reporting `xcodebuild -version`, `-showsdks` and `-list` stay open. Exit 2 with the
+reason on stderr blocks the call. Parser defects fail open, like the policy guard; the
+lead still integrates and reviews every agent commit. Hooks run the host's bare
+`python3`, often the macOS system Python 3.9: keep this file importable there. Never
+execute or persist input.
 """
 from __future__ import annotations
 
@@ -29,6 +31,12 @@ LANE_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "build.sh", "bui
                 "build_ui_test_bundles.sh", "release.sh", "create_dmg.sh", "clean_build_caches.sh",
                 "install_pinned_tools.sh", "publish_benchmark_history.py"}
 DEV_NATIVE_VERBS = {"build", "run", "ios", "test", "ci"}
+# Usage text only: these scripts print it and exit before any lock, build, device or model work.
+HELP_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "dev.sh"}
+HELP_WORDS = {"help", "--help", "-h"}
+# `xcodebuild` actions that only report the version, the SDKs or a project's targets and schemes.
+XCODEBUILD_REPORTS = {"-version", "-showsdks", "-list"}
+XCODEBUILD_REPORT_VALUES = {"-project", "-workspace", "-sdk"}
 QC_MODEL_VERBS = {"run", "language-bench"}
 CLI_MODEL_VERBS = {"generate", "gen", "custom", "design", "clone", "batch", "bench", "benchmark"}
 PYTHONS = re.compile(r"^python(3(\.\d+)?)?$")
@@ -39,6 +47,22 @@ def _script(word: str) -> str:
     """The repository script a word names (`scripts/x.sh`, `./scripts/x.sh`, absolute), else ''."""
     parts = word.split("/")
     return parts[-1] if len(parts) >= 2 and parts[-2] == "scripts" else ""
+
+
+def _xcodebuild_reports_only(args: list[str]) -> bool:
+    """`xcodebuild -version`, `-showsdks [-json]`, `-list [-json] [-project P | -workspace W]`: no action runs."""
+    reports = False
+    index = 0
+    while index < len(args):
+        word = args[index]
+        if word in XCODEBUILD_REPORTS:
+            reports = True
+        elif word in XCODEBUILD_REPORT_VALUES and index + 1 < len(args):
+            index += 1                                  # the option's value, never an action
+        elif word != "-json":
+            return False
+        index += 1
+    return reports
 
 
 def command_violation(command: str, depth: int = 0) -> str:
@@ -67,27 +91,31 @@ def command_violation(command: str, depth: int = 0) -> str:
                 continue
             if not operands:
                 continue
-            words, name = operands, operands[0].rsplit("/", 1)[-1]
-            args = operands[1:]
+            words = args[args.index(operands[0]):]       # the script and all its arguments, flags included
+            name, args = operands[0].rsplit("/", 1)[-1], words[1:]
             operands = [word for word in args if not word.startswith("-")]
         elif operands and (PYTHONS.match(name) or (words[0].lstrip('"').startswith(("$(", "`"))
                                                    and "python" in words[0])):
             # `python3 scripts/x.py ...` or `"$(python3 scripts/select_python.py)" scripts/x.py ...`
-            words, name = operands, operands[0].rsplit("/", 1)[-1]
-            args = operands[1:]
+            words = args[args.index(operands[0]):]
+            name, args = operands[0].rsplit("/", 1)[-1], words[1:]
             operands = [word for word in args if not word.startswith("-")]
         script = _script(words[0])
         verb = operands[0] if operands else ""
+        if script in HELP_SCRIPTS and args[:1] and args[0] in HELP_WORDS:
+            continue
         if script in LANE_SCRIPTS:
             return f"`{script}` builds, tests, drives devices or runs models or measured lanes"
         if script == "dev.sh" and (verb in DEV_NATIVE_VERBS or (verb == "check" and "--dry-run" not in args)):
             return f"`scripts/dev.sh {verb}` can run native builds or tests"
         if script == "qc.py" and verb in QC_MODEL_VERBS:
             return f"`scripts/qc.py {verb}` runs scoring models"
-        if name == "xcodebuild":
+        if name == "xcodebuild" and not _xcodebuild_reports_only(args):
             return "`xcodebuild` is a native build"
         if name == "xcrun" and operands:
             tool = operands[0]
+            if tool == "xcodebuild" and _xcodebuild_reports_only(args[args.index(tool) + 1:]):
+                continue
             if tool in ("xcodebuild", "xctest"):
                 return f"`xcrun {tool}` is a native build or test"
             if tool == "devicectl" and operands[1:2] != ["list"]:

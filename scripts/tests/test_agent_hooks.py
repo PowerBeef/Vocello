@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import fnmatch
 import json
 import os
@@ -85,6 +86,87 @@ GENERATED = ("docs/ROADMAP.md", "QwenVoice.xcodeproj/project.pbxproj",
              "Packages/VocelloQwen3Core/CURRENT_INVENTORY.json",
              "Packages/VocelloQwen3Core/FACADE_API_BASELINE.json")
 SIM_SUFFIX = "_" + "sim"
+SIM = "Sim" + "ulator"
+SDK = "iphone" + SIM.lower()
+COMMIT = "git com" "mit"
+
+# The guard corpus (DW-01, audit W-07 and W-10): every command a guard must refuse and every known false
+# positive it must let through, run through the real hook entry points.
+AGENT_REFUSED = (
+    "xcodebuild -scheme QwenVoice build", "xcrun xctest -XCTest A b.xctest", "swift build",
+    "swift test --package-path Packages/VocelloQwen3Core", "scripts/dev.sh build",
+    "./scripts/dev.sh test --only A", "scripts/dev.sh ios", "scripts/dev.sh check",
+    "scripts/macos_test.sh test", "bash scripts/ui_test.sh ios smoke", "scripts/ios_device.sh doctor",
+    "./scripts/build.sh cli", "scripts/build_ui_test_bundles.sh macos",
+    "xcrun devicectl device process launch x", "python3 scripts/qc.py run --x",
+    '"$(python3 scripts/select_python.py)" scripts/qc.py run --x', "build/vocello custom --text hi",
+    "build/vocello models install pro_custom", "env QVOICE_LEAD_ONLY=1 scripts/macos_test.sh qc-takes",
+    "echo ok && scripts/dev.sh build", "bash -c 'xcodebuild build'",
+    "sh <<'EOF'\nscripts/dev.sh build\nEOF\n", "git pu" "sh origin main",
+    # Usage text and reporting stay narrow: any other verb or action is still a lane or a build.
+    "scripts/ui_test.sh macos smoke", "scripts/ios_device.sh build", "scripts/macos_test.sh models install",
+    "scripts/ui_test.sh help; scripts/ui_test.sh ios smoke", "scripts/dev.sh help && scripts/dev.sh build",
+    "bash scripts/dev.sh check", "xcodebuild -list build", "xcodebuild -sdk -list",
+    "xcodebuild -list -scheme QwenVoice", "xcodebuild -version && xcodebuild -scheme QwenVoice build",
+    "xcodebuild -showsdks -destination generic/platform=iOS", "xcrun xcodebuild -scheme QwenVoice build",
+)
+AGENT_ALLOWED = (
+    "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
+    "scripts/dev.sh lint", "scripts/dev.sh check --dry-run --json", "scripts/dev.sh status",
+    "scripts/dev.sh triage build/artifacts/x --json", "scripts/dev.sh regen",
+    "./scripts/regenerate_project.sh --fast", "python3 -m pytest scripts/tests/test_x.py -k foo",
+    "python3 scripts/qc.py report --run R --json", "build/vocello models list",
+    "xcrun xcresulttool get object --path r.xcresult", "xcrun devicectl list devices",
+    "cat scripts/macos_test.sh", "grep -n xcodebuild scripts/build.sh", "swift --version",
+    "cat > notes.md <<'EOF'\nscripts/dev.sh build\nEOF\n", "npm --prefix website run check",
+    # Known false positives: the usage text the skills send agents to, and xcodebuild's reports.
+    "scripts/ui_test.sh help", "scripts/ui_test.sh --help", "scripts/ui_test.sh -h", "scripts/macos_test.sh help",
+    "./scripts/macos_test.sh --help", "bash scripts/ios_device.sh -h", "scripts/ios_device.sh help 2>&1 | head -40",
+    "scripts/dev.sh help", "scripts/dev.sh --help", "bash scripts/dev.sh check --dry-run --json",
+    "xcodebuild -version", "/usr/bin/xcodebuild -version", "xcrun xcodebuild -version",
+    "xcodebuild -version -sdk iphoneos", "xcodebuild -showsdks", "xcodebuild -showsdks -json", "xcodebuild -list",
+    "xcodebuild -list -project QwenVoice.xcodeproj", "xcodebuild -list -json -workspace W.xcworkspace",
+)
+SIMULATOR_REFUSED = (
+    f"xcodebuild test -scheme VocelloiOSUI -destination 'platform=iOS {SIM},name=iPhone 17 Pro'",
+    "xcrun simctl boot 1234", "xcrun simctl create test-device com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+    f"xcodebuild -scheme VocelloiOS -sdk {SDK} build", f"xcodebuild build -destination 'platform=iOS{SIM}'",
+    f"swift build --triple arm64-apple-ios26.0-{SIM.lower()}", f"open -a {SIM}", f"open -g -a '{SIM}'",
+    "xcrun simctl --set /tmp/devices boot 1234", f"xcodebuild -destination platform=iOS\\ {SIM},name=iPhone\\ 17",
+    f"xcodebuild -destination 'platform=visionOS {SIM}'", f"open -na {SIM}",
+    f"open /Applications/Xcode.app/Contents/Developer/Applications/{SIM}.app",
+    "xcrun simctl bootstatus 1234 -b", "xcrun simctl spawn booted log stream",
+    # Every simctl subcommand but maintenance, and real use beside a search or a message.
+    *(f"xcrun simctl {sub} booted x" for sub in ("clone", "install", "launch", "openurl", "io", "push", "privacy",
+                                                 "ui", "status_bar", "addmedia", "erase", "terminate", "uninstall",
+                                                 "get_app_container", "getenv")),
+    "xcrun simctl delete 1234", "xcrun simctl shutdown 1234", "xcrun simctl runtime add runtime.dmg",
+    "rg -n 'simctl boot' scripts && xcrun simctl boot 1234", f"{COMMIT} -m note && xcodebuild -sdk {SDK} build",
+    "git log --grep=x; xcrun simctl create d t", "timeout 60 xcrun simctl boot 1234",
+    "bash -lc 'xcrun simctl boot 1234'", "echo `xcrun simctl boot 1234`", "eval 'xcrun simctl boot 1234'",
+    "git bisect run xcrun simctl boot 1234", f"npx mcp call build_run{SIM_SUFFIX}",
+    f"bash <<'EOF'\nxcodebuild -destination 'platform=iOS {SIM}'\nEOF\n",
+)
+SIMULATOR_ALLOWED = (
+    "xcodebuild -scheme VocelloiOS -sdk iphoneos build", "xcrun simctl list\nnpm install",
+    "xcrun simctl list devices\necho boot done", "xcrun simctl list devices | grep Booted; echo install done",
+    f"gh issue list --search 'ios-{SIM.lower()} crash'", "echo open -a Preview",
+    f"cat > notes.txt <<'EOF'\nxcodebuild -destination 'platform=iOS {SIM}'\nEOF\n",
+    # Known false positives: search patterns, commit messages and simulator maintenance.
+    "rg 'simctl boot' scripts", "rg -n 'xcrun simctl (boot|create)' docs", f"git log --grep={SDK}",
+    f"git log --oneline --grep='{SDK}' -- scripts", f'grep -n "platform=iOS {SIM}" docs/reference/x.md',
+    f"git grep -n 'platform=iOS {SIM}'", f'{COMMIT} -m "docs: never pass -sdk {SDK} or run xcrun simctl boot"',
+    f"{COMMIT} -q -m 'subject' -m 'body: platform=iOS {SIM}'", f"{COMMIT} -F - <<'EOF'\nxcrun simctl boot 1\nEOF\n",
+    "xcrun simctl list", "xcrun simctl list devices available -j", "xcrun simctl list runtimes", "xcrun simctl help",
+    "xcrun simctl runtime list", "xcrun simctl runtime delete 1A2B3C4D", "xcrun simctl delete unavailable",
+    "xcrun simctl shutdown all",
+)
+
+
+def run_all(function, commands):
+    """Each command's hook result, in order; the hooks run concurrently to keep the corpus fast."""
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        return list(zip(commands, pool.map(function, commands)))
 
 
 class EditGuardTests(unittest.TestCase):
@@ -257,7 +339,9 @@ class SettingsWiringTests(unittest.TestCase):
                   ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
                                       "tool_input": {"command": "scripts/dev.sh build"}}, 2),
                   ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
-                                      "tool_input": {"command": "git status"}}, 0)]
+                                      "tool_input": {"command": "git status"}}, 0),
+                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                      "tool_input": {"command": "scripts/ui_test.sh help && xcodebuild -version"}}, 0)]
         for interpreter in sorted(interpreters):
             for name, payload, expected in cases:
                 with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
@@ -271,11 +355,14 @@ class SettingsWiringTests(unittest.TestCase):
                     self.assertNotIn("Traceback", result.stderr)
                     if name == "worker_lifecycle.py":
                         json.loads(result.stdout)
-            with self.subTest(interpreter=interpreter, hook="agent_hook_input.py"):
-                payload = {"tool_name": "Bash", "tool_input": {"command": "git status"}, "cwd": str(ROOT)}
-                result = subprocess.run([interpreter, str(HOOKS / "agent_hook_input.py"), "git-policy"],
-                                        input=json.dumps(payload), text=True, capture_output=True, timeout=20)
-                self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+            for mode, command, expected in (("git-policy", "git status", ""),
+                                            ("simulator-policy", "rg 'simctl boot' && xcrun simctl list", ""),
+                                            ("simulator-policy", "xcrun simctl boot 1234", "`simctl boot`\n")):
+                with self.subTest(interpreter=interpreter, hook="agent_hook_input.py", mode=mode, command=command):
+                    payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(ROOT)}
+                    result = subprocess.run([interpreter, str(HOOKS / "agent_hook_input.py"), mode],
+                                            input=json.dumps(payload), text=True, capture_output=True, timeout=20)
+                    self.assertEqual((result.returncode, result.stdout, result.stderr), (0, expected, ""))
 
     def test_matchers_select_only_the_intended_tool_family(self):
         simulator_tool = "mcp__MobileBuildMCP__build" + SIM_SUFFIX
@@ -330,33 +417,17 @@ class AgentGuardTests(unittest.TestCase):
                               env=dict(os.environ, CLAUDE_PROJECT_DIR=str(root)))
 
     def test_agents_cannot_run_native_device_model_or_measured_work(self):
-        for command in ("xcodebuild -scheme QwenVoice build", "xcrun xctest -XCTest A b.xctest", "swift build",
-                        "swift test --package-path Packages/VocelloQwen3Core", "scripts/dev.sh build",
-                        "./scripts/dev.sh test --only A", "scripts/dev.sh ios", "scripts/dev.sh check",
-                        "scripts/macos_test.sh test", "bash scripts/ui_test.sh ios smoke", "scripts/ios_device.sh doctor",
-                        "./scripts/build.sh cli", "scripts/build_ui_test_bundles.sh macos",
-                        "xcrun devicectl device process launch x", "python3 scripts/qc.py run --x",
-                        '"$(python3 scripts/select_python.py)" scripts/qc.py run --x', "build/vocello custom --text hi",
-                        "build/vocello models install pro_custom", "env QVOICE_LEAD_ONLY=1 scripts/macos_test.sh qc-takes",
-                        "echo ok && scripts/dev.sh build", "bash -c 'xcodebuild build'",
-                        "sh <<'EOF'\nscripts/dev.sh build\nEOF\n", "git pu" "sh origin main"):
+        agent = run_all(lambda command: self.guard({"command": command}), AGENT_REFUSED)
+        lead = dict(run_all(lambda command: self.guard({"command": command}, agent=False), AGENT_REFUSED))
+        for command, result in agent:
             with self.subTest(command=command):
-                result = self.guard({"command": command})
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("agent guard: BLOCKED", result.stderr)
-                self.assertEqual(self.guard({"command": command}, agent=False).returncode, 0)
+                self.assertEqual(lead[command].returncode, 0)
 
-    def test_agents_keep_research_and_deterministic_checks(self):
-        for command in ("git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
-                        "scripts/dev.sh lint", "scripts/dev.sh check --dry-run --json", "scripts/dev.sh status",
-                        "scripts/dev.sh triage build/artifacts/x --json", "scripts/dev.sh regen",
-                        "./scripts/regenerate_project.sh --fast", "python3 -m pytest scripts/tests/test_x.py -k foo",
-                        "python3 scripts/qc.py report --run R --json", "build/vocello models list",
-                        "xcrun xcresulttool get object --path r.xcresult", "xcrun devicectl list devices",
-                        "cat scripts/macos_test.sh", "grep -n xcodebuild scripts/build.sh", "swift --version",
-                        "cat > notes.md <<'EOF'\nscripts/dev.sh build\nEOF\n", "npm --prefix website run check"):
+    def test_agents_keep_research_checks_usage_text_and_xcodebuild_reports(self):
+        for command, result in run_all(lambda command: self.guard({"command": command}), AGENT_ALLOWED):
             with self.subTest(command=command):
-                result = self.guard({"command": command})
                 self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_agents_commit_only_in_their_own_worktree(self):
@@ -406,9 +477,24 @@ class PermissionTests(unittest.TestCase):
         for rule in ("Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push --tags*)",
                      "Bash(git push origin HEAD*)", "Bash(git push origin worktree-*)", "Bash(git push -u*)",
                      "Bash(git checkout -b*)", "Bash(git switch -c*)", "Bash(git worktree add*)",
-                     "Bash(git update-ref*)", "Bash(git stash*)", "Bash(git add -A*)", "Bash(git add .)",
+                     "Bash(git update-ref*)", "Bash(git add -A*)", "Bash(git add .)",
                      "Bash(git commit -a*)"):
             self.assertIn(rule, self.deny)
+
+    def test_stash_mutations_are_denied_but_its_reads_are_not(self):
+        def denied(command: str) -> bool:
+            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
+                       for rule in self.deny)
+
+        for command in ("git stash", "git stash -u", "git stash --include-untracked", "git stash -m wip",
+                        "git stash -- scripts/x.py", "git stash push -u -m tag", "git stash save wip",
+                        "git stash pop", "git stash apply abc1234", "git stash drop stash@{0}", "git stash clear",
+                        "git stash create", "git stash store abc1234", "git stash branch topic"):
+            with self.subTest(mutation=command):
+                self.assertTrue(denied(command))
+        for command in ("git stash list", "git stash list --format=%H", "git stash show", "git stash show -p"):
+            with self.subTest(read=command):
+                self.assertFalse(denied(command))
 
     def test_releases_generated_project_and_authorization_bound_actions(self):
         for rule in ("Edit(/QwenVoice.xcodeproj/**)", "Bash(scripts/release.sh*)", "Bash(gh release create*)",
@@ -510,8 +596,6 @@ class SimulatorToolGuardTests(unittest.TestCase):
                 result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-SIM = "Sim" + "ulator"
-
 class PolicyGuardTests(unittest.TestCase):
     def guard(self, command: str):
         return invoke("policy_guard.sh", {"command": command}, tool_name="Bash")
@@ -564,45 +648,18 @@ class PolicyGuardTests(unittest.TestCase):
                 result = self.guard(command)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_unsupported_destinations_are_blocked(self):
-        for command in (
-            f"xcodebuild test -scheme VocelloiOSUI -destination 'platform=iOS {SIM},name=iPhone 17 Pro'",
-            "xcrun simctl boot 1234",
-            "xcrun simctl create test-device com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
-        ):
+    def test_unsupported_destinations_are_blocked_in_every_spelling(self):
+        for command, result in run_all(self.guard, SIMULATOR_REFUSED):
             with self.subTest(command=command):
-                result = self.guard(command)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("Physical iPhone only", result.stderr)
 
-    def test_other_spellings_of_unsupported_destinations_are_blocked(self):
-        sdk = "iphone" + SIM.lower()
-        for command in (
-            f"xcodebuild -scheme VocelloiOS -sdk {sdk} build",
-            f"xcodebuild build -destination 'platform=iOS{SIM}'",
-            f"swift build --triple arm64-apple-ios26.0-{SIM.lower()}",
-            f"open -a {SIM}", f"open -g -a '{SIM}'",
-            "xcrun simctl --set /tmp/devices boot 1234",
-        ):
+    def test_searches_messages_prose_and_maintenance_are_not_destinations(self):
+        # Each simple command is judged on its own words: a pattern never reaches across a line or a
+        # separator, and a search pattern, a commit message or a heredoc body is text, not use.
+        for command, result in run_all(self.guard, SIMULATOR_ALLOWED):
             with self.subTest(command=command):
-                result = self.guard(command)
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("Physical iPhone only", result.stderr)
-        self.assertEqual(self.guard("xcodebuild -scheme VocelloiOS -sdk iphoneos build").returncode, 0)
-        for command in (
-            f"xcodebuild -destination platform=iOS\\ {SIM},name=iPhone\\ 17",
-            f"xcodebuild -destination 'platform=visionOS {SIM}'",
-            f"open -na {SIM}", f"open /Applications/Xcode.app/Contents/Developer/Applications/{SIM}.app",
-            "xcrun simctl bootstatus 1234 -b", "xcrun simctl spawn booted log stream",
-        ):
-            with self.subTest(command=command):
-                self.assertEqual(self.guard(command).returncode, 2)
-        # A pattern never reaches across a line or a separator, and prose is not a destination.
-        for command in ("xcrun simctl list\nnpm install", "xcrun simctl list devices\necho boot done",
-                        "xcrun simctl list devices | grep Booted; echo install done",
-                        f"gh issue list --search 'ios-{SIM.lower()} crash'", "echo open -a Preview"):
-            with self.subTest(command=command):
-                self.assertEqual(self.guard(command).returncode, 0)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_whole_cache_deletion_is_blocked_in_every_spelling(self):
         for command in ("rm -r -f build", "rm --recursive --force build", 'rm -rf "build"', "rm -rf build/*",
@@ -1090,15 +1147,90 @@ class SessionStartTests(unittest.TestCase):
                 tool = fake_bin / name
                 tool.write_text('#!/bin/sh\ntouch "' + str(root / "unexpected-operation") + '"\nexit 1\n')
                 tool.chmod(0o755)
+            # The hook runs under the macOS system bash 3.2 as well as a newer bash on PATH.
+            shells = [[], ["/bin/bash"]] if Path("/bin/bash").exists() else [[]]
             for cwd in (root, root / "website"):
-                result = subprocess.run([str(hooks / "session_start.sh")], cwd=cwd,
-                                        env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
-                                        capture_output=True, text=True, timeout=15)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn("CLAUDE.md: Start here", result.stdout)
-                self.assertIn("local-status", result.stdout)
-                self.assertIn("Checkpoint", result.stdout)
-                self.assertFalse((root / "unexpected-operation").exists())
+                for shell in shells:
+                    with self.subTest(cwd=cwd.name, shell=shell):
+                        result = subprocess.run([*shell, str(hooks / "session_start.sh")], cwd=cwd,
+                                                env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
+                                                capture_output=True, text=True, timeout=15)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn("CLAUDE.md: Start here", result.stdout)
+                        self.assertIn("local-status", result.stdout)
+                        self.assertIn("Checkpoint", result.stdout)
+                        self.assertIn("cache health: ", result.stdout)
+                        self.assertFalse((root / "unexpected-operation").exists())
+
+    def session(self, root: Path, progress: str, *, available_kb: int = 400 * 1024 * 1024) -> str:
+        """The hook's output in a fixture checkout whose volume reports `available_kb` free."""
+        hooks = fixture_hooks(root)
+        (root / "docs").mkdir(exist_ok=True)
+        (root / "docs/development-progress.md").write_text(progress, encoding="utf-8")
+        if not (root / ".git").exists():
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+        fake_bin = root / "bin"
+        fake_bin.mkdir(exist_ok=True)
+        df = fake_bin / "df"
+        df.write_text("#!/bin/sh\necho 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"
+                      f"echo 'map volume 900000000 1 {available_kb} 99% /Volumes/Fixture Disk'\n")
+        df.chmod(0o755)
+        shell = "/bin/bash" if Path("/bin/bash").exists() else "bash"   # macOS: the system bash 3.2
+        result = subprocess.run([shell, str(hooks / "session_start.sh")],
+                                cwd=root, env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def test_the_first_checkpoint_prints_whole_and_stops_at_the_next(self):
+        progress = ("# Checkpoint\n\n## Resume now\n\n### Newest\n\nIntro.\n\n- **One:** first\n  continued\n"
+                    "- **Two:** `scripts/ui_test.sh ios smoke`\n\n### Older\n\nOLDER-MARKER\n")
+        with tempfile.TemporaryDirectory() as temp:
+            output = self.session(Path(temp), progress)
+        checkpoint = output.split("-- docs/development-progress.md: Resume now --\n", 1)[1]
+        self.assertEqual(checkpoint, "### Newest\n\nIntro.\n\n- **One:** first\n  continued\n"
+                                     "- **Two:** `scripts/ui_test.sh ios smoke`\n")
+
+    def test_a_long_checkpoint_is_cut_at_a_bullet_near_four_kilobytes_with_a_pointer(self):
+        bullets = "".join(f"- **Item {n}:** {'word ' * 14}\n  {'more ' * 16}\n  last line of item {n}\n"
+                          for n in range(60))
+        progress = f"## Resume now\n\n### Newest\n\nIntro.\n\n{bullets}\n### Older\n\nOLDER-MARKER\n"
+        with tempfile.TemporaryDirectory() as temp:
+            output = self.session(Path(temp), progress)
+        checkpoint = output.split("-- docs/development-progress.md: Resume now --\n", 1)[1]
+        *kept, pointer = checkpoint.splitlines()
+        self.assertLessEqual(len(checkpoint.encode()), 4096)
+        self.assertGreater(len(checkpoint.encode()), 3000)
+        self.assertIn("docs/development-progress.md", pointer)
+        self.assertNotIn("OLDER-MARKER", output)
+        source = progress.splitlines()[2:]
+        self.assertEqual(kept, source[:len(kept)])
+        self.assertTrue(source[len(kept)].startswith("- **Item"), source[len(kept)])
+
+    def test_cache_health_reports_dangling_public_links_and_low_free_space(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            (root / "config/build-output-policy.json").write_text(json.dumps({
+                "entries": [{"path": "build/not-a-link"}],
+                "publicLinks": [{"path": "build/fixture-cli", "targetSuffix": "x"},
+                                {"path": "build/Fixture.app", "alternateTargetEntries": ["y"]}],
+                "migrations": [{"path": "build/never-read"}]}, indent=2))
+            (root / "build").mkdir()
+            (root / "build/fixture-cli").symlink_to("cache/xcode/gone/vocello")
+            (root / "build/never-read").symlink_to("cache/gone")
+            (root / "build/cache").mkdir()
+            (root / "build/Fixture.app").symlink_to("cache")
+            output = self.session(root, "## Resume now\n### Current\nCheckpoint\n", available_kb=10 * 1024 * 1024)
+            health = [line for line in output.splitlines() if line.startswith("cache health: ")]
+            self.assertEqual(len(health), 1, output)
+            self.assertIn("WARN build/fixture-cli dangles", health[0])
+            self.assertIn("10 GiB free on the repository volume, below the 40 GiB floor", health[0])
+            self.assertNotIn("Fixture.app", health[0])
+            self.assertNotIn("never-read", health[0])
+            (root / "build/fixture-cli").unlink()
+            output = self.session(root, "## Resume now\n### Current\nCheckpoint\n")
+            self.assertIn("cache health: ok (400 GiB free; no public build link dangles)", output)
 
 
 class ProjectSkillTests(unittest.TestCase):

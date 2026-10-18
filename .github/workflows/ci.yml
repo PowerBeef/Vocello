@@ -216,14 +216,17 @@ jobs:
         run: |
           # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
-          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
-          # One entry per (Xcode, dependency graph, ISO week): a warm run hits it
-          # exactly and saves nothing; the first run of a week or of a new graph
-          # misses the exact key, restores the newest prefix match and saves once.
+          # The dependency graph only: project.yml churns daily and is regenerated each run, so
+          # keying on it split one week into several cold namespaces (audit W-04).
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift') }}"
+          # Every key is unique, so restore always takes the newest entry of this week, then of
+          # this graph, then of this Xcode. A run saves a new snapshot when nothing of this week
+          # was restored or when it recompiled more than 200 files (see "Save build caches").
           week="$(date -u +%G-W%V)"
           echo "prefix=macos-xcode${xcode}-" >> "$GITHUB_OUTPUT"
           echo "graph=macos-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
-          echo "value=macos-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "week=macos-xcode${xcode}-${graph}-${week}-" >> "$GITHUB_OUTPUT"
+          echo "value=macos-xcode${xcode}-${graph}-${week}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
           echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
@@ -236,6 +239,7 @@ jobs:
             build/cache/swiftpm/mlx-audio-runtime
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
+            ${{ steps.key.outputs.week }}
             ${{ steps.key.outputs.graph }}
             ${{ steps.key.outputs.prefix }}
 
@@ -257,7 +261,18 @@ jobs:
         if: needs.changes.outputs.swift == 'true'
         env:
           VOCELLO_QUARANTINE: "1"
-        run: scripts/macos_test.sh test
+          QVOICE_BUILD_TIMING_SUMMARY: "1"
+        run: |
+          set -o pipefail
+          scripts/macos_test.sh test 2>&1 | tee "$RUNNER_TEMP/deterministic.log"
+
+      - name: Measure cache drift
+        id: drift
+        if: always()
+        run: |
+          compiled="$(grep -o 'test bundles built: [0-9]*' "$RUNNER_TEMP/deterministic.log" 2>/dev/null | grep -o '[0-9]*$' | tail -1 || true)"
+          echo "compiled=${compiled:-0}" >> "$GITHUB_OUTPUT"
+          echo "recompiled ${compiled:-0} Swift file(s); a new snapshot is saved above 200"
 
       - name: Verify source-built CLI version identity
         if: needs.changes.outputs.swift == 'true'
@@ -271,6 +286,10 @@ jobs:
         # settings. No runner is launched; repo_invariants.sh check 2 forbids
         # executing it.
         run: ./scripts/build_ui_test_bundles.sh macos --gate
+
+      - name: Name the failing tests
+        if: failure()
+        run: python3 scripts/ci/summarize_test_failures.py --lane "macOS deterministic tests" --root build/artifacts
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -292,11 +311,11 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save build caches
-        # Only an exact miss saves (first run of the week or of a new graph, or a
-        # cold dispatch), and only after every step passed (CI-11): a failed or
-        # partial build never becomes the week's snapshot. A warm run leaves the
-        # store untouched.
-        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
+        # Saves when nothing of this week was restored (the first run of a week or of a new
+        # graph, or a cold dispatch) or when the restored snapshot had drifted so far that this
+        # run recompiled more than 200 files, and only after every step passed (CI-11): a
+        # failed or partial build never becomes a snapshot. A warm, current run saves nothing.
+        if: ${{ success() && (!startsWith(steps.cache.outputs.cache-matched-key, steps.key.outputs.week) || fromJSON(steps.drift.outputs.compiled || '0') > 200) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -336,11 +355,13 @@ jobs:
         id: key
         run: |
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
-          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          # Same scheme as macos-tests: dependency graph only, unique keys, drift-triggered saves.
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift') }}"
           week="$(date -u +%G-W%V)"
           echo "prefix=macos-tsan-xcode${xcode}-" >> "$GITHUB_OUTPUT"
           echo "graph=macos-tsan-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
-          echo "value=macos-tsan-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "week=macos-tsan-xcode${xcode}-${graph}-${week}-" >> "$GITHUB_OUTPUT"
+          echo "value=macos-tsan-xcode${xcode}-${graph}-${week}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
           echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore the sanitizer build cache
@@ -351,6 +372,7 @@ jobs:
           path: build/cache/xcode/macos-tsan
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
+            ${{ steps.key.outputs.week }}
             ${{ steps.key.outputs.graph }}
             ${{ steps.key.outputs.prefix }}
 
@@ -369,7 +391,23 @@ jobs:
         run: ./scripts/regenerate_project.sh --fast
 
       - name: Run the Thread Sanitizer subset
-        run: scripts/macos_test.sh tsan
+        env:
+          QVOICE_BUILD_TIMING_SUMMARY: "1"
+        run: |
+          set -o pipefail
+          scripts/macos_test.sh tsan 2>&1 | tee "$RUNNER_TEMP/tsan.log"
+
+      - name: Measure cache drift
+        id: drift
+        if: always()
+        run: |
+          compiled="$(grep -o 'test bundles built: [0-9]*' "$RUNNER_TEMP/tsan.log" 2>/dev/null | grep -o '[0-9]*$' | tail -1 || true)"
+          echo "compiled=${compiled:-0}" >> "$GITHUB_OUTPUT"
+          echo "recompiled ${compiled:-0} Swift file(s); a new snapshot is saved above 200"
+
+      - name: Name the failing tests
+        if: failure()
+        run: python3 scripts/ci/summarize_test_failures.py --lane "macOS ThreadSanitizer subset"
 
       - name: Retain sanitizer evidence
         if: always()
@@ -389,7 +427,7 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save the sanitizer build cache
-        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ success() && (!startsWith(steps.cache.outputs.cache-matched-key, steps.key.outputs.week) || fromJSON(steps.drift.outputs.compiled || '0') > 200) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/macos-tsan
@@ -416,7 +454,8 @@ jobs:
         run: |
           # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
-          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          # The dependency graph only (audit W-04): project.yml is regenerated each run.
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift') }}"
           # One entry per (Xcode, dependency graph, ISO week): a warm run hits it
           # exactly and saves nothing; the first run of a week or of a new graph
           # misses the exact key, restores the newest prefix match and saves once.
@@ -466,6 +505,10 @@ jobs:
         env:
           QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
         run: ./scripts/build_ui_test_bundles.sh ios --gate
+
+      - name: Name the compile errors
+        if: failure()
+        run: python3 scripts/ci/summarize_test_failures.py --lane "iOS compile check" --root build/artifacts
 
       - name: Upload compile results on failure
         if: failure()

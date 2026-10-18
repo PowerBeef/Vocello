@@ -185,8 +185,9 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   source/resource membership in regeneration, cache freshness and check planning. Content-only edits
   do not invalidate generation; missing outputs always require it.
 - Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
-  not, so hop with `await MainActor.run`. CI compile failures are in the run's
-  `macos-deterministic-test-artifacts` artifact, not the job log.
+  not, so hop with `await MainActor.run`. A failed CI run names its failing tests or compile errors
+  in the job summary (`scripts/ci/summarize_test_failures.py`); the full logs are in the run's
+  `macos-deterministic-test-artifacts` artifact.
 - Trusting the local Xcode 27 compile for what CI's pinned Xcode 26.6 accepts: 26.6 flags a
   `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), and
   its region-isolation checker rejects a throwing `Task { … }` returning a value (return

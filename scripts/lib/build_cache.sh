@@ -643,10 +643,22 @@ warn_if_storage_bloated() {
 # exact-version pinned with lockstep-checked resolved files, and external
 # Actions/tools use SHA pins per config/toolchain.json. Revisit if a pinned
 # dependency ever ships a plugin that must execute on Darwin.
+#
+# QVOICE_BUILD_TIMING_SUMMARY=1 (set by CI) adds -showBuildTimingSummary to build and
+# build-for-testing invocations, so a job log ends with where the build time went.
 xcb_run() {
     acquire_native_lock "xcodebuild:${QVOICE_NATIVE_LOCK_LABEL:-$(basename "$0")}" || return 1
     local status=0
     local -a extra_args=(-skipPackagePluginValidation)
+    if [[ "${QVOICE_BUILD_TIMING_SUMMARY:-0}" == "1" ]]; then
+        local arg
+        for arg in "$@"; do
+            if [[ "$arg" == "build" || "$arg" == "build-for-testing" ]]; then
+                extra_args+=(-showBuildTimingSummary)
+                break
+            fi
+        done
+    fi
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
         set -o pipefail
         xcodebuild "$@" "${extra_args[@]}" | xcbeautify --renderer terminal || status=${PIPESTATUS[0]}

@@ -1,0 +1,24 @@
+{
+  "include": ["scripts"],
+  "exclude": [
+    "build",
+    "website",
+    ".claude/worktrees",
+    "**/__pycache__",
+    "**/node_modules"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "executionEnvironments": [
+    {
+      "root": "scripts/hooks",
+      "pythonVersion": "3.9",
+      "extraPaths": ["scripts/hooks", "scripts"]
+    },
+    {
+      "root": "scripts",
+      "pythonVersion": "3.10",
+      "extraPaths": ["scripts"]
+    }
+  ]
+}

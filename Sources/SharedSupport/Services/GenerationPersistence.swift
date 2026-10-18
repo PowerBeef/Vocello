@@ -1,6 +1,7 @@
 import Foundation
 
 import QwenVoiceCore
+import OSLog
 
 typealias PersistenceGenerationResult = QwenVoiceCore.GenerationResult
 
@@ -41,7 +42,10 @@ enum GenerationPersistence {
             playbackOperationID: playbackOperationID
         )
         if !result.usedStreaming, TelemetryGate.resolvedEnabled {
-            print("[Performance][\(caller)] autoplay_start_wall_ms=\(elapsedMs(since: autoplayStart))")
+            let autoplayStartMS = elapsedMs(since: autoplayStart)
+            GenerationPersistenceLog.logger.info(
+                "[Performance][\(caller, privacy: .public)] autoplay_start_wall_ms=\(autoplayStartMS, privacy: .public)"
+            )
         }
 
         return await saveToHistory(generation, caller: caller)
@@ -126,7 +130,10 @@ enum GenerationPersistence {
         )
         let saveMS = elapsedMs(since: saveStart)
         if TelemetryGate.resolvedEnabled {
-            print("[Performance][\(caller)] history_save_outcome=\(outcome) wall_ms=\(saveMS)")
+            let outcomeDescription = String(describing: outcome)
+            GenerationPersistenceLog.logger.info(
+                "[Performance][\(caller, privacy: .public)] history_save_outcome=\(outcomeDescription, privacy: .public) wall_ms=\(saveMS, privacy: .public)"
+            )
         }
         announceRecoveryStateChanged()
         return outcome
@@ -143,4 +150,11 @@ enum GenerationPersistence {
 
 extension Notification.Name {
     static let generationHistoryRecoveryChanged = Notification.Name("generationHistoryRecoveryChanged")
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`), under the
+/// hosting app's own subsystem: both apps compile it. `caller` names a code
+/// site and the values are numbers and outcome cases, so all are public.
+private enum GenerationPersistenceLog {
+    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.qwenvoice.app", category: "performance")
 }

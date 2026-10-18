@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import QwenVoiceCore
+import OSLog
 
 /// Manages model install state, repairability, download, and delete flows.
 @MainActor
@@ -208,7 +209,9 @@ final class ModelManagerViewModel {
             AppPerformanceSignposts.end(interval)
             if DebugMode.isEnabled {
                 let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
-                print("[Performance][ModelManagerViewModel] refresh_wall_ms=\(elapsedMs)")
+                ModelManagerLog.logger.info(
+                    "[Performance][ModelManagerViewModel] refresh_wall_ms=\(elapsedMs, privacy: .public)"
+                )
             }
         }
 
@@ -914,7 +917,10 @@ final class ModelManagerViewModel {
             },
             unloadFailed: { error in
                 if DebugMode.isEnabled {
-                    print("[ModelManagerViewModel] unload before delete failed: \(DiagnosticPrivacy.summary(of: error))")
+                    let summary = DiagnosticPrivacy.summary(of: error).description
+                    ModelManagerLog.logger.error(
+                        "[ModelManagerViewModel] unload before delete failed: \(summary, privacy: .public)"
+                    )
                 }
             }
         )
@@ -1388,4 +1394,10 @@ private extension ModelManagerViewModel.DownloadProgress.Phase {
             self = .cancelling
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Values marked
+/// public are code-owned numbers and typed error summaries.
+private enum ModelManagerLog {
+    static let logger = Logger(subsystem: "com.qwenvoice.app", category: "models")
 }

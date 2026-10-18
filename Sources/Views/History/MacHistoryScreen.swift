@@ -1,6 +1,7 @@
 import AppKit
 import QwenVoiceCore
 import SwiftUI
+import OSLog
 
 /// One loaded History row with everything a card needs precomputed once, off
 /// the main thread, in `reloadHistory`. Nothing here may be expensive: the
@@ -840,7 +841,9 @@ private extension MacHistoryScreen {
         AppPerformanceSignposts.end(interval)
         if DebugMode.isEnabled {
             let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
-            print("[Performance][MacHistoryScreen] reload_wall_ms=\(elapsedMs)")
+            MacHistoryLog.logger.info(
+                "[Performance][MacHistoryScreen] reload_wall_ms=\(elapsedMs, privacy: .public)"
+            )
         }
 
         // A read abandoned with its screen no longer owns the load state.
@@ -1070,4 +1073,9 @@ private extension MacHistoryScreen {
     func presentActionAlert(title: String, message: String) {
         actionAlert = MacHistoryActionAlert(title: title, message: message)
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`).
+private enum MacHistoryLog {
+    static let logger = Logger(subsystem: "com.qwenvoice.app", category: "performance")
 }

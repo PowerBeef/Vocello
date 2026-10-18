@@ -2,6 +2,7 @@ import AppKit
 import QwenVoiceCore
 import SwiftUI
 import UniformTypeIdentifiers
+import OSLog
 
 /// Session state of the reference the screen holds beside the draft: which
 /// saved voice has been hydrated from disk, a transcript that could not be
@@ -955,7 +956,10 @@ struct MacVoiceCloningScreen: View {
             )
         } catch {
             if DebugMode.isEnabled {
-                print("[Performance][MacVoiceCloningScreen] clone priming failed: \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                MacVoiceCloningLog.logger.error(
+                    "[Performance][MacVoiceCloningScreen] clone priming failed: \(summary, privacy: .public)"
+                )
             }
         }
     }
@@ -1078,4 +1082,10 @@ private extension VoiceCloningContextStatus {
             self = .fallback(message)
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Only the
+/// typed error summary is public.
+private enum MacVoiceCloningLog {
+    static let logger = Logger(subsystem: "com.qwenvoice.app", category: "performance")
 }

@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import QwenVoiceCore
 import SwiftUI
+import OSLog
 
 /// Lightweight AVAudioPlayer wrapper that plays per-voice sample WAVs
 /// bundled at `Sources/Resources/voice-previews/{id}.wav`. Used by the
@@ -73,7 +74,9 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
             // simply doesn't preview. Runtime diagnostics flag missing
             // assets during sample generation.
             if TelemetryGate.resolvedEnabled {
-                print("[IOSVoicePreviewPlayer] No sample WAV for voice id '\(voiceID)' under voice-previews/")
+                IOSVoicePreviewLog.logger.error(
+                    "[IOSVoicePreviewPlayer] No sample WAV for voice id '\(voiceID, privacy: .public)' under voice-previews/"
+                )
             }
             stop()
             return
@@ -93,7 +96,10 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
             player.play()
         } catch {
             if TelemetryGate.resolvedEnabled {
-                print("[IOSVoicePreviewPlayer] Failed to play '\(voiceID)': \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                IOSVoicePreviewLog.logger.error(
+                    "[IOSVoicePreviewPlayer] Failed to play '\(voiceID, privacy: .public)': \(summary, privacy: .public)"
+                )
             }
             stop()
         }
@@ -121,4 +127,10 @@ extension IOSVoicePreviewPlayer: AVAudioPlayerDelegate {
             self.stop()
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Voice IDs here
+/// are the bundled built-in speaker IDs, so they are public.
+private enum IOSVoicePreviewLog {
+    static let logger = Logger(subsystem: "com.patricedery.vocello", category: "voice-preview")
 }

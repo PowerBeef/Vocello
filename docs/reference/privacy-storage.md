@@ -344,8 +344,11 @@ cannot recognize an unquoted prompt. The persisted boundaries that use it:
 `generation-failures.jsonl` below and the generation telemetry records were already typed;
 telemetry keeps only a failure message's length and digest. Unified-log calls (`os_log`, `Logger`)
 mark only code-owned identifiers and numbers public, and the crash observer's write failure logs a
-typed summary. The app does not persist console output (`print`, standard error). The diagnostics
-writers print typed summaries; other console sites still print error text. Messages shown in the
+typed summary. The app does not persist console output (`print`, standard error). Only the
+internal device-diagnostics runners and writers still print (their lines are the stream
+`scripts/ios_device.sh console` and `logs` capture), with typed summaries; the engine's
+stderr channels (codec-replay memory lines, telemetry-sink and live-preview diagnostics) are
+unchanged; every other app site logs through `Logger` under the rule above (DW-03). Messages shown in the
 interface are not diagnostics and are unchanged. Regression tests pass synthetic failures carrying a
 home-directory path, a script-derived output name, a prompt and a transcript through each tested
 boundary and assert that none of them is retained (`GenerationFailureDiagnosticLoggerTests`,

@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import QwenVoiceCore
+import OSLog
 
 /// Why the Saved Voices list is not current. The busy state stays typed so each
 /// surface presents it in its interface language instead of as a failure (F-25).
@@ -139,7 +140,9 @@ final class SavedVoicesViewModel: ObservableObject {
     private func finishLoad(wallStart: UInt64) {
         if TelemetryGate.resolvedEnabled {
             let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
-            print("[Performance][SavedVoicesViewModel] load_wall_ms=\(elapsedMs)")
+            SavedVoicesLog.logger.info(
+                "[Performance][SavedVoicesViewModel] load_wall_ms=\(elapsedMs, privacy: .public)"
+            )
         }
 
         isLoading = false
@@ -158,4 +161,10 @@ final class SavedVoicesViewModel: ObservableObject {
 
 @MainActor private enum SavedVoicesSessionCache {
     static var voices: [Voice] = []
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`), under the
+/// hosting app's own subsystem: the macOS app compiles it by path.
+private enum SavedVoicesLog {
+    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.qwenvoice.app", category: "performance")
 }

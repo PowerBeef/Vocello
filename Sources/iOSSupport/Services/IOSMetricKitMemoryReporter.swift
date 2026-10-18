@@ -1,6 +1,7 @@
 import Foundation
 import MetricKit
 import QwenVoiceCore
+import OSLog
 
 /// Registers early and keeps the legacy iOS 26 MetricKit subscriber alive for
 /// the process lifetime. MetricKit is delayed field evidence, not a per-take
@@ -182,8 +183,13 @@ private actor IOSMetricKitMemorySummaryStore {
         } catch {
             if TelemetryGate.resolvedEnabled {
                 // Intentionally omit paths and raw errors from diagnostics output.
-                print("[IOSMetricKitMemoryReporter] Aggregate write failed.")
+                IOSMetricKitMemoryLog.logger.error("[IOSMetricKitMemoryReporter] Aggregate write failed.")
             }
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`).
+private enum IOSMetricKitMemoryLog {
+    static let logger = Logger(subsystem: "com.patricedery.vocello", category: "metrickit")
 }

@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import QwenVoiceCore
+import OSLog
 
 enum ModelInventoryStatus: Equatable {
     case checking
@@ -191,7 +192,9 @@ final class ModelManagerViewModel: ObservableObject {
             AppPerformanceSignposts.end(interval)
             if TelemetryGate.resolvedEnabled {
                 let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
-                print("[Performance][ModelManagerViewModel] refresh_wall_ms=\(elapsedMs)")
+                IOSModelManagerLog.logger.info(
+                    "[Performance][ModelManagerViewModel] refresh_wall_ms=\(elapsedMs, privacy: .public)"
+                )
             }
         }
 
@@ -214,4 +217,9 @@ final class ModelManagerViewModel: ObservableObject {
     func isLikelyInstalled(_ model: TTSModel) -> Bool {
         statusProvider.isLikelyInstalled(model)
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`).
+private enum IOSModelManagerLog {
+    static let logger = Logger(subsystem: "com.patricedery.vocello", category: "performance")
 }

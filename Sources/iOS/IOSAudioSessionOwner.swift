@@ -1,6 +1,7 @@
 import AVFoundation
 import Synchronization
 import QwenVoiceCore
+import OSLog
 
 /// The only code in the iOS app that changes `AVAudioSession` (PA-21, AUD-02).
 ///
@@ -141,7 +142,7 @@ final class IOSAudioSessionOwner: Sendable {
 
     private func log(_ message: String) {
         if TelemetryGate.resolvedEnabled {
-            print("[IOSAudioSessionOwner] \(message)")
+            IOSAudioSessionLog.logger.error("[IOSAudioSessionOwner] \(message, privacy: .public)")
         }
     }
 }
@@ -173,4 +174,10 @@ extension IOSPlaybackExclusivity {
             MainActor.assumeIsolated { handle(.outputDeviceLost) }
         })
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Every message
+/// is a code-owned step or use name and a typed error summary, so it is public.
+private enum IOSAudioSessionLog {
+    static let logger = Logger(subsystem: "com.patricedery.vocello", category: "audio-session")
 }

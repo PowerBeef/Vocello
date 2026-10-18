@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import QwenVoiceCore
+import OSLog
 
 /// The engine's own Auto resolution, so the chip names the language the take
 /// is sent with (U02). The recognizer reads the whole script (up to the
@@ -2332,7 +2333,10 @@ struct IOSVoiceCloningView: View {
             clonePrimingIntent.recordPrime(key: requestKey, preparationState: ttsEngine.clonePreparationState)
         } catch {
             if TelemetryGate.resolvedEnabled {
-                print("[IOSVoiceCloningView] clone priming failed: \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                IOSGenerationModeViewsLog.logger.error(
+                    "[IOSVoiceCloningView] clone priming failed: \(summary, privacy: .public)"
+                )
             }
         }
     }
@@ -2440,4 +2444,10 @@ private extension VoiceCloningContextStatus {
             self = .fallback(message)
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Only the
+/// typed error summary is public.
+private enum IOSGenerationModeViewsLog {
+    static let logger = Logger(subsystem: "com.patricedery.vocello", category: "performance")
 }

@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import OSLog
 
 /// Joins the per-layer telemetry rows for one generation into a single readable
 /// `generations-merged.jsonl` row, keyed by the shared `generationID`.
@@ -93,10 +94,10 @@ enum GenerationTelemetryMerger {
                     match = record
                 }
             } catch {
-                print(
-                    "[GenerationTelemetryMerger] Row matching '\(generationID)' in "
-                    + "\(url.lastPathComponent) failed to decode and was skipped "
-                    + "(schema drift? \(DiagnosticPrivacy.summary(of: error)))"
+                let fileName = url.lastPathComponent
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                GenerationTelemetryMergerLog.logger.error(
+                    "[GenerationTelemetryMerger] Row matching '\(generationID, privacy: .public)' in \(fileName, privacy: .public) failed to decode and was skipped (schema drift? \(summary, privacy: .public))"
                 )
             }
         }
@@ -126,7 +127,18 @@ enum GenerationTelemetryMerger {
                 maxBytes: GenerationTelemetryJSONLSink.maxLogBytes
             )
         } catch {
-            print("[GenerationTelemetryMerger] Could not write merged telemetry for '\(merged.generationID)': \(DiagnosticPrivacy.summary(of: error))")
+            let generationID = merged.generationID
+            let summary = DiagnosticPrivacy.summary(of: error).description
+            GenerationTelemetryMergerLog.logger.error(
+                "[GenerationTelemetryMerger] Could not write merged telemetry for '\(generationID, privacy: .public)': \(summary, privacy: .public)"
+            )
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Generation IDs
+/// are UUIDs, file names are the merger's own JSONL names and errors are typed
+/// summaries, so all three are public.
+private enum GenerationTelemetryMergerLog {
+    static let logger = Logger(subsystem: "com.qwenvoice.app", category: "telemetry")
 }

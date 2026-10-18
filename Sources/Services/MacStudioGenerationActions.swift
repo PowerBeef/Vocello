@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import OSLog
 
 /// The shared start and cancel path of the Studio screens (the iOS
 /// `IOSStudioGenerationActions` without haptics), bound to the engine store on
@@ -94,8 +95,17 @@ enum MacStudioGenerationActions {
             try await ttsEngine.ensureCloneReferencePrimed(modelID: priming.modelID, reference: priming.reference)
         } catch {
             if DebugMode.isEnabled {
-                print("[Performance][MacStudioGenerationActions] clone priming degraded: \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                MacStudioGenerationActionsLog.logger.error(
+                    "[Performance][MacStudioGenerationActions] clone priming degraded: \(summary, privacy: .public)"
+                )
             }
         }
     }
+}
+
+/// Unified-log channel for this file (DW-03: no console `print`). Only the
+/// typed error summary is public.
+private enum MacStudioGenerationActionsLog {
+    static let logger = Logger(subsystem: "com.qwenvoice.app", category: "performance")
 }

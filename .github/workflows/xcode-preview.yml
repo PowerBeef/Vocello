@@ -1,0 +1,75 @@
+name: Xcode preview
+
+# Report-only (workflow audit P3-1): the deterministic suites on GitHub's `xcode-27`
+# preview image (macOS 27, Xcode 27), the toolchain the App Store candidate is built with
+# on the maintainer's Mac. Push CI stays gated on the Xcode in config/toolchain.json
+# until the maintainer moves it; this run shows where the two toolchains disagree before
+# a push meets the difference. Its own concurrency group keeps a queued preview runner
+# (GitHub warns of preview capacity limits) from holding up the nightly. It blocks
+# nothing and files no issue.
+on:
+  schedule:
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xcode-preview
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    name: Deterministic suites on the Xcode 27 preview image (report-only)
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select the newest Xcode 27 and install the pinned tools
+        run: |
+          set -euo pipefail
+          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)"
+          [ -n "$xcode" ] || { echo "no Xcode 27 on this image" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          PYTEST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest']['version'])")"
+          XDIST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest-xdist']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}" \
+            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}"
+          ./scripts/install_pinned_tools.sh
+          echo "$HOME/.qwenvoice-pinned-tools/bin" >> "$GITHUB_PATH"
+          if ! xcrun metal --version >/dev/null 2>&1; then
+            xcodebuild -downloadComponent metalToolchain
+          fi
+
+      - name: Regenerate Xcode project
+        run: ./scripts/regenerate_project.sh --fast
+
+      - name: Run the deterministic macOS suites
+        env:
+          QVOICE_BUILD_TIMING_SUMMARY: "1"
+        run: scripts/macos_test.sh test
+
+      - name: Compile iOS for the device SDK
+        if: always()
+        env:
+          QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
+        run: ./scripts/build_foundation_targets.sh ios --incremental
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "### Xcode preview (report-only)"
+            echo ""
+            echo "- Toolchain: $(xcodebuild -version | head -1), $(swift --version 2>/dev/null | head -1)"
+            echo "- Deterministic verdict: $(cat build/artifacts/macos/tests/*/verdict.txt 2>/dev/null | tr '\n' ' ' || echo 'not run')"
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/summarize_test_failures.py --lane "Xcode 27 preview" --root build/artifacts || true

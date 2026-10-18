@@ -1,6 +1,7 @@
 import React from "react";
 
 export const Icon = ({ name, size = 18, stroke = 1.6, className = "" }) => {
+  /** @type {React.SVGProps<SVGSVGElement>} */
   const props = {
     width: size,
     height: size,

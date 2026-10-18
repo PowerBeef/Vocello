@@ -8,7 +8,7 @@ do not run Swift, iOS, macOS, Xcode, or native-app UI workflows for website-only
 
 ```sh
 npm --prefix website run dev      # localhost:5173
-npm --prefix website run lint     # source, metadata, accessibility, copy contract
+npm --prefix website run lint     # site contract, ESLint (eslint.config.js), tsc --checkJs (jsconfig.json)
 npm --prefix website test         # Node contract fixtures + rendered contract
 npm --prefix website run build    # client + SSR + prerender -> website/dist/
 npm --prefix website run check    # lint + test + build + Playwright browser tests

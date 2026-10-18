@@ -51,7 +51,7 @@ const useScrollReveal = () => {
     const revealHashTarget = () => {
       const { hash } = window.location;
       if (!hash || hash.length < 2) return;
-      let target = null;
+      let target;
       try {
         target = document.querySelector(hash);
       } catch {
@@ -75,7 +75,7 @@ const App = () => {
   <>
     <a className="skip-link" href="#main-content">Skip to main content</a>
     <Nav />
-    <main id="main-content" tabIndex="-1">
+    <main id="main-content" tabIndex={-1}>
       <Hero />
       <div id="workflows" className="workflows-anchor">
         {WORKFLOWS.map((w, i) => (

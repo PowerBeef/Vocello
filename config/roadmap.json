@@ -1710,6 +1710,21 @@
       "notes": "Found 2026-10-16 by the review of BKL-13: IOSVoicesView refuses a delete only while the engine has an active take or a long-form project runs, and a Clone take primes its saved voice before the engine reserves it. A delete in that window removes the reference, and the take ends in a typed failure (audio.input_missing): no crash, no History row. Parked without investigation under the focus lock: not a release blocker."
     },
     {
+      "id": "BKL-19",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "macOS UI smoke raises a Speech Recognition prompt after every lane rebuild",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A full macOS smoke run on a freshly rebuilt lane app finishes unattended: no TCC prompt appears, or the lane detects one before it runs and fails fast with a named cause.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "docs/reference/macos-permissions.md"
+      ],
+      "updated": "2026-10-18",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-18 by the DW-04 Observation smoke: test08's save-voice step asked for Speech Recognition, because the ad-hoc-signed lane build never matches an earlier grant. The system dialog covered the window, so test12, test13 and test14 failed on controls that were not hittable, and single-scenario reruns failed the same way until the maintainer answered it. macos-permissions.md describes this for the microphone only. Parked without investigation under the focus lock: test tooling, not a release blocker."
+    },
+    {
       "id": "BG-01",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",

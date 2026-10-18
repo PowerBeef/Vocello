@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/21 (62%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/22 (59%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -555,6 +555,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-12` | parked | Release rehearsal's macOS DMG step runs out of runner disk | — |
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
 | `BKL-18` | parked | iPhone Saved Voices Delete is offered while a Clone take primes its reference | — |
+| `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -579,6 +580,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-18`** (parked) — iPhone Saved Voices Delete is offered while a Clone take primes its reference.
   gate: On the iPhone, Delete waits while a Studio take holds its mode, including a Clone take still priming its reference before the engine reserves it, as the Mac does since BKL-13; a deterministic test covers it.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-19`** (parked) — macOS UI smoke raises a Speech Recognition prompt after every lane rebuild.
+  gate: A full macOS smoke run on a freshly rebuilt lane app finishes unattended: no TCC prompt appears, or the lane detects one before it runs and fails fast with a named cause.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

@@ -645,19 +645,22 @@ warn_if_storage_bloated() {
 # dependency ever ships a plugin that must execute on Darwin.
 #
 # QVOICE_BUILD_TIMING_SUMMARY=1 (set by CI) adds -showBuildTimingSummary to build and
-# build-for-testing invocations, so a job log ends with where the build time went.
+# build-for-testing invocations, so a job log ends with where the build time went. On
+# CI (CI=true) those invocations also skip the index store, which only a local editor
+# reads and CI deleted before saving its caches (audit P1-11).
 xcb_run() {
     acquire_native_lock "xcodebuild:${QVOICE_NATIVE_LOCK_LABEL:-$(basename "$0")}" || return 1
     local status=0
     local -a extra_args=(-skipPackagePluginValidation)
-    if [[ "${QVOICE_BUILD_TIMING_SUMMARY:-0}" == "1" ]]; then
-        local arg
-        for arg in "$@"; do
-            if [[ "$arg" == "build" || "$arg" == "build-for-testing" ]]; then
-                extra_args+=(-showBuildTimingSummary)
-                break
-            fi
-        done
+    local arg builds=0
+    for arg in "$@"; do
+        if [[ "$arg" == "build" || "$arg" == "build-for-testing" ]]; then
+            builds=1
+        fi
+    done
+    if (( builds )); then
+        [[ "${QVOICE_BUILD_TIMING_SUMMARY:-0}" != "1" ]] || extra_args+=(-showBuildTimingSummary)
+        [[ "${CI:-}" != "true" ]] || extra_args+=(COMPILER_INDEX_STORE_ENABLE=NO)
     fi
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
         set -o pipefail

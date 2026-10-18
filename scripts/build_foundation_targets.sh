@@ -22,6 +22,9 @@ FOUNDATION_BUILD_ROOT="$QVOICE_ARTIFACTS_FOUNDATION"
 # QVOICE_FOUNDATION_SWIFT_OPTIMIZATION=-O compiles the macOS foundation target optimized (the
 # nightly lane uses it so -O-only warnings surface before a release build does).
 MACOS_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--Onone}"
+# The nightly optimized compile sets wholemodule so it reproduces the release codegen and
+# its diagnostics (audit P1-11); everything else stays incremental.
+MACOS_COMPILATION_MODE="${QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE:-incremental}"
 # The incremental iOS compile defaults to -O so its arena matches the physical-device
 # UI lanes; push CI sets -Onone because a compile check needs no optimized products.
 IOS_INCREMENTAL_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}"
@@ -127,7 +130,7 @@ build_macos() {
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
     SWIFT_OPTIMIZATION_LEVEL="$MACOS_OPTIMIZATION" \
-    SWIFT_COMPILATION_MODE="incremental" \
+    SWIFT_COMPILATION_MODE="$MACOS_COMPILATION_MODE" \
     build
   write_build_provenance "$FOUNDATION_BUILD_ROOT/last-build.json" \
     "scripts/build_foundation_targets.sh macos" QwenVoice Release \

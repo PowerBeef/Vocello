@@ -16,6 +16,15 @@ inputs:
 runs:
   using: composite
   steps:
+    # pip spent about 96 of the step's 102 s building or fetching the pinned numpy, pytest
+    # and pytest-xdist on some macOS runner images (audit P1-11); the wheels it caches are
+    # keyed on the manifest that pins them, and the pip install below still checks versions.
+    - name: Cache the pinned Python wheels
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/Library/Caches/pip
+        key: pip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('config/toolchain.json') }}
+
     - name: Select and validate native toolchain
       shell: bash
       env:

@@ -94,6 +94,7 @@ jobs:
       - name: Compile the macOS app optimized (warnings are errors)
         env:
           QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-O"
+          QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE: "wholemodule"
         run: ./scripts/build_foundation_targets.sh macos
 
       - name: Upload compile results on failure

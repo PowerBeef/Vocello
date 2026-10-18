@@ -17,7 +17,42 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 18 — workflow audit saved; the local build arenas are cold (resume here)
+### October 18, evening — the workflow programme runs alongside the release (resume here)
+
+`main` is pushed through `1b02555f`; about 50 local commits wait for the maintainer's push request.
+
+- **Maintainer decisions (2026-10-18):**
+  - The audit runs now as DW-01 to DW-04 in the release plan, with the in-flight cap raised to 8.
+  - Refactors land one at a time.
+  - Periphery, Pyright in CI and website type checks are approved.
+  - CI keeps Xcode 26.6 as the required gate.
+- **Landed:** the roadmap notes of DW-01 to DW-04 carry each item's commit. This session landed:
+  - `@Observable` view models (`1406ebaf`);
+  - `Mutex` in place of `NSLock` (`b2d1e9c0`, `89ba5cf4`);
+  - InferIsolatedConformances (`335bac7d`);
+  - the Pyright, SwiftLint and website gates;
+  - the Periphery nightly;
+  - the migrate-report fix (`e32fb52f`).
+
+  All 15 macOS smoke journeys pass on the Observation tree. The iOS side compiles, but its runtime
+  proof waits for the next announced iPhone window.
+- **After the next push:**
+  - Confirm that CI's Xcode 26.6 compile carries `-enable-upcoming-feature InferIsolatedConformances`.
+    Xcode ignores a setting it does not define.
+  - Confirm that the new SwiftLint, Pyright and website gates pass on the runners.
+- **BKL-19:** after each rebuild, the ad-hoc-signed UI-lane app asks again for Speech Recognition.
+  Answer the dialog, or the dialog covers the window and the smoke run fails.
+- **Next (DW-03 and DW-04):**
+  - NonisolatedNonsendingByDefault (796 sites in the macOS migrate report) and strict memory safety
+    (407 sites), both behind the stall gate;
+  - an Enhanced Security trial;
+  - fewer `AnyView`;
+  - P2-3, a shared framework;
+  - P2-5, the test-adequacy seams;
+  - P3-5, lane orchestration in Python.
+- The local arenas are warm again. The RF-18 E4 note below still applies.
+
+### October 18 — workflow audit saved; the local build arenas are cold
 
 `main` is pushed through `1b02555f`; the release state is unchanged from the October 17 entry below.
 
@@ -122,35 +157,3 @@ unavailable: work stays on the Mac, and device checks wait for a window the main
 - **Focus lock** rewritten 2026-10-16: maxInFlight 4 until the freeze, 2 after.
 - **Queued for the next iPhone window:** smoke with the new `--scenario long-form`,
   `background-warmup`, an iPhone memory benchmark after the repin.
-
-### October 16 — RF-13 closes on the iPhone; paused by the maintainer
-
-The maintainer opened a two-hour iPhone window, asked that no macOS XCUITest run for a few hours
-after the recovery rerun below, and paused everything at the end of the day. Nothing is in flight.
-
-**Resume with:** the maintainer's decision on RF-15's long-form finding (reproduce it with the
-`vocello` CLI first, or accept it as a known limitation), then RF-09's freeze, whose listed blockers
-are all closed. RF-15's startup-retry proposal (October 13) still awaits the maintainer, and BG-01
-stays paused.
-
-- **Toolchain:** the Mac now has Xcode 27.1, whose iOS 27.1 platform component had to be downloaded
-  (with the maintainer's approval) before any iPhone build, and the phone had to re-enable UI
-  automation (`ios-xcui-purchase-20261016-172358-7922dfbf` never started).
-- **RF-13:** the purchase lane's exports scenario now generates one short Design take and checks the
-  Studio inline card's export owned and revoked, putting back the Studio mode, brief and script (result
-  schema 4), and runs its owned half with StoreKit offline as the app sees it (Apple's fault injection
-  fails product loading, purchase and sync while the phone stays connected): the unlock survives a
-  relaunch and a failed Restore, and every owned export goes through. All 26 phases pass with every
-  restoration observed (`ios-xcui-purchase-20261016-175234-5cbdbead`); the online version passed
-  before it (`ios-xcui-purchase-20261016-173803-de7338ff`). The first attempt
-  (`ios-xcui-purchase-20261016-172823-49bad283`) passed every export check but could not restore the
-  brief: the shared text helper's backspaces delete nothing when the tap leaves the caret at the start
-  (parked for the control audit as BKL-16). RF-13 is closed on the maintainer's go; owned exports in
-  Airplane Mode on the TestFlight build move to RF-12. RF-09's listed blockers are all closed.
-- **F-16:** the Mac recovery journey passes again on Xcode 27.1, now including the on-disk Retry check
-  (`macos-xcui-smoke-20261016-170320-da10149d`).
-- **Full iOS smoke on Xcode 27.1** (`ios-xcui-smoke-20261016-181355-c7c92864`, a justified rerun of
-  October 14's): the main journey and record-then-play pass with a clean crash delta; the long-form
-  journey fails again because Fast QC refuses a 56-62 s Built-in segment for a 2.1 s interior silence,
-  now under a second, different seed. Recorded on RF-15, whose long-form row needs a fix or an accepted
-  known limitation from the maintainer.

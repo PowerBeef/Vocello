@@ -8,12 +8,14 @@ NonisolatedNonsendingByDefault (SE-0461) and InferIsolatedConformances (SE-0470)
 (`QVOICE_FOUNDATION_MIGRATION_SETTINGS=... scripts/build_foundation_targets.sh macos`) and this
 script reports what they flag. It files no issue and fails nothing; no count is a verdict.
 
-    migration_warnings_report.py plan [--developer-dir DIR] [--output plan.json] [--github-output]
+    migration_warnings_report.py plan [--developer-dir DIR] [--project project.yml] [--output plan.json]
+            [--github-output]
         Chooses each setting's value for the selected Xcode: MIGRATE where its specification offers
         it; YES for strict memory safety where only YES is offered (its diagnostics are warnings
-        either way); skipped when the build-setting probe (probe_build_settings.py) reports the
-        setting absent, or when an upcoming feature has no migrate mode (YES would change the
-        language rules and can fail the build). `--github-output` writes `settings=<NAME=VALUE ...>`.
+        either way); skipped when project.yml already sets it to YES (the migrate override would
+        switch an adopted feature back off), when the build-setting probe (probe_build_settings.py)
+        reports the setting absent, or when an upcoming feature has no migrate mode (YES would change
+        the language rules and can fail the build). `--github-output` writes `settings=<NAME=VALUE ...>`.
     migration_warnings_report.py report LOG [--plan plan.json] [--root DIR] [--top N] [--output report.md]
         Counts the build log's warnings per diagnostic group ([#StrictMemorySafety], [-Wflag], ...)
         and per file, each distinct site once (xcodebuild repeats a diagnostic per compile job and per
@@ -43,6 +45,7 @@ MIGRATION_SETTINGS = {
 # Settings whose plain YES only adds warnings, so YES stands in where no migrate mode exists.
 WARNING_ONLY = frozenset({"SWIFT_STRICT_MEMORY_SAFETY"})
 PLAN_SCHEMA = 1
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 DEFAULT_TOP = 30
 
 DIAGNOSTIC = re.compile(
@@ -97,12 +100,23 @@ class Choice:
     reason: str
 
 
-def plan(text: str, defined: dict[str, bool]) -> list[Choice]:
-    """One choice per migration setting, from the specifications and the probe's verdicts."""
+def project_enabled(project_text: str) -> frozenset[str]:
+    """The migration settings project.yml already sets to YES."""
+    return frozenset(setting for setting in MIGRATION_SETTINGS
+                      if re.search(rf"^\s+{setting}:\s*YES\s*(#.*)?$", project_text, re.MULTILINE))
+
+
+def plan(text: str, defined: dict[str, bool], enabled: frozenset[str] = frozenset()) -> list[Choice]:
+    """One choice per migration setting, from the specifications, the probe's verdicts and what
+    project.yml already enables."""
     choices = []
     for setting, group in MIGRATION_SETTINGS.items():
         values = setting_values(text, setting)
-        if not defined.get(setting):
+        if setting in enabled:
+            choices.append(Choice(setting, group, None,
+                                  "skipped: project.yml already enables it, and its migrate mode would "
+                                  "switch it back off"))
+        elif not defined.get(setting):
             choices.append(Choice(setting, group, None,
                                   "skipped: the build-setting probe reports it absent from this Xcode"))
         elif values is None:
@@ -143,7 +157,8 @@ def _developer_dir(argument: pathlib.Path | None) -> pathlib.Path:
 
 def command_plan(args: argparse.Namespace) -> int:
     text = PROBE.spec_texts(_developer_dir(args.developer_dir))
-    choices = plan(text, PROBE.probe(text, tuple(MIGRATION_SETTINGS)))
+    project = args.project.read_text(encoding="utf-8") if args.project.is_file() else ""
+    choices = plan(text, PROBE.probe(text, tuple(MIGRATION_SETTINGS)), project_enabled(project))
     payload = {"schemaVersion": PLAN_SCHEMA, "xcode": _xcode_version(),
                "settings": [asdict(choice) for choice in choices]}
     if args.output:
@@ -345,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     plan_parser = commands.add_parser("plan", help="choose each setting's value for the selected Xcode")
     plan_parser.add_argument("--developer-dir", type=pathlib.Path, help="defaults to `xcode-select -p`")
+    plan_parser.add_argument("--project", type=pathlib.Path, default=ROOT / "project.yml",
+                             help="the project.yml whose enabled settings are skipped")
     plan_parser.add_argument("--output", type=pathlib.Path, help="write the plan as JSON")
     plan_parser.add_argument("--github-output", action="store_true", help="append settings=... to $GITHUB_OUTPUT")
     report_parser = commands.add_parser("report", help="count a build log's warnings per group and file")

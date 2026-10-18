@@ -462,7 +462,7 @@ final class ReferenceClipRecorder: NSObject {
     }
 }
 
-extension ReferenceClipRecorder: AVAudioRecorderDelegate {
+extension ReferenceClipRecorder: nonisolated AVAudioRecorderDelegate {
     /// The recorder also stops itself at `record(forDuration:)`'s cap, which can
     /// come before the metering timer's own stop after a main-thread hitch. The
     /// overlay then offers the clip without calling a stop, so this is where the

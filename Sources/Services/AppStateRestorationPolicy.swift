@@ -8,7 +8,7 @@ enum AppStateRestorationPolicy {
 }
 
 @MainActor
-final class QwenVoiceApplicationDelegate: NSObject, NSApplicationDelegate {
+final class QwenVoiceApplicationDelegate: NSObject, nonisolated NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Vocello is dark-only (matches iOS): pin the whole app — windows,
         // menus, alerts, panels, the Settings scene — to dark, ignoring the

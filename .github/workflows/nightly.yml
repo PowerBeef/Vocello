@@ -146,8 +146,9 @@ jobs:
     # NonisolatedNonsendingByDefault and InferIsolatedConformances upcoming features
     # would flag in their migrate mode, which only warns. The macOS app and
     # VocelloCoreTests compile once from a clean tree with warnings not treated as
-    # errors; a setting the pinned Xcode's build-setting probe reports absent, or an
-    # upcoming feature without a migrate mode, is skipped and named in the summary.
+    # errors; a setting project.yml already enables, a setting the pinned Xcode's
+    # build-setting probe reports absent, or an upcoming feature without a migrate mode
+    # is skipped and named in the summary.
     # It files no issue; no count is a verdict.
     name: Migrate-mode strictness warnings (report-only)
     runs-on: macos-26

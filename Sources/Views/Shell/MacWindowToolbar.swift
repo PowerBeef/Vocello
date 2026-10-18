@@ -182,7 +182,7 @@ private struct MacToolbarSearchField: NSViewRepresentable {
         field.setAccessibilityLabel(placeholder)
     }
 
-    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
+    @MainActor final class Coordinator: NSObject, nonisolated NSSearchFieldDelegate {
         var text: Binding<String>
 
         init(text: Binding<String>) {

@@ -385,7 +385,7 @@ import QwenVoiceCore
     }
 }
 
-@MainActor enum IOSSettingsCategory: String, CaseIterable {
+@MainActor enum IOSSettingsCategory: String, nonisolated CaseIterable {
     case audio, appLanguage, modelsFiles, privacyPermissions, accessibility, about
     var title: String {
         switch self {

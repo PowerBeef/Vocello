@@ -13,7 +13,7 @@ import QwenVoiceCore
 /// failure is shown with Retry instead of ending the session: `IOSStartupRunner` owns
 /// the pass, so Retry starts one only after a failure.
 @MainActor
-final class IOSAppDependenciesContainer: ObservableObject {
+final class IOSAppDependenciesContainer: nonisolated ObservableObject {
     struct Dependencies {
         let registry: ContractBackedModelRegistry
         let engine: TTSEngineStore

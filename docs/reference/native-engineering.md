@@ -182,6 +182,11 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - Blocking the main thread during model load; observing the whole engine store in the root shell's body.
 - Using the saved-reference language as Clone output language; assembling requests in a view.
 - Treating `.cancelled` as failure or releasing ownership before the terminal barrier.
+- Conforming a `@MainActor` type to an Objective-C delegate a framework calls off the main actor
+  (`AVAudioRecorderDelegate`, `CXCallObserverDelegate` and the like) without writing
+  `nonisolated` on the conformance. With InferIsolatedConformances on, the conformance is inferred
+  main-actor-isolated, so main-actor witnesses compile and then trap when the framework calls them.
+  Mark the conformance and its witnesses `nonisolated` and hop to the main actor inside.
 - Using raw `ScrollView` on iOS; making color the only indicator; reintroducing a separate engine process.
 - Adding, moving or deleting a file under a globbed `Sources/`, `Tests/` or resource path without
   `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit. The shared `scripts/project_generation.py` signature covers specifications, generators and

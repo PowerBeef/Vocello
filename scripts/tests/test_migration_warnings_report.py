@@ -130,6 +130,17 @@ class PlanTests(unittest.TestCase):
         # The probe's verdict wins even where a definition could be parsed.
         self.assertIsNone(MODULE.plan(ALL_MIGRATE, {SMS: False, NNBD: True, IIC: True})[0].value)
 
+    def test_a_setting_project_yml_already_enables_is_skipped(self) -> None:
+        project = (f"settings:\n  base:\n    {IIC}: YES\n    {NNBD}: NO\n"
+                   f"    # {SMS}: YES is only a comment\n")
+        self.assertEqual(MODULE.project_enabled(project), frozenset({IIC}))
+        choices = {choice.setting: choice
+                   for choice in MODULE.plan(ALL_MIGRATE, {SMS: True, NNBD: True, IIC: True},
+                                             MODULE.project_enabled(project))}
+        self.assertIsNone(choices[IIC].value)
+        self.assertIn("project.yml already enables it", choices[IIC].reason)
+        self.assertEqual((choices[SMS].value, choices[NNBD].value), ("MIGRATE", "MIGRATE"))
+
     def test_plan_reads_the_owning_xcode_and_writes_the_step_output(self) -> None:
         with tempfile.TemporaryDirectory(prefix="vocello migration ") as tmp:
             app = Path(tmp) / "Xcode.app"
@@ -143,7 +154,8 @@ class PlanTests(unittest.TestCase):
             stdout = io.StringIO()
             with mock.patch.object(MODULE, "_xcode_version", return_value="Xcode 26.6"), \
                     mock.patch.dict("os.environ", {"GITHUB_OUTPUT": str(github_output)}), redirect_stdout(stdout):
-                code = MODULE.main(["plan", "--developer-dir", str(developer), "--output", str(plan_path),
+                code = MODULE.main(["plan", "--developer-dir", str(developer), "--project",
+                                    str(Path(tmp) / "absent.yml"), "--output", str(plan_path),
                                     "--github-output"])
             self.assertEqual(code, 0)
             self.assertEqual(github_output.read_text(encoding="utf-8"), f"settings={SMS}=MIGRATE\n")

@@ -34,6 +34,12 @@ settings:
     # Imports must name the module that declares the members a file uses (SE-0444),
     # which keeps the module graph explicit for explicit-module builds.
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    # A global-actor-isolated type's conformances are inferred isolated to that actor
+    # unless the protocol is itself isolated or Sendable (SE-0470). The 14 conformances
+    # migrate mode flagged carry `nonisolated` and keep their earlier isolation; new ones
+    # are isolated by default. An Objective-C delegate a framework calls off the main
+    # actor must still be marked `nonisolated` (native-engineering.md).
+    SWIFT_UPCOMING_FEATURE_INFER_ISOLATED_CONFORMANCES: YES
     # Owned-target optimization (workflow audit P2-1). Project-level settings reach
     # only the targets of this project, never the Swift packages (MLX,
     # swift-transformers, GRDB). Development and test builds override these

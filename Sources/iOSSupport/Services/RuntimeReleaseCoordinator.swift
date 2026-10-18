@@ -3,7 +3,7 @@ import Observation
 import QwenVoiceCore
 
 @MainActor
-enum RuntimeReleaseAction: Equatable {
+enum RuntimeReleaseAction: nonisolated Equatable {
     case none
     case deferred(reason: String)
     case execute(reason: String, wasDeferred: Bool)
@@ -13,20 +13,20 @@ enum RuntimeReleaseAction: Equatable {
 /// deferred while a generation is active; `critical` must run immediately
 /// because the generation itself may be the source of the pressure.
 @MainActor
-enum MemoryPressureSeverity: Equatable {
+enum MemoryPressureSeverity: nonisolated Equatable {
     case warning
     case critical
 }
 
 @MainActor
-enum MemoryPressureReliefAction: Equatable {
+enum MemoryPressureReliefAction: nonisolated Equatable {
     case none
     case deferred(reason: String)
     case execute(reason: String, cancelActiveGeneration: Bool)
 }
 
 @MainActor
-enum CriticalMemoryReliefOutcome: Equatable {
+enum CriticalMemoryReliefOutcome: nonisolated Equatable {
     case completed
     case cancellationFailed
     case alreadyInFlight

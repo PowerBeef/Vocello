@@ -147,7 +147,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, nonisolated NSTextViewDelegate {
         var parent: MacScriptTextEditor
         var textState: ScriptTextState
         var appliedClearRequest: Int

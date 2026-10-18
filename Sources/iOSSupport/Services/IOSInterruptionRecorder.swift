@@ -96,7 +96,7 @@ public final class IOSInterruptionRecorder: NSObject {
     }
 }
 
-extension IOSInterruptionRecorder: CXCallObserverDelegate {
+extension IOSInterruptionRecorder: nonisolated CXCallObserverDelegate {
     public nonisolated func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
         let type: String
         if call.hasEnded {

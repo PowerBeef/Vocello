@@ -32,7 +32,7 @@ enum IOSNativeDeviceFeatureGate {
 }
 
 @MainActor
-final class TTSEngineStore: ObservableObject, TTSEngine {
+final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private static let memoryLogger = Logger(
         subsystem: "com.patricedery.vocello",
         category: "MemoryGuard"

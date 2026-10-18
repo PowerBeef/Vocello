@@ -104,7 +104,7 @@ enum SavedVoiceStoreFailureCategory: String, Equatable, Sendable {
 }
 
 @MainActor
-public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, TTSEngineEventStreaming, ActiveGenerationCancellable, StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {
+public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, nonisolated TTSEngineEventStreaming, ActiveGenerationCancellable, StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {
     private static let lightweightWarmupText = "Hi."
     public static var lightweightWarmupTextForUI: String { lightweightWarmupText }
 

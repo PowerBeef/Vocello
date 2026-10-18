@@ -269,7 +269,7 @@ class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellab
 /// The streaming shape of every production engine (`MLXTTSEngine`): the store
 /// skips its snapshot chunk forwarding for it.
 @MainActor
-private final class StreamingStoreFixtureEngine: StoreFixtureEngine, TTSEngineEventStreaming {
+private final class StreamingStoreFixtureEngine: StoreFixtureEngine, nonisolated TTSEngineEventStreaming {
     nonisolated func events(for generationID: UUID) -> AsyncStream<GenerationEvent> {
         AsyncStream { $0.finish() }
     }

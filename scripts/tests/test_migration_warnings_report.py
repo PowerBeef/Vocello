@@ -189,7 +189,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("the build succeeded. 6 distinct diagnostic site(s) from 9 log line(s).", text)
         self.assertIn(f"| `{SMS}` | `MIGRATE` | `#StrictMemorySafety` | 2 | 2 |", text)
         self.assertIn(f"| `{NNBD}` | `MIGRATE` | `#NonisolatedNonsendingByDefault` | 1 | 1 |", text)
-        self.assertIn(f"| `{IIC}` | `MIGRATE` | `#InferIsolatedConformances` | 0 | 0 |", text)
+        self.assertIn(f"| `{IIC}` | `MIGRATE` | `#IsolatedConformances` | 0 | 0 |", text)
         self.assertIn("| Sources/QwenVoiceCore | 1 | 1 | 0 |", text)
         self.assertIn("| Tests/VocelloCoreTests | 1 | 0 | 0 |", text)
         self.assertIn("| `Sources/QwenVoiceCore/MLXTTSEngine.swift` | 2 | 1 | 1 | 0 |", text)
@@ -199,9 +199,27 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn(REPO, text)
         self.assertNotIn("Errors", text)
 
+    def test_isolated_conformance_warnings_count_under_their_setting(self) -> None:
+        # Xcode 27.1's wording: the feature is InferIsolatedConformances, the group is shorter.
+        flagged = log(f"{SWIFT_FILE}:106:86: warning: conformance of 'MLXTTSEngine' to 'TTSEngineEventStreaming' "
+                      "should be marked 'nonisolated' to retain its behavior with upcoming feature "
+                      "'InferIsolatedConformances' [#IsolatedConformances]",
+                      "** TEST BUILD SUCCEEDED **")
+        text = MODULE.render(flagged, "x.log", self.plan_payload(), REPO)
+        self.assertIn(f"| `{IIC}` | `MIGRATE` | `#IsolatedConformances` | 1 | 1 |", text)
+        self.assertIn("| Sources/QwenVoiceCore | 0 | 0 | 1 |", text)
+        self.assertNotIn("Other diagnostic groups", text)
+        # A plan recorded with the feature's name as its group still counts them.
+        stale = self.plan_payload()
+        for entry in stale["settings"]:
+            if entry["setting"] == IIC:
+                entry["group"] = "InferIsolatedConformances"
+        self.assertIn(f"| `{IIC}` | `MIGRATE` | `#IsolatedConformances` | 1 | 1 |",
+                      MODULE.render(flagged, "x.log", stale, REPO))
+
     def test_skipped_settings_are_named_with_their_reason(self) -> None:
-        text = MODULE.render(BUILD_LOG, "x.log", self.plan_payload(InferIsolatedConformances=None), REPO)
-        self.assertIn(f"| `{IIC}` | skipped | `#InferIsolatedConformances` | – | – |", text)
+        text = MODULE.render(BUILD_LOG, "x.log", self.plan_payload(IsolatedConformances=None), REPO)
+        self.assertIn(f"| `{IIC}` | skipped | `#IsolatedConformances` | – | – |", text)
         self.assertIn(f"- `{IIC}`: skipped: the build-setting probe reports it absent from this Xcode.", text)
         self.assertIn("| Area | StrictMemorySafety | NonisolatedNonsendingByDefault |", text)
 
@@ -227,7 +245,7 @@ class ReportTests(unittest.TestCase):
             plan_path = Path(tmp) / "plan.json"
             plan_path.write_text(json.dumps(self.plan_payload(StrictMemorySafety=None,
                                                               NonisolatedNonsendingByDefault=None,
-                                                              InferIsolatedConformances=None)),
+                                                              IsolatedConformances=None)),
                                  encoding="utf-8")
             stdout = io.StringIO()
             with mock.patch.dict("os.environ", {"GITHUB_STEP_SUMMARY": str(summary)}), redirect_stdout(stdout):

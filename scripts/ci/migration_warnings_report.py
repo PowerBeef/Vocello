@@ -33,11 +33,12 @@ import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 
-# The settings the job enables, each with the diagnostic group its warnings carry.
+# The settings the job enables, each with the diagnostic group its warnings carry. The group is the
+# compiler's, not the feature's name: InferIsolatedConformances warns under [#IsolatedConformances].
 MIGRATION_SETTINGS = {
     "SWIFT_STRICT_MEMORY_SAFETY": "StrictMemorySafety",
     "SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT": "NonisolatedNonsendingByDefault",
-    "SWIFT_UPCOMING_FEATURE_INFER_ISOLATED_CONFORMANCES": "InferIsolatedConformances",
+    "SWIFT_UPCOMING_FEATURE_INFER_ISOLATED_CONFORMANCES": "IsolatedConformances",
 }
 # Settings whose plain YES only adds warnings, so YES stands in where no migrate mode exists.
 WARNING_ONLY = frozenset({"SWIFT_STRICT_MEMORY_SAFETY"})
@@ -228,7 +229,10 @@ def _cell(value: str) -> str:
 def render(log_text: str | None, log_name: str, plan_payload: dict | None, root: str,
            top: int = DEFAULT_TOP) -> str:
     out = ["### Migrate-mode strictness warnings (report-only)", ""]
-    choices = [Choice(**entry) for entry in (plan_payload or {}).get("settings", [])]
+    # Each setting's group comes from this script, not the plan, so a plan written before a group
+    # was corrected still counts the right diagnostics.
+    choices = [Choice(**{**entry, "group": MIGRATION_SETTINGS.get(entry["setting"], entry["group"])})
+               for entry in (plan_payload or {}).get("settings", [])]
     xcode = (plan_payload or {}).get("xcode", "the selected Xcode")
     if not choices:
         choices = [Choice(setting, group, None, "no plan was recorded")

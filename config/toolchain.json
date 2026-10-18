@@ -123,6 +123,13 @@
       "archivePath": "swiftlint-static",
       "binaryName": "swiftlint"
     },
+    "periphery": {
+      "version": "3.8.0",
+      "url": "https://github.com/peripheryapp/periphery/releases/download/3.8.0/periphery-3.8.0.zip",
+      "sha256": "07d4e286e31dd79164df39097e0b59f533c94badbe18158464a455ea88a166d7",
+      "archivePath": "periphery",
+      "versionArgs": ["version"]
+    },
     "ruff": {
       "version": "0.17.1",
       "url": "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-aarch64-apple-darwin.tar.gz",

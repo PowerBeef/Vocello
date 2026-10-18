@@ -21,6 +21,8 @@
 #   archived binary has another name (SwiftLint's Linux zip ships the fully
 #   static `swiftlint-static`) names its command with `binaryName`, the name
 #   the wrapper is installed under; it defaults to the archived file's name.
+#   A pin whose tool has no `--version` names its version arguments in
+#   `versionArgs` (Periphery: ["version"]).
 #   In GitHub Actions the prefix is appended to $GITHUB_PATH so subsequent
 #   steps resolve the pinned binaries first.
 
@@ -114,7 +116,15 @@ if [[ -n "${GITHUB_PATH:-}" ]]; then
     echo "$PREFIX" >> "$GITHUB_PATH"
 fi
 
+# The arguments that print a pin's version: its `versionArgs`, else `--version`
+# (Periphery answers only `periphery version`).
+pinned_version_args() {
+    python3 -c "import json;print('\n'.join(json.load(open('$MANIFEST'))['artifactPins']['$1'].get('versionArgs') or ['--version']))"
+}
+
 for tool in "${TOOLS[@]}"; do
     binary="$(pinned_binary_name "$tool")"
-    PATH="$PREFIX:$PATH" "$binary" --version | head -2
+    version_args=()
+    while IFS= read -r arg; do version_args+=("$arg"); done < <(pinned_version_args "$tool")
+    PATH="$PREFIX:$PATH" "$binary" "${version_args[@]}" | head -2
 done

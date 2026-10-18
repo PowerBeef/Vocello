@@ -119,5 +119,50 @@ class WriteSummaryTests(unittest.TestCase):
             self.assertFalse(payload["complete"])
 
 
+# `swift test` of the owned package: XCTest cases, then Swift Testing's banner, verdicts and trailer.
+SWIFT_TESTING_LOG = SWIFT_TEST_LOG + """↳ Testing Library Version: 2084
+◇ Suite "Frames" started.
+✔ Test "Sizes survive the trip" with 512 test cases passed after 0.004 seconds.
+✘ Test atLeastOneFrame(seconds:) with 4 test cases failed after 0.002 seconds with 1 issue.
+➜ Test "Needs fixtures" skipped: "fixtures unset"
+✘ Suite "Frames" failed after 0.006 seconds with 1 issue.
+✘ Test run with 3 tests in 1 suite failed after 0.006 seconds with 1 issue.
+"""
+
+
+class SwiftTestingTests(unittest.TestCase):
+    """Swift Testing results are counted, and a run whose library started must end with its trailer."""
+
+    def test_swift_testing_verdicts_join_the_tests(self):
+        payload = summary.summarize(SWIFT_TESTING_LOG, require_complete=True)
+        swift = [t for t in payload["tests"] if t["suite"] == "swift-testing"]
+        self.assertEqual([(t["test"], t["verdict"]) for t in swift], [
+            ("Sizes survive the trip", "passed"),
+            ("atLeastOneFrame(seconds:)", "failed"),
+            ("Needs fixtures", "skipped"),
+        ])
+        self.assertEqual(swift[0]["cases"], 512)
+        self.assertEqual(payload["counts"], {"passed": 2, "failed": 1, "skipped": 2, "total": 5})
+        self.assertEqual(payload["swiftTesting"], {"total": 3, "trailers": 1, "tests": 3})
+        self.assertTrue(payload["complete"])
+        self.assertTrue(payload["consistent"])  # XCTest's trailer still matches its own two cases
+
+    def test_a_started_run_without_its_trailer_is_incomplete(self):
+        truncated = SWIFT_TESTING_LOG.rsplit("✘ Test run with", 1)[0]
+        payload = summary.summarize(truncated, require_complete=True)
+        self.assertFalse(payload["complete"])
+        self.assertFalse(payload["consistent"])
+
+    def test_a_trailer_count_that_disagrees_is_inconsistent(self):
+        payload = summary.summarize(SWIFT_TESTING_LOG.replace("with 3 tests in", "with 4 tests in"))
+        self.assertFalse(payload["consistent"])
+
+    def test_a_log_without_swift_testing_is_unchanged(self):
+        payload = summary.summarize(SWIFT_TEST_LOG, require_complete=True)
+        self.assertNotIn("swiftTesting", payload)
+        self.assertTrue(payload["complete"])
+        self.assertTrue(payload["consistent"])
+
+
 if __name__ == "__main__":
     unittest.main()

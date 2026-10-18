@@ -70,6 +70,13 @@ if errors:
     raise SystemExit("\n".join(errors))
 PY
 
+# The deterministic lane runs the Xcode-built test bundles with the raw `xcrun xctest`
+# runner, which never executes Swift Testing tests: the run passes without them
+# (workflow audit P1-6, verified 2026-10-18). Until a runner executes them, tests in
+# the Xcode test targets stay XCTest. The owned package's tests run under `swift test`.
+out="$(rg -n '^\s*(@testable\s+)?import\s+Testing\b' Tests 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "Swift Testing in an Xcode test target would never run under the lane's xctest runner:\n$out"
+
 # UI tests synchronise on conditions, never on the clock. The two perf scenario
 # files are the recorded exemption: their paced sleeps are the measured workload.
 out="$(rg -n '\b(?:sleep|usleep)\s*\(|Thread\.sleep' \

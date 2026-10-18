@@ -2002,7 +2002,7 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-20",
-      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice. P0-1 to P0-9, P0-11 and P0-12 landed the same day (a7b765c2 to f49a4c4f, plus a roadmap validate cache): a roadmap-only check selects 6 Python modules and takes 29 s (was about 75 s; validate itself 2.9 s to 0.05 s); the 20 s target waits on P1-3's contract gate. The CI failure summary and cache re-save are proven at the next push's CI run."
+      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice. P0-1 to P0-9, P0-11 and P0-12 landed the same day (a7b765c2 to f49a4c4f, plus a roadmap validate cache): a roadmap-only check selects 6 Python modules and takes 29 s (was about 75 s; validate itself 2.9 s to 0.05 s); the 20 s target waits on P1-3's contract gate. The CI failure summary and cache re-save are proven at the next push's CI run. Measured after P1-3: a roadmap-only check takes 19.7 s (6 of 36 contract validators, 277 Python tests)."
     },
     {
       "id": "DW-02",
@@ -2019,7 +2019,7 @@
       ],
       "updated": "2026-10-18",
       "due": "2026-10-22",
-      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-4 and P1-5 (a59c556d), P1-11 (d4b08f21), P1-14 (9204b75d)."
+      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-1 lane ledger and dev.sh status --kpi (4a1f3c34; 257 retained runs classified), P1-3 parallel, path-selected contract gate (3c227dd1; about 11 s to 2-3 s), P1-4 and P1-5 deadline and report-only Main Thread Checker (a59c556d; 0 violations in 1,477 tests), P1-6 Swift Testing parser and the finding that the lane's raw xctest runner never runs Swift Testing, so an invariant keeps it out of Tests/ (c406eea2), P1-7 and P1-8 shellcheck and pinned ruff 0.17.1 against shrinking baselines (eb4ddab3; 0 and 44 findings), P1-11 (d4b08f21), P1-14 (9204b75d). P1-10 declined (see gate). Left: P1-2, P1-9, P1-12, P1-13, P1-15."
     },
     {
       "id": "DW-03",

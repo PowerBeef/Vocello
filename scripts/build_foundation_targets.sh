@@ -35,6 +35,24 @@ case "${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}" in
     exit 2
     ;;
 esac
+# QVOICE_FOUNDATION_MIGRATION_SETTINGS (macOS only; the report-only nightly job, audit E-04 and
+# P2-6): space-separated SWIFT_*=MIGRATE|YES build settings, which
+# `scripts/ci/migration_warnings_report.py plan` chooses for the selected Xcode. With them the macOS
+# compile also builds VocelloCoreTests (build-for-testing with the deterministic test lane's
+# testability and diagnostics settings), turns warnings-as-errors off so what the settings flag stays
+# a warning, and writes qwenvoice-macos-migration.log for `migration_warnings_report.py report`.
+# The tree is cold, so every file compiles and reports; no build receipt is written for it.
+MIGRATION_SETTINGS=()
+if [[ -n "${QVOICE_FOUNDATION_MIGRATION_SETTINGS:-}" ]]; then
+  read -r -a MIGRATION_SETTINGS <<< "$QVOICE_FOUNDATION_MIGRATION_SETTINGS"
+  # Guarded expansion: bash 3.2 treats an empty array as unset under set -u.
+  for setting in ${MIGRATION_SETTINGS[@]+"${MIGRATION_SETTINGS[@]}"}; do
+    if [[ ! "$setting" =~ ^SWIFT_[A-Z0-9_]+=(MIGRATE|YES)$ ]]; then
+      echo "error: QVOICE_FOUNDATION_MIGRATION_SETTINGS takes SWIFT_*=MIGRATE|YES settings (got '$setting')" >&2
+      exit 2
+    fi
+  done
+fi
 FOUNDATION_DERIVED_ROOT="$QVOICE_SCRATCH_FOUNDATION"
 SOURCE_PACKAGES_DIR="$QVOICE_XCODE_SOURCE_PACKAGES"
 
@@ -108,12 +126,26 @@ build_macos() {
   local derived_data_path="$FOUNDATION_DERIVED_ROOT/macos"
   local result_bundle_path="$FOUNDATION_BUILD_ROOT/qwenvoice-macos-build.xcresult"
   local log_path="$FOUNDATION_BUILD_ROOT/qwenvoice-macos-build.log"
+  local label="macOS foundation target" action=build
+  local -a migration_args=()
+  if (( ${#MIGRATION_SETTINGS[@]} > 0 )); then
+    result_bundle_path="$FOUNDATION_BUILD_ROOT/qwenvoice-macos-migration.xcresult"
+    log_path="$FOUNDATION_BUILD_ROOT/qwenvoice-macos-migration.log"
+    label="macOS app and VocelloCoreTests (${MIGRATION_SETTINGS[*]})"
+    action=build-for-testing
+    migration_args=(
+      QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS
+      "${QVOICE_OWNED_DEV_SETTINGS[@]}"
+      SWIFT_TREAT_WARNINGS_AS_ERRORS=NO
+      "${MIGRATION_SETTINGS[@]}"
+    )
+  fi
 
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \
     foundation-macos QwenVoice Release 'platform=macOS,arch=arm64'
   rm -rf "$derived_data_path" "$result_bundle_path"
 
-  run_foundation_build "macOS foundation target" "$log_path" \
+  run_foundation_build "$label" "$log_path" \
     -project "$PROJECT_FILE" \
     -scheme QwenVoice \
     -configuration Release \
@@ -131,7 +163,10 @@ build_macos() {
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
     SWIFT_OPTIMIZATION_LEVEL="$MACOS_OPTIMIZATION" \
     SWIFT_COMPILATION_MODE="$MACOS_COMPILATION_MODE" \
-    build
+    ${migration_args[@]+"${migration_args[@]}"} \
+    "$action"
+  # The migration compile is a report, not a product: its settings are not in the receipt.
+  (( ${#MIGRATION_SETTINGS[@]} == 0 )) || return 0
   write_build_provenance "$FOUNDATION_BUILD_ROOT/last-build.json" \
     "scripts/build_foundation_targets.sh macos" QwenVoice Release \
     "platform=macOS,arch=arm64" arm64 "${MACOS_OPTIMIZATION#-}" ad-hoc \
@@ -245,6 +280,11 @@ esac
 
 if (( INCREMENTAL == 1 )) && [[ "$MODE" != "ios" ]]; then
   echo "error: --incremental is supported only for the local iOS checkpoint" >&2
+  exit 2
+fi
+
+if (( ${#MIGRATION_SETTINGS[@]} > 0 )) && [[ "$MODE" != "macos" ]]; then
+  echo "error: QVOICE_FOUNDATION_MIGRATION_SETTINGS applies to the macos mode only" >&2
   exit 2
 fi
 

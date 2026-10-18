@@ -3,9 +3,9 @@
   "primaryPlan": "release-first-3-0-2026-09",
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
-    "decided": "2026-10-16",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot.",
-    "maxInFlight": 4
+    "decided": "2026-10-18",
+    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze.",
+    "maxInFlight": 6
   },
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
@@ -1294,16 +1294,16 @@
       "id": "AUD-09",
       "title": "Smoke test01 owns the fixture it depends on",
       "status": "planned",
-      "due": "2026-10-21",
+      "due": "2026-10-30",
       "gate": "Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
         "scripts/ui_test.sh"
       ],
-      "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See project-review-2026-09-18.md. 2026-10-13: the fixture preflights landed. Full smoke and the macOS localization walk now stop before the build when the debug store lacks the current benchmark clone voice (scripts/ui_test.sh, naming scripts/macos_test.sh models ensure); the iPhone smoke journey probes Saved Voices before it changes any setting or History and fails with the enrollment route. The clean-store outcome is that actionable stop with nothing changed. Closure needs RF-15's device smoke.",
+      "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See project-review-2026-09-18.md. 2026-10-13: the fixture preflights landed. Full smoke and the macOS localization walk now stop before the build when the debug store lacks the current benchmark clone voice (scripts/ui_test.sh, naming scripts/macos_test.sh models ensure); the iPhone smoke journey probes Saved Voices before it changes any setting or History and fails with the enrollment route. The clean-store outcome is that actionable stop with nothing changed. Closure needs RF-15's device smoke. 2026-10-18: due moved from 2026-10-21 to 2026-10-30; it cannot start before RF-15 (due 2026-10-29).",
       "plan": "release-first-3-0-2026-09",
-      "updated": "2026-10-13",
+      "updated": "2026-10-18",
       "blockedBy": [
         "RF-15"
       ]
@@ -1985,6 +1985,74 @@
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
       "notes": "Requested by the maintainer on 2026-10-16; doc-only, so it may run before the freeze. Re-homed into the release plan on 2026-10-16 while worked (doc-only). The research report is in (two read-only research agents plus the lead's verification against code); its §9 gap analysis is pass 1's work list, and pass 2 follows RF-18 and CONV-21 as shipped.",
       "due": "2026-10-22"
+    },
+    {
+      "id": "DW-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: tooling quick wins (audit Phase 0)",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "Audit P0-1 to P0-12 land with tests: a roadmap-only check selects at most 10 Python modules and runs under 20 s; every swift-lane input schedules a native command; the session hook prints the whole current checkpoint and cache health; the checkpoint keeps its newest five entries; roadmap.py gains set, close and note; the guard corpus passes every known false positive and still blocks every true positive; stale docs are fixed; CI shows failing test names and its build cache re-saves when a warm run recompiled more than 200 files; pyrightconfig.json exists; the local arenas are regenerated and warm.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "scripts/development_workflow.py",
+        "scripts/hooks/",
+        "scripts/roadmap.py",
+        ".github/workflows/ci.yml"
+      ],
+      "updated": "2026-10-18",
+      "due": "2026-10-20",
+      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice."
+    },
+    {
+      "id": "DW-02",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: structural tooling (audit Phase 1)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, a rehearsal that skips gates push CI proved, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "scripts/macos_test.sh",
+        "scripts/check_project_inputs.sh",
+        ".claude/agents/vocello-swift-review.md"
+      ],
+      "updated": "2026-10-18",
+      "due": "2026-10-22",
+      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18."
+    },
+    {
+      "id": "DW-03",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: product-side quality (audit Phase 2)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "project.yml",
+        "Packages/VocelloQwen3Core/Package.swift",
+        "Tests/VocelloCoreTests"
+      ],
+      "updated": "2026-10-18",
+      "due": "2026-10-22",
+      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release, not after the submission. Each change is validated on the Mac (unit lane, TSan, generic iOS compile, Mac smoke) before it lands; device proof joins the next announced iPhone window."
+    },
+    {
+      "id": "DW-04",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: longer-term modernization (audit Phase 3)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "config/toolchain.json",
+        "Sources/"
+      ],
+      "updated": "2026-10-18",
+      "due": "2026-10-30",
+      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release. Items that need an external condition (GitHub runners with Xcode 27, a new tool's approval, an iPhone window) wait for it and say so here."
     }
   ]
 }

@@ -7,7 +7,8 @@ deterministic Python and lint checks and commit in its own worktree. It never pu
 commits in the main checkout, runs native builds, tests, devices, models or measured
 lanes, or edits the roadmap or the checkpoint; the lane scripts' usage text and the
 reporting `xcodebuild -version` and `-showsdks` stay open (`-list` can resolve
-packages). Exit 2 with the reason on stderr blocks the call. Parser defects fail open,
+packages), but sourcing a lane script or a `scripts/lib` library does not: it leaves
+the lane's functions callable by bare name. Exit 2 with the reason on stderr blocks the call. Parser defects fail open,
 like the policy guard; the lead still integrates and reviews every agent commit. Hooks run the host's bare
 `python3`, often the macOS system Python 3.9: keep this file importable there. Never
 execute or persist input.
@@ -49,6 +50,14 @@ def _script(word: str) -> str:
     """The repository script a word names (`scripts/x.sh`, `./scripts/x.sh`, absolute), else ''."""
     parts = word.split("/")
     return parts[-1] if len(parts) >= 2 and parts[-2] == "scripts" else ""
+
+
+def _sources_lane_code(word: str) -> bool:
+    """A lane script or `scripts/lib` shell library: sourcing one defines `build`, `xcb_run` and the
+    rest in the caller's shell, where a later bare call runs them past every check here."""
+    parts = word.split("/")
+    return _script(word) in LANE_SCRIPTS | HELP_SCRIPTS or (
+        len(parts) >= 3 and parts[-3:-1] == ["scripts", "lib"] and word.endswith(".sh"))
 
 
 def _xcodebuild_reports_only(args: list[str]) -> bool:
@@ -104,6 +113,10 @@ def command_violation(command: str, depth: int = 0) -> str:
             operands = [word for word in args if not word.startswith("-")]
         script = _script(words[0])
         verb = operands[0] if operands else ""
+        if name in ("source", ".") and operands and _sources_lane_code(operands[0]):
+            return f"sourcing `{operands[0]}` defines its build, test and device functions in this shell"
+        if name == "xcb_run":
+            return "`xcb_run` is a native build"
         if script in HELP_SCRIPTS and args[:1] and args[0] in HELP_WORDS:
             continue
         if script in LANE_SCRIPTS:

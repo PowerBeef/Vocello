@@ -283,8 +283,10 @@ agent worktree is removed automatically. Inspect Git metadata and commit identit
 proof of repository identity. Give each worker a disjoint file set and clear validation limits; the
 SubagentStart hook repeats the agent rules to every subagent, and `agent_guard.py` enforces them: only a
 subagent's hook input carries `agent_id`, so it alone is refused pushes, commits in the main checkout,
-native builds and tests, device, model and measured-lane scripts and edits of `config/roadmap.json` or
-`docs/development-progress.md`. Hand-made branches and worktrees stay denied.
+native builds and tests, device, model and measured-lane scripts (sourcing a lane script or a
+`scripts/lib` shell library included, since that leaves `build` or `xcb_run` callable by bare name) and
+edits of `config/roadmap.json` or `docs/development-progress.md`. Hand-made branches and worktrees stay
+denied.
 
 Agents make scoped commits on their `worktree-*` branch and never push, modify the roadmap/checkpoint or
 run models, devices, native UI or native builds. The lead reviews each commit, integrates with
@@ -292,7 +294,8 @@ run models, devices, native UI or native builds. The lead reviews each commit, i
 not edit scripts used by a running lane. Remove integrated worktrees with
 `git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>`, preserving needed
 ignored evidence first; never discard unintegrated work to tidy the workspace (`--force` and
-`git branch -D` ask first).
+`git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
+`git cherry main worktree-<name>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
 
 Before source-bound measurements join or stop all delegated work. `scripts/active_workers.py`
 uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events, host-wide leases and the live

@@ -111,6 +111,10 @@ AGENT_REFUSED = (
     "xcodebuild -showsdks -destination generic/platform=iOS", "xcrun xcodebuild -scheme QwenVoice build",
     # -list can resolve the project's packages outside the native lock and the owned caches.
     "xcodebuild -list", "xcodebuild -list -project QwenVoice.xcodeproj", "xcodebuild -list -json -workspace W.xcworkspace",
+    # Sourcing a lane leaves its functions callable by bare name (an agent's `build` once ran this way).
+    "source scripts/ios_device.sh help; build", ". ./scripts/macos_test.sh help", "source scripts/dev.sh help",
+    'source "$PWD/scripts/ui_test.sh" --help', "bash -c 'source scripts/lib/build_cache.sh; xcb_run build'",
+    ". scripts/lib/dev_signing.sh", "xcb_run build -scheme QwenVoice",
 )
 AGENT_ALLOWED = (
     "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
@@ -127,6 +131,7 @@ AGENT_ALLOWED = (
     "scripts/dev.sh help", "scripts/dev.sh --help", "bash scripts/dev.sh check --dry-run --json",
     "xcodebuild -version", "/usr/bin/xcodebuild -version", "xcrun xcodebuild -version",
     "xcodebuild -version -sdk iphoneos", "xcodebuild -showsdks", "xcodebuild -showsdks -json",
+    "source .venv/bin/activate", ". website/scripts/env.sh", "cat scripts/lib/build_cache.sh",
 )
 SIMULATOR_REFUSED = (
     # A command substitution runs even inside a commit message or a search pattern.

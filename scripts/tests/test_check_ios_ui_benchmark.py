@@ -18,8 +18,8 @@ TEST_HELPERS = ROOT / "scripts" / "tests"
 if str(TEST_HELPERS) not in sys.path:
     sys.path.insert(0, str(TEST_HELPERS))
 from test_benchmark_memory import ENGINE_BOUNDARIES, row as memory_row, samples as memory_samples
+from shell_stubs import ui_function
 CHECK = ROOT / "scripts" / "check_ios_ui_benchmark.py"
-RUNNER = ROOT / "scripts" / "ui_test.sh"
 RUN_ID = "ios-ui-order-fixture"
 
 
@@ -578,11 +578,9 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_runner_does_not_mask_benchmark_gate_failure_in_or_list(self) -> None:
-        text = RUNNER.read_text(encoding="utf-8")
-        prefix = "validate_ios_benchmark() {\n"
-        start = text.index(prefix)
-        end = text.index("\n}\n", start) + 3
-        function = text[start:end]
+        # ui_test.sh runs its lane at top level, so the shared loader in
+        # scripts/tests/shell_stubs.py takes this one function.
+        function = ui_function("validate_ios_benchmark")
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

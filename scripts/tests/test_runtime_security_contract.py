@@ -123,15 +123,25 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         )
         self.assertEqual(classifications["master-gate"], "capability-gate")
 
+    @staticmethod
+    def route_fixtures(capability: dict) -> dict[str, str]:
+        """Route sources that satisfy the boundary: enabled routes compile the capability,
+        distributed ones never name it. The real routes are checked by
+        validate_debug_contract (test_runtime_debug_registry_covers_production_sources)."""
+        routes = {relative: "build --flag VOCELLO_INTERNAL_DIAGNOSTICS\n"
+                  for relative in capability["enabledBuildRoutes"]}
+        routes.update({relative: "build --distribution\n" for relative in capability["distributedBuildRoutes"]})
+        return routes
+
+    def test_route_fixtures_pass_the_boundary(self) -> None:
+        contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
+        route_sources = self.route_fixtures(contract["internalBuildCapability"])
+        self.assertEqual(MODULE.internal_diagnostics_capability_errors(contract, route_sources=route_sources), [])
+
     def test_internal_capability_may_not_leak_into_distribution_routes(self) -> None:
         contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
         capability = contract["internalBuildCapability"]
-        route_sources = {
-            relative: (ROOT / relative).read_text(encoding="utf-8")
-            for relative in (
-                capability["enabledBuildRoutes"] + capability["distributedBuildRoutes"]
-            )
-        }
+        route_sources = self.route_fixtures(capability)
         release_route = capability["distributedBuildRoutes"][0]
         route_sources[release_route] += "\nVOCELLO_INTERNAL_DIAGNOSTICS\n"
         errors = MODULE.internal_diagnostics_capability_errors(
@@ -143,12 +153,7 @@ class RuntimeSecurityContractTests(unittest.TestCase):
     def test_every_enabled_route_must_compile_internal_capability(self) -> None:
         contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")
         capability = contract["internalBuildCapability"]
-        route_sources = {
-            relative: (ROOT / relative).read_text(encoding="utf-8")
-            for relative in (
-                capability["enabledBuildRoutes"] + capability["distributedBuildRoutes"]
-            )
-        }
+        route_sources = self.route_fixtures(capability)
         enabled_route = capability["enabledBuildRoutes"][0]
         route_sources[enabled_route] = route_sources[enabled_route].replace(
             "VOCELLO_INTERNAL_DIAGNOSTICS",

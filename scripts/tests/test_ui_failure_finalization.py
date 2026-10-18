@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import re
 import signal
 import shlex
 import subprocess
@@ -13,16 +12,12 @@ import time
 import unittest
 from unittest import mock
 
+# scripts/tests/shell_stubs.py loads one function at a time: sourcing the runner would execute UI.
+from shell_stubs import ui_function as function
+
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "scripts/ui_test.sh"
 HELPER = ROOT / "scripts/lib/ui_finalization.sh"
-
-
-def function(name: str) -> str:
-    # Load the producer's function only; sourcing the runner would execute UI.
-    match = re.search(rf"^{name}\(\) \{{\n.*?^\}}$", RUNNER.read_text(), re.M | re.S)
-    assert match, name
-    return match.group(0)
 
 
 class UIFinalizationTests(unittest.TestCase):

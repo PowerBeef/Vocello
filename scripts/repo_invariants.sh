@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Cheap, exact greps for product invariants that no unit test can see.
-# Each check names the invariant it protects; there is no prose denylist and
-# no assertion about the text of other scripts or workflows.
+# Each check names the invariant it protects; there is no prose denylist. A check
+# reads a script's text only where the invariant lives in a lane that needs a
+# phone or the app's UI to run, so no test can execute it; each such check says so.
 
 set -euo pipefail
 
@@ -217,14 +218,56 @@ out="$(rg -l 'VocelloExports\.storekit' QwenVoice.xcodeproj/xcshareddata/xcschem
 out="$(rg -n 'voiceCloning_consentAcknowledgment' Sources/iOS 2>/dev/null | rg -v 'Settings/SettingsScreen\.swift' || true)"
 [[ -z "$out" ]] || fail "clone consent is settings-owned; no other iOS surface may declare it:\n$out"
 
+# Purchase acceptance proves restoration: the iPhone purchase lane validates its local
+# StoreKit evidence with --require-restoration, so a run that left the phone's Studio,
+# tab or History filter changed is never purchase acceptance (the collector's own tests,
+# scripts/tests/test_ios_purchase_acceptance.py, cover what the flag enforces). The lane
+# needs a paired iPhone, so no test can run it; this keeps the flag on that call.
+rg -q -U --multiline-dotall 'ios_purchase_acceptance\.py.{0,400}--require-restoration' scripts/ui_test.sh \
+  || fail "scripts/ui_test.sh must run ios_purchase_acceptance.py with --require-restoration"
+
+# Evidence ledgers: every UI lane in config/orchestration-contract.json binds each step it
+# declares to a ledger call in scripts/ui_test.sh, and the lane announces PASS only after
+# finalizing that ledger. The lanes need a phone or the app's UI, so no test can run them;
+# the gate and release-readiness producers are behaviour-tested instead
+# (scripts/tests/test_macos_gate.py, scripts/tests/test_profile_capture_contract.py).
+ledger_error="$(python3 - 2>&1 <<'PY' || true
+from pathlib import Path
+import json
+import re
+
+producer = "scripts/ui_test.sh"
+text = Path(producer).read_text(encoding="utf-8")
+errors = []
+for name in ("required_steps_init", "required_steps_finalize"):
+    if name not in text:
+        errors.append(f"{producer} never calls {name}")
+workflows = json.loads(Path("config/orchestration-contract.json").read_text(encoding="utf-8"))["workflows"]
+for workflow_id, workflow in workflows.items():
+    if workflow["producer"] != producer:
+        continue
+    for step in workflow["requiredSteps"] + workflow.get("optionalSteps", []):
+        if not re.search(rf"required_step_(?:run|record)[\s\S]{{0,100}}\b{re.escape(step)}\b", text):
+            errors.append(f"{producer} binds no ledger call to step {step} that {workflow_id} declares")
+if not re.search(r'required_steps_finalize[\s\S]{0,1400}note "\$platform \$lane PASS', text):
+    errors.append(f"{producer} can announce PASS without finalizing its required-step ledger")
+if errors:
+    raise SystemExit("\n".join(errors))
+PY
+)"
+[[ -z "$ledger_error" ]] || fail "$ledger_error"
+
 # Release-only candidate acceptance: the preinstalled-candidate UI test drives the shipped app as is.
 out="$(rg -n 'QWENVOICE_DEBUG|VOCELLO_INTERNAL_DIAGNOSTICS|appDataContainer' \
   Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "candidate acceptance must not enable diagnostics or reach into the app container:\n$out"
 
-# One Python test root: pytest collects scripts/tests/test_*.py only, so a module
-# anywhere else or named otherwise would be silently unrun.
-out="$(find scripts -name 'test_*.py' -not -path 'scripts/tests/*' -print; find scripts/tests -maxdepth 1 -name '*.py' ! -name 'test_*.py' ! -name 'conftest.py' -print)"
+# One Python test root: pytest collects scripts/tests/test_*.py only, so a test module
+# anywhere else, or a module there that defines tests under another name, would be
+# silently unrun. Helper modules there (scripts/tests/shell_stubs.py) define no tests.
+out="$(find scripts -name 'test_*.py' -not -path 'scripts/tests/*' -print
+  find scripts/tests -maxdepth 1 -name '*.py' ! -name 'test_*.py' ! -name 'conftest.py' \
+    -exec rg -l '^\s*def test_|^class \w+\(.*TestCase\)' {} + || true)"
 [[ -z "$out" ]] || fail "Python tests live only in scripts/tests as test_*.py (pytest collects nothing else):\n$out"
 
 # Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB.

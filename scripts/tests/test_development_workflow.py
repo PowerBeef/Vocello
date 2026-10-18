@@ -14,6 +14,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
+from shell_stubs import SANDBOX_BUILD_PATHS, ScriptSandbox
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("development_workflow", ROOT / "scripts/development_workflow.py")
@@ -100,17 +101,41 @@ class CheckPlanTests(unittest.TestCase):
     def test_compiling_a_ui_bundle_is_never_running_one(self) -> None:
         """`build-for-testing` builds and stops; nothing here may execute a lane.
 
-        Asserted against the code, not the comments: the header explains at
-        length what this script deliberately does not do, and naming a thing in
-        prose is not invoking it.
+        The real scripts/build_ui_test_bundles.sh runs from a sandbox
+        (scripts/tests/shell_stubs.py) whose build_cache.sh records every
+        `xcb_run` instead of compiling; Xcode and scripts/ui_test.sh are recorded
+        stand-ins too.
         """
-        script = (ROOT / "scripts/build_ui_test_bundles.sh").read_text(encoding="utf-8")
-        code = "\n".join(
-            line for line in script.splitlines() if not line.lstrip().startswith("#")
-        )
-        self.assertIn("build-for-testing", code)
-        for forbidden in ("test-without-building", "ui_test.sh", "Simulator", "xcodebuild test"):
-            self.assertNotIn(forbidden, code, f"{forbidden!r} must not be invoked here")
+        expected = {
+            "macos": {"VocelloMacUI": "platform=macOS,arch=arm64"},
+            "ios": {"VocelloiOSUI": "generic/platform=iOS"},
+        }
+        expected["all"] = {**expected["macos"], **expected["ios"]}
+        for mode, schemes in expected.items():
+            for gate in ((), ("--gate",)):
+                with self.subTest(mode=mode, gate=gate):
+                    sandbox = ScriptSandbox(self, "scripts/build_ui_test_bundles.sh", {
+                        "scripts/lib/shared.sh": None,
+                        "scripts/lib/build_paths.sh": SANDBOX_BUILD_PATHS,
+                        "scripts/lib/build_cache.sh": (
+                            'xcb_run() { qv_record xcb_run "$@"; echo "SwiftCompile normal arm64 Fixture.swift"; }\n'
+                            "qv_stub ensure_project_regenerated\nqv_stub ensure_spm_resolved\n"
+                            "qv_stub require_ios_xcode_platform\n"
+                        ),
+                    })
+                    sandbox.executable("scripts/ui_test.sh")
+                    completed = sandbox.run_script(mode, *gate)
+                    self.assertEqual(completed.returncode, 0, completed.stderr)
+                    builds = sandbox.calls_to("xcb_run")
+                    # Every Xcode invocation is a compile that stops: no test action runs anything.
+                    self.assertEqual({build[0] for build in builds}, {"build-for-testing"})
+                    for build in builds:
+                        self.assertFalse({"test", "test-without-building"} & set(build), build)
+                    self.assertEqual({build[build.index("-scheme") + 1]: build[build.index("-destination") + 1]
+                                      for build in builds}, schemes)
+                    self.assertTrue(all("Simulator" not in argument for build in builds for argument in build))
+                    names = set(sandbox.names())
+                    self.assertFalse({"scripts/ui_test.sh", "xcodebuild", "xcrun", "devicectl"} & names, names)
 
     def test_lineage_path_changes_are_named_unless_the_identity_changes_too(self) -> None:
         """A harness change on a kind's path list is only separated by a reviewed version bump."""

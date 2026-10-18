@@ -17,6 +17,9 @@ module = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = module
 SPEC.loader.exec_module(module)
 
+# The fixture release script's one signing call (the app, with the reviewed entitlements).
+RELEASE_SIGNING = 'run_codesign "$APP_PATH" --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"\n'
+
 
 class EntitlementContractTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -58,10 +61,7 @@ targets:
     platform: macOS
 """
         )
-        (self.root / "scripts/release.sh").write_text(
-            """run_codesign "$APP_PATH" --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"
-"""
-        )
+        (self.root / "scripts/release.sh").write_text(RELEASE_SIGNING)
         (self.root / "scripts/verify_release_bundle.sh").write_text(
             """python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-app --bundle "$APP_PATH"
 python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$framework_path"
@@ -135,10 +135,9 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framewo
         self.assertTrue(any("routing differs" in error for error in module.validate(self.root)))
 
     def test_release_signing_must_not_name_an_xpc_service(self) -> None:
-        path = self.root / "scripts/release.sh"
-        path.write_text(
+        (self.root / "scripts/release.sh").write_text(
             'run_codesign "$APP_PATH/Contents/XPCServices/Helper.xpc" --options runtime\n'
-            + path.read_text()
+            + RELEASE_SIGNING
         )
         self.assertTrue(any("XPC service" in error for error in module.validate(self.root)))
 

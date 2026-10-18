@@ -122,12 +122,13 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             saved_voice_lifecycle_contract.validate(self.root)
 
     def test_missing_ios_device_lane_fails(self) -> None:
-        path = self.root / "scripts/ui_test.sh"
-        text = path.read_text(encoding="utf-8").replace(
-            '"saved-voice-lifecycle"',
-            '"saved-voice-lifecycle-removed"',
+        # A runner that still drives the saved-voice suite and its fixture, but under no lane name.
+        (self.root / "scripts/ui_test.sh").write_text(
+            '#!/usr/bin/env bash\nlane="saved-voice-lifecycle-removed"\n'
+            "only_test=VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests\n"
+            'fixture="ICI Direct Clone Import.wav"\n',
+            encoding="utf-8",
         )
-        path.write_text(text, encoding="utf-8")
         with self.assertRaisesRegex(saved_voice_lifecycle_contract.ContractError, "XCUITest lane"):
             saved_voice_lifecycle_contract.validate(self.root)
 

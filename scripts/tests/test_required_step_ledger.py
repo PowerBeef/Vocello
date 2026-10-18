@@ -14,12 +14,12 @@ import tempfile
 import time
 import unittest
 
+from shell_stubs import ui_lane_sandbox
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "scripts" / "required_step_ledger.py"
 CONTRACT = ROOT / "config" / "orchestration-contract.json"
 LIBRARY = ROOT / "scripts" / "lib" / "required_steps.sh"
-UI_RUNNER = ROOT / "scripts" / "ui_test.sh"
 SPEC = importlib.util.spec_from_file_location("required_step_ledger", TOOL)
 assert SPEC and SPEC.loader
 ledger_module = importlib.util.module_from_spec(SPEC)
@@ -123,55 +123,64 @@ class RequiredStepLedgerTests(unittest.TestCase):
             ["control-audit-device-correlation", "result-retention"],
         )
 
-    def test_ui_runner_explicit_retention_pin_precedes_execution(self) -> None:
-        text = UI_RUNNER.read_text(encoding="utf-8")
-        parse = text.index("--retain-result) retain_result=1")
-        pin = text.index('>"$out/retention-pin.json"')
-        xcode = text.index('required_step_run "$step_ledger" xcuitest')
-        prune = text.index('--prune-ui-results --ui-keep 1')
-        self.assertLess(parse, pin)
-        self.assertLess(pin, xcode)
-        self.assertLess(xcode, prune)
-        self.assertIn('"pinned":true', text)
+    def test_an_explicit_retention_pin_is_written_before_the_lane_runs_anything(self) -> None:
+        # The real scripts/ui_test.sh in a sandbox (scripts/tests/shell_stubs.py). Its first
+        # step, the provenance snapshot, is a stand-in that notes whether the pin already
+        # exists and then fails, so the lane stops before Xcode.
+        snapshot = (
+            'if compgen -G "$QV_SANDBOX/build/*/macos/*/retention-pin.json" >/dev/null; then\n'
+            "  qv_record pin-present\n"
+            "fi\n"
+            "exit 1\n"
+        )
+        for retain in (True, False):
+            with self.subTest(retain=retain):
+                sandbox = ui_lane_sandbox(self)
+                (sandbox.root / "QwenVoice.xcodeproj").mkdir()
+                sandbox.helper("scripts/publish_benchmark_history.py", snapshot)
+                sandbox.executable("scripts/clean_build_caches.sh")
+                arguments = ["macos", "smoke", "--scenario", "layout"] + (["--retain-result"] if retain else [])
+                completed = sandbox.run_script(*arguments)
+                self.assertEqual(completed.returncode, 1)
+                self.assertIn("could not capture pre-run source provenance", completed.stderr)
+                [run] = [path.parent for path in sandbox.build.rglob("run.json")]
+                self.assertEqual(json.loads((run / "run.json").read_text(encoding="utf-8"))["status"], "failed")
+                pin = run / "retention-pin.json"
+                if retain:
+                    self.assertEqual(json.loads(pin.read_text(encoding="utf-8")),
+                                     {"schemaVersion": 1, "pinned": True, "reason": "explicit-ui-campaign-retention"})
+                    self.assertIn("pin-present", sandbox.names())
+                else:
+                    self.assertFalse(pin.exists())
+                    self.assertNotIn("pin-present", sandbox.names())
+                # A run that stopped early never reached Xcode and never pruned results.
+                for later in ("xcb_run", "xcodebuild", "scripts/clean_build_caches.sh"):
+                    self.assertNotIn(later, sandbox.names())
 
-    def test_producers_bind_every_declared_step_and_finalize_before_pass(self) -> None:
+    def test_workflow_producers_bind_every_declared_step_and_finalize_before_release_evidence(self) -> None:
+        # Shell producers are checked where their behaviour can be: the macOS gates and
+        # release readiness run in test_macos_gate.py, the iPhone gates in
+        # test_profile_capture_contract.py (IOSGateTests), and the UI lanes, which need
+        # a device or the app's UI to run, by scripts/repo_invariants.sh.
+        shell_producers = {"scripts/macos_test.sh", "scripts/ios_device.sh", "scripts/ui_test.sh"}
         workflows = json.loads(CONTRACT.read_text(encoding="utf-8"))["workflows"]
         for workflow_id, workflow in workflows.items():
             producer = workflow["producer"]
+            if producer in shell_producers:
+                continue
             steps = workflow["requiredSteps"] + workflow.get("optionalSteps", [])
             with self.subTest(workflow=workflow_id, producer=producer):
+                self.assertTrue(producer.endswith(".yml"), f"{producer} is a producer no test covers")
                 text = (ROOT / producer).read_text(encoding="utf-8")
-                if producer.endswith(".yml"):
-                    self.assertIn("required_step_ledger.py init", text)
-                    self.assertIn("required_step_ledger.py finalize", text)
-                    for step in steps:
-                        self.assertRegex(text, rf"--step\s+{re.escape(step)}\b")
-                    self.assertRegex(
-                        text,
-                        r"required_step_ledger\.py finalize[\s\S]{0,900}release_evidence\.py create",
-                        "release evidence can be created before managed required-step finalization",
-                    )
-                else:
-                    self.assertIn("required_steps_init", text)
-                    self.assertIn("required_steps_finalize", text)
-                    for step in steps:
-                        self.assertRegex(
-                            text,
-                            rf"required_step_(?:run|record)[\s\S]{{0,100}}\b{re.escape(step)}\b",
-                            f"{producer} does not bind declared step {step}",
-                        )
-                    pass_markers = [
-                        marker for marker in (
-                            "GATE: PASS", "RELEASE READINESS: PASS", 'note "$platform $lane PASS'
-                        ) if marker in text
-                    ]
-                    self.assertTrue(pass_markers)
-                    for marker in pass_markers:
-                        self.assertRegex(
-                            text,
-                            rf"required_steps_finalize[\s\S]{{0,1400}}{re.escape(marker)}",
-                            f"{producer} can announce {marker!r} without a nearby finalizer",
-                        )
+                self.assertIn("required_step_ledger.py init", text)
+                self.assertIn("required_step_ledger.py finalize", text)
+                for step in steps:
+                    self.assertRegex(text, rf"--step\s+{re.escape(step)}\b")
+                self.assertRegex(
+                    text,
+                    r"required_step_ledger\.py finalize[\s\S]{0,900}release_evidence\.py create",
+                    "release evidence can be created before managed required-step finalization",
+                )
 
     def test_every_declared_required_step_is_failure_injected(self) -> None:
         # CI-15: this matrix is quadratic in each lane's steps, so it drives the

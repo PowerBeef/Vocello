@@ -32,6 +32,7 @@ from test_benchmark_memory import (  # noqa: E402
     row as memory_row,
     samples as memory_samples,
 )
+from shell_stubs import ui_lane_sandbox  # noqa: E402
 
 
 def source_fixture() -> dict:
@@ -1497,10 +1498,27 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("--diagnostics and --run-id", stderr.getvalue())
 
     def test_ui_test_macos_benchmark_refuses_a_non_canonical_host_before_building(self) -> None:
-        text = (SCRIPT.parent / "ui_test.sh").read_text(encoding="utf-8")
-        gate = text.index("verify-hardware --platform macos")
-        self.assertIn("non-canonical host; benchmark records are not publishable", text[gate:gate + 300])
-        self.assertLess(gate, text.index("command -v xcodebuild"))
+        # The real scripts/ui_test.sh in a sandbox (scripts/tests/shell_stubs.py): this
+        # publisher's verify-hardware is a stand-in that refuses, as on any other Mac.
+        name = "scripts/publish_benchmark_history.py"
+        sandbox = ui_lane_sandbox(self)
+        sandbox.helper(name, 'echo "this Mac does not match the canonical benchmark profile" >&2; exit 1')
+        completed = sandbox.run_script("macos", "benchmark")
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("non-canonical host; benchmark records are not publishable", completed.stderr)
+        self.assertEqual(sandbox.calls_to(name), [["verify-hardware", "--platform", "macos"]])
+        self.assertLess(sandbox.index("require_quiet_host"), sandbox.index(name))
+        # The refusal is the last thing the lane did: no fixture check, project, build or run directory.
+        self.assertEqual(sandbox.names()[-1], name)
+        self.assertFalse(list(sandbox.build.rglob("run.json")))
+
+        # On the canonical host the lane goes on toward the build (the sandbox has no project to build).
+        sandbox = ui_lane_sandbox(self)
+        sandbox.helper(name, "exit 0")
+        completed = sandbox.run_script("macos", "benchmark")
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("QwenVoice.xcodeproj (run ./scripts/regenerate_project.sh)", completed.stderr)
+        self.assertLess(sandbox.index(name, "verify-hardware"), sandbox.index("mac_test_clone_fixture_current"))
 
     def test_ios_hardware_profile_binds_sentinel_to_one_exact_coredevice(self) -> None:
         product_type = "iPhone18,1"

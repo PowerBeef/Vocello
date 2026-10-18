@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import sys
 import tempfile
@@ -22,6 +23,7 @@ from language_bench_evidence import (
     validate_plan_against_sources,
     write_json_atomic,
 )
+from shell_stubs import LaneShell, quote  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -124,41 +126,97 @@ def build_source(root: Path, plan: dict, *, stale: bool = False) -> None:
         (root / "unrelated-history.txt").write_text("must not be copied", encoding="utf-8")
 
 
+LANGUAGE_EVIDENCE = "scripts/language_bench_evidence.py"
+PUBLISHER = "scripts/publish_benchmark_history.py"
+HISTORY = "scripts/benchmark_history.py"
+SUMMARIZER = "scripts/summarize_generation_telemetry.py"
+GATES = ("scripts/check_language_hints.py", "scripts/check_language_output.py")
+
+# The phone's side of one take: the sentinel of take `failed_take` (1-based) reports a
+# failed generation, every other one ok.
+SENTINEL_STAND_IN = r'''
+wait_device_diagnostics_sentinel() {
+  qv_record wait_device_diagnostics_sentinel "$1"
+  local status=ok
+  (( $(grep -c "^wait_device_diagnostics_sentinel" "$QV_CALLS") != FAILED_TAKE )) || status=failed
+  mkdir -p "$3/$1"
+  printf '{"status": "%s"}\n' "$status" >"$3/$1/device-diagnostics-done.json"
+  printf '%s\n' "$3/$1/device-diagnostics-done.json"
+}
+'''
+
+
+class IOSLanguageBenchLaneTests(unittest.TestCase):
+    """The shipped iPhone `lang-bench` (scripts/ios_device.sh cmd_lang_bench), run end to end
+    over recorded stand-ins (scripts/tests/shell_stubs.py): the phone, the build and every
+    gate and publisher are shims; the immutable plan is the real one. On macOS this runs
+    under the lane's own Bash 3.2, where an empty optional array would break `set -u`."""
+
+    def lang_bench(self, *arguments: str, failed_take: int = 0):
+        shell = LaneShell(self, "ios_device.sh")
+        real_evidence = quote(ROOT / LANGUAGE_EVIDENCE)
+        shell.helper(LANGUAGE_EVIDENCE, f'[[ "$1" != plan ]] || exec "$QV_REAL_PYTHON" {real_evidence} "$@"')
+        for gate in GATES:
+            shell.helper(gate, "exit 0")
+        shell.helper("scripts/qc.py",
+                     'case "$1" in run) echo qc-run-fixture ;; language-bench) echo "spoken content PASS" ;; esac')
+        for helper in (PUBLISHER, SUMMARIZER, HISTORY):
+            shell.helper(helper, "exit 0")
+        body = (
+            "qv_stub require_team\nqv_stub cmd_build\nqv_stub cmd_install\nqv_stub capture_benchmark_source\n"
+            "require_qc_python() { QC_PYTHON=python3; }\n"
+            'cmd_launch() { qv_record cmd_launch "$@" "telemetry=${QWENVOICE_NATIVE_TELEMETRY_MODE:-}"; }\n'
+            + SENTINEL_STAND_IN.replace("FAILED_TAKE", str(failed_take))
+            + f"cmd_lang_bench {shlex.join(arguments)}\n"
+        )
+        return shell.run(body), shell
+
+    def test_a_benchmark_run_gates_without_cohort_arguments_then_publishes(self) -> None:
+        completed, shell = self.lang_bench("--subset", "quick")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        launches = shell.calls_to("cmd_launch")
+        self.assertEqual(len(launches), 7)
+        self.assertEqual({launch[-1] for launch in launches}, {"telemetry=verbose"})
+        [collected] = shell.calls_to(LANGUAGE_EVIDENCE, "collect")
+        self.assertNotIn("--cohort", collected)
+        for gate in GATES:
+            [arguments] = shell.calls_to(gate)
+            self.assertNotIn("--cohort", arguments)
+            self.assertNotIn("--strict-qc", arguments)
+        [published] = shell.calls_to(PUBLISHER, "language")
+        self.assertEqual(published[published.index("--output-gate") + 1], "pass")
+        self.assertLess(max(shell.index(gate) for gate in GATES), shell.index(PUBLISHER, "language"))
+        self.assertLess(shell.index(PUBLISHER, "language"), shell.index(HISTORY, "record"))
+
+    def test_a_diagnostic_cohort_gates_strictly_and_never_publishes(self) -> None:
+        completed, shell = self.lang_bench("--subset", "quick", "--diagnostic-cohort")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("no history record created", completed.stderr)
+        self.assertEqual(len(shell.calls_to("cmd_launch")), 15)
+        [collected] = shell.calls_to(LANGUAGE_EVIDENCE, "collect")
+        self.assertEqual(collected[collected.index("--cohort") + 1], str(COHORT))
+        [hints] = shell.calls_to(GATES[0])
+        self.assertIn("--strict-qc", hints)
+        self.assertEqual(hints[hints.index("--cohort") + 1], str(COHORT))
+        for helper in (PUBLISHER, SUMMARIZER, HISTORY):
+            self.assertEqual(shell.calls_to(helper), [], helper)
+
+    def assert_failed_before_publishing(self, *arguments: str) -> None:
+        completed, shell = self.lang_bench(*arguments, failed_take=2)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("lang-bench FAIL", completed.stderr)
+        self.assertNotIn("no history record created", completed.stderr)
+        for helper in (PUBLISHER, HISTORY):
+            self.assertEqual(shell.calls_to(helper), [], helper)
+
+    def test_a_failed_take_fails_a_benchmark_run_before_it_publishes(self) -> None:
+        self.assert_failed_before_publishing("--subset", "quick")
+
+    def test_a_failed_take_fails_a_cohort_instead_of_reporting_it_passed(self) -> None:
+        self.assert_failed_before_publishing("--subset", "quick", "--diagnostic-cohort")
+
+
 class LanguageBenchEvidenceTests(unittest.TestCase):
-    def test_optional_language_gate_arrays_are_safe_under_bash_nounset(self) -> None:
-        script = (ROOT / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
-        start = script.index("cmd_lang_bench() {")
-        end = script.index("\ncmd_bench() {", start)
-        body = script[start:end]
-        self.assertNotIn('\n    "${cohort_args[@]}"', body)
-        self.assertNotIn('\n    "${hint_gate_args[@]}"', body)
-        self.assertEqual(
-            body.count('${cohort_args[@]+"${cohort_args[@]}"}'),
-            3,
-        )
-        self.assertEqual(
-            body.count('${hint_gate_args[@]+"${hint_gate_args[@]}"}'),
-            1,
-        )
-
-    def test_cohort_control_flow_cannot_publish_history(self) -> None:
-        script = (ROOT / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
-        start = script.index("cmd_lang_bench() {")
-        end = script.index("\ncmd_bench() {", start)
-        body = script[start:end]
-        failure_gate = body.index("if (( cell_fail > 0 || collect_st != 0")
-        cohort_return = body.index(
-            'note "lang-bench diagnostic cohort PASS · all $cell_count predeclared takes passed · no history record created"'
-        )
-        cohort_return = body.index("return 0", cohort_return)
-        publisher = body.index("publish_benchmark_history.py")
-        recorder = body.index("record_benchmark_history")
-        self.assertLess(failure_gate, cohort_return)
-        self.assertLess(cohort_return, publisher)
-        self.assertLess(publisher, recorder)
-        self.assertNotIn("publish_benchmark_history.py", body[:cohort_return])
-        self.assertNotIn("record_benchmark_history", body[:cohort_return])
-
     def test_default_plan_is_deterministic_seeded_and_pairs_pinned_auto(self) -> None:
         first = build_plan(
             run_id="plan-fixture",

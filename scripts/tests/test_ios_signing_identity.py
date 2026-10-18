@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 import unittest
+
+from shell_stubs import LaneShell
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,15 +67,68 @@ class IOSSigningIdentityTests(unittest.TestCase):
         self.assertNotIn("team", encoded)
         self.assertEqual(encoded["certificateCount"], 1)
 
-    def test_device_build_checks_identity_before_package_resolution(self) -> None:
-        source = (ROOT / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
-        build = source[source.index("cmd_build() {") : source.index("cmd_install() {")]
-        self.assertLess(
-            build.index('require_development_identity "$team"'),
-            build.index("ensure_spm_resolved"),
+
+IDENTITY = "scripts/lib/ios_signing_identity.py"
+VALID = 'echo "Apple Development identity valid"'
+EXPIRED = 'echo "the Apple Development certificate expired"; exit 1'
+DEVICE_LIST = r'''
+[[ "$1 $2 $3" == "devicectl list devices" ]] || exit 97
+while (( $# )); do case "$1" in --json-output) output="$2"; shift 2 ;; *) shift ;; esac; done
+printf '{"result": {"devices": [{"identifier": "fixture-device", "connectionProperties": {"pairingState": "paired"}}]}}\n' >"$output"
+'''
+
+
+class DeviceLaneSigningTests(unittest.TestCase):
+    """The shipped scripts/ios_device.sh build and preflight over stand-ins
+    (scripts/tests/shell_stubs.py): the identity check is a stand-in, Xcode a shim."""
+
+    def build(self, identity: str) -> tuple[subprocess.CompletedProcess[str], LaneShell]:
+        shell = LaneShell(self, "ios_device.sh")
+        shell.helper(IDENTITY, identity)
+        body = (
+            "qv_stub require_ios_xcode_platform\nqv_stub require_build_free_space\n"
+            "qv_stub ensure_project_regenerated\nqv_stub ensure_spm_resolved\n"
+            "derive_team() { printf 'TEAMFIXTURE\\n'; }\n"
+            "resolve_device() { printf 'fixture-device\\n'; }\n"
+            'xcb_run() { qv_record xcb_run "$@"; return 65; }\n'
+            "cmd_build\n"
         )
-        preflight = source[source.index("cmd_preflight() {") : source.index("_gate_generation_check() {")]
-        self.assertIn('development_identity_status "$team"', preflight)
+        return shell.run(body), shell
+
+    def test_device_build_checks_the_identity_before_regeneration_or_package_resolution(self) -> None:
+        completed, shell = self.build(EXPIRED)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("device signing unavailable — the Apple Development certificate expired", completed.stderr)
+        # The refused identity is the last thing the build did.
+        self.assertEqual(shell.calls()[-1], [IDENTITY, "check", "--team", "TEAMFIXTURE"])
+        for later in ("ensure_project_regenerated", "ensure_spm_resolved", "xcb_run"):
+            self.assertNotIn(later, shell.names())
+
+        completed, shell = self.build(VALID)
+        self.assertEqual(completed.returncode, 1, "the stand-in Xcode build fails")
+        self.assertIn("device build failed", completed.stderr)
+        order = [shell.index(IDENTITY), shell.index("ensure_project_regenerated"),
+                 shell.index("ensure_spm_resolved"), shell.index("xcb_run")]
+        self.assertEqual(order, sorted(order))
+
+    def test_preflight_reports_the_signing_identity_it_checked(self) -> None:
+        for identity, status, line in ((VALID, 0, "signing: OK team TEAMFIXTURE (Apple Development identity valid)"),
+                                       (EXPIRED, 1, "signing: ✗ the Apple Development certificate expired")):
+            with self.subTest(status=status):
+                shell = LaneShell(self, "ios_device.sh")
+                shell.helper(IDENTITY, identity)
+                shell.tool("xcrun", DEVICE_LIST)
+                body = (
+                    "derive_team() { printf 'TEAMFIXTURE\\n'; }\n"
+                    "resolve_device() { printf 'fixture-device\\n'; }\n"
+                    "qv_stub guard_device_state\n"
+                    'mkdir -p "$APP_PATH"\n'
+                    "cmd_preflight\n"
+                )
+                completed = shell.run(body)
+                self.assertEqual(completed.returncode, status, completed.stderr)
+                self.assertIn(line, completed.stderr)
+                self.assertEqual(shell.calls_to(IDENTITY), [["check", "--team", "TEAMFIXTURE"]])
 
 
 if __name__ == "__main__":

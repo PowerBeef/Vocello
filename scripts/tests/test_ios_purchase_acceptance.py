@@ -82,7 +82,9 @@ class PurchaseAcceptanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 subject.collect(self.line(changed), "test-owned-run", "a" * 64, "exports", True)
 
-    def test_producer_and_runner_require_explicit_restoration(self):
+    def test_producer_requires_explicit_restoration(self):
+        # The runner's half (scripts/ui_test.sh passing --require-restoration to this
+        # collector) is an exact check in scripts/repo_invariants.sh: the lane needs a phone.
         root = Path(__file__).resolve().parents[2]
         source = (root / "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift").read_text()
         self.assertIn('"schemaVersion": 4', source)
@@ -92,7 +94,6 @@ class PurchaseAcceptanceTests(unittest.TestCase):
         self.assertIn('restoration.tab = originalTab == nil ? .baselineMissing : .skippedBackground', source)
         self.assertIn('try selectHistoryFilter(originalHistoryFilter)', source)
         self.assertNotIn('selectHistoryFilter("All")', source)
-        self.assertIn('--require-restoration', (root / "scripts/ui_test.sh").read_text())
 
     def test_missing_duplicate_and_corrupt_results_fail(self):
         for value in ["", self.line(self.result) * 2, subject.PREFIX + "AAAA"]:

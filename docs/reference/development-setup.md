@@ -51,7 +51,7 @@ from the repository's SHA-pinned installer instead:
 ```sh
 brew install gh python node@24
 ./scripts/install_pinned_tools.sh
-./scripts/install_pinned_tools.sh swiftlint   # optional: the advisory local lint
+./scripts/install_pinned_tools.sh swiftlint ruff   # optional: the local lints CI gates
 cat >> ~/.zprofile <<'EOF'
 export PATH="$HOME/.qwenvoice-pinned-tools/bin:/opt/homebrew/opt/node@24/bin:$PATH"
 EOF
@@ -67,9 +67,10 @@ xcodegen's version decides the bytes of the generated Xcode project. xcodegen is
 first build even if you never edit `project.yml`, because the build scripts regenerate the project
 whenever their generation stamp under `build/` is missing; `rg` is required by
 `scripts/repo_invariants.sh` and the contract gate. `node@24` is keg-only, hence its `PATH` entry.
-SwiftLint is optional and pinned the same way (`artifactPins.swiftlint`, installed only when named):
-`scripts/dev.sh lint` runs its advisory rules, and reports when it is missing or is not the pinned
-version. `gh` is the CI and release interface (`gh run watch`).
+SwiftLint and ruff are optional locally and pinned the same way (installed only when named):
+`scripts/dev.sh lint` runs SwiftLint on changed files and reports it missing or not the pinned
+version, and `python3 scripts/lint_baseline.py <shellcheck|ruff|swiftlint>` runs the gate CI's
+`contracts` job runs against `config/lint-baseline/`. `gh` is the CI and release interface (`gh run watch`).
 
 ## 3. Python
 

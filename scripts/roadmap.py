@@ -65,6 +65,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import bisect
 import copy
 import datetime as _dt
 import difflib
@@ -151,10 +152,28 @@ def resolve_benchmark(root: pathlib.Path, run_id: str) -> str | None:
     return None
 
 
+# Commits reachable from main, per repository, sorted for prefix lookup. The archive cites
+# hundreds of commits; two git processes per reference made each validate take about 3 s.
+# Main only grows, so a miss refreshes the list once before the exact checks below decide.
+_MAIN_COMMITS: dict[str, list[str]] = {}
+
+
+def _on_main(root: pathlib.Path, sha: str, *, refresh: bool = False) -> bool:
+    key = str(root.resolve())
+    if refresh or key not in _MAIN_COMMITS:
+        listed = _git(root, "rev-list", "main")
+        _MAIN_COMMITS[key] = sorted(listed.stdout.split()) if listed.returncode == 0 else []
+    commits = _MAIN_COMMITS[key]
+    index = bisect.bisect_left(commits, sha)
+    return index < len(commits) and commits[index].startswith(sha)
+
+
 def resolve_commit(root: pathlib.Path, sha: str) -> str | None:
     """A commit reference must exist and be reachable from main."""
     if not re.fullmatch(r"[0-9a-f]{7,40}", sha):
         return f"not a commit sha: {sha!r}"
+    if _on_main(root, sha) or _on_main(root, sha, refresh=True):
+        return None
     if _git(root, "cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
         return f"commit does not exist: {sha}"
     merge_base = _git(root, "merge-base", "--is-ancestor", sha, "main")

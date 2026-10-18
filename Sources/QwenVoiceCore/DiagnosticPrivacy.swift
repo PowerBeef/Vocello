@@ -82,9 +82,11 @@ public enum DiagnosticPrivacy {
     /// A MetricKit diagnostic payload (`MXDiagnosticPayload.jsonRepresentation()`)
     /// with each uncaught Objective-C exception reason's message, format string
     /// and arguments passed through `redactedText`, the same treatment as the
-    /// crash observer's own exception record. Call stacks and metadata stay for
-    /// symbolication. A payload without an exception reason is returned as is;
-    /// one that is not JSON returns nil, so a caller never persists it unread.
+    /// crash observer's own exception record, and the crash metadata that can
+    /// name a file (`terminationReason`, `virtualMemoryRegionInfo`) passed through
+    /// it too. Call stacks and the other metadata stay for symbolication. A payload
+    /// that redaction leaves unchanged is returned byte for byte; one that is not
+    /// JSON returns nil, so a caller never persists it unread.
     public static func redactedMetricKitPayload(_ json: Data) -> Data? {
         // Exception-reason text and the crash metadata that can name a path are redacted;
         // everything else in the payload is runtime-owned.

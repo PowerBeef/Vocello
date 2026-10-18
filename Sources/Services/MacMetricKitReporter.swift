@@ -15,8 +15,9 @@ import QwenVoiceCore
 ///   `MetricKitMemoryExitSummaryDocument` the iPhone keeps (no raw payload,
 ///   call stack, path or identity);
 /// - `crashes/metrickit-<time>-<id>.json`: a diagnostic payload that carries a
-///   crash or a hang, with its Objective-C exception text passed through
-///   `DiagnosticPrivacy.redactedMetricKitPayload`, as on the iPhone.
+///   crash or a hang, with its Objective-C exception text and its path-bearing
+///   crash metadata passed through `DiagnosticPrivacy.redactedMetricKitPayload`,
+///   as on the iPhone.
 ///
 /// The iPhone observer's uncaught-exception hook is not mirrored: on the Mac
 /// the system already keeps the crash report.

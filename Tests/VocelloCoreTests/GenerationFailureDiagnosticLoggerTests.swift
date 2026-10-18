@@ -541,8 +541,6 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         fixture.assertNoPrivateContent(details.map { "\($0.key)=\($0.value)" }.joined(separator: "\n"))
     }
 
-    /// The crash observer persists MetricKit payloads whose Objective-C exception reason
-    /// carries the same message as its own exception record (AUD-08).
     /// A macOS crash's dyld termination reason and faulting-region description can name a file
     /// under the user's home folder; both are redacted, the rest of the metadata stays.
     func testMetricKitPayloadRedactsPathBearingCrashMetadata() throws {
@@ -564,8 +562,20 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             as? [String: Any])
         XCTAssertTrue((metadata["terminationReason"] as? String)?.hasPrefix("Library not loaded") == true)
         XCTAssertEqual(metadata["signal"] as? Int, 6)
+
+        // The same keys with nothing private in them keep MetricKit's bytes.
+        let clean = try JSONSerialization.data(withJSONObject: ["crashDiagnostics": [[
+            "diagnosticMetaData": [
+                "terminationReason": "Namespace SIGNAL, Code 0x6",
+                "virtualMemoryRegionInfo": "0 is not in any region.",
+                "signal": 6,
+            ],
+        ]]])
+        XCTAssertEqual(DiagnosticPrivacy.redactedMetricKitPayload(clean), clean)
     }
 
+    /// The crash observer persists MetricKit payloads whose Objective-C exception reason
+    /// carries the same message as its own exception record (AUD-08).
     func testMetricKitPayloadRedactsExceptionReasonAndKeepsSymbolication() throws {
         let fixture = PrivateDiagnosticFixture.self
         let frame: [String: Any] = [
@@ -622,7 +632,7 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertEqual(frames.first?["binaryName"] as? String, "QVoiceiOS")
         XCTAssertEqual(frames.first?["address"] as? Int, 4_312_345_678)
 
-        // A payload without an exception reason keeps MetricKit's bytes; one that is not
+        // A payload with nothing to redact keeps MetricKit's bytes; one that is not
         // JSON is never handed back for persistence.
         let hangOnly = try JSONSerialization.data(withJSONObject: [
             "hangDiagnostics": [["callStackTree": ["callStacks": [["callStackRootFrames": [frame]]]]]],

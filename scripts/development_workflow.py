@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import functools
 import importlib.util
 import json
 import os
@@ -24,14 +25,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_CLASS_PATTERN = re.compile(r"\b(?:final\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*XCTestCase\b")
-# Tooling whose change means every Python test is a consumer.
+# Tooling whose change means every Python test is a consumer: the shared
+# libraries and fixtures, and the files pytest applies to every module.
 FULL_PYTHON_PATTERNS = (
-    "scripts/development_workflow.py",
     "scripts/lib/",
     "scripts/tests/fixtures/",
+    "scripts/tests/conftest.py",
+    "pytest.ini",
     "config/toolchain.json",
     "config/build-output-policy.json",
 )
+# This selector and CI's router. A change to either always runs both suites,
+# named here rather than computed, so a broken matcher cannot hide its own tests;
+# their pinned selections cover every other input.
+ROUTING_SOURCES = ("scripts/development_workflow.py", "scripts/ci/classify_changes.py")
+ROUTING_TESTS = ("scripts/tests/test_classify_changes.py", "scripts/tests/test_development_workflow.py")
 # Owned Swift that every test bundle links; a change here runs the whole macOS lane.
 CORE_SWIFT_PREFIXES = ("Sources/QwenVoiceCore/", "Sources/SharedSupport/", "Packages/", "project.yml")
 
@@ -87,11 +95,71 @@ def lanes_for(paths: list[str]) -> dict[str, bool]:
     return classify_changes.classify(paths)
 
 
-def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict:
-    """Reverse literal dependencies (imports, subprocess paths, config names), transitively.
+def _mentions(names: set[str]) -> re.Pattern[str]:
+    """A file name as a whole word: `roadmap.json` matches `config/roadmap.json`, not `test-roadmap.json`."""
+    return re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(name) for name in sorted(names)) + r")(?![\w-])")
 
-    Basename matching deliberately over-selects. When an input has no known test
-    consumer, or tooling everything depends on changed, the whole suite runs.
+
+def _python_importers(classify_changes, root: Path) -> dict[str, set[str]]:
+    """The reverse of CI's import graph (classify_changes._imported_script_modules) over scripts/."""
+    importers: dict[str, set[str]] = {}
+    for path in (root / "scripts").rglob("*.py"):
+        if "__pycache__" in path.parts or not path.is_file():
+            continue
+        importer = path.relative_to(root).as_posix()
+        for imported in classify_changes._imported_script_modules(path):
+            importers.setdefault(imported.relative_to(classify_changes.REPO_ROOT).as_posix(), set()).add(importer)
+    return importers
+
+
+def _import_node(changed: str, root: Path) -> str:
+    """The file CI's resolver maps imports of `changed` to.
+
+    It resolves a package import (`from qc import store`, `qc.store`) by the
+    package's top-level name, to the same-named script beside it (scripts/qc.py),
+    so a module inside a package reaches every importer of that package."""
+    parts = changed.split("/")
+    if len(parts) > 2 and parts[0] == "scripts" and (root / "scripts" / parts[1] / "__init__.py").is_file():
+        return f"scripts/{parts[1]}.py"
+    return changed
+
+
+def _with_importers(files: set[str], importers, root: Path) -> set[str]:
+    """`files` and every file importing one of them, transitively (`importers` builds the graph on demand)."""
+    affected = set(files)
+    pending = [node for path in files if path.endswith(".py") for node in (path, _import_node(path, root))]
+    graph = importers() if pending else {}
+    while pending:
+        for importer in graph.get(pending.pop(), ()):
+            if importer not in affected:
+                affected.add(importer)
+                pending.append(importer)
+    return affected
+
+
+def _test_consumers(affected: set[str], test_texts: dict[str, str]) -> set[str]:
+    """The test modules among `affected`, and those naming another of its files.
+
+    Test modules are consumers, never subjects: one naming another (a routing
+    example, a fixture path) is not its consumer."""
+    tests = affected & test_texts.keys()
+    if names := {Path(p).name for p in affected - tests}:
+        pattern = _mentions(names)
+        tests |= {p for p, text in test_texts.items() if pattern.search(text)}
+    return tests
+
+
+def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict:
+    """Test modules that import a changed module, or name a changed or importing file.
+
+    A Python input reaches the files that import it, transitively, through CI's
+    own import graph. A test module is selected when it is one of them, or when it
+    names (by file name or repository path) the changed file or one of them:
+    tests load scripts by path and drive shell scripts and config by name. Name
+    matching is one step deep, never iterated: only when nothing imports or names
+    an input do the scripts that name it stand in for it, one step further. When
+    an input still has no test consumer, or tooling everything depends on changed,
+    the whole suite runs.
     """
     root = root or ROOT
     classify_changes = _load("scripts/ci/classify_changes.py")
@@ -99,39 +167,51 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
                                          and p.endswith(classify_changes.AGENT_CONFIG_SUFFIXES))
                     or p in classify_changes.RULE_SOURCES]
     # Top-level benchmark contracts (record schemas, hardware profiles) are read
-    # by the registry tests; published records under benchmarks/runs/ are not.
+    # by the registry tests through benchmark_history.py, and those tests do not
+    # name them; published records under benchmarks/runs/ are not tooling inputs.
+    contracts = [p for p in paths if p.startswith("benchmarks/") and p.count("/") == 1 and p.endswith(".json")]
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
-              or p in {"project.yml", "Package.resolved"}
-              or (p.startswith("benchmarks/") and p.count("/") == 1 and p.endswith(".json"))] + agent_inputs
+              or p in {"project.yml", "Package.resolved"}] + contracts + agent_inputs
     if any(p.startswith(FULL_PYTHON_PATTERNS) for p in paths):
         return {"mode": "full", "tests": [], "reason": "shared tooling changed"}
-    modules = sorted(root.glob("scripts/tests/**/test_*.py"))
-    test_paths = {p.relative_to(root).as_posix() for p in modules}
-    texts = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
-             for p in (root / "scripts").rglob("*.py") if p.is_file() and "__pycache__" not in p.parts}
+    if not inputs:
+        return {"mode": "none", "tests": [], "reason": "no tooling inputs changed"}
+    test_texts = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
+                  for p in sorted(root.glob("scripts/tests/**/test_*.py"))}
+
+    @functools.cache
+    def importers() -> dict[str, set[str]]:
+        return _python_importers(classify_changes, root)
+
+    @functools.cache
+    def script_texts() -> dict[str, str]:
+        return {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8", errors="replace")
+                for p in (root / "scripts").rglob("*") if p.suffix in {".py", ".sh"} and p.is_file()
+                and "__pycache__" not in p.parts and not p.relative_to(root).as_posix().startswith("scripts/tests/")}
+
     selected: set[str] = set()
     if agent_inputs:
-        selected.update({"scripts/tests/test_agent_hooks.py"})
+        selected.add("scripts/tests/test_agent_hooks.py")
     for changed in inputs:
         if changed in agent_inputs:
             continue  # Additions, modifications and deletions all use behavioral hook tests.
         if not (root / changed).is_file():
             return {"mode": "full", "tests": [], "reason": "deleted or missing tooling input"}
-        affected = {changed}
-        while True:
-            tokens = {Path(p).name for p in affected} | {Path(p).stem for p in affected if p.endswith(".py")}
-            pattern = re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(t) for t in sorted(tokens)) + r")(?![\w-])")
-            expanded = affected | {p for p, text in texts.items() if pattern.search(text)}
-            if expanded == affected:
-                break
-            affected = expanded
-        tests = affected & test_paths
+        # The selector loads the router at run time, so their consumers are shared.
+        seeds = set(ROUTING_SOURCES) if changed in ROUTING_SOURCES else {changed}
+        tests = _test_consumers(_with_importers(seeds, importers, root), test_texts)
+        if not tests:
+            pattern = _mentions({Path(changed).name})
+            if readers := {p for p, text in script_texts().items() if p != changed and pattern.search(text)}:
+                tests = _test_consumers(_with_importers(readers, importers, root), test_texts)
+        if changed in ROUTING_SOURCES:
+            tests.update(ROUTING_TESTS)
+        if changed in contracts:
+            tests.add("scripts/tests/test_benchmark_history.py")
         if not tests:
             return {"mode": "full", "tests": [], "reason": "no known test consumer for changed input"}
         selected.update(tests)
-    if not inputs:
-        return {"mode": "none", "tests": [], "reason": "no tooling inputs changed"}
-    return {"mode": "selected", "tests": sorted(selected), "reason": "transitive local test consumers"}
+    return {"mode": "selected", "tests": sorted(selected), "reason": "importing and naming test consumers"}
 
 
 PYTEST = [sys.executable, "-m", "pytest", "-n", "auto"]
@@ -145,10 +225,15 @@ def python_test_commands(selection: dict) -> list[list[str]]:
     return [[*PYTEST, *selection["tests"]]]
 
 
+# Test sources whose XCTestCase classes `core-test --only` runs (VocelloCoreTests
+# compiles the iOS logic tests too).
+CORE_TEST_SOURCES = ("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/")
+
+
 def changed_swift_test_classes(paths: list[str]) -> list[str]:
     classes: set[str] = set()
     for relative in paths:
-        if relative.endswith(".swift") and relative.startswith(("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/")):
+        if relative.endswith(".swift") and relative.startswith(CORE_TEST_SOURCES):
             path = ROOT / relative
             if path.is_file():
                 classes.update(TEST_CLASS_PATTERN.findall(path.read_text(encoding="utf-8")))
@@ -214,17 +299,72 @@ def _installed_version(command: list[str]) -> str | None:
 UI_TEST_ONLY_SOURCES = ("Tests/VocelloMacUITests/", "Tests/VocelloiOSUITests/")
 
 
+MACOS_TESTS = ("scripts/macos_test.sh", "test")
+
+
+def _swift_data_input(path: str, classify_changes) -> bool:
+    """A record or fixture Swift tests read, as opposed to a compile, build or lane input.
+
+    Every other non-Swift swift-lane input (lane scripts and their imports,
+    scripts/lib, the build and toolchain configs, resources, schemes, the
+    project and workflow files) runs the whole lane."""
+    if path in classify_changes.SWIFT_PARITY_FIXTURES:
+        return True
+    if path in classify_changes.BUILD_CONFIGS or path.startswith("config/xcode-schemes/"):
+        return False
+    return path.startswith(("config/", "Tests/"))
+
+
+def swift_test_readers(names: list[str]) -> dict[str, list[str] | None]:
+    """Per file name, the XCTestCase classes whose test sources name it.
+
+    None when only the whole lane covers it: no class names it, a helper without
+    a class does (its callers are unknown), or the owned runtime package's tests
+    do (`macos_test.sh test` is their only runner). XCUITest-only sources never run here."""
+    sources = [*ROOT.glob("Tests/**/*.swift"), *ROOT.glob("Packages/VocelloQwen3Core/Tests/**/*.swift")]
+    texts = {p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8") for p in sources if p.is_file()}
+    readers: dict[str, list[str] | None] = {}
+    for name in names:
+        pattern = _mentions({name})
+        classes: set[str] = set()
+        whole_lane = False
+        for relative, text in texts.items():
+            if relative.startswith(UI_TEST_ONLY_SOURCES) or not pattern.search(text):
+                continue
+            found = TEST_CLASS_PATTERN.findall(text) if relative.startswith(CORE_TEST_SOURCES) else []
+            whole_lane = whole_lane or not found
+            classes.update(found)
+        readers[name] = None if whole_lane or not classes else sorted(classes)
+    return readers
+
+
 def swift_test_commands(paths: list[str], *, everything: bool = False) -> list[list[str]]:
+    """The macOS test command the swift-lane inputs among `paths` need, or [] when none does.
+
+    Changed test classes run alone; a data input runs the classes whose sources
+    name it; any other swift-lane input runs the whole lane (never TSan, which
+    push CI runs)."""
     if everything or any(p.startswith(CORE_SWIFT_PREFIXES) for p in paths):
-        return [["scripts/macos_test.sh", "test"]]
-    classes = changed_swift_test_classes(paths)
+        return [[*MACOS_TESTS]]
+    classes = set(changed_swift_test_classes(paths))
     product = [p for p in paths if p.startswith(("Sources/", "Tests/")) and p.endswith(".swift")
-               and not p.startswith(("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/",
-                                     *UI_TEST_ONLY_SOURCES))]
+               and not p.startswith((*CORE_TEST_SOURCES, *UI_TEST_ONLY_SOURCES))]
     if product:
-        return [["scripts/macos_test.sh", "test"]]
+        return [[*MACOS_TESTS]]
+    classify_changes = _load("scripts/ci/classify_changes.py")
+    data: list[str] = []
+    for path in paths:
+        if path.endswith(".swift") or not classify_changes.classify([path])["swift"]:
+            continue
+        if not _swift_data_input(path, classify_changes):
+            return [[*MACOS_TESTS]]
+        data.append(Path(path).name)
+    for readers in (swift_test_readers(sorted(set(data))) if data else {}).values():
+        if readers is None:
+            return [[*MACOS_TESTS]]
+        classes.update(readers)
     if classes:
-        return [["scripts/macos_test.sh", "core-test", "--only", ",".join(classes)]]
+        return [["scripts/macos_test.sh", "core-test", "--only", ",".join(sorted(classes))]]
     return []
 
 
@@ -286,7 +426,8 @@ def check_plan(paths: list[str]) -> dict:
     commands.extend(lint_commands(paths))
     commands.append(["./scripts/check_project_inputs.sh", "--local"])
     if lanes["swift"]:
-        commands.extend(swift_test_commands(paths))
+        # A swift lane that schedules nothing verifies nothing: fall back to the whole lane.
+        commands.extend(swift_test_commands(paths) or [[*MACOS_TESTS]])
     if lanes["ios"]:
         commands.append(["./scripts/build_foundation_targets.sh", "ios", "--incremental"])
     if lanes["website"]:

@@ -44,11 +44,28 @@ branch in which that lane's job passed (not against the previous push), because 
 can drop a superseded push's run and the lanes it owed must still run on the next push; a lane with
 no prior green run always runs. Locally the lanes come from the dirty tree, and a clean tree routes
 no lane (`--since origin/main` plans for committed work): `swift` runs the macOS
-test bundles (`scripts/macos_test.sh test`, or `core-test --only` when only test classes changed),
-`ios` runs the generic compile, `python` runs the reverse-dependency Python selection, `website`
-runs `npm --prefix website run check`. A change to shared tooling (`scripts/lib/`,
-`scripts/development_workflow.py`, `config/toolchain.json`, `config/build-output-policy.json`) runs
-the whole Python suite.
+test bundles, `ios` runs the generic compile, `python` runs the Python selection, `website`
+runs `npm --prefix website run check`. Push CI also runs the TSan subset with `swift`; the local
+check does not.
+
+The `swift` lane runs `core-test --only` for the test classes that changed and for the classes whose
+sources name a changed record or fixture by file name (`config/ios-memory-budget-policy.json`, the
+parity fixtures). Any other input runs the whole `scripts/macos_test.sh test`: product Swift, lane
+scripts and their imports, `scripts/lib/`, build and toolchain configs, project and workflow files,
+and a record that only a helper without a test class or the owned runtime package's tests read (the
+package tests have no focused runner). A `swift` lane that would schedule nothing runs it too.
+
+The Python selection follows the import graph CI builds (`scripts/ci/classify_changes.py`) in
+reverse: a changed module reaches every file that imports it, transitively, and a module inside a
+package such as `scripts/qc/` reaches every importer of the package. A test module runs when it is
+one of those files, or names the changed file or one of them by file name or repository path. Name
+matching is one step deep and never iterated; only when no test imports or names an input do the
+scripts that name it stand in for it, one step further. A change to `development_workflow.py` or
+`ci/classify_changes.py` always runs both routing suites. An input with no test consumer, and shared
+tooling (`scripts/lib/`, `scripts/tests/fixtures/`, `scripts/tests/conftest.py`, `pytest.ini`,
+`config/toolchain.json`, `config/build-output-policy.json`), run the whole suite. A config or roadmap
+edit selects a handful of modules, so a test that reaches its input only through another script can
+be missed locally; the Linux CI job still runs the whole suite.
 
 ## The commit lint
 
@@ -298,10 +315,12 @@ arbitrary external programs.
 
 The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
 the routine loop: read-only Git, scoped staging and commits, worktree integration, `scripts/dev.sh`,
-contract and privacy scripts, pytest, the website check and the local `macos_test.sh`, `ui_test.sh` and
+contract and privacy scripts, the website check and the local `macos_test.sh`, `ui_test.sh` and
 `ios_device.sh` lanes. It also covers read-only Hugging Face queries: the `hf` CLI's `version`,
 `auth whoami`, `models` and `datasets` card/info/list, `papers`, and `cache` list/verify, plus the
-`hf-mcp-server` read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`).
+`hf-mcp-server` read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`). No rule
+allows pytest by itself: run it through `scripts/dev.sh py` or
+`"$(python3 scripts/select_python.py)" -m pytest`.
 
 `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
 installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
@@ -331,7 +350,7 @@ git diff --check
 python3 scripts/privacy_scan.py --changes
 scripts/repo_invariants.sh
 python3 scripts/build_output_policy.py validate
-python3 -m pytest scripts/tests/test_agent_hooks.py scripts/tests/test_active_workers.py
+scripts/dev.sh py scripts/tests/test_agent_hooks.py scripts/tests/test_active_workers.py
 ```
 
 `policy_guard.sh` and `generated_file_guard.sh` can read a fixture hook JSON on stdin; their tests

@@ -6,7 +6,9 @@ import datetime
 import importlib.util
 import io
 import json
+import re
 import subprocess
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -117,6 +119,49 @@ class CheckPlanTests(unittest.TestCase):
         self.assertEqual(MODULE.check_plan([driver, MODULE.LINEAGE_IDENTITY])["lineageReviewPaths"], [])
         self.assertEqual(MODULE.check_plan(["Sources/Views/SidebarView.swift"])["lineageReviewPaths"], [])
 
+    def test_every_non_swift_swift_lane_input_schedules_a_macos_test(self) -> None:
+        """W-06: a non-Swift input routed to the swift lane once scheduled no macOS test at all."""
+        classify = MODULE._load("scripts/ci/classify_changes.py")
+        candidates = {*classify.BUILD_CONFIGS, *classify.SWIFT_PARITY_FIXTURES, *classify.MACOS_LANE_SCRIPTS,
+                      *classify.python_import_closure(classify.MACOS_LANE_SCRIPTS), *classify.WORKFLOW_INPUTS,
+                      "project.yml", "QwenVoice.xcodeproj/project.pbxproj", "Sources/Resources/qwenvoice_contract.json",
+                      ".github/actions/native-toolchain/action.yml"}
+        candidates.update(path.relative_to(ROOT).as_posix() for top in ("config", "scripts", "Tests")
+                          for path in (ROOT / top).rglob("*") if path.is_file() and "__pycache__" not in path.parts)
+        inputs = sorted(path for path in candidates if not path.endswith(".swift") and classify.classify([path])["swift"])
+        # The classifier's own tables reach every kind: records, fixtures, lane scripts, build configs.
+        for expected in ("config/test-quarantine.json", "scripts/tests/fixtures/language_normalization.json",
+                         "scripts/lib/xctest_summary.py", "scripts/lib/build_paths.sh", "config/toolchain.json",
+                         "scripts/macos_test.sh", "scripts/build.sh"):
+            self.assertIn(expected, inputs)
+        with mock.patch.object(MODULE, "project_generation_status", return_value=None), \
+                mock.patch.object(MODULE, "lint_commands", return_value=[]):
+            for path in inputs:
+                with self.subTest(path=path):
+                    native = [c for c in commands(MODULE.check_plan([path])) if c.startswith("scripts/macos_test.sh ")]
+                    self.assertTrue(native, path)
+                    self.assertFalse(any(" tsan" in c for c in native), native)
+
+    def test_a_data_input_runs_the_test_classes_that_read_it(self) -> None:
+        def plan(*paths: str) -> list[str]:
+            with mock.patch.object(MODULE, "project_generation_status", return_value=None):
+                return [c for c in commands(MODULE.check_plan(list(paths))) if c.startswith("scripts/macos_test.sh ")]
+
+        self.assertEqual(plan("config/ios-memory-budget-policy.json"),
+                         ["scripts/macos_test.sh core-test --only StartupReliabilityDiagnosticsV2Tests"])
+        self.assertEqual(plan("scripts/tests/fixtures/language_normalization.json"),
+                         ["scripts/macos_test.sh core-test --only WordErrorRateTests"])
+        # No focused runner: a reader without a test class (the quarantine helper) or
+        # the owned runtime package's tests; lane scripts and build configs run it all.
+        for path in ("config/test-quarantine.json", "config/audio-qc-stage0-observations.json",
+                     "scripts/macos_test.sh", "scripts/lib/xctest_summary.py", "config/toolchain.json"):
+            with self.subTest(path=path):
+                self.assertEqual(plan(path), ["scripts/macos_test.sh test"])
+        # Beside a changed test class, the data readers join one focused run.
+        test_file = "Tests/VocelloCoreTests/WordErrorRateTests.swift"
+        mixed = plan(test_file, "config/ios-memory-budget-policy.json")
+        self.assertEqual(mixed, ["scripts/macos_test.sh core-test --only StartupReliabilityDiagnosticsV2Tests,WordErrorRateTests"])
+
     def test_check_never_schedules_ui_device_or_release_lanes(self) -> None:
         plan = MODULE.check_plan(["Sources/iOS/A.swift", "scripts/ui_test.sh", "scripts/release.sh", "website/x.ts"])
         for command in commands(plan):
@@ -182,7 +227,75 @@ class PythonSelectionTests(unittest.TestCase):
 
     def test_unknown_input_and_shared_tooling_fall_back_to_the_full_suite(self) -> None:
         self.assertEqual(MODULE.python_test_selection(["scripts/tests/nonexistent_helper.py"])["mode"], "full")
-        self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")
+        for path in ("scripts/lib/build_paths.sh", "scripts/tests/conftest.py", "pytest.ini"):
+            with self.subTest(path=path):
+                self.assertEqual(MODULE.python_test_selection([path])["mode"], "full")
+
+    def assert_selects(self, path: str, *, at_most: int, includes: tuple[str, ...]) -> list[str]:
+        selection = MODULE.python_test_selection([path])
+        self.assertEqual(selection["mode"], "selected", selection)
+        tests = selection["tests"]
+        self.assertLessEqual(len(tests), at_most, tests)
+        for module in includes:
+            self.assertIn(f"scripts/tests/{module}", tests)
+        return tests
+
+    def test_ordinary_inputs_select_the_tests_that_read_them(self) -> None:
+        """W-02: generic stems as search words once selected 118-120 of 126 modules for each of these."""
+        cases = {
+            "config/roadmap.json": (10, ("test_roadmap.py",)),
+            "scripts/roadmap.py": (10, ("test_roadmap.py",)),
+            "scripts/macos_test.sh": (12, ("test_macos_test_evidence.py", "test_profile_capture_contract.py",
+                                           "test_macos_gate.py")),
+            "scripts/ui_test.sh": (20, ("test_ui_failure_finalization.py", "test_required_step_ledger.py",
+                                        "test_check_ios_smoke_acceptance.py", "test_long_form_project_summary.py")),
+            "project.yml": (20, ("test_project_generation.py", "test_lineage_identity.py")),
+        }
+        for path, (at_most, includes) in cases.items():
+            with self.subTest(path=path):
+                self.assert_selects(path, at_most=at_most, includes=includes)
+
+    def test_a_qc_module_selects_the_qc_tests_that_import_it(self) -> None:
+        importing = {path.relative_to(ROOT).as_posix() for path in ROOT.glob("scripts/tests/test_*.py")
+                     if re.search(r"^\s*from qc[ .]", path.read_text(encoding="utf-8"), re.MULTILINE)}
+        self.assertIn("scripts/tests/test_qc_evidence.py", importing)
+        tests = self.assert_selects("scripts/qc/evidence.py", at_most=40, includes=("test_qc_evidence.py",))
+        self.assertLessEqual(importing, set(tests))
+        self.assertNotIn("scripts/tests/test_roadmap.py", tests)
+
+    def test_routing_changes_run_both_routing_suites_and_the_selector_consumers(self) -> None:
+        for path in MODULE.ROUTING_SOURCES:
+            with self.subTest(path=path):
+                tests = self.assert_selects(path, at_most=10, includes=("test_workflow_diagnostics.py",))
+                self.assertLessEqual(set(MODULE.ROUTING_TESTS), set(tests))
+
+    def test_a_changed_test_module_selects_itself_not_the_tests_that_name_it(self) -> None:
+        self.assertEqual(MODULE.python_test_selection(["scripts/tests/test_roadmap.py"])["tests"],
+                         ["scripts/tests/test_roadmap.py"])
+
+    def test_name_matching_is_one_step_deep_unless_nothing_names_the_input(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, text in {
+                "config/data.json": "{}",
+                "config/indirect.json": "{}",
+                "config/orphan.json": "{}",
+                "scripts/reader.py": 'PATHS = ("config/data.json", "config/indirect.json")\n',
+                "scripts/tests/test_reader.py": 'SCRIPT = "scripts/reader.py"\n',
+                "scripts/tests/test_data.py": 'DATA = ROOT / "config" / "data.json"\n',
+                "scripts/tests/test_other.py": 'NAMES = ("my-data.json", "data.jsonl", "data_json")\n',
+            }.items():
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(text, encoding="utf-8")
+
+            def tests(path: str) -> list[str]:
+                return MODULE.python_test_selection([path], root=root)["tests"]
+
+            # A test that reads the input runs; the tests of another reader do not.
+            self.assertEqual(tests("config/data.json"), ["scripts/tests/test_data.py"])
+            # Only when no test names it does the script that reads it stand in.
+            self.assertEqual(tests("config/indirect.json"), ["scripts/tests/test_reader.py"])
+            self.assertEqual(MODULE.python_test_selection(["config/orphan.json"], root=root)["mode"], "full")
 
     def test_instruction_changes_do_not_select_python(self) -> None:
         for path in ("CLAUDE.md", "website/CLAUDE.md", "docs/reference/development-workflow.md"):

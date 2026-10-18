@@ -115,6 +115,7 @@
 		1E717451FC0F883570018189 /* IOSDeviceDiagnosticsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23ECC0A581C6D3682E9A846A /* IOSDeviceDiagnosticsRecorder.swift */; };
 		1ED0434D51388D0666F8FF1F /* ThemeModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68911A1D10F5E325090F912 /* ThemeModifiers.swift */; };
 		1F0331F59477C4B2ED745030 /* IOSGenerationInputControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8265666E168A61818AB382C1 /* IOSGenerationInputControls.swift */; };
+		1F43A12B385E959816667476 /* MacMetricKitReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916B21B75394EFA8291A6E95 /* MacMetricKitReporter.swift */; };
 		1F82F2EB497CD657E48CB444 /* VoiceCloningReferenceAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B4E314CA682B131C91D12CB /* VoiceCloningReferenceAudioSupport.swift */; };
 		1F9D4B35823565594E6E83E2 /* IOSSavedOutputsDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3D06E2FF511C7FBE4BFE41 /* IOSSavedOutputsDestinationTests.swift */; };
 		1FE636CA103785636B5D4985 /* VocelloMacSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E74540DA8C426D633D6114C /* VocelloMacSmokeUITests.swift */; };
@@ -1240,6 +1241,7 @@
 		90CCF06F522DF8986C274D30 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		90F9873786E11A6DBE0BCF00 /* IOSUnloadQuiescence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSUnloadQuiescence.swift; sourceTree = "<group>"; };
 		9149B3BEE30949867C4573CF /* MacStudioSetupChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStudioSetupChip.swift; sourceTree = "<group>"; };
+		916B21B75394EFA8291A6E95 /* MacMetricKitReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMetricKitReporter.swift; sourceTree = "<group>"; };
 		917EC933816CEDA7A4F80E85 /* MacFileSaveCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFileSaveCopy.swift; sourceTree = "<group>"; };
 		921DFEA4B9EC8C78C42A09E5 /* HantHansFoldTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HantHansFoldTable.swift; sourceTree = "<group>"; };
 		9269C58288AECE619F4F9582 /* SavedVoiceSheetConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedVoiceSheetConfigurationTests.swift; sourceTree = "<group>"; };
@@ -2055,6 +2057,7 @@
 				60063661FA117455600430A7 /* MacLineBatchRequest.swift */,
 				E0CC2006AEA4AFD71AE708C2 /* MacLineBatchRunner.swift */,
 				57AE623767698B51848E3388 /* MacMemoryBudgetPolicy.swift */,
+				916B21B75394EFA8291A6E95 /* MacMetricKitReporter.swift */,
 				A7FE9D2BDA257CCFD9C61608 /* MacModelVariantResolution.swift */,
 				803DDA2894963BDCD16DA65D /* MacSavedVoiceDeletion.swift */,
 				E3967ADEFB3305E5953E7758 /* MacStudioGenerationActions.swift */,
@@ -3440,6 +3443,7 @@
 				F3043A2FD1787BA4265A381A /* MacLineBatchRunner.swift in Sources */,
 				59B0198DFE993816B8862851 /* MacListPrimitives.swift in Sources */,
 				F48341B1ADE4FAA70550D70A /* MacMemoryBudgetPolicy.swift in Sources */,
+				1F43A12B385E959816667476 /* MacMetricKitReporter.swift in Sources */,
 				48FA9E2519E0947699BEBA3B /* MacModelRow.swift in Sources */,
 				3C9418DBE9247CC7C70FC84E /* MacModelVariantResolution.swift in Sources */,
 				C4F9EF2F686BF8C357EE285D /* MacMotion.swift in Sources */,

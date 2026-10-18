@@ -30,6 +30,9 @@ final class QwenVoiceApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // DW-03: MetricKit's delayed field diagnostics, as the iPhone app
+        // subscribes at launch (`IOSMetricKitMemoryReporter`, `IOSCrashObserver`).
+        MacMetricKitReporter.shared.start()
         // MAC-25: reference recordings a crash or force quit left behind; no
         // draft can point at them in a new process. Another running copy's
         // folder is left alone. The scan runs off the main thread so it never

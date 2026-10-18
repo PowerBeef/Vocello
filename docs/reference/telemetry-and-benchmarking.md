@@ -594,6 +594,8 @@ MetricKit has not delivered a payload. Each lane pull copies the same rolling do
 counts one record per (kind, interval start, interval end), keeps the newest document's copy and
 reports the rest as `duplicateRecordCount`. Daily values are not run-correlated and cannot qualify or
 retroactively fail an individual take.
+The Mac app keeps the same document under its app-support `diagnostics/` folder (DW-03,
+`MacMetricKitReporter`), with the same limits; no lane or report reads it yet.
 
 ### Frontend responsiveness and playback health
 

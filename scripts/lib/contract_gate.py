@@ -156,7 +156,8 @@ VALIDATORS: tuple[Validator, ...] = (
         "project.yml")),
     _reads(PYTHON, "scripts/validate_backend_risk_spine.py", "--root", "{root}", inputs=(
         "scripts/validate_backend_risk_spine.py", "scripts/macos_test.sh", "config/backend-risk-spine.json",
-        "Tests/VocelloCoreTests/", "Packages/VocelloQwen3Core/",
+        # VocelloCoreTests also hosts Tests/VocelloiOSLogicTests; an item's source may be a UI test.
+        "Tests/", "Packages/VocelloQwen3Core/",
         # Item sources and the evidence report directory must resolve.
         "Sources/", "docs/audits/")),
 

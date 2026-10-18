@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "referenceFormat": "target/class/test",
   "evidence": {
     "reportDirectory": "docs/audits/archive/2026-07-10",
     "reportCommit": "05bd2b6d24b3f43351f3b388622a72d8f0d6ecce",
     "validatedAgainst": "current-source-at-test-time",
-    "policy": "implemented requires every resolvable test reference and an empty remaining list"
+    "policy": "implemented requires every resolvable test reference and an empty remaining list; partial names resolvable tests and what they leave unpinned; uncovered names no test and gives the reason"
   },
   "items": [
     {
@@ -149,6 +149,402 @@
       "tests": [
         "VocelloCoreTests/AtomicWAVPublicationTests/testOneShotWriterPublishesReadableFrameAccurateWAV",
         "VocelloCoreTests/AtomicWAVPublicationTests/testStreamingWriterKeepsPartialOutputHiddenUntilTerminalBarrier"
+      ],
+      "status": "implemented",
+      "remaining": []
+    },
+    {
+      "id": "A-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "runtimeCapabilityID": "generation-contracts",
+      "title": "Streamed takes feed text at one token per codec frame, so a long segment runs out of script and the talker sees only tts_pad (D1)",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open by decision: the 2026-10-16 RF-18 screen did not adopt full-text conditioning, and the Consistent long-form stall is a 3.0 known limitation; no test pins the production layout (ER-03)."
+    },
+    {
+      "id": "A-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "runtimeCapabilityID": "mimi-codec",
+      "title": "The Mimi clone-reference encoder applies traditional RoPE to rotate_half weights",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: the encoder still builds RoPE(traditional: true), and no parity fixture against the official tokenizer exists; the fix ships with G-03's version bump (ER-04, parity fixtures ER-01)."
+    },
+    {
+      "id": "A-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "mimi-codec",
+      "title": "The speech-tokenizer decoder never applies its 72-frame window; its KV grows for the whole take",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: PA-16 (parked) owns the window, the bounded KV and a parity fixture against the official 300/25 decode."
+    },
+    {
+      "id": "A-04",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "bounded-streaming",
+      "title": "Streamed clones decode from a cold decoder without reference history",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: fixed together with A-26's primed decoder history (ER-04)."
+    },
+    {
+      "id": "A-05",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "bounded-streaming",
+      "title": "A talker KV window would evict the unspoken script in the streaming text layout (latent; the refuter rated it S3)",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open and latent: production sets no talker window, and nothing refuses one with the streaming layout (ER-09)."
+    },
+    {
+      "id": "A-06",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "qwen3-loading-and-sampling",
+      "title": "EOS is re-inserted into the sampled logits (D2), which can truncate a take",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: the RF-18 follow-up screen's EOS arms (C4, E4) decide D2; E4 has not run (ER-05)."
+    },
+    {
+      "id": "A-07",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Custom voices under Auto fall back to English and its diction instruction (D6)",
+      "source": "Sources/QwenVoiceCore/GenerationSemantics.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open by design (C-33) until ER-05 decides it by screen."
+    },
+    {
+      "id": "A-08",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "mimi-codec",
+      "title": "The tokenizer encoder keeps its KV, and a longer input concatenates onto the stale buffer (MEM-1)",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: MEM-1 (ER-06)."
+    },
+    {
+      "id": "A-09",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "generation-contracts",
+      "title": "ICA-06, ICA-15 and RF-06 (Chinese silences) share A-01's streaming-text mechanism",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: re-measured under ER-03 once the text-conditioning decision changes."
+    },
+    {
+      "id": "B-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "title": "Proactive load, prime and prompt prebuilds keep submitting GPU work after the app leaves the foreground (BG-1)",
+      "source": "Sources/iOS/TTSEngineStore.swift",
+      "tests": [
+        "VocelloCoreTests/TTSEngineStoreTests/testLosingTheForegroundRefusesProactiveWorkAndCancelsWhatIsInFlight",
+        "VocelloCoreTests/TTSEngineStoreTests/testAnEngineStartedInTheBackgroundRefusesProactiveWorkUntilActive",
+        "VocelloCoreTests/ProactiveTaskChainTests/testANewerOperationWaitsForTheRunningOneInsteadOfCancellingIt",
+        "VocelloCoreTests/ProactiveTaskChainTests/testCancellingTheChainCancelsTheRunningAndTheWaitingOperation"
+      ],
+      "status": "partial",
+      "remaining": [
+        "The cancellation check before marking (path d) is verified by review only: no test drives the adapter's execution body without a loaded model.",
+        "A proactive load already running still finishes (B-04).",
+        "Device proof (smoke --scenario background-warmup): the paired iPhone run waits for the next announced window."
+      ]
+    },
+    {
+      "id": "B-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "A cancelled Mac warm unloads the model, then the cancelled-take path publishes .loaded with nothing resident",
+      "source": "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open (ER-06). The suite stayed green because ResidentLoadCoordinator(warmRequests: .cancel) throws in qwen3Capabilities, before the warm body and its catch run."
+    },
+    {
+      "id": "B-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Quitting the Mac app mid-take runs MLX's static destructors under live GPU work",
+      "source": "Sources/Services/AppStateRestorationPolicy.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: no applicationShouldTerminate and no shutdown barrier on the Mac (ER-02)."
+    },
+    {
+      "id": "B-04",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Cancel and memory relief wait out load, warm, trust hashing and marking (CONC-1)",
+      "source": "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: no cooperative checkpoints inside the loader, warm or hashing, and the load-epoch veto has no production trigger (ER-02)."
+    },
+    {
+      "id": "B-05",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Mac unloads keep the process-global Qwen3 caches, also at the critical band (E2-01)",
+      "source": "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open (ER-06)."
+    },
+    {
+      "id": "B-06",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "No engine-side deletion lease; the deletion gate trusts a load state B-02 can make stale",
+      "source": "Sources/SharedSupport/Services/ModelDeletionSequence.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: PA-33 (parked)."
+    },
+    {
+      "id": "G-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "title": "Saved-voice enrollment accepts a partial recognition transcript, so ICL takes run on a truncated ref_text",
+      "source": "Sources/SharedSupport/Services/VoiceClipTranscriber.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: enrollment never applies the verifier's edge-coverage rule (ER-04)."
+    },
+    {
+      "id": "G-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Use audio only on a saved voice with a transcript still conditions on the stored transcript",
+      "source": "Sources/QwenVoiceCore/NativeCloneSupport.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: needs three explicit transcript request states (ER-04)."
+    },
+    {
+      "id": "G-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "clone-artifacts",
+      "title": "Nothing versions the encoder implementation, so saved voices keep A-02's wrong codes after the RoPE fix",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: the speaker-feature version now ends with the MLX build (F-06), but no encoder version or golden-codes test exists; ships with A-02 (ER-04)."
+    },
+    {
+      "id": "G-04",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Mac History's Save to Saved Voices enrolls the requested script as a Clone take's transcript",
+      "source": "Sources/Views/Voices/SavedVoiceSheetConfiguration.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open (ER-04)."
+    },
+    {
+      "id": "G-05",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "iPhone import trusts a neighbouring .txt as a reviewed transcript",
+      "source": "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open (ER-04)."
+    },
+    {
+      "id": "G-06",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Stereo and multichannel references are mixed to mono implicitly and untested",
+      "source": "Sources/QwenVoiceCore/AudioPreparation.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: lands after G-13's audio-preparation version (ER-04)."
+    },
+    {
+      "id": "G-07",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "References end abruptly with no trim or fade before 0.5 s of padding (the onset-echo trigger)",
+      "source": "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: lands after G-13's audio-preparation version (ER-04)."
+    },
+    {
+      "id": "F-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "runtimeCapabilityID": "actor-classified-generation",
+      "title": "Clone-artifact adoption, persistence and codec replay ran GPU validation outside any MLX error scope",
+      "source": "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift",
+      "tests": [
+        "Qwen3RuntimeTests/VocelloQwen3FacadeTests/testAdoptingAMalformedArtifactFailsTypedWithoutMarkingTheModel",
+        "Qwen3RuntimeTests/RuntimeFailureCaptureTests/testUnleasedArtifactFailuresMarkTheModelOnlyForEvaluationOrAllocation",
+        "Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests/testSpeakerEmbeddingFiniteCheckRejectsNonFiniteValues"
+      ],
+      "status": "partial",
+      "remaining": [
+        "No test forces an MLX failure through persistCloneArtifact or replayCodecTrace.",
+        "Nothing asserts that the speaker-embedding finite check runs on the CPU stream; its test passes on the GPU stream too."
+      ]
+    },
+    {
+      "id": "F-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "qwen3-loading-and-sampling",
+      "title": "The MLX refresh changes every seeded take (inverse-CDF categorical); accepted with a release-note line, and seeded draws are pinned",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3RequestSamplingTests/testSeededSamplerGoldenTokens"
+      ],
+      "status": "implemented",
+      "remaining": []
+    },
+    {
+      "id": "F-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "runtimeCapabilityID": "qwen3-loading-and-sampling",
+      "title": "Reading an array back after a captured allocation failure copied from an unfilled buffer",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [
+        "Qwen3RuntimeTests/RuntimeFailureCaptureTests/testReadbackProbeThrowsAForcedAllocationFailureInsteadOfTrapping"
+      ],
+      "status": "partial",
+      "remaining": [
+        "The probe and the generation completion are tested; no test drives a failure through the talker-loop or decoder-chunk readbacks, so dropping the probe at one of them stays green."
+      ]
+    },
+    {
+      "id": "E-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Two quick iPhone installs ran at once and wedged both",
+      "source": "Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift",
+      "tests": [
+        "VocelloCoreTests/IOSModelDownloadAdmissionTests/testTwoInterleavedStartsLeaveTheSecondQueued",
+        "VocelloCoreTests/IOSModelDownloadAdmissionTests/testTheDuplicateGuardSeesAStartingModel",
+        "VocelloCoreTests/IOSModelDownloadAdmissionTests/testTwoQuickTapsOnOneModelPrepareItOnce",
+        "VocelloCoreTests/IOSModelDownloadAdmissionTests/testAFailedStartReleasesTheClaim",
+        "VocelloCoreTests/IOSModelDownloadAdmissionTests/testAFailedPreparationReleasesTheClaim"
+      ],
+      "status": "partial",
+      "remaining": [
+        "The admission rules are pinned; that IOSModelDownloadCoordinator takes both claims before its first await is not: the coordinator is in no unit-test target.",
+        "Device proof (RF-15's onboarding and download row): the paired iPhone run waits for the next announced window."
+      ]
+    },
+    {
+      "id": "E-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "A failed file was recorded as a user cancel: the row froze at Cancelling and the next launch deleted the staging",
+      "source": "Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift",
+      "tests": [
+        "VocelloCoreTests/IOSModelDownloadProgressMappingTests/testCancellingWithoutUserIntentChangesNeitherTheRowNorTheLedger",
+        "VocelloCoreTests/IOSModelDownloadProgressMappingTests/testOnlyTheUsersCancelRecordsCancelRequested",
+        "VocelloCoreTests/IOSModelDownloadProgressMappingTests/testAFailureWhileCancellingWithoutIntentWritesNoCancelAndIsReportedAsFailed",
+        "VocelloCoreTests/ModelDownloadLifecycleTests/testRestoreActionTable",
+        "VocelloCoreTests/ModelDownloadLifecycleTests/testARunReportsItsRootFailureRatherThanASiblingsCancellation"
+      ],
+      "status": "partial",
+      "remaining": [
+        "The mapping, run-end and restore rules are pinned; IOSModelDownloadCoordinator, which applies them, is in no unit-test target.",
+        "Device proof: the paired iPhone run waits for the next announced window."
+      ]
+    },
+    {
+      "id": "E-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "Staged files the current plan does not list are hard-linked into the installed model after a catalog layout change",
+      "source": "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open, partly mitigated: a launch that finds a request's artifact gone now discards its staging (64ff7f86, applied in the untested coordinator), but staging is still keyed by model and unlisted files are still linked; lands before any catalog layout change (ER-10)."
+    },
+    {
+      "id": "C-01",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S1",
+      "title": "About 60 s single takes drift into silences of 2 s or more late in the take; long-form fails in ordinary use",
+      "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open by decision: a 3.0 known limitation naming Consistent; the RF-18 follow-up screen (subtalker C1 passing, budget C2 failing, EOS arms pending) decides the fix, and the iOS long-form smoke is the device proof."
+    },
+    {
+      "id": "C-02",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "The planner fills every segment to the 300-unit ceiling (CJK segments of about 70-78 s)",
+      "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: the follow-up screen's 200-unit arm (C2) failed its rule on 2026-10-17; planner v3 (ER-03)."
+    },
+    {
+      "id": "C-03",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "The iPhone long-form smoke was not hermetic: it inherited the phone's variation",
+      "source": "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Fixed in the smoke itself (6efc4f8a pins Expressive and restores it), which runs only on the paired iPhone; no deterministic test fails if the pin is removed."
+    },
+    {
+      "id": "C-04",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "A symbol-only paragraph becomes its own segment, and the project fails on every Resume (the refuter rated it S3)",
+      "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: planner v3 merges unspeakable segments (ER-03)."
+    },
+    {
+      "id": "C-05",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S2",
+      "title": "The per-sample silence floor sits at the codec noise floor, so dropout verdicts are unstable",
+      "source": "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+      "tests": [],
+      "status": "uncovered",
+      "reason": "Open: ER-11, calibrated with QC v2's human controls."
+    },
+    {
+      "id": "A-15",
+      "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
+      "severity": "S3",
+      "runtimeCapabilityID": "bounded-streaming",
+      "title": "Codec frames lost a frame for 37 chunk sizes on the trip through seconds",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3StreamChunkFramesTests/framesSurviveTheTripThroughSeconds",
+        "Qwen3RuntimeTests/Qwen3StreamChunkFramesTests/atLeastOneFrame"
       ],
       "status": "implemented",
       "remaining": []

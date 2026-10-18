@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Validate that the backend risk spine points at executable repository evidence."""
+"""Validate that the backend risk spine points at executable repository evidence.
+
+Each item is `implemented` (named tests pin it, nothing remains), `partial` (named tests pin
+part of it and `remaining` says what they leave unpinned) or `uncovered` (no test pins it and
+`reason` says why: an open finding, or a fix that landed without one). Every named test must
+exist; an uncovered item names none rather than inventing one. Items mapped from an audit cite
+it (`audit`) with the finding's severity. `--report` lists every item that is not implemented.
+"""
 
 from __future__ import annotations
 
@@ -10,13 +17,26 @@ import subprocess
 from pathlib import Path
 
 
+# A target's classes, by the source trees project.yml compiles into it: VocelloCoreTests also
+# hosts the iOS logic tests, which the compile-only VocelloiOSLogicTests bundle never runs.
 TEST_ROOTS = {
-    "Qwen3RuntimeTests": Path("Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"),
-    "VocelloCoreTests": Path("Tests/VocelloCoreTests"),
+    "Qwen3RuntimeTests": (Path("Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"),),
+    "VocelloCoreTests": (Path("Tests/VocelloCoreTests"), Path("Tests/VocelloiOSLogicTests")),
 }
 RUNTIME_CHECKS = {
     "telemetry-overhead": (Path("scripts/macos_test.sh"), re.compile(r"^\s*telemetry-overhead\)" , re.MULTILINE)),
 }
+STATUSES = ("implemented", "partial", "uncovered")
+SEVERITIES = {"S1", "S2", "S3"}
+# A test class at any depth, or a top-level struct (a Swift Testing suite), after any attributes
+# (`@MainActor`, `@Suite("...")`). A nested struct is a helper inside a test class and must not
+# end that class's region; `class func` and `class var` declare members, not classes.
+ATTRIBUTES = r"(?:@[A-Za-z_][A-Za-z0-9_.]*(?:\([^)\n]*\))?\s+)*"
+DECLARATION = re.compile(
+    rf"(?m)^(?:\s*{ATTRIBUTES}(?:(?:final|private|fileprivate|internal|public|open)\s+)*class"
+    rf"|{ATTRIBUTES}(?:(?:private|fileprivate|internal|public)\s+)*struct)"
+    r"\s+(?!(?:func|var|let|subscript)\b)([A-Za-z_][A-Za-z0-9_]*)\b"
+)
 
 
 def _swift_sources(path: Path) -> list[Path]:
@@ -24,10 +44,7 @@ def _swift_sources(path: Path) -> list[Path]:
 
 
 def _class_contains_test(text: str, class_name: str, test_name: str) -> bool:
-    declarations = list(re.finditer(
-        r"(?m)^\s*(?:(?:final|private|internal|public|open)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)\b",
-        text,
-    ))
+    declarations = list(DECLARATION.finditer(text))
     for index, declaration in enumerate(declarations):
         if declaration.group(1) != class_name:
             continue
@@ -50,6 +67,10 @@ def _commit_is_reachable(root: Path, commit: str) -> bool:
     return result.returncode == 0
 
 
+def _nonempty_strings(value: object) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(v, str) and v.strip() for v in value)
+
+
 def validate(root: Path, config_path: Path) -> list[str]:
     errors: list[str] = []
     try:
@@ -57,8 +78,8 @@ def validate(root: Path, config_path: Path) -> list[str]:
     except (OSError, json.JSONDecodeError) as exc:
         return [f"cannot read {config_path}: {exc}"]
 
-    if data.get("schemaVersion") != 2:
-        errors.append("schemaVersion must be 2")
+    if data.get("schemaVersion") != 3:
+        errors.append("schemaVersion must be 3")
     if data.get("referenceFormat") != "target/class/test":
         errors.append("referenceFormat must be target/class/test")
 
@@ -94,37 +115,60 @@ def validate(root: Path, config_path: Path) -> list[str]:
             errors.append(f"duplicate item id: {item_id}")
         else:
             seen_ids.add(item_id)
+            prefix = f"{prefix} ({item_id})"
 
         source = item.get("source")
         if not isinstance(source, str) or not (root / source).is_file():
             errors.append(f"{prefix}.source does not resolve: {source!r}")
 
+        if "audit" in item or "severity" in item:
+            audit = item.get("audit")
+            if not isinstance(audit, str) or not (root / audit).is_file():
+                errors.append(f"{prefix}.audit does not resolve: {audit!r}")
+            if item.get("severity") not in SEVERITIES:
+                errors.append(f"{prefix}.severity must be one of {sorted(SEVERITIES)}")
+
         status = item.get("status")
-        remaining = item.get("remaining")
+        remaining = item.get("remaining", [])
         tests = item.get("tests")
-        if status != "implemented":
-            errors.append(f"{prefix}.status must be implemented")
-        if remaining != []:
-            errors.append(f"{prefix}.remaining must be empty for implemented evidence")
-        if not isinstance(tests, list) or not tests:
-            errors.append(f"{prefix}.tests must be a non-empty array")
+        if not isinstance(tests, list):
+            errors.append(f"{prefix}.tests must be an array")
             tests = []
+        if status not in STATUSES:
+            errors.append(f"{prefix}.status must be one of {list(STATUSES)}")
+        elif status == "implemented":
+            if not tests:
+                errors.append(f"{prefix}.tests must name the tests that pin implemented evidence")
+            if remaining != []:
+                errors.append(f"{prefix}.remaining must be empty for implemented evidence")
+        elif status == "partial":
+            if not tests:
+                errors.append(f"{prefix}.tests must name the tests that pin part of a partial item")
+            if not _nonempty_strings(remaining):
+                errors.append(f"{prefix}.remaining must say what a partial item's tests leave unpinned")
+        else:
+            if tests:
+                errors.append(f"{prefix}.tests must be empty for an uncovered item; name no test")
+            reason = item.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                errors.append(f"{prefix}.reason must say why an uncovered item has no test")
+            if remaining != []:
+                errors.append(f"{prefix}.remaining is for partial items; an uncovered item gives a reason")
 
         for reference in tests:
             if not isinstance(reference, str) or reference.count("/") != 2:
                 errors.append(f"{prefix} has malformed test reference: {reference!r}")
                 continue
             target, class_name, test_name = reference.split("/")
-            relative_root = TEST_ROOTS.get(target)
-            if relative_root is None:
+            relative_roots = TEST_ROOTS.get(target)
+            if relative_roots is None:
                 errors.append(f"{prefix} uses unsupported test target: {target}")
                 continue
-            test_root = root / relative_root
-            cache_key = str(test_root)
-            sources = source_cache.get(cache_key)
+            sources = source_cache.get(target)
             if sources is None:
-                sources = [path.read_text(encoding="utf-8") for path in _swift_sources(test_root)]
-                source_cache[cache_key] = sources
+                sources = [path.read_text(encoding="utf-8")
+                           for relative in relative_roots for path in _swift_sources(root / relative)]
+                source_cache[target] = sources
             if not any(_class_contains_test(text, class_name, test_name) for text in sources):
                 errors.append(f"{prefix} test reference does not resolve: {reference}")
 
@@ -156,10 +200,30 @@ def validate(root: Path, config_path: Path) -> list[str]:
     return errors
 
 
+def summary(config_path: Path, *, report: bool = False) -> list[str]:
+    """Counts by status, the ids that are not implemented and, with `report`, why."""
+    items = [item for item in json.loads(config_path.read_text(encoding="utf-8"))["items"]]
+    lines = [", ".join(f"{sum(item['status'] == status for item in items)} {status}" for status in STATUSES)]
+    for status in STATUSES[1:]:
+        ids = [item["id"] for item in items if item["status"] == status]
+        if ids:
+            lines.append(f"{status}: {', '.join(ids)}")
+    if report:
+        for item in items:
+            if item["status"] == "implemented":
+                continue
+            severity = f" {item['severity']}" if "severity" in item else ""
+            detail = item.get("reason") or " ".join(item.get("remaining", []))
+            lines.append(f"- {item['id']}{severity} {item['status']}: {detail}")
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--report", action="store_true",
+                        help="also list every partial and uncovered item with what it leaves unpinned")
     args = parser.parse_args()
     root = args.root.resolve()
     config = args.config or root / "config/backend-risk-spine.json"
@@ -168,7 +232,10 @@ def main() -> int:
         for error in errors:
             print(f"error: {error}")
         return 1
-    print("backend risk spine: PASS")
+    lines = summary(config, report=args.report)
+    print(f"backend risk spine: PASS ({lines[0]})")
+    for line in lines[1:]:
+        print(line)
     return 0
 
 

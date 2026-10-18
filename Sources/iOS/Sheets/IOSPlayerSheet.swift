@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import SwiftUI
 import QwenVoiceCore
 

@@ -4,6 +4,7 @@ import Foundation
 import QwenVoiceCore
 import Speech
 import UIKit
+import VocelloQwen3Core
 
 /// Headless, non-UI on-device diagnostics runner — the iOS analog of `vocello bench`.
 ///

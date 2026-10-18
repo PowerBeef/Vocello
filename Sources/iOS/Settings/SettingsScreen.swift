@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import QwenVoiceCore
 
 /// Typed Settings copy shared by the hub and its destinations.

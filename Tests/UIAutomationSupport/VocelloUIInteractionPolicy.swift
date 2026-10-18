@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Visibility and actionability are different claims. Layout checks always require

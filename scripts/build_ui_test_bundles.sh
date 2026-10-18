@@ -93,8 +93,7 @@ if [[ "$MODE" == "macos" || "$MODE" == "all" ]]; then
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
       CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-      SWIFT_OPTIMIZATION_LEVEL="-Onone" SWIFT_COMPILATION_MODE="incremental" \
-      GCC_OPTIMIZATION_LEVEL="0" ENABLE_TESTABILITY=YES
+      "${QVOICE_OWNED_DEV_SETTINGS[@]}"
   else
     # The same settings as scripts/ui_test.sh's macOS build-for-testing.
     build VocelloMacUI "platform=macOS,arch=arm64" "$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED" \

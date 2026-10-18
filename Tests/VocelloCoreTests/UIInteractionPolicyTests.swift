@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 
 final class UIInteractionPolicyTests: XCTestCase {

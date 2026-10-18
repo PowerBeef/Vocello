@@ -1,6 +1,7 @@
 import AppKit
 import QwenVoiceCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The batch sheet of the three Studio screens: line-by-line batches run on
 /// `MacLineBatchRunner` (one ordinary take per line on the shared single-take

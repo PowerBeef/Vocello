@@ -159,9 +159,7 @@ build_mac_test_bundles() {
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-    SWIFT_OPTIMIZATION_LEVEL="-Onone" SWIFT_COMPILATION_MODE="incremental" \
-    GCC_OPTIMIZATION_LEVEL="0" \
-    ENABLE_TESTABILITY=YES > "$log_path" 2>&1 || xcode_status=$?
+    "${QVOICE_OWNED_DEV_SETTINGS[@]}" > "$log_path" 2>&1 || xcode_status=$?
   (( xcode_status == 0 )) || return "$xcode_status"
   # How much the arena actually rebuilt: the number that proves a warm cache
   # (MV-01) and shows up in the CI step log.

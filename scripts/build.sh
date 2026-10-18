@@ -143,10 +143,7 @@ build_app() {
         ENABLE_HARDENED_RUNTIME=NO \
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
         QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-        SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-        SWIFT_COMPILATION_MODE="incremental" \
-        GCC_OPTIMIZATION_LEVEL="0" \
-        ENABLE_TESTABILITY=YES \
+        "${QVOICE_OWNED_DEV_SETTINGS[@]}" \
         "${build_tail[@]}"
 
     if [ ! -d "$XCODEBUILD_APP" ]; then
@@ -304,12 +301,10 @@ CLI_BUILT="$DERIVED_DATA/Build/Products/Release/vocello"
 build_cli() {
     local optimization="${1:-Onone}"
     local swift_optimization="-Onone"
-    local compilation_mode="incremental"
-    local gcc_optimization="0"
-    # Every -Onone build in the shared macOS arena (test bundles, app, CLI) uses
-    # the same package-affecting settings, so switching between them relinks the
+    # Every -Onone build in the shared macOS arena (test bundles, app, CLI) passes
+    # the same QVOICE_OWNED_DEV_SETTINGS, so switching between them relinks the
     # owned targets instead of recompiling MLX and the other packages.
-    local testability="YES"
+    local -a optimization_settings=("${QVOICE_OWNED_DEV_SETTINGS[@]}")
     local command_identity="scripts/build.sh cli"
     # One arena per optimization level (MV-01): an optimized build in the
     # -Onone arena flipped it and the next test or app build recompiled the
@@ -318,9 +313,9 @@ build_cli() {
     DERIVED_DATA="$QVOICE_XCODE_MACOS_DERIVED"
     if [ "$optimization" = "O" ]; then
         swift_optimization="-O"
-        compilation_mode="wholemodule"
-        gcc_optimization="s"
-        testability="NO"
+        # The measured CLI keeps its exact global settings: engine benchmarks run it.
+        optimization_settings=(SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule
+            GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO)
         command_identity="scripts/build.sh cli-optimized"
         DERIVED_DATA="$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
     elif [ "$optimization" != "Onone" ]; then
@@ -352,10 +347,7 @@ build_cli() {
         CODE_SIGN_IDENTITY="-" \
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
         QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-        SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" \
-        SWIFT_COMPILATION_MODE="$compilation_mode" \
-        GCC_OPTIMIZATION_LEVEL="$gcc_optimization" \
-        ENABLE_TESTABILITY="$testability" \
+        "${optimization_settings[@]}" \
         build
 
     if [ ! -x "$CLI_BUILT" ]; then

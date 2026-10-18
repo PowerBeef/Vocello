@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import UniformTypeIdentifiers
 import XCTest
 
 final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {

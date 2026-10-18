@@ -632,6 +632,20 @@ warn_if_storage_bloated() {
         "${QWENVOICE_MODELS_WARN_GB:-10}" "QwenVoice-Debug/models" "--models"
 }
 
+# The settings of every development and test build in the shared -Onone macOS arena
+# (the test bundles, the development app and CLI, the XCUITest bundle compile). They
+# set the owned-target variables project.yml declares (workflow audit P2-1), never
+# SWIFT_OPTIMIZATION_LEVEL itself, so the Swift packages (MLX among them) keep their
+# optimized Release builds while owned code builds -Onone, incremental and testable.
+# Every -Onone build must pass exactly these, or switching between them recompiles.
+# shellcheck disable=SC2034  # read by the scripts that source this file
+QVOICE_OWNED_DEV_SETTINGS=(
+    QVOICE_OWNED_SWIFT_OPTIMIZATION=-Onone
+    QVOICE_OWNED_SWIFT_COMPILATION_MODE=incremental
+    QVOICE_OWNED_GCC_OPTIMIZATION=0
+    QVOICE_OWNED_TESTABILITY=YES
+)
+
 # Run xcodebuild, piping output through xcbeautify when it's on PATH and
 # stdout is a terminal. Preserves xcodebuild's exit code in both cases.
 #

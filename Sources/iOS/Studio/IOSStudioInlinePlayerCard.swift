@@ -1,5 +1,7 @@
 import AVFoundation
+import Combine
 import Observation
+import QwenVoiceCore
 import SwiftUI
 
 /// Studio dock hero player — a SINGLE card that serves both the **live streaming

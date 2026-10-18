@@ -28,6 +28,26 @@ settings:
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     STRING_CATALOG_GENERATE_SYMBOLS: YES
     SWIFT_EMIT_LOC_STRINGS: YES
+    # Every target is Swift 6; targets restate it, and a new target no longer
+    # falls back to XcodeGen's Swift 5.0 project default.
+    SWIFT_VERSION: "6"
+    # Imports must name the module that declares the members a file uses (SE-0444),
+    # which keeps the module graph explicit for explicit-module builds.
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    # Owned-target optimization (workflow audit P2-1). Project-level settings reach
+    # only the targets of this project, never the Swift packages (MLX,
+    # swift-transformers, GRDB). Development and test builds override these
+    # variables, not SWIFT_OPTIMIZATION_LEVEL, so the packages keep their optimized
+    # Release builds while owned code builds -Onone and testable. The defaults are
+    # the Release values the targets inherited before, so release builds are unchanged.
+    QVOICE_OWNED_SWIFT_OPTIMIZATION: "-O"
+    QVOICE_OWNED_SWIFT_COMPILATION_MODE: wholemodule
+    QVOICE_OWNED_GCC_OPTIMIZATION: s
+    QVOICE_OWNED_TESTABILITY: NO
+    SWIFT_OPTIMIZATION_LEVEL: $(QVOICE_OWNED_SWIFT_OPTIMIZATION)
+    SWIFT_COMPILATION_MODE: $(QVOICE_OWNED_SWIFT_COMPILATION_MODE)
+    GCC_OPTIMIZATION_LEVEL: $(QVOICE_OWNED_GCC_OPTIMIZATION)
+    ENABLE_TESTABILITY: $(QVOICE_OWNED_TESTABILITY)
 
 packages:
   GRDB:

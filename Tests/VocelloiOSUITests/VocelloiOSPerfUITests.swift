@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 
 /// iOS UI-performance scenarios for `scripts/ui_test.sh ios perf`, on the

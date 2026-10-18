@@ -18,8 +18,8 @@ private struct VoiceDesignActionAlert: Identifiable {
 /// contract.
 struct MacVoiceDesignScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(MacAppModel.self) private var appModel
 
@@ -203,7 +203,7 @@ struct MacVoiceDesignScreen: View {
             case .batch(let configuration):
                 MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
-                .environmentObject(audioPlayer)
+                .environment(audioPlayer)
             case .saveVoice(let configuration):
                 MacSavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoice(voice)

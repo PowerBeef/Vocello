@@ -31,7 +31,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
-  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|long-form-recovery|saved-voices-states] [--long-form-segments N]
+  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
@@ -239,8 +239,9 @@ elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" 
   [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" \
       || "$scenario_argument" == "generation-errors" || "$scenario_argument" == "design-enrollment" \
       || "$scenario_argument" == "clone-reference" || "$scenario_argument" == "long-form" \
-      || "$scenario_argument" == "long-form-recovery" || "$scenario_argument" == "saved-voices-states" ]] \
-    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, long-form-recovery, or saved-voices-states"
+      || "$scenario_argument" == "line-batch" || "$scenario_argument" == "long-form-recovery" \
+      || "$scenario_argument" == "saved-voices-states" ]] \
+    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, line-batch, long-form-recovery, or saved-voices-states"
 elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   scenario_argument="${scenario_argument:-lifecycle}"
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
@@ -453,7 +454,7 @@ if payload["lane"] == "marketing":
 if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20]:
     payload["scenario"] = sys.argv[20]
     payload["evidenceClass"] = "focused-smoke"
-    if sys.argv[20] in ("design-enrollment", "clone-reference", "long-form"):
+    if sys.argv[20] in ("design-enrollment", "clone-reference", "long-form", "line-batch"):
         payload["modes"] = [{"design-enrollment": "design", "clone-reference": "clone"}.get(sys.argv[20], "custom")]
         payload["lengths"] = []
         payload["warm"] = 0
@@ -1669,6 +1670,7 @@ elif [[ "$platform" == "macos" ]]; then
       design-enrollment) only_test+="/test08_DesignBriefAndCompletedPlayer" ;;
       clone-reference) only_test+="/test09_CloneReferenceAndCompletedPlayer" ;;
       long-form) only_test+="/test06_LongFormProjectJourney" ;;
+      line-batch) only_test+="/test07_LineBatchJourney" ;;
       long-form-recovery) only_test+="/test13_LongFormRecoveryDiscard" ;;
       saved-voices-states) only_test+="/test14_SavedVoicesEmptyAndErrorStates" ;;
     esac

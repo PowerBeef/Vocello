@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 import OSLog
 
@@ -144,15 +144,16 @@ final class LocalModelStatusProvider: ModelStatusProviding {
 
 /// Read-only model inventory for the current native product path.
 @MainActor
-final class ModelManagerViewModel: ObservableObject {
+@Observable
+final class ModelManagerViewModel {
     typealias ModelStatus = ModelInventoryStatus
 
-    @Published var statuses: [String: ModelInventoryStatus] = [:]
+    var statuses: [String: ModelInventoryStatus] = [:]
 
     private let modelRegistry: ContractBackedModelRegistry
     private let statusProvider: any ModelStatusProviding
     private let models: [TTSModel]
-    private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
     /// `models` is a test seam (PA-19); the app inventories the bundled
     /// contract's models.

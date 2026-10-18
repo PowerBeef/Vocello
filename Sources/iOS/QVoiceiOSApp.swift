@@ -18,9 +18,9 @@ struct QVoiceiOSApp: App {
     private let appLanguage = IOSAppLanguage.shared
     @StateObject private var deps: IOSAppDependenciesContainer
     @UIApplicationDelegateAdaptor private var appDelegate: IOSAppDelegate
-    @StateObject private var audioPlayer = AudioPlayerViewModel()
-    @StateObject private var savedVoicesViewModel = SavedVoicesViewModel()
-    @StateObject private var runtimeReleaseCoordinator = RuntimeReleaseCoordinator()
+    @State private var audioPlayer = AudioPlayerViewModel()
+    @State private var savedVoicesViewModel = SavedVoicesViewModel()
+    @State private var runtimeReleaseCoordinator = RuntimeReleaseCoordinator()
     /// AUD-01: opened files wait here until the root view can present them.
     @State private var externalImports = IOSExternalImportInbox()
     /// PA-15: background time, Studio cancellation/notice and the screen-awake hold.
@@ -70,11 +70,11 @@ struct QVoiceiOSApp: App {
                             backgroundGeneration: backgroundGeneration
                         )
                             .environmentObject(engine)
-                            .environmentObject(audioPlayer)
-                            .environmentObject(audioPlayer.playbackProgress)
-                            .environmentObject(manager)
-                            .environmentObject(savedVoicesViewModel)
-                            .environmentObject(installer)
+                            .environment(audioPlayer)
+                            .environment(audioPlayer.playbackProgress)
+                            .environment(manager)
+                            .environment(savedVoicesViewModel)
+                            .environment(installer)
                             .environment(externalImports)
                             .onAppear {
                                 setupAppSupport()

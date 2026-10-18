@@ -21,7 +21,7 @@ struct IOSRecordVoiceSheet: View {
     var onDismiss: () -> Void
 
     @EnvironmentObject private var ttsEngine: TTSEngineStore
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     /// PA-17: saving needs the Settings acknowledgment; the recorder names it before
     /// the take and `IOSSaveVoiceSheet` keeps Save disabled until it is on.
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false

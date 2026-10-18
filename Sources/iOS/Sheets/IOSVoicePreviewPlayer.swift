@@ -1,5 +1,5 @@
 import AVFoundation
-import Combine
+import Observation
 import QwenVoiceCore
 import SwiftUI
 import OSLog
@@ -9,21 +9,22 @@ import OSLog
 /// voice picker sheet to preview ~2.5 s of each voice without leaving
 /// the picker.
 ///
-/// One instance lives in `IOSVoicePickerSheet` as `@StateObject` so
+/// One instance lives in `IOSVoicePickerSheet` as `@State` so
 /// preview state survives filter + search re-renders but resets when
 /// the sheet dismisses.
 @MainActor
-final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
+@Observable
+final class IOSVoicePreviewPlayer: NSObject {
     /// The voice id currently previewing, or `nil` when no audio is
     /// playing. Drives the play↔pause icon swap in the row's preview
     /// button.
-    @Published private(set) var currentlyPlayingID: String?
+    private(set) var currentlyPlayingID: String?
 
-    private var player: AVAudioPlayer?
+    @ObservationIgnored private var player: AVAudioPlayer?
     /// Mixable hold on the audio session while a sample plays (PA-21). The
     /// owner restores the default category when it is released, so mixing
     /// never leaks into later playback.
-    private var sessionClaim: IOSAudioSessionClaim?
+    @ObservationIgnored private var sessionClaim: IOSAudioSessionClaim?
 
     override init() {
         super.init()

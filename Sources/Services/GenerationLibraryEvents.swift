@@ -2,7 +2,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class GenerationLibraryEvents: ObservableObject {
+final class GenerationLibraryEvents {
     static let shared = GenerationLibraryEvents()
 
     /// Fires after a Generation has been persisted and is ready for

@@ -19,9 +19,10 @@ struct ContentView: View {
     /// which `gateModel` republishes flip-scoped. Descendant screens keep
     /// their own environment-object injection.
     private let ttsEngineStore: TTSEngineStore
-    @StateObject private var gateModel: GenerationPerformanceGateModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
-    @EnvironmentObject private var appCommandRouter: AppCommandRouter
+    /// App-scoped beside the store; Observation tracks `isActive` through body.
+    private let gateModel: GenerationPerformanceGateModel
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @Environment(AppCommandRouter.self) private var appCommandRouter
 
     /// App-scoped (A10-04): `QwenVoiceApp` owns it beside the engine store and
     /// the player, so a take and the Studio state outlive a closed window.
@@ -38,7 +39,9 @@ struct ContentView: View {
     @State private var didCompleteInitialAvailabilityRefresh = false
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
     private var cloneConsentAcknowledged = false
-    @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
+    /// App-scoped: its admission policy starts a kernel memory-pressure monitor, so it is
+    /// built once beside the store, never per shell init.
+    private let generationWarmupCoordinator: MacGenerationWarmupCoordinator
     /// The language an Auto Built-in Voice or Voice Design take resolves for
     /// its script, detected off the main actor once typing pauses, so the warm
     /// of that draft is keyed like its take (P01-05, P02-05, P12-07).
@@ -70,12 +73,16 @@ struct ContentView: View {
         )
     }
 
-    init(ttsEngineStore: TTSEngineStore, appModel: MacAppModel) {
+    init(
+        ttsEngineStore: TTSEngineStore,
+        gateModel: GenerationPerformanceGateModel,
+        generationWarmupCoordinator: MacGenerationWarmupCoordinator,
+        appModel: MacAppModel
+    ) {
         self.ttsEngineStore = ttsEngineStore
+        self.gateModel = gateModel
+        self.generationWarmupCoordinator = generationWarmupCoordinator
         self.appModel = appModel
-        _gateModel = StateObject(
-            wrappedValue: GenerationPerformanceGateModel(store: ttsEngineStore)
-        )
         var initialDraft = VoiceCloningDraft()
         if let storedVoiceID = appModel.restoredVoiceCloningSavedVoiceID {
             initialDraft.selectedSavedVoiceID = storedVoiceID

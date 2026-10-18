@@ -1,4 +1,3 @@
-import Combine
 import Foundation
 import QwenVoiceCore
 
@@ -51,7 +50,7 @@ enum MacWarmLanguageResolution {
 }
 
 @MainActor
-final class MacGenerationWarmupCoordinator: ObservableObject {
+final class MacGenerationWarmupCoordinator {
     /// Benchmark hook: when `QWENVOICE_SUPPRESS_WARMUP` is set (`1`/`true`/`on`/`yes`),
     /// all proactive warmup/prefetch is skipped, so a cold benchmark generation does —
     /// and records — its own model load instead of being silently pre-warmed. Resolved

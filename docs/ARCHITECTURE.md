@@ -807,10 +807,12 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   (`Sources/Views/Studio`) renders the iOS canvas per mode; every mode generates through the
   shared `StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor` with
   `MacStudioSingleTakeGenerationHooks`.
-- State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
-  the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
-  injected as environment objects, with the store's `snapshotChanges` and
-  `performanceActivityUpdates` bridges for the root shell and the gate model.
+- State: coordinators, the player (`AudioPlayerViewModel` and its `PlaybackProgress`
+  slice) and the other view models are `@MainActor @Observable`, injected with
+  `.environment(_:)`; only the shared `TTSEngineStore` (and the iPhone's
+  `IOSAppDependenciesContainer`) stay `ObservableObject`s injected as environment
+  objects, with the store's `snapshotChanges` and `performanceActivityUpdates` bridges
+  for the root shell and the gate model.
 - `Sources/Services/` — app-level services: `MacEngineBootstrap` (in-process
   engine + `MacMemoryBudgetPolicy`),
   `MacLineBatchRunner` (line batch over the shared single-take executor),

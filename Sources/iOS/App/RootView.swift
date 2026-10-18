@@ -25,7 +25,7 @@ struct RootView: View {
 
     @Environment(AppModel.self) private var appModel
     @Environment(IOSExternalImportInbox.self) private var externalImports
-    @StateObject private var performanceGate: IOSGenerationPerformanceGateModel
+    @State private var performanceGate: IOSGenerationPerformanceGateModel
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
@@ -41,9 +41,7 @@ struct RootView: View {
 
     init(ttsEngine: TTSEngineStore) {
         self.ttsEngine = ttsEngine
-        _performanceGate = StateObject(
-            wrappedValue: IOSGenerationPerformanceGateModel(store: ttsEngine)
-        )
+        _performanceGate = State(initialValue: IOSGenerationPerformanceGateModel(store: ttsEngine))
     }
 
     var body: some View {

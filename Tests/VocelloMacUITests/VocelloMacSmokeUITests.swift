@@ -109,7 +109,10 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 30))
         let editor = element("batch_textEditor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 30))
-        let lines = "First batch line about the morning tide \(nonce).\nSecond batch line about the evening harbor \(nonce)."
+        // Long enough that the batch outlasts the menu reads below (two short lines settled
+        // about 4.5 s after Generate All).
+        let lines = "First batch line about the morning tide rolling slowly over the old harbor stones \(nonce).\n"
+            + "Second batch line about the evening harbor lights coming on one by one along the pier \(nonce)."
         XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: lines, timeout: 20))
 
         let generateAll = button("batch_generateAllButton")
@@ -117,6 +120,21 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generateAll, timeout: 20))
 
         let done = button("batch_doneButton")
+        // A running batch keeps its Studio screen, which presents this sheet (A14-05):
+        // the Navigate commands wait for it, and return once it settles. The lock is read
+        // first, as soon as the run starts, and Done must still be absent after the read,
+        // or the read could have come after the batch settled. File ▸ Open Output Folder,
+        // which the lock does not govern, stays enabled under the same sheet, so a
+        // disabled History is the lock and not the sheet's modality.
+        XCTAssertTrue(VocelloUIWait.condition("line batch to start", timeout: 60) {
+            !generateAll.exists || !generateAll.isEnabled || done.exists
+        })
+        XCTAssertFalse(done.exists, "the two-line batch must still be running to check the Navigate lock")
+        let historyIsEnabled = menuCommandIsEnabled("History", inMenu: "Navigate")
+        XCTAssertFalse(done.exists, "the batch settled before the Navigate menu was read; lengthen its lines")
+        XCTAssertEqual(historyIsEnabled, false, "Navigate must wait for a running line batch")
+        XCTAssertEqual(menuCommandIsEnabled("Open Output Folder", inMenu: "File"), true,
+                       "Commands outside Navigate stay available under the batch sheet")
         let statusList = element("batch_itemStatusList")
         XCTAssertTrue(
             VocelloUIWait.progressing(
@@ -127,6 +145,10 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             }
         )
         VocelloUIScreenshot.attach(app, named: "mac-smoke-linebatch-complete")
+        // Read while the settled sheet is still up, so the release is the batch settling
+        // and not the sheet closing.
+        XCTAssertEqual(menuCommandIsEnabled("History", inMenu: "Navigate"), true,
+                       "Navigate must return once the line batch settles")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: done, timeout: 20))
 
         // Both takes must be visible in History exactly once each.
@@ -498,7 +520,13 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
                        "A dismissed stream must not retake playback ownership")
         XCTAssertTrue(button("textInput_cancelButton").exists,
                       "Dismissing playback must leave generation under the Cancel control")
+        // Stop (⌘.) follows the running take, not only the player (MAC-23): with the
+        // preview dismissed, only the take keeps it enabled.
+        XCTAssertEqual(menuCommandIsEnabled("Stop", inMenu: "Playback"), true,
+                       "Stop must stay available to cancel a running take")
         cancelActiveGenerationAndAssertCleanReset()
+        XCTAssertEqual(menuCommandIsEnabled("Stop", inMenu: "Playback"), false,
+                       "With the take cancelled and its preview dismissed, Stop has nothing to stop")
         VocelloUIScreenshot.attach(app, named: "mac-smoke-cancelled")
 
         // A user-cancelled take must never land in History.

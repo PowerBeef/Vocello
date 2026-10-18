@@ -5,7 +5,7 @@ import SwiftUI
 /// One card serves the live stream and the completed take, so the transition is an in-place morph. Keeps every
 /// `sidebarPlayer_*` identifier the lanes assert.
 struct MacInlinePlayerCard: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     let inlinePlayerActivity: MacShellActivity?
     private var tint: Color {
         audioPlayer.currentGenerationMode.map { MacTheme.tint(for: $0) } ?? MacTheme.voicesTint
@@ -130,8 +130,8 @@ struct MacInlinePlayerCard: View {
 /// The per-tick slice of the card: only this row subscribes to the playback
 /// progress object, so the card chrome does not re-render on every tick.
 private struct MacInlineWaveformRow: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(AudioPlayerViewModel.PlaybackProgress.self) private var playbackProgress
     let tint: Color
 
     /// Matches the Studio player card's time column, so the two cards line up
@@ -264,7 +264,7 @@ struct MacPlaybackFooter: View {
         return audioPlayer.currentFilePath == output.audioURL.path
             || audioPlayer.playbackError(forFile: output.audioURL.path) != nil
     }
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
 
     private var status: MacShellStatus {

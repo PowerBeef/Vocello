@@ -1,4 +1,5 @@
 import Combine
+import Observation
 
 /// Scopes the fixed-refresh generation performance gate to its own tiny
 /// observable (IUI-5 P2 — the direct port of the macOS
@@ -10,13 +11,15 @@ import Combine
 /// most contended windows. This model republishes only the boolean *flips*:
 /// the shell now invalidates at generation start/stop instead of per event.
 @MainActor
-final class IOSGenerationPerformanceGateModel: ObservableObject {
-    @Published private(set) var isActive = false
+@Observable
+final class IOSGenerationPerformanceGateModel {
+    private(set) var isActive = false
+    @ObservationIgnored private var activityUpdates: AnyCancellable?
 
     init(store: TTSEngineStore) {
         isActive = store.hasActiveGeneration || store.hasSustainedPerformanceActivity
-        store.performanceActivityUpdates
+        activityUpdates = store.performanceActivityUpdates
             .removeDuplicates()
-            .assign(to: &$isActive)
+            .sink { [weak self] isActive in self?.isActive = isActive }
     }
 }

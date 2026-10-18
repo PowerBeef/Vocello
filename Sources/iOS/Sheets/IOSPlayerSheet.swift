@@ -1,5 +1,4 @@
 import AVFoundation
-import Combine
 import SwiftUI
 import QwenVoiceCore
 
@@ -17,7 +16,7 @@ struct IOSPlayerSheet: View {
     var onSave: (() -> Void)?
     var onDismiss: () -> Void
 
-    @StateObject private var controller = IOSPlayerSheetController()
+    @State private var controller = IOSPlayerSheetController()
     @State private var exportGate = IOSExportGate()
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
@@ -533,7 +532,7 @@ struct IOSPlayerKaraokeText: View {
 /// Observes the boundary-rate karaoke clock so only this leaf re-renders as
 /// the highlight advances; the sheet body and scroll container stay still.
 private struct IOSPlayerKaraokeLive: View {
-    @ObservedObject var karaokeClock: IOSPlayerKaraokeClock
+    let karaokeClock: IOSPlayerKaraokeClock
     let spans: [IOSWordSpan]
     let tint: Color
     var alignment: TextAlignment = .leading
@@ -554,7 +553,7 @@ private struct IOSPlayerKaraokeLive: View {
 /// it observes the playback clock directly so ticks stop invalidating the
 /// whole sheet body.
 private struct IOSPlayerWaveformSection: View {
-    @ObservedObject var clock: IOSPlayerPlaybackClock
+    let clock: IOSPlayerPlaybackClock
     let seed: Int
     let tint: Color
     let duration: TimeInterval
@@ -578,7 +577,7 @@ private struct IOSPlayerWaveformSection: View {
 /// controller as a plain (non-observing) reference for actions; duration
 /// arrives as a value from the observing parent.
 private struct IOSPlayerScrubSection: View {
-    @ObservedObject var clock: IOSPlayerPlaybackClock
+    let clock: IOSPlayerPlaybackClock
     let controller: IOSPlayerSheetController
     let duration: TimeInterval
     let tint: Color
@@ -709,8 +708,9 @@ private func iosPlayerLoadAudio(
 /// scrub thumb, elapsed label) observe this clock, so the 20–60 Hz display
 /// link no longer invalidates the whole sheet body per tick.
 @MainActor
-final class IOSPlayerPlaybackClock: ObservableObject {
-    @Published fileprivate(set) var currentTime: TimeInterval = 0
+@Observable
+final class IOSPlayerPlaybackClock {
+    fileprivate(set) var currentTime: TimeInterval = 0
 }
 
 /// Karaoke highlight state: the active word plus the played prefix (span end
@@ -726,8 +726,9 @@ struct IOSKaraokeHighlight: Equatable {
 /// ~2–4 Hz), so the transcript rebuilds at the rate its output changes
 /// rather than per display-link tick.
 @MainActor
-final class IOSPlayerKaraokeClock: ObservableObject {
-    @Published fileprivate(set) var highlight = IOSKaraokeHighlight(activeIndex: nil, playedCount: 0)
+@Observable
+final class IOSPlayerKaraokeClock {
+    fileprivate(set) var highlight = IOSKaraokeHighlight(activeIndex: nil, playedCount: 0)
 
     fileprivate func update(spans: [IOSWordSpan], time: TimeInterval) {
         let active = IOSWordTimingPlanner.activeIndex(in: spans, at: time)
@@ -744,18 +745,19 @@ final class IOSPlayerKaraokeClock: ObservableObject {
 }
 
 @MainActor
-final class IOSPlayerSheetController: NSObject, ObservableObject {
-    @Published private(set) var isPlaying: Bool = false
-    @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var spans: [IOSWordSpan] = [] {
+@Observable
+final class IOSPlayerSheetController: NSObject {
+    private(set) var isPlaying: Bool = false
+    private(set) var duration: TimeInterval = 0
+    private(set) var spans: [IOSWordSpan] = [] {
         didSet { karaokeClock.update(spans: spans, time: currentTime) }
     }
 
-    /// Deliberately NOT `@Published` (IUI-5 P3): per-tick publication through
+    /// Deliberately not observed (IUI-5 P3): per-tick publication through
     /// this sheet-level object was the whole-body invalidation the baseline
     /// measured at 106.5 ms/s during scrub. Per-frame consumers observe
     /// `clock`; boundary-rate consumers observe `karaokeClock`.
-    private(set) var currentTime: TimeInterval = 0 {
+    @ObservationIgnored private(set) var currentTime: TimeInterval = 0 {
         didSet {
             clock.currentTime = currentTime
             karaokeClock.update(spans: spans, time: currentTime)
@@ -765,11 +767,11 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
     let clock = IOSPlayerPlaybackClock()
     let karaokeClock = IOSPlayerKaraokeClock()
 
-    private var player: AVAudioPlayer?
-    private var displayLink: CADisplayLink?
-    private var loadedItem: IOSPlayerSheetItem?
-    private var loadGeneration = 0
-    private var sessionClaim: IOSAudioSessionClaim?
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var displayLink: CADisplayLink?
+    @ObservationIgnored private var loadedItem: IOSPlayerSheetItem?
+    @ObservationIgnored private var loadGeneration = 0
+    @ObservationIgnored private var sessionClaim: IOSAudioSessionClaim?
 
     override init() {
         super.init()

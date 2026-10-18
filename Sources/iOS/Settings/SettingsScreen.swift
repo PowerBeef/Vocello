@@ -474,7 +474,7 @@ struct SettingsScreen: View {
     @Environment(\.iosDockHeight) private var dockHeight
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppModel.self) private var appModel
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
+    @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(\.openURL) private var openURL
     @Environment(\.iosTabIsActive) private var isTabActive
 

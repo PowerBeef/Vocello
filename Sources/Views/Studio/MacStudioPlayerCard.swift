@@ -41,7 +41,7 @@ struct MacStudioPlayerCard: View {
         }
     }
 
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     let phase: Phase
     let tint: Color
     let onDismiss: () -> Void
@@ -283,8 +283,8 @@ struct MacStudioPlayerCard: View {
 /// The per-tick slice of the card: only this row subscribes to the playback
 /// progress object, so the card chrome does not re-render on every tick.
 private struct MacStudioWaveformRow: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(AudioPlayerViewModel.PlaybackProgress.self) private var playbackProgress
     let tint: Color
     /// Names the scrubber for the card it is in. The row appears in the live
     /// preview and whenever this completed take owns the shared transport.

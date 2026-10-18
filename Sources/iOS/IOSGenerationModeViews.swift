@@ -45,10 +45,10 @@ private enum IOSStudioChipAbbreviation {
 }
 
 struct IOSCustomVoiceView: View {
-    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
+    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @EnvironmentObject private var ttsEngine: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(AppModel.self) private var appModel
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 
@@ -559,11 +559,11 @@ private struct IOSDesignedVoiceSaveResult: Equatable {
 }
 
 struct IOSVoiceDesignView: View {
-    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
+    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @EnvironmentObject private var ttsEngine: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(ModelManagerViewModel.self) private var modelManager
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(AppModel.self) private var appModel
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 
@@ -1456,12 +1456,12 @@ struct IOSVoiceDesignView: View {
 }
 
 struct IOSVoiceCloningView: View {
-    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
+    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
     @EnvironmentObject private var ttsEngine: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(ModelManagerViewModel.self) private var modelManager
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(AppModel.self) private var appModel
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 

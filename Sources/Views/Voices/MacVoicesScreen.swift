@@ -17,8 +17,8 @@ private struct MacVoicesAlertState: Identifiable {
 /// place destructive actions in a menu.
 struct MacVoicesScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(MacAppModel.self) private var appModel
 
     let enrollRequestID: UUID?

@@ -1,9 +1,10 @@
-import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 
 @MainActor
-final class IOSModelInstallerViewModel: ObservableObject {
+@Observable
+final class IOSModelInstallerViewModel {
     enum OperationState: Equatable {
         case idle
         case available(estimatedBytes: Int64?)
@@ -27,20 +28,20 @@ final class IOSModelInstallerViewModel: ObservableObject {
         case failed(String)
     }
 
-    @Published private(set) var states: [String: OperationState] = [:]
+    private(set) var states: [String: OperationState] = [:]
     /// A model whose removal the engine refused because it was busy; the Voice
     /// Models screen explains it in the localized busy alert (A5-01).
-    @Published private(set) var blockedDeletionModelID: String?
+    private(set) var blockedDeletionModelID: String?
 
     private let modelAssetStore: LocalModelAssetStore?
     private let modelManager: ModelManagerViewModel
     /// The in-process engine a model removal coordinates with (A5-01), as on macOS.
-    private weak var engine: (any ModelDeletionEngineCoordinating)?
+    @ObservationIgnored private weak var engine: (any ModelDeletionEngineCoordinating)?
     private let backgroundSessionIdentifier: String
     private let diagnosticsStore: ModelDownloadDiagnosticsStore
-    private var coordinator: IOSModelDownloadCoordinator?
-    private var lastAcceptedGeneration: [String: UInt64] = [:]
-    private var lastDiagnosticSnapshotTrace:
+    @ObservationIgnored private var coordinator: IOSModelDownloadCoordinator?
+    @ObservationIgnored private var lastAcceptedGeneration: [String: UInt64] = [:]
+    @ObservationIgnored private var lastDiagnosticSnapshotTrace:
         [String: (uptime: TimeInterval, phase: IOSModelDeliverySnapshot.Phase, bytes: Int64)] = [:]
 
     init(

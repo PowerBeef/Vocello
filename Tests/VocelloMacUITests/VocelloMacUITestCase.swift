@@ -172,6 +172,32 @@ class VocelloMacUITestCase: XCTestCase {
         element(id, type: .button, in: scope)
     }
 
+    /// Whether a menu bar command is enabled, read with its menu open, which is when
+    /// AppKit validates the items and how a user finds them; the menu closes again.
+    /// Commands bound to app state (Stop follows a running take, Navigate waits for
+    /// a line batch) are how the app's observation of that state is checked. The menu
+    /// bar exposes a closed menu's items too, so only a hittable item proves the menu
+    /// opened: until then nothing is read and no Escape is sent, which would otherwise
+    /// reach the key window (a batch sheet cancels its run on Escape). Nil when the
+    /// menu did not open or has no such command.
+    func menuCommandIsEnabled(_ title: String, inMenu menuTitle: String) -> Bool? {
+        let menuBarItem = app.menuBars.menuBarItems[menuTitle]
+        guard menuBarItem.waitForExistence(timeout: 10) else { return nil }
+        menuBarItem.click()
+        let item = menuBarItem.menus.firstMatch.menuItems[title]
+        let opened = XCTWaiter.wait(
+            for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: item)],
+            timeout: 5
+        ) == .completed
+        guard opened else {
+            if menuBarItem.isSelected { app.typeKey(.escape, modifierFlags: []) }
+            return nil
+        }
+        let isEnabled = item.isEnabled
+        app.typeKey(.escape, modifierFlags: [])
+        return isEnabled
+    }
+
     /// A live query across the dock transition, preserving both production IDs.
     /// On Built-in Voice, the completed card's Retry replaces idle Generate.
     var generationAction: XCUIElement {

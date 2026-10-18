@@ -1,9 +1,10 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class AppStartupCoordinator: ObservableObject {
-    @Published private(set) var launchDiagnostics: AppLaunchDiagnosticsSnapshot?
+@Observable
+final class AppStartupCoordinator {
+    private(set) var launchDiagnostics: AppLaunchDiagnosticsSnapshot?
 
     func setupAppSupport() {
         let fm = FileManager.default

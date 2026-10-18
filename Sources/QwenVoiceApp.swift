@@ -9,14 +9,17 @@ struct QwenVoiceApp: App {
     /// when the bootstrap failed, in which case the window shows the startup
     /// diagnostics instead of the shell.
     @State private var ttsEngineStore: TTSEngineStore?
+    /// The shell's flip-scoped generation gate, created once with the store.
+    @State private var gateModel: GenerationPerformanceGateModel?
+    /// Studio warmups; its admission policy runs a memory-pressure monitor, so one per app.
+    @State private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
     @State private var engineBootstrapDiagnostics: AppLaunchDiagnosticsSnapshot?
     @State private var didInitializeSelectedTTSEngine = false
-    @StateObject private var audioPlayer = AudioPlayerViewModel()
+    @State private var audioPlayer = AudioPlayerViewModel()
     @State private var modelManager: ModelManagerViewModel
-    @StateObject private var savedVoicesViewModel = SavedVoicesViewModel()
-    @StateObject private var appCommandRouter = AppCommandRouter.shared
-    @StateObject private var generationLibraryEvents = GenerationLibraryEvents.shared
-    @StateObject private var appStartupCoordinator = AppStartupCoordinator()
+    @State private var savedVoicesViewModel = SavedVoicesViewModel()
+    @State private var appCommandRouter = AppCommandRouter.shared
+    @State private var appStartupCoordinator = AppStartupCoordinator()
     /// The shell model lives as long as the engine store and the player it
     /// drives (A10-04): its Studio coordinators outlive the window, so a window
     /// closed during a take reopens on that take with its Stop, not on idle
@@ -34,6 +37,7 @@ struct QwenVoiceApp: App {
             // MAC-20: a model deletion checks the engine before it removes files.
             modelManager.attachEngine(store)
             _ttsEngineStore = State(initialValue: store)
+            _gateModel = State(initialValue: GenerationPerformanceGateModel(store: store))
         } catch {
             _engineBootstrapDiagnostics = State(initialValue: Self.engineBootstrapDiagnostics(for: error))
         }
@@ -169,15 +173,19 @@ struct QwenVoiceApp: App {
                     minWidth: MacShellMetrics.diagnosticsMinSize.width,
                     minHeight: MacShellMetrics.diagnosticsMinSize.height
                 )
-            } else if let ttsEngineStore {
-                ContentView(ttsEngineStore: ttsEngineStore, appModel: appModel)
+            } else if let ttsEngineStore, let gateModel {
+                ContentView(
+                    ttsEngineStore: ttsEngineStore,
+                    gateModel: gateModel,
+                    generationWarmupCoordinator: generationWarmupCoordinator,
+                    appModel: appModel
+                )
                     .environmentObject(ttsEngineStore)
-                    .environmentObject(audioPlayer)
-                    .environmentObject(audioPlayer.playbackProgress)
+                    .environment(audioPlayer)
+                    .environment(audioPlayer.playbackProgress)
                     .environment(modelManager)
-                    .environmentObject(savedVoicesViewModel)
-                    .environmentObject(appCommandRouter)
-                    .environmentObject(generationLibraryEvents)
+                    .environment(savedVoicesViewModel)
+                    .environment(appCommandRouter)
                     .frame(
                         minWidth: MacShellMetrics.windowMinSize.width,
                         minHeight: MacShellMetrics.windowMinSize.height
@@ -273,6 +281,7 @@ struct QwenVoiceApp: App {
             let store = try MacEngineBootstrap.makeEngineStore()
             modelManager.attachEngine(store)
             ttsEngineStore = store
+            gateModel = GenerationPerformanceGateModel(store: store)
             engineBootstrapDiagnostics = nil
             startSelectedTTSEngineIfNeeded()
         } catch {

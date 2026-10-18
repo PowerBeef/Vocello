@@ -17,7 +17,7 @@ struct IOSRecordingOverlay: View {
     var onComplete: (URL) -> Void
     var onCancel: () -> Void
 
-    @StateObject private var recorder = ReferenceClipRecorder()
+    @State private var recorder = ReferenceClipRecorder()
     /// When true, the clip was handed to `onComplete` — skip `stopWithoutSaving` on
     /// `.onDisappear` so the temp WAV survives until the caller stashes/imports it.
     @State private var didHandOffClip = false

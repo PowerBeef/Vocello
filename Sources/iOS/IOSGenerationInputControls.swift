@@ -358,7 +358,7 @@ struct IOSSaveVoiceSheet: View {
     let onCancel: () -> Void
     let onSave: () -> Void
 
-    @StateObject private var clipPlayer = ClipReviewPlayer()
+    @State private var clipPlayer = ClipReviewPlayer()
     /// PA-17: the store refuses enrollment until the Settings acknowledgment is on,
     /// so the sheet says so up front and keeps Save disabled instead of failing
     /// after the user named and reviewed the voice.

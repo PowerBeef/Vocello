@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 
 @MainActor
@@ -74,10 +74,11 @@ enum CriticalMemoryFullUnloadSequence {
 }
 
 @MainActor
-final class RuntimeReleaseCoordinator: ObservableObject {
-    @Published private(set) var pendingReason: String?
-    @Published private(set) var pendingCacheReliefReason: String?
-    @Published private(set) var isReleaseInFlight = false
+@Observable
+final class RuntimeReleaseCoordinator {
+    private(set) var pendingReason: String?
+    private(set) var pendingCacheReliefReason: String?
+    private(set) var isReleaseInFlight = false
 
     func requestRelease(reason: String, hasActiveGeneration: Bool) -> RuntimeReleaseAction {
         if hasActiveGeneration || isReleaseInFlight {

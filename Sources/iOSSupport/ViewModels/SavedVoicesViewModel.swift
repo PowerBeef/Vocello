@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 import OSLog
 
@@ -21,17 +21,18 @@ enum SavedVoicesLoadIssue: Equatable {
 }
 
 @MainActor
-final class SavedVoicesViewModel: ObservableObject {
-    @Published private(set) var voices: [Voice] = SavedVoicesSessionCache.voices
-    @Published private(set) var isLoading = false
-    @Published private(set) var loadIssue: SavedVoicesLoadIssue?
+@Observable
+final class SavedVoicesViewModel {
+    private(set) var voices: [Voice] = SavedVoicesSessionCache.voices
+    private(set) var isLoading = false
+    private(set) var loadIssue: SavedVoicesLoadIssue?
 
-    private var hasLoadedOnce = !SavedVoicesSessionCache.voices.isEmpty
-    private var pendingRefresh = false
-    private var loadTask: Task<Void, Never>?
-    private var lastRefreshAction: (() async -> Void)?
-    private var busyRetryPolicy = SavedVoicesBusyRetryPolicy()
-    private var storeBusyRetryTask: Task<Void, Never>?
+    @ObservationIgnored private var hasLoadedOnce = !SavedVoicesSessionCache.voices.isEmpty
+    @ObservationIgnored private var pendingRefresh = false
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var lastRefreshAction: (() async -> Void)?
+    @ObservationIgnored private var busyRetryPolicy = SavedVoicesBusyRetryPolicy()
+    @ObservationIgnored private var storeBusyRetryTask: Task<Void, Never>?
 
     /// Stops a pending busy-store retry and restores a fresh schedule. The
     /// Voices screens call this when they disappear; reappearing loads again.

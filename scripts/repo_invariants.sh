@@ -146,7 +146,7 @@ for relative, start, end in regions:
     begin = re.search(start, text)
     stop = re.search(end, text)
     region = text[begin.start(): stop.start()] if begin and stop else text
-    if re.search(r"@EnvironmentObject.*AudioPlayerViewModel", region):
+    if re.search(r"@EnvironmentObject.*AudioPlayerViewModel|@Environment\(AudioPlayerViewModel(\.PlaybackProgress)?\.self\)", region):
         errors.append(f"{relative}: routing must not observe AudioPlayerViewModel directly")
 if errors:
     raise SystemExit("\n".join(errors))

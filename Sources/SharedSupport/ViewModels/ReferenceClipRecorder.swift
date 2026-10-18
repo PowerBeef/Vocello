@@ -1,6 +1,6 @@
 import AVFoundation
-import Combine
 import Foundation
+import Observation
 import QwenVoiceCore
 
 /// Records a 10–20 s reference clip as a 24 kHz mono Int16 PCM WAV for Voice Cloning enrollment,
@@ -8,7 +8,8 @@ import QwenVoiceCore
 /// `IOSRecordingOverlay`, macOS `MacRecordVoiceSheet`). Does its own permission request;
 /// callers don't need to pre-check microphone access.
 @MainActor
-final class ReferenceClipRecorder: NSObject, ObservableObject {
+@Observable
+final class ReferenceClipRecorder: NSObject {
     static let minDuration: Double = 10.0
     static let maxDuration: Double = 20.0
 
@@ -17,25 +18,25 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     /// session owner and `IOSPlaybackExclusivity` do this.
     nonisolated static let willStartRecordingNotification = Notification.Name("ReferenceClipRecorderWillStartRecording")
 
-    @Published private(set) var isRecording: Bool = false
-    @Published private(set) var elapsed: Double = 0
-    @Published private(set) var amplitude: Double = 0
+    private(set) var isRecording: Bool = false
+    private(set) var elapsed: Double = 0
+    private(set) var amplitude: Double = 0
     /// Rolling history of recent mic levels (oldest → newest, 0…1) that drives the live
     /// level meter so the user can SEE their voice being heard + recorded.
-    @Published private(set) var levels: [Double] = []
-    @Published var showsPermissionAlert: Bool = false
-    @Published private(set) var permissionDenied: Bool = false
-    @Published private(set) var lastSavedURL: URL?
+    private(set) var levels: [Double] = []
+    var showsPermissionAlert: Bool = false
+    private(set) var permissionDenied: Bool = false
+    private(set) var lastSavedURL: URL?
     /// True when the in-progress recording was ended by an audio-session
     /// interruption (incoming call, Siri, another app taking the mic) rather
     /// than the user stopping it. The capture up to that point is finalized +
     /// saved (so the take isn't silently lost); the UI surfaces a notice.
     /// Cleared on the next `start()` / `reset()`.
-    @Published private(set) var wasInterrupted: Bool = false
+    private(set) var wasInterrupted: Bool = false
     /// True when the last `start()` attempt couldn't begin capturing —
     /// typically no input device (Macs without a microphone) or a hardware
     /// failure. Cleared on the next successful start or `reset()`.
-    @Published private(set) var recordingFailed: Bool = false
+    private(set) var recordingFailed: Bool = false
 
     /// Whether the system reports any audio-input hardware at all. Always
     /// true on iPhone; on a Mac without a microphone the record UI should
@@ -64,20 +65,20 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     /// ~80 ms/sample × 48 ≈ a 3.8 s scrolling window.
     private let maxLevels = 48
 
-    private var recorder: AVAudioRecorder?
-    private var meteringTimer: Timer?
-    private var startedAt: Date?
+    @ObservationIgnored private var recorder: AVAudioRecorder?
+    @ObservationIgnored private var meteringTimer: Timer?
+    @ObservationIgnored private var startedAt: Date?
     /// Active virtual-microphone session (see `virtualMicrophoneURL`).
-    private var virtualSource: (url: URL, duration: Double, envelope: [Double])?
+    @ObservationIgnored private var virtualSource: (url: URL, duration: Double, envelope: [Double])?
     #if os(iOS)
-    private var interruptionObserver: NSObjectProtocol?
+    @ObservationIgnored private var interruptionObserver: NSObjectProtocol?
     /// Hold on the audio session while capturing (PA-21).
-    private var recordingClaim: IOSAudioSessionClaim?
+    @ObservationIgnored private var recordingClaim: IOSAudioSessionClaim?
     /// `start()` is waiting for the session off the main actor.
-    private var isActivatingSession = false
+    @ObservationIgnored private var isActivatingSession = false
     /// Advanced by every stop, so a start whose activation finishes after the
     /// user cancelled never begins capturing.
-    private var captureGeneration: UInt64 = 0
+    @ObservationIgnored private var captureGeneration: UInt64 = 0
     #endif
 
     deinit {

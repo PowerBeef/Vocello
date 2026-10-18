@@ -17,8 +17,8 @@ struct MacBatchGenerationSheet: View {
     let configuration: MacBatchSheetConfiguration
 
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var appCommandRouter: AppCommandRouter
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(AppCommandRouter.self) private var appCommandRouter
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(MacAppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss

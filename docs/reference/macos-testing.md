@@ -152,6 +152,7 @@ scripts/ui_test.sh macos smoke
 scripts/ui_test.sh macos smoke --scenario design-enrollment
 scripts/ui_test.sh macos smoke --scenario clone-reference
 scripts/ui_test.sh macos smoke --scenario long-form
+scripts/ui_test.sh macos smoke --scenario line-batch
 scripts/ui_test.sh macos smoke --scenario long-form-recovery
 scripts/ui_test.sh macos smoke --scenario saved-voices-states
 scripts/ui_test.sh macos localization
@@ -169,7 +170,9 @@ scripts/ui_test.sh macos marketing [--scenario all|models]
 `design-enrollment` runs the existing Design brief/player and actual-audio enrollment journey;
 `clone-reference` runs saved-reference hydration, editing and completed Clone playback; `long-form`
 runs the long-form project journey alone, including a regenerated segment accepted as a new revision
-with the replaced take and joined output kept in History (F-16); `long-form-recovery` plants an
+with the replaced take and joined output kept in History (F-16); `line-batch` runs the two-line
+batch alone and reads, from the open menus, that Navigate ▸ History is disabled while the batch runs
+and enabled once it settles, while File ▸ Open Output Folder stays enabled; `long-form-recovery` plants an
 unreadable long-form journal in an isolated empty profile and drives History's notice: Export is
 offered, Retry is offered and the notice stays, and a confirmed Discard ends the notice and sets the
 journal aside on disk, unchanged (F-16); `saved-voices-states` opens Saved Voices on an isolated
@@ -290,7 +293,7 @@ source). Ceilings come only from the counted runs' own spread, through `--derive
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Fifteen journeys in method-name order (`test00`–`test14`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|long-form-recovery\|saved-voices-states` runs `test00`, `test12`, `test11`, `test13` or `test14` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard) and `test14` (Saved Voices empty and error states), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows) |
+| Smoke | Fifteen journeys in method-name order (`test00`–`test14`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|line-batch\|long-form-recovery\|saved-voices-states` runs `test00`, `test12`, `test11`, `test07`, `test13` or `test14` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard) and `test14` (Saved Voices empty and error states), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows; while it runs, Navigate ▸ History is disabled and File ▸ Open Output Folder is not, read from the open menus) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching

@@ -6,7 +6,7 @@ struct IOSGenerateContainerView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     // Only the model manager: an unused engine or player environment object
     // would re-evaluate this container on every publish (A10-06).
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
+    @Environment(ModelManagerViewModel.self) private var modelManager
     private var selectorRailHeight: CGFloat {
         dynamicTypeSize.isAccessibilitySize ? 136 : 44
     }

@@ -15,7 +15,7 @@ import SwiftUI
 /// `textInput_*` and `delivery_*` identifier is the lane contract.
 struct MacCustomVoiceScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(MacAppModel.self) private var appModel
 
@@ -188,7 +188,7 @@ struct MacCustomVoiceScreen: View {
             case .batch(let configuration):
                 MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
-                .environmentObject(audioPlayer)
+                .environment(audioPlayer)
             }
         }
     }

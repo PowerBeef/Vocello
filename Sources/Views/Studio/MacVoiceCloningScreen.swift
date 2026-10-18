@@ -26,8 +26,8 @@ private struct CloneReferenceSessionState: Equatable {
 /// on-demand clone priming) and proactive priming stays with the engine store.
 struct MacVoiceCloningScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(MacAppModel.self) private var appModel
 
@@ -306,7 +306,7 @@ struct MacVoiceCloningScreen: View {
             case .batch(let configuration):
                 MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
-                .environmentObject(audioPlayer)
+                .environment(audioPlayer)
             }
         }
         .sheet(isPresented: $isRecordSheetPresented) {

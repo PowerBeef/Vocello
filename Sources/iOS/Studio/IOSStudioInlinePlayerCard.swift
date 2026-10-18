@@ -81,7 +81,7 @@ struct IOSStudioPlayerCard: View {
     @State private var pulse = false
     @State private var showDismissConfirm = false
     @State private var exportGate = IOSExportGate()
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 

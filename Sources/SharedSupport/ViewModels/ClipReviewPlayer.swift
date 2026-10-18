@@ -1,23 +1,24 @@
 import AVFoundation
-import Combine
 import Foundation
+import Observation
 
 /// Tiny audio player for reviewing a just-recorded (or just-generated) reference clip inside the
 /// "Save this voice" sheet: play/pause + a 0…1 progress for the waveform playhead + the clip's
 /// duration. Deliberately small — the Studio `AudioPlayerViewModel` is too coupled to the
 /// generation flow, and `IOSVoicePreviewPlayer` has no progress.
 @MainActor
-final class ClipReviewPlayer: NSObject, ObservableObject {
-    @Published private(set) var isPlaying = false
-    @Published private(set) var progress: Double = 0   // 0…1
-    @Published private(set) var duration: TimeInterval = 0
+@Observable
+final class ClipReviewPlayer: NSObject {
+    private(set) var isPlaying = false
+    private(set) var progress: Double = 0   // 0…1
+    private(set) var duration: TimeInterval = 0
 
-    private var player: AVAudioPlayer?
-    private var url: URL?
-    private var timer: Timer?
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var url: URL?
+    @ObservationIgnored private var timer: Timer?
     #if os(iOS)
     /// Hold on the audio session while reviewing (PA-21).
-    private var sessionClaim: IOSAudioSessionClaim?
+    @ObservationIgnored private var sessionClaim: IOSAudioSessionClaim?
 
     override init() {
         super.init()

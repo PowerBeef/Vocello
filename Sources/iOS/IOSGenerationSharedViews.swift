@@ -333,7 +333,7 @@ struct IOSCompactInlineNotice: View {
 }
 
 private struct IOSGenerateMiniPlayerTimeline: View {
-    @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
+    @Environment(AudioPlayerViewModel.PlaybackProgress.self) private var playbackProgress
 
     @ScaledMetric(relativeTo: .caption2) private var itemSpacing = 8
     @ScaledMetric(relativeTo: .caption2) private var railMinWidth = 92
@@ -365,7 +365,7 @@ private struct IOSGenerateMiniPlayerTimeline: View {
 }
 
 private struct IOSGenerateMiniPlayerProgressRail: View {
-    @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
+    @Environment(AudioPlayerViewModel.PlaybackProgress.self) private var playbackProgress
     @GestureState private var dragFraction: Double?
 
     @ScaledMetric(relativeTo: .caption2) private var railHeight = 4

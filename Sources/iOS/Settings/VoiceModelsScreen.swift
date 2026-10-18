@@ -6,8 +6,8 @@ import QwenVoiceCore
 struct VoiceModelsScreen: View {
     @Environment(\.iosDockHeight) private var dockHeight
     @Environment(AppModel.self) private var appModel
-    @EnvironmentObject private var modelManager: ModelManagerViewModel
-    @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
+    @Environment(ModelManagerViewModel.self) private var modelManager
+    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @Environment(\.dismiss) private var dismiss
 
     @State private var modelPendingCancel: TTSModel?

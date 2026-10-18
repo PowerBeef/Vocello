@@ -746,7 +746,7 @@ struct IOSVoicePickerSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var search: String = ""
-    @StateObject private var previewer = IOSVoicePreviewPlayer()
+    @State private var previewer = IOSVoicePreviewPlayer()
     /// Local provisional selection. The binding is only committed when the
     /// user taps the Confirm header button.
     @State private var pendingSelectedID: String
@@ -1154,7 +1154,7 @@ struct IOSVoicePickerOption: Identifiable, Equatable {
 /// built from a closure outside its presenter's body, so without this a Retry
 /// from the load-failure card would never replace the card with the list.
 struct IOSSavedVoicesObservingHost<Content: View>: View {
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @ViewBuilder let content: () -> Content
 
     var body: some View {

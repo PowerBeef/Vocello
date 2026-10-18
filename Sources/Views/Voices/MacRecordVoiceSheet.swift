@@ -16,8 +16,8 @@ struct MacRecordVoiceSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var recorder = ReferenceClipRecorder()
-    @StateObject private var reviewPlayer = ClipReviewPlayer()
+    @State private var recorder = ReferenceClipRecorder()
+    @State private var reviewPlayer = ClipReviewPlayer()
 
     private let tint = MacTheme.Brand.modeClone
 

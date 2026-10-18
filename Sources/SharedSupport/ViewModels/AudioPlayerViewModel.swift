@@ -1,6 +1,6 @@
 import AVFoundation
-import Combine
 import Foundation
+import Observation
 
 import QwenVoiceCore
 
@@ -8,7 +8,8 @@ typealias PlaybackGenerationResult = QwenVoiceCore.GenerationResult
 
 /// Manages playback state for the persistent sidebar player bar.
 @MainActor
-final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
+@Observable
+final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
 
     enum PlaybackPresentationContext: Equatable, Sendable {
         case none
@@ -27,9 +28,10 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     /// Lightweight observable that holds timer-driven properties (currentTime, duration).
     /// Only views that need per-frame progress (e.g. SidebarPlayerView) should subscribe.
     @MainActor
-    final class PlaybackProgress: ObservableObject {
-        @Published var currentTime: TimeInterval = 0
-        @Published var duration: TimeInterval = 0
+    @Observable
+    final class PlaybackProgress {
+        var currentTime: TimeInterval = 0
+        var duration: TimeInterval = 0
 
         var progress: Double {
             guard duration > 0 else { return 0 }
@@ -44,15 +46,15 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
     // MARK: - Published State (low-frequency)
 
-    @Published var isPlaying = false
-    @Published var currentFilePath: String?
-    @Published var currentTitle: String = ""
-    @Published var waveformSamples: [Float] = []
-    @Published var playbackError: String?
-    @Published private(set) var playbackTargetFilePath: String?
-    @Published private(set) var currentGenerationMode: GenerationMode?
-    private var generationPlaybackOwnership = GenerationPlaybackOwnership()
-    private var generationPlaybackMode: GenerationMode?
+    var isPlaying = false
+    var currentFilePath: String?
+    var currentTitle: String = ""
+    var waveformSamples: [Float] = []
+    var playbackError: String?
+    private(set) var playbackTargetFilePath: String?
+    private(set) var currentGenerationMode: GenerationMode?
+    @ObservationIgnored private var generationPlaybackOwnership = GenerationPlaybackOwnership()
+    @ObservationIgnored private var generationPlaybackMode: GenerationMode?
 
     func beginGenerationPlayback(operationID: UUID, mode: GenerationMode) {
         // S1: an earlier operation's waiting takes never take over the player.
@@ -76,19 +78,19 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         playbackTargetFilePath == path ? playbackError : nil
     }
 
-    @Published private(set) var isLiveStream = false
-    // Demoted from @Published (iOS frontend perf audit, Wave 3): these have ZERO SwiftUI
-    // readers — `livePreviewQueueDepth` is written on every streamed chunk but consumed only
-    // internally. Publishing them fired AudioPlayerViewModel.objectWillChange per chunk,
-    // invalidating every observer (notably the 3 Studio mode views, which inject this VM via
-    // @EnvironmentObject only for imperative cancel/abort, rendering none of its state). Plain
-    // stored properties remove that per-chunk broadcast at the source; the high-frequency
-    // progress is already isolated in the PlaybackProgress slice. If a streaming-progress UI
-    // ever needs these, move them into a nested ObservableObject slice (mirror PlaybackProgress).
-    private(set) var livePreviewQueueDepth = 0
-    private(set) var livePreviewPhase: LivePreviewPhase = .idle
-    @Published private(set) var playbackPresentationContext: PlaybackPresentationContext = .none
-    @Published private(set) var generatePreviewVisibilityState: GeneratePreviewVisibilityState = .hidden
+    private(set) var isLiveStream = false
+    // Not observed (iOS frontend perf audit, Wave 3): these have ZERO SwiftUI readers —
+    // `livePreviewQueueDepth` is written on every streamed chunk but consumed only internally.
+    // Published, they fired objectWillChange per chunk and invalidated every observer (notably
+    // the 3 Studio mode views, which use this VM only for imperative cancel/abort). Observation
+    // updates a view only for what its body reads, and these stay ignored so a chunk touches no
+    // registrar; the high-frequency progress is isolated in the PlaybackProgress slice. Internal
+    // state stays ignored likewise, except what `hasAudio`, `canSeek` and `durationDisplayText`
+    // read (`liveSessionID`, `playbackMode`, `liveFinalFilePath`).
+    @ObservationIgnored private(set) var livePreviewQueueDepth = 0
+    @ObservationIgnored private(set) var livePreviewPhase: LivePreviewPhase = .idle
+    private(set) var playbackPresentationContext: PlaybackPresentationContext = .none
+    private(set) var generatePreviewVisibilityState: GeneratePreviewVisibilityState = .hidden
 
     private enum PlaybackMode {
         case none
@@ -188,52 +190,52 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     private typealias TakeQueue = LivePreviewTakeQueue<QueuedChunk, QueuedCompletion, QueuedTakeDetails>
 
     private var playbackMode: PlaybackMode = .none
-    private var player: AVAudioPlayer?
+    @ObservationIgnored private var player: AVAudioPlayer?
     /// AVAudioEngine graph + FIFO scheduled-buffer bookkeeping (W2-D
     /// extraction; see `LiveStreamingPlaybackEngine`). Session identity,
     /// staleness guards, published state, timers, and telemetry stay here.
     private let livePlayback = LiveStreamingPlaybackEngine()
     // Smooth-first prebuffer state — set before generation starts,
     // picked up by startLiveSession, cleared at session end.
-    private var pendingLivePreviewEstimate: LivePreviewEstimate?
-    private var livePreviewEstimate: LivePreviewEstimate?
-    private var liveExpectedFrameOffset: Int64?
-    private var livePreviewDisabledSessionID: String?
+    @ObservationIgnored private var pendingLivePreviewEstimate: LivePreviewEstimate?
+    @ObservationIgnored private var livePreviewEstimate: LivePreviewEstimate?
+    @ObservationIgnored private var liveExpectedFrameOffset: Int64?
+    @ObservationIgnored private var livePreviewDisabledSessionID: String?
     private var liveSessionID: String?
-    private var liveSessionDirectory: String?
+    @ObservationIgnored private var liveSessionDirectory: String?
     private var liveFinalFilePath: String?
     /// Auto-play, user and system holds and explicit Play for the current
     /// session and its generation operation (U04, U06).
-    private var liveAutoplay = LivePreviewAutoplayState()
+    @ObservationIgnored private var liveAutoplay = LivePreviewAutoplayState()
     private var liveAutoplayEnabled: Bool { liveAutoplay.allowsAutomaticPlayback }
     /// Takes of the current operation waiting for the take that plays (U07).
-    private var takeQueue = TakeQueue()
-    private var pendingFirstChunkInterval: AppPerformanceSignposts.Interval?
-    private var pendingAutoplaySignpost = false
-    private var livePlaybackStarted = false
-    private var livePreviewDuration: TimeInterval = 0
-    private var livePlaybackTimeOffset: TimeInterval = 0
-    private var liveUnderrunCount = 0
-    private var completedLiveSessionIDs: Set<String> = []
-    private var completedLiveSessionOrder: [String] = []
+    @ObservationIgnored private var takeQueue = TakeQueue()
+    @ObservationIgnored private var pendingFirstChunkInterval: AppPerformanceSignposts.Interval?
+    @ObservationIgnored private var pendingAutoplaySignpost = false
+    @ObservationIgnored private var livePlaybackStarted = false
+    @ObservationIgnored private var livePreviewDuration: TimeInterval = 0
+    @ObservationIgnored private var livePlaybackTimeOffset: TimeInterval = 0
+    @ObservationIgnored private var liveUnderrunCount = 0
+    @ObservationIgnored private var completedLiveSessionIDs: Set<String> = []
+    @ObservationIgnored private var completedLiveSessionOrder: [String] = []
     private let livePreviewConfiguration: LivePreviewConfiguration
-    private var chunkObserver: NSObjectProtocol?
+    @ObservationIgnored private var chunkObserver: NSObjectProtocol?
     #if os(macOS)
-    private var recordingObserver: NSObjectProtocol?
+    @ObservationIgnored private var recordingObserver: NSObjectProtocol?
     #endif
-    private var timer: Timer?
+    @ObservationIgnored private var timer: Timer?
     #if os(iOS)
-    private var interruptionObserver: NSObjectProtocol?
-    private var routeChangeObserver: NSObjectProtocol?
-    private var shouldResumeAfterInterruption = false
+    @ObservationIgnored private var interruptionObserver: NSObjectProtocol?
+    @ObservationIgnored private var routeChangeObserver: NSObjectProtocol?
+    @ObservationIgnored private var shouldResumeAfterInterruption = false
     /// Held from the first playback until the app leaves the foreground (PA-21),
     /// so a closing preview never deactivates the session under this player.
-    private var sessionClaim: IOSAudioSessionClaim?
+    @ObservationIgnored private var sessionClaim: IOSAudioSessionClaim?
     /// During a headless batch run, streamed chunks are ignored so each item
     /// doesn't start the live-preview player. The engine still streams
     /// internally (flat memory), and dropped PCM chunk events carry no files
     /// to clean up (NativeStreamingOutputPolicy defaults to .pcmPreview).
-    private(set) var batchSuppressionActive = false
+    @ObservationIgnored private(set) var batchSuppressionActive = false
     #endif
 
     private func setLivePreviewQueueDepth(_ value: Int) {
@@ -269,7 +271,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 
-    /// Non-published pass-through for callers that need the current value without subscribing.
+    /// Pass-through to `playbackProgress` for imperative callers. A view body that reads it
+    /// tracks the per-tick slice and re-renders every tick: views read `PlaybackProgress`.
     var currentTime: TimeInterval {
         get { playbackProgress.currentTime }
         set { playbackProgress.currentTime = newValue }
@@ -2041,7 +2044,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         playbackMode == .live ? (1.0 / 3.0) : 0.1
     }
 
-    private var activeTimerInterval: TimeInterval = 0.1
+    @ObservationIgnored private var activeTimerInterval: TimeInterval = 0.1
 
     private func startTimer() {
         stopTimer()

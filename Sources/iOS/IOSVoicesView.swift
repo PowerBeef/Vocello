@@ -22,7 +22,7 @@ struct IOSVoicesView: View {
     let onImportNewVoice: (ImportedReferenceAudio) -> Void
 
     @EnvironmentObject private var ttsEngine: TTSEngineStore
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @Environment(AppModel.self) private var appModel
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
 

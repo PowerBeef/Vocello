@@ -220,9 +220,9 @@ private extension HistorySortOrder {
 /// mode filter chips, the pending-recovery card, and the desktop's toolbar
 /// sort, search and clear, Save As, Reveal in Finder and pinned seed.
 struct MacHistoryScreen: View {
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
-    @EnvironmentObject private var generationLibraryEvents: GenerationLibraryEvents
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    private let generationLibraryEvents = GenerationLibraryEvents.shared
     /// Plain reference, not `@EnvironmentObject` (W1-D): History uses the
     /// store only to forward into the saved-voice sheet and for one
     /// imperative refresh; subscribing re-rendered every row on every engine

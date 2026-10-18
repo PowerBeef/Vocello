@@ -1,4 +1,5 @@
 import Combine
+import Observation
 import QwenVoiceCore
 
 /// Scopes the §K generation performance gate to its own tiny observable
@@ -8,15 +9,18 @@ import QwenVoiceCore
 /// re-diffed the entire `NavigationSplitView` during the most contended
 /// windows (measured 158 ms/s hitch while generating with glass already
 /// off). This model republishes only the boolean *flips*: the shell now
-/// invalidates at generation start/stop instead of per event.
+/// invalidates at generation start/stop instead of per event. The app creates
+/// it once with the store, so a re-created shell never resubscribes.
 @MainActor
-final class GenerationPerformanceGateModel: ObservableObject {
-    @Published private(set) var isActive = false
+@Observable
+final class GenerationPerformanceGateModel {
+    private(set) var isActive = false
+    @ObservationIgnored private var activityUpdates: AnyCancellable?
 
     init(store: TTSEngineStore) {
         isActive = store.hasActiveGeneration || store.hasSustainedPerformanceActivity
-        store.performanceActivityUpdates
+        activityUpdates = store.performanceActivityUpdates
             .removeDuplicates()
-            .assign(to: &$isActive)
+            .sink { [weak self] isActive in self?.isActive = isActive }
     }
 }

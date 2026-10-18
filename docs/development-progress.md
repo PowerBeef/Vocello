@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-16
+reviewed: 2026-10-18
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### October 17, early morning — the freeze waits for an iPhone window; backlog work without the iPhone (resume here)
+### October 18 — workflow audit saved; the local build arenas are cold (resume here)
+
+`main` is pushed through `1b02555f`; the release state is unchanged from the October 17 entry below.
+
+- **Workflow audit:** [docs/audits/2026-10-18-dev-workflow-audit.md](audits/2026-10-18-dev-workflow-audit.md)
+  holds the verified findings and the phased programme. It is recommendations only: nothing is
+  scheduled until the maintainer picks a phase, and picked items after the freeze join the release plan.
+- **Cold arenas (audit W-13):** every `build/cache/xcode/*` root vanished at 21:15 EDT on October 17
+  while the disk was 98% full, most likely macOS's low-storage purge. This corrects the earlier report
+  that the build caches were untouched. The repository cleaner only dry-ran, and the models, QC v2
+  caches, RF-18 data and corpora are intact. `build/vocello` and `build/Vocello.app` dangle. The next
+  `check` regenerates the project, and the first native build is cold, so it is never a measurement.
+- **RF-18 E4:** the resume script finds no CLI with the screen's digest. It rebuilds
+  `cli-optimized` at HEAD and records the new digest in its driver log; note that in the E4 result.
+
+### October 17, early morning — the freeze waits for an iPhone window; backlog work without the iPhone
 
 On local `main`, not pushed (pushes wait for the maintainer's request).
 

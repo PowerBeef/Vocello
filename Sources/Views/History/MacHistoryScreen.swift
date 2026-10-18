@@ -309,7 +309,7 @@ struct MacHistoryScreen: View {
                     options: HistoryModeFilter.allCases,
                     selection: $modeFilter,
                     label: \.title,
-                    leading: { filter in AnyView(VocelloModeDot(tint: filter.dotColor)) },
+                    leading: { filter in VocelloModeDot(tint: filter.dotColor) },
                     accessibilityIdentifier: \.accessibilityID
                 )
                 .accessibilityElement(children: .contain)

@@ -292,12 +292,15 @@ final class AppModel {
         isFocusBackdropPresented = false
     }
 
-    func presentBottomPanel(
+    /// The panel's content is stored, so it is type-erased here, once, rather than at each caller.
+    func presentBottomPanel<Content: View>(
         id: String = UUID().uuidString,
-        content: @escaping @MainActor (_ bottomSafeAreaInset: CGFloat, _ availableHeight: CGFloat, _ dismiss: @escaping @MainActor () -> Void) -> AnyView
+        @ViewBuilder content: @escaping @MainActor (_ bottomSafeAreaInset: CGFloat, _ availableHeight: CGFloat, _ dismiss: @escaping @MainActor () -> Void) -> Content
     ) {
         isFocusBackdropPresented = true
-        bottomPanelItem = IOSBottomPanelPresentation(id: id, content: content)
+        bottomPanelItem = IOSBottomPanelPresentation(id: id) { bottomSafeAreaInset, availableHeight, dismiss in
+            AnyView(content(bottomSafeAreaInset, availableHeight, dismiss))
+        }
     }
 
     func dismissBottomPanel() {

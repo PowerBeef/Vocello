@@ -997,12 +997,12 @@ struct IOSSetupChipPill: View {
 
 /// Horizontal row of selectable filter chips. Used by Voices, History, and
 /// Settings to filter content.
-struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
+struct IOSFilterChipRow<Option: Hashable & Identifiable, Leading: View>: View {
     let options: [Option]
     @Binding var selection: Option
     let tint: Color
     let label: (Option) -> String
-    let leading: ((Option) -> AnyView)?
+    let leading: ((Option) -> Leading)?
     let accessibilityIdentifier: ((Option) -> String)?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1012,7 +1012,7 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
         selection: Binding<Option>,
         tint: Color,
         label: @escaping (Option) -> String,
-        leading: ((Option) -> AnyView)? = nil,
+        @ViewBuilder leading: @escaping (Option) -> Leading,
         accessibilityIdentifier: ((Option) -> String)? = nil
     ) {
         self.options = options
@@ -1081,6 +1081,23 @@ struct IOSFilterChipRow<Option: Hashable & Identifiable>: View {
         // VoiceOver must hear which filter is active — the visual state is
         // brightness-only (IUI-4 X7; the delivery preset cards' pattern).
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+extension IOSFilterChipRow where Leading == EmptyView {
+    init(
+        options: [Option],
+        selection: Binding<Option>,
+        tint: Color,
+        label: @escaping (Option) -> String,
+        accessibilityIdentifier: ((Option) -> String)? = nil
+    ) {
+        self.options = options
+        self._selection = selection
+        self.tint = tint
+        self.label = label
+        self.leading = nil
+        self.accessibilityIdentifier = accessibilityIdentifier
     }
 }
 

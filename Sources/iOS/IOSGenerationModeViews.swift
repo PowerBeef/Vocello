@@ -371,25 +371,23 @@ struct IOSCustomVoiceView: View {
 
     private func presentVoicePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSVoicePickerSheet(
-                    speakers: voicePickerOptions,
-                    selectedID: Binding(
-                        get: { draft.selectedSpeaker },
-                        set: { newSpeaker in
-                            // Picking a speaker no longer pins the language —
-                            // the language token describes the TEXT's language,
-                            // which the selector follows via detection (Auto);
-                            // mirrors the macOS behavior change.
-                            draft.selectedSpeaker = newSpeaker
-                        }
-                    ),
-                    tint: Theme.Brand.modeCustom,
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSVoicePickerSheet(
+                speakers: voicePickerOptions,
+                selectedID: Binding(
+                    get: { draft.selectedSpeaker },
+                    set: { newSpeaker in
+                        // Picking a speaker no longer pins the language —
+                        // the language token describes the TEXT's language,
+                        // which the selector follows via detection (Auto);
+                        // mirrors the macOS behavior change.
+                        draft.selectedSpeaker = newSpeaker
+                    }
+                ),
+                tint: Theme.Brand.modeCustom,
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -397,16 +395,14 @@ struct IOSCustomVoiceView: View {
 
     private func presentLanguagePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSQwenLanguagePickerSheet(
-                    selectedLanguage: $draft.selectedLanguage,
-                    tint: Theme.Brand.modeCustom,
-                    recommended: detectedPromptLanguage,
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSQwenLanguagePickerSheet(
+                selectedLanguage: $draft.selectedLanguage,
+                tint: Theme.Brand.modeCustom,
+                recommended: detectedPromptLanguage,
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -415,25 +411,23 @@ struct IOSCustomVoiceView: View {
     private func presentDeliveryPicker() {
         guard supportsDeliveryControl else { return }
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSDeliveryPickerSheet(
-                    selectedPresetID: Binding(
-                        get: { draft.delivery.selectedPresetID },
-                        set: { newID in
-                            draft.delivery.mode = .preset
-                            draft.delivery.selectedPresetID = newID
-                        }
-                    ),
-                    intensity: $draft.delivery.selectedIntensity,
-                    customText: $draft.delivery.customText,
-                    contentLanguage: promptContentLanguage,
-                    tint: Theme.Brand.modeCustom,
-                    onUseCustomTone: { draft.delivery.mode = .custom },
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSDeliveryPickerSheet(
+                selectedPresetID: Binding(
+                    get: { draft.delivery.selectedPresetID },
+                    set: { newID in
+                        draft.delivery.mode = .preset
+                        draft.delivery.selectedPresetID = newID
+                    }
+                ),
+                intensity: $draft.delivery.selectedIntensity,
+                customText: $draft.delivery.customText,
+                contentLanguage: promptContentLanguage,
+                tint: Theme.Brand.modeCustom,
+                onUseCustomTone: { draft.delivery.mode = .custom },
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -1277,33 +1271,29 @@ struct IOSVoiceDesignView: View {
 
     private func presentBriefEditor() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSVoiceDesignBriefSheet(
-                    voiceDescription: $draft.voiceDescription,
-                    tint: Theme.Brand.modeDesign,
-                    contentLanguage: promptContentLanguage,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    ),
-                    onDismiss: dismiss
-                )
+            IOSVoiceDesignBriefSheet(
+                voiceDescription: $draft.voiceDescription,
+                tint: Theme.Brand.modeDesign,
+                contentLanguage: promptContentLanguage,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
+                ),
+                onDismiss: dismiss
             )
         }
     }
 
     private func presentDesignLanguagePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSQwenLanguagePickerSheet(
-                    selectedLanguage: $draft.selectedLanguage,
-                    tint: Theme.Brand.modeDesign,
-                    recommended: detectedPromptLanguage,
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSQwenLanguagePickerSheet(
+                selectedLanguage: $draft.selectedLanguage,
+                tint: Theme.Brand.modeDesign,
+                recommended: detectedPromptLanguage,
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -1311,25 +1301,23 @@ struct IOSVoiceDesignView: View {
 
     private func presentDesignDeliveryPicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSDeliveryPickerSheet(
-                    selectedPresetID: Binding(
-                        get: { draft.delivery.selectedPresetID },
-                        set: { newID in
-                            draft.delivery.mode = .preset
-                            draft.delivery.selectedPresetID = newID
-                        }
-                    ),
-                    intensity: $draft.delivery.selectedIntensity,
-                    customText: $draft.delivery.customText,
-                    contentLanguage: promptContentLanguage,
-                    tint: Theme.Brand.modeDesign,
-                    onUseCustomTone: { draft.delivery.mode = .custom },
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSDeliveryPickerSheet(
+                selectedPresetID: Binding(
+                    get: { draft.delivery.selectedPresetID },
+                    set: { newID in
+                        draft.delivery.mode = .preset
+                        draft.delivery.selectedPresetID = newID
+                    }
+                ),
+                intensity: $draft.delivery.selectedIntensity,
+                customText: $draft.delivery.customText,
+                contentLanguage: promptContentLanguage,
+                tint: Theme.Brand.modeDesign,
+                onUseCustomTone: { draft.delivery.mode = .custom },
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -1976,38 +1964,36 @@ struct IOSVoiceCloningView: View {
 
     private func presentReferencePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSSavedVoicesObservingHost {
-                    IOSReferenceClipSheet(
-                        savedVoices: savedVoiceOptions,
-                        selectedSavedVoiceID: Binding(
-                            get: { draft.selectedSavedVoiceID },
-                            set: { newValue in
-                                guard let id = newValue,
-                                      let voice = savedVoices.first(where: { $0.id == id })
-                                else { return }
-                                applySavedVoice(voice)
-                                dismiss()
-                            }
-                        ),
-                        onRequestRecord: {
-                            appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
-                        },
-                        onRequestImport: {
-                            appModel.requestCloneReferenceImport(afterDismiss: dismiss)
-                        },
-                        onDismiss: dismiss,
-                        presentation: .edgeToEdge(
-                            bottomSafeAreaInset: bottomSafeAreaInset,
-                            height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                        ),
-                        savedVoicesLoadError: savedVoicesLoadError,
-                        onRetrySavedVoices: {
-                            Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
+            IOSSavedVoicesObservingHost {
+                IOSReferenceClipSheet(
+                    savedVoices: savedVoiceOptions,
+                    selectedSavedVoiceID: Binding(
+                        get: { draft.selectedSavedVoiceID },
+                        set: { newValue in
+                            guard let id = newValue,
+                                  let voice = savedVoices.first(where: { $0.id == id })
+                            else { return }
+                            applySavedVoice(voice)
+                            dismiss()
                         }
-                    )
-                }
-            )
+                    ),
+                    onRequestRecord: {
+                        appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
+                    },
+                    onRequestImport: {
+                        appModel.requestCloneReferenceImport(afterDismiss: dismiss)
+                    },
+                    onDismiss: dismiss,
+                    presentation: .edgeToEdge(
+                        bottomSafeAreaInset: bottomSafeAreaInset,
+                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
+                    ),
+                    savedVoicesLoadError: savedVoicesLoadError,
+                    onRetrySavedVoices: {
+                        Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
+                    }
+                )
+            }
         }
     }
 
@@ -2021,22 +2007,20 @@ struct IOSVoiceCloningView: View {
 
     private func presentBankDeliveryPicker(_ persona: VoiceBankCatalog.Persona) {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSBankDeliveryPickerSheet(
-                    personaName: persona.name,
-                    options: bankDeliveryOptions(persona),
-                    selectedVoiceID: draft.selectedSavedVoiceID,
-                    onSelect: { voiceID in
-                        if let voice = savedVoices.first(where: { $0.id == voiceID }) {
-                            applySavedVoice(voice)
-                        }
-                        dismiss()
-                    },
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSBankDeliveryPickerSheet(
+                personaName: persona.name,
+                options: bankDeliveryOptions(persona),
+                selectedVoiceID: draft.selectedSavedVoiceID,
+                onSelect: { voiceID in
+                    if let voice = savedVoices.first(where: { $0.id == voiceID }) {
+                        applySavedVoice(voice)
+                    }
+                    dismiss()
+                },
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }
@@ -2044,16 +2028,14 @@ struct IOSVoiceCloningView: View {
 
     private func presentCloneLanguagePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSQwenLanguagePickerSheet(
-                    selectedLanguage: $draft.selectedLanguage,
-                    tint: Theme.Brand.modeClone,
-                    recommended: detectedPromptLanguage,
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSQwenLanguagePickerSheet(
+                selectedLanguage: $draft.selectedLanguage,
+                tint: Theme.Brand.modeClone,
+                recommended: detectedPromptLanguage,
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }

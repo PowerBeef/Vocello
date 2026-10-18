@@ -115,30 +115,28 @@ struct IOSDeliveryPicker: View {
 
     private func presentPresetSheet() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
-            AnyView(
-                IOSDeliveryPickerSheet(
-                    selectedPresetID: Binding(
-                        get: { delivery.selectedPresetID },
-                        set: { newID in
-                            delivery.mode = .preset
-                            delivery.selectedPresetID = newID
-                        }
-                    ),
-                    intensity: $delivery.selectedIntensity,
-                    customText: $delivery.customText,
-                    contentLanguage: StudioPromptContent.language(
-                        selected: .auto, detected: .auto,
-                        interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
-                    ),
-                    tint: tint,
-                    onUseCustomTone: {
-                        delivery.mode = .custom
-                    },
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
-                    )
+            IOSDeliveryPickerSheet(
+                selectedPresetID: Binding(
+                    get: { delivery.selectedPresetID },
+                    set: { newID in
+                        delivery.mode = .preset
+                        delivery.selectedPresetID = newID
+                    }
+                ),
+                intensity: $delivery.selectedIntensity,
+                customText: $delivery.customText,
+                contentLanguage: StudioPromptContent.language(
+                    selected: .auto, detected: .auto,
+                    interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
+                ),
+                tint: tint,
+                onUseCustomTone: {
+                    delivery.mode = .custom
+                },
+                onDismiss: dismiss,
+                presentation: .edgeToEdge(
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                 )
             )
         }

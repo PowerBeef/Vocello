@@ -70,7 +70,7 @@ private struct IOSHistoryFilterChips: View {
             tint: Theme.Brand.library,
             label: \.title,
             leading: { filter in
-                AnyView(IOSModeDot(tint: filter.dotColor, diameter: 7))
+                IOSModeDot(tint: filter.dotColor, diameter: 7)
             },
             accessibilityIdentifier: { "historyModeFilter_\($0.rawValue)" }
         )

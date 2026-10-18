@@ -29,11 +29,11 @@ struct MacIconButton: View {
 
 /// Single-select capsule chips (the iOS `IOSFilterChipRow`). Selection is
 /// brightness plus the selected trait, never color alone.
-struct MacFilterChipRow<Option: Hashable & Identifiable>: View {
+struct MacFilterChipRow<Option: Hashable & Identifiable, Leading: View>: View {
     let options: [Option]
     @Binding var selection: Option
     let label: (Option) -> String
-    let leading: ((Option) -> AnyView)?
+    let leading: ((Option) -> Leading)?
     let accessibilityIdentifier: (Option) -> String
 
     var body: some View {

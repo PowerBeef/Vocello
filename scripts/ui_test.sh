@@ -550,7 +550,13 @@ record_early_failure() {
   write_test_summary || true
   required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
   write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status"
+  record_lane_ledger
   exit "$status"
+}
+# One classified line per finished run in build/artifacts/diagnostics/lane-ledger.jsonl
+# (audit P1-1); recording never changes the lane's exit status.
+record_lane_ledger() {
+  python3 "$ROOT_DIR/scripts/lane_ledger.py" record "$out" >&2 2>/dev/null || true
 }
 trap record_early_failure EXIT
 required_step_run "$step_ledger" source-provenance \
@@ -955,6 +961,7 @@ cleanup_ui_run() {
     required_steps_finalize "$step_ledger" >"$out/required-steps-finalization.log" 2>&1 || true
     write_run_metadata failed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status" || true
   fi
+  record_lane_ledger
   exit "$status"
 }
 

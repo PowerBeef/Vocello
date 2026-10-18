@@ -976,6 +976,7 @@ cmd_tsan() {
   printf 'build=%s\ncore=%s\ncore_summary=%s\n' \
     "$build_st" "$core_st" "$core_summary_st" > "$artifacts/verdict.txt"
   cat "$artifacts/verdict.txt" >&2
+  python3 "$SCRIPT_DIR/lane_ledger.py" record "$artifacts" >&2 2>/dev/null || true
   if (( build_st == 0 && core_st == 0 && core_summary_st == 0 )); then
     note "tsan characterization PASS · artifacts → $artifacts"
     return 0
@@ -1588,6 +1589,8 @@ cmd_test() {
     fi
   fi
   cat "$artifacts/verdict.txt" >&2
+  # One classified line per finished run (audit P1-1); recording never changes the verdict.
+  python3 "$SCRIPT_DIR/lane_ledger.py" record "$artifacts" >&2 2>/dev/null || true
   if (( core_st == 0 && runtime_st == 0 && core_summary_st == 0 && runtime_summary_st == 0 )); then
     note "test verdict: PASS · artifacts → $artifacts"
   else

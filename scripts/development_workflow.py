@@ -578,7 +578,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run", help="build and launch the macOS app")
     sub.add_parser("regen", help="regenerate derived artifacts and stale project inputs or membership")
     sub.add_parser("ci", help="exactly what push CI runs, serially")
-    sub.add_parser("status", help="branch, dirty paths, lanes, primary plan")
+    status_parser = sub.add_parser("status", help="branch, dirty paths, lanes, primary plan")
+    status_parser.add_argument("--kpi", action="store_true",
+                               help="also print lane pass rates and failed-minute shares from the lane ledger")
     doctor_parser = sub.add_parser("doctor", help="read-only prerequisite and optional capability inventory")
     doctor_parser.add_argument("--json", action="store_true")
     triage_parser = sub.add_parser("triage", help="read retained run evidence without rerunning or rewriting it")
@@ -599,6 +601,9 @@ def main(argv: list[str] | None = None) -> int:
                 diagnostics.print_report(report)
         elif command == "status":
             print_status()
+            if args.kpi:
+                ledger = _load("scripts/lane_ledger.py")
+                ledger.print_kpi(ledger.kpi(ledger.recorded(ROOT), 30))
         elif command == "check":
             if args.since:
                 _git("rev-parse", "--verify", "--quiet", f"{args.since}^{{commit}}")

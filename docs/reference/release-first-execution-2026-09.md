@@ -78,8 +78,9 @@ ASR-06 and the ASR-05 screenshots.
 
 ## Rules while the focus lock holds
 
-- **One plan holds live work.** Only this plan may hold planned or in-flight items, at most two in
-  flight. `roadmap.py validate` fails otherwise.
+- **One plan holds live work.** Only this plan may hold planned or in-flight items, at most
+  `focusLock.maxInFlight` in flight (the lock's dated decision records the cap). `roadmap.py validate`
+  fails otherwise.
 - **Blocker definition.** A new finding joins this plan only if it risks App Review rejection, a crash
   or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS. It joins
   with a due date and a gate.

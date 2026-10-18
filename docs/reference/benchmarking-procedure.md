@@ -1226,7 +1226,7 @@ Punctuation-aware pause budget avoids false positives on natural delivery.
 Headless matrix (`scripts/ios_device.sh lang-bench` or `scripts/macos_test.sh lang-bench`)
 stamps `notes.languageHint` (resolved Qwen3 token, not raw UI picker). Gate with
 `scripts/check_language_hints.py` against `config/language-bench-matrix.json`.
-Offline fixture self-test: `python3 -m pytest scripts/tests/test_check_language_hints.py` (or
+Offline fixture self-test: `"$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_check_language_hints.py` (or
 `scripts/dev.sh py` after editing the gate).
 
 ### Layer 2.6 — Output language + WER/CER (Phase 3, iOS device diagnostics)

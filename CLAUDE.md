@@ -83,7 +83,7 @@ scripts/dev.sh check --since <ref>    # also everything committed since <ref>
 scripts/dev.sh check --paths <p...>   # only assigned paths when unrelated dirty work must wait
 scripts/dev.sh test --only Class      # targeted XCTest; Class/testMethod and A,B also work
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
-python3 -m pytest scripts/tests/test_x.py -k expr          # -k is not accepted by dev.sh py
+"$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
 scripts/dev.sh lint                   # changed-file advisory SwiftLint, shellcheck, privacy
 scripts/dev.sh build | run            # warm incremental macOS development build / launch
 scripts/dev.sh ios                    # generic device-SDK compile; no phone involved
@@ -104,8 +104,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 ## Hard boundaries
 
 - **Release focus (until the 3.0 iOS submission):** the `focusLock` in `config/roadmap.json` makes
-  `release-first-3-0-2026-09` the only plan with live work, at most two items in flight
-  (`roadmap.py validate` enforces it).
+  `release-first-3-0-2026-09` the only plan with live work, at most `focusLock.maxInFlight` items in
+  flight (`roadmap.py validate` enforces it; the lock's dated decision records the current cap).
   - **Classify every new finding.** A release blocker joins that plan with a due date. A release
     blocker is an App Review rejection risk, a crash or hang, data loss, a broken purchase or restore,
     or a privacy or metadata mismatch on iOS.

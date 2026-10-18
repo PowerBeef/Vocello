@@ -452,7 +452,7 @@ gates. The gate result is not part of the published record.
 ## Offline gate tests
 
 ```sh
-python3 -m pytest scripts/tests/test_check_ios_speech_assets.py scripts/tests/test_check_language_hints.py scripts/tests/test_check_language_output.py
+"$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_check_ios_speech_assets.py scripts/tests/test_check_language_hints.py scripts/tests/test_check_language_output.py
 # or, after editing a gate: scripts/dev.sh py
 ```
 

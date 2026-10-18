@@ -1393,6 +1393,19 @@ enum Qwen3LearnedComponentWeights {
 }
 
 struct Qwen3StreamChunkSchedule: Sendable {
+    /// The codec runs at 12.5 frames per second.
+    static let codecFrameRateHz = 12.5
+
+    /// The codec frames a streaming interval stands for, at least one. It inverts
+    /// `VocelloQwen3StreamChunkConfiguration.compatibilityStreamingInterval`
+    /// (`Double(frames) / 12.5`), so it rounds: truncation lost a frame for 37 of the
+    /// chunk sizes 1-512 (engine audit A-15). It is not the conversion for a raw tier
+    /// interval: the product maps those to frames by truncating
+    /// (`StreamChunkPolicy.currentShippingDefault`), and 0.6 s is 7 frames there, 8 here.
+    static func codecFrames(forStreamingInterval interval: Double) -> Int {
+        max(1, Int((interval * codecFrameRateHz).rounded()))
+    }
+
     let firstChunkSize: Int
     let laterChunkSize: Int
     private(set) var pendingCount = 0
@@ -3554,8 +3567,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             .filter { $0 != eosTokenId }
 
         // Streaming decode state
-        let codecTokenRateHz = 12.5
-        let streamingChunkSize = max(1, Int(streamingInterval * codecTokenRateHz))
+        let streamingChunkSize = Qwen3StreamChunkSchedule.codecFrames(forStreamingInterval: streamingInterval)
         let postFirstStreamingChunkSize = streamingGenerationMode.postFirstStreamingChunkSize(
             baseChunkSize: streamingChunkSize,
             customVoiceProfile: customVoiceProfile

@@ -126,9 +126,10 @@ public struct StreamChunkPolicy: Codable, Hashable, Sendable {
     /// Shadow representation of the shipping 8 GB Mac/iPhone defaults.
     ///
     /// `NativeMemoryPolicyResolver` floors the interval at 0.6 seconds on
-    /// constrained tiers. The owned Qwen runtime truncates `0.6 * 12.5` to
-    /// seven codec frames. Its baseline Custom profile remains seven frames;
-    /// Design and Clone use the existing post-first multiplier of two.
+    /// constrained tiers, and this mapper truncates `0.6 * 12.5` to seven codec
+    /// frames (`currentShippingDefault` below). Its baseline Custom profile
+    /// remains seven frames; Design and Clone use the existing post-first
+    /// multiplier of two.
     public static func currentConstrainedTierDefault(for mode: GenerationMode) -> Self {
         let firstFrames = 7
         let laterFrames = mode == .custom ? firstFrames : firstFrames * 2
@@ -143,8 +144,12 @@ public struct StreamChunkPolicy: Codable, Hashable, Sendable {
 
     /// Shadow representation of the shipping Qwen codec-frame schedule for an
     /// already-resolved streaming interval. Qwen emits at 12.5 codec frames per
-    /// second, truncates the interval-derived frame count, and currently keeps
-    /// Custom's later chunk equal to the first while Design/Clone double it.
+    /// second, and currently keeps Custom's later chunk equal to the first while
+    /// Design/Clone double it. The truncation here is the shipping policy and must
+    /// stay: `0.6 * 12.5` is exactly 7.5 in Double, so rounding would move the
+    /// constrained tier from 7 to 8 frames. The owned runtime converts the frames
+    /// it receives back exactly (`compatibilityStreamingInterval` and
+    /// `Qwen3StreamChunkSchedule.codecFrames`, engine audit A-15).
     public static func currentShippingDefault(
         for mode: GenerationMode,
         effectiveStreamingInterval: Double

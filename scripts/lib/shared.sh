@@ -98,6 +98,58 @@ require_qc_python() {
   QC_PYTHON="$selected"
 }
 
+# Run a command under a wall-clock deadline; macOS has no timeout(1). A deterministic
+# test run once hung for 65 minutes on an XPC call (audit W-11). On expiry every process
+# of the command's tree gets a short stack sample beside the log
+# (<log>.hang-sample-<pid>.txt), then SIGTERM and, ten seconds later, SIGKILL; a TIMEOUT
+# line is appended to the log and the helper returns 124. Otherwise it returns the
+# command's status. A deadline of 0 runs the command without one.
+#   run_with_deadline SECONDS LOG COMMAND [ARGS...]
+run_with_deadline() {
+  local seconds="$1" log_path="$2"
+  shift 2
+  if [[ ! "$seconds" =~ ^[0-9]+$ ]] || (( seconds == 0 )); then
+    "$@"
+    return
+  fi
+  "$@" &
+  local pid=$! elapsed=0
+  while kill -0 "$pid" 2>/dev/null; do
+    if (( elapsed >= seconds )); then
+      local tree process grace=0
+      tree="$(_process_tree "$pid")"
+      for process in $tree; do
+        sample "$process" "${QVOICE_DEADLINE_SAMPLE_SECONDS:-3}" \
+          -file "${log_path%.log}.hang-sample-$process.txt" >/dev/null 2>&1 || true
+      done
+      # shellcheck disable=SC2086  # one pid per word
+      kill -TERM $tree 2>/dev/null || true
+      while kill -0 "$pid" 2>/dev/null && (( grace < 10 )); do
+        sleep 1
+        grace=$((grace + 1))
+      done
+      # shellcheck disable=SC2086
+      kill -KILL $tree 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      printf 'TIMEOUT: %s exceeded its %ss deadline; stack samples are beside this log\n' \
+        "$1" "$seconds" >> "$log_path"
+      return 124
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  wait "$pid"
+}
+
+# The pid and all of its descendants, parents first.
+_process_tree() {
+  local child
+  printf '%s ' "$1"
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    _process_tree "$child"
+  done
+}
+
 # Publish one qualified artifact directory into benchmarks/runs; the evidence is
 # preserved and the exact repair command printed when publication fails.
 record_benchmark_history() {

@@ -189,6 +189,13 @@ build_mac_test_bundles() {
   fi
 }
 
+# A bundle or the runtime package's tests normally finish in one or two minutes; a hung
+# test is stopped at this deadline with stack samples beside its log (audit W-11).
+# QVOICE_MAC_TEST_DEADLINE_SECONDS overrides it; 0 disables it.
+mac_test_deadline_seconds() {
+  echo "${QVOICE_MAC_TEST_DEADLINE_SECONDS:-900}"
+}
+
 # Test execution holds the host-wide native lock too: an MLX test run next to
 # another native build would contend for the 16 GB host's memory.
 run_mac_test_bundle() {
@@ -197,7 +204,7 @@ run_mac_test_bundle() {
     echo "could not acquire the host native lock ($QVOICE_NATIVE_LOCK)" > "$2"
     return 1
   fi
-  _run_mac_test_bundle "$@" || status=$?
+  run_with_deadline "$(mac_test_deadline_seconds)" "$2" _run_mac_test_bundle "$@" || status=$?
   release_native_lock
   return "$status"
 }
@@ -229,6 +236,23 @@ _run_mac_test_bundle() {
         "$xctest_runner" "$bundle" > "$log_path" 2>&1
     fi
     return
+  fi
+  if [[ "${QVOICE_MAIN_THREAD_CHECKER:-0}" == "1" ]]; then
+    # Report-only (audit P1-5): Xcode's Main Thread Checker logs each UI or AppKit call
+    # made off the main thread and never stops the run. Like TSan, it is inserted into the
+    # resolved runner, since xcrun would strip DYLD_INSERT_LIBRARIES; the count lands in
+    # <log>.main-thread-checker.txt.
+    local checker status=0
+    checker="$(xcode-select -p 2>/dev/null)/usr/lib/libMainThreadChecker.dylib"
+    xctest_runner="$(xcrun --find xctest 2>/dev/null || true)"
+    [[ -f "$checker" && -x "$xctest_runner" ]] \
+      || { echo "Main Thread Checker or the xctest runner is unavailable" > "$log_path"; return 1; }
+    local -a filter_args=()
+    [[ -z "$test_filter" ]] || filter_args=(-XCTest "$test_filter")
+    DYLD_INSERT_LIBRARIES="$checker" DYLD_FRAMEWORK_PATH="$products" \
+      "$xctest_runner" ${filter_args[@]+"${filter_args[@]}"} "$bundle" > "$log_path" 2>&1 || status=$?
+    { grep -c "Main Thread Checker:" "$log_path" || true; } > "${log_path%.log}.main-thread-checker.txt"
+    return "$status"
   fi
   if [[ -n "$test_filter" ]]; then
     DYLD_FRAMEWORK_PATH="$products" xcrun xctest -XCTest "$test_filter" "$bundle" > "$log_path" 2>&1
@@ -1508,7 +1532,8 @@ cmd_test() {
         # TF32 also avoids MLX's NAX float32 GEMM path, whose runtime-compiled
         # kernel is not accepted by the Metal compiler bundled with Xcode 26.5
         # on GitHub's macOS 26 runner. No test is skipped or moved off Metal.
-        run_runtime_test_command "$artifacts/runtime.log" env MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
+        run_with_deadline "$(mac_test_deadline_seconds)" "$artifacts/runtime.log" \
+          run_runtime_test_command "$artifacts/runtime.log" env MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
           --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
           --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
           --skip-build \

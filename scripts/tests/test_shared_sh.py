@@ -90,5 +90,41 @@ class HelperTests(unittest.TestCase):
         self.assertIn("benchmark_history.py record --artifact-dir", completed.stderr)
 
 
+class DeadlineTests(unittest.TestCase):
+    """run_with_deadline: a hung lane command is stopped and reported, a finished one keeps its status."""
+
+    def run_deadline(self, snippet: str) -> tuple[subprocess.CompletedProcess, str, float]:
+        import time
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "core.log"
+            log.write_text("")
+            environment = {**os.environ, "QVOICE_DEADLINE_SAMPLE_SECONDS": "1"}
+            started = time.monotonic()
+            completed = run_helper(snippet, str(log), env=environment)
+            return completed, log.read_text(), time.monotonic() - started
+
+    def test_a_command_past_its_deadline_is_stopped_with_124(self) -> None:
+        completed, log, elapsed = self.run_deadline('run_with_deadline 2 "$1" sleep 60')
+        self.assertEqual(completed.returncode, 124, completed.stderr)
+        self.assertIn("TIMEOUT: sleep exceeded its 2s deadline", log)
+        self.assertLess(elapsed, 30)
+
+    def test_a_shell_function_tree_is_stopped_too(self) -> None:
+        completed, log, elapsed = self.run_deadline(
+            'hang() { sleep 60; }; run_with_deadline 2 "$1" hang')
+        self.assertEqual(completed.returncode, 124, completed.stderr)
+        self.assertIn("TIMEOUT: hang", log)
+        self.assertLess(elapsed, 30)
+
+    def test_a_finished_command_keeps_its_status(self) -> None:
+        self.assertEqual(self.run_deadline('run_with_deadline 5 "$1" true')[0].returncode, 0)
+        self.assertEqual(self.run_deadline('run_with_deadline 5 "$1" sh -c "exit 7"')[0].returncode, 7)
+
+    def test_a_zero_deadline_runs_without_one(self) -> None:
+        completed, log, _ = self.run_deadline('run_with_deadline 0 "$1" sh -c "exit 3"')
+        self.assertEqual(completed.returncode, 3)
+        self.assertNotIn("TIMEOUT", log)
+
+
 if __name__ == "__main__":
     unittest.main()

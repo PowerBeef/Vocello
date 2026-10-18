@@ -262,9 +262,20 @@ jobs:
         env:
           VOCELLO_QUARANTINE: "1"
           QVOICE_BUILD_TIMING_SUMMARY: "1"
+          # Report-only (audit P1-5): about 5 s on the core bundle; violations are counted below.
+          QVOICE_MAIN_THREAD_CHECKER: "1"
         run: |
           set -o pipefail
           scripts/macos_test.sh test 2>&1 | tee "$RUNNER_TEMP/deterministic.log"
+
+      - name: Report Main Thread Checker findings
+        if: always() && needs.changes.outputs.swift == 'true'
+        run: |
+          count="$(cat build/artifacts/macos/tests/*/core.main-thread-checker.txt 2>/dev/null | tail -1)"
+          echo "Main Thread Checker: ${count:-not run} violation(s) in VocelloCoreTests (report-only)"
+          if [ "${count:-0}" != "0" ]; then
+            echo "::warning title=Main Thread Checker::${count} violation(s); see core.log in the test artifacts"
+          fi
 
       - name: Measure cache drift
         id: drift

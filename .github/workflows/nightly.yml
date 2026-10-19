@@ -45,7 +45,7 @@ jobs:
 
       - name: Retain sanitizer evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tsan-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/artifacts/macos/tests/tsan-*/
@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload compile results on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: foundation-cold-artifacts
           path: build/artifacts/foundation/
@@ -167,7 +167,7 @@ jobs:
 
       - name: Upload the run's results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shipped-config-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/artifacts/macos/tests/
@@ -218,7 +218,7 @@ jobs:
 
       - name: Retain the migration log and report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: migration-warnings-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -261,7 +261,7 @@ jobs:
 
       - name: Retain the results, the report and the logs
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dead-code-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

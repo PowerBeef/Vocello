@@ -1,6 +1,7 @@
 // Strict memory safety across two Swift toolchains (DW-04). Swift 6.4 annotates
-// Array.withUnsafeBufferPointer, Array.withUnsafeMutableBufferPointer and withUnsafeBytes(of:)
-// @safe; Swift 6.3, in CI's required Xcode 26.6, does not. A call to one of them needs an
+// Array.withUnsafeBufferPointer, Array.withUnsafeMutableBufferPointer, withUnsafeBytes(of:),
+// withUnsafePointer(to:) and withUnsafeMutablePointer(to:) @safe; Swift 6.3, in CI's required
+// Xcode 26.6, does not. A call to one of them needs an
 // `unsafe` marker under 6.3 that 6.4 reports as unnecessary, and warnings are errors on both.
 // These @safe forwards absorb the difference in one place: each spells its one call the way the
 // compiler building it requires, and their callers need no marker under either toolchain.
@@ -55,5 +56,31 @@ public func withValueBytes<T, Result>(
     try withUnsafeBytes(of: &value, body)
 #else
     unsafe try withUnsafeBytes(of: &value, body)
+#endif
+}
+
+/// `withUnsafePointer(to: &value, _:)` that needs no `unsafe` marker under Swift 6.3 or 6.4.
+@safe @inlinable
+public func withValuePointer<T, Result>(
+    to value: inout T,
+    _ body: (UnsafePointer<T>) throws -> Result
+) rethrows -> Result {
+#if compiler(>=6.4)
+    try withUnsafePointer(to: &value, body)
+#else
+    unsafe try withUnsafePointer(to: &value, body)
+#endif
+}
+
+/// `withUnsafeMutablePointer(to: &value, _:)` that needs no `unsafe` marker under Swift 6.3 or 6.4.
+@safe @inlinable
+public func withMutableValuePointer<T, Result>(
+    to value: inout T,
+    _ body: (UnsafeMutablePointer<T>) throws -> Result
+) rethrows -> Result {
+#if compiler(>=6.4)
+    try withUnsafeMutablePointer(to: &value, body)
+#else
+    unsafe try withUnsafeMutablePointer(to: &value, body)
 #endif
 }

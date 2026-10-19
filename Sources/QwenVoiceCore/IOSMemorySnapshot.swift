@@ -249,7 +249,7 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         var count = mach_msg_type_number_t(
             MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<integer_t>.stride
         )
-        let result = withUnsafeMutablePointer(to: &info) { pointer -> kern_return_t in
+        let result = withMutableValuePointer(to: &info) { pointer -> kern_return_t in
             unsafe pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { integerPointer in
                 unsafe task_info(
                     mach_task_self_,

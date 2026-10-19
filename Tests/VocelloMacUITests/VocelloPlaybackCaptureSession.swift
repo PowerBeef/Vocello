@@ -185,7 +185,7 @@ final class FirstBufferStamp: @unchecked Sendable {
         var processID = pid
         var objectID: AudioObjectID = 0
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        let status = withUnsafePointer(to: &processID) { pointer in
+        let status = captureValuePointer(to: &processID) { pointer in
             unsafe AudioObjectGetPropertyData(
                 AudioObjectID(kAudioObjectSystemObject), &address,
                 UInt32(MemoryLayout<pid_t>.size), pointer, &size, &objectID
@@ -441,4 +441,18 @@ final class FirstBufferStamp: @unchecked Sendable {
             .max { $0.launchDate ?? .distantPast < $1.launchDate ?? .distantPast }?
             .processIdentifier
     }
+}
+
+// The UI bundles do not link QwenVoiceCore, so this file keeps its own copy of its
+// ToolchainNeutralUnsafeAccess forward (DW-04): Swift 6.4 annotates withUnsafePointer(to:) @safe
+// and the 6.3 in CI's Xcode 26.6 does not.
+@safe private func captureValuePointer<T, Result>(
+    to value: inout T,
+    _ body: (UnsafePointer<T>) throws -> Result
+) rethrows -> Result {
+#if compiler(>=6.4)
+    try withUnsafePointer(to: &value, body)
+#else
+    unsafe try withUnsafePointer(to: &value, body)
+#endif
 }

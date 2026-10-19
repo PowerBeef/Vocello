@@ -200,7 +200,7 @@ public func currentProcessSchedulingNotes() -> [String: String] {
         MemoryLayout<task_category_policy>.size / MemoryLayout<integer_t>.size
     )
     var isDefault: boolean_t = 0
-    let result = withUnsafeMutablePointer(to: &category) { pointer in
+    let result = withMutableValuePointer(to: &category) { pointer in
         unsafe pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
             unsafe task_policy_get(
                 mach_task_self_,

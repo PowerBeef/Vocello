@@ -70,6 +70,10 @@ class HelperTests(unittest.TestCase):
         completed = run_helper('require_qc_python; printf "%s" "$QC_PYTHON"', env=environment)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(completed.stdout, os.path.abspath(sys.executable))
+        # The macOS UI benchmark's checker and the played-audio analysis use the same interpreter.
+        completed = run_helper('require_numpy_python; printf "%s" "$NUMPY_PYTHON"', env=environment)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, os.path.abspath(sys.executable))
 
         with tempfile.TemporaryDirectory() as temporary:
             # The same interpreter without site-packages: a valid Python that cannot import numpy.

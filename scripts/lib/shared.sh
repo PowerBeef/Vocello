@@ -82,20 +82,28 @@ benchmark_nonce() {
   python3 -c 'import secrets; print(secrets.token_hex(4))'
 }
 
-# QC v2 (scripts/qc.py) runs under the interpreter scripts/select_python.py picks, which
-# honours VOCELLO_PYTHON, never under whichever python3 the shell finds first: that one
-# can lack numpy, which turned every QC v2 score into an error (BKL-17). A lane calls
-# this before it generates, so a missing dependency fails the lane at once; it sets
-# QC_PYTHON.
-require_qc_python() {
+# Scripts that import numpy (QC v2's scripts/qc.py, the macOS UI benchmark checker and the
+# played-audio analysis through scripts/lib/playback_capture.py) run under the interpreter
+# scripts/select_python.py picks, which honours VOCELLO_PYTHON, never under whichever python3
+# the shell finds first. That one can lack numpy: it turned every QC v2 score into an error
+# (BKL-17), and on 2026-10-19 a newer Homebrew python3 crashed the macOS UI benchmark's
+# validation after a complete run. A lane calls this before it runs anything long, so a missing
+# dependency fails the lane at once; it sets NUMPY_PYTHON, and QC_PYTHON for QC v2's callers.
+require_numpy_python() {
   local scripts_dir selected
   scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   selected="$(python3 "$scripts_dir/select_python.py")" \
-    || die "QC v2: no repository Python was found (scripts/select_python.py); set VOCELLO_PYTHON"
+    || die "no repository Python was found (scripts/select_python.py); set VOCELLO_PYTHON"
   "$selected" -c 'import numpy' >/dev/null 2>&1 \
-    || die "QC v2: $selected cannot import numpy; install the pinned packages (config/toolchain.json) or set VOCELLO_PYTHON"
+    || die "$selected cannot import numpy; install the pinned packages (config/toolchain.json) or set VOCELLO_PYTHON"
   # shellcheck disable=SC2034  # read by the lane script that sourced this file
+  NUMPY_PYTHON="$selected"
+  # shellcheck disable=SC2034
   QC_PYTHON="$selected"
+}
+
+require_qc_python() {
+  require_numpy_python
 }
 
 # Run a command under a wall-clock deadline; macOS has no timeout(1). A deterministic

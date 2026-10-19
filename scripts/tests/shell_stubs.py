@@ -331,6 +331,10 @@ def ui_lane_sandbox(test: unittest.TestCase) -> ScriptSandbox:
     })
     sandbox.helper("scripts/ui_bench_allocation.py",
                    'case " $* " in *" --field name "*) echo canonical-fixture ;; esac')
+    # require_numpy_python asks select_python.py for the repository interpreter and checks it
+    # imports numpy; a recorded stand-in interpreter answers both.
+    interpreter = sandbox.executable("bin/repository-python")
+    sandbox.helper("scripts/select_python.py", f"echo {quote(interpreter)}")
     return sandbox
 
 

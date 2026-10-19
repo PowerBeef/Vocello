@@ -364,6 +364,8 @@ if [[ "$platform" == "macos" && "$lane" == "benchmark" ]]; then
   # profile; refuse before the build on any other Mac.
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" verify-hardware --platform macos \
     || die "non-canonical host; benchmark records are not publishable"
+  # The benchmark's validation imports numpy: fail before the build and the run, not after.
+  require_numpy_python
 fi
 
 if [[ "$platform" == "macos" && "$lane" == "benchmark" && ",${modes}," == *",clone,"* ]]; then
@@ -1427,7 +1429,7 @@ validate_macos_benchmark() {
   # run the Speed variant (audit #6, #17).
   while :; do
     status=0
-    python3 "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
+    "$NUMPY_PYTHON" "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
         --build-provenance "$out/last-build.json" \
@@ -1821,7 +1823,9 @@ WAV
     required_step_record "$step_ledger" playback-capture 0
   fi
   if [[ "$lane" == "smoke" && -f "$out/playback-capture/capture-run.json" ]]; then
-    python3 "$ROOT_DIR/scripts/analyze_playback_capture.py" "$out/playback-capture" \
+    # Advisory, so a host without the selected Python only loses the analysis.
+    capture_python="$(python3 "$ROOT_DIR/scripts/select_python.py" 2>/dev/null)" || capture_python=python3
+    "$capture_python" "$ROOT_DIR/scripts/analyze_playback_capture.py" "$out/playback-capture" \
       --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" --mode custom \
       || warn "smoke playback capture analysis failed (advisory)"
   fi

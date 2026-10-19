@@ -123,8 +123,15 @@ actor NativePreparedCloneConditioningCache {
     private var voiceClonePromptCache: [GenerationSemantics.ClonePromptIdentity: CachedCloneHandle] = [:]
     private var voiceClonePromptLRUKeys: [GenerationSemantics.ClonePromptIdentity] = []
 
-    init(capacity: Int = NativeMemoryPolicyResolver.cloneCacheCapacity()) {
+    /// MLX's allocator, injected so deterministic tests stay off Metal (`.inert`).
+    private let allocatorControl: NativeMLXAllocatorControl
+
+    init(
+        capacity: Int = NativeMemoryPolicyResolver.cloneCacheCapacity(),
+        allocatorControl: NativeMLXAllocatorControl = .live
+    ) {
         self.capacity = max(capacity, 0)
+        self.allocatorControl = allocatorControl
     }
 
     func clear() {
@@ -136,7 +143,7 @@ actor NativePreparedCloneConditioningCache {
         decodedReferenceAudioLRUKeys.removeAll()
         voiceClonePromptCache.removeAll()
         voiceClonePromptLRUKeys.removeAll()
-        Memory.clearCache()
+        allocatorControl.clearCache()
     }
 
     func softTrim(retainingMostRecent retainedCount: Int = 1) {
@@ -161,7 +168,7 @@ actor NativePreparedCloneConditioningCache {
             lruKeys: &normalizedReferenceLRUKeys,
             retainingMostRecent: keepCount
         )
-        Memory.clearCache()
+        allocatorControl.clearCache()
     }
 
     func resolve(
@@ -488,7 +495,7 @@ actor NativePreparedCloneConditioningCache {
             evicted = true
         }
         if evicted {
-            Memory.clearCache()
+            allocatorControl.clearCache()
         }
     }
 
@@ -596,7 +603,7 @@ actor NativePreparedCloneConditioningCache {
             evicted = true
         }
         if evicted {
-            Memory.clearCache()
+            allocatorControl.clearCache()
         }
         return (referenceAudio, false)
     }
@@ -650,7 +657,7 @@ actor NativePreparedCloneConditioningCache {
             evicted = true
         }
         if evicted {
-            Memory.clearCache()
+            allocatorControl.clearCache()
         }
     }
 

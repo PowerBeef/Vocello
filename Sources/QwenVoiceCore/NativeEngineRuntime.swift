@@ -461,7 +461,7 @@ actor NativeEngineRuntime {
     init(
         loadCoordinator: any MLXModelCoordinating,
         audioPreparationService: any AudioPreparationService,
-        preparedCloneConditioningCache: NativePreparedCloneConditioningCache = NativePreparedCloneConditioningCache(),
+        preparedCloneConditioningCache: NativePreparedCloneConditioningCache? = nil,
         lightweightWarmupText: String,
         telemetryRecorder: NativeTelemetryRecorder? = nil,
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
@@ -474,6 +474,7 @@ actor NativeEngineRuntime {
         self.loadCoordinator = loadCoordinator
         self.audioPreparationService = audioPreparationService
         self.preparedCloneConditioningCache = preparedCloneConditioningCache
+            ?? NativePreparedCloneConditioningCache(allocatorControl: allocatorControl)
         self.lightweightWarmupText = lightweightWarmupText
         self.telemetryRecorder = telemetryRecorder
         self.customPrewarmPolicy = customPrewarmPolicy
@@ -559,7 +560,7 @@ actor NativeEngineRuntime {
         // The cold CLI replay does not pass through prepareGeneration. Apply
         // the same host allocator policy before loading, not after the peak.
         let policy = NativeMemoryPolicyResolver.policy(mode: request.mode, isBatch: false)
-        NativeMemoryPolicyResolver.apply(policy)
+        allocatorControl.applyPolicy(policy)
         try Task.checkCancellation()
         try recordCodecReplayLoadMemory(stage: "before_load")
         let loadResult = try await loadModel(
@@ -592,7 +593,7 @@ actor NativeEngineRuntime {
         }
         // Like the cold replay: the host allocator policy applies before loading.
         let policy = NativeMemoryPolicyResolver.policy(mode: .clone, isBatch: false)
-        NativeMemoryPolicyResolver.apply(policy)
+        allocatorControl.applyPolicy(policy)
         try Task.checkCancellation()
         let loadResult = try await loadModel(
             id: modelID,
@@ -729,7 +730,7 @@ actor NativeEngineRuntime {
             mode: request.mode,
             isBatch: false
         )
-        NativeMemoryPolicyResolver.apply(memoryPolicy)
+        allocatorControl.applyPolicy(memoryPolicy)
         let requestMemory = NativeMemoryPolicyResolver.memoryConfiguration(for: memoryPolicy)
         let prefetchStartedAt = ContinuousClock.now
         let identity = runtimePrewarmIdentity(for: request)
@@ -854,7 +855,7 @@ actor NativeEngineRuntime {
             mode: request.mode,
             isBatch: request.batchTotal != nil
         )
-        NativeMemoryPolicyResolver.apply(memoryPolicy)
+        allocatorControl.applyPolicy(memoryPolicy)
         await telemetryRecorder?.mark(stage: GenerationStartupBoundary.memoryAdmitted.telemetryStage)
         let requestMemory = NativeMemoryPolicyResolver.memoryConfiguration(for: memoryPolicy)
         NativeMemoryPolicyResolver.resetPeakMemory()
@@ -1455,7 +1456,7 @@ actor NativeEngineRuntime {
             mode: .clone,
             isBatch: false
         )
-        NativeMemoryPolicyResolver.apply(memoryPolicy)
+        allocatorControl.applyPolicy(memoryPolicy)
         let token = UUID()
         activeClonePrimeToken = token
         defer {
@@ -1648,7 +1649,7 @@ actor NativeEngineRuntime {
                 activeModelID = nil
                 await clearCloneState(preserveActiveClonePrimeToken: preserveActiveClonePrimeToken)
                 await clearQwen3MemoryCachesIfNeeded()
-                Memory.clearCache()
+                allocatorControl.clearCache()
                 await recordDiagnosticEvent(
                     "runtime-load-model-preswitch-cache-clear",
                     extra: [
@@ -2200,7 +2201,7 @@ actor NativeEngineRuntime {
             activeDesignConditioningWarmSource = nil
             activeDesignStreamStepWarmIdentity = nil
             activeDesignStreamStepWarmSource = nil
-            Memory.clearCache()
+            allocatorControl.clearCache()
         }
 
         let warmText = GenerationSemantics.canonicalDesignWarmText(for: warmBucket)

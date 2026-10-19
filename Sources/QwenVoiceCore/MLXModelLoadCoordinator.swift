@@ -208,6 +208,8 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     private let fileManager: FileManager
     private let modelLoader: NativeModelLoader
     private let beforeModelLoad: (@Sendable (String?) -> Void)?
+    /// MLX's allocator, injected so deterministic tests stay off Metal (`.inert`).
+    private let allocatorControl: NativeMLXAllocatorControl
     private var telemetryRecorder: NativeTelemetryRecorder?
     private let diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?
     private var preparedMetadataByDescriptorID: [String: PreparedModelMetadata] = [:]
@@ -229,13 +231,15 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         modelLoader: @escaping NativeModelLoader = MLXModelLoadCoordinator.defaultModelLoader,
         beforeModelLoad: (@Sendable (String?) -> Void)? = nil,
         telemetryRecorder: NativeTelemetryRecorder? = nil,
-        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil
+        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil,
+        allocatorControl: NativeMLXAllocatorControl = .live
     ) {
         self.modelAssetStore = modelAssetStore
         self.hubCacheDirectory = hubCacheDirectory
         self.fileManager = fileManager
         self.modelLoader = modelLoader
         self.beforeModelLoad = beforeModelLoad
+        self.allocatorControl = allocatorControl
         self.telemetryRecorder = telemetryRecorder
         self.diagnosticEventSink = diagnosticEventSink
     }
@@ -495,7 +499,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         loadedModel = nil
         loadedModelRuntimeIdentity = nil
         prewarmedIdentityKeys.removeAll()
-        Memory.clearCache()
+        allocatorControl.clearCache()
     }
 
     private func descriptor(for id: String) throws -> ModelAssetDescriptor {

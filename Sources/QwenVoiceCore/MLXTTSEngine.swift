@@ -1586,7 +1586,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     appSupportDirectory: diagnosticAppSupportBox.url
                 )
                 let cleanupStartedAt = ContinuousClock.now
-                Memory.clearCache()
+                allocatorControl.clearCache()
                 await runtime.unloadModel()
                 let cleanupMS = cleanupStartedAt.elapsedMilliseconds
                 do {
@@ -1848,7 +1848,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         if !Self.requiresUnloadAfterFailure(error) {
             guard await runtime.requiresUnloadAfterRuntimeFailure() else { return false }
         }
-        Memory.clearCache()
+        allocatorControl.clearCache()
         await runtime.unloadModel()
         clonePreparationState = .idle
         return true

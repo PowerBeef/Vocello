@@ -494,6 +494,8 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     /// DA-09: the runtime's caller trims, observed through a recording
     /// allocator: a soft trim clears the buffer cache only, a hard trim also
     /// drops prewarm state, and a full unload releases through the coordinator.
+    /// The runtime's default clone-conditioning cache clears through the same
+    /// allocator, so each level records the cache's clear before its own.
     func testRuntimeTrimLevelsDriveTheAllocatorAndTheModelCoordinator() async {
         let allocator = TestCallLog()
         let coordinator = TrimRecordingCoordinator()
@@ -508,17 +510,19 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         )
 
         await runtime.trimMemory(level: .softTrim, reason: "test_soft_trim")
-        XCTAssertEqual(allocator.entries, ["clearCache"])
+        XCTAssertEqual(allocator.entries.count, 2, "the cache's soft trim, then the runtime's clear")
+        XCTAssertEqual(Set(allocator.entries), ["clearCache"], "a trim never applies a policy")
         let afterSoftTrim = await coordinator.events
         XCTAssertEqual(afterSoftTrim, [], "a soft trim keeps prewarm state and the model")
 
         await runtime.trimMemory(level: .hardTrim, reason: "test_hard_trim")
-        XCTAssertEqual(allocator.entries, ["clearCache", "clearCache"])
+        XCTAssertEqual(allocator.entries.count, 4, "the cache's full clear, then the runtime's clear")
         let afterHardTrim = await coordinator.events
         XCTAssertEqual(afterHardTrim, ["clearPrewarmState"], "a hard trim keeps the model")
 
         await runtime.trimMemory(level: .fullUnload, reason: "test_full_unload")
-        XCTAssertEqual(allocator.entries, ["clearCache", "clearCache"])
+        XCTAssertEqual(allocator.entries.count, 5, "the unload clears the clone state, and so the cache, once")
+        XCTAssertEqual(Set(allocator.entries), ["clearCache"])
         let afterFullUnload = await coordinator.events
         XCTAssertEqual(afterFullUnload, ["clearPrewarmState", "unload"])
         let loadedModelID = await runtime.loadedModelID()

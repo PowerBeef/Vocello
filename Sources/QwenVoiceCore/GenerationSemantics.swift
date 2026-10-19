@@ -705,7 +705,7 @@ public enum GenerationSemantics {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(prompt) else { return nil }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     public static func resolvedDeliveryInstruction(
@@ -1157,7 +1157,7 @@ public enum GenerationSemantics {
 
     private static func canonicalIdentityDigest(_ serialization: String) -> String {
         SHA256.hash(data: Data(serialization.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
     }
 

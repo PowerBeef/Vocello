@@ -42,7 +42,7 @@ struct VocelloLocalization: Sendable {
     }
 
     func format(_ format: String, arguments: [CVarArg]) -> String {
-        String(format: format, locale: locale, arguments: arguments)
+        unsafe String(format: format, locale: locale, arguments: arguments)
     }
 
     /// A file size in this context's locale, so units and separators follow the

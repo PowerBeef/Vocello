@@ -536,14 +536,14 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     }
 
     nonisolated static func sessionDirectoryURL(in rootDirectory: URL, requestID: Int) -> URL {
-        rootDirectory.appendingPathComponent(
+        unsafe rootDirectory.appendingPathComponent(
             String(format: "session_%04d", requestID),
             isDirectory: true
         )
     }
 
     nonisolated static func chunkFileName(for chunkIndex: Int) -> String {
-        String(format: "chunk_%04d.wav", chunkIndex)
+        unsafe String(format: "chunk_%04d.wav", chunkIndex)
     }
 
     nonisolated static func chunkURL(in sessionDirectory: URL, chunkIndex: Int) -> URL {
@@ -613,13 +613,13 @@ private enum PCM16WAVWriter {
         }
 
         guard let buffer = reusableBuffer,
-              let channelData = buffer.int16ChannelData?[0] else {
+              let channelData = unsafe buffer.int16ChannelData?[0] else {
             throw MLXTTSEngineError.generationFailed("Could not allocate the native PCM output buffer.")
         }
 
         buffer.frameLength = frameCount
         pcmSamples.withUnsafeBufferPointer { pointer in
-            channelData.update(from: pointer.baseAddress!, count: pcmSamples.count)
+            unsafe channelData.update(from: pointer.baseAddress!, count: pcmSamples.count)
         }
         return buffer
     }
@@ -649,9 +649,9 @@ private enum AtomicFilePublisher {
         // window. A failed publication leaves the previous destination intact.
         // Concurrent explicit replacements are ordered by this commit point;
         // neither writer may subsequently unlink the other's published file.
-        let result = temporaryURL.withUnsafeFileSystemRepresentation { source in
-            finalURL.withUnsafeFileSystemRepresentation { destination in
-                Darwin.rename(source!, destination!)
+        let result = unsafe temporaryURL.withUnsafeFileSystemRepresentation { source in
+            unsafe finalURL.withUnsafeFileSystemRepresentation { destination in
+                unsafe Darwin.rename(source!, destination!)
             }
         }
         guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
@@ -810,7 +810,7 @@ enum AtomicPCM16WAVWriter {
             try handle.write(contentsOf: header)
             let pcmData = pcmSamples.withUnsafeBufferPointer { pointer -> Data in
                 guard let baseAddress = pointer.baseAddress else { return Data() }
-                return Data(
+                return unsafe Data(
                     bytes: UnsafeRawPointer(baseAddress),
                     count: pointer.count * MemoryLayout<Int16>.stride
                 )
@@ -901,7 +901,7 @@ final class PCM16ScratchBuffer: @unchecked Sendable {
     func pcm16LittleEndianData(from pcmSamples: [Int16]) -> Data {
         pcmSamples.withUnsafeBufferPointer { pointer in
             guard let baseAddress = pointer.baseAddress else { return Data() }
-            return Data(
+            return unsafe Data(
                 bytes: UnsafeRawPointer(baseAddress),
                 count: pointer.count * MemoryLayout<Int16>.stride
             )
@@ -1179,7 +1179,7 @@ struct PCM16StreamLimiter: Sendable {
             let count = buffer.count
             for index in 0 ..< count {
                 let absoluteIndex = localMetrics.processedSamples
-                let rawSample = base[index]
+                let rawSample = unsafe base[index]
                 let sample: Float
                 if rawSample.isFinite {
                     sample = rawSample
@@ -2665,7 +2665,7 @@ struct StreamingExecutionContext: Sendable {
             // Privacy-safe corpus identity for history/trend equivalence. The
             // script itself is never persisted in telemetry or tracked records.
             "promptDigest": SHA256.hash(data: Data(request.text.utf8))
-                .map { String(format: "%02x", $0) }.joined(),
+                .map { unsafe String(format: "%02x", $0) }.joined(),
             // Resolved Qwen3 language for this generation (explicit hint or
             // text-detected) — verifies Auto-language resolution (incl. the
             // Latin-script NLLanguageRecognizer path) and gives delivery
@@ -2686,7 +2686,7 @@ struct StreamingExecutionContext: Sendable {
            !deliveryInstruction.isEmpty {
             tierNotes["instructChars"] = String(deliveryInstruction.count)
             tierNotes["instructDigest"] = SHA256.hash(data: Data(deliveryInstruction.utf8))
-                .map { String(format: "%02x", $0) }.joined()
+                .map { unsafe String(format: "%02x", $0) }.joined()
         }
         // Phase 10: when the spoken script differs from the typed script, the
         // row records the transformation count and the spoken-text digest so
@@ -2826,12 +2826,12 @@ struct StreamingExecutionContext: Sendable {
                 return nil
             case .design(let voiceDescription, _):
                 return SHA256.hash(data: Data(voiceDescription.utf8))
-                    .map { String(format: "%02x", $0) }.joined()
+                    .map { unsafe String(format: "%02x", $0) }.joined()
             case .clone(let reference):
                 guard let data = try? Data(contentsOf: URL(fileURLWithPath: reference.audioPath), options: .mappedIfSafe) else {
                     return nil
                 }
-                return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                return SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
             }
         }()
         let nestedStreamingV9 = GenerationStreamingTelemetryV9Bridge.make(
@@ -3004,10 +3004,10 @@ struct StreamingExecutionContext: Sendable {
             let count = Int(buffer.frameLength)
             guard count > 0 else { break }
             let persistedSamples: [Float]
-            if let floats = buffer.floatChannelData {
-                persistedSamples = Array(UnsafeBufferPointer(start: floats[0], count: count))
-            } else if let integers = buffer.int16ChannelData {
-                persistedSamples = UnsafeBufferPointer(start: integers[0], count: count).map {
+            if let floats = unsafe buffer.floatChannelData {
+                persistedSamples = unsafe Array(UnsafeBufferPointer(start: floats[0], count: count))
+            } else if let integers = unsafe buffer.int16ChannelData {
+                persistedSamples = unsafe UnsafeBufferPointer(start: integers[0], count: count).map {
                     Float($0) / Float(Int16.max)
                 }
             } else {

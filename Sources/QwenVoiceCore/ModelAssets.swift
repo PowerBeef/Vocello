@@ -436,7 +436,7 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                 "\(seed)|\(model.id)|\(model.folder)|\(model.artifactVersion)|\(model.huggingFaceRepo)|\(model.huggingFaceRevision ?? "")".utf8
             )
         )
-        return "store-\(digest.prefix(8).map { String(format: "%02x", $0) }.joined())"
+        return "store-\(digest.prefix(8).map { unsafe String(format: "%02x", $0) }.joined())"
     }
 
     private static func directorySize(at url: URL) -> Int64 {

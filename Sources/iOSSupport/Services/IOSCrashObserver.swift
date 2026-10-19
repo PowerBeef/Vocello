@@ -29,7 +29,7 @@ final class IOSCrashObserver: NSObject, @unchecked Sendable {
         NSSetUncaughtExceptionHandler { exception in
             IOSCrashObserver.shared.recordUncaught(exception)
         }
-        os_log("started MetricKit crash/hang subscriber", log: log, type: .info)
+        unsafe os_log("started MetricKit crash/hang subscriber", log: log, type: .info)
     }
 
     /// The app's OWN container Caches dir (`Library/Caches/Vocello/diagnostics/crashes`)
@@ -47,9 +47,9 @@ final class IOSCrashObserver: NSObject, @unchecked Sendable {
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
-            os_log("wrote %{public}@", log: log, type: .info, url.lastPathComponent)
+            unsafe os_log("wrote %{public}@", log: log, type: .info, url.lastPathComponent)
         } catch {
-            os_log("write failed: %{public}@", log: log, type: .error, DiagnosticPrivacy.summary(of: error).description)
+            unsafe os_log("write failed: %{public}@", log: log, type: .error, DiagnosticPrivacy.summary(of: error).description)
         }
     }
 
@@ -92,7 +92,7 @@ extension IOSCrashObserver: MXMetricManagerSubscriber {
             // An uncaught Objective-C exception's message and arguments ride in this JSON
             // (iOS 17+); they get the exception record's redaction (AUD-08).
             guard let json = DiagnosticPrivacy.redactedMetricKitPayload(payload.jsonRepresentation()) else {
-                os_log("skipped an unreadable MetricKit payload", log: log, type: .error)
+                unsafe os_log("skipped an unreadable MetricKit payload", log: log, type: .error)
                 continue
             }
             writeJSON(json, named: "metrickit-\(stamp()).json")

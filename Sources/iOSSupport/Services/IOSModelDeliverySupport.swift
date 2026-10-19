@@ -120,7 +120,7 @@ struct IOSModelDeliveryConfiguration: Sendable {
 
         let digest = SHA256.hash(data: Data(isolatedRoot.utf8))
             .prefix(12)
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
         return "\(canonical).isolated.\(digest)"
     }

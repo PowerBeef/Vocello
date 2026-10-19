@@ -223,7 +223,7 @@ struct IOSRecordingOverlay: View {
 
     private var timeString: String {
         let total = max(0, Int(recorder.elapsed.rounded(.down)))
-        return String(format: "%02d:%02d", total / 60, total % 60)
+        return unsafe String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     // MARK: - Controls

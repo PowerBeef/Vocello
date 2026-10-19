@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Darwin
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 
 @MainActor
 final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
@@ -73,7 +73,7 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         // QVOICE_MAC_BENCH_CAPTURE_DIR; absent or failing capture never fails a take.
         let capture = VocelloPlaybackCaptureCoordinator(environment: processEnvironment, runID: runID)
         print("VOCELLO_PLAYBACK_CAPTURE_DIR=\(processEnvironment[VocelloPlaybackCaptureCoordinator.environmentKey] ?? "missing")")
-        fflush(stdout)
+        unsafe fflush(stdout)
         defer { capture?.abort() }
 
         var preparedMode: VocelloUIBenchMatrix.Mode?
@@ -314,11 +314,11 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         // polling for the shell (audit #31); the relay stays the fallback.
         if Self.writesManifestDirectly, writeCurrentTakeManifest(data) {
             print("VOCELLO_BENCH_TAKE_FILE_WRITTEN take=\(takeIndex)")
-            fflush(stdout)
+            unsafe fflush(stdout)
             return true
         }
         print("VOCELLO_BENCH_TAKE_MANIFEST=\(data.base64EncodedString())")
-        fflush(stdout)
+        unsafe fflush(stdout)
         return VocelloUIWait.condition(
             "shell runner to publish take \(takeIndex) metadata",
             timeout: 10
@@ -392,6 +392,6 @@ private final class VocelloBenchTakePhases {
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let line = String(data: data, encoding: .utf8) else { return }
         print("VOCELLO_BENCH_TAKE_PHASES=\(line)")
-        fflush(stdout)
+        unsafe fflush(stdout)
     }
 }

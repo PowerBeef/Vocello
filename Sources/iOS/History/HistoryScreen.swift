@@ -886,7 +886,7 @@ private struct IOSHistoryItemCard: View {
 
     private var durationText: String? {
         guard let duration = item.duration else { return nil }
-        return String(format: "%.1fs", duration)
+        return unsafe String(format: "%.1fs", duration)
     }
 
     private var thumbnailSeed: Int {

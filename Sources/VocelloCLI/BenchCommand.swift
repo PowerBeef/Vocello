@@ -255,12 +255,12 @@ enum BenchCommand {
             // the runtime overrides below set QWENVOICE_DEBUG=1: the explicit off
             // mode and the latched `.off` both win over the debug switch
             // (TelemetryGate), whichever resolves first.
-            setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "off", 1)
+            unsafe setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "off", 1)
             TelemetryGate.applyHandshakeMode(.off)
         } else {
             TelemetryGate.applyHandshakeMode(telemetryVerbose ? .verbose : .lightweight)
-            if telemetryVerbose { setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "verbose", 1) }
-            setenv("QWENVOICE_DEBUG", "1", 0)
+            if telemetryVerbose { unsafe setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "verbose", 1) }
+            unsafe setenv("QWENVOICE_DEBUG", "1", 0)
         }
 
         // Bench isolates memory from inline preview PCM (no UI consumer) and must
@@ -271,9 +271,9 @@ enum BenchCommand {
         )
 
         let runID = args.string("run-id") ?? "macos-engine-\(Self.utcRunTimestamp())-\(UUID().uuidString.lowercased().prefix(8))"
-        setenv("QVOICE_MAC_BENCH_RUN_ID", runID, 1)
+        unsafe setenv("QVOICE_MAC_BENCH_RUN_ID", runID, 1)
         defer {
-            unsetenv("QVOICE_MAC_BENCH_RUN_ID")
+            unsafe unsetenv("QVOICE_MAC_BENCH_RUN_ID")
             BenchRunContext.clearCurrentTakeFile()
         }
 
@@ -660,7 +660,7 @@ enum BenchCommand {
             }
         }
 
-        note("✓ \(takeResults.count)/\(total) analyzable takes in \(String(format: "%.0f", Date().timeIntervalSince(started)))s")
+        note(unsafe "✓ \(takeResults.count)/\(total) analyzable takes in \(String(format: "%.0f", Date().timeIntervalSince(started)))s")
 
         try writeResultsManifest(
             BenchResultsManifest(
@@ -754,7 +754,7 @@ enum BenchCommand {
                     let (_, ms, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                     rows.append(TTFCRow(mode: mode.rawValue, variant: quality ? "quality" : "speed",
                                         modelID: modelID, firstChunkMS: ms))
-                    note("  ttfc \(mode.rawValue)/\(quality ? "Q" : "S"): \(ms.map { String(format: "%.0f", $0) } ?? "-")ms")
+                    note("  ttfc \(mode.rawValue)/\(quality ? "Q" : "S"): \(ms.map { unsafe String(format: "%.0f", $0) } ?? "-")ms")
                 }
             }
             reportTTFC(rows, diagnostics: diagDir)
@@ -822,8 +822,8 @@ enum BenchCommand {
             mode: mode, modelID: modelID, text: text, outputPath: out,
             shouldStream: shouldStream, payload: payload, generationID: generationID, seed: seed,
             deliveryInstructionCellID: mode == .custom ? delivery : nil)
-        if let delivery { setenv("QWENVOICE_BENCH_DELIVERY", delivery, 1) }
-        defer { if delivery != nil { unsetenv("QWENVOICE_BENCH_DELIVERY") } }
+        if let delivery { unsafe setenv("QWENVOICE_BENCH_DELIVERY", delivery, 1) }
+        defer { if delivery != nil { unsafe unsetenv("QWENVOICE_BENCH_DELIVERY") } }
         let environment = captureEnvironment()
         // Monotonic clock: a wall-clock step during a take must not corrupt the sample.
         let started = ContinuousClock.now
@@ -850,14 +850,14 @@ enum BenchCommand {
         }
         let wall = started.elapsedSeconds
         let deliveryTag = delivery.map { "/\($0)" } ?? ""
-        let ttfcTag = firstChunkMS.map { "  ttfc=\(String(format: "%.1f", $0))ms" } ?? ""
+        let ttfcTag = firstChunkMS.map { unsafe "  ttfc=\(String(format: "%.1f", $0))ms" } ?? ""
         // Standard real-time factor (wall ÷ audio, lower is faster); the CLI-side
         // wall includes request dispatch, so the engine row's `realTimeFactor` is
         // the published figure and this line is operator feedback.
         let rtfTag = result.durationSeconds > 0
-            ? "  rtf=\(String(format: "%.2f", wall / result.durationSeconds))" : ""
+            ? unsafe "  rtf=\(String(format: "%.2f", wall / result.durationSeconds))" : ""
         FileHandle.standardError.write(Data(
-            "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(rtfTag)\(ttfcTag)\n".utf8))
+            unsafe "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(rtfTag)\(ttfcTag)\n".utf8))
         return BenchTakeResult(
             takeIndex: takeIndex,
             generationID: generationID.uuidString,
@@ -885,14 +885,14 @@ enum BenchCommand {
         guard let path = Bundle.main.executablePath else { return nil }
         let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath()
         guard let data = try? Data(contentsOf: resolved) else { return nil }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func captureEnvironment() -> BenchTakeEnvironment {
         var loads = [Double](repeating: 0, count: 3)
         let loadCount = loads.withUnsafeMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
-            return Int(getloadavg(baseAddress, Int32(buffer.count)))
+            return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }
         let freeStorage = (
             try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
@@ -938,7 +938,7 @@ enum BenchCommand {
     }
 
     private static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func deliveryFailure(
@@ -1581,8 +1581,8 @@ enum BenchCommand {
         key: String,
         value: String
     ) throws {
-        guard setenv("QWENVOICE_DEBUG", "1", 1) == 0,
-              setenv(key, value, 1) == 0,
+        guard unsafe setenv("QWENVOICE_DEBUG", "1", 1) == 0,
+              unsafe setenv(key, value, 1) == 0,
               RuntimeDebugGate.value(for: key) == value else {
             throw CLIError("failed to install the requested benchmark runtime override")
         }
@@ -1644,7 +1644,7 @@ enum BenchCommand {
         FileHandle.standardError.write(Data(
             "\nEngine first-chunk latency (TTFC, ms) — warm streaming probe (engine-side, not the app's playback-scheduled latency)\n".utf8))
         for r in rows {
-            let ms = r.firstChunkMS.map { String(format: "%.0f", $0) } ?? "-"
+            let ms = r.firstChunkMS.map { unsafe String(format: "%.0f", $0) } ?? "-"
             FileHandle.standardError.write(Data("  \(r.mode)/\(r.variant)\t\(ms)\n".utf8))
         }
         let enc = JSONEncoder()

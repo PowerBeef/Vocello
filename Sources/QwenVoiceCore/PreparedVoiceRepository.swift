@@ -555,7 +555,7 @@ actor PreparedVoiceRepository {
     private func acquireStoreLock() throws -> Int32 {
         let root = voicesDirectory.deletingLastPathComponent()
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        let fd = Darwin.open(root.appendingPathComponent(".voice-store.lock").path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        let fd = unsafe Darwin.open(root.appendingPathComponent(".voice-store.lock").path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
         guard fd >= 0 else { throw PreparedVoiceRepositoryError.recoveryRequired }
         guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
             let failure = errno
@@ -747,14 +747,14 @@ actor PreparedVoiceRepository {
     /// 1970, or nil when none does or the kernel cannot say.
     private static func startTime(ofProcess processIdentifier: Int32) -> UInt64? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
+        var info = unsafe kinfo_proc()
+        var size = unsafe MemoryLayout<kinfo_proc>.stride
         let status = mib.withUnsafeMutableBufferPointer { mib in
-            sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
+            unsafe sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
         }
-        guard status == 0, size >= MemoryLayout<kinfo_proc>.stride,
-              info.kp_proc.p_pid == processIdentifier else { return nil }
-        let started = info.kp_proc.p_un.__p_starttime
+        guard status == 0, unsafe size >= MemoryLayout<kinfo_proc>.stride,
+              unsafe info.kp_proc.p_pid == processIdentifier else { return nil }
+        let started = unsafe info.kp_proc.p_un.__p_starttime
         let microseconds = UInt64(clamping: started.tv_sec) * 1_000_000 + UInt64(clamping: started.tv_usec)
         return microseconds == 0 ? nil : microseconds
     }

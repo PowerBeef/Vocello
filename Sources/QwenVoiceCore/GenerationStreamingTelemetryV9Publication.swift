@@ -254,6 +254,6 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
             .map { "\($0.utf8.count):\($0)" }
             .joined()
         return SHA256.hash(data: Data(serialization.utf8))
-            .map { String(format: "%02x", $0) }.joined()
+            .map { unsafe String(format: "%02x", $0) }.joined()
     }
 }

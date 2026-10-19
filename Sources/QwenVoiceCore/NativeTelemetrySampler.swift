@@ -427,7 +427,7 @@ public struct RunEnvironmentSnapshot: Hashable, Codable, Sendable {
         var loadValues = [Double](repeating: 0, count: 3)
         let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
-            return Int(getloadavg(baseAddress, Int32(buffer.count)))
+            return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }
         let freeStorageBytes: UInt64? = {
             guard let attributes = try? FileManager.default.attributesOfFileSystem(
@@ -1348,7 +1348,7 @@ public actor NativeTelemetrySampler {
 
     private static func captureProcessResourceUsage() -> ProcessResourceUsageSnapshot? {
         var usage = rusage()
-        guard getrusage(RUSAGE_SELF, &usage) == 0 else { return nil }
+        guard unsafe getrusage(RUSAGE_SELF, &usage) == 0 else { return nil }
         func milliseconds(_ value: timeval) -> Double {
             (Double(value.tv_sec) * 1_000) + (Double(value.tv_usec) / 1_000)
         }
@@ -1370,13 +1370,13 @@ public actor NativeTelemetrySampler {
     static func threadCount() -> (count: Int, succeeded: Bool) {
         var threadList: thread_act_array_t?
         var threadCount: mach_msg_type_number_t = 0
-        let result = task_threads(mach_task_self_, &threadList, &threadCount)
+        let result = unsafe task_threads(mach_task_self_, &threadList, &threadCount)
         defer {
-            if let threadList {
+            if let threadList = unsafe threadList {
                 for index in 0..<Int(threadCount) {
-                    mach_port_deallocate(mach_task_self_, threadList[index])
+                    unsafe mach_port_deallocate(mach_task_self_, threadList[index])
                 }
-                vm_deallocate(
+                unsafe vm_deallocate(
                     mach_task_self_,
                     vm_address_t(UInt(bitPattern: threadList)),
                     vm_size_t(Int(threadCount) * MemoryLayout<thread_t>.stride)

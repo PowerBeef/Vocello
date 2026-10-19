@@ -26,7 +26,7 @@ enum FileStreamIO {
     static func sha256Hex(reading handle: FileHandle, chunkSize: Int = defaultChunkSize) throws -> String {
         var hasher = SHA256()
         try forEachChunk(of: handle, chunkSize: chunkSize) { hasher.update(data: $0) }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     /// Reads `handle` from its current offset to end of file in chunks of at most

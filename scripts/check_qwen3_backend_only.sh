@@ -145,7 +145,7 @@ validate_owned_facade_boundary() {
   local direct_imports
   direct_imports="$(
     rg -n --glob '*.swift' \
-      '^\s*(@preconcurrency\s+)?import\s+MLXAudio(Core|Codecs|TTS)\b' \
+      '^\s*(@\w+\s+)*import\s+MLXAudio(Core|Codecs|TTS)\b' \
       "$PROJECT_DIR/Sources" "$PROJECT_DIR/Tests" || true
   )"
   if [[ -n "$direct_imports" ]]; then

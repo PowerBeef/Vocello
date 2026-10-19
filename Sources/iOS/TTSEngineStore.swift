@@ -141,7 +141,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     deinit {
         activeGenerationMemoryGuardTask?.cancel()
-        if let thermalObserverToken {
+        if let thermalObserverToken = unsafe thermalObserverToken {
             NotificationCenter.default.removeObserver(thermalObserverToken)
         }
     }
@@ -151,7 +151,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     /// proactive-warm gate. Recording is diagnostics-gated; the gate is always on
     /// unless QVOICE_IOS_THERMAL_GATE=off.
     private func startThermalObservation() {
-        thermalObserverToken = NotificationCenter.default.addObserver(
+        unsafe thermalObserverToken = NotificationCenter.default.addObserver(
             forName: ProcessInfo.thermalStateDidChangeNotification,
             object: nil,
             queue: .main
@@ -1184,7 +1184,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     }
 
     private static func megabytesString(_ bytes: UInt64) -> String {
-        String(format: "%.1f", Double(bytes) / 1_048_576)
+        unsafe String(format: "%.1f", Double(bytes) / 1_048_576)
     }
 
 }

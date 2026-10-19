@@ -84,9 +84,9 @@ enum VocelloUIWindowFrame {
         }
         let axApp = AXUIElementCreateApplication(process.processIdentifier)
         var main: CFTypeRef?
-        let mainError = AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &main)
+        let mainError = unsafe AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &main)
         var windows: CFTypeRef?
-        let listError = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windows)
+        let listError = unsafe AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windows)
         let count = (windows as? [AXUIElement])?.count ?? -1
         return "trusted=\(trusted) pid=\(process.processIdentifier) "
             + "mainWindowError=\(mainError.rawValue) windowsError=\(listError.rawValue) windowCount=\(count)"
@@ -107,8 +107,8 @@ enum VocelloUIWindowFrame {
 
         var position = origin
         var size = CGSize(width: width, height: height)
-        guard let positionValue = AXValueCreate(.cgPoint, &position),
-              let sizeValue = AXValueCreate(.cgSize, &size) else { return nil }
+        guard let positionValue = unsafe AXValueCreate(.cgPoint, &position),
+              let sizeValue = unsafe AXValueCreate(.cgSize, &size) else { return nil }
 
         // Position first: a window pinned near the top-left has room to grow to
         // the wide width without the window server clamping it to the display.
@@ -382,7 +382,7 @@ enum VocelloUIWindowFrame {
         guard let axApp = axApplication() else { return nil }
 
         var main: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &main) == .success,
+        if unsafe AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &main) == .success,
            let value = main,
            CFGetTypeID(value) == AXUIElementGetTypeID() {
             return (value as! AXUIElement)
@@ -391,7 +391,7 @@ enum VocelloUIWindowFrame {
         // A sheet can hold main-window status while its parent is the window we
         // want to size, and a just-launched app may have no main window yet.
         var windows: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windows) == .success,
+        guard unsafe AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windows) == .success,
               let list = windows as? [AXUIElement] else { return nil }
         return list.first
     }

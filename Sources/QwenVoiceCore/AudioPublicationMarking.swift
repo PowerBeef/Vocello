@@ -200,10 +200,10 @@ struct WAVDataLayout {
             throw MLXTTSEngineError.generationFailed("Marking target data chunk could not be read.")
         }
         var samples = [Float](repeating: 0, count: sampleCount)
-        raw.withUnsafeBytes { bytes in
-            let int16 = bytes.bindMemory(to: Int16.self)
+        unsafe raw.withUnsafeBytes { bytes in
+            let int16 = unsafe bytes.bindMemory(to: Int16.self)
             for index in 0 ..< sampleCount {
-                samples[index] = Float(Int16(littleEndian: int16[index])) / Self.pcm16Scale
+                samples[index] = unsafe Float(Int16(littleEndian: int16[index])) / Self.pcm16Scale
             }
         }
         return samples
@@ -215,7 +215,7 @@ struct WAVDataLayout {
         for value in samples {
             let scaled = value.isNaN ? 0 : (value * Self.pcm16Scale).rounded()
             let quantized = Int16(max(-32768.0, min(32767.0, scaled)))
-            withUnsafeBytes(of: quantized.littleEndian) { raw.append(contentsOf: $0) }
+            withUnsafeBytes(of: quantized.littleEndian) { unsafe raw.append(contentsOf: $0) }
         }
         let handle = try FileHandle(forUpdating: url)
         defer { try? handle.close() }

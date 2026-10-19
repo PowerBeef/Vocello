@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 
 enum VocelloMacScreen: String, CaseIterable {
     case customVoice

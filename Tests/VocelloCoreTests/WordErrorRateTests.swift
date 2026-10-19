@@ -206,7 +206,7 @@ final class WordErrorRateTests: XCTestCase {
             "config/language-normalization/hant-hans-v1.txt"
         ))
         XCTAssertEqual(Data(HantHansFoldTable.table.utf8), data)
-        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let digest = SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
         XCTAssertEqual(digest, HantHansFoldTable.tableSHA256)
         XCTAssertEqual(HantHansFoldTable.version, "hant-hans-v1")
 

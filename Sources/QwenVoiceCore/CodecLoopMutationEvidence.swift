@@ -246,7 +246,7 @@ public enum CodecLoopMutationEvidence {
     }
 
     public static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func validFrames(_ frames: [[Int32]]) -> Bool {

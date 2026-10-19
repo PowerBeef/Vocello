@@ -52,7 +52,7 @@ public struct NativeTelemetryClock: Sendable {
         self.startUptimeSeconds = startUptimeSeconds
         self.startMachAbs = startMachAbs
         var info = mach_timebase_info_data_t()
-        mach_timebase_info(&info)
+        unsafe mach_timebase_info(&info)
         self.nanosecondsPerMachUnit = Double(info.numer) / Double(info.denom)
     }
 

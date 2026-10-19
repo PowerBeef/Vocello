@@ -120,7 +120,7 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
             GenerationCancellationSummary(generationID: generationID, reason: .memoryPressure)
         )
         let producer = Task.detached {
-            withUnsafeCurrentTask { $0?.cancel() }
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             await router.yield(terminal, for: generationID)
         }
         await producer.value

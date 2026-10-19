@@ -770,7 +770,7 @@ enum IOSStartupReliabilityRunner {
             byteCount += chunk.count
         }
         return OutputDigest(
-            sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+            sha256: hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined(),
             byteCount: byteCount,
             durationSeconds: Double(audio.length) / audio.fileFormat.sampleRate
         )
@@ -781,7 +781,7 @@ enum IOSStartupReliabilityRunner {
             .appendingPathComponent("startup-reliability", isDirectory: true)
             .appendingPathComponent(runID, isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent(
+        return unsafe directory.appendingPathComponent(
             String(format: "take-%03d.wav", take.takeIndex),
             isDirectory: false
         )
@@ -828,7 +828,7 @@ enum IOSStartupReliabilityRunner {
     }
 
     private static func writeTake(_ result: TakeResult, runID: String) throws {
-        try writeRecord(
+        unsafe try writeRecord(
             result,
             name: String(format: "startup-reliability-take-%03d.json", result.takeIndex),
             runID: runID,

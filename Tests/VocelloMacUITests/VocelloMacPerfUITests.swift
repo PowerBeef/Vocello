@@ -219,7 +219,7 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         beginScenario("history-scroll", seedHistory: true)
         // Sentinel: the seeder finished before we scroll (row 0400 would be
         // absent if the top-up was still running or failed).
-        assertHistoryRows(
+        unsafe assertHistoryRows(
             matching: String(format: "uiperf-seed-%04d", Self.seededHistoryRows - 1),
             expected: 1
         )

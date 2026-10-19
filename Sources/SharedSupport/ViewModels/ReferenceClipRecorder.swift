@@ -386,10 +386,10 @@ final class ReferenceClipRecorder: NSObject {
             buffer.frameLength = 0
             guard (try? file.read(into: buffer, frameCount: windowFrames)) != nil,
                   buffer.frameLength > 0,
-                  let channel = buffer.floatChannelData?[0] else { break }
+                  let channel = unsafe buffer.floatChannelData?[0] else { break }
             var sum: Double = 0
             for i in 0..<Int(buffer.frameLength) {
-                let sample = Double(channel[i])
+                let sample = unsafe Double(channel[i])
                 sum += sample * sample
             }
             let rms = (sum / Double(buffer.frameLength)).squareRoot()

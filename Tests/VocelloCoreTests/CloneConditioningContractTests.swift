@@ -1,4 +1,4 @@
-@preconcurrency import AVFoundation
+@unsafe @preconcurrency import AVFoundation
 import Foundation
 import CryptoKit
 import VocelloQwen3Core
@@ -49,7 +49,7 @@ final class CloneConditioningContractTests: XCTestCase {
         let digest = NativePreparedCloneConditioningCache.clonePromptArtifactDigest(
             modelID: "pro_clone_speed", internalIdentityKey: reference.legacyKey)
         let previousPrimeDigest = SHA256.hash(data: Data("pro_clone_speed|\(reference.legacyKey)|auto".utf8))
-            .prefix(16).map { String(format: "%02x", $0) }.joined()
+            .prefix(16).map { unsafe String(format: "%02x", $0) }.joined()
         XCTAssertEqual(digest, previousPrimeDigest)
     }
 
@@ -695,7 +695,7 @@ final class CloneConditioningContractTests: XCTestCase {
         }
         let base = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<10 {
-            let artifact = transientRoot.appendingPathComponent(
+            let artifact = unsafe transientRoot.appendingPathComponent(
                 String(format: "artifact-%02d", index),
                 isDirectory: true
             )
@@ -717,7 +717,7 @@ final class CloneConditioningContractTests: XCTestCase {
         let remaining = try FileManager.default.contentsOfDirectory(atPath: transientRoot.path)
             .filter { !$0.hasPrefix(".") }
             .sorted()
-        XCTAssertEqual(remaining, (2..<10).map { String(format: "artifact-%02d", $0) })
+        XCTAssertEqual(remaining, (2..<10).map { unsafe String(format: "artifact-%02d", $0) })
         XCTAssertTrue(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: savedVoicePrompts.path))
     }
@@ -748,12 +748,12 @@ final class CloneConditioningContractTests: XCTestCase {
         let file = try AVAudioFile(forWriting: url, settings: settings)
         let frames = AVAudioFrameCount(sampleRate * seconds)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
-              let channel = buffer.floatChannelData?.pointee else {
+              let channel = unsafe buffer.floatChannelData?.pointee else {
             throw CocoaError(.fileWriteUnknown)
         }
         buffer.frameLength = frames
         for index in 0..<Int(frames) {
-            channel[index] = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / sampleRate))
+            unsafe channel[index] = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / sampleRate))
         }
         try file.write(from: buffer)
     }

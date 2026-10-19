@@ -795,7 +795,7 @@ def capability_benchmark_evidence_errors(
 def swift_imports(root: Path) -> set[str]:
     imports: set[str] = set()
     pattern = re.compile(
-        r"^\s*(?:@preconcurrency\s+)?import\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+        r"^\s*(?:@\w+\s+)*import\s+([A-Za-z_][A-Za-z0-9_]*)\b",
         re.MULTILINE,
     )
     for path in root.rglob("*.swift"):

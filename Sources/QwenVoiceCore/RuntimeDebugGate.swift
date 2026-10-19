@@ -122,7 +122,7 @@ public enum RuntimeDebugGate {
                 }
             }
             return SHA256.hash(data: bytes)
-                .map { String(format: "%02x", $0) }
+                .map { unsafe String(format: "%02x", $0) }
                 .joined()
         }()
         return RuntimeDebugProvenance(

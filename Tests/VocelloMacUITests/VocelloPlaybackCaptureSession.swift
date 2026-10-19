@@ -20,7 +20,7 @@ final class FirstBufferStamp: @unchecked Sendable {
 /// One tap → aggregate device → IOProc chain for one process, with a
 /// preallocated ring the real-time callback writes into.
 @available(macOS 14.2, *)
-final class VocelloPlaybackCaptureSession {
+@safe final class VocelloPlaybackCaptureSession {
     enum Failure: Error, CustomStringConvertible {
         case translatePID(OSStatus)
         case createTap(OSStatus)
@@ -61,7 +61,7 @@ final class VocelloPlaybackCaptureSession {
         description.name = "Vocello benchmark capture"
 
         var tap: AudioObjectID = 0
-        let tapStatus = AudioHardwareCreateProcessTap(description, &tap)
+        let tapStatus = unsafe AudioHardwareCreateProcessTap(description, &tap)
         guard tapStatus == noErr, tap != 0 else { throw Failure.createTap(tapStatus) }
         tapID = tap
 
@@ -72,7 +72,7 @@ final class VocelloPlaybackCaptureSession {
         )
         var streamFormat = AudioStreamBasicDescription()
         var formatSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
-        let formatStatus = AudioObjectGetPropertyData(tap, &formatAddress, 0, nil, &formatSize, &streamFormat)
+        let formatStatus = unsafe AudioObjectGetPropertyData(tap, &formatAddress, 0, nil, &formatSize, &streamFormat)
         guard formatStatus == noErr, streamFormat.mSampleRate > 0 else {
             AudioHardwareDestroyProcessTap(tap)
             throw Failure.readFormat(formatStatus)
@@ -91,7 +91,7 @@ final class VocelloPlaybackCaptureSession {
             ]],
         ]
         var aggregate: AudioObjectID = 0
-        let aggregateStatus = AudioHardwareCreateAggregateDevice(aggregateDescription as CFDictionary, &aggregate)
+        let aggregateStatus = unsafe AudioHardwareCreateAggregateDevice(aggregateDescription as CFDictionary, &aggregate)
         guard aggregateStatus == noErr, aggregate != 0 else {
             AudioHardwareDestroyProcessTap(tap)
             throw Failure.createAggregate(aggregateStatus)
@@ -104,36 +104,36 @@ final class VocelloPlaybackCaptureSession {
         let channels = Int(max(1, streamFormat.mChannelsPerFrame))
         let interleaved = (streamFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) == 0
         var procID: AudioDeviceIOProcID?
-        let procStatus = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregate, nil) { _, inputData, inputTime, _, _ in
+        let procStatus = unsafe AudioDeviceCreateIOProcIDWithBlock(&procID, aggregate, nil) { _, inputData, inputTime, _, _ in
             // Real-time thread: copy the first channel into the ring, stamp the
             // first buffer's host time; no allocation, lock or actor hop here.
-            _ = firstHostTime.hostTime.compareExchange(
+            _ = unsafe firstHostTime.hostTime.compareExchange(
                 expected: 0, desired: inputTime.pointee.mHostTime, ordering: .relaxed
             )
-            let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
-            guard let first = buffers.first, let data = first.mData else { return }
-            let floats = data.assumingMemoryBound(to: Float.self)
-            let frames = Int(first.mDataByteSize) / (MemoryLayout<Float>.size * (interleaved ? channels : 1))
+            let buffers = unsafe UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
+            guard let first = unsafe buffers.first, let data = unsafe first.mData else { return }
+            let floats = unsafe data.assumingMemoryBound(to: Float.self)
+            let frames = unsafe Int(first.mDataByteSize) / (MemoryLayout<Float>.size * (interleaved ? channels : 1))
             if interleaved && channels > 1 {
                 // Mono mixdown was requested; if the HAL still hands an interleaved
                 // stereo buffer, take the left channel sample by sample.
                 for frame in 0 ..< frames {
-                    var sample = floats[frame * channels]
-                    ring.write(&sample, count: 1)
+                    var sample = unsafe floats[frame * channels]
+                    unsafe ring.write(&sample, count: 1)
                 }
             } else {
-                ring.write(floats, count: frames)
+                unsafe ring.write(floats, count: frames)
             }
         }
-        guard procStatus == noErr, let procID else {
+        guard procStatus == noErr, let procID = unsafe procID else {
             AudioHardwareDestroyAggregateDevice(aggregate)
             AudioHardwareDestroyProcessTap(tap)
             throw Failure.createIOProc(procStatus)
         }
-        ioProcID = procID
-        let startStatus = AudioDeviceStart(aggregate, procID)
+        unsafe ioProcID = unsafe procID
+        let startStatus = unsafe AudioDeviceStart(aggregate, procID)
         guard startStatus == noErr else {
-            AudioDeviceDestroyIOProcID(aggregate, procID)
+            unsafe AudioDeviceDestroyIOProcID(aggregate, procID)
             AudioHardwareDestroyAggregateDevice(aggregate)
             AudioHardwareDestroyProcessTap(tap)
             throw Failure.start(startStatus)
@@ -161,9 +161,9 @@ final class VocelloPlaybackCaptureSession {
     private func stopIfNeeded() {
         guard !stopped else { return }
         stopped = true
-        if let ioProcID {
-            AudioDeviceStop(aggregateID, ioProcID)
-            AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
+        if let ioProcID = unsafe ioProcID {
+            unsafe AudioDeviceStop(aggregateID, ioProcID)
+            unsafe AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
         }
         if aggregateID != 0 {
             AudioHardwareDestroyAggregateDevice(aggregateID)
@@ -171,7 +171,7 @@ final class VocelloPlaybackCaptureSession {
         if tapID != 0 {
             AudioHardwareDestroyProcessTap(tapID)
         }
-        ioProcID = nil
+        unsafe ioProcID = nil
         aggregateID = 0
         tapID = 0
     }
@@ -186,7 +186,7 @@ final class VocelloPlaybackCaptureSession {
         var objectID: AudioObjectID = 0
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         let status = withUnsafePointer(to: &processID) { pointer in
-            AudioObjectGetPropertyData(
+            unsafe AudioObjectGetPropertyData(
                 AudioObjectID(kAudioObjectSystemObject), &address,
                 UInt32(MemoryLayout<pid_t>.size), pointer, &size, &objectID
             )
@@ -199,7 +199,7 @@ final class VocelloPlaybackCaptureSession {
 /// Drives one capture per benchmark take and writes the per-take WAV and
 /// sidecar under the lane's `playback-capture` directory. Never fails a test.
 @MainActor
-final class VocelloPlaybackCaptureCoordinator {
+@safe final class VocelloPlaybackCaptureCoordinator {
     static let environmentKey = "QVOICE_MAC_BENCH_CAPTURE_DIR"
     static let appBundleIdentifier = "com.qwenvoice.app"
 
@@ -288,11 +288,11 @@ final class VocelloPlaybackCaptureCoordinator {
                     self?.attachNow(pid: pid, generation: generation)
                 }
             }
-            let status = AudioObjectAddPropertyListenerBlock(
+            let status = unsafe AudioObjectAddPropertyListenerBlock(
                 AudioObjectID(kAudioObjectSystemObject), &Self.processListAddress, DispatchQueue.main, listener
             )
             if status == noErr {
-                processListListener = listener
+                unsafe processListListener = unsafe listener
             } else {
                 sidecar?.status = "unavailable"
                 sidecar?.reason = "process-list listener failed (\(status))"
@@ -319,11 +319,11 @@ final class VocelloPlaybackCaptureCoordinator {
     }
 
     private func removeProcessListListener() {
-        guard let listener = processListListener else { return }
-        AudioObjectRemovePropertyListenerBlock(
+        guard let listener = unsafe processListListener else { return }
+        unsafe AudioObjectRemovePropertyListenerBlock(
             AudioObjectID(kAudioObjectSystemObject), &Self.processListAddress, DispatchQueue.main, listener
         )
-        processListListener = nil
+        unsafe processListListener = nil
     }
 
     @available(macOS 14.2, *)
@@ -347,7 +347,7 @@ final class VocelloPlaybackCaptureCoordinator {
 
     /// True when no tap is live or pending for the current take.
     var isIdle: Bool {
-        session == nil && processListListener == nil
+        unsafe session == nil && processListListener == nil
     }
 
     /// Condition for the post-playback wait: the last `seconds` of captured

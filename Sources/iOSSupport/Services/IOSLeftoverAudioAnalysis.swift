@@ -131,7 +131,7 @@ enum IOSLeftoverAudioAnalysis {
         var listing = Listing(entries: [], isComplete: true)
         for directory in directories {
             var info = stat()
-            guard lstat(directory.path, &info) == 0 else {
+            guard unsafe lstat(directory.path, &info) == 0 else {
                 if errno != ENOENT { listing.isComplete = false }
                 continue
             }
@@ -146,7 +146,7 @@ enum IOSLeftoverAudioAnalysis {
             for name in names.sorted() {
                 let path = directory.appendingPathComponent(name, isDirectory: false).path
                 var info = stat()
-                guard lstat(path, &info) == 0 else {
+                guard unsafe lstat(path, &info) == 0 else {
                     // Removed since the folder was read: gone, not damage.
                     if errno != ENOENT { listing.isComplete = false }
                     continue

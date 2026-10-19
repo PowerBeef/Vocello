@@ -209,7 +209,7 @@ public enum CodecRoundTripEvidence {
     }
 
     public static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     /// `[A-Za-z0-9][A-Za-z0-9._-]{0,95}`.

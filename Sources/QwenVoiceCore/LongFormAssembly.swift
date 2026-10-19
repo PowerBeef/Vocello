@@ -439,11 +439,11 @@ private extension BoundedLongFormAssembler {
             )
             buffer.frameLength = 0
             try file.read(into: buffer, frameCount: request)
-            guard let samples = buffer.int16ChannelData?[0], buffer.frameLength > 0 else {
+            guard let samples = unsafe buffer.int16ChannelData?[0], buffer.frameLength > 0 else {
                 throw LongFormAssemblyError.invalidAudioFormat(segmentID: segment.segmentID)
             }
             for offset in 0..<Int(buffer.frameLength) {
-                let value = Int(samples[offset])
+                let value = unsafe Int(samples[offset])
                 peakMagnitude = max(peakMagnitude, abs(value))
                 if abs(value) > threshold {
                     let position = absoluteFrame + Int64(offset)
@@ -524,7 +524,7 @@ private extension BoundedLongFormAssembler {
             )
             buffer.frameLength = 0
             try file.read(into: buffer, frameCount: request)
-            guard let source = buffer.int16ChannelData?[0], buffer.frameLength > 0 else {
+            guard let source = unsafe buffer.int16ChannelData?[0], buffer.frameLength > 0 else {
                 throw LongFormAssemblyError.invalidAudioFormat(segmentID: segment.segmentID)
             }
 
@@ -546,7 +546,7 @@ private extension BoundedLongFormAssembler {
                     scale *= Double(trailingOffset + 1)
                         / Double(analysis.fadeOutFrames)
                 }
-                let scaled = (Double(source[index]) * scale).rounded()
+                let scaled = unsafe (Double(source[index]) * scale).rounded()
                 output.append(
                     Int16(
                         min(
@@ -596,6 +596,6 @@ private extension BoundedLongFormAssembler {
             if data.isEmpty { break }
             hasher.update(data: data)
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 }

@@ -46,7 +46,7 @@ struct MacInlinePlayerCard: View {
             y: VocelloTheme.Elevation.cardY
         )
         .transition(
-            AppLaunchConfiguration.current.animationsEnabled
+            unsafe AppLaunchConfiguration.current.animationsEnabled
                 ? .move(edge: .bottom).combined(with: .opacity)
                 : .identity
         )

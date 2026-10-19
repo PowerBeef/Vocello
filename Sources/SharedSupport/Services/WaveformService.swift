@@ -44,7 +44,7 @@ enum WaveformService {
                 return []
             }
             let frames = Int(buffer.frameLength)
-            guard frames > 0, let channels = buffer.floatChannelData else { break }
+            guard frames > 0, let channels = unsafe buffer.floatChannelData else { break }
 
             var offset = 0
             while offset < frames {
@@ -57,7 +57,7 @@ enum WaveformService {
                 var spanSquares: Float = 0
                 for channel in 0..<channelCount {
                     var channelSquares: Float = 0
-                    vDSP_svesq(channels[channel].advanced(by: offset), 1, &channelSquares, vDSP_Length(span))
+                    unsafe vDSP_svesq(channels[channel].advanced(by: offset), 1, &channelSquares, vDSP_Length(span))
                     spanSquares += channelSquares
                 }
                 sumOfSquares[bin] += Double(spanSquares) / Double(channelCount)

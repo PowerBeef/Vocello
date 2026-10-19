@@ -89,7 +89,7 @@ public struct IOSStartupReliabilityLaunchSpec: Codable, Hashable, Sendable {
             throw IOSStartupReliabilityPlanError.scriptIdentityMismatch
         }
         let scriptDigest = SHA256.hash(data: Data(script.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
         guard scriptDigest == plan.scriptSHA256,
               Self.isSHA256(plan.scriptSHA256) else {

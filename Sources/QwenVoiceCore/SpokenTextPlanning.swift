@@ -508,7 +508,7 @@ extension String {
 
 enum SpokenTextCanonical {
     static func digest(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     static func serialize(namespace: String, components: [String]) -> String {

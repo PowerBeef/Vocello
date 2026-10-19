@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 #if os(iOS)
 import UIKit
 #endif
@@ -675,7 +675,7 @@ public struct VocelloUIPerfScenarioMarker: Codable {
         print("VOCELLO_UIPERF_SCENARIO=\(data.base64EncodedString())")
         // stdout is fully buffered under the runner's pipe; a crash later in
         // the run must not take the markers of completed scenarios with it.
-        fflush(stdout)
+        unsafe fflush(stdout)
     }
 }
 
@@ -724,7 +724,7 @@ public struct VocelloUIPerfSetupMarker: Codable {
     public func emit() {
         guard let data = try? JSONEncoder().encode(self) else { return }
         print("VOCELLO_UIPERF_SETUP=\(data.base64EncodedString())")
-        fflush(stdout)
+        unsafe fflush(stdout)
     }
 }
 

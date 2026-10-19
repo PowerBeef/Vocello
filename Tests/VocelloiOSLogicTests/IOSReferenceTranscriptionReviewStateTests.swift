@@ -29,7 +29,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
         guard FileManager.default.fileExists(atPath: infoPlist.path) else {
             throw XCTSkip("The repository sources are not on this host")
         }
-        let plist = try XCTUnwrap(
+        let plist = unsafe try XCTUnwrap(
             PropertyListSerialization.propertyList(from: Data(contentsOf: infoPlist), format: nil) as? [String: Any]
         )
         let documentTypes = try XCTUnwrap(plist["CFBundleDocumentTypes"] as? [[String: Any]])

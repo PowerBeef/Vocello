@@ -139,7 +139,7 @@ enum BenchCodecLoop {
             }
         )
         // mkdir is exclusive: failed or completed evidence can never be overwritten.
-        guard mkdir(output.path, 0o700) == 0 else {
+        guard unsafe mkdir(output.path, 0o700) == 0 else {
             throw CLIError("Codec-loop output must be a new directory with an existing parent.")
         }
         let runID = "codec-loop-" + UUID().uuidString.lowercased()

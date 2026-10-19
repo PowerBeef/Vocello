@@ -276,10 +276,10 @@ enum IOSDeviceDiagnosticsRunner {
         let transcript = transcriptRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         if let audioData = try? Data(contentsOf: wavURL) {
             result.stagedAudioSHA256 = SHA256.hash(data: audioData)
-                .map { String(format: "%02x", $0) }.joined()
+                .map { unsafe String(format: "%02x", $0) }.joined()
         }
         result.stagedTranscriptSHA256 = SHA256.hash(data: Data(transcript.utf8))
-            .map { String(format: "%02x", $0) }.joined()
+            .map { unsafe String(format: "%02x", $0) }.joined()
 
         // Bounded wait for engine bring-up; enrollment needs the prepared backend.
         let readinessDeadline = Date().addingTimeInterval(180)
@@ -724,7 +724,7 @@ enum IOSDeviceDiagnosticsRunner {
             record.requestReceipt = RequestReceiptObservation(
                 stringFlags: result.diagnosticStringFlags
             )
-            print(String(
+            unsafe print(String(
                 format: "[device-diagnostics] ✓ %.2fs audio · rtf=%.2f (wall/audio) · finish=%@",
                 result.durationSeconds, rtf, result.finishReason?.rawValue ?? "?"
             ))
@@ -740,9 +740,9 @@ enum IOSDeviceDiagnosticsRunner {
                 record.outputVerification = verification
                 // The rate `pass` reads (WER v2, or CER for Chinese, Japanese and Korean).
                 let gatedRateLabel = verification.accuracyMetric == .characterErrorRate ? "cer" : "wer"
-                let gatedRate = verification.accuracyValue.map { String(format: "%.2f", $0) } ?? "unavailable"
+                let gatedRate = verification.accuracyValue.map { unsafe String(format: "%.2f", $0) } ?? "unavailable"
                 print(
-                    "[device-diagnostics] output verify pass=\(verification.pass) "
+                    unsafe "[device-diagnostics] output verify pass=\(verification.pass) "
                     + "lang=\(verification.languagePass) \(gatedRateLabel)=\(gatedRate) "
                     + "score=\(String(format: "%.2f", verification.languageMatchScore))"
                 )
@@ -1337,7 +1337,7 @@ enum IOSDeviceDiagnosticsRunner {
                 )
 
                 let generationID = UUID()
-                let outputFileName = String(
+                let outputFileName = unsafe String(
                     format: "take-%02d-%@-speed-medium-retained-%d.wav",
                     plannedTake.takeIndex,
                     plannedTake.mode,
@@ -1619,7 +1619,7 @@ enum IOSDeviceDiagnosticsRunner {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(value)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     /// Privacy-safe identity for the exact non-text fixture used by a diagnostic
@@ -1631,7 +1631,7 @@ enum IOSDeviceDiagnosticsRunner {
             return nil
         case .design(let voiceDescription, _):
             return SHA256.hash(data: Data(voiceDescription.utf8))
-                .map { String(format: "%02x", $0) }
+                .map { unsafe String(format: "%02x", $0) }
                 .joined()
         case .clone(let reference):
             let url = URL(fileURLWithPath: reference.audioPath)
@@ -1643,7 +1643,7 @@ enum IOSDeviceDiagnosticsRunner {
             var hasher = SHA256()
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while stream.hasBytesAvailable {
-                let count = stream.read(&buffer, maxLength: buffer.count)
+                let count = unsafe stream.read(&buffer, maxLength: buffer.count)
                 if count < 0 {
                     throw stream.streamError
                         ?? DiagnosticsError("could not read the resolved clone reference for identity hashing")
@@ -1651,7 +1651,7 @@ enum IOSDeviceDiagnosticsRunner {
                 if count == 0 { break }
                 hasher.update(data: Data(buffer[..<count]))
             }
-            return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
         }
     }
 
@@ -2080,7 +2080,7 @@ enum IOSDeviceDiagnosticsRunner {
             if chunk.isEmpty { break }
             hasher.update(data: chunk)
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func mirrorOutputToPullableDiagnostics(_ source: URL, runID: String) throws {

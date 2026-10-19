@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 
 private struct IOSControlAuditTake: Codable {
     let takeID: String

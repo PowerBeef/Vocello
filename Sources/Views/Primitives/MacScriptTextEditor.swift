@@ -55,7 +55,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.textContainerInset = NSSize(width: 0, height: 8)
-        textView.textContainer?.lineFragmentPadding = 0
+        unsafe textView.textContainer?.lineFragmentPadding = 0
         textView.typingAttributes = Self.typingAttributes(font: font, color: textColor, tracking: tracking)
         textView.delegate = context.coordinator
         textView.tracking = tracking
@@ -83,7 +83,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
-        textView.textContainer?.widthTracksTextView = true
+        unsafe textView.textContainer?.widthTracksTextView = true
 
         return scrollView
     }
@@ -180,7 +180,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
         /// answers what the text view would without a delegate: the responder
         /// chain's undo manager (the window's).
         func undoManager(for view: NSTextView) -> UndoManager? {
-            parent.clearUndoTitles == nil ? view.nextResponder?.undoManager : scriptUndoManager
+            unsafe parent.clearUndoTitles == nil ? view.nextResponder?.undoManager : scriptUndoManager
         }
     }
 }
@@ -224,7 +224,7 @@ final class PlaceholderTextView: NSTextView {
     /// set programmatically carries the storage's own attributes, so the kern
     /// is applied to the whole string as well.
     func applyTracking() {
-        guard let storage = textStorage else { return }
+        guard let storage = unsafe textStorage else { return }
         let range = NSRange(location: 0, length: storage.length)
         guard range.length > 0 else { return }
         if tracking == 0 {
@@ -245,7 +245,7 @@ final class PlaceholderTextView: NSTextView {
         if let actionName {
             undoManager?.setActionName(actionName)
         }
-        window?.makeFirstResponder(self)
+        unsafe window?.makeFirstResponder(self)
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -272,7 +272,7 @@ final class PlaceholderTextView: NSTextView {
             ]
             if tracking != 0 { attrs[.kern] = tracking }
             let inset = textContainerInset
-            let padding = textContainer?.lineFragmentPadding ?? 0
+            let padding = unsafe textContainer?.lineFragmentPadding ?? 0
             let rect = NSRect(
                 x: inset.width + padding,
                 y: inset.height,

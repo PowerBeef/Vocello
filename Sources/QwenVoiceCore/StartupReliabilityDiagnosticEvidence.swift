@@ -66,7 +66,7 @@ public struct StartupReliabilityArtifactEvidence: Hashable, Codable, Sendable {
             "\(prefix)ByteCount": String(byteCount),
         ]
         if let durationSeconds {
-            notes["\(prefix)DurationSeconds"] = String(format: "%.6f", durationSeconds)
+            notes["\(prefix)DurationSeconds"] = unsafe String(format: "%.6f", durationSeconds)
         }
         if let codecFrameCount {
             notes["\(prefix)FrameCount"] = String(codecFrameCount)
@@ -452,11 +452,11 @@ public enum StartupReliabilityDiagnosticEvidence {
 
     private static func append<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
         var littleEndian = value.littleEndian
-        withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: &littleEndian) { unsafe data.append(contentsOf: $0) }
     }
 
     private static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func isSafeIdentifier(_ value: String) -> Bool {

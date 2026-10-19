@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 
 /// Black-box route proof, not the full distribution-candidate acceptance matrix.
 /// No production dependency, debug launch input, telemetry or container access.

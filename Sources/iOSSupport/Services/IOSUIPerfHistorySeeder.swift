@@ -50,7 +50,7 @@ enum IOSUIPerfHistorySeeder {
             })
         let modes = ["custom", "design", "clone"]
         for index in 0..<target where !present.contains(index) {
-            var generation = Generation(
+            var generation = unsafe Generation(
                 text: String(format: "%@%04d · %@", textPrefix, index, fillerSentence),
                 mode: modes[index % modes.count],
                 modelTier: "pro",
@@ -79,8 +79,8 @@ enum IOSUIPerfHistorySeeder {
         let dataBytes = frames * 2
         var header = Data()
         func append(_ string: String) { header.append(string.data(using: .ascii)!) }
-        func append32(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { header.append(contentsOf: $0) } }
-        func append16(_ value: UInt16) { withUnsafeBytes(of: value.littleEndian) { header.append(contentsOf: $0) } }
+        func append32(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { unsafe header.append(contentsOf: $0) } }
+        func append16(_ value: UInt16) { withUnsafeBytes(of: value.littleEndian) { unsafe header.append(contentsOf: $0) } }
         append("RIFF"); append32(36 + dataBytes); append("WAVE")
         append("fmt "); append32(16); append16(1); append16(1)
         append32(sampleRate); append32(sampleRate * 2); append16(2); append16(16)

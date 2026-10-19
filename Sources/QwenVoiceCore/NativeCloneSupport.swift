@@ -1,7 +1,7 @@
 import CryptoKit
-@preconcurrency import AVFoundation
+@unsafe @preconcurrency import AVFoundation
 import Foundation
-@preconcurrency import MLX
+@unsafe @preconcurrency import MLX
 import VocelloQwen3Core
 
 enum ResolvedCloneTranscriptMode: String, Sendable {
@@ -631,12 +631,12 @@ actor NativePreparedCloneConditioningCache {
             )
         }
         try file.read(into: buffer)
-        guard let channel = buffer.floatChannelData?[0] else {
+        guard let channel = unsafe buffer.floatChannelData?[0] else {
             throw AudioPreparationError.conversionFailed(
                 "Could not decode normalized clone reference samples."
             )
         }
-        return Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+        return unsafe Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
     }
 
     private func touchDecodedReferenceAudio(_ key: DecodedReferenceIdentity) {
@@ -765,9 +765,9 @@ actor NativePreparedCloneConditioningCache {
         var sumSquares: Double = 0
         var sampleCount = 0
         for channel in 0..<channels {
-            guard let samples = buffer.floatChannelData?[channel] else { continue }
+            guard let samples = unsafe buffer.floatChannelData?[channel] else { continue }
             for frame in 0..<frames {
-                let value = samples[frame]
+                let value = unsafe samples[frame]
                 let magnitude = abs(value)
                 peak = max(peak, magnitude)
                 sumSquares += Double(value * value)
@@ -894,7 +894,7 @@ actor NativePreparedCloneConditioningCache {
             hasher.update(data: chunk)
         }
         let digest = hasher.finalize()
-        return digest.map { String(format: "%02x", $0) }.joined()
+        return digest.map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private func decodedReferenceAudioCacheKey(
@@ -1025,7 +1025,7 @@ actor NativePreparedCloneConditioningCache {
         ].joined(separator: "|")
         let digest = SHA256.hash(data: Data(identity.utf8))
             .prefix(16)
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
         return digest
     }
@@ -1054,7 +1054,7 @@ actor NativePreparedCloneConditioningCache {
 
     private static func sha256Hex(text: String) -> String {
         SHA256.hash(data: Data(text.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
     }
 

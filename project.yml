@@ -34,6 +34,7 @@ settings:
     # Imports must name the module that declares the members a file uses (SE-0444),
     # which keeps the module graph explicit for explicit-module builds.
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    SWIFT_STRICT_MEMORY_SAFETY: YES
     # A global-actor-isolated type's conformances are inferred isolated to that actor
     # unless the protocol is itself isolated or Sendable (SE-0470). The 14 conformances
     # migrate mode flagged carry `nonisolated` and keep their earlier isolation; new ones

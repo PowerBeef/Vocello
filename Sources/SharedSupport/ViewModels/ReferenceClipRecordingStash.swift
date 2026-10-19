@@ -81,16 +81,16 @@ struct ReferenceClipRecordingOwner: Hashable, Sendable {
     /// `sysctl(KERN_PROC_PID)`: an identifier no process holds comes back empty.
     private static func lookUp(_ processIdentifier: Int32) -> ProcessLookup {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
+        var info = unsafe kinfo_proc()
+        var size = unsafe MemoryLayout<kinfo_proc>.stride
         let status = mib.withUnsafeMutableBufferPointer { mib in
-            sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
+            unsafe sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
         }
         guard status == 0 else { return .unknown }
-        guard size >= MemoryLayout<kinfo_proc>.stride, info.kp_proc.p_pid == processIdentifier else {
+        guard unsafe size >= MemoryLayout<kinfo_proc>.stride, unsafe info.kp_proc.p_pid == processIdentifier else {
             return .notRunning
         }
-        let started = info.kp_proc.p_un.__p_starttime
+        let started = unsafe info.kp_proc.p_un.__p_starttime
         return .running(
             startTime: UInt64(clamping: started.tv_sec) * 1_000_000 + UInt64(clamping: started.tv_usec)
         )
@@ -229,8 +229,8 @@ enum ReferenceClipRecordingStash {
                   now.timeIntervalSince(modified) >= minimumAge else { continue }
             try? fileManager.removeItem(at: entry)
         }
-        _ = directory.withUnsafeFileSystemRepresentation { path in
-            path.map { Darwin.rmdir($0) }
+        _ = unsafe directory.withUnsafeFileSystemRepresentation { path in
+            unsafe path.map { unsafe Darwin.rmdir($0) }
         }
     }
 

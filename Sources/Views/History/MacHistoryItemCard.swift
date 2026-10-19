@@ -41,7 +41,7 @@ struct MacHistoryItemCard: View {
 
     private var durationText: String? {
         guard let duration = generation.duration, duration > 0 else { return nil }
-        return String(format: "%.1fs", duration)
+        return unsafe String(format: "%.1fs", duration)
     }
 
     private var metadataParts: [String] {

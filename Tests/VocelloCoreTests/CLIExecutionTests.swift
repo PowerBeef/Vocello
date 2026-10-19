@@ -35,7 +35,7 @@ final class CLIExecutionTests: XCTestCase {
                 XCTAssertEqual(request.text, index == 0 ? "First clip." : "Second clip.")
                 XCTAssertEqual(request.mode, mode)
                 XCTAssertEqual(request.modelID, "pro_\(mode.rawValue)_speed")
-                XCTAssertTrue(request.outputPath.hasSuffix("_\(String(format: "%03d", index)).wav"))
+                XCTAssertTrue(request.outputPath.hasSuffix(unsafe "_\(String(format: "%03d", index)).wav"))
                 XCTAssertEqual(request.payload, payload)
                 XCTAssertEqual(request.seed, 30_000_005)
                 XCTAssertEqual(request.variation, .consistent)
@@ -244,7 +244,7 @@ final class CLIExecutionTests: XCTestCase {
         let requests = (0..<2).map { request($0, root: URL(fileURLWithPath: "/missing/\(UUID())")) }
         let failed = await Task {
             await CLIBatchExecution.run(requests) { _ in
-                withUnsafeCurrentTask { $0?.cancel() }
+                unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
                 throw Failure.injected
             }
         }.value
@@ -258,7 +258,7 @@ final class CLIExecutionTests: XCTestCase {
 
         let cancelled = await Task {
             await CLIBatchExecution.run(requests) { _ in
-                withUnsafeCurrentTask { $0?.cancel() }
+                unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
                 throw CancellationError()
             }
         }.value
@@ -333,9 +333,9 @@ final class CLIExecutionTests: XCTestCase {
         let observed = EventLog()
         let code = await CLIProcessSupervisor.run(signals: [number]) {
             var current = sigaction()
-            sigaction(number, nil, &current)
-            let handler = withUnsafeBytes(of: current.__sigaction_u) { $0.load(as: UInt.self) }
-            let ignore = withUnsafeBytes(of: SIG_IGN) { $0.load(as: UInt.self) }
+            unsafe sigaction(number, nil, &current)
+            let handler = withUnsafeBytes(of: current.__sigaction_u) { unsafe $0.load(as: UInt.self) }
+            let ignore = withUnsafeBytes(of: SIG_IGN) { unsafe $0.load(as: UInt.self) }
             let armed = handler == ignore
             observed.append(armed ? "armed" : "unarmed")
             guard armed else { return 1 }
@@ -393,7 +393,7 @@ final class CLIExecutionTests: XCTestCase {
         release.signal()
 
         let preCancelled = Task { () -> (any Error)? in
-            withUnsafeCurrentTask { $0?.cancel() }
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             do {
                 _ = try await GenerateCommand.readLineCancellably {
                     XCTFail("no read starts once the command is cancelled")

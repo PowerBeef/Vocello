@@ -52,7 +52,7 @@ final class FileStreamIOTests: XCTestCase {
         // 2.5 MiB spans two full default chunks plus a partial third.
         let contents = patternedData(count: FileStreamIO.defaultChunkSize * 5 / 2)
         let url = try makeFile(named: "multi.bin", contents: contents)
-        let expected = SHA256.hash(data: contents).map { String(format: "%02x", $0) }.joined()
+        let expected = SHA256.hash(data: contents).map { unsafe String(format: "%02x", $0) }.joined()
 
         XCTAssertEqual(try FileStreamIO.sha256Hex(of: url), expected)
         XCTAssertEqual(try HuggingFaceDownloader.sha256Hex(for: url), expected)

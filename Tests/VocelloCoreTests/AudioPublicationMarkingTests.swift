@@ -15,19 +15,19 @@ final class AudioPublicationMarkingTests: XCTestCase {
             .appendingPathComponent("marking-\(UUID().uuidString).wav")
         var data = Data()
         data.append(contentsOf: "RIFF".utf8)
-        withUnsafeBytes(of: UInt32(36 + samples.count * 2).littleEndian) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt32(36 + samples.count * 2).littleEndian) { unsafe data.append(contentsOf: $0) }
         data.append(contentsOf: "WAVE".utf8)
         data.append(contentsOf: "fmt ".utf8)
-        withUnsafeBytes(of: UInt32(16).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt16(1).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt16(1).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt32(24_000).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt32(48_000).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt16(2).littleEndian) { data.append(contentsOf: $0) }
-        withUnsafeBytes(of: UInt16(16).littleEndian) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt32(16).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt16(1).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt16(1).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt32(24_000).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt32(48_000).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt16(2).littleEndian) { unsafe data.append(contentsOf: $0) }
+        withUnsafeBytes(of: UInt16(16).littleEndian) { unsafe data.append(contentsOf: $0) }
         data.append(contentsOf: "data".utf8)
-        withUnsafeBytes(of: UInt32(samples.count * 2).littleEndian) { data.append(contentsOf: $0) }
-        samples.withUnsafeBufferPointer { data.append(Data(buffer: $0)) }
+        withUnsafeBytes(of: UInt32(samples.count * 2).littleEndian) { unsafe data.append(contentsOf: $0) }
+        samples.withUnsafeBufferPointer { unsafe data.append(Data(buffer: $0)) }
         try data.write(to: url)
         return url
     }

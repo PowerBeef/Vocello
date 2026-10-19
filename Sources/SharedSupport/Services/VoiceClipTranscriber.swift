@@ -252,7 +252,7 @@ enum VoiceClipTranscriber {
 
     private static func sha256(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
     }
 
@@ -273,7 +273,7 @@ enum VoiceClipTranscriber {
             encoder.outputFormatting = [.sortedKeys]
             let data = try encoder.encode(evidence)
             evidenceDigest = SHA256.hash(data: data)
-                .map { String(format: "%02x", $0) }
+                .map { unsafe String(format: "%02x", $0) }
                 .joined()
         } else {
             evidenceDigest = nil
@@ -300,7 +300,7 @@ enum VoiceClipTranscriber {
             try Task.checkCancellation()
             digest.update(data: data)
         }
-        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+        return digest.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     @concurrent

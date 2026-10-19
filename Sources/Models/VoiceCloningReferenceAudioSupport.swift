@@ -47,15 +47,15 @@ enum VoiceCloningReferenceAudioSupport {
     /// system (`kAudioFileGlobalInfo_AllExtensions`); empty when the query fails.
     static func systemReadableAudioExtensions() -> Set<String> {
         var extensions: Unmanaged<CFArray>?
-        var size = UInt32(MemoryLayout<Unmanaged<CFArray>?>.size)
-        let status = AudioFileGetGlobalInfo(
+        var size = unsafe UInt32(MemoryLayout<Unmanaged<CFArray>?>.size)
+        let status = unsafe AudioFileGetGlobalInfo(
             kAudioFileGlobalInfo_AllExtensions,
             0,
             nil,
             &size,
             &extensions
         )
-        guard status == noErr, let array = extensions?.takeRetainedValue() as? [String] else { return [] }
+        guard status == noErr, let array = unsafe extensions?.takeRetainedValue() as? [String] else { return [] }
         return Set(array.map { $0.lowercased() })
     }
 }

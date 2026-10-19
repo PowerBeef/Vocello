@@ -598,7 +598,7 @@ public enum GenerationTelemetryPrivacy {
     /// correlation-safe metadata. Call only while telemetry is enabled.
     public static func failureNotes(message: String) -> [String: String] {
         let digest = SHA256.hash(data: Data(message.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
         return [
             "failureMessageLength": String(message.count),

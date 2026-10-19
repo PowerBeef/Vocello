@@ -28,6 +28,6 @@ enum AppPerformanceSignposts {
     }
 
     static func emit(_ name: StaticString, message: String) {
-        os_signpost(.event, log: log, name: name, "%{public}@", message)
+        unsafe os_signpost(.event, log: log, name: name, "%{public}@", message)
     }
 }

@@ -262,7 +262,7 @@ final class CLIArgumentsTests: XCTestCase {
         let nested = root.appendingPathComponent("a/b/take.wav").path
         try GenerateCommand.prepareOutputFolder(of: nested)
         var isDirectory: ObjCBool = false
-        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("a/b").path, isDirectory: &isDirectory))
+        unsafe XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("a/b").path, isDirectory: &isDirectory))
         XCTAssertTrue(isDirectory.boolValue)
         XCTAssertThrowsError(try GenerateCommand.prepareOutputFolder(of: existing.appendingPathComponent("take.wav").path))
     }

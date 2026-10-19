@@ -195,7 +195,7 @@ public enum IOSSavedOutputsDestination {
             // Coordinated write so iCloud-Drive destinations sync cleanly.
             // A3-01: the bytes are staged beside a same-named file in the user's folder and replace
             // it only once complete, so a failed copy never costs the user that file.
-            NSFileCoordinator().coordinate(
+            unsafe NSFileCoordinator().coordinate(
                 writingItemAt: destination,
                 options: .forReplacing,
                 error: &coordinationError

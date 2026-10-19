@@ -87,7 +87,7 @@ private struct IOSAccessibleAnimationModifier<Value: Equatable>: ViewModifier {
 @MainActor
 enum IOSAccessibleAnimation {
     static func perform<R>(_ animation: Animation?, _ block: () -> R) -> R {
-        let shouldReduceMotion = UIAccessibility.isReduceMotionEnabled || IOSAppDefaults.reduceMotionEnabled
+        let shouldReduceMotion = unsafe UIAccessibility.isReduceMotionEnabled || IOSAppDefaults.reduceMotionEnabled
         let resolved = shouldReduceMotion ? nil : animation
         return withAnimation(resolved, block)
     }

@@ -255,7 +255,7 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
         // From a cancelled task, the owner stopped the take: nothing changes.
         let owned = try XCTUnwrap(coordinator.start())
         let fromCancelledTask = await Task { @MainActor in
-            withUnsafeCurrentTask { $0?.cancel() }
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             return coordinator.finishEngineCancellation(attempt: owned)
         }.value
         XCTAssertFalse(fromCancelledTask)

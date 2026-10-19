@@ -1,4 +1,4 @@
-@preconcurrency import AVFoundation
+@unsafe @preconcurrency import AVFoundation
 import Foundation
 @testable import QwenVoiceCore
 import XCTest
@@ -301,12 +301,12 @@ final class ReferenceImportStorageTests: XCTestCase {
         let file = try AVAudioFile(forWriting: url, settings: settings)
         let frames = AVAudioFrameCount(sampleRate * seconds)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
-              let channel = buffer.floatChannelData?.pointee else {
+              let channel = unsafe buffer.floatChannelData?.pointee else {
             throw CocoaError(.fileWriteUnknown)
         }
         buffer.frameLength = frames
         for index in 0..<Int(frames) {
-            channel[index] = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / sampleRate))
+            unsafe channel[index] = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / sampleRate))
         }
         try file.write(from: buffer)
     }

@@ -250,8 +250,8 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
             MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<integer_t>.stride
         )
         let result = withUnsafeMutablePointer(to: &info) { pointer -> kern_return_t in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { integerPointer in
-                task_info(
+            unsafe pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { integerPointer in
+                unsafe task_info(
                     mach_task_self_,
                     task_flavor_t(TASK_VM_INFO),
                     integerPointer,
@@ -314,7 +314,7 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
 
     private static func availableProcessMemory() -> UInt64? {
         var headroom: UInt64 = 0
-        guard QVoiceGetOSProcAvailableMemory(&headroom) else {
+        guard unsafe QVoiceGetOSProcAvailableMemory(&headroom) else {
             return nil
         }
         return headroom

@@ -38,8 +38,8 @@ enum NativeHelperProcess {
     /// Path of the ThreadSanitizer runtime if it is loaded into this process.
     static func loadedSanitizerRuntimePath() -> String? {
         for index in 0..<_dyld_image_count() {
-            guard let raw = _dyld_get_image_name(index) else { continue }
-            let name = String(cString: raw)
+            guard let raw = unsafe _dyld_get_image_name(index) else { continue }
+            let name = unsafe String(cString: raw)
             if name.contains("libclang_rt.tsan") { return name }
         }
         return nil

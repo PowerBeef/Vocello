@@ -88,7 +88,7 @@ struct MacRecordVoiceSheet: View {
 
     private var timeString: String {
         let total = max(0, Int(recorder.elapsed.rounded(.down)))
-        return String(format: "%02d:%02d", total / 60, total % 60)
+        return unsafe String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     var body: some View {
@@ -273,7 +273,7 @@ struct MacRecordVoiceSheet: View {
 
     private var durationString: String {
         let total = max(0, Int(reviewPlayer.duration.rounded()))
-        return String(format: "%d:%02d", total / 60, total % 60)
+        return unsafe String(format: "%d:%02d", total / 60, total % 60)
     }
 
     // MARK: - Completion

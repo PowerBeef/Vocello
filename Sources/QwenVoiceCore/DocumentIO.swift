@@ -224,7 +224,7 @@ public struct LocalDocumentIO: DocumentIO, Hashable, Sendable {
         let mtime = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         let data = Data("\(resolvedPath)|\(size)|\(mtime)".utf8)
         let digest = SHA256.hash(data: data)
-        return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return digest.prefix(8).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func sanitizedStem(for url: URL) -> String {

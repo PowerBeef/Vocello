@@ -201,8 +201,8 @@ public func currentProcessSchedulingNotes() -> [String: String] {
     )
     var isDefault: boolean_t = 0
     let result = withUnsafeMutablePointer(to: &category) { pointer in
-        pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
-            task_policy_get(
+        unsafe pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
+            unsafe task_policy_get(
                 mach_task_self_,
                 task_policy_flavor_t(TASK_CATEGORY_POLICY),
                 rebound,

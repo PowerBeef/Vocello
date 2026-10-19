@@ -29,7 +29,7 @@ enum CLIBatchExecution {
         deliveryInstructionCellID: String?, captureCodecTrace: Bool = false
     ) -> [GenerationRequest] {
         lines.enumerated().map { index, text in
-            let name = "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index)).wav"
+            let name = unsafe "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index)).wav"
             return GenerationRequest(
                 mode: mode, modelID: modelID, text: text,
                 outputPath: outputDirectory.appendingPathComponent(name).path,

@@ -68,7 +68,7 @@ final class IOSStartupReliabilityPlanTests: XCTestCase {
     private func makeRawSpec() -> String {
         let script = "Exact private script."
         let digest = SHA256.hash(data: Data(script.utf8))
-            .map { String(format: "%02x", $0) }.joined()
+            .map { unsafe String(format: "%02x", $0) }.joined()
         return json([
             "schemaVersion": 1,
             "runID": "startup-run-1",

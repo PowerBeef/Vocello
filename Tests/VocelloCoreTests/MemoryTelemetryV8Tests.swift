@@ -360,11 +360,11 @@ final class MemoryTelemetryV8Tests: XCTestCase {
 
     func testThreadCountReleasesTheThreadPortsItReceives() {
         let thread = mach_thread_self()
-        defer { mach_port_deallocate(mach_task_self_, thread) }
+        defer { unsafe mach_port_deallocate(mach_task_self_, thread) }
         func sendReferences() -> mach_port_urefs_t {
             var references: mach_port_urefs_t = 0
             // mach_port_right_t(0) is MACH_PORT_RIGHT_SEND.
-            XCTAssertEqual(
+            unsafe XCTAssertEqual(
                 mach_port_get_refs(mach_task_self_, thread, mach_port_right_t(0), &references),
                 KERN_SUCCESS
             )
@@ -665,14 +665,14 @@ final class MemoryTelemetryV8Tests: XCTestCase {
     ) throws -> Double? {
         var address: vm_address_t = 0
         let size = vm_size_t(megabytes * 1_048_576)
-        guard vm_allocate(mach_task_self_, &address, size, VM_FLAGS_ANYWHERE) == KERN_SUCCESS,
-              let pointer = UnsafeMutableRawPointer(bitPattern: UInt(address)) else {
+        guard unsafe vm_allocate(mach_task_self_, &address, size, VM_FLAGS_ANYWHERE) == KERN_SUCCESS,
+              let pointer = unsafe UnsafeMutableRawPointer(bitPattern: UInt(address)) else {
             throw XCTSkip("could not reserve the transient allocation")
         }
-        defer { vm_deallocate(mach_task_self_, address, size) }
+        defer { unsafe vm_deallocate(mach_task_self_, address, size) }
         let pageSize = Int(getpagesize())
         for offset in stride(from: 0, to: Int(size), by: pageSize) {
-            pointer.storeBytes(of: 0xA5, toByteOffset: offset, as: UInt8.self)
+            unsafe pointer.storeBytes(of: 0xA5, toByteOffset: offset, as: UInt8.self)
         }
         return body()
     }

@@ -1,5 +1,5 @@
 import CryptoKit
-@preconcurrency import Foundation
+@unsafe @preconcurrency import Foundation
 import OSLog
 import Synchronization
 
@@ -354,9 +354,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 at: lockURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            let descriptor = lockURL.withUnsafeFileSystemRepresentation { path -> Int32 in
-                guard let path else { return -1 }
-                return Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, mode_t(0o600))
+            let descriptor = unsafe lockURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+                guard let path = unsafe path else { return -1 }
+                return unsafe Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, mode_t(0o600))
             }
             guard descriptor >= 0 else {
                 throw DownloadError.invalidLocalDestination(lockURL.lastPathComponent)
@@ -1367,7 +1367,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     private nonisolated func sessionNamespace(of candidate: URLSession) -> Int {
-        if candidate === session { return 0 }
+        if unsafe candidate === session { return 0 }
         return chunkSessionsBox.withLock { sessions in
             guard let index = sessions.firstIndex(where: { $0 === candidate }) else { return 0 }
             return index + 1
@@ -1383,7 +1383,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         guard engineConfiguration.chunkSessionStrategy == .perWorker,
               !isBackgroundSession,
               let configuration = foregroundTransferConfiguration else {
-            return session
+            return unsafe session
         }
         return chunkSessionsBox.withLock { sessions in
             while sessions.count <= workerIndex {
@@ -1592,7 +1592,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         self.transferDelegateQueue = delegateQueue
         super.init()
 
-        session = URLSession(configuration: config, delegate: self, delegateQueue: delegateQueue)
+        unsafe session = URLSession(configuration: config, delegate: self, delegateQueue: delegateQueue)
     }
 
     // MARK: - Public API
@@ -1690,9 +1690,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await completeBackgroundEventsAfterPostprocessing()
         guard !isBackgroundSession else { return }
         if succeeded {
-            session.finishTasksAndInvalidate()
+            unsafe session.finishTasksAndInvalidate()
         } else {
-            session.invalidateAndCancel()
+            unsafe session.invalidateAndCancel()
         }
         invalidateChunkSessions(cancelling: !succeeded)
     }
@@ -1919,7 +1919,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Remove orphan or stale tasks when no durable request is eligible for adoption.
     public func cancelAllSessionTasks() async {
         let tasks = await withCheckedContinuation { continuation in
-            session.getAllTasks { continuation.resume(returning: $0) }
+            unsafe session.getAllTasks { continuation.resume(returning: $0) }
         }
         await withTaskGroup(of: Void.self) { group in
             for case let task as URLSessionDownloadTask in tasks {
@@ -1935,7 +1935,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     private func completeBackgroundEventsAfterPostprocessing() async {
         guard isBackgroundSession,
-              let identifier = session.configuration.identifier,
+              let identifier = unsafe session.configuration.identifier,
               await state.markPostprocessingFinished() else { return }
         backgroundSessionCompletionHandler?(identifier)
     }
@@ -1944,7 +1944,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// may legitimately appear as a whole-file slot plus N chunk slots.
     private func reconcileBackgroundTasks(expected: [String: ModelDownloadTaskIdentity]) async {
         let tasks = await withCheckedContinuation { continuation in
-            session.getAllTasks { continuation.resume(returning: $0) }
+            unsafe session.getAllTasks { continuation.resume(returning: $0) }
         }
         var existing: [ModelDownloadExistingTask] = []
         var validIdentityByTaskID: [Int: ModelDownloadTaskIdentity] = [:]
@@ -2605,7 +2605,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 for range in missing {
                     group.addTask { [self] in
                         do {
-                            try await self.downloadOneChunkWithRetry(
+                            unsafe try await self.downloadOneChunkWithRetry(
                                 url: url,
                                 range: range,
                                 fileIndex: fileIndex,
@@ -3048,7 +3048,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             return try await withCheckedThrowingContinuation { continuation in
                 Task {
                     let receivedBytes = max(existingBytes, adoptedTask.countOfBytesReceived)
-                    let shouldResume = await state.register(
+                    let shouldResume = unsafe await state.register(
                         taskKey: self.taskKey(for: adoptedTask, in: self.session),
                         task: adoptedTask,
                         destination: url,
@@ -3066,7 +3066,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         if fileManager.fileExists(atPath: resumeDataURL.path),
            let resumeData = try? Data(contentsOf: resumeDataURL) {
-            let resumedTask = session.downloadTask(withResumeData: resumeData)
+            let resumedTask = unsafe session.downloadTask(withResumeData: resumeData)
             if let artifactURLPolicy,
                let resumeURL = resumedTask.currentRequest?.url ?? resumedTask.originalRequest?.url,
                !artifactURLPolicy.allowsTransferURL(resumeURL) {
@@ -3082,7 +3082,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         let task = resumedTask
                         Task {
                             task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
-                            let shouldResume = await state.register(
+                            let shouldResume = unsafe await state.register(
                                 taskKey: self.taskKey(for: task, in: self.session),
                                 task: task,
                                 destination: url,
@@ -3114,10 +3114,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
         let request = Self.downloadRequest(for: url, existingBytes: existingBytes)
         return try await withCheckedThrowingContinuation { continuation in
-            let task = session.downloadTask(with: request)
+            let task = unsafe session.downloadTask(with: request)
             Task {
                 task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
-                let shouldResume = await state.register(
+                let shouldResume = unsafe await state.register(
                     taskKey: self.taskKey(for: task, in: self.session),
                     task: task,
                     destination: url,

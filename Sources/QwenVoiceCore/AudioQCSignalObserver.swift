@@ -19,7 +19,7 @@ import Foundation
 /// 1 MB. The FFT, K-weighting and true-peak filters run through Accelerate;
 /// every other loop walks unsafe pointers so the unoptimized development build
 /// stays inside the Stage 0 budget.
-final class AudioQCSignalObserver {
+@safe final class AudioQCSignalObserver {
     enum Constants {
         static let algorithmVersion = AudioQCSignalObservations.currentAlgorithmVersion
         // BS.1770-4 K-weighting from its analog prototype (libebur128's design).
@@ -184,7 +184,7 @@ final class AudioQCSignalObserver {
             ? rate / Constants.loudnessSubBlocksPerSecond
             : 0
         subBlockLength = subBlock
-        biquadSetup = subBlock > 0
+        unsafe biquadSetup = unsafe subBlock > 0
             ? vDSP_biquad_CreateSetupD(AudioQCSignalObserver.kWeightingSections(sampleRate: rate), 2)
             : nil
         let filters = AudioQCSignalObserver.reversedTruePeakTaps()
@@ -201,7 +201,7 @@ final class AudioQCSignalObserver {
         let half = size / 2
         let log2n = size > 0 ? vDSP_Length(Int(log2(Double(size)).rounded())) : 0
         log2FFTSize = log2n
-        fftSetup = size > 0 ? vDSP_create_fftsetupD(log2n, FFTRadix(kFFTRadix2)) : nil
+        unsafe fftSetup = unsafe size > 0 ? vDSP_create_fftsetupD(log2n, FFTRadix(kFFTRadix2)) : nil
         let periodicHann = (0 ..< size).map { 0.5 - 0.5 * cos(2 * Double.pi * Double($0) / Double(size)) }
         window = periodicHann
         windowEnergy = periodicHann.reduce(0.0) { $0 + $1 * $1 }
@@ -231,11 +231,11 @@ final class AudioQCSignalObserver {
     }
 
     deinit {
-        if let biquadSetup {
-            vDSP_biquad_DestroySetupD(biquadSetup)
+        if let biquadSetup = unsafe biquadSetup {
+            unsafe vDSP_biquad_DestroySetupD(biquadSetup)
         }
-        if let fftSetup {
-            vDSP_destroy_fftsetupD(fftSetup)
+        if let fftSetup = unsafe fftSetup {
+            unsafe vDSP_destroy_fftsetupD(fftSetup)
         }
     }
 
@@ -294,19 +294,19 @@ final class AudioQCSignalObserver {
             input.withUnsafeMutableBufferPointer { destination in
                 var index = 0
                 while index < count {
-                    let value = source[index]
-                    destination[index] = value.isFinite ? Double(value) : 0
+                    let value = unsafe source[index]
+                    unsafe destination[index] = value.isFinite ? Double(value) : 0
                     index += 1
                 }
             }
         }
         input.withUnsafeBufferPointer { block in
-            observeMagnitudes(block)
-            observeLoudness(block)
-            observeTruePeak(block)
-            observeFrames(block)
-            observeSeams(block)
-            observeSpectrum(block)
+            unsafe observeMagnitudes(block)
+            unsafe observeLoudness(block)
+            unsafe observeTruePeak(block)
+            unsafe observeFrames(block)
+            unsafe observeSeams(block)
+            unsafe observeSpectrum(block)
         }
         processedSamples += count
         lastSample = input[count - 1]
@@ -319,12 +319,12 @@ final class AudioQCSignalObserver {
         magnitudeHistogram.withUnsafeMutableBufferPointer { histogram in
             var index = 0
             while index < block.count {
-                let magnitude = abs(block[index])
+                let magnitude = unsafe abs(block[index])
                 if magnitude > peak { peak = magnitude }
                 // Full scale and above share the top bin; the cap also keeps the
                 // conversion to Int in range for any finite input.
                 let bin = magnitude >= 1 ? cap : Int((magnitude * steps + 0.5).rounded(.down))
-                histogram[bin] += 1
+                unsafe histogram[bin] += 1
                 index += 1
             }
         }
@@ -332,11 +332,11 @@ final class AudioQCSignalObserver {
     }
 
     private func observeLoudness(_ block: UnsafeBufferPointer<Double>) {
-        guard let setup = biquadSetup, subBlockLength > 0, let base = block.baseAddress else { return }
+        guard let setup = unsafe biquadSetup, subBlockLength > 0, let base = block.baseAddress else { return }
         var weighted = [Double](repeating: 0, count: block.count)
         weighted.withUnsafeMutableBufferPointer { output in
             biquadDelay.withUnsafeMutableBufferPointer { delay in
-                vDSP_biquadD(setup, delay.baseAddress!, base, 1, output.baseAddress!, 1, vDSP_Length(block.count))
+                unsafe vDSP_biquadD(setup, delay.baseAddress!, base, 1, output.baseAddress!, 1, vDSP_Length(block.count))
             }
         }
         var sum = subBlockSum
@@ -345,7 +345,7 @@ final class AudioQCSignalObserver {
         weighted.withUnsafeBufferPointer { output in
             var index = 0
             while index < output.count {
-                let value = output[index]
+                let value = unsafe output[index]
                 sum += value * value
                 fill += 1
                 if fill == length {
@@ -364,14 +364,14 @@ final class AudioQCSignalObserver {
         let historyLength = truePeakHistory.count
         let count = block.count
         var extended = truePeakHistory
-        extended.append(contentsOf: block)
+        unsafe extended.append(contentsOf: block)
         var output = [Double](repeating: 0, count: count)
         var maximum = truePeakMaximum
         extended.withUnsafeBufferPointer { signal in
             output.withUnsafeMutableBufferPointer { result in
                 for filter in truePeakFilters {
                     filter.withUnsafeBufferPointer { taps in
-                        vDSP_convD(
+                        unsafe vDSP_convD(
                             signal.baseAddress!, 1,
                             taps.baseAddress!, 1,
                             result.baseAddress!, 1,
@@ -379,7 +379,7 @@ final class AudioQCSignalObserver {
                         )
                     }
                     var magnitude = 0.0
-                    vDSP_maxmgvD(result.baseAddress!, 1, &magnitude, vDSP_Length(count))
+                    unsafe vDSP_maxmgvD(result.baseAddress!, 1, &magnitude, vDSP_Length(count))
                     if magnitude > maximum { maximum = magnitude }
                 }
             }
@@ -394,7 +394,7 @@ final class AudioQCSignalObserver {
         var fill = frameFill
         var index = 0
         while index < block.count {
-            let value = block[index]
+            let value = unsafe block[index]
             sum += value * value
             fill += 1
             if fill == hop {
@@ -424,8 +424,8 @@ final class AudioQCSignalObserver {
             var position = max(low, blockStart)
             let last = min(high, blockEnd - 1)
             while position <= last {
-                let current = block[position - blockStart]
-                let previous = position == blockStart ? lastSample : block[position - blockStart - 1]
+                let current = unsafe block[position - blockStart]
+                let previous = unsafe position == blockStart ? lastSample : block[position - blockStart - 1]
                 let step = abs(current - previous)
                 if position == seam {
                     seamCenter[seamIndex] = step
@@ -442,12 +442,12 @@ final class AudioQCSignalObserver {
     }
 
     private func observeSpectrum(_ block: UnsafeBufferPointer<Double>) {
-        guard fftSize > 0, fftSetup != nil else { return }
-        pending.append(contentsOf: block)
+        guard fftSize > 0, unsafe fftSetup != nil else { return }
+        unsafe pending.append(contentsOf: block)
         var start = 0
         while pending.count - start >= fftSize {
             pending.withUnsafeBufferPointer { samples in
-                analyzeFrame(samples.baseAddress! + start)
+                unsafe analyzeFrame(samples.baseAddress! + start)
             }
             start += hop
         }
@@ -457,7 +457,7 @@ final class AudioQCSignalObserver {
     }
 
     private func analyzeFrame(_ frame: UnsafePointer<Double>) {
-        guard let setup = fftSetup else { return }
+        guard let setup = unsafe fftSetup else { return }
         let size = fftSize
         let half = size / 2
         var squares = 0.0
@@ -465,8 +465,8 @@ final class AudioQCSignalObserver {
             window.withUnsafeBufferPointer { taper in
                 var index = 0
                 while index < size {
-                    let value = frame[index] * taper[index]
-                    output[index] = value
+                    let value = unsafe frame[index] * taper[index]
+                    unsafe output[index] = value
                     squares += value * value
                     index += 1
                 }
@@ -482,22 +482,22 @@ final class AudioQCSignalObserver {
                 imaginaryParts.withUnsafeMutableBufferPointer { imaginary in
                     var index = 0
                     while index < half {
-                        real[index] = input[2 * index]
-                        imaginary[index] = input[2 * index + 1]
+                        unsafe real[index] = unsafe input[2 * index]
+                        unsafe imaginary[index] = unsafe input[2 * index + 1]
                         index += 1
                     }
-                    var split = DSPDoubleSplitComplex(realp: real.baseAddress!, imagp: imaginary.baseAddress!)
-                    vDSP_fft_zripD(setup, &split, 1, log2FFTSize, FFTDirection(kFFTDirection_Forward))
+                    var split = unsafe DSPDoubleSplitComplex(realp: real.baseAddress!, imagp: imaginary.baseAddress!)
+                    unsafe vDSP_fft_zripD(setup, &split, 1, log2FFTSize, FFTDirection(kFFTDirection_Forward))
                     power.withUnsafeMutableBufferPointer { spectrum in
-                        let dc = real[0] * 0.5
-                        let nyquist = imaginary[0] * 0.5
-                        spectrum[0] = dc * dc / energy
-                        spectrum[half] = nyquist * nyquist / energy
+                        let dc = unsafe real[0] * 0.5
+                        let nyquist = unsafe imaginary[0] * 0.5
+                        unsafe spectrum[0] = dc * dc / energy
+                        unsafe spectrum[half] = nyquist * nyquist / energy
                         var bin = 1
                         while bin < half {
-                            let re = real[bin] * 0.5
-                            let im = imaginary[bin] * 0.5
-                            spectrum[bin] = (re * re + im * im) / energy
+                            let re = unsafe real[bin] * 0.5
+                            let im = unsafe imaginary[bin] * 0.5
+                            unsafe spectrum[bin] = (re * re + im * im) / energy
                             bin += 1
                         }
                     }
@@ -511,7 +511,7 @@ final class AudioQCSignalObserver {
                 ltas.withUnsafeMutableBufferPointer { average in
                     var bin = 0
                     while bin <= half {
-                        average[bin] += spectrum[bin]
+                        unsafe average[bin] += spectrum[bin]
                         bin += 1
                     }
                 }
@@ -529,7 +529,7 @@ final class AudioQCSignalObserver {
             logInput.withUnsafeMutableBufferPointer { input in
                 var index = 0
                 while index < bins {
-                    input[index] = max(spectrum[index + 1], Constants.spectralPowerFloor)
+                    unsafe input[index] = unsafe max(spectrum[index + 1], Constants.spectralPowerFloor)
                     index += 1
                 }
             }
@@ -537,7 +537,7 @@ final class AudioQCSignalObserver {
         var count = Int32(bins)
         logInput.withUnsafeBufferPointer { input in
             logOutput.withUnsafeMutableBufferPointer { output in
-                vvlog10(output.baseAddress!, input.baseAddress!, &count)
+                unsafe vvlog10(output.baseAddress!, input.baseAddress!, &count)
             }
         }
         var rise = 0.0
@@ -546,9 +546,9 @@ final class AudioQCSignalObserver {
             previousLog.withUnsafeMutableBufferPointer { previous in
                 var index = 0
                 while index < bins {
-                    let difference = current[index] - previous[index]
+                    let difference = unsafe current[index] - previous[index]
                     if difference > 0 { rise += difference }
-                    previous[index] = current[index]
+                    unsafe previous[index] = unsafe current[index]
                     index += 1
                 }
             }
@@ -573,12 +573,12 @@ final class AudioQCSignalObserver {
                     var band = 0
                     while band < bands {
                         var sum = 0.0
-                        var bin = edges[band]
-                        while bin < edges[band + 1] {
-                            sum += spectrum[bin]
+                        var bin = unsafe edges[band]
+                        while unsafe bin < edges[band + 1] {
+                            unsafe sum += spectrum[bin]
                             bin += 1
                         }
-                        accumulator[band] += sum / Double(edges[band + 1] - edges[band])
+                        unsafe accumulator[band] += sum / Double(edges[band + 1] - edges[band])
                         band += 1
                     }
                 }
@@ -777,7 +777,7 @@ final class AudioQCSignalObserver {
         enabled: Bool, bandwidth: Double?, eventsPerSecond: Double?,
         stripeLongestMS: Int?, stripeLagMS: Int?, stripeCount: Int?
     ) {
-        guard fftSize > 0, fftSetup != nil else { return (false, nil, nil, nil, nil, nil) }
+        guard fftSize > 0, unsafe fftSetup != nil else { return (false, nil, nil, nil, nil, nil) }
         let duration = sampleRate > 0 ? Double(processedSamples) / Double(sampleRate) : 0
         let eventsPerSecond: Double? = duration > 0 ? Double(fluxEventCount) / duration : nil
 
@@ -829,10 +829,10 @@ final class AudioQCSignalObserver {
             for lag in Constants.repetitionMinimumLagFrames ... upper {
                 let span = pooled - lag
                 dots.withUnsafeMutableBufferPointer { sums in
-                    vDSP_vclrD(sums.baseAddress!, 1, vDSP_Length(span))
+                    unsafe vDSP_vclrD(sums.baseAddress!, 1, vDSP_Length(span))
                     for band in 0 ..< bands {
                         featuresByBand[band].withUnsafeBufferPointer { feature in
-                            vDSP_vmaD(
+                            unsafe vDSP_vmaD(
                                 feature.baseAddress!, 1,
                                 feature.baseAddress! + lag, 1,
                                 sums.baseAddress!, 1,
@@ -848,7 +848,7 @@ final class AudioQCSignalObserver {
                             var start = -1
                             var frame = 0
                             while frame <= span {
-                                if frame < span, active[frame], active[frame + lag], sums[frame] >= threshold {
+                                if frame < span, unsafe active[frame], unsafe active[frame + lag], unsafe sums[frame] >= threshold {
                                     if start < 0 { start = frame }
                                     frame += 1
                                     continue
@@ -856,7 +856,7 @@ final class AudioQCSignalObserver {
                                 if start >= 0 {
                                     let end = frame - 1
                                     let length = end - start + 1
-                                    if prefix[end + 1] - prefix[start + 1] >= Constants.repetitionMinimumChangingFrames {
+                                    if unsafe prefix[end + 1] - prefix[start + 1] >= Constants.repetitionMinimumChangingFrames {
                                         if length > bestLength {
                                             bestLength = length
                                             bestLag = lag

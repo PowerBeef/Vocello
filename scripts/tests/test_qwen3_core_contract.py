@@ -316,10 +316,11 @@ public func stableFacadeEntryPoint() -> Bool { true }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "Imports.swift").write_text(
-                "import Foundation\n@preconcurrency import MLX\n",
+                "import Foundation\n@preconcurrency import MLX\n@unsafe @preconcurrency import AVFoundation\n",
                 encoding="utf-8",
             )
-            self.assertEqual(MODULE.swift_imports(root), {"Foundation", "MLX"})
+            # Strict memory safety writes `@unsafe @preconcurrency import`; any attribute run counts.
+            self.assertEqual(MODULE.swift_imports(root), {"Foundation", "MLX", "AVFoundation"})
 
     def test_owned_target_dependency_inventory_matches_package(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE

@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import MLX
+@unsafe @preconcurrency import MLX
 import VocelloQwen3Core
 import CoreFoundation
 import CryptoKit
@@ -542,7 +542,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
             )
         }
         let integrityManifestDigest = SHA256.hash(data: data)
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
         let speechTokenizerDigest = (try? JSONDecoder().decode(
             ModelAssetIntegrityManifest.self,
@@ -921,7 +921,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         additionalRequiredRelativePaths: [String]
     ) throws -> PreparedCacheValidationResult {
         var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: targetDirectory.path, isDirectory: &isDirectory),
+        guard unsafe fileManager.fileExists(atPath: targetDirectory.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
             return PreparedCacheValidationResult(isValid: false, marker: nil)
         }
@@ -1384,7 +1384,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     }
 
     private static func sha256Hex(data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 }
 

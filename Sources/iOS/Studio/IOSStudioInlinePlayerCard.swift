@@ -226,7 +226,7 @@ struct IOSStudioPlayerCard: View {
     }
 
     private var cardTransition: AnyTransition {
-        reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
+        unsafe reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
     }
 
     // MARK: - Controls row
@@ -829,7 +829,7 @@ final class IOSInlinePlaybackController: NSObject {
         let total = max(0, Int(time.rounded()))
         let m = total / 60
         let s = total % 60
-        return String(format: "%d:%02d", m, s)
+        return unsafe String(format: "%d:%02d", m, s)
     }
 
     private func startDisplayLink() {

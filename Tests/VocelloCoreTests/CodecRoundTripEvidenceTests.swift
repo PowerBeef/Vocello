@@ -181,13 +181,13 @@ final class CodecRoundTripEvidenceTests: XCTestCase {
         dataBeforeFormat: Bool = false
     ) -> Data {
         func le<T: FixedWidthInteger>(_ value: T) -> Data {
-            withUnsafeBytes(of: value.littleEndian) { Data($0) }
+            withUnsafeBytes(of: value.littleEndian) { unsafe Data($0) }
         }
         let blockAlign = channels * bitsPerSample / 8
         var formatChunk = Data("fmt ".utf8) + le(UInt32(16))
         formatChunk += le(format) + le(channels) + le(sampleRate)
         formatChunk += le(sampleRate * UInt32(blockAlign)) + le(blockAlign) + le(bitsPerSample)
-        let body = pcm.map(\.littleEndian).withUnsafeBufferPointer { Data(buffer: $0) }
+        let body = pcm.map(\.littleEndian).withUnsafeBufferPointer { unsafe Data(buffer: $0) }
         let dataChunk = Data("data".utf8) + le(UInt32(body.count)) + body
         var chunks = dataBeforeFormat ? dataChunk + formatChunk : formatChunk + dataChunk
         if let extraChunk {
@@ -198,7 +198,7 @@ final class CodecRoundTripEvidenceTests: XCTestCase {
     }
 
     private func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private func temporaryDirectory() throws -> URL {

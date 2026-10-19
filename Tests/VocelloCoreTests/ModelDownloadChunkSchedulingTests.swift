@@ -113,7 +113,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
     func testChunkWorkQueueReturnsNilForCancelledWorker() async {
         let queue = HuggingFaceDownloader.ChunkWorkQueue(ranges: [ChunkRange(start: 0, end: 9)])
         let worker = Task { () -> ChunkRange? in
-            withUnsafeCurrentTask { $0?.cancel() }
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             return await queue.next()
         }
         let pulled = await worker.value
@@ -742,10 +742,10 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
         let partial = root.appendingPathComponent("partial.bin")
         let payload = Data((0..<64).map { UInt8($0) })
-        let chunks: [(offset: Int64, bytes: Data)] = [
-            (32, payload[32..<64].withUnsafeBytes { Data($0) }),
-            (0, payload[0..<16].withUnsafeBytes { Data($0) }),
-            (16, payload[16..<32].withUnsafeBytes { Data($0) }),
+        let chunks: [(offset: Int64, bytes: Data)] = unsafe [
+            (32, payload[32..<64].withUnsafeBytes { unsafe Data($0) }),
+            unsafe (0, payload[0..<16].withUnsafeBytes { unsafe Data($0) }),
+            unsafe (16, payload[16..<32].withUnsafeBytes { unsafe Data($0) }),
         ]
 
         let assembly = HuggingFaceDownloader.ChunkAssemblyCoordinator(partialURL: partial)

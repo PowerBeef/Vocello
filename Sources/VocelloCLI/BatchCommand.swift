@@ -240,7 +240,7 @@ enum BatchCommand {
             for r in results { print(r.audioPath) }
         }
         let totalAudio = results.reduce(0.0) { $0 + $1.durationSeconds }
-        note("✓ \(results.count) clip(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
+        note(unsafe "✓ \(results.count) clip(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
 
         if args.flag("play") { try await CLIPlayback.play(results.map(\.audioPath)) }
     }
@@ -301,7 +301,7 @@ enum BatchCommand {
         var engineCancellation: CLIEngineCancellation?
         let started = ContinuousClock.now
         projects: for (index, plan) in plans.enumerated() {
-            let name = "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
+            let name = unsafe "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
             let joinedURL = outDir.appendingPathComponent("\(name).wav")
             rows[index].longFormBaseSeed = plan.configuration.baseSeed
             rows[index].longFormPlanDigest = plan.evidence.planDigest
@@ -313,7 +313,7 @@ enum BatchCommand {
                 let request = CLIBatchExecution.makeLongFormSegmentRequest(
                     mode: mode, modelID: modelID, text: segment.spokenTextForGeneration,
                     outputPath: outDir.appendingPathComponent(
-                        "\(name)_segment_\(String(format: "%03d", position)).wav"
+                        unsafe "\(name)_segment_\(String(format: "%03d", position)).wav"
                     ).path,
                     payload: payload, generationID: generationID, subseed: segment.evidence.effectiveSubseed,
                     variation: variation, deliveryInstructionCellID: deliveryInstructionCellID
@@ -441,7 +441,7 @@ enum BatchCommand {
             for item in items { print(item.audioPath) }
         }
         let totalAudio = items.reduce(0.0) { $0 + $1.durationSeconds }
-        note("✓ \(items.count) long-form project(s), \(segmentCount) segment(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
+        note(unsafe "✓ \(items.count) long-form project(s), \(segmentCount) segment(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
 
         if args.flag("play") { try await CLIPlayback.play(items.map(\.audioPath)) }
     }

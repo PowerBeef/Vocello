@@ -299,15 +299,15 @@ enum GenerateCommand {
             // stdout = machine-readable (the path). stderr = human notes.
             print(result.audioPath)
         }
-        let ttfc = firstChunkMS.map { " · ttfc=\(String(format: "%.0f", $0))ms" } ?? ""
+        let ttfc = firstChunkMS.map { unsafe " · ttfc=\(String(format: "%.0f", $0))ms" } ?? ""
         let chunks = chunkCount.map { " · chunks=\($0)" } ?? ""
-        note("✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
+        note(unsafe "✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
 
         if args.flag("play") { try await CLIPlayback.play([result.audioPath]) }
     }
 
     private static func sha256(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Reusable request building (shared with `batch`)
@@ -637,7 +637,7 @@ enum GenerateCommand {
             throw CLIError("--out must name a .wav file (got \(out)); the take is always written as WAV")
         }
         var isDirectory: ObjCBool = false
-        let exists = fileManager.fileExists(atPath: path, isDirectory: &isDirectory)
+        let exists = unsafe fileManager.fileExists(atPath: path, isDirectory: &isDirectory)
         guard !(exists && isDirectory.boolValue) else {
             throw CLIError("--out \(out) is an existing folder; pass a .wav file path inside it")
         }
@@ -658,7 +658,7 @@ enum GenerateCommand {
     static func prepareOutputFolder(of outputPath: String, fileManager: FileManager = .default) throws {
         let folder = URL(fileURLWithPath: outputPath).deletingLastPathComponent()
         var isDirectory: ObjCBool = false
-        if fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory) {
+        if unsafe fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory) {
             guard isDirectory.boolValue else {
                 throw CLIError("the output folder \(folder.path) is a file")
             }

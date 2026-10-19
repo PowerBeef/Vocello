@@ -36,12 +36,12 @@ final class WaveformServiceTests: XCTestCase {
         let format = file.processingFormat
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)))
         buffer.frameLength = AVAudioFrameCount(frames)
-        let data = try XCTUnwrap(buffer.floatChannelData)
+        let data = unsafe try XCTUnwrap(buffer.floatChannelData)
         for channel in 0..<Int(channels) {
             for frame in 0..<frames {
                 // A square wave at the given amplitude: its RMS is the amplitude.
                 let sign: Float = frame.isMultiple(of: 2) ? 1 : -1
-                data[channel][frame] = sign * amplitude(frame, channel)
+                unsafe data[channel][frame] = sign * amplitude(frame, channel)
             }
         }
         try file.write(from: buffer)

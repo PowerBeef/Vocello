@@ -161,7 +161,7 @@ enum BenchCodecReplay {
             }
         )
         // mkdir is exclusive: failed or completed evidence can never be overwritten.
-        guard mkdir(output.path, 0o700) == 0 else { throw CLIError("Replay output must be a new directory with an existing parent.") }
+        guard unsafe mkdir(output.path, 0o700) == 0 else { throw CLIError("Replay output must be a new directory with an existing parent.") }
         let runID = "codec-replay-" + UUID().uuidString.lowercased()
         var report = Report(
             sourceTakeSHA256: expectedDigest, sourceReceipt: receipt, trace: evidence,
@@ -270,7 +270,7 @@ enum BenchCodecReplay {
     }
 
     private static func digest(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func write(_ report: Report, to url: URL) throws {

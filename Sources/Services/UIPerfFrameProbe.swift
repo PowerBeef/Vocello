@@ -111,7 +111,7 @@ final class UIPerfFrameProbe: NSObject {
         var loadValues = [Double](repeating: 0, count: 3)
         let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
-            return Int(getloadavg(baseAddress, Int32(buffer.count)))
+            return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }
         let freeStorageBytes = (try? FileManager.default.attributesOfFileSystem(
             forPath: NSHomeDirectory()
@@ -322,7 +322,7 @@ final class UIPerfFrameProbe: NSObject {
 
     private static func cpuTimesMS() -> (user: Int, system: Int) {
         var usage = rusage()
-        getrusage(RUSAGE_SELF, &usage)
+        unsafe getrusage(RUSAGE_SELF, &usage)
         let user = usage.ru_utime.tv_sec * 1000 + Int(usage.ru_utime.tv_usec) / 1000
         let system = usage.ru_stime.tv_sec * 1000 + Int(usage.ru_stime.tv_usec) / 1000
         return (user, system)
@@ -333,8 +333,8 @@ final class UIPerfFrameProbe: NSObject {
         var count = mach_msg_type_number_t(
             MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { raw in
-                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), raw, &count)
+            unsafe pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { raw in
+                unsafe task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), raw, &count)
             }
         }
         guard result == KERN_SUCCESS else { return 0 }

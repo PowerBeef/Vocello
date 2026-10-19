@@ -165,8 +165,8 @@ final class LongFormAssemblyTests: XCTestCase {
             AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
         )
         try file.read(into: buffer)
-        let samples = try XCTUnwrap(buffer.int16ChannelData?[0])
-        let maximum = (0..<Int(buffer.frameLength)).map { abs(Int(samples[$0])) }.max() ?? 0
+        let samples = unsafe try XCTUnwrap(buffer.int16ChannelData?[0])
+        let maximum = (0..<Int(buffer.frameLength)).map { unsafe abs(Int(samples[$0])) }.max() ?? 0
         XCTAssertLessThanOrEqual(Double(maximum), ceiling + 0.5)
         XCTAssertLessThan(maximum, Int(Int16.max), "no sample reaches the 16-bit clamp")
     }

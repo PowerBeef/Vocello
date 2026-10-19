@@ -173,7 +173,7 @@ public actor GenerationTelemetryJSONLSink {
         var writeError: Error?
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinatorError: NSError?
-        coordinator.coordinate(
+        unsafe coordinator.coordinate(
             writingItemAt: url,
             options: .forMerging,
             error: &coordinatorError
@@ -213,7 +213,7 @@ public actor GenerationTelemetryJSONLSink {
         var pruneError: Error?
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinatorError: NSError?
-        coordinator.coordinate(
+        unsafe coordinator.coordinate(
             readingItemAt: url,
             options: [],
             writingItemAt: url,
@@ -291,7 +291,7 @@ public actor GenerationTelemetryJSONLSink {
         var writeError: Error?
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinatorError: NSError?
-        coordinator.coordinate(
+        unsafe coordinator.coordinate(
             writingItemAt: url,
             options: .forReplacing,
             error: &coordinatorError

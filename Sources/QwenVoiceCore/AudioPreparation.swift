@@ -1,4 +1,4 @@
-@preconcurrency import AVFoundation
+@unsafe @preconcurrency import AVFoundation
 import CoreMedia
 import CryptoKit
 import Foundation
@@ -34,9 +34,9 @@ public enum AudioPreparationError: LocalizedError, Equatable {
         case .inputFileTooLarge(_, let maxBytes, let actualBytes):
             return "Audio file is too large to prepare safely: it is \(actualBytes) bytes; the limit is \(maxBytes) bytes."
         case .inputDurationTooLong(let maxSeconds, let actualSeconds):
-            return "Audio file is too long to prepare safely: \(String(format: "%.1f", actualSeconds)) seconds; the limit is \(String(format: "%.1f", maxSeconds)) seconds."
+            return unsafe "Audio file is too long to prepare safely: \(String(format: "%.1f", actualSeconds)) seconds; the limit is \(String(format: "%.1f", maxSeconds)) seconds."
         case .decodeTimedOut(let seconds):
-            return "Audio preparation timed out after \(String(format: "%.1f", seconds)) seconds."
+            return unsafe "Audio preparation timed out after \(String(format: "%.1f", seconds)) seconds."
         case .cancelled:
             return "Audio preparation was cancelled."
         case .missingOutputDirectory:
@@ -433,10 +433,10 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     /// Atomically replaces `outputURL` (present or not) with the completed
     /// conversion at `temporaryURL`.
     private static func replaceItem(at outputURL: URL, withConvertedAudioAt temporaryURL: URL) throws {
-        let result = temporaryURL.withUnsafeFileSystemRepresentation { temporaryPath in
-            outputURL.withUnsafeFileSystemRepresentation { outputPath -> Int32 in
-                guard let temporaryPath, let outputPath else { return -1 }
-                return rename(temporaryPath, outputPath)
+        let result = unsafe temporaryURL.withUnsafeFileSystemRepresentation { temporaryPath in
+            unsafe outputURL.withUnsafeFileSystemRepresentation { outputPath -> Int32 in
+                guard let temporaryPath = unsafe temporaryPath, let outputPath = unsafe outputPath else { return -1 }
+                return unsafe rename(temporaryPath, outputPath)
             }
         }
         guard result == 0 else {
@@ -551,11 +551,11 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
                 }
 
                 let dataLength = CMBlockBufferGetDataLength(blockBuffer)
-                guard let channelData = outputBuffer.int16ChannelData else {
+                guard let channelData = unsafe outputBuffer.int16ChannelData else {
                     throw AudioPreparationError.conversionFailed("Decoded audio data could not be mapped into PCM channels.")
                 }
 
-                let status = CMBlockBufferCopyDataBytes(
+                let status = unsafe CMBlockBufferCopyDataBytes(
                     blockBuffer,
                     atOffset: 0,
                     dataLength: dataLength,
@@ -725,7 +725,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         let mtime = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         let data = Data("\(resolvedPath)|\(size)|\(mtime)".utf8)
         let digest = SHA256.hash(data: data)
-        return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return digest.prefix(8).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func fileSize(at url: URL) throws -> Int64 {

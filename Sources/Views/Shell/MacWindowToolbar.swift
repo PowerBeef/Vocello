@@ -170,7 +170,7 @@ private struct MacToolbarSearchField: NSViewRepresentable {
             Task { @MainActor in
                 guard request.wrappedValue else { return }
                 request.wrappedValue = false
-                nsView.window?.makeFirstResponder(nsView)
+                unsafe nsView.window?.makeFirstResponder(nsView)
             }
         }
     }

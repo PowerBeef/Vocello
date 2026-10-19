@@ -247,10 +247,10 @@ enum IOSDeviceSupport {
 
     private static func machineIdentifier() -> String {
         var systemInfo = utsname()
-        uname(&systemInfo)
+        unsafe uname(&systemInfo)
         return withUnsafePointer(to: &systemInfo.machine) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: 1) {
-                String(cString: $0)
+            unsafe pointer.withMemoryRebound(to: CChar.self, capacity: 1) {
+                unsafe String(cString: $0)
             }
         }
     }

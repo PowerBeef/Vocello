@@ -28,8 +28,8 @@ final class VocelloPlaybackCaptureSupportTests: XCTestCase {
         XCTAssertEqual(String(decoding: data[0..<4], as: UTF8.self), "RIFF")
         XCTAssertEqual(String(decoding: data[8..<12], as: UTF8.self), "WAVE")
         XCTAssertEqual(String(decoding: data[12..<16], as: UTF8.self), "fmt ")
-        func u16(_ offset: Int) -> UInt16 { data.subdata(in: offset..<offset + 2).withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) } }
-        func u32(_ offset: Int) -> UInt32 { data.subdata(in: offset..<offset + 4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } }
+        func u16(_ offset: Int) -> UInt16 { unsafe data.subdata(in: offset..<offset + 2).withUnsafeBytes { unsafe $0.loadUnaligned(as: UInt16.self) } }
+        func u32(_ offset: Int) -> UInt32 { unsafe data.subdata(in: offset..<offset + 4).withUnsafeBytes { unsafe $0.loadUnaligned(as: UInt32.self) } }
         XCTAssertEqual(u32(16), 16)
         XCTAssertEqual(u16(20), 3, "IEEE float format tag")
         XCTAssertEqual(u16(22), 1, "mono")
@@ -39,8 +39,8 @@ final class VocelloPlaybackCaptureSupportTests: XCTestCase {
         XCTAssertEqual(u16(34), 32)
         XCTAssertEqual(String(decoding: data[36..<40], as: UTF8.self), "data")
         XCTAssertEqual(u32(40), UInt32(samples.count * 4))
-        let back = data.subdata(in: 44..<data.count).withUnsafeBytes { raw in
-            (0..<samples.count).map { Float(bitPattern: UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self))) }
+        let back = unsafe data.subdata(in: 44..<data.count).withUnsafeBytes { raw in
+            (0..<samples.count).map { unsafe Float(bitPattern: UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self))) }
         }
         XCTAssertEqual(back, samples)
     }

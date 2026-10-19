@@ -50,7 +50,7 @@ public enum WAVProvenanceChunk {
             fields.insert("version=\(generatorVersion)", at: 2)
         }
         if let payload = watermarkPayload {
-            fields.append(String(format: "marking=AudioSeal:0x%04X", payload))
+            unsafe fields.append(String(format: "marking=AudioSeal:0x%04X", payload))
         }
         return fields.joined(separator: "; ")
     }
@@ -147,7 +147,7 @@ public enum WAVProvenanceChunk {
     }
 
     private static func appendUInt32LE(_ value: UInt32, to data: inout Data) {
-        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: value.littleEndian) { unsafe data.append(contentsOf: $0) }
     }
 
     private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {

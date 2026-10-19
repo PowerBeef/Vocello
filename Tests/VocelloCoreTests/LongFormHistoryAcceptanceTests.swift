@@ -158,7 +158,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let newerPayload = try JSONSerialization.data(withJSONObject: payload)
         let newer = try JSONSerialization.data(withJSONObject: [
             "payload": newerPayload.base64EncodedString(),
-            "digest": SHA256.hash(data: newerPayload).map { String(format: "%02x", $0) }.joined(),
+            "digest": SHA256.hash(data: newerPayload).map { unsafe String(format: "%02x", $0) }.joined(),
         ])
         try newer.write(to: journal)
         try Data().write(to: f.store.rootURL.appendingPathComponent("0.json"))
@@ -370,7 +370,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     func testCancelledAcceptanceDoesNotPublish() async throws {
         let f = try fixture()
         let task = Task {
-            withUnsafeCurrentTask { $0?.cancel() }
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             return try await f.store.commit(f.input, using: f.queue)
         }
         do { _ = try await task.value; XCTFail("Expected cancellation") }

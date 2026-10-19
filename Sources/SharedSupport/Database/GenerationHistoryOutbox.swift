@@ -581,7 +581,7 @@ struct GenerationHistoryOutboxStore: Sendable {
         )) ?? []
         return urls.filter { url in
             var info = stat()
-            return url.pathExtension == Self.unreadableExtension
+            return unsafe url.pathExtension == Self.unreadableExtension
                 && lstat(url.path, &info) == 0
                 && (info.st_mode & S_IFMT) == S_IFREG
         }
@@ -1272,14 +1272,14 @@ enum GenerationHistoryAudioFile {
 
     static func removeRegularFile(atPath path: String) -> RemovalResult {
         var info = stat()
-        guard lstat(path, &info) == 0 else {
+        guard unsafe lstat(path, &info) == 0 else {
             // Only a missing file is absent. Any other failure (EACCES, EIO)
             // keeps the path listed for a later retry.
             let code = errno
             return code == ENOENT || code == ENOTDIR ? .absentOrNotRegular : .failed(posixCode(code))
         }
         guard (info.st_mode & S_IFMT) == S_IFREG else { return .absentOrNotRegular }
-        if unlink(path) == 0 { return .removed }
+        if unsafe unlink(path) == 0 { return .removed }
         let code = errno
         return code == ENOENT ? .removed : .failed(posixCode(code))
     }

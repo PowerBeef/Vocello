@@ -254,7 +254,7 @@ final class ProductionModelCatalogTests: XCTestCase {
         let configurationFile = try SharedComponentFileIdentity(
             relativePath: "config.json",
             byteCount: Int64(configuration.count),
-            sha256: SHA256.hash(data: configuration).map { String(format: "%02x", $0) }.joined()
+            sha256: SHA256.hash(data: configuration).map { unsafe String(format: "%02x", $0) }.joined()
         )
         let catalogURL = try writeCatalog(makeV2Catalog(
             content: content,
@@ -310,7 +310,7 @@ final class ProductionModelCatalogTests: XCTestCase {
         let configurationFile = try SharedComponentFileIdentity(
             relativePath: "config.json",
             byteCount: Int64(configuration.count),
-            sha256: SHA256.hash(data: configuration).map { String(format: "%02x", $0) }.joined()
+            sha256: SHA256.hash(data: configuration).map { unsafe String(format: "%02x", $0) }.joined()
         )
         let catalogURL = try writeCatalog(makeV2Catalog(
             content: content,

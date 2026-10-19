@@ -658,7 +658,7 @@ struct IOSSaveVoiceSheet: View {
     private func durationLabel(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite, seconds > 0 else { return "0:00" }
         let total = Int(seconds.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+        return unsafe String(format: "%d:%02d", total / 60, total % 60)
     }
 
     /// Pre-save quality hint from the clip length, aligned with the clone-reference window

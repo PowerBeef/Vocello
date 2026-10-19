@@ -1,5 +1,5 @@
 import AVFoundation
-@preconcurrency import XCTest
+@unsafe @preconcurrency import XCTest
 
 /// The macOS smoke suite: focused journeys that run in the numbered
 /// order (XCTest executes methods alphabetically). Each test owns a fresh
@@ -162,7 +162,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     /// evidence only; canonical registry publication stays with the benchmark
     /// pipeline and its schema review.
     private func attachLongFormProjectSummary(wallSeconds: TimeInterval) {
-        let line = String(format: "LONGFORM_WALL_SECONDS=%.1f", wallSeconds)
+        let line = unsafe String(format: "LONGFORM_WALL_SECONDS=%.1f", wallSeconds)
         XCTContext.runActivity(named: line) { activity in
             let attachment = XCTAttachment(string: line)
             attachment.name = "long-form-project-wall-seconds"
@@ -403,7 +403,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
                                    "Relaunch must preserve \(mode.rawValue) text in \(identifier)")
                 }
                 print("Verified interface language: \(identifier)")
-                fflush(stdout)
+                unsafe fflush(stdout)
             }
         }
     }
@@ -853,7 +853,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         let file = try AVAudioFile(forWriting: url, settings: settings)
         let frames = AVAudioFrameCount(sampleRate * seconds)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
-              let channel = buffer.floatChannelData?.pointee else {
+              let channel = unsafe buffer.floatChannelData?.pointee else {
             throw CocoaError(.fileWriteUnknown)
         }
         buffer.frameLength = frames
@@ -862,7 +862,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             let syllable = abs(sin(2.0 * .pi * 2.4 * t))
             let phrase: Double = sin(2.0 * .pi * 0.22 * t) > -0.55 ? 1.0 : 0.0
             let tone = 0.7 * sin(2.0 * .pi * 175.0 * t) + 0.3 * sin(2.0 * .pi * 330.0 * t)
-            channel[i] = Float(0.28 * tone * syllable * phrase)
+            unsafe channel[i] = Float(0.28 * tone * syllable * phrase)
         }
         try file.write(from: buffer)
     }

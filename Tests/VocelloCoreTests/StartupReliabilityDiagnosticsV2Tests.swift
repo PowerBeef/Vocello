@@ -289,7 +289,7 @@ assert take_path.read_bytes()==original
     private func replayEvidence(_ data: Data) -> StartupReliabilityArtifactEvidence {
         StartupReliabilityArtifactEvidence(
             kind: .codecTrace,
-            sha256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), byteCount: data.count,
+            sha256: SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined(), byteCount: data.count,
             codecFrameCount: 2, codeGroupRange: .init(minimum: 16, maximum: 16),
             codecChunkRanges: [.init(start: 0, endExclusive: 1), .init(start: 1, endExclusive: 2)], complete: true
         )
@@ -350,7 +350,7 @@ assert take_path.read_bytes()==original
         XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("rejected.wav")), original)
         XCTAssertEqual(try Data(contentsOf: staged), original)
         XCTAssertEqual(evidence.byteCount, original.count)
-        XCTAssertEqual(evidence.sha256, SHA256.hash(data: original).map { String(format: "%02x", $0) }.joined())
+        XCTAssertEqual(evidence.sha256, SHA256.hash(data: original).map { unsafe String(format: "%02x", $0) }.joined())
         let json = String(decoding: try JSONEncoder().encode(evidence), as: UTF8.self)
         XCTAssertFalse(json.contains(root.path))
         XCTAssertFalse(json.contains("staged.wav"))

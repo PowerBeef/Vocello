@@ -1,7 +1,7 @@
 import AVFoundation
 import Combine
 import Foundation
-@preconcurrency import MLX
+@unsafe @preconcurrency import MLX
 import Synchronization
 import VocelloQwen3Core
 

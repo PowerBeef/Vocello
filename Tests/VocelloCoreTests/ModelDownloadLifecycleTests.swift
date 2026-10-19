@@ -1292,7 +1292,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         func run(
             requestIdentity: ModelDownloadRequestIdentity? = nil
         ) async throws -> HuggingFaceDownloader.RepositoryTransferAccounting {
-            let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+            let digest = SHA256.hash(data: payload).map { unsafe String(format: "%02x", $0) }.joined()
             let file = HuggingFaceDownloader.RepoFile(
                 path: ModelDownloadLifecycleTests.stubRelativePath,
                 size: Int64(payload.count),

@@ -87,7 +87,7 @@ enum LivePreviewDiagnostics {
         } else {
             size = -1
         }
-        var line = "[live-preview-diag] t=\(String(format: "%.3f", timestamp))"
+        var line = unsafe "[live-preview-diag] t=\(String(format: "%.3f", timestamp))"
             + " vm=\(String(format: "%04x", vmID))"
             + " event=\(event)"
             + " chunk=\(basename)"

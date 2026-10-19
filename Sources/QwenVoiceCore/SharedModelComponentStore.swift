@@ -1229,12 +1229,12 @@ public struct SharedModelComponentStore: Sendable {
 
     private func withPublicationLock<T>(_ body: () throws -> T) throws -> T {
         try prepareStoreDirectories()
-        let descriptor = lockURL.withUnsafeFileSystemRepresentation { path in
-            guard let path else { return Int32(-1) }
+        let descriptor = unsafe lockURL.withUnsafeFileSystemRepresentation { path in
+            guard let path = unsafe path else { return Int32(-1) }
             // Create and open the lock file in one kernel operation. A separate existence check
             // plus FileManager.createFile can race on the store's first concurrent publication,
             // leaving contenders flocking different inodes and both reporting `.published`.
-            return Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, mode_t(0o600))
+            return unsafe Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, mode_t(0o600))
         }
         guard descriptor >= 0 else {
             throw SharedModelComponentStoreError.lockFailed(code: errno)
@@ -1345,10 +1345,10 @@ private enum SharedComponentIdentityValidation {
         for field in [domain] + fields {
             let data = Data(field.utf8)
             var length = UInt64(data.count).bigEndian
-            withUnsafeBytes(of: &length) { hasher.update(bufferPointer: $0) }
+            withUnsafeBytes(of: &length) { unsafe hasher.update(bufferPointer: $0) }
             hasher.update(data: data)
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -1461,9 +1461,9 @@ private enum SharedComponentFileSystem {
     /// read; reclamation treats that as protected.
     static func linkStatus(_ url: URL) -> (linkCount: UInt64, changedAt: Date)? {
         var info = stat()
-        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
-            return lstat(path, &info)
+        let result = unsafe url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path = unsafe path else { return -1 }
+            return unsafe lstat(path, &info)
         }
         guard result == 0 else { return nil }
         let changedAt = Date(
@@ -1572,9 +1572,9 @@ private enum SharedComponentFileSystem {
     }
 
     static func atomicSwap(_ first: URL, _ second: URL) throws {
-        let result = first.withUnsafeFileSystemRepresentation { firstPath in
-            second.withUnsafeFileSystemRepresentation { secondPath in
-                renameatx_np(AT_FDCWD, firstPath, AT_FDCWD, secondPath, UInt32(RENAME_SWAP))
+        let result = unsafe first.withUnsafeFileSystemRepresentation { firstPath in
+            unsafe second.withUnsafeFileSystemRepresentation { secondPath in
+                unsafe renameatx_np(AT_FDCWD, firstPath, AT_FDCWD, secondPath, UInt32(RENAME_SWAP))
             }
         }
         guard result == 0 else {
@@ -1586,9 +1586,9 @@ private enum SharedComponentFileSystem {
     }
 
     static func move(_ source: URL, to destination: URL, operation: String) throws {
-        let result = source.withUnsafeFileSystemRepresentation { sourcePath in
-            destination.withUnsafeFileSystemRepresentation { destinationPath in
-                rename(sourcePath, destinationPath)
+        let result = unsafe source.withUnsafeFileSystemRepresentation { sourcePath in
+            unsafe destination.withUnsafeFileSystemRepresentation { destinationPath in
+                unsafe rename(sourcePath, destinationPath)
             }
         }
         guard result == 0 else {

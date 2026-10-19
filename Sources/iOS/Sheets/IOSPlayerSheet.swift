@@ -893,7 +893,7 @@ final class IOSPlayerSheetController: NSObject {
         let total = max(0, Int(time.rounded()))
         let m = total / 60
         let s = total % 60
-        return String(format: "%d:%02d", m, s)
+        return unsafe String(format: "%d:%02d", m, s)
     }
 
     private func startDisplayLink() {

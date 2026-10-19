@@ -10,7 +10,9 @@ import Synchronization
 /// Single-producer, single-consumer ring of Float32 samples. The real-time
 /// IOProc writes, the test thread drains once the take is over. Writes never
 /// allocate or lock; an overflow drops the newest samples and counts them.
-public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
+/// `@safe` holds only under that contract: one writer and one reader. Two
+/// concurrent writers could move `written` backwards and copy past `storage`.
+@safe public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
     public let capacity: Int
     private let storage: UnsafeMutableBufferPointer<Float>
     private let written = Atomic<Int>(0)
@@ -19,12 +21,12 @@ public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
 
     public init(capacity: Int) {
         self.capacity = max(1, capacity)
-        storage = .allocate(capacity: self.capacity)
-        storage.initialize(repeating: 0)
+        unsafe storage = .allocate(capacity: self.capacity)
+        unsafe storage.initialize(repeating: 0)
     }
 
     deinit {
-        storage.deallocate()
+        unsafe storage.deallocate()
     }
 
     /// Real-time safe append; returns the number of samples stored.
@@ -41,9 +43,9 @@ public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
         guard stored > 0 else { return 0 }
         let offset = head % capacity
         let firstRun = min(stored, capacity - offset)
-        (storage.baseAddress! + offset).update(from: source, count: firstRun)
+        unsafe (storage.baseAddress! + offset).update(from: source, count: firstRun)
         if stored > firstRun {
-            storage.baseAddress!.update(from: source + firstRun, count: stored - firstRun)
+            unsafe storage.baseAddress!.update(from: source + firstRun, count: stored - firstRun)
         }
         written.store(head + stored, ordering: .releasing)
         return stored
@@ -53,7 +55,7 @@ public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
     public func write(_ samples: [Float]) -> Int {
         samples.withUnsafeBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return 0 }
-            return write(base, count: buffer.count)
+            return unsafe write(base, count: buffer.count)
         }
     }
 
@@ -75,9 +77,9 @@ public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
         output.withUnsafeMutableBufferPointer { destination in
             let offset = tail % capacity
             let firstRun = min(count, capacity - offset)
-            destination.baseAddress!.update(from: storage.baseAddress! + offset, count: firstRun)
+            unsafe destination.baseAddress!.update(from: storage.baseAddress! + offset, count: firstRun)
             if count > firstRun {
-                (destination.baseAddress! + firstRun).update(from: storage.baseAddress!, count: count - firstRun)
+                unsafe (destination.baseAddress! + firstRun).update(from: storage.baseAddress!, count: count - firstRun)
             }
         }
         consumed.store(head, ordering: .releasing)
@@ -89,17 +91,17 @@ public final class VocelloPlaybackCaptureRing: @unchecked Sendable {
 public enum VocelloPlaybackCaptureWAV {
     public static func data(samples: [Float], sampleRate: Double) -> Data {
         var pcm = Data(count: samples.count * 4)
-        pcm.withUnsafeMutableBytes { raw in
+        unsafe pcm.withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress else { return }
             for (index, sample) in samples.enumerated() {
-                base.storeBytes(of: sample.bitPattern.littleEndian, toByteOffset: index * 4, as: UInt32.self)
+                unsafe base.storeBytes(of: sample.bitPattern.littleEndian, toByteOffset: index * 4, as: UInt32.self)
             }
         }
         let rate = UInt32(sampleRate.rounded())
         var header = Data()
         func append<T: FixedWidthInteger>(_ value: T) {
             var little = value.littleEndian
-            withUnsafeBytes(of: &little) { header.append(contentsOf: $0) }
+            withUnsafeBytes(of: &little) { unsafe header.append(contentsOf: $0) }
         }
         header.append(contentsOf: Array("RIFF".utf8))
         append(UInt32(36 + pcm.count))
@@ -176,7 +178,7 @@ public struct VocelloPlaybackCaptureSidecar: Codable, Equatable, Sendable {
     /// Python side joins on the sidecar's fields, not on the name.
     public static func baseName(takeIndex: Int, cell: String) -> String {
         let safe = cell.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "#", with: "-")
-        return String(format: "take-%02d-%@", takeIndex, safe)
+        return unsafe String(format: "take-%02d-%@", takeIndex, safe)
     }
 
     public func encoded() throws -> Data {
@@ -204,7 +206,7 @@ public struct VocelloPlaybackCaptureClock: Sendable {
         self.referenceEpochMS = referenceEpochMS
         self.referenceHostTime = referenceHostTime
         var info = mach_timebase_info_data_t()
-        mach_timebase_info(&info)
+        unsafe mach_timebase_info(&info)
         nanosecondsPerHostTick = info.denom == 0 ? 1 : Double(info.numer) / Double(info.denom)
     }
 

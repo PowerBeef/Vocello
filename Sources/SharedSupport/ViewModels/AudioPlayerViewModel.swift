@@ -1829,14 +1829,14 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
                   pcmFormat: format,
                   frameCapacity: AVAudioFrameCount(previewAudio.frameCount)
               ),
-              let channelData = buffer.int16ChannelData?[0] else {
+              let channelData = unsafe buffer.int16ChannelData?[0] else {
             return nil
         }
 
         buffer.frameLength = AVAudioFrameCount(previewAudio.frameCount)
-        previewAudio.pcm16LE.withUnsafeBytes { rawBuffer in
-            guard let baseAddress = rawBuffer.bindMemory(to: Int16.self).baseAddress else { return }
-            channelData.update(from: baseAddress, count: previewAudio.frameCount)
+        unsafe previewAudio.pcm16LE.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = unsafe rawBuffer.bindMemory(to: Int16.self).baseAddress else { return }
+            unsafe channelData.update(from: baseAddress, count: previewAudio.frameCount)
         }
         return (buffer, format)
     }
@@ -2121,7 +2121,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     static func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        return unsafe String(format: "%d:%02d", minutes, seconds)
     }
 
     // MARK: - AVAudioPlayerDelegate

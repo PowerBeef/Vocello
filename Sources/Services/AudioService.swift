@@ -40,7 +40,7 @@ enum AudioService {
 
         let expandedPath = (configuredPath as NSString).expandingTildeInPath
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory),
+        guard unsafe FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory),
               isDirectory.boolValue else {
             return MacInterfaceText.audioFolderMissing
         }

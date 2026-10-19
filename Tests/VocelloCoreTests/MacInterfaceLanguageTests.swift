@@ -199,7 +199,7 @@ final class MacInterfaceLanguageTests: XCTestCase {
                                     ("ko", "모델 %d개 준비됨")] {
             let text = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: language))
             for count in [0, 1, 2, 5] {
-                XCTAssertEqual(text.readyModelCount(count), String(format: format, count), language)
+                unsafe XCTAssertEqual(text.readyModelCount(count), String(format: format, count), language)
             }
         }
     }

@@ -856,7 +856,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
     }
 
     private func identity(path: String, bytes: Data) throws -> SharedComponentFileIdentity {
-        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let digest = SHA256.hash(data: bytes).map { unsafe String(format: "%02x", $0) }.joined()
         return try SharedComponentFileIdentity(
             relativePath: path,
             byteCount: Int64(bytes.count),

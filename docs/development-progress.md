@@ -19,7 +19,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through `d85aadd9`. Push CI is green on Xcode 26.6.
+`main` is pushed through `49702a2c`. Push CI is green on Xcode 26.6.
 
 - **Landed today:**
   - **P2-5 test adequacy (DW-03):**
@@ -34,6 +34,13 @@ the last copy with every earlier checkpoint is at commit a0597deb).
     - The UI stall gate passed on the NonisolatedNonsendingByDefault commit: a maximum of
       460 ms against the 600 ms limit.
     - CI's compile logs show both settings applied on 26.6.
+  - **Enhanced Security trial (DW-04):** `scripts/build.sh cli-enhanced-security` builds an arm64e
+    CLI with `ENABLE_ENHANCED_SECURITY` in its own arena (`49702a2c`). MLX builds, and the takes
+    pass Fast QC at the regular speed with 0.5–2% more peak RSS. This was exploratory, not a
+    measured lane. The hardened-process entitlements and the apps wait for the submission.
+  - **P2-3 step 1 (DW-03):** the CLI's runtime and parsing became `VocelloCLICore`, which the tests
+    import instead of compiling by path (`cd4843eb`). Step 2 waits for the submission: the Mac-only
+    files depend on shared by-path code that has to move first.
 - **Pinned defects:** strict expected failures pin B-02 (ER-06) and a new BKL-20, where a rebuilt
   overlay trusts weights that changed in place. B-04 is pinned as current behaviour (ER-02).
 - **Fixed lanes:**
@@ -41,9 +48,6 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   - The macOS UI benchmark ran its checker under a `python3` without numpy (`d85aadd9`).
     Its run was recorded as failed, then passed on re-check; nothing was published.
 - **Next:**
-  - P2-3, the per-product modules for the test-compiled files. The maintainer chose now; it
-    is multi-day.
-  - The Enhanced Security trial, which needs an arm64e lane option.
   - P3-5, lane orchestration in Python.
   - vDSP after measurement.
 - **Still waiting on an iPhone window:** the iOS runtime proof of the Observation migration and

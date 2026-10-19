@@ -150,7 +150,7 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
 
     private func assertRefusedAsync(
         _ operation: VoiceCloningOperation,
-        _ body: () async throws -> Void,
+        _ body: @concurrent () async throws -> Void,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {
@@ -415,7 +415,7 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
     }
 
     private func assertReachesEngine(
-        _ body: () async throws -> Void,
+        _ body: @concurrent () async throws -> Void,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {

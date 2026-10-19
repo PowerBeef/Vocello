@@ -94,7 +94,7 @@ private actor BoundedGenerationEventChannel {
                 }
             }
         } onCancel: {
-            Task { await self.cancelPendingSend(pendingID) }
+            Task { @concurrent in await self.cancelPendingSend(pendingID) }
         }
     }
 
@@ -121,7 +121,7 @@ private actor BoundedGenerationEventChannel {
                 }
             }
         } onCancel: {
-            Task { await self.cancelConsumer() }
+            Task { @concurrent in await self.cancelConsumer() }
         }
     }
 
@@ -202,13 +202,13 @@ final class GenerationScopedEventRouter: @unchecked Sendable {
             return true
         }
         guard accepted else {
-            return AsyncStream(unfolding: { nil })
+            return AsyncStream(unfolding: { @concurrent in nil })
         }
         return AsyncStream(
-            unfolding: { await channel.next() },
+            unfolding: { @concurrent in await channel.next() },
             onCancel: { [weak self] in
                 self?.consumerTerminated(generationID: generationID)
-                Task { await channel.cancelConsumer() }
+                Task { @concurrent in await channel.cancelConsumer() }
             }
         )
     }
@@ -235,7 +235,7 @@ final class GenerationScopedEventRouter: @unchecked Sendable {
         }
     }
 
-    func yield(_ event: GenerationEvent, for generationID: UUID) async {
+    @concurrent func yield(_ event: GenerationEvent, for generationID: UUID) async {
         let channel = lock.withLock { state -> BoundedGenerationEventChannel? in
             if state.active[generationID] == nil {
                 state.active[generationID] = ActiveSubscription(

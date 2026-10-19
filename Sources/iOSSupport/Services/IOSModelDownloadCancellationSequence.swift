@@ -84,7 +84,7 @@ enum IOSModelDownloadCancellationSequence {
         persistIntent: () -> Bool,
         keepCancellable: () -> Void,
         publishCancelling: () -> Void,
-        drainTask: () async -> Void,
+        drainTask: @concurrent () async -> Void,
         rollbackRacedInstallation: () -> Bool,
         persistTombstone: () -> Bool,
         removeStaging: () -> Void,

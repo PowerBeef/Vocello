@@ -35,6 +35,10 @@ settings:
     # which keeps the module graph explicit for explicit-module builds.
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
     SWIFT_STRICT_MEMORY_SAFETY: YES
+    # A nonisolated async function or closure runs on its caller's actor (SE-0461). The
+    # declarations that ran on the global executor before carry `@concurrent`, so enabling it
+    # changed no existing behaviour; new code that must leave the caller's actor says so.
+    SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT: YES
     # A global-actor-isolated type's conformances are inferred isolated to that actor
     # unless the protocol is itself isolated or Sendable (SE-0470). The 14 conformances
     # migrate mode flagged carry `nonisolated` and keep their earlier isolation; new ones

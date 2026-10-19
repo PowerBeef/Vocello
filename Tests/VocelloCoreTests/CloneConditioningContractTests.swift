@@ -6,7 +6,7 @@ import VocelloQwen3Core
 import XCTest
 
 final class CloneConditioningContractTests: XCTestCase {
-    func testCachedConditioningKeepsCurrentTranscriptOwnership() async throws {
+    @concurrent func testCachedConditioningKeepsCurrentTranscriptOwnership() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -513,7 +513,7 @@ final class CloneConditioningContractTests: XCTestCase {
     /// in-memory entry and the on-disk output are reused by that same
     /// fingerprint, so `reusedNormalizedReference` reports the reuse that
     /// actually happened.
-    func testConvertedCloneReferenceReusesItsContentNamedOutput() async throws {
+    @concurrent func testConvertedCloneReferenceReusesItsContentNamedOutput() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-clone-reuse-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -527,7 +527,7 @@ final class CloneConditioningContractTests: XCTestCase {
             counter: counter
         )
         let reference = CloneReference(audioPath: source.path)
-        func resolve(
+        @concurrent func resolve(
             with cache: NativePreparedCloneConditioningCache
         ) async throws -> ResolvedCloneConditioning {
             try await cache.resolve(
@@ -601,7 +601,7 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: output.path), "completed outputs are never swept")
     }
 
-    func testPartialNormalizedReferenceIsNotReused() async throws {
+    @concurrent func testPartialNormalizedReferenceIsNotReused() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-clone-partial-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -650,7 +650,7 @@ final class CloneConditioningContractTests: XCTestCase {
         let interrupting = NativeAudioPreparationService(
             testingHooks: AudioPreparationTestingHooks(
                 beforeWriterCreation: nil,
-                beforeConversionLoop: {
+                beforeConversionLoop: { @concurrent in
                     if FileManager.default.fileExists(atPath: interruptedOutput.path) {
                         throw PartialOutputVisible()
                     }
@@ -771,7 +771,7 @@ private struct CountingAudioPreparationService: AudioPreparationService {
     let base: NativeAudioPreparationService
     let counter: PreparationCallCounter
 
-    func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
+    @concurrent func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
         await counter.increment()
         return try await base.normalizeAudio(request)
     }

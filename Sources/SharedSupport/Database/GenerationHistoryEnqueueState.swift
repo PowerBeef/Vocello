@@ -58,7 +58,7 @@ final class GenerationHistoryEnqueueState {
     func persist(
         _ generation: Generation,
         enqueue write: (Generation) throws -> GenerationHistoryOutboxEntry,
-        commit: (GenerationHistoryOutboxEntry) async throws -> Generation,
+        commit: @concurrent (GenerationHistoryOutboxEntry) async throws -> Generation,
         onSaved: (Generation) -> Void
     ) async -> GenerationHistoryPersistenceOutcome {
         let (outcome, entry) = enqueue(generation, using: write)

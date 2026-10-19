@@ -826,7 +826,7 @@ public actor NativeTelemetrySampler {
         let clock = self.clock
         let device = self.metalDevice
         let processRole = self.processRole
-        samplingTask = Task.detached(priority: .utility) {
+        samplingTask = Task.detached(priority: .utility) { @concurrent in
             var scheduledElapsedNS = Self.addingClamped(
                 startSample.capturedElapsedNS ?? startSample.tNS ?? 0,
                 intervalNanos

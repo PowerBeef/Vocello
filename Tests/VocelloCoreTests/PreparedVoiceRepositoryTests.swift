@@ -5,7 +5,7 @@ import XCTest
 final class PreparedVoiceRepositoryTests: XCTestCase {
     private enum Injected: Error { case filesystem }
 
-    func testNativeStoreWorker() async throws {
+    @concurrent func testNativeStoreWorker() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let path = environment["VOCELLO_TEST_STORE_ROOT"], let phase = environment["VOCELLO_TEST_STORE_PHASE"] else { return }
         let shared = URL(fileURLWithPath: path)
@@ -70,7 +70,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         }
     }
 
-    func testTwoNativeProcessesExcludePreparationReplacementAndDeletion() async throws {
+    @concurrent func testTwoNativeProcessesExcludePreparationReplacementAndDeletion() async throws {
         try NativeHelperProcess.skipUnderThreadSanitizer()
         for phase in ["prepare", "replace", "delete", "publish"] {
             let shared = root.appendingPathComponent(phase)
@@ -116,7 +116,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         }
     }
 
-    func testFailedRollbackRetainsBackupAndRecoveryIsIdempotent() async throws {
+    @concurrent func testFailedRollbackRetainsBackupAndRecoveryIsIdempotent() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "old.wav", bytes: [1, 2, 3])
         let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old",
@@ -146,7 +146,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Same.wav")), Data([4, 5, 6]))
     }
 
-    func testCommittedCleanupFailureNeverRollsBackNewVoice() async throws {
+    @concurrent func testCommittedCleanupFailureNeverRollsBackNewVoice() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "old.wav", bytes: [1])
         let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
@@ -165,7 +165,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "new")
     }
 
-    func testRollbackCleanupFailureDoesNotDeleteRestoredSidecarsOnRetry() async throws {
+    @concurrent func testRollbackCleanupFailureDoesNotDeleteRestoredSidecarsOnRetry() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "old.wav", bytes: [1])
         let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
@@ -177,13 +177,13 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             default: break
             }
         })
-        await XCTAssertThrowsErrorAsync { _ = try await failing.commit(id: candidate.id) }
+        await XCTAssertThrowsErrorAsync { @concurrent in _ = try await failing.commit(id: candidate.id) }
         try await repository.reconcile()
         XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("voices/Same.txt"), encoding: .utf8), "old")
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Same.wav")), Data([1]))
     }
 
-    func testChangedPublishedAudioRetainsBothVersionsInsteadOfGuessingRollback() async throws {
+    @concurrent func testChangedPublishedAudioRetainsBothVersionsInsteadOfGuessingRollback() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "old.wav", bytes: [1])
         let original = try await repository.prepare(name: "Same", audioURL: source, transcript: "old", qualityWarnings: [], replacingVoiceID: nil)
@@ -210,7 +210,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: committed.audioURL), Data([2]))
     }
 
-    func testDeleteCleanupFailureRetainsWitnessAndFinishesWithoutResurrection() async throws {
+    @concurrent func testDeleteCleanupFailureRetainsWitnessAndFinishesWithoutResurrection() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "source.wav")
         let candidate = try await repository.prepare(name: "Delete", audioURL: source, transcript: "delete", qualityWarnings: [], replacingVoiceID: nil)
@@ -227,7 +227,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     }
 
     #if os(macOS)
-    func testAnotherProcessLockRefusesAllOperationsWithoutReconciliation() async throws {
+    @concurrent func testAnotherProcessLockRefusesAllOperationsWithoutReconciliation() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let partial = root.appendingPathComponent("voice-candidates/.partial-active")
@@ -342,7 +342,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// that can take it finishes the discard, so the candidate does not keep
     /// its name until it expires. An explicit Discard that fails leaves its
     /// candidate under review: Keep after it still publishes.
-    func testAnAbandonedDiscardThatCannotTakeTheStoreIsFinishedByTheNextOperation() async throws {
+    @concurrent func testAnAbandonedDiscardThatCannotTakeTheStoreIsFinishedByTheNextOperation() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "source.wav")
         let abandoned = try await repository.prepare(
@@ -379,7 +379,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// F-01: a review save never removes the open review of another copy of the
     /// app that is still running (the Mac runs several on one store); once
     /// that copy has ended, the next review save does.
-    func testAReviewSaveKeepsAnotherRunningCopysReviewUntilItEnds() async throws {
+    @concurrent func testAReviewSaveKeepsAnotherRunningCopysReviewUntilItEnds() async throws {
         try NativeHelperProcess.skipUnderThreadSanitizer()
         let shared = root.appendingPathComponent("review")
         try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
@@ -436,7 +436,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// holds it. A review save removes one an ended session left, so its name
     /// is free again at once, and keeps this session's open reviews and every
     /// one-shot candidate.
-    func testAReviewSaveRemovesCandidatesAnEndedSessionLeftBehind() async throws {
+    @concurrent func testAReviewSaveRemovesCandidatesAnEndedSessionLeftBehind() async throws {
         let source = try writeSource(named: "source.wav")
         let ended = makeRepository(reviewSession: UUID())
         let abandoned = try await ended.prepare(
@@ -469,7 +469,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// F-01: a one-shot enrollment (the CLI's) never removes another process's
     /// open review, whose name stays taken; nor does a review while a journal a
     /// newer build left may still own a candidate.
-    func testOnlyAReviewSweepsAndNeverPastANewerJournal() async throws {
+    @concurrent func testOnlyAReviewSweepsAndNeverPastANewerJournal() async throws {
         let source = try writeSource(named: "source.wav")
         let app = makeRepository(reviewSession: UUID())
         let review = try await app.prepare(
@@ -499,7 +499,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertTrue(exists(candidateDirectory(review.id)), "a newer journal may own it")
     }
 
-    func testReconcileSkipsHiddenAndNonDirectoryRootEntries() async throws {
+    @concurrent func testReconcileSkipsHiddenAndNonDirectoryRootEntries() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "source.wav")
         let candidate = try await repository.prepare(name: "Kept", audioURL: source, transcript: nil, qualityWarnings: [], replacingVoiceID: nil)
@@ -537,7 +537,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voice-transactions-quarantine").path))
     }
 
-    func testUninterpretableTransactionsAreQuarantinedNotDeleted() async throws {
+    @concurrent func testUninterpretableTransactionsAreQuarantinedNotDeleted() async throws {
         let repository = makeRepository()
         let source = try writeSource(named: "source.wav")
         for name in ["Kept", "Gone"] {
@@ -677,7 +677,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         }
     }
 
-    func testPreparedCandidateIsInvisibleUntilCommit() async throws {
+    @concurrent func testPreparedCandidateIsInvisibleUntilCommit() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "source.m4a")
@@ -704,7 +704,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(committedIDs, ["Review Voice"])
     }
 
-    func testReviewedReferenceMetadataPublishesTransactionallyAndSurvivesRelaunch() async throws {
+    @concurrent func testReviewedReferenceMetadataPublishesTransactionallyAndSurvivesRelaunch() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "metadata-source.wav")
@@ -740,7 +740,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         ))
     }
 
-    func testUnreadableOrNewerSidecarIsReportedRatherThanTreatedAsAbsent() async throws {
+    @concurrent func testUnreadableOrNewerSidecarIsReportedRatherThanTreatedAsAbsent() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "sidecar-source.wav")
@@ -760,7 +760,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         _ = try await repository.commit(id: candidate.id)
         let sidecar = root.appendingPathComponent("voices/Designed.voice.json")
 
-        func relisted() async throws -> PreparedVoiceStorageRecord {
+        @concurrent func relisted() async throws -> PreparedVoiceStorageRecord {
             let relaunched = makeRepository()
             try await relaunched.reconcile()
             let listed = try await relaunched.list()
@@ -788,7 +788,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(voice.enrollmentMetadataUnreadable, "no sidecar is an older or recorded voice")
     }
 
-    func testDiscardIsIdempotentAndAllowsSameNameRetry() async throws {
+    @concurrent func testDiscardIsIdempotentAndAllowsSameNameRetry() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "source.wav")
@@ -814,7 +814,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         )
     }
 
-    func testPendingAndCommittedNamesAreReserved() async throws {
+    @concurrent func testPendingAndCommittedNamesAreReserved() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "source.wav")
@@ -826,7 +826,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             replacingVoiceID: nil
         )
 
-        await XCTAssertThrowsErrorAsync {
+        await XCTAssertThrowsErrorAsync { @concurrent in
             _ = try await repository.prepare(
                 name: "Unique",
                 audioURL: source,
@@ -836,7 +836,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
             )
         }
         _ = try await repository.commit(id: candidate.id)
-        await XCTAssertThrowsErrorAsync {
+        await XCTAssertThrowsErrorAsync { @concurrent in
             _ = try await repository.prepare(
                 name: "Unique",
                 audioURL: source,
@@ -847,7 +847,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         }
     }
 
-    func testReplacementPublishesNewVoiceAndRemovesOldAssets() async throws {
+    @concurrent func testReplacementPublishesNewVoiceAndRemovesOldAssets() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let firstSource = try writeSource(named: "first.wav", bytes: [1, 2, 3])
@@ -884,7 +884,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// U16: Replace reference keeps the name, so the store must accept its own
     /// ID (spaces and apostrophes kept) as the replaced voice, and refuse the
     /// underscored form the Mac sheet used to send.
-    func testReplacingKeepsTheNameWhenTheReplacedIDIsTheStoreID() async throws {
+    @concurrent func testReplacingKeepsTheNameWhenTheReplacedIDIsTheStoreID() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let original = try await repository.prepare(
@@ -923,7 +923,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("voices/Grandma Rose's.wav")), Data([7, 8, 9]))
     }
 
-    func testDeleteRemovesOnlySelectedVoiceAndPromptArtifacts() async throws {
+    @concurrent func testDeleteRemovesOnlySelectedVoiceAndPromptArtifacts() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "source.wav")
@@ -953,7 +953,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     /// voice's audio go with the voice. "Alice" and "Alice!" share a sanitized
     /// stem and their audio, so they derive the same files, which stay until
     /// neither voice is left; nothing else in the directory is touched.
-    func testDeleteRemovesTheNormalizedCopyClonedFromTheVoice() async throws {
+    @concurrent func testDeleteRemovesTheNormalizedCopyClonedFromTheVoice() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "memo.m4a", bytes: [7, 7, 7])
@@ -990,7 +990,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
 
     /// A8-01: a replacement retires the old audio's derived copy, and keeps it
     /// when the replacement publishes the same name and audio.
-    func testReplacementRemovesTheReplacedVoicesNormalizedCopy() async throws {
+    @concurrent func testReplacementRemovesTheReplacedVoicesNormalizedCopy() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let first = try await repository.prepare(
@@ -1025,7 +1025,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(exists(sidecar(of: original)))
     }
 
-    func testReconcileExpiresCandidatesAndRemovesPartialAndDeleteTombstones() async throws {
+    @concurrent func testReconcileExpiresCandidatesAndRemovesPartialAndDeleteTombstones() async throws {
         let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
         let repository = PreparedVoiceRepository(
             appSupportDirectory: root,
@@ -1069,7 +1069,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("voice-transactions").path).isEmpty)
     }
 
-    func testMalformedCandidateManifestIsRemovedDuringReconcile() async throws {
+    @concurrent func testMalformedCandidateManifestIsRemovedDuringReconcile() async throws {
         let directory = root.appendingPathComponent("voice-candidates/not-a-uuid", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data(#"{"schemaVersion":1,"audioFileName":"../escape.wav"}"#.utf8)
@@ -1081,7 +1081,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
     }
 
-    func testReconcileRollsBackInterruptedReplacementBeforeAudioPublication() async throws {
+    @concurrent func testReconcileRollsBackInterruptedReplacementBeforeAudioPublication() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let originalSource = try writeSource(named: "original.wav", bytes: [1, 2, 3])
@@ -1146,7 +1146,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertEqual(replacementIDs, ["Replacement"])
     }
 
-    func testReconcileCompletesInterruptedReplacementAfterAudioPublication() async throws {
+    @concurrent func testReconcileCompletesInterruptedReplacementAfterAudioPublication() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let originalSource = try writeSource(named: "original.wav", bytes: [1, 2, 3])
@@ -1201,7 +1201,7 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices/Original.wav").path))
     }
 
-    func testReconcileCompletesJournaledDeleteFromAnyMovePoint() async throws {
+    @concurrent func testReconcileCompletesJournaledDeleteFromAnyMovePoint() async throws {
         let repository = makeRepository()
         try await repository.reconcile()
         let source = try writeSource(named: "source.wav")
@@ -1327,8 +1327,8 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
     }
 }
 
-private func XCTAssertThrowsErrorAsync(
-    _ expression: () async throws -> Void,
+@concurrent private func XCTAssertThrowsErrorAsync(
+    _ expression: @concurrent () async throws -> Void,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {

@@ -38,7 +38,7 @@ final class QwenVoiceApplicationDelegate: NSObject, nonisolated NSApplicationDel
         // folder is left alone. The scan runs off the main thread so it never
         // delays launch; quit keeps its sweep synchronous below.
         let anotherCopyIsRunning = Self.anotherCopyIsRunning
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { @concurrent in
             ReferenceClipRecordingStash.removeLeftoverRecordings(anotherCopyIsRunning: anotherCopyIsRunning)
         }
         // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their

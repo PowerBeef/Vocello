@@ -4,7 +4,7 @@ import QwenVoiceCore
 import XCTest
 
 final class WordErrorRateTests: XCTestCase {
-    func testLiveUnreadableAudioFailsBeforeSpeechWithoutInventingDuration() async throws {
+    @concurrent func testLiveUnreadableAudioFailsBeforeSpeechWithoutInventingDuration() async throws {
         let result = await GenerationOutputVerifier.verify(
             audioURL: URL(fileURLWithPath: "/missing/\(UUID()).wav"),
             expectedScript: "Hello there.", expectedLanguage: .english
@@ -458,11 +458,11 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertTrue(VoiceClipTranscriber.shouldContinueVerification(after: [first, agreement]))
     }
 
-    func testAuthorizationCompletionClaimHasExactlyOneWinnerUnderContention() async {
+    @concurrent func testAuthorizationCompletionClaimHasExactlyOneWinnerUnderContention() async {
         let completion = CompletionClaim()
-        let winners = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
+        let winners = await withTaskGroup(of: Bool.self, returning: Int.self) { @concurrent group in
             for _ in 0 ..< 100 {
-                group.addTask { completion.claim() }
+                group.addTask { @concurrent in completion.claim() }
             }
             var count = 0
             for await won in group where won { count += 1 }

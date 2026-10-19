@@ -27,53 +27,53 @@ public final class AnyTTSEngineBackend {
     private let supportDecisionBlock: (GenerationRequest) -> GenerationSupportDecision
     private let startBlock: () -> Void
     private let stopBlock: () -> Void
-    private let initializeBlock: (URL) async throws -> Void
-    private let pingBlock: () async throws -> Bool
-    private let loadModelBlock: (String) async throws -> Void
-    private let unloadModelBlock: () async throws -> Void
-    private let prepareAudioBlock: (AudioPreparationRequest) async throws -> AudioNormalizationResult
-    private let ensureModelLoadedIfNeededBlock: (String) async -> Void
-    private let prewarmModelIfNeededBlock: (GenerationRequest) async -> Void
-    private let prefetchInteractiveReadinessIfNeededBlock: (GenerationRequest) async -> InteractivePrefetchDiagnostics?
-    private let ensureCloneReferencePrimedBlock: (String, CloneReference) async throws -> Void
-    private let cancelClonePreparationIfNeededBlock: () async -> Void
-    private let cancelProactiveModelWorkBlock: () async -> Void
-    private let cancelActiveGenerationBlock: (GenerationCancellationReason) async throws -> Void
-    private let generateBlock: (GenerationRequest) async throws -> GenerationResult
-    private let replayStartupReliabilityCodecTraceBlock: (
+    private let initializeBlock: @concurrent (URL) async throws -> Void
+    private let pingBlock: @concurrent () async throws -> Bool
+    private let loadModelBlock: @concurrent (String) async throws -> Void
+    private let unloadModelBlock: @concurrent () async throws -> Void
+    private let prepareAudioBlock: @concurrent (AudioPreparationRequest) async throws -> AudioNormalizationResult
+    private let ensureModelLoadedIfNeededBlock: @concurrent (String) async -> Void
+    private let prewarmModelIfNeededBlock: @concurrent (GenerationRequest) async -> Void
+    private let prefetchInteractiveReadinessIfNeededBlock: @concurrent (GenerationRequest) async -> InteractivePrefetchDiagnostics?
+    private let ensureCloneReferencePrimedBlock: @concurrent (String, CloneReference) async throws -> Void
+    private let cancelClonePreparationIfNeededBlock: @concurrent () async -> Void
+    private let cancelProactiveModelWorkBlock: @concurrent () async -> Void
+    private let cancelActiveGenerationBlock: @concurrent (GenerationCancellationReason) async throws -> Void
+    private let generateBlock: @concurrent (GenerationRequest) async throws -> GenerationResult
+    private let replayStartupReliabilityCodecTraceBlock: @concurrent (
         GenerationRequest,
         [[Int32]],
         [StartupReliabilityCodecFrameRange]
     ) async throws -> StartupReliabilityCodecReplayResult
     private let startupReliabilityRuntimeOwnershipSnapshotBlock:
-        () async -> StartupReliabilityRuntimeOwnershipSnapshot
-    private let listPreparedVoicesBlock: () async throws -> [PreparedVoice]
-    private let preparePreparedVoiceCandidateBlock: (
+        @concurrent () async -> StartupReliabilityRuntimeOwnershipSnapshot
+    private let listPreparedVoicesBlock: @concurrent () async throws -> [PreparedVoice]
+    private let preparePreparedVoiceCandidateBlock: @concurrent (
         String,
         String,
         String?,
         String?,
         PreparedVoiceEnrollmentMetadata?
     ) async throws -> PreparedVoiceCandidate
-    private let commitPreparedVoiceCandidateBlock: (UUID) async throws -> PreparedVoice
-    private let discardPreparedVoiceCandidateBlock: (UUID) async throws -> Void
-    private let discardAbandonedPreparedVoiceCandidateBlock: (UUID) async -> Void
-    private let enrollPreparedVoiceBlock: (String, String, String?) async throws -> PreparedVoice
-    private let deletePreparedVoiceBlock: (String) async throws -> Void
+    private let commitPreparedVoiceCandidateBlock: @concurrent (UUID) async throws -> PreparedVoice
+    private let discardPreparedVoiceCandidateBlock: @concurrent (UUID) async throws -> Void
+    private let discardAbandonedPreparedVoiceCandidateBlock: @concurrent (UUID) async -> Void
+    private let enrollPreparedVoiceBlock: @concurrent (String, String, String?) async throws -> PreparedVoice
+    private let deletePreparedVoiceBlock: @concurrent (String) async throws -> Void
     private let exportGeneratedAudioBlock: (URL, URL) throws -> ExportedDocument
     private let importReferenceAudioBlock: (URL) throws -> ImportedReferenceAudio
     private let clearGenerationActivityBlock: () -> Void
     private let clearVisibleErrorBlock: () -> Void
     private let setVisibleErrorBlock: (String?) -> Void
     private let setAllowsProactiveWarmOperationsBlock: (Bool) -> Void
-    private let recordApplicationMemoryWarningBlock: (String) async -> Void
-    private let recordMemoryBudgetTransitionBlock: (
+    private let recordApplicationMemoryWarningBlock: @concurrent (String) async -> Void
+    private let recordMemoryBudgetTransitionBlock: @concurrent (
         IOSMemoryPressureBand,
         IOSMemoryPressureBand,
         String
     ) async -> Void
-    private let trimMemoryBlock: (NativeMemoryTrimLevel, String) async -> Void
-    private let captureMemorySnapshotBlock: (IOSMemoryProcessRole) async -> IOSMemorySnapshot?
+    private let trimMemoryBlock: @concurrent (NativeMemoryTrimLevel, String) async -> Void
+    private let captureMemorySnapshotBlock: @concurrent (IOSMemoryProcessRole) async -> IOSMemorySnapshot?
     private let engineLifecycleStateBlock: () -> EngineLifecycleState
     private let voiceCloningConsentBlock: @MainActor () -> VoiceCloningConsentPolicy
 

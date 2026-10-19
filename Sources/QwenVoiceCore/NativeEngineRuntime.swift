@@ -423,7 +423,7 @@ actor NativeEngineRuntime {
     private var activeTelemetrySampler: NativeTelemetrySampler?
     private let customPrewarmPolicy: NativeCustomPrewarmPolicy
     private let speakerNativeLanguages: [String: String]
-    private let diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?
+    private let diagnosticEventSink: (@Sendable @concurrent (String, [String: String]) async -> Void)?
     private let diagnosticAppSupportBox: DiagnosticAppSupportBox?
 
     private var normalizedCloneReferenceDirectory: URL?
@@ -467,7 +467,7 @@ actor NativeEngineRuntime {
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
         speakerNativeLanguages: [String: String] = [:],
         diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
-        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil,
+        diagnosticEventSink: (@Sendable @concurrent (String, [String: String]) async -> Void)? = nil,
         allocatorControl: NativeMLXAllocatorControl = .live
     ) {
         self.allocatorControl = allocatorControl

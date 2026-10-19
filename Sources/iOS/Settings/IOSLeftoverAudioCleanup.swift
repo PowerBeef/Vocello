@@ -39,7 +39,7 @@ enum IOSLeftoverAudioCleanup {
 
     /// The audio to offer, or nil: already reviewed, nothing left, or History
     /// state that cannot be read fully.
-    static func pendingOffer() async -> IOSLeftoverAudioAnalysis.Leftovers? {
+    @concurrent static func pendingOffer() async -> IOSLeftoverAudioAnalysis.Leftovers? {
         guard !isReviewed else { return nil }
         guard let leftovers = await withCurrentLeftovers({ $0 }) else { return nil }
         guard !leftovers.files.isEmpty else {
@@ -53,7 +53,7 @@ enum IOSLeftoverAudioCleanup {
     /// decided against History as it is at that moment. Nil when History state
     /// could not be read fully: then nothing was removed. The review is done
     /// once nothing failed.
-    static func remove(
+    @concurrent static func remove(
         _ confirmed: IOSLeftoverAudioAnalysis.Leftovers
     ) async -> IOSLeftoverAudioAnalysis.RemovalOutcome? {
         let outcome = await withCurrentLeftovers { current in
@@ -82,7 +82,7 @@ enum IOSLeftoverAudioCleanup {
         }
     }
 
-    private static func withCurrentLeftovers<T: Sendable>(
+    @concurrent private static func withCurrentLeftovers<T: Sendable>(
         _ body: @escaping @Sendable (IOSLeftoverAudioAnalysis.Leftovers) -> T
     ) async -> T? {
         // A long-form acceptance awaiting recovery names audio no row holds yet.

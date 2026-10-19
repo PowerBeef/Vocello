@@ -40,7 +40,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
 
     /// CORE-16: the copy runs off the main actor and refuses a file larger
     /// than audio preparation accepts before copying it.
-    func testAnOversizedImportIsRefusedWithInterfaceCopy() async throws {
+    @concurrent func testAnOversizedImportIsRefusedWithInterfaceCopy() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("IOSReferenceImport-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

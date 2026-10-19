@@ -5,15 +5,15 @@ import XCTest
 final class CloneArtifactPublicationTests: XCTestCase {
     private enum Injected: Error { case write }
 
-    func testDeletionWhileModelPersistenceIsSuspendedCannotRecreateVoiceArtifacts() async throws {
+    @concurrent func testDeletionWhileModelPersistenceIsSuspendedCannotRecreateVoiceArtifacts() async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try makeVoice(in: root)
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         let entered = GenerationTaskStartGate()
         let resume = GenerationTaskStartGate()
-        let publication = Task.detached { () async throws -> Bool in
-            try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
+        let publication = Task.detached { @concurrent () async throws -> Bool in
+            try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { @concurrent staging in
                 try writeArtifact(to: staging)
                 await entered.open()
                 await resume.wait()
@@ -34,26 +34,26 @@ final class CloneArtifactPublicationTests: XCTestCase {
         try assertNoStaging(in: root)
     }
 
-    func testReplacementWithDifferentAudioRejectsTheOldPrompt() async throws {
+    @concurrent func testReplacementWithDifferentAudioRejectsTheOldPrompt() async throws {
         try await assertReplacementRejected(bytes: [9, 8, 7], transcript: "old")
     }
 
-    func testReplacementWithSameAudioAndNewTranscriptRejectsTheOldPrompt() async throws {
+    @concurrent func testReplacementWithSameAudioAndNewTranscriptRejectsTheOldPrompt() async throws {
         try await assertReplacementRejected(bytes: [1, 2, 3], transcript: "new")
     }
 
-    func testValidSourcePublishesAndInlineTranscriptOverrideIsAllowed() async throws {
+    @concurrent func testValidSourcePublishesAndInlineTranscriptOverrideIsAllowed() async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try makeVoice(in: root)
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
-        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint, checksTranscript: false) {
+        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint, checksTranscript: false) { @concurrent in
             try writeArtifact(to: $0)
         }
         XCTAssertTrue(published)
         XCTAssertEqual(try Data(contentsOf: artifact(in: root).appendingPathComponent("payload")), Data([4, 5, 6]))
         // Atomic replacement is covered as well as first publication.
-        let replaced = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
+        let replaced = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { @concurrent staging in
             try writeArtifact(to: staging, bytes: [7])
         }
         XCTAssertTrue(replaced)
@@ -61,14 +61,14 @@ final class CloneArtifactPublicationTests: XCTestCase {
         try assertNoStaging(in: root)
     }
 
-    func testFailedModelWriteCleansPrivateStagingAndPreservesPublishedArtifact() async throws {
+    @concurrent func testFailedModelWriteCleansPrivateStagingAndPreservesPublishedArtifact() async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try makeVoice(in: root)
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         try writeArtifact(to: artifact(in: root))
         do {
-            _ = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
+            _ = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { @concurrent staging in
                 try writeArtifact(to: staging, bytes: [9])
                 throw Injected.write
             }
@@ -78,14 +78,14 @@ final class CloneArtifactPublicationTests: XCTestCase {
         try assertNoStaging(in: root)
     }
 
-    private func assertReplacementRejected(bytes: [UInt8], transcript: String) async throws {
+    @concurrent private func assertReplacementRejected(bytes: [UInt8], transcript: String) async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try makeVoice(in: root)
         let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
         // Inject replacement at the exact production suspension, after model
         // serialization and before repository publication. No scheduler delay.
-        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { staging in
+        let published = try await persistCloneArtifact(in: root, source: source, fingerprint: fingerprint) { @concurrent staging in
             try writeArtifact(to: staging)
             let replacement = root.appendingPathComponent("replacement.wav")
             try Data(bytes).write(to: replacement)
@@ -133,9 +133,9 @@ private func writeArtifact(to url: URL, bytes: [UInt8] = [4, 5, 6]) throws {
     try Data(bytes).write(to: url.appendingPathComponent("payload"))
 }
 
-private func persistCloneArtifact(in root: URL, source: URL, fingerprint: String,
+@concurrent private func persistCloneArtifact(in root: URL, source: URL, fingerprint: String,
                      checksTranscript: Bool = true,
-                     writer: @Sendable (URL) async throws -> Void) async throws -> Bool {
+                     writer: @Sendable @concurrent (URL) async throws -> Void) async throws -> Bool {
     try await NativePreparedCloneConditioningCache.persistSavedVoiceCloneArtifact(
         voicesDirectory: root.appendingPathComponent("voices"), artifactDirectory: artifact(in: root),
         voiceID: "Voice", sourceURL: source, sourceFingerprint: fingerprint,

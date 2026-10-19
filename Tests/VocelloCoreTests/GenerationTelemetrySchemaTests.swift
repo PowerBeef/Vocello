@@ -184,7 +184,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
     /// Audit #20: the full default matrix plans 58 verbose generations. A bench
     /// run sized to its plan keeps every sidecar publication needs, where the
     /// ad-hoc budget keeps only the newest 48.
-    func testBenchRunSidecarBudgetKeepsEverySidecarOfTheDefaultMatrix() async throws {
+    @concurrent func testBenchRunSidecarBudgetKeepsEverySidecarOfTheDefaultMatrix() async throws {
         XCTAssertEqual(BenchMatrixSpec.plannedGenerationCount(
             modes: BenchMatrixSpec.defaultModes,
             variantCount: 2,
@@ -853,7 +853,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertNil(decoded.cadence)
     }
 
-    func testSamplerStopIsIdempotentAcrossTerminalCleanup() async {
+    @concurrent func testSamplerStopIsIdempotentAcrossTerminalCleanup() async {
         let sampler = NativeTelemetrySampler(
             clock: NativeTelemetryClock(),
             sampleIntervalMS: 60_000
@@ -1324,7 +1324,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         )
     }
 
-    func testTerminalGateAllowsExactlyOneDurableRowPerAttempt() async {
+    @concurrent func testTerminalGateAllowsExactlyOneDurableRowPerAttempt() async {
         let gate = NativeTelemetryTerminalGate()
         async let first = gate.claim()
         async let second = gate.claim()

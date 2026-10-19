@@ -81,10 +81,10 @@ struct NativeMemoryPressureResponsePolicy: Sendable {
 /// handler can never run concurrently with active model compute for a critical
 /// event.
 actor NativeMemoryPressureResponseExecutor {
-    typealias ObservationHandler = @Sendable (NativeMemoryTrimLevel) async -> Void
-    typealias CancellationHandler = @Sendable (GenerationCancellationReason) async -> Void
-    typealias TrimHandler = @Sendable (NativeMemoryTrimLevel, String) async -> Void
-    typealias ReliefBarrierHandler = @Sendable () async -> Void
+    typealias ObservationHandler = @Sendable @concurrent (NativeMemoryTrimLevel) async -> Void
+    typealias CancellationHandler = @Sendable @concurrent (GenerationCancellationReason) async -> Void
+    typealias TrimHandler = @Sendable @concurrent (NativeMemoryTrimLevel, String) async -> Void
+    typealias ReliefBarrierHandler = @Sendable @concurrent () async -> Void
 
     private let policy: NativeMemoryPressureResponsePolicy
     private let recordObservation: ObservationHandler
@@ -101,9 +101,9 @@ actor NativeMemoryPressureResponseExecutor {
         recordObservation: @escaping ObservationHandler,
         cancelActiveGeneration: @escaping CancellationHandler,
         trim: @escaping TrimHandler,
-        closeAdmissionForCriticalRelief: @escaping ReliefBarrierHandler = {},
-        awaitModelOperationsQuiesced: @escaping ReliefBarrierHandler = {},
-        publishCriticalReliefCompletion: @escaping ReliefBarrierHandler = {}
+        closeAdmissionForCriticalRelief: @escaping ReliefBarrierHandler = { @concurrent in},
+        awaitModelOperationsQuiesced: @escaping ReliefBarrierHandler = { @concurrent in},
+        publishCriticalReliefCompletion: @escaping ReliefBarrierHandler = { @concurrent in}
     ) {
         self.policy = policy
         self.recordObservation = recordObservation

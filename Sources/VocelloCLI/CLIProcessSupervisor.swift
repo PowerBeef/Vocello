@@ -118,7 +118,7 @@ final class CLIProcessSupervisor: Sendable {
     /// Never resumes: the forced exit ends the process. A sleep loop rather than a
     /// Never-typed continuation, which the pinned CI compiler (Xcode 26.6) rejects as
     /// "will never be executed" under warnings-as-errors.
-    private static func parkForever() async -> Never {
+    @concurrent private static func parkForever() async -> Never {
         while true {
             try? await Task.sleep(for: .seconds(3600))
         }
@@ -135,7 +135,7 @@ protocol CLIChildProcess: Sendable {
     func terminate()
     /// Forced stop (SIGKILL), sent only on the forced-exit path.
     func forceKill()
-    func waitUntilExit() async
+    @concurrent func waitUntilExit() async
     /// Bounded wait for the forced-exit path, which cannot suspend.
     func waitUntilExit(timeout: DispatchTime) -> Bool
 }
@@ -162,7 +162,7 @@ final class CLIChildProcesses: Sendable {
 
     /// Runs one child to exit. Throws `CancellationError`, only after the
     /// child is reaped, when the owning task was cancelled.
-    func run(_ executable: URL, arguments: [String], launch: CLIProcessLauncher) async throws {
+    @concurrent func run(_ executable: URL, arguments: [String], launch: CLIProcessLauncher) async throws {
         try Task.checkCancellation()
         let id = UUID()
         // Launch under the lock: a concurrent forced exit either sees this
@@ -174,7 +174,7 @@ final class CLIChildProcesses: Sendable {
             return child
         }
         defer { state.withLock { _ = $0.live.removeValue(forKey: id) } }
-        await withTaskCancellationHandler {
+        await withTaskCancellationHandler { @concurrent in
             await child.waitUntilExit()
         } onCancel: {
             child.terminate()
@@ -233,7 +233,7 @@ final class CLIFoundationChildProcess: CLIChildProcess {
         if process.isRunning { kill(process.processIdentifier, SIGKILL) }
     }
 
-    func waitUntilExit() async {
+    @concurrent func waitUntilExit() async {
         await withCheckedContinuation { (reaped: CheckedContinuation<Void, Never>) in
             exited.notify(queue: .global(qos: .utility)) { @Sendable in reaped.resume() }
         }
@@ -250,7 +250,7 @@ final class CLIFoundationChildProcess: CLIChildProcess {
 enum CLIPlayback {
     static let player = URL(fileURLWithPath: "/usr/bin/afplay")
 
-    static func play(
+    @concurrent static func play(
         _ paths: [String],
         children: CLIChildProcesses = .shared,
         launch: CLIProcessLauncher = CLIFoundationChildProcess.launch

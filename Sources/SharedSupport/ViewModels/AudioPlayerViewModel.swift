@@ -2107,7 +2107,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     /// land only while that file is still the loaded one, so a slow read of a
     /// take the user already left never replaces the current take's waveform.
     private func extractWaveform(from url: URL, loadedPath: String) {
-        Task.detached {
+        Task.detached { @concurrent in
             let extracted = WaveformService.extractSamples(from: url, targetCount: 120)
             await MainActor.run { [weak self] in
                 guard let self, self.currentFilePath == loadedPath else { return }

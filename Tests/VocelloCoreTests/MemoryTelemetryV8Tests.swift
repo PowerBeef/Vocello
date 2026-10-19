@@ -131,7 +131,7 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         XCTAssertEqual(summary.boundaryCoverage?.missingBoundaryNames, [])
     }
 
-    func testKernelLedgerCatchesAnAllocationSpikeTheSamplesMiss() async throws {
+    @concurrent func testKernelLedgerCatchesAnAllocationSpikeTheSamplesMiss() async throws {
         // A cadence far longer than the test, so only the start and stop samples
         // are taken and a transient spike lives and dies between them, as a short
         // allocation does between two 500 ms ticks (audit #3, #16).

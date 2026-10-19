@@ -236,7 +236,7 @@ final class LiveStreamingPlaybackEngine {
         playerNode = nil
         engine = nil
         guard let retiredGraph else { return }
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { @concurrent in
             retiredGraph.stopAndReleaseResources()
         }
     }

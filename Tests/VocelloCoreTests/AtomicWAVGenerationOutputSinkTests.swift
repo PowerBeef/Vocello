@@ -60,7 +60,7 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: output), Data("reference".utf8))
     }
 
-    func testQCFailureAndAbortPreserveExistingDestination() async throws {
+    @concurrent func testQCFailureAndAbortPreserveExistingDestination() async throws {
         let output = temporaryOutputURL()
         let fm = FileManager.default
         try fm.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -79,7 +79,7 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: output), sentinel)
     }
 
-    func testSinkPublishesOnlyAfterPersistedFastQCPasses() async throws {
+    @concurrent func testSinkPublishesOnlyAfterPersistedFastQCPasses() async throws {
         let outputURL = temporaryOutputURL()
         defer { try? FileManager.default.removeItem(at: outputURL.deletingLastPathComponent()) }
         let sink = try AtomicWAVGenerationOutputSink(
@@ -131,7 +131,7 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         }
     }
 
-    func testSinkRejectsUnstableOutputBeforePublication() async throws {
+    @concurrent func testSinkRejectsUnstableOutputBeforePublication() async throws {
         let outputURL = temporaryOutputURL()
         defer { try? FileManager.default.removeItem(at: outputURL.deletingLastPathComponent()) }
         let sink = try AtomicWAVGenerationOutputSink(
@@ -159,7 +159,7 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
     }
 
-    func testSinkRejectsCrossGenerationAndNonContiguousChunks() async throws {
+    @concurrent func testSinkRejectsCrossGenerationAndNonContiguousChunks() async throws {
         let outputURL = temporaryOutputURL()
         defer { try? FileManager.default.removeItem(at: outputURL.deletingLastPathComponent()) }
         let sink = try AtomicWAVGenerationOutputSink(
@@ -206,7 +206,7 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
     }
 
-    func testSinkRejectsTerminalFrameCountMismatch() async throws {
+    @concurrent func testSinkRejectsTerminalFrameCountMismatch() async throws {
         let outputURL = temporaryOutputURL()
         defer { try? FileManager.default.removeItem(at: outputURL.deletingLastPathComponent()) }
         let sink = try AtomicWAVGenerationOutputSink(

@@ -182,6 +182,11 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - Blocking the main thread during model load; observing the whole engine store in the root shell's body.
 - Using the saved-reference language as Clone output language; assembling requests in a view.
 - Treating `.cancelled` as failure or releasing ownership before the terminal barrier.
+- Writing new `nonisolated async` work that must not run on the caller's actor without `@concurrent`.
+  NonisolatedNonsendingByDefault is on: such a function, closure or function type now runs on its
+  caller's actor, so heavy work called from the main actor stalls the UI (the macOS stall gate
+  catches it late). Write `@concurrent` closures with an explicit `async`
+  (`{ @concurrent () async -> T in`), the form CI's Xcode 26.6 also accepts.
 - Conforming a `@MainActor` type to an Objective-C delegate a framework calls off the main actor
   (`AVAudioRecorderDelegate`, `CXCallObserverDelegate` and the like) without writing
   `nonisolated` on the conformance. With InferIsolatedConformances on, the conformance is inferred

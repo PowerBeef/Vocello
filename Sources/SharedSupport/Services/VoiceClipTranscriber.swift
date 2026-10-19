@@ -306,7 +306,7 @@ enum VoiceClipTranscriber {
     @concurrent
     static func stableEnrollmentResult(
         url: URL,
-        recognize: @Sendable (URL) async -> EnrollmentResult = { await VoiceClipTranscriber.enrollmentResult(url: $0) }
+        recognize: @Sendable @concurrent (URL) async -> EnrollmentResult = { @concurrent in await VoiceClipTranscriber.enrollmentResult(url: $0) }
     ) async -> EnrollmentResult? {
         guard let before = try? await audioContentIdentity(url: url), !Task.isCancelled else { return nil }
         let directory = FileManager.default.temporaryDirectory
@@ -327,13 +327,13 @@ enum VoiceClipTranscriber {
         return result
     }
 
-    static func transcribe(url: URL) async -> (text: String, language: Qwen3SupportedLanguage)? {
+    @concurrent static func transcribe(url: URL) async -> (text: String, language: Qwen3SupportedLanguage)? {
         let result = await enrollmentResult(url: url)
         guard let text = result.text else { return nil }
         return (text, result.language)
     }
 
-    static func enrollmentResult(url: URL) async -> EnrollmentResult {
+    @concurrent static func enrollmentResult(url: URL) async -> EnrollmentResult {
         let authorization = await requestAuthorizationState()
         guard authorization == .authorized else {
             return EnrollmentResult(
@@ -376,7 +376,7 @@ enum VoiceClipTranscriber {
         return await enrollmentResult(
             candidates: localeCandidates,
             authorization: authorization,
-            recognize: { index in
+            recognize: { @concurrent index in
                 await recognizeDetailed(
                     url: url,
                     candidate: candidates[index],
@@ -441,13 +441,13 @@ enum VoiceClipTranscriber {
 
     /// The selection over injected recognition passes (`recognize` returns the
     /// pass for candidate `index`), so it is tested without Speech.
-    static func enrollmentResult(
+    @concurrent static func enrollmentResult(
         candidates: [EnrollmentLocaleCandidate],
         authorization: AuthorizationState,
         scoreLanguage: @Sendable (String, Qwen3SupportedLanguage) -> Double = {
             languageMatchScore(text: $0, expected: $1)
         },
-        recognize: @Sendable (Int) async -> RecognitionPass
+        recognize: @Sendable @concurrent (Int) async -> RecognitionPass
     ) async -> EnrollmentResult {
         var attempts: [EnrollmentLocaleAttempt] = []
         var best: (text: String, language: Qwen3SupportedLanguage, score: EnrollmentPassScore)?
@@ -534,7 +534,7 @@ enum VoiceClipTranscriber {
     /// Captures deterministic, bounded ASR evidence for output verification. One locale is selected
     /// once, then the exact same URL and locale are used for up to three sequential passes. Success
     /// requires all three; a terminal failure or disagreement stops immediately.
-    static func verificationEvidence(
+    @concurrent static func verificationEvidence(
         url: URL,
         expectedLanguage: Qwen3SupportedLanguage
     ) async -> VerificationEvidence {
@@ -1216,7 +1216,7 @@ enum VoiceClipTranscriber {
             }
     }
 
-    private static func recognizeDetailed(
+    @concurrent private static func recognizeDetailed(
         url: URL,
         candidate: CandidateLocale,
         authorizationStatus: AuthorizationState,
@@ -1259,7 +1259,7 @@ enum VoiceClipTranscriber {
         let controller = SpeechRecognitionTaskController()
 
         return await withCheckedContinuation { (continuation: CheckedContinuation<RecognitionPass, Never>) in
-            let timeoutTask = Task {
+            let timeoutTask = Task { @concurrent in
                 do {
                     try await Task.sleep(for: recognitionPassTimeout)
                 } catch {
@@ -1411,12 +1411,12 @@ enum VoiceClipTranscriber {
         }
     }
 
-    private static func requestAuthorizationState() async -> AuthorizationState {
+    @concurrent private static func requestAuthorizationState() async -> AuthorizationState {
         let current = authorizationState()
         guard current == .notDetermined else { return current }
         let completion = CompletionClaim()
         return await withCheckedContinuation { continuation in
-            let timeoutTask = Task {
+            let timeoutTask = Task { @concurrent in
                 do {
                     try await Task.sleep(for: authorizationTimeout)
                 } catch {

@@ -119,11 +119,11 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertEqual(observed.value, .superseded)
     }
 
-    func testCancellationRetainsOwnershipUntilTaskTerminates() async throws {
+    @concurrent func testCancellationRetainsOwnershipUntilTaskTerminates() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
         let cancellationRequested = expectation(description: "typed cancellation reached the worker")
-        let worker = Task {
+        let worker = Task { @concurrent in
             await terminalGate.wait()
         }
         let registration = try await coordinator.register(
@@ -131,10 +131,10 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
                 worker.cancel()
                 cancellationRequested.fulfill()
             },
-            waitForTermination: { _ = await worker.result }
+            waitForTermination: { @concurrent in _ = await worker.result }
         )
 
-        let cancellation = Task {
+        let cancellation = Task { @concurrent in
             await coordinator.cancelCurrent(reason: .memoryPressure)
         }
 
@@ -160,7 +160,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertNil(reasonAfterFinish)
     }
 
-    func testFinishPreservesEveryTypedReasonAcrossEarlyCancellation() async throws {
+    @concurrent func testFinishPreservesEveryTypedReasonAcrossEarlyCancellation() async throws {
         let reasons: [GenerationCancellationReason] = [
             .memoryPressure,
             .superseded,
@@ -171,7 +171,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             let coordinator = ActiveGenerationCoordinator()
             let terminalGate = TestGenerationGate()
             let cancellationRequested = expectation(description: "worker received \(expectedReason)")
-            let worker = Task {
+            let worker = Task { @concurrent in
                 await terminalGate.wait()
                 try Task.checkCancellation()
             }
@@ -180,10 +180,10 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
                     worker.cancel()
                     cancellationRequested.fulfill()
                 },
-                waitForTermination: { _ = await worker.result }
+                waitForTermination: { @concurrent in _ = await worker.result }
             )
 
-            let cancellation = Task {
+            let cancellation = Task { @concurrent in
                 await coordinator.cancelCurrent(reason: expectedReason)
             }
             await fulfillment(of: [cancellationRequested], timeout: 5)
@@ -198,19 +198,19 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         }
     }
 
-    func testSecondGenerationIsRejectedWhileFirstOwnsEngine() async throws {
+    @concurrent func testSecondGenerationIsRejectedWhileFirstOwnsEngine() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
-        let worker = Task {
+        let worker = Task { @concurrent in
             await terminalGate.wait()
         }
         let registration = try await coordinator.register(
             cancel: { _ in worker.cancel() },
-            waitForTermination: { _ = await worker.result }
+            waitForTermination: { @concurrent in _ = await worker.result }
         )
 
         do {
-            _ = try await coordinator.register(cancel: { _ in }, waitForTermination: {})
+            _ = try await coordinator.register(cancel: { _ in }, waitForTermination: { @concurrent in})
             XCTFail("A second generation must not acquire the engine")
         } catch let error as TTSEngineError {
             guard case .generationFailed = error else {
@@ -225,42 +225,42 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertFalse(isActiveAfterFinish)
     }
 
-    func testCriticalKernelPressureWaitsForTypedCancellationBarrierBeforeHardTrim() async throws {
+    @concurrent func testCriticalKernelPressureWaitsForTypedCancellationBarrierBeforeHardTrim() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
         let actions = TestMemoryPressureActionLog()
-        let worker = Task {
+        let worker = Task { @concurrent in
             await terminalGate.wait()
             await actions.append(.workerTerminated)
         }
         let registration = try await coordinator.register(
             cancel: { _ in worker.cancel() },
-            waitForTermination: { _ = await worker.result }
+            waitForTermination: { @concurrent in _ = await worker.result }
         )
         let executor = NativeMemoryPressureResponseExecutor(
-            recordObservation: { level in
+            recordObservation: { @concurrent level in
                 await actions.append(.observed(level))
             },
-            cancelActiveGeneration: { reason in
+            cancelActiveGeneration: { @concurrent reason in
                 await actions.append(.cancellationRequested(reason))
                 await coordinator.cancelCurrent(reason: reason)
                 await actions.append(.terminalBarrierPassed)
             },
-            trim: { level, reason in
+            trim: { @concurrent level, reason in
                 await actions.append(.trimmed(level, reason))
             },
-            closeAdmissionForCriticalRelief: {
+            closeAdmissionForCriticalRelief: { @concurrent in
                 await actions.append(.admissionClosed)
             },
-            awaitModelOperationsQuiesced: {
+            awaitModelOperationsQuiesced: { @concurrent in
                 await actions.append(.modelOperationsQuiesced)
             },
-            publishCriticalReliefCompletion: {
+            publishCriticalReliefCompletion: { @concurrent in
                 await actions.append(.reliefPublished)
             }
         )
 
-        let response = Task {
+        let response = Task { @concurrent in
             await executor.execute(
                 level: .hardTrim,
                 reason: "test_kernel_pressure_hardTrim"
@@ -308,13 +308,13 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertEqual(terminalReason, .memoryPressure)
     }
 
-    func testFirstCancellationReasonWinsAcrossConcurrentRequests() async throws {
+    @concurrent func testFirstCancellationReasonWinsAcrossConcurrentRequests() async throws {
         let coordinator = ActiveGenerationCoordinator()
         let terminalGate = TestGenerationGate()
         let cancellationRequested = expectation(description: "first cancellation reached the worker")
         let terminalWaitsEntered = expectation(description: "both cancellation requests joined termination")
         terminalWaitsEntered.expectedFulfillmentCount = 2
-        let worker = Task {
+        let worker = Task { @concurrent in
             await terminalGate.wait()
             try Task.checkCancellation()
         }
@@ -323,20 +323,20 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
                 worker.cancel()
                 cancellationRequested.fulfill()
             },
-            waitForTermination: {
+            waitForTermination: { @concurrent in
                 terminalWaitsEntered.fulfill()
                 _ = await worker.result
             }
         )
 
-        let criticalCancellation = Task {
+        let criticalCancellation = Task { @concurrent in
             await coordinator.cancelCurrent(reason: .memoryPressure)
         }
         await fulfillment(of: [cancellationRequested], timeout: 5)
         let firstReason = await coordinator.currentCancellationReason
         XCTAssertEqual(firstReason, .memoryPressure)
 
-        let laterCancellation = Task {
+        let laterCancellation = Task { @concurrent in
             await coordinator.cancelCurrent(reason: .shutdown)
         }
         await fulfillment(of: [terminalWaitsEntered], timeout: 5)
@@ -360,25 +360,25 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         let quiescenceGate = TestGenerationGate()
         let actions = TestMemoryPressureActionLog()
         let executor = NativeMemoryPressureResponseExecutor(
-            recordObservation: { level in
+            recordObservation: { @concurrent level in
                 await actions.append(.observed(level))
             },
-            cancelActiveGeneration: { reason in
+            cancelActiveGeneration: { @concurrent reason in
                 await actions.append(.cancellationRequested(reason))
             },
-            trim: { level, reason in
+            trim: { @concurrent level, reason in
                 await actions.append(.trimmed(level, reason))
             },
-            closeAdmissionForCriticalRelief: {
+            closeAdmissionForCriticalRelief: { @concurrent in
                 await admission.close()
                 await actions.append(.admissionClosed)
             },
-            awaitModelOperationsQuiesced: {
+            awaitModelOperationsQuiesced: { @concurrent in
                 await actions.append(.modelOperationBarrierStarted)
                 await quiescenceGate.wait()
                 await actions.append(.modelOperationsQuiesced)
             },
-            publishCriticalReliefCompletion: {
+            publishCriticalReliefCompletion: { @concurrent in
                 await actions.append(.reliefPublished)
                 await admission.reopen()
             }
@@ -439,12 +439,12 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertFalse(completed.contains(.operationEntered("prewarm")))
     }
 
-    func testPressureSnapshotSupportsConcurrentReadsAndTransitions() async {
+    @concurrent func testPressureSnapshotSupportsConcurrentReadsAndTransitions() async {
         let state = NativeMemoryPressureSnapshotState()
 
-        await withTaskGroup(of: Void.self) { group in
+        await withTaskGroup(of: Void.self) { @concurrent group in
             for writer in 0..<8 {
-                group.addTask {
+                group.addTask { @concurrent in
                     for iteration in 0..<2_000 {
                         let value: NativeMemoryTrimLevel? = switch (writer + iteration) % 3 {
                         case 0: .softTrim
@@ -456,7 +456,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
                 }
             }
             for _ in 0..<8 {
-                group.addTask {
+                group.addTask { @concurrent in
                     for _ in 0..<4_000 {
                         _ = state.currentLevel
                     }
@@ -473,7 +473,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     /// DA-09: the kernel monitor maps each callback to one trim level, lets
     /// critical win over warning, emits only on a change, never emits for
     /// relief, and `stop()` finishes the stream the engine iterates.
-    func testKernelPressureCallbacksEmitTrimLevelsOnlyOnChange() async {
+    @concurrent func testKernelPressureCallbacksEmitTrimLevelsOnlyOnChange() async {
         let monitor = NativeMemoryPressureMonitor(label: "test.memory-pressure")
         monitor.handle(event: [.warning, .critical])
         XCTAssertEqual(monitor.currentLevel, .hardTrim, "critical wins in a combined callback")
@@ -497,7 +497,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     /// drops prewarm state, and a full unload releases through the coordinator.
     /// The runtime's default clone-conditioning cache clears through the same
     /// allocator, so each level records the cache's clear before its own.
-    func testRuntimeTrimLevelsDriveTheAllocatorAndTheModelCoordinator() async {
+    @concurrent func testRuntimeTrimLevelsDriveTheAllocatorAndTheModelCoordinator() async {
         let allocator = TestCallLog()
         let coordinator = TrimRecordingCoordinator()
         let runtime = NativeEngineRuntime(
@@ -532,16 +532,16 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
 
     /// DA-09: `MLXTTSEngine.generate` holds its task behind this gate until
     /// the coordinator has registered it; no waiter may pass a closed gate.
-    func testGenerationTaskStartGateHoldsEveryWaiterUntilOpened() async {
+    @concurrent func testGenerationTaskStartGateHoldsEveryWaiterUntilOpened() async {
         let gate = GenerationTaskStartGate()
         let passed = TestCallLog()
         let firstEntered = expectation(description: "first task entered the start gate")
         let secondEntered = expectation(description: "second task entered the start gate")
-        let first = Task {
+        let first = Task { @concurrent in
             await gate.wait(entered: firstEntered)
             passed.append("first")
         }
-        let second = Task {
+        let second = Task { @concurrent in
             await gate.wait(entered: secondEntered)
             passed.append("second")
         }
@@ -562,25 +562,25 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         await gate.wait()
     }
 
-    func testWarningKernelPressureSoftTrimsWithoutCancellingGeneration() async {
+    @concurrent func testWarningKernelPressureSoftTrimsWithoutCancellingGeneration() async {
         let actions = TestMemoryPressureActionLog()
         let executor = NativeMemoryPressureResponseExecutor(
-            recordObservation: { level in
+            recordObservation: { @concurrent level in
                 await actions.append(.observed(level))
             },
-            cancelActiveGeneration: { reason in
+            cancelActiveGeneration: { @concurrent reason in
                 await actions.append(.cancellationRequested(reason))
             },
-            trim: { level, reason in
+            trim: { @concurrent level, reason in
                 await actions.append(.trimmed(level, reason))
             },
-            closeAdmissionForCriticalRelief: {
+            closeAdmissionForCriticalRelief: { @concurrent in
                 await actions.append(.admissionClosed)
             },
-            awaitModelOperationsQuiesced: {
+            awaitModelOperationsQuiesced: { @concurrent in
                 await actions.append(.modelOperationsQuiesced)
             },
-            publishCriticalReliefCompletion: {
+            publishCriticalReliefCompletion: { @concurrent in
                 await actions.append(.reliefPublished)
             }
         )

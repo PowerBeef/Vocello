@@ -30,7 +30,7 @@ final class SavedVoicesViewModel {
     @ObservationIgnored private var hasLoadedOnce = !SavedVoicesSessionCache.voices.isEmpty
     @ObservationIgnored private var pendingRefresh = false
     @ObservationIgnored private var loadTask: Task<Void, Never>?
-    @ObservationIgnored private var lastRefreshAction: (() async -> Void)?
+    @ObservationIgnored private var lastRefreshAction: (@concurrent () async -> Void)?
     @ObservationIgnored private var busyRetryPolicy = SavedVoicesBusyRetryPolicy()
     @ObservationIgnored private var storeBusyRetryTask: Task<Void, Never>?
 

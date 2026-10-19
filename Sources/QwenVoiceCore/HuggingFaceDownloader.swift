@@ -285,9 +285,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     final class VerifiedArtifactHandlerBox: Sendable {
-        let handler: @Sendable (VerifiedArtifactReceipt) async -> Void
+        let handler: @Sendable @concurrent (VerifiedArtifactReceipt) async -> Void
 
-        init(_ handler: @escaping @Sendable (VerifiedArtifactReceipt) async -> Void) {
+        init(_ handler: @escaping @Sendable @concurrent (VerifiedArtifactReceipt) async -> Void) {
             self.handler = handler
         }
     }
@@ -323,7 +323,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         /// Takes the lock, waiting up to `patience` for its current owner (a cancelled
         /// run of the same model unwinding) to let go, then refusing the run.
-        static func acquire(
+        @concurrent static func acquire(
             stagingRoot: URL,
             fileManager: FileManager,
             patience: Duration
@@ -404,7 +404,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             self.resumeDataURL = resumeDataURL
         }
 
-        func cancelAndWait() async {
+        @concurrent func cancelAndWait() async {
             await withCheckedContinuation { continuation in
                 task.cancel { [resumeDataURL] resumeData in
                     guard let resumeDataURL,
@@ -683,7 +683,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         taskID: taskID,
                         transferredBytes: taskBytes[taskID]
                     ))
-                    group.addTask {
+                    group.addTask { @concurrent in
                         await cancellation.cancelAndWait()
                     }
                 }
@@ -1120,7 +1120,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private func startHeartbeatIfNeeded() {
             guard heartbeatTask == nil else { return }
             let registry = self
-            heartbeatTask = Task {
+            heartbeatTask = Task { @concurrent in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(750))
                     await registry.emitHeartbeatIfNeeded()
@@ -1542,7 +1542,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         fileManager: FileManager = .default,
         durableTemporaryDirectory: URL? = nil,
         transferMetricsHandler: (@Sendable (TransferMetrics) -> Void)? = nil,
-        verifiedArtifactHandler: (@Sendable (VerifiedArtifactReceipt) async -> Void)? = nil,
+        verifiedArtifactHandler: (@Sendable @concurrent (VerifiedArtifactReceipt) async -> Void)? = nil,
         lifecycleEventHandler: (@Sendable (LifecycleEvent) -> Void)? = nil,
         rangeRetryHandler: (@Sendable (RangeRetryEvent) -> Void)? = nil,
         backgroundSessionCompletionHandler: (@Sendable (String) -> Void)? = nil,
@@ -1603,7 +1603,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// foreground macOS/CLI runs and adoptable across iOS background-session relaunches.
     /// `repo`/`revision` seed the integrity manifest and fallback resolve URL.
     @discardableResult
-    public func downloadFiles(
+    @concurrent public func downloadFiles(
         _ files: [RepoFile],
         repo: String,
         revision: String,
@@ -1682,7 +1682,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     /// Ends one repository run. A failure (or cancellation) tears down any remaining
     /// in-flight URLSession tasks so the caller does not wait for them.
-    private func finishRun(succeeded: Bool) async {
+    @concurrent private func finishRun(succeeded: Bool) async {
         if !succeeded {
             await state.requestCancellation()
         }
@@ -1699,7 +1699,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     /// Staging → parallel download → SHA-256 verify → atomic install flow behind
     /// `downloadFiles` (catalog path). `downloadFiles` owns the run's teardown.
-    private func runDownload(
+    @concurrent private func runDownload(
         files: [RepoFile],
         repo: String,
         revision: String,
@@ -1880,17 +1880,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     /// Cancel all in-flight downloads. Await before deleting staging so delegate callbacks
     /// don't race against a removed directory.
-    public func cancel() async {
+    @concurrent public func cancel() async {
         await state.requestCancellation()
     }
 
     /// Privacy-safe active-task count for the opt-in physical-device diagnostic heartbeat.
     /// It exposes no task requests, URLs, paths, or session identifiers.
-    public func diagnosticActiveTaskCount() async -> Int {
+    @concurrent public func diagnosticActiveTaskCount() async -> Int {
         await state.activeTaskCount()
     }
 
-    private func throwIfCancellationRequested() async throws {
+    @concurrent private func throwIfCancellationRequested() async throws {
         if Task.isCancelled {
             throw DownloadError.cancelled
         }
@@ -1902,7 +1902,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Retry backoff that observes both task cancellation and the downloader's own
     /// cancellation request within a quarter second, so a user cancel never waits out a
     /// multi-second backoff or a server's `Retry-After`. A cancelled wait never retries.
-    private func sleepBeforeRetry(seconds: Double) async throws {
+    @concurrent private func sleepBeforeRetry(seconds: Double) async throws {
         var remaining = max(0, seconds)
         repeat {
             let slice = min(remaining, 0.25)
@@ -1917,13 +1917,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     /// Remove orphan or stale tasks when no durable request is eligible for adoption.
-    public func cancelAllSessionTasks() async {
+    @concurrent public func cancelAllSessionTasks() async {
         let tasks = await withCheckedContinuation { continuation in
             unsafe session.getAllTasks { continuation.resume(returning: $0) }
         }
-        await withTaskGroup(of: Void.self) { group in
+        await withTaskGroup(of: Void.self) { @concurrent group in
             for case let task as URLSessionDownloadTask in tasks {
-                group.addTask {
+                group.addTask { @concurrent in
                     await withCheckedContinuation { continuation in
                         task.cancel { _ in continuation.resume() }
                     }
@@ -1933,7 +1933,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await state.requestCancellation()
     }
 
-    private func completeBackgroundEventsAfterPostprocessing() async {
+    @concurrent private func completeBackgroundEventsAfterPostprocessing() async {
         guard isBackgroundSession,
               let identifier = unsafe session.configuration.identifier,
               await state.markPostprocessingFinished() else { return }
@@ -1942,7 +1942,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     /// `expected` is keyed by `ModelDownloadTaskIdentity.reconciliationKey`, so one file
     /// may legitimately appear as a whole-file slot plus N chunk slots.
-    private func reconcileBackgroundTasks(expected: [String: ModelDownloadTaskIdentity]) async {
+    @concurrent private func reconcileBackgroundTasks(expected: [String: ModelDownloadTaskIdentity]) async {
         let tasks = await withCheckedContinuation { continuation in
             unsafe session.getAllTasks { continuation.resume(returning: $0) }
         }
@@ -2014,7 +2014,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Download every file concurrently (up to `maxConcurrentFileDownloads` at a time),
     /// staging each into `filesRoot`. Repository progress aggregates across all files
     /// that are in flight. A single file failure cancels the rest and throws.
-    private func downloadAllFiles(
+    @concurrent private func downloadAllFiles(
         _ files: [RepoFile],
         repo: String,
         revision: String,
@@ -2031,7 +2031,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // "Resuming" phase — that was a vestige of the discarded pause/resume feature.
         let maxConcurrent = min(max(1, engineConfiguration.maxConcurrentFiles), files.count)
 
-        try await withThrowingTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { @concurrent group in
             // Largest first: the multi-gigabyte long pole dominates total transfer time,
             // so its stream (or chunk queue) starts at t=0 instead of waiting behind a
             // catalog position; the small files fill remaining slots either way.
@@ -2042,7 +2042,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // Prime the group with up to `maxConcurrent` file downloads.
             for _ in 0..<maxConcurrent {
                 guard let (index, file) = fileIterator.next() else { break }
-                group.addTask { [self] in
+                group.addTask { @concurrent [self] in
                     try await self.downloadOneFileCancelingPeers(
                         file,
                         fileIndex: index,
@@ -2062,7 +2062,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     throw DownloadError.cancelled
                 }
                 guard let (index, file) = fileIterator.next() else { continue }
-                group.addTask { [self] in
+                group.addTask { @concurrent [self] in
                     try await self.downloadOneFileCancelingPeers(
                         file,
                         fileIndex: index,
@@ -2080,7 +2080,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     /// Stage a single file (skip if already valid, else download + validate into the
     /// staging tree), then report completion so the shared progress counter reconciles.
-    private func downloadOneFile(
+    @concurrent private func downloadOneFile(
         _ file: RepoFile,
         fileIndex: Int,
         repo: String,
@@ -2165,7 +2165,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Wraps `downloadOneFile` so that when any file fails it immediately cancels every
     /// other in-flight download. Without this, a `ThrowingTaskGroup` failure would leave
     /// sibling URLSession tasks running until they complete naturally, stalling teardown.
-    private func downloadOneFileCancelingPeers(
+    @concurrent private func downloadOneFileCancelingPeers(
         _ file: RepoFile,
         fileIndex: Int,
         repo: String,
@@ -2192,7 +2192,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    private func downloadFile(
+    @concurrent private func downloadFile(
         from url: URL,
         to destination: URL,
         partialURL: URL,
@@ -2301,7 +2301,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     /// A single (un-retried) attempt to stage one file.
-    private func attemptFileDownload(
+    @concurrent private func attemptFileDownload(
         from url: URL,
         to destination: URL,
         partialURL: URL,
@@ -2484,7 +2484,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// sidecar does not cover are fetched, recovered bytes are folded into progress, and
     /// stale adopted tasks for recovered ranges (or a superseded whole-file task) are
     /// cancelled so they can never stream duplicate wire bytes unawaited.
-    private func downloadChunkedFile(
+    @concurrent private func downloadChunkedFile(
         from url: URL,
         to destination: URL,
         partialURL: URL,
@@ -2593,7 +2593,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// stops dispatching new ranges and lets in-flight siblings finish (their ranges
     /// land in the sidecar) before it escalates, so the file-level retry fetches only
     /// the gaps rather than discarding every partially transferred sibling.
-    private func runChunkTransfers(
+    @concurrent private func runChunkTransfers(
         missing: [ChunkRange],
         url: URL,
         fileIndex: Int,
@@ -2601,9 +2601,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         assembly: ChunkAssemblyCoordinator
     ) async throws {
         if isBackgroundSession, engineConfiguration.backgroundInFlightRangeLimit == nil {
-            try await withThrowingTaskGroup(of: (any Error)?.self) { group in
+            try await withThrowingTaskGroup(of: (any Error)?.self) { @concurrent group in
                 for range in missing {
-                    group.addTask { [self] in
+                    group.addTask { @concurrent [self] in
                         do {
                             unsafe try await self.downloadOneChunkWithRetry(
                                 url: url,
@@ -2635,10 +2635,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             : engineConfiguration.chunkWorkerCount
         let workerCount = max(1, min(poolSize, missing.count))
         do {
-            try await withThrowingTaskGroup(of: (any Error)?.self) { group in
+            try await withThrowingTaskGroup(of: (any Error)?.self) { @concurrent group in
                 for workerIndex in 0..<workerCount {
                     let workerSession = chunkTransferSession(forWorker: workerIndex)
-                    group.addTask { [self] in
+                    group.addTask { @concurrent [self] in
                         while let range = await queue.next() {
                             try Task.checkCancellation()
                             do {
@@ -2705,7 +2705,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// range-qualified identity, so background relaunch adoption and logical-slot
     /// progress accounting stay exact. Non-transient failures throw immediately to the
     /// file-level fallback; a cancelled task or downloader never retries.
-    private func downloadOneChunkWithRetry(
+    @concurrent private func downloadOneChunkWithRetry(
         url: URL,
         range: ChunkRange,
         fileIndex: Int,
@@ -2768,7 +2768,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// identity, so a background relaunch adopts the live task (consumed here) or claims
     /// its parked completion (inside `register`), and post-relaunch transfer metrics
     /// still attribute the bytes to their file.
-    private func downloadOneChunk(
+    @concurrent private func downloadOneChunk(
         url: URL,
         range: ChunkRange,
         fileIndex: Int,
@@ -2802,9 +2802,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // delegate event can arrive (adopted-already-terminal task, registration
         // fail-fast, parked-completion claim, cancellation).
         defer { _ = chunkTaskPathsBox.withLock { $0.removeValue(forKey: key) } }
-        let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler {
+        let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler { @concurrent in
             try await withCheckedThrowingContinuation { continuation in
-                Task {
+                Task { @concurrent in
                     let shouldResume = await state.register(
                         taskKey: key,
                         task: task,
@@ -2872,7 +2872,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// temp chunk on every exit, including a throwing write (a full disk, a
     /// short write or a closed partial), so a failed range never strands a
     /// range-sized file in the temporary directory.
-    static func assembleDownloadedChunk(
+    @concurrent static func assembleDownloadedChunk(
         tempURL: URL,
         range: ChunkRange,
         into assembly: ChunkAssemblyCoordinator,
@@ -3031,7 +3031,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return bounds.start == expectedStart && bounds.end == expectedEnd
     }
 
-    private func downloadTemporaryFile(
+    @concurrent private func downloadTemporaryFile(
         from url: URL,
         existingBytes: Int64,
         resumeDataURL: URL,
@@ -3046,7 +3046,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         if let adoptedTask = await state.takeAdoptedTask(for: url) {
             return try await withCheckedThrowingContinuation { continuation in
-                Task {
+                Task { @concurrent in
                     let receivedBytes = max(existingBytes, adoptedTask.countOfBytesReceived)
                     let shouldResume = unsafe await state.register(
                         taskKey: self.taskKey(for: adoptedTask, in: self.session),
@@ -3080,7 +3080,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 do {
                     return try await withCheckedThrowingContinuation { continuation in
                         let task = resumedTask
-                        Task {
+                        Task { @concurrent in
                             task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
                             let shouldResume = unsafe await state.register(
                                 taskKey: self.taskKey(for: task, in: self.session),
@@ -3115,7 +3115,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let request = Self.downloadRequest(for: url, existingBytes: existingBytes)
         return try await withCheckedThrowingContinuation { continuation in
             let task = unsafe session.downloadTask(with: request)
-            Task {
+            Task { @concurrent in
                 task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
                 let shouldResume = unsafe await state.register(
                     taskKey: self.taskKey(for: task, in: self.session),
@@ -3172,7 +3172,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    private func recordVerifiedReceipt(
+    @concurrent private func recordVerifiedReceipt(
         relativePath: String,
         artifactVersion: String,
         expectedSize: Int64,
@@ -3197,7 +3197,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await verifiedArtifactHandler?.handler(receipt)
     }
 
-    private func verifyDownloadedFilesUsingReceipts(
+    @concurrent private func verifyDownloadedFilesUsingReceipts(
         _ files: [RepoFile],
         artifactVersion: String,
         in root: URL
@@ -3452,7 +3452,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Foreground sessions (macOS/CLI) never trigger this, so they're unaffected.
     public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         guard let identifier = session.configuration.identifier else { return }
-        Task {
+        Task { @concurrent in
             if await state.markBackgroundEventsFinished() {
                 backgroundSessionCompletionHandler?(identifier)
             }
@@ -3463,7 +3463,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         _ session: URLSession,
         taskIsWaitingForConnectivity task: URLSessionTask
     ) {
-        Task { await state.setWaitingForConnectivity(true) }
+        Task { @concurrent in await state.setWaitingForConnectivity(true) }
     }
 
     public func urlSession(
@@ -3515,7 +3515,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             )
         }
         guard shouldForward else { return }
-        Task(priority: .utility) {
+        Task(priority: .utility) { @concurrent in
             await state.setWaitingForConnectivity(false)
             await state.reportProgress(taskID: taskID, totalBytesWritten: totalBytesWritten)
         }
@@ -3540,7 +3540,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let contentRange = response?.value(forHTTPHeaderField: "Content-Range")
         if oversizedTasksBox.withLock({ $0.contains(taskID) }) {
             let rangeIgnored = Self.isIgnoredRange(downloadTask)
-            terminalEventSequencer.stage(taskID: taskID) { [state] in
+            terminalEventSequencer.stage(taskID: taskID) { @concurrent [state] in
                 let path = await state.destinationPath(taskID: taskID)
                 await state.resumeFailure(
                     taskID: taskID,
@@ -3554,7 +3554,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // URL the bytes finally came from.
         if let artifactURLPolicy,
            !artifactURLPolicy.allowsTransferURL(response?.url ?? downloadTask.currentRequest?.url) {
-            terminalEventSequencer.stage(taskID: taskID) { [state] in
+            terminalEventSequencer.stage(taskID: taskID) { @concurrent [state] in
                 let path = await state.destinationPath(taskID: taskID)
                 await state.resumeFailure(
                     taskID: taskID,
@@ -3564,7 +3564,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             return
         }
         if let statusCode, ![200, 206].contains(statusCode) {
-            terminalEventSequencer.stage(taskID: taskID) { [state] in
+            terminalEventSequencer.stage(taskID: taskID) { @concurrent [state] in
                 let path = await state.destinationPath(taskID: taskID)
                 await state.resumeFailure(
                     taskID: taskID,
@@ -3585,7 +3585,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             try fileManager.createDirectory(at: durableTemporaryDirectory, withIntermediateDirectories: true)
             try fileManager.moveItem(at: location, to: safeTmp)
             let finalBytes = downloadTask.countOfBytesReceived
-            terminalEventSequencer.stage(taskID: taskID) { [state] in
+            terminalEventSequencer.stage(taskID: taskID) { @concurrent [state] in
                 await state.setWaitingForConnectivity(false)
                 await state.reportProgress(taskID: taskID, totalBytesWritten: finalBytes)
                 await state.stageSuccess(
@@ -3600,7 +3600,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
             }
         } catch {
-            terminalEventSequencer.stage(taskID: taskID) { [state] in
+            terminalEventSequencer.stage(taskID: taskID) { @concurrent [state] in
                 await state.resumeFailure(taskID: taskID, error: error)
             }
         }
@@ -3652,7 +3652,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         _ = transferCeilingsBox.withLock { $0.removeValue(forKey: taskID) }
         let wasOversized = oversizedTasksBox.withLock { $0.remove(taskID) != nil }
         let rangeIgnored = wasOversized && Self.isIgnoredRange(task)
-        terminalEventSequencer.complete(taskID: taskID) { [state] in
+        terminalEventSequencer.complete(taskID: taskID) { @concurrent [state] in
             await state.setWaitingForConnectivity(false)
             guard let error else {
                 // An oversized task that still finished already staged its failure.

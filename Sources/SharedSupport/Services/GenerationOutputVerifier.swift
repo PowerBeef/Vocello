@@ -122,7 +122,7 @@ enum GenerationOutputVerifier {
         var wordBoundaryOnlyEdits: Int?
     }
 
-    static func verify(
+    @concurrent static func verify(
         audioURL: URL,
         expectedScript: String,
         expectedLanguage: Qwen3SupportedLanguage,

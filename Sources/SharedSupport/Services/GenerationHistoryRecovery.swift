@@ -19,7 +19,7 @@ enum GenerationHistoryRecovery {
 
     static let coordinator = GenerationHistoryRecoveryCoordinator(
         store: outboxStore,
-        commitGeneration: { operation, generation in
+        commitGeneration: { @concurrent operation, generation in
             switch operation {
             case .append:
                 return try await DatabaseService.shared.saveGenerationIfMissingAsync(generation)
@@ -27,13 +27,13 @@ enum GenerationHistoryRecovery {
                 return try await DatabaseService.shared.replaceLongFormJoinedGenerationIfMissingAsync(generation)
             }
         },
-        fetchAllGenerations: {
+        fetchAllGenerations: { @concurrent in
             try DatabaseService.shared.fetchAllGenerationsForClear()
         },
-        deleteGenerationsThrough: { maxRowID in
+        deleteGenerationsThrough: { @concurrent maxRowID in
             try DatabaseService.shared.deleteGenerations(throughID: maxRowID)
         },
-        referencedAudioPaths: { audioPaths in
+        referencedAudioPaths: { @concurrent audioPaths in
             try DatabaseService.shared.referencedAudioPaths(among: audioPaths)
         }
     )
@@ -54,7 +54,7 @@ enum GenerationHistoryRecovery {
     /// hand to `retainAudioRemoval(_:)`. Off the main actor: a synchronous
     /// SQLite write and a file removal.
     /// A failure reads in `localization`, the caller's interface language.
-    static func deleteSingle(
+    @concurrent static func deleteSingle(
         recordID: Int64?,
         audioPath: String,
         localization: VocelloLocalization
@@ -76,7 +76,7 @@ enum GenerationHistoryRecovery {
 
     /// Keeps the audio of a deleted row for a later reconcile to remove (AUD-05).
     /// `false` when even the pending list could not be written.
-    static func retainAudioRemoval(_ audioPath: String) async -> Bool {
+    @concurrent static func retainAudioRemoval(_ audioPath: String) async -> Bool {
         do {
             try await coordinator.retainAudioRemoval(audioPath)
             return true
@@ -92,7 +92,7 @@ enum GenerationHistoryRecovery {
         try outboxStore.enqueue(generation, operation: operation)
     }
 
-    static func persist(
+    @concurrent static func persist(
         _ generation: Generation,
         operation: GenerationHistoryOutboxOperation = .append
     ) async throws -> Generation {
@@ -100,7 +100,7 @@ enum GenerationHistoryRecovery {
         return try await coordinator.commit(entry)
     }
 
-    static func reconcile() async -> GenerationHistoryReconciliationResult {
+    @concurrent static func reconcile() async -> GenerationHistoryReconciliationResult {
         await unqueued.retry { try enqueue($0) }
         // A long-form acceptance a suspended History interrupted completes here
         // after resume (PA-30); one that cannot stays visible as pending recovery.
@@ -109,7 +109,7 @@ enum GenerationHistoryRecovery {
         return GenerationHistoryReconciliationResult(committed: result.committed, snapshot: await snapshot())
     }
 
-    static func snapshot() async -> GenerationHistoryRecoverySnapshot {
+    @concurrent static func snapshot() async -> GenerationHistoryRecoverySnapshot {
         let durable = await coordinator.snapshot()
         let unqueuedCount = await unqueued.records.count
         let available = await unqueued.availableAudioURLs.count
@@ -125,14 +125,14 @@ enum GenerationHistoryRecovery {
     /// Retry on the notice about removal lists that could not be read (PA-30):
     /// the user has seen it, so the lists are discarded. The audio they named
     /// is not deleted. A failure leaves the notice for another Retry.
-    static func discardUnreadableAudioRemovals() async {
+    @concurrent static func discardUnreadableAudioRemovals() async {
         try? await coordinator.discardUnreadableAudioRemovals()
     }
 
     /// The user confirmed discarding the queued records that cannot be read
     /// or verified (A2-02): they are set aside, never deleted, and no audio is
     /// touched. A failure leaves the notice and its Discard action in place.
-    static func setAsideUnverifiableRecords() async {
+    @concurrent static func setAsideUnverifiableRecords() async {
         _ = try? await coordinator.setAsideUnverifiableRecords()
     }
 
@@ -141,7 +141,7 @@ enum GenerationHistoryRecovery {
     /// touched, and queued takes then reach History again. A device failure
     /// (full storage, a missing permission) leaves the notice and its Discard
     /// action in place and is returned, classified, for the screen to show.
-    static func setAsideLongFormRecoveryRecords() async -> HistoryPersistenceError? {
+    @concurrent static func setAsideLongFormRecoveryRecords() async -> HistoryPersistenceError? {
         do {
             _ = try DatabaseService.shared.setAsideUnresolvableLongFormRecovery()
             return nil
@@ -150,12 +150,12 @@ enum GenerationHistoryRecovery {
         }
     }
 
-    static func pendingAudioURLs() async -> [URL] {
+    @concurrent static func pendingAudioURLs() async -> [URL] {
         let durable = await coordinator.pendingAudioURLs()
         return Array(Set(durable + (await unqueued.availableAudioURLs))).sorted { $0.path < $1.path }
     }
 
-    static func recoveryExportURLs() async -> [URL] {
+    @concurrent static func recoveryExportURLs() async -> [URL] {
         let audio = await pendingAudioURLs()
         // Failure leaves the banner visible and never exports an unbounded or
         // redirected file. Ordinary queued audio remains exportable.
@@ -163,7 +163,7 @@ enum GenerationHistoryRecovery {
         return audio + journals
     }
 
-    static func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {
+    @concurrent static func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {
         // A keep-files request reaches a pending clear even when it is refused
         // below, so a later resume never deletes the audio (AUD-05).
         if !deleteAudio {

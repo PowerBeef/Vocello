@@ -787,7 +787,7 @@ private extension MacHistoryScreen {
             }
 
             do {
-                let (loadedItems, hasMore, count) = try await Task.detached(priority: .userInitiated) {
+                let (loadedItems, hasMore, count) = try await Task.detached(priority: .userInitiated) { @concurrent in
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }

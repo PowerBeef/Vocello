@@ -157,7 +157,7 @@ final class DatabaseService: @unchecked Sendable {
 
     // MARK: - CRUD
 
-    func acceptLongFormProject(_ input: LongFormHistoryAcceptance) async throws -> Generation {
+    @concurrent func acceptLongFormProject(_ input: LongFormHistoryAcceptance) async throws -> Generation {
         try await longFormAcceptance.commit(input, using: requireQueue(for: .write))
     }
 
@@ -215,11 +215,11 @@ final class DatabaseService: @unchecked Sendable {
     /// returning the persisted Generation lets callers obtain the
     /// auto-assigned `id` without an `inout` parameter (unsendable in
     /// async contexts).
-    func saveGenerationAsync(_ generation: Generation) async throws -> Generation {
+    @concurrent func saveGenerationAsync(_ generation: Generation) async throws -> Generation {
         try await saveGenerationIfMissingAsync(generation)
     }
 
-    func saveGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
+    @concurrent func saveGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in
@@ -240,11 +240,11 @@ final class DatabaseService: @unchecked Sendable {
 
     /// Retains older joined outputs as individually deletable History rows, then
     /// saves the new accepted output — one current joined record per project.
-    func replaceLongFormJoinedGenerationAsync(_ generation: Generation) async throws -> Generation {
+    @concurrent func replaceLongFormJoinedGenerationAsync(_ generation: Generation) async throws -> Generation {
         try await replaceLongFormJoinedGenerationIfMissingAsync(generation)
     }
 
-    func replaceLongFormJoinedGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
+    @concurrent func replaceLongFormJoinedGenerationIfMissingAsync(_ generation: Generation) async throws -> Generation {
         let dbQueue = try requireQueue(for: .write)
         do {
             return try await dbQueue.write { db in

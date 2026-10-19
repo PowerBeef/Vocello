@@ -3,14 +3,14 @@ import QwenVoiceCore
 import XCTest
 
 final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
-    func testStableRecognitionRejectsSamePathContentReplacement() async throws {
+    @concurrent func testStableRecognitionRejectsSamePathContentReplacement() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = directory.appendingPathComponent("voice.wav")
         try Data("original bytes".utf8).write(to: source)
         let fixture = Self.recognitionFixture()
-        let result = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { snapshot in
+        let result = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { @concurrent snapshot in
             XCTAssertEqual(try? Data(contentsOf: snapshot), Data("original bytes".utf8))
             try? Data("replacement bytes".utf8).write(to: source)
             return fixture
@@ -18,7 +18,7 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         XCTAssertNil(result, "A completed recognition cannot describe replaced reference contents")
     }
 
-    func testStableRecognitionUsesPrivateSnapshotAcrossAtoBtoAReplacementAndCleansIt() async throws {
+    @concurrent func testStableRecognitionUsesPrivateSnapshotAcrossAtoBtoAReplacementAndCleansIt() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -26,7 +26,7 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         let original = Data("original bytes".utf8)
         try original.write(to: source)
         let fixture = Self.recognitionFixture()
-        let result = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { snapshot in
+        let result = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { @concurrent snapshot in
             XCTAssertNotEqual(snapshot, source)
             try? Data("temporary replacement".utf8).write(to: source)
             XCTAssertEqual(try? Data(contentsOf: snapshot), original)
@@ -37,7 +37,7 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: source), original)
         // A second fake returns its snapshot URL in memory; the service's defer
         // must delete that private copy before delivering the result.
-        let cleanupResult = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { snapshot in
+        let cleanupResult = await VoiceClipTranscriber.stableEnrollmentResult(url: source) { @concurrent snapshot in
             var response = fixture
             response.text = snapshot.path
             return response
@@ -46,10 +46,10 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: removedPath))
     }
 
-    func testMissingReferenceCannotInvokeRecognition() async {
+    @concurrent func testMissingReferenceCannotInvokeRecognition() async {
         let result = await VoiceClipTranscriber.stableEnrollmentResult(
             url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        ) { _ in
+        ) { @concurrent _ in
             XCTFail("Missing audio must not request speech recognition")
             return VoiceClipEnrollmentEvidenceTests.recognitionFixture()
         }

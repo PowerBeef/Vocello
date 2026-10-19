@@ -420,7 +420,7 @@ actor NativePreparedCloneConditioningCache {
                     sourceFingerprint: sourceFingerprint,
                     checksStoredTranscript: conditioning.transcriptMode != .inline,
                     expectedStoredTranscript: conditioning.resolvedTranscript
-                ) { staging in
+                ) { @concurrent staging in
                     try await model.engine.persistCloneArtifact(handle, to: staging, metadata: metadata)
                 }
             } else if conditioning.preparedVoiceID == nil {
@@ -445,7 +445,7 @@ actor NativePreparedCloneConditioningCache {
     /// ownership and publishes under the delete/replacement lock. A concurrent
     /// deletion may discard persistence without invalidating this take's handle.
     @discardableResult
-    static func persistSavedVoiceCloneArtifact(
+    @concurrent static func persistSavedVoiceCloneArtifact(
         voicesDirectory: URL,
         artifactDirectory: URL,
         voiceID: String,
@@ -453,7 +453,7 @@ actor NativePreparedCloneConditioningCache {
         sourceFingerprint: String,
         checksStoredTranscript: Bool,
         expectedStoredTranscript: String?,
-        persist: @Sendable (URL) async throws -> Void
+        persist: @Sendable @concurrent (URL) async throws -> Void
     ) async throws -> Bool {
         let staging = voicesDirectory.appendingPathComponent(".clone-prompt-staging-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: staging) }

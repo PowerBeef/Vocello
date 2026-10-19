@@ -2,13 +2,13 @@ import XCTest
 @testable import QwenVoiceCore
 
 final class GenerationEventDeliveryProbeTests: XCTestCase {
-    func testBoundedGenerationStreamBackpressuresWithoutEvictingAudioOrTerminal() async {
+    @concurrent func testBoundedGenerationStreamBackpressuresWithoutEvictingAudioOrTerminal() async {
         let router = GenerationScopedEventRouter()
         let generationID = UUID()
         let stream = router.stream(for: generationID, capacity: 1)
         router.beginGeneration(generationID)
 
-        let producer = Task.detached {
+        let producer = Task.detached { @concurrent in
             await router.yield(.progress(GenerationProgress(percent: 10, message: "one")), for: generationID)
             await router.yield(.progress(GenerationProgress(percent: 20, message: "two")), for: generationID)
             await router.yield(.failed("fixture"), for: generationID)
@@ -35,7 +35,7 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
         XCTAssertTrue(snapshot.accountingIsExact)
     }
 
-    func testPriorGenerationCannotOccupyNextGenerationBuffer() async {
+    @concurrent func testPriorGenerationCannotOccupyNextGenerationBuffer() async {
         let router = GenerationScopedEventRouter()
         let oldID = UUID()
         let newID = UUID()
@@ -56,12 +56,12 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
         withExtendedLifetime(oldStream) {}
     }
 
-    func testConsumerTerminationBeforeTerminalIsReportedExactly() async {
+    @concurrent func testConsumerTerminationBeforeTerminalIsReportedExactly() async {
         let router = GenerationScopedEventRouter()
         let generationID = UUID()
         let stream = router.stream(for: generationID, capacity: 4)
         router.beginGeneration(generationID)
-        let consumer = Task {
+        let consumer = Task { @concurrent in
             for await _ in stream {}
         }
         consumer.cancel()
@@ -79,7 +79,7 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
         XCTAssertTrue(snapshot.accountingIsExact)
     }
 
-    func testStressRetainsEveryChunkAndTerminalUnderBackpressure() async {
+    @concurrent func testStressRetainsEveryChunkAndTerminalUnderBackpressure() async {
         let router = GenerationScopedEventRouter()
         let generationID = UUID()
         let capacity = 1_001
@@ -108,7 +108,7 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
     /// With the consumer a full queue behind, that terminal must still reach it
     /// after the queued chunks; dropped, the consumer would wait forever and the
     /// store's `generate` would never return.
-    func testATerminalFromACancelledProducerIsNeverDroppedBehindAFullQueue() async {
+    @concurrent func testATerminalFromACancelledProducerIsNeverDroppedBehindAFullQueue() async {
         let router = GenerationScopedEventRouter()
         let generationID = UUID()
         let stream = router.stream(for: generationID, capacity: 2)
@@ -119,19 +119,19 @@ final class GenerationEventDeliveryProbeTests: XCTestCase {
         let terminal = GenerationEvent.cancelled(
             GenerationCancellationSummary(generationID: generationID, reason: .memoryPressure)
         )
-        let producer = Task.detached {
+        let producer = Task.detached { @concurrent in
             unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             await router.yield(terminal, for: generationID)
         }
         await producer.value
 
-        let drained = Task { () -> [GenerationEvent] in
+        let drained = Task { @concurrent () async -> [GenerationEvent] in
             var received: [GenerationEvent] = []
             for await event in stream { received.append(event) }
             return received
         }
         // Without the fix the drain parks forever; the watchdog turns that into a failure.
-        let watchdog = Task {
+        let watchdog = Task { @concurrent in
             try? await Task.sleep(for: .seconds(10))
             drained.cancel()
         }

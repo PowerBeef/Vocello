@@ -576,7 +576,7 @@ private final class FakeChild: CLIChildProcess {
         markExited()
     }
 
-    func waitUntilExit() async {
+    @concurrent func waitUntilExit() async {
         await withCheckedContinuation { (reaped: CheckedContinuation<Void, Never>) in
             let exited = state.withLock { state -> Bool in
                 if !state.exited { state.waiters.append(reaped) }

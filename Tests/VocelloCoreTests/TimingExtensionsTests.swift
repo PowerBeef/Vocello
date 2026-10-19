@@ -20,7 +20,7 @@ final class TimingExtensionsTests: XCTestCase {
         XCTAssertEqual(duration.seconds * 1_000, 1499.6, accuracy: 1e-6)
     }
 
-    func testElapsedSecondsMeasuresAShortWaitInSeconds() async throws {
+    @concurrent func testElapsedSecondsMeasuresAShortWaitInSeconds() async throws {
         let started = ContinuousClock.now
         try await Task.sleep(for: .milliseconds(20))
         let elapsed = started.elapsedSeconds

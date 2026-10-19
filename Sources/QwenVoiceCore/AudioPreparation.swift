@@ -97,7 +97,7 @@ public struct AudioNormalizationResult: Hashable, Codable, Sendable {
 }
 
 public protocol AudioPreparationService: Sendable {
-    func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult
+    @concurrent func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult
 }
 
 public struct AudioPreparationLimits: Hashable, Sendable {
@@ -131,7 +131,7 @@ private actor NativeAudioPreparationWorkQueue {
     private var isRunning = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
+    func run<T: Sendable>(_ operation: @Sendable @concurrent () async throws -> T) async throws -> T {
         await acquire()
         do {
             let result = try await operation()
@@ -163,8 +163,8 @@ private actor NativeAudioPreparationWorkQueue {
 }
 
 struct AudioPreparationTestingHooks: Sendable {
-    var beforeWriterCreation: (@Sendable () async throws -> Void)?
-    var beforeConversionLoop: (@Sendable () async throws -> Void)?
+    var beforeWriterCreation: (@Sendable @concurrent () async throws -> Void)?
+    var beforeConversionLoop: (@Sendable @concurrent () async throws -> Void)?
 
     static let none = AudioPreparationTestingHooks()
 }
@@ -237,9 +237,9 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         hasher.combine(limits)
     }
 
-    public func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
+    @concurrent public func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
         do {
-            return try await NativeAudioPreparationWorkQueue.shared.run {
+            return try await NativeAudioPreparationWorkQueue.shared.run { @concurrent in
                 try Task.checkCancellation()
                 return try await normalizeAudioAsynchronously(request)
             }
@@ -281,7 +281,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         return isCanonical(file: file, sourceURL: outputURL)
     }
 
-    private func normalizeAudioAsynchronously(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
+    @concurrent private func normalizeAudioAsynchronously(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
         let deadline = AudioPreparationDeadline(timeoutSeconds: limits.normalizationTimeoutSeconds)
         let fileManager = FileManager.default
         let sourceURL = request.inputURL
@@ -444,7 +444,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         }
     }
 
-    private static func convertAudio(
+    @concurrent private static func convertAudio(
         inputURL: URL,
         outputURL: URL,
         limits: AudioPreparationLimits,
@@ -615,15 +615,15 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         return totalWrittenFrames
     }
 
-    private static func firstAudioTrack(
+    @concurrent private static func firstAudioTrack(
         from asset: AVURLAsset,
         timeoutSeconds: Double
     ) async throws -> AVAssetTrack {
         guard timeoutSeconds > 0 else {
             throw AudioPreparationError.decodeTimedOut(seconds: timeoutSeconds)
         }
-        return try await withThrowingTaskGroup(of: AVAssetTrack.self) { group in
-            group.addTask {
+        return try await withThrowingTaskGroup(of: AVAssetTrack.self) { @concurrent group in
+            group.addTask { @concurrent in
                 let resolvedTrack = try await asset.loadTracks(withMediaType: .audio).first
                 guard let resolvedTrack else {
                     throw AudioPreparationError.unsupportedInput(
@@ -632,7 +632,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
                 }
                 return resolvedTrack
             }
-            group.addTask {
+            group.addTask { @concurrent in
                 try await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
                 throw AudioPreparationError.decodeTimedOut(seconds: timeoutSeconds)
             }

@@ -51,11 +51,11 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         usedStreaming: false
     )
 
-    func testACompletedTakePublishesItsTerminalBeforeReleasingTheLease() async throws {
+    @concurrent func testACompletedTakePublishesItsTerminalBeforeReleasingTheLease() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
 
-        let result = try await ChoreographyDriver.run(take, log: log, execute: { _ in
+        let result = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in
             Self.completedResult
         })
 
@@ -68,12 +68,12 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         XCTAssertNil(take.cancellation.reason)
     }
 
-    func testAModelTerminalOtherThanEndOfSequenceAbortsWithoutACompletion() async throws {
+    @concurrent func testAModelTerminalOtherThanEndOfSequenceAbortsWithoutACompletion() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log, terminal: .completed(.maximumTokens))
 
         do {
-            _ = try await ChoreographyDriver.run(take, log: log, execute: { _ in Self.completedResult })
+            _ = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in Self.completedResult })
             XCTFail("A take that hit the token cap must not complete")
         } catch is NativeRuntimeError {}
 
@@ -85,13 +85,13 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         XCTAssertEqual(take.cancellation.reason, .shutdown)
     }
 
-    func testAFailureAfterOpenCancelsWithTheTypedReasonAndRethrowsIt() async throws {
+    @concurrent func testAFailureAfterOpenCancelsWithTheTypedReasonAndRethrowsIt() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
         let ingress = GenerationCancellationIngress()
 
         do {
-            _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { _ in
+            _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { @concurrent _ in
                 // The admission coordinator's typed reason arrives mid-stream,
                 // then the output sink fails.
                 ingress.request(.superseded)
@@ -110,7 +110,7 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         ])
     }
 
-    func testAFailureBeforeOpenAbortsTheReservationAndNeverAcknowledges() async throws {
+    @concurrent func testAFailureBeforeOpenAbortsTheReservationAndNeverAcknowledges() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
 
@@ -118,8 +118,8 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
             _ = try await ChoreographyDriver.run(
                 take,
                 log: log,
-                prepare: { throw ScriptedTakeFailure(step: "sessionDirectory") },
-                execute: { _ in Self.completedResult }
+                prepare: { @concurrent in throw ScriptedTakeFailure(step: "sessionDirectory") },
+                execute: { @concurrent _ in Self.completedResult }
             )
             XCTFail("A setup failure must surface")
         } catch let failure as ScriptedTakeFailure {
@@ -135,12 +135,12 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
     /// Today a published acknowledgement that throws (the lease failed
     /// revalidation) still follows the `.completed` the sink already took:
     /// the take is cancelled, finalized as aborted and the failure rethrown.
-    func testAPublishedAcknowledgementThatThrowsAbortsAndRethrows() async throws {
+    @concurrent func testAPublishedAcknowledgementThatThrowsAbortsAndRethrows() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log, failing: ["acknowledge(published)"])
 
         do {
-            _ = try await ChoreographyDriver.run(take, log: log, execute: { _ in Self.completedResult })
+            _ = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in Self.completedResult })
             XCTFail("A refused acknowledgement must surface")
         } catch let failure as ScriptedTakeFailure {
             XCTAssertEqual(failure, ScriptedTakeFailure(step: "acknowledge(published)"))
@@ -157,12 +157,12 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
 
     /// A cleanup call that throws (the reservation is already invalid) ends
     /// the cleanup there and its error replaces the original one.
-    func testACancelThatThrowsDuringCleanupSurfacesItsOwnError() async throws {
+    @concurrent func testACancelThatThrowsDuringCleanupSurfacesItsOwnError() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log, failing: ["cancelGeneration"])
 
         do {
-            _ = try await ChoreographyDriver.run(take, log: log, execute: { _ in
+            _ = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in
                 throw ScriptedTakeFailure(step: "sink")
             })
             XCTFail("A failed take must surface")
@@ -176,14 +176,14 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         ])
     }
 
-    func testAPreCancelledTakeNeverReserves() async throws {
+    @concurrent func testAPreCancelledTakeNeverReserves() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
         let ingress = GenerationCancellationIngress()
         ingress.request(.memoryPressure)
 
         do {
-            _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { _ in
+            _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { @concurrent _ in
                 Self.completedResult
             })
             XCTFail("A cancelled take must not run")
@@ -193,7 +193,7 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         XCTAssertNil(take.cancellation.reason)
     }
 
-    func testCancellationWonDuringReservationAbortsWithItsTypedReason() async throws {
+    @concurrent func testCancellationWonDuringReservationAbortsWithItsTypedReason() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
         let ingress = GenerationCancellationIngress()
@@ -204,7 +204,7 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
                 ingress: ingress,
                 log: log,
                 duringReservation: { ingress.request(.memoryPressure) },
-                execute: { _ in Self.completedResult }
+                execute: { @concurrent _ in Self.completedResult }
             )
             XCTFail("A cancelled take must not open")
         } catch is CancellationError {}
@@ -213,7 +213,7 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         XCTAssertEqual(log.entries, ["reserve", "abortReservation(memory_pressure)"])
     }
 
-    func testCallerTaskCancellationReportsUser() async throws {
+    @concurrent func testCallerTaskCancellationReportsUser() async throws {
         let (take, log, ingress) = await runUntilCancelled { task, _ in
             task.cancel()
         }
@@ -226,7 +226,7 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         ])
     }
 
-    func testATypedReasonRequestedBeforeTheCallerCancelsWins() async throws {
+    @concurrent func testATypedReasonRequestedBeforeTheCallerCancelsWins() async throws {
         // PA-15 at the adapter: the barrier records `.shutdown` before the
         // Swift task is cancelled, so the task's `.user` is ignored.
         let (take, log, ingress) = await runUntilCancelled { task, typedIngress in
@@ -242,16 +242,16 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
 
     /// Runs a take whose execution waits until its session is cancelled,
     /// applies `cancel` once the take is executing, and returns its state.
-    private func runUntilCancelled(
+    @concurrent private func runUntilCancelled(
         _ cancel: (Task<(any Error)?, Never>, GenerationCancellationIngress) -> Void
     ) async -> (ScriptedReservedTake, ChoreographyLog, GenerationCancellationIngress) {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
         let ingress = GenerationCancellationIngress()
         let executing = ChoreographySignal()
-        let task = Task { () async -> (any Error)? in
+        let task = Task { @concurrent () async -> (any Error)? in
             do {
-                _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { take in
+                _ = try await ChoreographyDriver.run(take, ingress: ingress, log: log, execute: { @concurrent take in
                     await executing.raise()
                     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                         take.cancellation.installCancelAction { continuation.resume() }
@@ -273,28 +273,28 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
 
 /// Drives `GenerationOutputAdapter.runReservedTake` over a scripted take.
 private enum ChoreographyDriver {
-    static func run(
+    @concurrent static func run(
         _ take: ScriptedReservedTake,
         ingress: GenerationCancellationIngress = GenerationCancellationIngress(),
         log: ChoreographyLog,
         duringReservation: () -> Void = {},
-        prepare: () async throws -> Void = {},
-        execute: (ScriptedReservedTake) async throws -> GenerationResult
+        prepare: @concurrent () async throws -> Void = { @concurrent in},
+        execute: @concurrent (ScriptedReservedTake) async throws -> GenerationResult
     ) async throws -> GenerationResult {
         try await GenerationOutputAdapter.runReservedTake(
             cancellationIngress: ingress,
             telemetryRecorder: nil,
-            reserve: { () async throws -> ScriptedReservedTake in
+            reserve: { @concurrent () async throws -> ScriptedReservedTake in
                 log.append("reserve")
                 duringReservation()
                 return take
             },
-            prepareExecution: { () async throws -> String in
+            prepareExecution: { @concurrent () async throws -> String in
                 log.append("prepareExecution")
                 try await prepare()
                 return "execution"
             },
-            execute: { (
+            execute: { @concurrent (
                 execution: String,
                 reserved: ScriptedReservedTake,
                 audio: Int,
@@ -305,8 +305,8 @@ private enum ChoreographyDriver {
                 log.append("execute")
                 return try await execute(reserved)
             },
-            chunkSink: { event in log.append(Self.label(event)) },
-            afterFinalization: { log.append("afterFinalization") }
+            chunkSink: { @concurrent event in log.append(Self.label(event)) },
+            afterFinalization: { @concurrent in log.append("afterFinalization") }
         )
     }
 
@@ -369,20 +369,20 @@ private struct ScriptedReservedTake: GenerationReservedTake {
         if failing.contains(step) { throw ScriptedTakeFailure(step: step) }
     }
 
-    func claimAudioConsumer() async throws -> Int {
+    @concurrent func claimAudioConsumer() async throws -> Int {
         log.append("claim")
         return Self.audioToken
     }
 
-    func cancelAudio(_ audio: Int, reason: VocelloQwen3CancellationReason) async {
+    @concurrent func cancelAudio(_ audio: Int, reason: VocelloQwen3CancellationReason) async {
         log.append("cancelAudio(\(reason.rawValue))")
     }
 
-    func open() async throws {
+    @concurrent func open() async throws {
         log.append("open")
     }
 
-    func waitForModelTermination() async -> VocelloQwen3TerminalEvent {
+    @concurrent func waitForModelTermination() async -> VocelloQwen3TerminalEvent {
         log.append("waitForModelTermination")
         return VocelloQwen3TerminalEvent(
             generationID: UUID(),
@@ -393,16 +393,16 @@ private struct ScriptedReservedTake: GenerationReservedTake {
         )
     }
 
-    func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
+    @concurrent func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
         log.append("cancelGeneration(\(reason.rawValue))")
         if failing.contains("cancelGeneration") { throw ScriptedTakeFailure(step: "cancelGeneration") }
     }
 
-    func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
+    @concurrent func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
         log.append("abortReservation(\(reason.rawValue))")
     }
 
-    func acknowledgeProductFinalization(
+    @concurrent func acknowledgeProductFinalization(
         _ disposition: VocelloQwen3ProductFinalizationDisposition
     ) async throws {
         switch disposition {

@@ -590,7 +590,7 @@ private struct IOSHistoryLibrarySection: View {
             do {
                 let (page, availablePaths) = try await Task.detached(
                     priority: .userInitiated
-                ) { () throws -> (GenerationHistoryPage, Set<String>) in
+                ) { @concurrent () async throws -> (GenerationHistoryPage, Set<String>) in
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }

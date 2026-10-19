@@ -52,7 +52,7 @@ final class MacMetricKitReporter: NSObject, MXMetricManagerSubscriber, Sendable 
         let records = payloads.map(Self.metricRecord)
         guard !records.isEmpty else { return }
         let store = store
-        Task {
+        Task { @concurrent in
             await store.appendSummaries(records)
         }
     }
@@ -73,7 +73,7 @@ final class MacMetricKitReporter: NSObject, MXMetricManagerSubscriber, Sendable 
         }
         guard !records.isEmpty || !crashPayloads.isEmpty else { return }
         let store = store
-        Task {
+        Task { @concurrent in
             await store.appendSummaries(records)
             await store.writeCrashPayloads(crashPayloads)
         }

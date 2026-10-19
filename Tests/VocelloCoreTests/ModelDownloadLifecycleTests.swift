@@ -399,16 +399,16 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         ))
     }
 
-    func testDelegateTerminalSequencerAwaitsDurableStageBeforeCompletion() async {
+    @concurrent func testDelegateTerminalSequencerAwaitsDurableStageBeforeCompletion() async {
         let sequencer = ModelDownloadDelegateTerminalSequencer()
         let suspension = SuspensionGate()
         let events = EventRecorder()
 
-        sequencer.stage(taskID: 9) {
+        sequencer.stage(taskID: 9) { @concurrent in
             await suspension.wait()
             await events.append("staged")
         }
-        let completion = sequencer.complete(taskID: 9) {
+        let completion = sequencer.complete(taskID: 9) { @concurrent in
             await events.append("completed")
         }
 
@@ -604,7 +604,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
     /// E-02: a failed file's error is what the run reports, never the `.cancelled` its
     /// stopped siblings end with (on the Mac that `.cancelled` hid the failure reason, on the
     /// iPhone it left the row at Cancelling); a run cancelled first reports its cancellation.
-    func testARunReportsItsRootFailureRatherThanASiblingsCancellation() async {
+    @concurrent func testARunReportsItsRootFailureRatherThanASiblingsCancellation() async {
         typealias DownloadError = HuggingFaceDownloader.DownloadError
         let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
 
@@ -1289,7 +1289,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         var stagingRoot: URL { root.appendingPathComponent("staging", isDirectory: true) }
 
         @discardableResult
-        func run(
+        @concurrent func run(
             requestIdentity: ModelDownloadRequestIdentity? = nil
         ) async throws -> HuggingFaceDownloader.RepositoryTransferAccounting {
             let digest = SHA256.hash(data: payload).map { unsafe String(format: "%02x", $0) }.joined()
@@ -1388,7 +1388,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         try? FileManager.default.removeItem(at: delivery.root)
     }
 
-    func testShortRangeBodyRetriesOnlyThatRangeAndKeepsEveryOtherRange() async throws {
+    @concurrent func testShortRangeBodyRetriesOnlyThatRangeAndKeepsEveryOtherRange() async throws {
         let delivery = try makeStubbedDelivery(faults: [2: [.shortBody(900)]])
         defer { tearDownStubbedDelivery(delivery) }
 
@@ -1413,7 +1413,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         )
     }
 
-    func testTransientNetworkErrorOnOneRangeRetriesThatRange() async throws {
+    @concurrent func testTransientNetworkErrorOnOneRangeRetriesThatRange() async throws {
         let delivery = try makeStubbedDelivery(
             faults: [1: [.transportError(NSURLErrorNetworkConnectionLost)]]
         )
@@ -1434,7 +1434,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
     /// SEC-16: a range whose body outgrows the range is stopped as an integrity
     /// failure, never assembled, and the file recovers through one clean single
     /// stream bounded by the catalog size.
-    func testOversizedRangeBodyIsRejectedAndTheFileRecoversCleanly() async throws {
+    @concurrent func testOversizedRangeBodyIsRejectedAndTheFileRecoversCleanly() async throws {
         let delivery = try makeStubbedDelivery(faults: [2: [.oversizedBody(4_096)]])
         defer { tearDownStubbedDelivery(delivery) }
 
@@ -1456,7 +1456,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
     /// CORE-13 and CORE-14: a run refused before any transfer (here by a busy
     /// staging lock) still releases the downloader, and a foreground downloader
     /// runs once.
-    func testRefusedRunReleasesTheDownloaderWhichIsSingleUse() async throws {
+    @concurrent func testRefusedRunReleasesTheDownloaderWhichIsSingleUse() async throws {
         let delivery = try makeStubbedDelivery()
         defer { tearDownStubbedDelivery(delivery) }
         let holder = try HuggingFaceDownloader.StagingLock(
@@ -1508,7 +1508,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertNil(released, "an early failure invalidates the session")
     }
 
-    func testStagingLockAdmitsOneOwnerAtATime() async throws {
+    @concurrent func testStagingLockAdmitsOneOwnerAtATime() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1531,7 +1531,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         }
 
         // A run that is still unwinding lets go within the patience window.
-        let releaser = Task {
+        let releaser = Task { @concurrent in
             try? await Task.sleep(for: .milliseconds(150))
             first.release()
         }
@@ -1639,7 +1639,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         }
     }
 
-    func testIgnoredRangeStillFallsBackToOneCleanSingleStream() async throws {
+    @concurrent func testIgnoredRangeStillFallsBackToOneCleanSingleStream() async throws {
         let delivery = try makeStubbedDelivery(ignoreRange: true)
         defer { tearDownStubbedDelivery(delivery) }
 
@@ -1655,7 +1655,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .rangeResponse })
     }
 
-    func testExhaustedRangeRetriesEscalateWithoutClearingTheSidecar() async throws {
+    @concurrent func testExhaustedRangeRetriesEscalateWithoutClearingTheSidecar() async throws {
         let last = HuggingFaceDownloader.chunkRanges(
             total: 8_192,
             chunkSize: 1_024,
@@ -1695,7 +1695,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .shortRange && $0.retryCount == 1 })
     }
 
-    func testServerThatAlwaysTruncatesARangeEndsInOneSingleStream() async throws {
+    @concurrent func testServerThatAlwaysTruncatesARangeEndsInOneSingleStream() async throws {
         let last = HuggingFaceDownloader.chunkRanges(
             total: 8_192,
             chunkSize: 1_024,
@@ -1727,14 +1727,14 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .shortRange })
     }
 
-    func testCancellationDuringRangeRetryBackoffNeverRetries() async throws {
+    @concurrent func testCancellationDuringRangeRetryBackoffNeverRetries() async throws {
         let delivery = try makeStubbedDelivery(
             faults: [0: [.status(503, retryAfter: "30")]]
         )
         defer { tearDownStubbedDelivery(delivery) }
 
         let started = ContinuousClock.now
-        let transfer = Task { try await delivery.run() }
+        let transfer = Task { @concurrent in try await delivery.run() }
         let deadline = ContinuousClock.now.advanced(by: .seconds(10))
         while delivery.retries.values.isEmpty, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))

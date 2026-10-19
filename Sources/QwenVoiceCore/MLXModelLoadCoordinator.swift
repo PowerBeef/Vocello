@@ -16,23 +16,23 @@ struct NativeModelLoadResult: Sendable {
 }
 
 protocol MLXModelCoordinating: AnyObject, Sendable {
-    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities
-    func loadModel(id: String, capabilityProfile: NativeLoadCapabilityProfile) async throws -> NativeModelLoadResult
-    func unloadModel() async
-    func isPrewarmed(identityKey: String) async -> Bool
-    func markPrewarmed(identityKey: String) async
-    func clearPrewarmState() async
+    @concurrent func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities
+    @concurrent func loadModel(id: String, capabilityProfile: NativeLoadCapabilityProfile) async throws -> NativeModelLoadResult
+    @concurrent func unloadModel() async
+    @concurrent func isPrewarmed(identityKey: String) async -> Bool
+    @concurrent func markPrewarmed(identityKey: String) async
+    @concurrent func clearPrewarmState() async
     /// Swaps in the per-generation telemetry recorder so model-load stage marks
     /// (preparedCacheValidation / tokenizerPreparation / upstreamModelLoad) land on
     /// the same recorder (and start clock) as the rest of the generation timeline.
-    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async
+    @concurrent func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async
     /// Whether the loaded model's runtime actor observed an MLX failure during
     /// a generation, including one that ended cancelled.
-    func requiresUnloadAfterRuntimeFailure() async -> Bool
+    @concurrent func requiresUnloadAfterRuntimeFailure() async -> Bool
 }
 
 actor MLXModelLoadCoordinator: MLXModelCoordinating {
-    typealias NativeModelLoader = @Sendable (
+    typealias NativeModelLoader = @Sendable @concurrent (
         ModelAssetDescriptor,
         PreparedModelMetadata,
         NativeLoadCapabilityProfile
@@ -211,7 +211,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     /// MLX's allocator, injected so deterministic tests stay off Metal (`.inert`).
     private let allocatorControl: NativeMLXAllocatorControl
     private var telemetryRecorder: NativeTelemetryRecorder?
-    private let diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?
+    private let diagnosticEventSink: (@Sendable @concurrent (String, [String: String]) async -> Void)?
     private var preparedMetadataByDescriptorID: [String: PreparedModelMetadata] = [:]
 
     private(set) var loadedDescriptor: ModelAssetDescriptor?
@@ -231,7 +231,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         modelLoader: @escaping NativeModelLoader = MLXModelLoadCoordinator.defaultModelLoader,
         beforeModelLoad: (@Sendable (String?) -> Void)? = nil,
         telemetryRecorder: NativeTelemetryRecorder? = nil,
-        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil,
+        diagnosticEventSink: (@Sendable @concurrent (String, [String: String]) async -> Void)? = nil,
         allocatorControl: NativeMLXAllocatorControl = .live
     ) {
         self.modelAssetStore = modelAssetStore
@@ -770,7 +770,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         )
     }
 
-    private static func defaultModelLoader(
+    @concurrent private static func defaultModelLoader(
         descriptor: ModelAssetDescriptor,
         preparedMetadata: PreparedModelMetadata,
         capabilityProfile: NativeLoadCapabilityProfile
@@ -793,7 +793,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     /// Actor-owned load with the local-diagnostics load-stage channel. Product
     /// coordinators construct the immutable bundle and load policy; the loaded
     /// model itself never leaves the runtime actor.
-    static func loadPreparedActorModel(
+    @concurrent static func loadPreparedActorModel(
         _ bundle: VocelloQwen3PreparedModelBundle,
         loadBehavior: VocelloQwen3LoadBehavior,
         verboseDiagnosticSink: VocelloQwen3VerboseLoadDiagnosticSink?

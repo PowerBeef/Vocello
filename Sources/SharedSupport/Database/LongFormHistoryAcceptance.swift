@@ -90,7 +90,7 @@ struct LongFormHistoryAcceptanceStore: Sendable {
     /// since a suspended app is frozen and wakes after its database resumes.
     static let maximumSuspensionRetries = 120
 
-    func commit(_ input: LongFormHistoryAcceptance, using queue: DatabaseQueue) async throws -> Generation {
+    @concurrent func commit(_ input: LongFormHistoryAcceptance, using queue: DatabaseQueue) async throws -> Generation {
         try Task.checkCancellation()
         var resumable = false
         var suspensionRetries = 0
@@ -206,7 +206,7 @@ struct LongFormHistoryAcceptanceStore: Sendable {
     /// preserves that success; never erase committed audio because cleanup threw.
     /// A resumable acceptance is never reported as an invalid candidate: its
     /// audio belongs to the reconcile that completes it.
-    private func recover(
+    @concurrent private func recover(
         _ input: LongFormHistoryAcceptance,
         using queue: DatabaseQueue,
         resumable: Bool

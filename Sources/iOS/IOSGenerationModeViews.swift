@@ -2073,7 +2073,7 @@ struct IOSVoiceCloningView: View {
                 referenceLanguage: $0.enrollmentMetadata?.referenceLanguage
             )
         }
-        let map = await Task.detached(priority: .utility) { () -> [String: Qwen3SupportedLanguage] in
+        let map = await Task.detached(priority: .utility) { @concurrent () async -> [String: Qwen3SupportedLanguage] in
             var result: [String: Qwen3SupportedLanguage] = [:]
             for entry in entries {
                 if let referenceLanguage = entry.referenceLanguage {

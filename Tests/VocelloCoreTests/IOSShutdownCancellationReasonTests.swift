@@ -202,7 +202,7 @@ final class IOSShutdownCancellationReasonTests: XCTestCase {
     private static func firstTerminal(
         of events: AsyncStream<GenerationEvent>
     ) -> Task<GenerationEvent?, Never> {
-        Task {
+        Task { @concurrent in
             for await event in events {
                 switch event {
                 case .completed, .cancelled, .failed:

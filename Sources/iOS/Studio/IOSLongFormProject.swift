@@ -810,7 +810,7 @@ final class IOSLongFormProjectRunner {
     }
 
     private func evaluateQC(path: String, expectedPauseCount: Int) async -> AudioQualityGate.Report {
-        await Task.detached(priority: .utility) {
+        await Task.detached(priority: .utility) { @concurrent in
             AudioQualityGate.evaluate(
                 url: URL(fileURLWithPath: path),
                 expectedPauseCount: expectedPauseCount
@@ -1389,7 +1389,7 @@ final class IOSLongFormProjectRunner {
         let audioPaths: [String?] = plan.evidence.segments.indices.map { index in
             index < segments.count ? segments[index].audioPath : nil
         }
-        let durations: [Double?] = await Task.detached(priority: .utility) {
+        let durations: [Double?] = await Task.detached(priority: .utility) { @concurrent in
             audioPaths.map { path -> Double? in
                 guard let path,
                       let audioFile = try? AVAudioFile(forReading: URL(fileURLWithPath: path)),

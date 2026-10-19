@@ -762,7 +762,7 @@ final class ModelManagerViewModel {
             do {
                 let catalog = downloadPlan.catalog
                 let artifact = downloadPlan.artifact
-                delivery = try await Task.detached(priority: .utility) {
+                delivery = try await Task.detached(priority: .utility) { @concurrent in
                     try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
                 }.value
             } catch {
@@ -993,7 +993,7 @@ final class ModelManagerViewModel {
     private func performRefresh() async {
         let modelsDirectory = modelsDirectory
         let startedGenerations = mutationGenerations
-        let snapshots = await Task.detached(priority: .utility) {
+        let snapshots = await Task.detached(priority: .utility) { @concurrent in
             Self.fetchSnapshots(in: modelsDirectory)
         }.value
         applySnapshots(snapshots, startedGenerations: startedGenerations)

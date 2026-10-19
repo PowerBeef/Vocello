@@ -47,7 +47,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// A first load mirrors the installed folder into the runtime cache,
     /// writes the current marker, hands the loader the overlay and publishes
     /// exactly the model the loader returned.
-    func testColdLoadRebuildsTheOverlayAndPublishesTheLoaderModel() async throws {
+    @concurrent func testColdLoadRebuildsTheOverlayAndPublishesTheLoaderModel() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -98,7 +98,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A reload on the same coordinator reuses the overlay in place and, now
     /// that a load succeeded, hands the loader a trusted checkpoint.
-    func testASecondLoadReusesTheOverlayAndTrustsTheCheckpoint() async throws {
+    @concurrent func testASecondLoadReusesTheOverlayAndTrustsTheCheckpoint() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -121,7 +121,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A new coordinator (a relaunch) has no in-memory metadata and validates
     /// the overlay from its marker on disk.
-    func testAFreshCoordinatorReusesAValidOverlayFromDisk() async throws {
+    @concurrent func testAFreshCoordinatorReusesAValidOverlayFromDisk() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         _ = try await makeCoordinator([descriptor], probes: Probes())
             .loadModel(id: Self.idA, capabilityProfile: .customOnly)
@@ -141,7 +141,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     }
 
     /// A marker written by another prepared-cache schema is never reused.
-    func testAMarkerFromAnotherSchemaVersionForcesARebuild() async throws {
+    @concurrent func testAMarkerFromAnotherSchemaVersionForcesARebuild() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         _ = try await makeCoordinator([descriptor], probes: Probes())
             .loadModel(id: Self.idA, capabilityProfile: .customOnly)
@@ -160,7 +160,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A descriptor version change (an artifact or store-seed change) is never
     /// served from the overlay the previous descriptor prepared.
-    func testADescriptorVersionChangeForcesARebuild() async throws {
+    @concurrent func testADescriptorVersionChangeForcesARebuild() async throws {
         let original = try installModel(id: Self.idA, folder: Self.folderA)
         _ = try await makeCoordinator([original], probes: Probes())
             .loadModel(id: Self.idA, capabilityProfile: .customOnly)
@@ -177,7 +177,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A missing marker, an unreadable marker and a missing prepared artifact
     /// each force a rebuild, even with valid metadata still in memory.
-    func testAMissingUnreadableOrIncompleteOverlayIsRebuilt() async throws {
+    @concurrent func testAMissingUnreadableOrIncompleteOverlayIsRebuilt() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -212,7 +212,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// The checkpoint trust (source trust file and the marker's trust entry)
     /// is written only once a load has succeeded on those weights.
-    func testTheTrustedCheckpointMarkerIsPersistedOnlyAfterASuccessfulLoad() async throws {
+    @concurrent func testTheTrustedCheckpointMarkerIsPersistedOnlyAfterASuccessfulLoad() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -236,7 +236,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// Weights that changed behind a still-valid overlay lose their trust
     /// until a load succeeds on them, and a failed load records nothing.
-    func testChangedWeightsBehindAValidOverlayAreNotTrustedUntilALoadSucceeds() async throws {
+    @concurrent func testChangedWeightsBehindAValidOverlayAreNotTrustedUntilALoadSucceeds() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -263,7 +263,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// test above, but the overlay is also invalid (a descriptor change or a
     /// cache sweep), so the coordinator rebuilds it. The rebuild path trusts a
     /// digest it has just recomputed rather than one a load succeeded on.
-    func testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt() async throws {
+    @concurrent func testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -309,7 +309,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A loader failure publishes nothing and releases MLX's buffer cache; a
     /// failed switch leaves no model rather than the previous one.
-    func testALoaderFailurePublishesNothingAndClearsTheAllocatorCache() async throws {
+    @concurrent func testALoaderFailurePublishesNothingAndClearsTheAllocatorCache() async throws {
         let descriptorA = try installModel(id: Self.idA, folder: Self.folderA)
         let descriptorB = try installModel(id: Self.idB, folder: Self.folderB)
         let probes = Probes()
@@ -350,7 +350,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     }
 
     /// Metadata that fails validation stops the load before the loader runs.
-    func testAPrepareFailureNeverReachesTheLoader() async throws {
+    @concurrent func testAPrepareFailureNeverReachesTheLoader() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         try Data(#"{"model_type":"fixture_other"}"#.utf8)
             .write(to: sourceDirectory(Self.folderA).appendingPathComponent("config.json"))
@@ -373,7 +373,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// An unload while the load is suspended inside the loader vetoes its
     /// publication: the caller gets a raw `CancellationError`, nothing is
     /// resident and no trust is persisted. The veto does not wedge later loads.
-    func testAnUnloadWhileTheLoaderIsSuspendedVetoesPublication() async throws {
+    @concurrent func testAnUnloadWhileTheLoaderIsSuspendedVetoesPublication() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -408,7 +408,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// An unload that lands after publication but before the load returns
     /// (during the trust-marker diagnostic) vetoes the result as well. The
     /// loader did succeed, so the checkpoint trust is still persisted.
-    func testAnUnloadAfterPublicationVetoesTheResult() async throws {
+    @concurrent func testAnUnloadAfterPublicationVetoesTheResult() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -438,7 +438,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// An unload before the loader runs also ends the load cancelled with
     /// nothing resident. The epoch is checked only after the loader returns,
     /// so the superseded load still pays for a full load (engine audit B-04).
-    func testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad() async throws {
+    @concurrent func testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -464,7 +464,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// Prewarm keys are tracked per identity, survive a resident reuse and are
     /// cleared by `clearPrewarmState`, by a publication and by an unload.
-    func testPrewarmKeysFollowTheResidentModel() async throws {
+    @concurrent func testPrewarmKeysFollowTheResidentModel() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -504,7 +504,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// A model switch releases the resident model and its prewarm state before
     /// the new loader runs; a key marked during the new load does not survive
     /// its publication.
-    func testAModelSwitchReleasesTheResidentModelAndItsPrewarmStateFirst() async throws {
+    @concurrent func testAModelSwitchReleasesTheResidentModelAndItsPrewarmStateFirst() async throws {
         let descriptorA = try installModel(id: Self.idA, folder: Self.folderA)
         let descriptorB = try installModel(id: Self.idB, folder: Self.folderB)
         let probes = Probes()
@@ -544,7 +544,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// `didLoad`; the later publication replaces the earlier one without a
     /// reset, and stays resident for the fast path. Production serializes
     /// model operations in `MLXTTSEngine`; this pins the coordinator alone.
-    func testConcurrentLoadsOfOneModelBothRunTheLoaderAndTheLastStaysResident() async throws {
+    @concurrent func testConcurrentLoadsOfOneModelBothRunTheLoaderAndTheLastStaysResident() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -586,7 +586,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     /// Two concurrent loads of different models: neither sees a resident
     /// model to release, and whichever finishes last stays resident, even the
     /// one that started first.
-    func testConcurrentLoadsOfTwoModelsLeaveTheLastFinisherResident() async throws {
+    @concurrent func testConcurrentLoadsOfTwoModelsLeaveTheLastFinisherResident() async throws {
         let descriptorA = try installModel(id: Self.idA, folder: Self.folderA)
         let descriptorB = try installModel(id: Self.idB, folder: Self.folderB)
         let probes = Probes()
@@ -623,7 +623,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
 
     /// A load an unload superseded never replaces a newer load that
     /// published first, whatever order the two loaders return in.
-    func testAStaleLoadFinishingAfterANewerOneNeverReplacesIt() async throws {
+    @concurrent func testAStaleLoadFinishingAfterANewerOneNeverReplacesIt() async throws {
         let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
         let probes = Probes()
         let coordinator = makeCoordinator([descriptor], probes: probes)
@@ -806,7 +806,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
         return MLXModelLoadCoordinator(
             modelAssetStore: LocalModelAssetStore(rootDirectory: modelsRoot, descriptors: descriptors),
             hubCacheDirectory: hubCache,
-            modelLoader: { descriptor, metadata, capabilityProfile in
+            modelLoader: { @concurrent descriptor, metadata, capabilityProfile in
                 try await loader.load(
                     descriptor: descriptor,
                     metadata: metadata,
@@ -816,7 +816,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
             beforeModelLoad: { previousModelID in
                 beforeLoads.append(previousModelID ?? "none")
             },
-            diagnosticEventSink: { action, details in
+            diagnosticEventSink: { @concurrent action, details in
                 await diagnostics.record(action: action, details: details)
             },
             allocatorControl: NativeMLXAllocatorControl(
@@ -827,7 +827,7 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
     }
 
     /// Unloads, damages the overlay, drops a sentinel into it and reloads.
-    private func reload(
+    @concurrent private func reload(
         _ coordinator: MLXModelLoadCoordinator,
         afterDamaging folder: String,
         _ damage: (URL) throws -> Void
@@ -917,7 +917,7 @@ private final class FakeModelLoader: Sendable {
         state.withLock { $0.steps.append(contentsOf: steps) }
     }
 
-    func load(
+    @concurrent func load(
         descriptor: ModelAssetDescriptor,
         metadata: MLXModelLoadCoordinator.PreparedModelMetadata,
         capabilityProfile: NativeLoadCapabilityProfile
@@ -978,7 +978,7 @@ private final class DiagnosticProbe: Sendable {
         }
     }
 
-    func record(action: String, details: [String: String]) async {
+    @concurrent func record(action: String, details: [String: String]) async {
         let event = Event(action: action, details: details)
         let matched = state.withLock { locked -> Hold? in
             locked.events.append(event)
@@ -1000,7 +1000,7 @@ private enum LoadOutcome: Sendable {
 /// A non-throwing task, so CI's pinned compiler accepts it (a throwing task
 /// that returns a value fails its region-isolation check).
 private func startLoad(_ coordinator: MLXModelLoadCoordinator, id: String) -> Task<LoadOutcome, Never> {
-    Task { () -> LoadOutcome in
+    Task { @concurrent () async -> LoadOutcome in
         do {
             let result = try await coordinator.loadModel(id: id, capabilityProfile: .customOnly)
             return .loaded(result)
@@ -1010,7 +1010,7 @@ private func startLoad(_ coordinator: MLXModelLoadCoordinator, id: String) -> Ta
     }
 }
 
-private func loadError(_ coordinator: MLXModelLoadCoordinator, id: String) async -> (any Error)? {
+@concurrent private func loadError(_ coordinator: MLXModelLoadCoordinator, id: String) async -> (any Error)? {
     do {
         _ = try await coordinator.loadModel(id: id, capabilityProfile: .customOnly)
         return nil

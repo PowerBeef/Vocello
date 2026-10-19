@@ -126,7 +126,7 @@ final class MacWarmupAdmissionPolicy {
     ) {
         guard TelemetryGate.appProcessIntendedEnabled else { return }
         let appSupportDirectory = AppPaths.appSupportDir
-        Task.detached(priority: .background) {
+        Task.detached(priority: .background) { @concurrent in
             let event: [String: Any] = [
                 "event": name,
                 "reason": reason,

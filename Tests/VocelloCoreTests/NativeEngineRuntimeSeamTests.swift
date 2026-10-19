@@ -17,7 +17,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// resident model clears nothing. `unloadModel()` and `stop()` each release
     /// the weights through the coordinator's unload, never through
     /// `clearPrewarmState()`, and leave no active model.
-    func testLoadUnloadAndStopReachTheCoordinatorInOrder() async throws {
+    @concurrent func testLoadUnloadAndStopReachTheCoordinatorInOrder() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
 
@@ -58,7 +58,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// nothing first (that block is iOS-only), applies no allocator policy and
     /// leaves the coordinator's prewarm marks alone. It clears the clone state
     /// once the new weights are in.
-    func testAModelSwitchLoadsOverTheResidentModelAndClearsOnlyCloneState() async throws {
+    @concurrent func testAModelSwitchLoadsOverTheResidentModelAndClearsOnlyCloneState() async throws {
         let fixture = RuntimeSeamFixture()
         _ = try await fixture.runtime.loadModel(id: RuntimeSeam.modelA)
         let switched = try await fixture.runtime.loadModel(
@@ -83,11 +83,11 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// A caller's switch clears the clone-prime token with the rest of the
     /// clone state, so a prime whose load was in flight ends cancelled once its
     /// load lands, before any clone preparation.
-    func testAModelSwitchDuringAPrimeLoadCancelsThePrime() async throws {
+    @concurrent func testAModelSwitchDuringAPrimeLoadCancelsThePrime() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         await fixture.coordinator.hold(.load)
-        let prime = Task { await RuntimeSeam.primeError(runtime, modelID: RuntimeSeam.cloneModel) }
+        let prime = Task { @concurrent in await RuntimeSeam.primeError(runtime, modelID: RuntimeSeam.cloneModel) }
         await waitForEntries(fixture.log, prefix: "load:\(RuntimeSeam.cloneModel)")
 
         _ = try await runtime.loadModel(id: RuntimeSeam.modelB)
@@ -110,11 +110,11 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// prime whose load it overtook still runs on to clone preparation. With no
     /// clone-reference directory configured the prebuild stops there quietly,
     /// the prime fails there with a typed error, and neither unloads.
-    func testASavedVoicePrebuildDuringAPrimeLoadKeepsThePrimeAlive() async throws {
+    @concurrent func testASavedVoicePrebuildDuringAPrimeLoadKeepsThePrimeAlive() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         await fixture.coordinator.hold(.load)
-        let prime = Task { await RuntimeSeam.primeError(runtime, modelID: RuntimeSeam.cloneModel) }
+        let prime = Task { @concurrent in await RuntimeSeam.primeError(runtime, modelID: RuntimeSeam.cloneModel) }
         await waitForEntries(fixture.log, prefix: "load:\(RuntimeSeam.cloneModel)")
 
         await runtime.prebuildSavedVoiceClonePrompt(
@@ -143,7 +143,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     /// The prebuild skips a reference that is not a saved voice, and a model
     /// other than the active one, before it asks the coordinator anything.
-    func testAPrebuildSkipsATransientReferenceAndAnotherActiveModel() async throws {
+    @concurrent func testAPrebuildSkipsATransientReferenceAndAnotherActiveModel() async throws {
         let fixture = RuntimeSeamFixture()
         await fixture.runtime.prebuildSavedVoiceClonePrompt(
             modelID: RuntimeSeam.cloneModel,
@@ -169,7 +169,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// once they pass, before its load: a refused prime applies no policy and
     /// loads nothing. Its own load keeps its token, so with no reference
     /// directory configured it fails at clone preparation, not cancelled.
-    func testAClonePrimeAppliesItsPolicyBetweenCapabilitiesAndItsLoad() async throws {
+    @concurrent func testAClonePrimeAppliesItsPolicyBetweenCapabilitiesAndItsLoad() async throws {
         let fixture = RuntimeSeamFixture()
         await fixture.coordinator.failCapabilities(true)
         let refused = await RuntimeSeam.primeError(fixture.runtime, modelID: RuntimeSeam.cloneModel)
@@ -197,7 +197,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// no active model (the earlier one included), clears the clone state and
     /// reaches the caller as a `NativeRuntimeError` at the model-load stage that
     /// keeps the cause's type.
-    func testAFailedLoadUnloadsDropsTheActiveModelAndWrapsTheError() async throws {
+    @concurrent func testAFailedLoadUnloadsDropsTheActiveModelAndWrapsTheError() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         _ = try await runtime.loadModel(id: RuntimeSeam.modelA)
@@ -227,9 +227,9 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// and supersedes it: the coordinator ends the load cancelled, as its load
     /// epoch does in production, and the runtime unloads again, keeps no active
     /// model and types the error as a cancellation so callers settle quietly.
-    func testAnUnloadOrStopDuringASuspendedLoadSupersedesIt() async throws {
-        try await assertTeardownSupersedesASuspendedLoad { await $0.unloadModel() }
-        try await assertTeardownSupersedesASuspendedLoad { await $0.stop() }
+    @concurrent func testAnUnloadOrStopDuringASuspendedLoadSupersedesIt() async throws {
+        try await assertTeardownSupersedesASuspendedLoad { @concurrent in await $0.unloadModel() }
+        try await assertTeardownSupersedesASuspendedLoad { @concurrent in await $0.stop() }
     }
 
     // MARK: - Prewarm slot
@@ -238,7 +238,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// suspension in the coordinator, so a Built-in Voice warm that arrived
     /// meanwhile makes its in-slot prewarm query only after the trim cleared
     /// the allocator and left. The slot is private; the log is the evidence.
-    func testAHardTrimHoldsThePrewarmSlotAgainstAWarm() async throws {
+    @concurrent func testAHardTrimHoldsThePrewarmSlotAgainstAWarm() async throws {
         let fixture = RuntimeSeamFixture()
         _ = try await fixture.runtime.loadModel(id: RuntimeSeam.customModel)
         let holder = await startHoldingHardTrim(fixture)
@@ -270,7 +270,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// A trim cancelled before it holds the slot returns without clearing a
     /// cache, reaching the coordinator or releasing the slot another trim
     /// holds: a warm that arrives afterwards still waits for the holder.
-    func testACancelledTrimNeitherEntersNorFreesTheHeldSlot() async throws {
+    @concurrent func testACancelledTrimNeitherEntersNorFreesTheHeldSlot() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         _ = try await runtime.loadModel(id: RuntimeSeam.customModel)
@@ -280,7 +280,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         // Bounded: a trim that stopped honouring cancellation would wait on the held slot,
         // and the test must fail rather than hang.
         let trimReturned = expectation(description: "the cancelled trim returns without the slot")
-        Task {
+        Task { @concurrent in
             unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             await runtime.trimMemory(level: .hardTrim, reason: "seam_cancelled_trim")
             trimReturned.fulfill()
@@ -308,7 +308,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     /// The runtime returns the coordinator's verdict unchanged, and asking
     /// neither unloads nor clears anything.
-    func testRequiresUnloadAfterRuntimeFailurePassesTheCoordinatorsAnswerThrough() async throws {
+    @concurrent func testRequiresUnloadAfterRuntimeFailurePassesTheCoordinatorsAnswerThrough() async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         _ = try await runtime.loadModel(id: RuntimeSeam.modelA)
@@ -326,15 +326,15 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func assertTeardownSupersedesASuspendedLoad(
-        _ teardown: @escaping @Sendable (NativeEngineRuntime) async -> Void,
+    @concurrent private func assertTeardownSupersedesASuspendedLoad(
+        _ teardown: @escaping @Sendable @concurrent (NativeEngineRuntime) async -> Void,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
         let fixture = RuntimeSeamFixture()
         let runtime = fixture.runtime
         await fixture.coordinator.hold(.load)
-        let load = Task { () -> (any Error)? in
+        let load = Task { @concurrent () async -> (any Error)? in
             do {
                 _ = try await runtime.loadModel(id: RuntimeSeam.modelA)
                 return nil
@@ -347,7 +347,7 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         // A timeout here fails the test instead of hanging it; the release
         // below then unwinds a teardown that waited for the load.
         let tornDown = expectation(description: "the teardown ran while the load was suspended")
-        let teardownTask = Task {
+        let teardownTask = Task { @concurrent in
             await teardown(runtime)
             tornDown.fulfill()
         }
@@ -384,9 +384,9 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     /// Returns once `log` holds `count` entries starting with `prefix`; a
     /// timeout fails the test rather than hanging it.
-    private func waitForEntries(_ log: RuntimeSeamLog, prefix: String, count: Int = 1) async {
+    @concurrent private func waitForEntries(_ log: RuntimeSeamLog, prefix: String, count: Int = 1) async {
         let reached = expectation(description: "\(count) log entries starting with \(prefix)")
-        Task {
+        Task { @concurrent in
             await log.waitForEntries(withPrefix: prefix, count: count)
             reached.fulfill()
         }
@@ -395,10 +395,10 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     /// A hard trim that holds the prewarm slot, suspended inside the
     /// coordinator's `clearPrewarmState()` until the test releases it.
-    private func startHoldingHardTrim(_ fixture: RuntimeSeamFixture) async -> Task<Void, Never> {
+    @concurrent private func startHoldingHardTrim(_ fixture: RuntimeSeamFixture) async -> Task<Void, Never> {
         await fixture.coordinator.hold(.clearPrewarm)
         let runtime = fixture.runtime
-        let holder = Task { await runtime.trimMemory(level: .hardTrim, reason: "seam_holder_trim") }
+        let holder = Task { @concurrent in await runtime.trimMemory(level: .hardTrim, reason: "seam_holder_trim") }
         await waitForEntries(fixture.log, prefix: "clearPrewarm")
         return holder
     }
@@ -407,11 +407,11 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
     /// waits on the prewarm slot or, when nothing holds the slot, has made its
     /// in-slot prewarm query. Its query before the slot answers "not warm" and
     /// the one inside it "warm", so the warm never reaches MLX.
-    private func startContendingWarm(_ fixture: RuntimeSeamFixture) async -> RuntimeSeamWarmTask {
+    @concurrent private func startContendingWarm(_ fixture: RuntimeSeamFixture) async -> RuntimeSeamWarmTask {
         await fixture.coordinator.answerIsPrewarmed([false, true])
         let runtime = fixture.runtime
         let request = RuntimeSeam.warmRequest(modelID: RuntimeSeam.customModel)
-        let warm = Task { () -> Result<InteractivePrefetchDiagnostics, any Error> in
+        let warm = Task { @concurrent () async -> Result<InteractivePrefetchDiagnostics, any Error> in
             do {
                 return .success(try await runtime.prepareInteractiveReadiness(for: request))
             } catch {
@@ -425,9 +425,9 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
 
     /// A later trim takes the prewarm slot; a leaked slot fails the test after
     /// the timeout instead of hanging the suite.
-    private func assertPrewarmSlotIsFree(_ runtime: NativeEngineRuntime) async {
+    @concurrent private func assertPrewarmSlotIsFree(_ runtime: NativeEngineRuntime) async {
         let trimmed = expectation(description: "a later trim takes the free prewarm slot")
-        Task {
+        Task { @concurrent in
             await runtime.trimMemory(level: .softTrim, reason: "seam_free_slot_trim")
             trimmed.fulfill()
         }
@@ -503,7 +503,7 @@ private enum RuntimeSeam {
     }
 
     /// The error a prime of `savedVoiceReference` ends with, or nil.
-    static func primeError(_ runtime: NativeEngineRuntime, modelID: String) async -> (any Error)? {
+    @concurrent static func primeError(_ runtime: NativeEngineRuntime, modelID: String) async -> (any Error)? {
         do {
             _ = try await runtime.primeCloneReference(modelID: modelID, reference: savedVoiceReference)
             return nil
@@ -518,7 +518,7 @@ private enum RuntimeSeam {
     /// jobs in arrival order, so on return the contender has run on the runtime
     /// up to its next suspension (the prewarm slot) and, had it gone on to the
     /// coordinator instead, has logged that call.
-    static func settle(_ runtime: NativeEngineRuntime, _ coordinator: RuntimeSeamCoordinator) async {
+    @concurrent static func settle(_ runtime: NativeEngineRuntime, _ coordinator: RuntimeSeamCoordinator) async {
         await coordinator.roundTrip()
         _ = await runtime.loadedModelID()
         await coordinator.roundTrip()
@@ -561,7 +561,7 @@ private final class RuntimeSeamLog: Sendable {
         ready.forEach { $0.resume() }
     }
 
-    func waitForEntries(withPrefix prefix: String, count: Int) async {
+    @concurrent func waitForEntries(withPrefix prefix: String, count: Int) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let reached = storage.withLock { state -> Bool in
                 guard RuntimeSeam.count(of: prefix, in: state.entries) < count else { return true }

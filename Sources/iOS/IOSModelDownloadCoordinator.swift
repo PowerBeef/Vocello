@@ -690,7 +690,7 @@ final class IOSModelDownloadCoordinator {
             transferMetricsHandler: { [diagnosticsStore] metrics in
                 diagnosticsStore.record(metrics: metrics)
             },
-            verifiedArtifactHandler: { [weak self] receipt in
+            verifiedArtifactHandler: { @concurrent [weak self] receipt in
                 await MainActor.run { [weak self] in self?.recordVerifiedFile(receipt) }
             },
             lifecycleEventHandler: { [diagnosticsStore] event in
@@ -898,7 +898,7 @@ final class IOSModelDownloadCoordinator {
             )
         }
         let modelsRoot = AppPaths.modelsDir
-        return try await Task.detached(priority: .utility) {
+        return try await Task.detached(priority: .utility) { @concurrent in
             try catalog.deliveryPlan(for: artifact, modelsRoot: modelsRoot)
         }.value
     }
@@ -1378,7 +1378,7 @@ final class IOSModelDownloadCoordinator {
             }
             await withTaskGroup(of: Void.self) { group in
                 for case let task as URLSessionDownloadTask in tasks {
-                    group.addTask {
+                    group.addTask { @concurrent in
                         await withCheckedContinuation { continuation in
                             task.cancel { _ in continuation.resume() }
                         }

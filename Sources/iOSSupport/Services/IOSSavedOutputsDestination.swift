@@ -185,7 +185,7 @@ public enum IOSSavedOutputsDestination {
         // the folder meanwhile (which clears the issue), a late result must not land on the new
         // choice. Another copy refreshing a stale bookmark is not a new choice (P10-09).
         let choice = folderChoice
-        return Task.detached(priority: .utility) {
+        return Task.detached(priority: .utility) { @concurrent in
             let didAccess = folder.startAccessingSecurityScopedResource()
             defer { if didAccess { folder.stopAccessingSecurityScopedResource() } }
 

@@ -13,7 +13,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         roots.removeAll()
     }
 
-    func testAcceptanceCommitsRowsManifestAndRetainsPriorAudio() async throws {
+    @concurrent func testAcceptanceCommitsRowsManifestAndRetainsPriorAudio() async throws {
         let f = try fixture()
         let saved = try await f.store.commit(f.input, using: f.queue)
         XCTAssertNotNil(saved.id)
@@ -27,7 +27,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// project the candidate no longer holds (the take a regeneration replaced)
     /// is superseded like the older joined row: kept and deletable on its own,
     /// out of the project's segment list. Other projects' rows are untouched.
-    func testAcceptanceSupersedesTheProjectSegmentRowsItNoLongerHolds() async throws {
+    @concurrent func testAcceptanceSupersedesTheProjectSegmentRowsItNoLongerHolds() async throws {
         let f = try fixture()
         let projectID = try XCTUnwrap(f.input.joined.longFormProjectID)
         var replaced = f.input.segments[0]
@@ -72,7 +72,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertFalse(LongFormHistoryAcceptance.projectID(nil, belongsTo: digest))
     }
 
-    func testDatabaseFailureRestoresPriorManifestAndRows() async throws {
+    @concurrent func testDatabaseFailureRestoresPriorManifestAndRows() async throws {
         let f = try fixture()
         try await f.queue.write { db in
             try db.execute(sql: "CREATE TRIGGER refuse_join BEFORE INSERT ON generations WHEN NEW.longFormRole = 'joined' BEGIN SELECT RAISE(ABORT, 'fixture'); END")
@@ -277,7 +277,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertNil(f.store.setAsideAudioPaths())
     }
 
-    func testMissingAudioAndEncodingFailureCannotChangeAcceptedProject() async throws {
+    @concurrent func testMissingAudioAndEncodingFailureCannotChangeAcceptedProject() async throws {
         let f = try fixture()
         try FileManager.default.removeItem(atPath: f.input.segments[0].audioPath)
         do { _ = try await f.store.commit(f.input, using: f.queue); XCTFail("Expected failure") } catch {}
@@ -290,7 +290,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertEqual(try rowCount(bad.queue), 1)
     }
 
-    func testManifestWriteFailureLeavesPriorDatabaseAndRecoverableJournal() async throws {
+    @concurrent func testManifestWriteFailureLeavesPriorDatabaseAndRecoverableJournal() async throws {
         let f = try fixture()
         try FileManager.default.removeItem(at: f.input.manifestURL)
         try FileManager.default.createDirectory(at: f.input.manifestURL, withIntermediateDirectories: false)
@@ -299,21 +299,21 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.oldJoined.path))
     }
 
-    func testFailedSegmentQCCannotBeAccepted() async throws {
+    @concurrent func testFailedSegmentQCCannotBeAccepted() async throws {
         let f = try fixture(qcPassed: false)
         do { _ = try await f.store.commit(f.input, using: f.queue); XCTFail("Expected QC refusal") } catch {}
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
         XCTAssertEqual(try rowCount(f.queue), 1)
     }
 
-    func testFailedJoinedQCCannotBeAccepted() async throws {
+    @concurrent func testFailedJoinedQCCannotBeAccepted() async throws {
         let f = try fixture(joinedQCPassed: false)
         do { _ = try await f.store.commit(f.input, using: f.queue); XCTFail("Expected joined-QC refusal") } catch {}
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
         XCTAssertEqual(try rowCount(f.queue), 1)
     }
 
-    func testExactRetryIsIdempotentButChangedIdentityAtSamePathIsRejected() async throws {
+    @concurrent func testExactRetryIsIdempotentButChangedIdentityAtSamePathIsRejected() async throws {
         let f = try fixture()
         let first = try await f.store.commit(f.input, using: f.queue)
         let second = try await f.store.commit(f.input, using: f.queue)
@@ -338,7 +338,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertEqual(try journalURLs(f.store).count, 1)
     }
 
-    func testReusedSegmentWithDifferentIdentityCannotBeAccepted() async throws {
+    @concurrent func testReusedSegmentWithDifferentIdentityCannotBeAccepted() async throws {
         let f = try fixture()
         try await f.queue.write { db in
             var conflicting = f.input.segments[0]
@@ -367,9 +367,9 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: audio.path))
     }
 
-    func testCancelledAcceptanceDoesNotPublish() async throws {
+    @concurrent func testCancelledAcceptanceDoesNotPublish() async throws {
         let f = try fixture()
-        let task = Task {
+        let task = Task { @concurrent in
             unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             return try await f.store.commit(f.input, using: f.queue)
         }
@@ -414,7 +414,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertThrowsError(try f.store.recoveryExportURLs(), "Never export a redirected private file")
     }
 
-    func testRetainedSegmentsSurviveJoinFailureAndSupersededOutputRemainsOwned() async throws {
+    @concurrent func testRetainedSegmentsSurviveJoinFailureAndSupersededOutputRemainsOwned() async throws {
         let f = try fixture()
         try await f.queue.write { db in
             for var segment in f.input.segments { try segment.insert(db) }
@@ -447,7 +447,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// Suspension before the acceptance: nothing is prepared while History is
     /// suspended, and the acceptance waits and completes once History resumes,
     /// so its candidate is never orphaned.
-    func testSuspensionBeforeAcceptanceWaitsAndAcceptsAfterResume() async throws {
+    @concurrent func testSuspensionBeforeAcceptanceWaitsAndAcceptsAfterResume() async throws {
         let f = try fixture(suspendable: true)
         NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
         // A throwing step below must not leave every observing queue in the test process suspended.
@@ -468,7 +468,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
 
     /// Suspension before the acceptance, then the caller stops waiting: nothing
     /// was prepared, so the store reports a plain cancellation and changes nothing.
-    func testSuspensionBeforeAcceptanceThenCancellationChangesNothing() async throws {
+    @concurrent func testSuspensionBeforeAcceptanceThenCancellationChangesNothing() async throws {
         let f = try fixture(suspendable: true)
         NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
@@ -485,7 +485,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// and the journal survives. The acceptance is marked resumable instead of
     /// being rolled back, waits while History stays suspended, and completes
     /// after resume with its audio kept.
-    func testSuspensionInsideAcceptanceIsCompletedAfterResumeNotRolledBack() async throws {
+    @concurrent func testSuspensionInsideAcceptanceIsCompletedAfterResumeNotRolledBack() async throws {
         let f = try fixture(suspendable: true)
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
         try interruptAcceptanceBySuspension(f)
@@ -512,7 +512,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// before the writer is released: the first writer that runs after it,
     /// once History has resumed, completes the acceptance instead of rolling
     /// it back and deleting its audio (PA-30).
-    func testSuspensionInsideCommitMarksTheJournalBeforeAnotherWriterRuns() async throws {
+    @concurrent func testSuspensionInsideCommitMarksTheJournalBeforeAnotherWriterRuns() async throws {
         let f = try fixture(suspendable: true)
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
         let queue = f.queue
@@ -560,7 +560,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// foreground): the acceptance reports it was interrupted, its candidate
     /// belongs to recovery, and the first reconcile after resume, even in a
     /// relaunched process, completes it rather than deleting its audio.
-    func testInterruptedAcceptanceIsCompletedByTheReconcileAfterResume() async throws {
+    @concurrent func testInterruptedAcceptanceIsCompletedByTheReconcileAfterResume() async throws {
         let f = try fixture(suspendable: true)
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
         try interruptAcceptanceBySuspension(f)
@@ -666,7 +666,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     /// A non-throwing task that hands back its error: the shape the pinned CI
     /// compiler's region-isolation checker accepts.
     private func startCommit(_ f: Fixture) -> Task<(any Error)?, Never> {
-        Task { () -> (any Error)? in
+        Task { @concurrent () async -> (any Error)? in
             do {
                 _ = try await f.store.commit(f.input, using: f.queue)
                 return nil
@@ -688,7 +688,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         return (try? journals[0].resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
 
-    private func waitUntil(
+    @concurrent private func waitUntil(
         timeout: Duration = .seconds(10),
         _ condition: () -> Bool
     ) async throws {

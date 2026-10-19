@@ -643,7 +643,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let loadCoordinator = MLXModelLoadCoordinator(
             modelAssetStore: modelAssetStore,
             hubCacheDirectory: hubCacheDirectory,
-            modelLoader: { descriptor, preparedMetadata, capabilityProfile in
+            modelLoader: { @concurrent descriptor, preparedMetadata, capabilityProfile in
                 let resolvedProfile = Self.resolvedPreparedLoadProfile(
                     requestedCapabilityProfile: capabilityProfile,
                     explicitProfile: qwenPreparedLoadProfile
@@ -674,7 +674,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                             preparedDirectoryAlreadyValidated: true,
                             speechTokenizerContentIdentity: preparedMetadata.speechTokenizerContentIdentity
                         ),
-                        verboseDiagnosticSink: { action, details in
+                        verboseDiagnosticSink: { @concurrent action, details in
                             await Self.recordDiagnosticEvent(
                                 action,
                                 details: details,
@@ -698,7 +698,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 return base
             },
             telemetryRecorder: telemetryRecorder,
-            diagnosticEventSink: { action, details in
+            diagnosticEventSink: { @concurrent action, details in
                 await Self.recordDiagnosticEvent(
                     action,
                     details: details,
@@ -793,7 +793,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 uniquingKeysWith: { first, _ in first }
             ),
             diagnosticAppSupportBox: diagnosticAppSupportBox,
-            diagnosticEventSink: { action, details in
+            diagnosticEventSink: { @concurrent action, details in
                 await Self.recordDiagnosticEvent(
                     action,
                     details: details,
@@ -842,7 +842,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let runtime = runtime
         let activeGenerationCoordinator = activeGenerationCoordinator
         let previousCleanupTask = stopCleanupTask
-        stopCleanupTask = Task.detached(priority: .utility) {
+        stopCleanupTask = Task.detached(priority: .utility) { @concurrent in
             await previousCleanupTask?.value
             // If a critical response was already in progress, let it finish
             // its fail-closed trim and reopen publication before this engine
@@ -876,25 +876,25 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let activeGenerationCoordinator = activeGenerationCoordinator
         let reasonPrefix = deviceClass == .iPhonePro ? "ios_memory_pressure" : "macos_memory_pressure"
         let responseExecutor = NativeMemoryPressureResponseExecutor(
-            recordObservation: { level in
+            recordObservation: { @concurrent level in
                 await runtime.recordMemoryPressureObserved(level: level)
             },
-            cancelActiveGeneration: { reason in
+            cancelActiveGeneration: { @concurrent reason in
                 // `cancelCurrent` returns only after the registered task's
                 // terminal barrier. A critical hard trim therefore cannot
                 // clear MLX state while generation is still using it.
                 await activeGenerationCoordinator.cancelCurrent(reason: reason)
             },
-            trim: { [weak self] level, reason in
+            trim: { @concurrent [weak self] level, reason in
                 await self?.applyMemoryPressureTrim(level: level, reason: reason)
             },
-            closeAdmissionForCriticalRelief: { [weak self] in
+            closeAdmissionForCriticalRelief: { @concurrent [weak self] in
                 await self?.closeAdmissionForCriticalMemoryRelief()
             },
-            awaitModelOperationsQuiesced: { [weak self] in
+            awaitModelOperationsQuiesced: { @concurrent [weak self] in
                 await self?.waitForModelOperationsToQuiesce()
             },
-            publishCriticalReliefCompletion: { [weak self] in
+            publishCriticalReliefCompletion: { @concurrent [weak self] in
                 await self?.publishCriticalMemoryReliefCompletion()
             }
         )
@@ -921,7 +921,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
         let normalizedCloneReferenceDirectory = Self.normalizedCloneReferenceDirectory(in: appSupportDirectory)
         let streamSessionsDirectory = self.streamSessionsDirectory
-        try await Task.detached(priority: .utility) {
+        try await Task.detached(priority: .utility) { @concurrent in
             try FileManager.default.createDirectory(
                 at: streamSessionsDirectory,
                 withIntermediateDirectories: true
@@ -998,7 +998,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         normalizedCloneReferenceDirectory: URL,
         outputsDirectory: URL
     ) {
-        Task.detached(priority: .background) {
+        Task.detached(priority: .background) { @concurrent in
             _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
                 .reclaimUnreferencedComponents()
             NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(
@@ -1320,7 +1320,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     cancellationIngress.request(reason)
                     task.cancel()
                 },
-                waitForTermination: { _ = await task.result }
+                waitForTermination: { @concurrent in _ = await task.result }
             )
         } catch {
             task.cancel()
@@ -1769,7 +1769,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             markingConfiguration(for: request)
         )
         let deliveryGenerationID = request.generationID ?? prepared.generationID
-        return try await session.run { [weak self] event in
+        return try await session.run { @concurrent [weak self] event in
             // Yield to the generation-scoped stream BEFORE the @Published
             // slot. The stream is the chunk-delivery transport; the slot is
             // for snapshot consumers.
@@ -1902,7 +1902,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
     }
 
-    nonisolated private func yieldEvent(
+    @concurrent nonisolated private func yieldEvent(
         _ event: GenerationEvent,
         generationID: UUID
     ) async {
@@ -2569,7 +2569,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
-    nonisolated private static func recordDiagnosticEvent(
+    @concurrent nonisolated private static func recordDiagnosticEvent(
         _ name: String,
         details: [String: String],
         appSupportDirectoryURL: URL?

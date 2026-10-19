@@ -151,7 +151,7 @@ enum ModelsCommand {
             note("Updating \(modelID): \(stale.count) file(s) no longer match the pinned catalog identity")
         }
         let modelsDirectory = ctx.modelsDirectory
-        let delivery = try await Task.detached(priority: .utility) {
+        let delivery = try await Task.detached(priority: .utility) { @concurrent in
             try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
         }.value
         note("Installing \(modelID) from \(artifact.repo) (revision \(artifact.revision.prefix(7))\u{2026})")

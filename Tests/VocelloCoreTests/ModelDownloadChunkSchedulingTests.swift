@@ -76,13 +76,13 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     // MARK: - Chunk work queue
 
-    func testChunkWorkQueueDrainsEveryRangeExactlyOnceAcrossWorkers() async {
+    @concurrent func testChunkWorkQueueDrainsEveryRangeExactlyOnceAcrossWorkers() async {
         let ranges = (0..<37).map { ChunkRange(start: Int64($0) * 10, end: Int64($0) * 10 + 9) }
         let queue = HuggingFaceDownloader.ChunkWorkQueue(ranges: ranges)
 
-        let drained = await withTaskGroup(of: [ChunkRange].self, returning: [ChunkRange].self) { group in
+        let drained = await withTaskGroup(of: [ChunkRange].self, returning: [ChunkRange].self) { @concurrent group in
             for _ in 0..<4 {
-                group.addTask {
+                group.addTask { @concurrent in
                     var pulled: [ChunkRange] = []
                     while let range = await queue.next() {
                         pulled.append(range)
@@ -99,7 +99,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(Set(drained.map(\.start)).count, ranges.count, "no range may be dispatched twice")
     }
 
-    func testChunkWorkQueueAbortStopsDispatch() async {
+    @concurrent func testChunkWorkQueueAbortStopsDispatch() async {
         let queue = HuggingFaceDownloader.ChunkWorkQueue(ranges: [
             ChunkRange(start: 0, end: 9), ChunkRange(start: 10, end: 19),
         ])
@@ -110,9 +110,9 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertNil(afterAbort)
     }
 
-    func testChunkWorkQueueReturnsNilForCancelledWorker() async {
+    @concurrent func testChunkWorkQueueReturnsNilForCancelledWorker() async {
         let queue = HuggingFaceDownloader.ChunkWorkQueue(ranges: [ChunkRange(start: 0, end: 9)])
-        let worker = Task { () -> ChunkRange? in
+        let worker = Task { @concurrent () async -> ChunkRange? in
             unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             return await queue.next()
         }
@@ -220,7 +220,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(verdict(nil, "bytes 100-199/1000"), .unsupported)
     }
 
-    func testShortRangeIsRejectedBeforeAnyByteLandsOrIsRecorded() async throws {
+    @concurrent func testShortRangeIsRejectedBeforeAnyByteLandsOrIsRecorded() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("chunk-short-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -408,16 +408,16 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     /// Registers `task` with a pending continuation and returns once the registration
     /// has landed; the returned task ends when the registry resumes that continuation.
-    private func registerPendingTask(
+    @concurrent private func registerPendingTask(
         _ task: URLSessionDownloadTask,
         taskKey: Int,
         in registry: HuggingFaceDownloader.DownloadStateRegistry
     ) async -> Task<Void, Never> {
         let registered = XCTestExpectation(description: "task \(taskKey) registered")
-        let completion = Task {
+        let completion = Task { @concurrent in
             _ = try? await withCheckedThrowingContinuation {
                 (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
-                Task {
+                Task { @concurrent in
                     _ = await registry.register(
                         taskKey: taskKey,
                         task: task,
@@ -434,7 +434,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         return completion
     }
 
-    func testMultipleTasksPerFileAggregateAndReconcileAtExpectedSize() async throws {
+    @concurrent func testMultipleTasksPerFileAggregateAndReconcileAtExpectedSize() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -484,7 +484,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         for completion in completions { await completion.value }
     }
 
-    func testReplacementTaskForSameRangeCannotDoubleCountLogicalBytes() async throws {
+    @concurrent func testReplacementTaskForSameRangeCannotDoubleCountLogicalBytes() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -493,7 +493,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
         let identity = chunkIdentity(start: 0, end: 499)
 
-        func register(taskID: Int) async -> Task<Void, Never> {
+        @concurrent func register(taskID: Int) async -> Task<Void, Never> {
             let task = makeDummyTask(session: session)
             task.taskDescription = identity.encodedTaskDescription
             return await registerPendingTask(task, taskKey: taskID, in: registry)
@@ -525,7 +525,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         await replacementCompletion.value
     }
 
-    func testProgressPublicationCoalescesInsideTheQuarterSecondWindow() async {
+    @concurrent func testProgressPublicationCoalescesInsideTheQuarterSecondWindow() async {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -550,7 +550,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(sink.values.map(\.downloadedBytes), [0, 300, 380])
     }
 
-    func testSpeedIsSampledOnlyAcrossTheHalfSecondWindowAndSmoothed() async throws {
+    @concurrent func testSpeedIsSampledOnlyAcrossTheHalfSecondWindowAndSmoothed() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -587,7 +587,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         await completion.value
     }
 
-    func testSkippedFilesAndResumedPartialsNeverInflateMeasuredSpeed() async throws {
+    @concurrent func testSkippedFilesAndResumedPartialsNeverInflateMeasuredSpeed() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -609,7 +609,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(progress.bytesPerSecond, 333, "skipped bytes leaked into the speed sample")
     }
 
-    func testHeartbeatReportsAStallOnlyAfterTwentySecondsWithoutProgress() async throws {
+    @concurrent func testHeartbeatReportsAStallOnlyAfterTwentySecondsWithoutProgress() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -658,7 +658,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
     /// The one real-time proof: the registry's default clock is the process uptime, so
     /// the production throttle reopens after a real quarter second. Every other
     /// registry test steps a manual clock.
-    func testDefaultClockThrottlesPublicationAgainstRealUptime() async throws {
+    @concurrent func testDefaultClockThrottlesPublicationAgainstRealUptime() async throws {
         let sink = ProgressSink()
         let registry = HuggingFaceDownloader.DownloadStateRegistry(
             repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
@@ -681,7 +681,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         await registry.finishRepositoryDownload()
     }
 
-    func testCleanRetryPublishesLowerExactDurableTotal() async throws {
+    @concurrent func testCleanRetryPublishesLowerExactDurableTotal() async throws {
         let sink = ProgressSink()
         let clock = ManualProgressClock()
         let registry = makeRegistry(sink: sink, clock: clock)
@@ -703,7 +703,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         )
     }
 
-    func testTransferAccountingIncludesSharedSkippedAndRecoveredBytesExactly() async throws {
+    @concurrent func testTransferAccountingIncludesSharedSkippedAndRecoveredBytesExactly() async throws {
         let registry = HuggingFaceDownloader.DownloadStateRegistry(
             repositoryProgressHandler: nil
         )
@@ -734,7 +734,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     // MARK: - Out-of-order chunk assembly
 
-    func testChunkAssemblyWritesOutOfOrderChunksIntoOnePartial() async throws {
+    @concurrent func testChunkAssemblyWritesOutOfOrderChunksIntoOnePartial() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("chunk-assembly-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -763,7 +763,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: partial), payload)
     }
 
-    func testAssembledChunkTempFileIsRemovedAfterItsBytesLand() async throws {
+    @concurrent func testAssembledChunkTempFileIsRemovedAfterItsBytesLand() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("chunk-temp-cleanup-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -787,7 +787,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: partial), Data([0, 0]) + Data("WXYZ".utf8))
     }
 
-    func testAssembledChunkTempFileIsRemovedWhenTheWriteThrows() async throws {
+    @concurrent func testAssembledChunkTempFileIsRemovedWhenTheWriteThrows() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("chunk-temp-failure-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -997,7 +997,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         )
     }
 
-    func testAssemblyRecordsCompletedRangesDurably() async throws {
+    @concurrent func testAssemblyRecordsCompletedRangesDurably() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("chunk-durable-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -1028,7 +1028,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     // MARK: - Registry: adopted-task teardown and identity-exact claims
 
-    func testCancellationDrainsAdoptedButUnconsumedTasks() async throws {
+    @concurrent func testCancellationDrainsAdoptedButUnconsumedTasks() async throws {
         let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
@@ -1042,7 +1042,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(adopted.state, .suspended)
 
         await registry.requestCancellation()
-        let left: Bool = await {
+        let left: Bool = await { @concurrent in
             for _ in 0..<50 {
                 if adopted.state != .suspended { return true }
                 try? await Task.sleep(for: .milliseconds(20))
@@ -1055,7 +1055,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertNil(taken)
     }
 
-    func testParkedCompletionClaimRequiresExactIdentity() async throws {
+    @concurrent func testParkedCompletionClaimRequiresExactIdentity() async throws {
         let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
@@ -1097,9 +1097,9 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         let dummy = makeDummyTask(session: session)
         dummy.taskDescription = fresh.encodedTaskDescription
         let registered: Bool = await withCheckedContinuation { outer in
-            Task {
+            Task { @concurrent in
                 _ = try? await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
-                    Task {
+                    Task { @concurrent in
                         let shouldResume = await registry.register(
                             taskKey: 42,
                             task: dummy,
@@ -1128,7 +1128,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     // MARK: - Registry: parked chunk completions claim by range slot
 
-    func testParkedChunkCompletionsAreClaimedPerRangeSlot() async throws {
+    @concurrent func testParkedChunkCompletionsAreClaimedPerRangeSlot() async throws {
         let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
@@ -1166,7 +1166,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             dummy.taskDescription = identity.encodedTaskDescription
             let claimed: HuggingFaceDownloader.DownloadedTemporaryFile =
                 try await withCheckedThrowingContinuation { continuation in
-                    Task {
+                    Task { @concurrent in
                         let shouldResume = await registry.register(
                             taskKey: key,
                             task: dummy,

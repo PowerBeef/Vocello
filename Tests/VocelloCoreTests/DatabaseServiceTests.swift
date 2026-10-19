@@ -285,7 +285,7 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(page.archiveCount, 3)
     }
 
-    func testSaveIfMissingIsIdempotentByAudioPath() async throws {
+    @concurrent func testSaveIfMissingIsIdempotentByAudioPath() async throws {
         let service = try makeService()
         let first = try await service.saveGenerationIfMissingAsync(row("/nonexistent/same.wav", text: "original", at: 0))
         let firstID = try XCTUnwrap(first.id)
@@ -300,7 +300,7 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(try service.fetchAllGenerations().count, 2)
     }
 
-    func testReplacingTheJoinedOutputSupersedesOnlyThatProjectsJoinedRow() async throws {
+    @concurrent func testReplacingTheJoinedOutputSupersedesOnlyThatProjectsJoinedRow() async throws {
         let service = try makeService()
         _ = try await service.saveGenerationAsync(
             row("/nonexistent/p-segment.wav", at: 0, projectID: "project-p", role: "segment")
@@ -451,7 +451,7 @@ final class DatabaseServiceTests: XCTestCase {
         )
     }
 
-    func testDiscardingUnreadableLongFormRecoveryUnblocksHistoryWrites() async throws {
+    @concurrent func testDiscardingUnreadableLongFormRecoveryUnblocksHistoryWrites() async throws {
         let root = try makeRoot()
         let service = DatabaseService(rootDirectory: root)
         let journals = root.appendingPathComponent("history-outbox/long-form", isDirectory: true)

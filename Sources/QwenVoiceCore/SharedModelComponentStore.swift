@@ -838,7 +838,7 @@ public struct SharedModelComponentStore: Sendable {
             )
         case .background:
             let store = self
-            Task.detached(priority: .utility) {
+            Task.detached(priority: .utility) { @concurrent in
                 _ = try? store.reclaimUnreferencedComponents(
                     gracePeriod: componentGracePeriod,
                     releasedDigests: releasedDigests

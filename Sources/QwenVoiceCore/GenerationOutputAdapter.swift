@@ -14,8 +14,8 @@ import OSLog
 // Keep behavior changes here aligned with the platform host adapters.
 
 protocol GenerationOutputAdapting {
-    func run(
-        chunkSink: @escaping @Sendable (GenerationEvent) async -> Void
+    @concurrent func run(
+        chunkSink: @escaping @Sendable @concurrent (GenerationEvent) async -> Void
     ) async throws -> GenerationResult
 }
 
@@ -26,13 +26,13 @@ protocol GenerationReservedTake: Sendable {
     associatedtype AudioConsumer: Sendable
 
     var cancellation: VocelloQwen3CancellationController { get }
-    func claimAudioConsumer() async throws -> AudioConsumer
-    func cancelAudio(_ audio: AudioConsumer, reason: VocelloQwen3CancellationReason) async
-    func open() async throws
-    func waitForModelTermination() async -> VocelloQwen3TerminalEvent
-    func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws
-    func abortReservation(reason: VocelloQwen3CancellationReason) async throws
-    func acknowledgeProductFinalization(
+    @concurrent func claimAudioConsumer() async throws -> AudioConsumer
+    @concurrent func cancelAudio(_ audio: AudioConsumer, reason: VocelloQwen3CancellationReason) async
+    @concurrent func open() async throws
+    @concurrent func waitForModelTermination() async -> VocelloQwen3TerminalEvent
+    @concurrent func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws
+    @concurrent func abortReservation(reason: VocelloQwen3CancellationReason) async throws
+    @concurrent func acknowledgeProductFinalization(
         _ disposition: VocelloQwen3ProductFinalizationDisposition
     ) async throws
 }
@@ -47,34 +47,34 @@ struct EngineReservedTake: GenerationReservedTake {
         reservation.session.cancellation
     }
 
-    func claimAudioConsumer() async throws -> VocelloQwen3LosslessAudioSequence {
+    @concurrent func claimAudioConsumer() async throws -> VocelloQwen3LosslessAudioSequence {
         try await reservation.session.claimAudioConsumer()
     }
 
-    func cancelAudio(
+    @concurrent func cancelAudio(
         _ audio: VocelloQwen3LosslessAudioSequence,
         reason: VocelloQwen3CancellationReason
     ) async {
         await audio.cancel(reason: reason)
     }
 
-    func open() async throws {
+    @concurrent func open() async throws {
         try await engine.open(reservation.id)
     }
 
-    func waitForModelTermination() async -> VocelloQwen3TerminalEvent {
+    @concurrent func waitForModelTermination() async -> VocelloQwen3TerminalEvent {
         await reservation.session.waitForModelTermination()
     }
 
-    func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
+    @concurrent func cancelGeneration(reason: VocelloQwen3CancellationReason) async throws {
         try await engine.cancelGeneration(reservation.id, reason: reason)
     }
 
-    func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
+    @concurrent func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
         try await engine.abortReservation(reservation.id, reason: reason)
     }
 
-    func acknowledgeProductFinalization(
+    @concurrent func acknowledgeProductFinalization(
         _ disposition: VocelloQwen3ProductFinalizationDisposition
     ) async throws {
         _ = try await engine.acknowledgeProductFinalization(
@@ -246,8 +246,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         self.markingConfiguration = markingConfiguration
     }
 
-    func run(
-        chunkSink: @escaping @Sendable (GenerationEvent) async -> Void
+    @concurrent func run(
+        chunkSink: @escaping @Sendable @concurrent (GenerationEvent) async -> Void
     ) async throws -> GenerationResult {
         let telemetryTerminalGate = NativeTelemetryTerminalGate()
         let cloneHandle = preparedCloneHandle
@@ -255,7 +255,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             return try await Self.runReservedTake(
                 cancellationIngress: cancellationIngress,
                 telemetryRecorder: telemetryRecorder,
-                reserve: { () async throws -> EngineReservedTake in
+                reserve: { @concurrent () async throws -> EngineReservedTake in
                     let chunkCapacity = actorRequest.chunking.pendingFrameLimit * 1_920
                     let reservation = try await model.engine.reserveGeneration(
                         request: actorRequest,
@@ -268,7 +268,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         generationID: generationID
                     )
                 },
-                prepareExecution: { () async throws -> StreamingExecutionContext in
+                prepareExecution: { @concurrent () async throws -> StreamingExecutionContext in
                     let sessionDirectory = try makeSessionDirectory()
                     await telemetryRecorder?.mark(
                         stage: GenerationStartupBoundary.sessionDirectoryCreated.telemetryStage
@@ -297,7 +297,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         markingConfiguration: markingConfiguration
                     )
                 },
-                execute: { execution, take, audio, engineOpenClockMS in
+                execute: { @concurrent execution, take, audio, engineOpenClockMS in
                     try await execution.run(
                         audio: audio,
                         session: take.reservation.session,
@@ -306,7 +306,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                     )
                 },
                 chunkSink: chunkSink,
-                afterFinalization: {
+                afterFinalization: { @concurrent in
                     if let cloneHandle {
                         _ = await model.engine.releaseCloneHandle(cloneHandle)
                     }
@@ -330,16 +330,16 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     /// with its catch-path cancel, abort and acknowledge. `run` drives it over
     /// the actor reservation (`EngineReservedTake`); deterministic tests drive
     /// the same code over a fake take, since a real reservation needs weights.
-    static func runReservedTake<Take: GenerationReservedTake, Execution>(
+    @concurrent static func runReservedTake<Take: GenerationReservedTake, Execution>(
         cancellationIngress: GenerationCancellationIngress,
         telemetryRecorder: NativeTelemetryRecorder?,
-        reserve: () async throws -> Take,
-        prepareExecution: () async throws -> Execution,
-        execute: (Execution, Take, Take.AudioConsumer, Int?) async throws -> GenerationResult,
-        chunkSink: @Sendable (GenerationEvent) async -> Void,
-        afterFinalization: () async -> Void
+        reserve: @concurrent () async throws -> Take,
+        prepareExecution: @concurrent () async throws -> Execution,
+        execute: @concurrent (Execution, Take, Take.AudioConsumer, Int?) async throws -> GenerationResult,
+        chunkSink: @Sendable @concurrent (GenerationEvent) async -> Void,
+        afterFinalization: @concurrent () async -> Void
     ) async throws -> GenerationResult {
-        try await withTaskCancellationHandler {
+        try await withTaskCancellationHandler { @concurrent in
             // Cancellation can win after product preparation but before the
             // actor reservation exists. The typed ingress records that
             // decision before Task cancellation reaches this adapter.
@@ -455,7 +455,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     /// Covers failures that occur before an execution context exists (most
     /// notably session-directory setup). Execution-owned failures normally
     /// claim the same terminal gate first, making this outer fallback a no-op.
-    private func writeUnhandledSessionFailureTelemetryIfNeeded(
+    @concurrent private func writeUnhandledSessionFailureTelemetryIfNeeded(
         _ error: Error,
         terminalGate: NativeTelemetryTerminalGate
     ) async {
@@ -507,7 +507,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         }
     }
 
-    private func stopSamplerIfNeeded() async {
+    @concurrent private func stopSamplerIfNeeded() async {
         let marks = await telemetryRecorder?.snapshot() ?? []
         _ = await telemetrySampler?.stop(stageMarks: marks)
     }
@@ -1610,11 +1610,11 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
-    func run(
+    @concurrent func run(
         audio: VocelloQwen3LosslessAudioSequence,
         session: VocelloQwen3ClassifiedGenerationSession,
         engineOpenClockMS: Int?,
-        chunkSink: @escaping @Sendable (GenerationEvent) async -> Void
+        chunkSink: @escaping @Sendable @concurrent (GenerationEvent) async -> Void
     ) async throws -> GenerationResult {
         let benchNotes = BenchRunContext.telemetryNotes()
         let benchRunID = benchNotes["benchRunID"] ?? "not-bench"
@@ -2529,7 +2529,7 @@ struct StreamingExecutionContext: Sendable {
     /// empty-output, token-cap, or finalization failures that occur outside the
     /// producer-loop catch. The sampler itself is idempotent, so an outer cleanup
     /// may safely call stop again without changing this evidence.
-    private func writeFailureTelemetry(
+    @concurrent private func writeFailureTelemetry(
         error: Error,
         usedStreaming: Bool,
         counters: [String: Int],
@@ -2619,7 +2619,7 @@ struct StreamingExecutionContext: Sendable {
     /// engine-layer row of the unified telemetry artifact. Runtime-gated and a
     /// no-op when the gate is off or the app-support directory is unknown — so it
     /// is safe to call on every terminal path (success, failure, non-EOS finish).
-    private func writeEngineTelemetryRecord(
+    @concurrent private func writeEngineTelemetryRecord(
         summary: TelemetrySummary,
         stageMarks: [NativeTelemetryStageMark],
         usedStreaming: Bool,
@@ -3544,7 +3544,7 @@ struct StreamingExecutionContext: Sendable {
         return metrics
     }
 
-    private static func stopTelemetrySampler(
+    @concurrent private static func stopTelemetrySampler(
         _ telemetrySampler: NativeTelemetrySampler?,
         stageMarks: [NativeTelemetryStageMark]
     ) async -> (summary: TelemetrySummary, samples: [TelemetrySample]) {

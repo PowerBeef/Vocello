@@ -148,7 +148,7 @@ final class VoiceCloneEnrollmentConfidenceTests: XCTestCase {
             ],
             authorization: .authorized,
             scoreLanguage: scoreLanguage,
-            recognize: { await fixture.recognize($0) }
+            recognize: { @concurrent in await fixture.recognize($0) }
         )
     }
 }

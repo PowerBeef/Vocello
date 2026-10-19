@@ -33,7 +33,7 @@ final class IOSMetricKitMemoryReporter: NSObject, MXMetricManagerSubscriber, Sen
     func didReceive(_ payloads: [MXMetricPayload]) {
         let records = payloads.map(Self.metricRecord)
         guard !records.isEmpty else { return }
-        Task {
+        Task { @concurrent in
             await IOSMetricKitMemorySummaryStore.shared.append(records)
         }
     }
@@ -41,7 +41,7 @@ final class IOSMetricKitMemoryReporter: NSObject, MXMetricManagerSubscriber, Sen
     func didReceive(_ payloads: [MXDiagnosticPayload]) {
         let records = payloads.map(Self.diagnosticRecord)
         guard !records.isEmpty else { return }
-        Task {
+        Task { @concurrent in
             await IOSMetricKitMemorySummaryStore.shared.append(records)
         }
     }

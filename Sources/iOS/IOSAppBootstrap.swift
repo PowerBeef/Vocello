@@ -66,7 +66,7 @@ final class IOSAppDependenciesContainer: nonisolated ObservableObject {
             forcedStartupFailurePending = false
             throw ForcedStartupFailure()
         }
-        let protection = await Task.detached(priority: .userInitiated) {
+        let protection = await Task.detached(priority: .userInitiated) { @concurrent in
             // MAC-25 on the iPhone: reference clips an earlier launch recorded
             // (a crash or jetsam kill stranded them) go before any sheet can
             // record again. One app process owns this temporary directory.

@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 final class LongFormAssemblyTests: XCTestCase {
-    func testOneSegmentPublishesReadableTrimmedAtomicWAVAndFrameMap() async throws {
+    @concurrent func testOneSegmentPublishesReadableTrimmedAtomicWAVAndFrameMap() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let source = try fixture.makeSegment(index: 1, audibleFrames: 800, edgeSilence: 200)
@@ -27,7 +27,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertEqual(try fixture.visibleFiles(named: "joined"), ["joined.wav"])
     }
 
-    func testTenSegmentsUseBoundaryPausesAndContiguousFrameMap() async throws {
+    @concurrent func testTenSegmentsUseBoundaryPausesAndContiguousFrameMap() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let segments = try (1...10).map {
@@ -62,7 +62,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertLessThan(evidence.maximumSegmentBoundaryJump, 4_000)
     }
 
-    func testStepDiscontinuityRecordsBoundaryJumpAdvisoryWarning() async throws {
+    @concurrent func testStepDiscontinuityRecordsBoundaryJumpAdvisoryWarning() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         // Two loud square-wave segments joined with no pause: an even audible
@@ -112,7 +112,7 @@ final class LongFormAssemblyTests: XCTestCase {
     /// CORE-12: a quiet segment with a near-ceiling peak is boosted only up to
     /// the limiter's ceiling, never clipped at full scale; a quiet segment
     /// without such a peak still gets the full loudness gain.
-    func testLoudnessGainNeverPushesAPeakPastTheCeiling() async throws {
+    @concurrent func testLoudnessGainNeverPushesAPeakPastTheCeiling() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let peak: Int16 = 31_000
@@ -171,7 +171,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertLessThan(maximum, Int(Int16.max), "no sample reaches the 16-bit clamp")
     }
 
-    func testSmoothJoinRecordsNoAdvisoryAndOldEvidenceDecodesWithoutTheField() async throws {
+    @concurrent func testSmoothJoinRecordsNoAdvisoryAndOldEvidenceDecodesWithoutTheField() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let segments = try (1...2).map {
@@ -200,7 +200,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertEqual(decoded.maximumSegmentBoundaryJump, evidence.maximumSegmentBoundaryJump)
     }
 
-    func testDefaultPauseComesFromPlannerBoundarySemantics() async throws {
+    @concurrent func testDefaultPauseComesFromPlannerBoundarySemantics() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let firstURL = try fixture.makeAudioFile(
@@ -244,7 +244,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertEqual(evidence.segments[1].insertedPauseOutputRange.count, 0)
     }
 
-    func testHundredSegmentsRetainFixedWorkingSetProxy() async throws {
+    @concurrent func testHundredSegmentsRetainFixedWorkingSetProxy() async throws {
         let fixture = try Fixture(blockFrames: 128)
         defer { fixture.cleanup() }
         let segments = try (1...100).map {
@@ -264,7 +264,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertTrue(evidence.segments.allSatisfy { $0.contentOutputRange.count == 257 })
     }
 
-    func testGainIsBoundedAndFadesAreRestrictedToVerifiedNonSpeech() async throws {
+    @concurrent func testGainIsBoundedAndFadesAreRestrictedToVerifiedNonSpeech() async throws {
         let fixture = try Fixture(maximumTrimMillisecondsPerEdge: 1)
         defer { fixture.cleanup() }
         let source = try fixture.makeSegment(
@@ -287,7 +287,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertLessThanOrEqual(map.verifiedNonSpeechFadeOutFrames, 240)
     }
 
-    func testCancellationLeavesNoPartialOrStagingOutput() async throws {
+    @concurrent func testCancellationLeavesNoPartialOrStagingOutput() async throws {
         let fixture = try Fixture(blockFrames: 64)
         defer { fixture.cleanup() }
         let segments = try (1...100).map {
@@ -295,7 +295,7 @@ final class LongFormAssemblyTests: XCTestCase {
         }
         let output = fixture.directory.appendingPathComponent("joined.wav")
         let configuration = fixture.configuration
-        let task = Task.detached { @Sendable in
+        let task = Task.detached { @concurrent @Sendable in
             try await BoundedLongFormAssembler.assemble(
                 segments: segments,
                 outputURL: output,
@@ -314,7 +314,7 @@ final class LongFormAssemblyTests: XCTestCase {
         XCTAssertEqual(try fixture.visibleFiles(named: "joined"), [])
     }
 
-    func testSilentSegmentFailsClosedWithoutPublishing() async throws {
+    @concurrent func testSilentSegmentFailsClosedWithoutPublishing() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
         let url = fixture.directory.appendingPathComponent("silent.wav")

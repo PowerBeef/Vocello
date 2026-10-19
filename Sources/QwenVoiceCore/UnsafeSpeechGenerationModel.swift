@@ -165,7 +165,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
     /// Loads the prepared bundle into a fresh actor and captures its facts.
     /// The verbose sink is the local-diagnostics load-stage channel; see
     /// `VocelloQwen3VerboseLoadDiagnosticSink` for its confinement contract.
-    static func load(
+    @concurrent static func load(
         bundle: VocelloQwen3PreparedModelBundle,
         loadBehavior: VocelloQwen3LoadBehavior,
         verboseDiagnosticSink: VocelloQwen3VerboseLoadDiagnosticSink? = nil
@@ -211,23 +211,23 @@ final class UnsafeSpeechGenerationModel: Sendable {
     var loadDiagnosticsTimingsMS: [String: Int] { facts.loadDiagnostics.timingsMilliseconds }
     var loadDiagnosticBooleanFlags: [String: Bool] { facts.loadDiagnostics.booleanFlags }
 
-    func latestPreparationTimingsMS() async -> [String: Int] {
+    @concurrent func latestPreparationTimingsMS() async -> [String: Int] {
         await engine.preparationDiagnostics()?.timingsMilliseconds ?? [:]
     }
 
-    func latestPreparationBooleanFlags() async -> [String: Bool] {
+    @concurrent func latestPreparationBooleanFlags() async -> [String: Bool] {
         await engine.preparationDiagnostics()?.booleanFlags ?? [:]
     }
 
-    func latestPreparationStringFlags() async -> [String: String] {
+    @concurrent func latestPreparationStringFlags() async -> [String: String] {
         await engine.preparationDiagnostics()?.stringFlags ?? [:]
     }
 
-    func resetPreparationDiagnostics() async {
+    @concurrent func resetPreparationDiagnostics() async {
         await engine.resetPreparationDiagnostics()
     }
 
-    func replayCodecTrace(
+    @concurrent func replayCodecTrace(
         frames: [[Int32]],
         incrementalRanges: [StartupReliabilityCodecFrameRange],
         memory: VocelloQwen3MemoryConfiguration
@@ -246,7 +246,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
-    func codecRoundTrip(
+    @concurrent func codecRoundTrip(
         samples: [Float],
         memory: VocelloQwen3MemoryConfiguration,
         didLoadModel: Bool
@@ -280,7 +280,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
-    func prewarmCustomVoice(
+    @concurrent func prewarmCustomVoice(
         text: String,
         language: String,
         speaker: String,
@@ -297,7 +297,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
-    func prewarmVoiceDesign(
+    @concurrent func prewarmVoiceDesign(
         text: String,
         language: String,
         voiceDescription: String
@@ -311,7 +311,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
-    func makeCloneHandle(
+    @concurrent func makeCloneHandle(
         refAudio: [Float],
         refText: String?,
         xVectorOnlyMode: Bool,
@@ -325,7 +325,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
         )
     }
 
-    func prewarmVoiceClone(
+    @concurrent func prewarmVoiceClone(
         text: String,
         language: String,
         cloneHandle: VocelloQwen3CloneHandle
@@ -343,7 +343,7 @@ final class UnsafeSpeechGenerationModel: Sendable {
     /// Bounded actor-owned priming generation; audio never crosses the
     /// boundary. Returns the produced frame count for the host's non-empty
     /// guard.
-    func primeVoiceClone(
+    @concurrent func primeVoiceClone(
         text: String,
         language: String,
         cloneHandle: VocelloQwen3CloneHandle

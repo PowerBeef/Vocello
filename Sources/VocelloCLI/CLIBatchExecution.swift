@@ -101,7 +101,7 @@ enum CLIBatchExecution {
     static func run(
         _ requests: [GenerationRequest],
         progress: (Int, Int) -> Void = { _, _ in },
-        generate: (GenerationRequest) async throws -> GenerationResult
+        generate: @concurrent (GenerationRequest) async throws -> GenerationResult
     ) async -> Outcome {
         var rows = requests.enumerated().map { Row(index: $0.offset, generationID: $0.element.generationID) }
         var results: [GenerationResult] = []

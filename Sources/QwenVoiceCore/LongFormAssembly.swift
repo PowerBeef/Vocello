@@ -203,7 +203,7 @@ public struct LongFormAssemblyEvidence: Codable, Equatable, Sendable {
 /// performs two bounded passes per source segment: one for edge/RMS analysis
 /// and one for incremental output.
 public enum BoundedLongFormAssembler {
-    public static func assemble(
+    @concurrent public static func assemble(
         segments: [LongFormAssemblySegmentSource],
         outputURL: URL,
         configuration: LongFormAssemblyConfiguration = LongFormAssemblyConfiguration(),

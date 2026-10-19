@@ -78,7 +78,7 @@ enum GenerateCommand {
         let wantedID = request.generationID
         let streamTask: Task<StreamObservation, Never>? = request.shouldStream && wantedID != nil ? {
             let events = runtime.engine.events(for: wantedID!)
-            return Task.detached(priority: .utility) {
+            return Task.detached(priority: .utility) { @concurrent in
                 var firstChunkMS: Double?
                 var firstChunkUptimeNS: UInt64?
                 var count = 0
@@ -422,7 +422,7 @@ enum GenerateCommand {
 
     /// Mode for `generate`: an explicit `--mode` wins; otherwise prompt interactively
     /// when stdin is a terminal; otherwise default to `custom` (scripted/piped runs).
-    static func resolveModeInteractive(_ args: Args) async throws -> GenerationMode {
+    @concurrent static func resolveModeInteractive(_ args: Args) async throws -> GenerationMode {
         if let explicit = args.string("mode") { return try parseModeString(explicit) }
         if isInteractiveStdin() { return try await promptForMode() }
         return .custom
@@ -431,7 +431,7 @@ enum GenerateCommand {
     /// Numbered menu on stderr; reads a choice (number or name) from stdin. Falls
     /// back to `custom` on EOF/blank after a few tries. A Ctrl-C at the prompt
     /// ends the command at once (P15-10).
-    static func promptForMode(
+    @concurrent static func promptForMode(
         readLine read: @escaping @Sendable () -> String? = { Swift.readLine(strippingNewline: true) }
     ) async throws -> GenerationMode {
         let modes = GenerationMode.allCases
@@ -457,9 +457,9 @@ enum GenerateCommand {
     /// forced exit. The read runs on its own thread instead; a cancellation ends
     /// the wait at once with `CancellationError`, and the abandoned thread ends
     /// with the process.
-    static func readLineCancellably(_ read: @escaping @Sendable () -> String?) async throws -> String? {
+    @concurrent static func readLineCancellably(_ read: @escaping @Sendable () -> String?) async throws -> String? {
         let gate = CLICancellableLineRead()
-        return try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler { @concurrent in
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String?, any Error>) in
                 guard gate.install(continuation) else { return }
                 Thread.detachNewThread { gate.deliver(read()) }

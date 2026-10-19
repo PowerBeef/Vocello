@@ -797,16 +797,16 @@ struct GenerationHistoryOutboxStore: Sendable {
 /// (always a larger id) is never deleted by it (AUD-05). Database writes remain
 /// idempotent through the injected audio-identity-aware commit operation.
 actor GenerationHistoryRecoveryCoordinator {
-    typealias Commit = @Sendable (GenerationHistoryOutboxOperation, Generation) async throws -> Generation
+    typealias Commit = @Sendable @concurrent (GenerationHistoryOutboxOperation, Generation) async throws -> Generation
     /// Every History row, or a throw. A read that would withhold rows (a
     /// long-form journal awaiting recovery) must fail instead: the clear's
     /// bound must never cover a row it did not capture (AUD-05).
-    typealias FetchAll = @Sendable () async throws -> [Generation]
+    typealias FetchAll = @Sendable @concurrent () async throws -> [Generation]
     /// Deletes the History rows whose id is at most the bound and returns
     /// their audio paths, in one database write.
-    typealias DeleteThrough = @Sendable (Int64) async throws -> [String]
+    typealias DeleteThrough = @Sendable @concurrent (Int64) async throws -> [String]
     /// The subset of the given audio paths that History rows still reference.
-    typealias ReferencedAudioPaths = @Sendable ([String]) async throws -> Set<String>
+    typealias ReferencedAudioPaths = @Sendable @concurrent ([String]) async throws -> Set<String>
 
     private let store: GenerationHistoryOutboxStore
     private let commitGeneration: Commit

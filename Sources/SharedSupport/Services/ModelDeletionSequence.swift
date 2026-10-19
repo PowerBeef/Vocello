@@ -137,7 +137,7 @@ enum ModelDeletionSequence {
     static func run(
         modelID: String,
         engine: (any ModelDeletionEngineCoordinating)?,
-        stopDownloads: () async -> Bool,
+        stopDownloads: @concurrent () async -> Bool,
         removeFiles: () -> Bool,
         unloadFailed: (any Error) -> Void = { _ in }
     ) async -> Outcome {

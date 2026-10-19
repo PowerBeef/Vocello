@@ -397,7 +397,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         XCTAssertNotEqual(first.retryAttempt, retry.retryAttempt)
     }
 
-    func testHistoricalStartupMarksSortByObservedTimeThenSequence() async {
+    @concurrent func testHistoricalStartupMarksSortByObservedTimeThenSequence() async {
         let recorder = NativeTelemetryRecorder(clock: NativeTelemetryClock())
         await recorder.mark(stage: GenerationStartupBoundary.engineOpened.telemetryStage)
         await recorder.mark(
@@ -416,7 +416,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
         ])
     }
 
-    func testStartupBoundariesAreOneShotAndResettable() async {
+    @concurrent func testStartupBoundariesAreOneShotAndResettable() async {
         let recorder = NativeTelemetryRecorder(clock: NativeTelemetryClock())
         let stage = GenerationStartupBoundary.firstDecodedAudioFrame.telemetryStage
 

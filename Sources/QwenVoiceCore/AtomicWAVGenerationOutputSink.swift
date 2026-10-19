@@ -163,24 +163,24 @@ final class AtomicWAVGenerationOutputSink: VocelloQwen3ProductOutputSink, Sendab
         )
     }
 
-    func consume(
+    @concurrent func consume(
         _ chunk: VocelloQwen3AudioChunkEvent
     ) async throws -> VocelloQwen3PreviewAudioChunk {
         try await state.consume(chunk)
     }
 
-    func finalize(
+    @concurrent func finalize(
         modelTerminal: VocelloQwen3TerminalEvent
     ) async throws -> VocelloQwen3ProductFinalizationDisposition {
         _ = try await state.finalize(modelTerminal: modelTerminal)
         return .published
     }
 
-    func abort() async {
+    @concurrent func abort() async {
         await state.abort()
     }
 
-    func result() async -> AtomicWAVGenerationOutputResult? {
+    @concurrent func result() async -> AtomicWAVGenerationOutputResult? {
         await state.result()
     }
 }

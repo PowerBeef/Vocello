@@ -40,9 +40,9 @@ enum CriticalMemoryReliefOutcome: nonisolated Equatable {
 @MainActor
 enum CriticalMemoryReliefExecutor {
     static func execute(
-        cancel: (GenerationCancellationReason) async throws -> Void,
-        applyRelief: () async -> Void,
-        releaseOwnership: () async -> Void
+        cancel: @concurrent (GenerationCancellationReason) async throws -> Void,
+        applyRelief: @concurrent () async -> Void,
+        releaseOwnership: @concurrent () async -> Void
     ) async -> CriticalMemoryReliefOutcome {
         do {
             try await cancel(.memoryPressure)
@@ -63,7 +63,7 @@ enum CriticalMemoryReliefExecutor {
 @MainActor
 enum CriticalMemoryFullUnloadSequence {
     static func execute(
-        unload: () async -> Void,
+        unload: @concurrent () async -> Void,
         recordUnloadCompleted: () -> Void,
         clearGenerationActivity: () -> Void
     ) async {

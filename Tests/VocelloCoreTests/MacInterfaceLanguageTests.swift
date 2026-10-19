@@ -64,14 +64,14 @@ final class MacInterfaceLanguageTests: XCTestCase {
         XCTAssertEqual(MacInterfaceLanguage.selection, "fr")
         XCTAssertEqual(MacInterfaceLanguage.current.language, "fr")
         XCTAssertEqual(UserDefaults(suiteName: suiteName)?.string(forKey: IOSAppLanguage.preferenceKey), "fr")
-        let offMain = await Task.detached {
+        let offMain = await Task.detached { @concurrent in
             XCTAssertFalse(Thread.isMainThread)
             return MacInterfaceLanguage.current.language
         }.value
         XCTAssertEqual(offMain, "fr")
 
         MacInterfaceLanguage.select(IOSAppLanguage.system)
-        let restored = await Task.detached { MacInterfaceLanguage.current.language }.value
+        let restored = await Task.detached { @concurrent in MacInterfaceLanguage.current.language }.value
         XCTAssertEqual(restored, "en")
         XCTAssertNil(UserDefaults(suiteName: suiteName)?.string(forKey: IOSAppLanguage.preferenceKey))
     }
@@ -93,7 +93,7 @@ final class MacInterfaceLanguageTests: XCTestCase {
             XCTAssertEqual(restored.selection, identifier)
             XCTAssertEqual(restored.resolvedLanguage, identifier)
             XCTAssertEqual(restored.interfaceLocale.region, Locale.current.region)
-            let snapshotLanguage = await Task.detached { MacInterfaceLanguage.current.language }.value
+            let snapshotLanguage = await Task.detached { @concurrent in MacInterfaceLanguage.current.language }.value
             XCTAssertEqual(snapshotLanguage, identifier)
             XCTAssertEqual(defaults.string(forKey: "test.speechLanguage"), "french")
             XCTAssertEqual(defaults.string(forKey: "test.draft"), "Exact 日本語 draft")

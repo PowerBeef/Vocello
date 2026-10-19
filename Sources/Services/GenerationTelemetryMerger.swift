@@ -32,12 +32,12 @@ enum GenerationTelemetryMerger {
         guard let generationID else { return }
         let key = generationID.uuidString
         let appSupportDirectory = AppPaths.appSupportDir
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { @concurrent in
             await merge(generationID: key, appSupportDirectory: appSupportDirectory)
         }
     }
 
-    private static func merge(generationID: String, appSupportDirectory: URL) async {
+    @concurrent private static func merge(generationID: String, appSupportDirectory: URL) async {
         let diagnostics = appSupportDirectory.appendingPathComponent("diagnostics", isDirectory: true)
         let appURL = diagnostics.appendingPathComponent("app/generations.jsonl", isDirectory: false)
         let engineURL = diagnostics.appendingPathComponent("engine/generations.jsonl", isDirectory: false)

@@ -29,7 +29,7 @@ final class LatestEventCoalescer: @unchecked Sendable {
         }
     }
 
-    func waitForUpdate() async {
+    @concurrent func waitForUpdate() async {
         let shouldResumeImmediately = lock.withLock { state -> Bool in
             if state.pending != nil {
                 return true
@@ -40,7 +40,7 @@ final class LatestEventCoalescer: @unchecked Sendable {
             return
         }
 
-        await withTaskCancellationHandler {
+        await withTaskCancellationHandler { @concurrent in
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 let resumedImmediately = lock.withLock { state -> Bool in
                     if state.pending != nil {

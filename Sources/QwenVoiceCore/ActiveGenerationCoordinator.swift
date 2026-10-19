@@ -147,7 +147,7 @@ actor ActiveGenerationCoordinator {
     private struct Active: Sendable {
         let id: UUID
         let cancel: @Sendable (GenerationCancellationReason) -> Void
-        let waitForTermination: @Sendable () async -> Void
+        let waitForTermination: @Sendable @concurrent () async -> Void
     }
 
     private var active: Active?
@@ -160,7 +160,7 @@ actor ActiveGenerationCoordinator {
 
     func register(
         cancel: @escaping @Sendable (GenerationCancellationReason) -> Void,
-        waitForTermination: @escaping @Sendable () async -> Void
+        waitForTermination: @escaping @Sendable @concurrent () async -> Void
     ) throws -> Registration {
         guard active == nil else {
             throw TTSEngineError.generationFailed(

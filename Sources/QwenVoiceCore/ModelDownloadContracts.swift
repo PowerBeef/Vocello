@@ -341,10 +341,10 @@ struct ModelDownloadDelegateProgressGate: Sendable {
 final class ModelDownloadDelegateTerminalSequencer: Sendable {
     private let pendingStages = Mutex<[Int: Task<Void, Never>]>([:])
 
-    func stage(taskID: Int, operation: @escaping @Sendable () async -> Void) {
+    func stage(taskID: Int, operation: @escaping @Sendable @concurrent () async -> Void) {
         pendingStages.withLock { stages in
             let predecessor = stages[taskID]
-            stages[taskID] = Task(priority: .userInitiated) {
+            stages[taskID] = Task(priority: .userInitiated) { @concurrent in
                 await predecessor?.value
                 await operation()
             }
@@ -354,12 +354,12 @@ final class ModelDownloadDelegateTerminalSequencer: Sendable {
     @discardableResult
     func complete(
         taskID: Int,
-        operation: @escaping @Sendable () async -> Void
+        operation: @escaping @Sendable @concurrent () async -> Void
     ) -> Task<Void, Never> {
         let predecessor = pendingStages.withLock { stages in
             stages.removeValue(forKey: taskID)
         }
-        return Task(priority: .userInitiated) {
+        return Task(priority: .userInitiated) { @concurrent in
             await predecessor?.value
             await operation()
         }

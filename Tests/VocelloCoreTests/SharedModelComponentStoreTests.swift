@@ -454,7 +454,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
         )
     }
 
-    func testConcurrentPublishersConvergeOnOneVerifiedBlob() async throws {
+    @concurrent func testConcurrentPublishersConvergeOnOneVerifiedBlob() async throws {
         let root = try temporaryDirectory("concurrent")
         defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("source", isDirectory: true)
@@ -467,9 +467,9 @@ final class SharedModelComponentStoreTests: XCTestCase {
         let content = try SharedComponentContentIdentity(files: [file])
         let models = root.appendingPathComponent("models", isDirectory: true)
 
-        let results = try await withThrowingTaskGroup(of: SharedComponentPublicationResult.self) { group in
+        let results = try await withThrowingTaskGroup(of: SharedComponentPublicationResult.self) { @concurrent group in
             for _ in 0..<8 {
-                group.addTask {
+                group.addTask { @concurrent in
                     try SharedModelComponentStore(modelsRoot: models).publish(content: content, from: source)
                 }
             }
@@ -485,7 +485,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: blob), bytes)
     }
 
-    func testActorCoordinatorUsesSameStoreContract() async throws {
+    @concurrent func testActorCoordinatorUsesSameStoreContract() async throws {
         let root = try temporaryDirectory("actor")
         defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("source", isDirectory: true)

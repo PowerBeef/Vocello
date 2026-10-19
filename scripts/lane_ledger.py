@@ -73,6 +73,8 @@ def lane_name(run_dir: Path, metadata: dict | None) -> str:
         return "macos-tsan"
     if run_dir.name.startswith("mac-test-"):
         return "macos-deterministic"
+    if run_dir.name.startswith("mac-shipped-"):
+        return "macos-shipped-config"
     return run_dir.parent.name
 
 

@@ -8,8 +8,9 @@ name: Nightly
 # `nightly`; this workflow itself blocks no commit or push, and no retry is
 # automatic. The report-only jobs file no issue: coverage (line coverage of the
 # watched engine files and the pinned Xcode's build-setting probe),
-# migration-warnings (what the migrate-mode strictness settings would flag) and
-# dead-code (what the pinned Periphery reports unused in owned code).
+# migration-warnings (what the migrate-mode strictness settings would flag),
+# dead-code (what the pinned Periphery reports unused in owned code) and
+# shipped-config (the deterministic suites built as the release ships).
 on:
   schedule:
     - cron: '0 4 * * *'
@@ -140,6 +141,38 @@ jobs:
           else
             echo "no coverage.json was written" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+
+  shipped-config:
+    # Report-only (audit P2-5): the deterministic suites built the way the release ships.
+    # The owned code compiles -O whole-module, keeping testability for @testable imports,
+    # and the runtime package runs in release with TF32 on. The TF32-off partition
+    # determinism contract is skipped. GitHub's macOS 26 runner rejected the TF32 kernel
+    # under Xcode 26.5 (scripts/macos_test.sh), so a failure here may be the runner, not
+    # the code. It files no issue.
+    name: Shipped-configuration test run (report-only)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+
+      - name: Run the deterministic suites in the shipped configuration
+        run: scripts/macos_test.sh test --shipped-config
+
+      - name: Upload the run's results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shipped-config-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/artifacts/macos/tests/
+          if-no-files-found: warn
+          retention-days: 7
 
   migration-warnings:
     # Report-only (audit E-04 and P2-6): what strict memory safety and the

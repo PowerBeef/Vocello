@@ -67,6 +67,14 @@ class LaneLedgerTests(unittest.TestCase):
         self.assertEqual(entry["lane"], "macos-deterministic")
         self.assertEqual(entry["verdict"], "PASS")
 
+    def test_a_shipped_configuration_run_is_its_own_lane(self) -> None:
+        run = self.root / "build/artifacts/macos/tests/mac-shipped-20261019-020000"
+        run.mkdir(parents=True)
+        (run / "verdict.txt").write_text("test_build=0\ncore=0\nruntime=0\ncore_summary=0\nruntime_summary=0\n")
+        entry = LEDGER.entry_for(run)
+        self.assertEqual(entry["lane"], "macos-shipped-config")
+        self.assertEqual(entry["verdict"], "PASS")
+
     def test_append_records_each_run_once(self) -> None:
         run = ui_run(self.root, "ios-xcui-smoke-20261016-180000-cccc", passed=True)
         entry = LEDGER.entry_for(run)

@@ -16,8 +16,11 @@
 #   scripts/macos_test.sh qc-takes [--split calibration|confirmation] [--languages a,b]
 #                                  [--cells standard,clone,cross-lingual|long-form] [--label L]
 #                                                 # QC v2 take pool (vocello batch), then qc.py run and queue
-#   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
+#   scripts/macos_test.sh test [--coverage|--shipped-config]  # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
+#                                                    # --shipped-config: owned code -O whole-module (still testable),
+#                                                    #   the runtime package in release with TF32 on as shipped; skips
+#                                                    #   the TF32-off partition-determinism contract (audit P2-5)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
 #   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app)
 #   scripts/macos_test.sh debug                     # LLDB attach guidance (app PID)
@@ -175,14 +178,19 @@ build_mac_test_bundles() {
   if [[ "$tsan" == "0" ]]; then
     preserve_macos_dsyms "$products" "$products/Vocello.app" "$QVOICE_SYMBOLS_MACOS" || return 1
   fi
+  # The owned code's optimization as built: -Onone, or -O under --shipped-config.
+  local owned_optimization=Onone
+  if [[ " ${QVOICE_OWNED_DEV_SETTINGS[*]} " == *" QVOICE_OWNED_SWIFT_OPTIMIZATION=-O "* ]]; then
+    owned_optimization=O
+  fi
   write_build_provenance "$derived_data/last-build.json" \
     "$build_command" QwenVoice Release \
-    "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
+    "platform=macOS,arch=arm64" arm64 "$owned_optimization" ad-hoc \
     "$derived_data" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
   if [[ "$tsan" == "0" ]]; then
     write_build_provenance "$QVOICE_SYMBOLS_MACOS/last-build.json" \
       "$build_command" QwenVoice Release \
-      "platform=macOS,arch=arm64" arm64 Onone ad-hoc \
+      "platform=macOS,arch=arm64" arm64 "$owned_optimization" ad-hoc \
       "$derived_data" "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
   fi
 }
@@ -1449,15 +1457,22 @@ print(counts["generated"], counts["rejected"], counts["failed"], counts["missing
 # test: deterministic Core and owned Qwen3 runtime tests. No UI process is
 # launched and no frontend action is synthesized.
 cmd_test() {
-  local coverage=0
+  local coverage=0 shipped=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --coverage) coverage=1; shift ;;
-      *) die "unknown test argument '$1' (try --coverage)" ;;
+      --shipped-config) shipped=1; shift ;;
+      *) die "unknown test argument '$1' (try --coverage or --shipped-config)" ;;
     esac
   done
+  (( coverage && shipped )) && die "--coverage and --shipped-config measure different builds; pass one"
   local run_id
-  run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
+  # A shipped-configuration run is its own lane in the ledger (mac-shipped-*), never a deterministic run.
+  if (( shipped )); then
+    run_id="mac-shipped-$(date +%Y%m%d-%H%M%S)"
+  else
+    run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
+  fi
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   mkdir -p "$artifacts"
   local test_build_st=0 core_st=0 runtime_st=0 coverage_st=0
@@ -1468,6 +1483,17 @@ cmd_test() {
     note "test: coverage requested — instrumented build (opt-in; flips the shared cache, expect a rebuild)"
     export QVOICE_COVERAGE=1
     mkdir -p "$artifacts/profraw"
+  fi
+  if (( shipped )); then
+    # The release values project.yml gives the owned targets, with testability kept for
+    # @testable imports. Like --coverage it rebuilds the shared arena.
+    note "test: shipped configuration — owned code -O whole-module, runtime package in release with TF32 on"
+    QVOICE_OWNED_DEV_SETTINGS=(
+      QVOICE_OWNED_SWIFT_OPTIMIZATION=-O
+      QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule
+      QVOICE_OWNED_GCC_OPTIMIZATION=s
+      QVOICE_OWNED_TESTABILITY=YES
+    )
   fi
   note "test: compile deterministic macOS test bundles"
   set +e
@@ -1497,6 +1523,29 @@ cmd_test() {
   if swift build --help 2>/dev/null | grep -q -- '--build-system'; then
     swiftpm_engine=(--build-system native)
   fi
+  # The runtime package's build: debug with TF32 off normally (the fp32 parity contracts below need
+  # full-float matmuls, and TF32 also avoids MLX's NAX float32 GEMM path, whose runtime-compiled
+  # kernel the Metal compiler bundled with Xcode 26.5 on GitHub's macOS 26 runner rejects); release
+  # with TF32 on, as shipped, under --shipped-config, which therefore skips those contracts: decoder
+  # partition invariance, the compiled code-predictor plan against the eager path (with and without
+  # projection), and incremental KV-cached talker steps against a full pass (TF32's 10-bit mantissa
+  # moves them by about 1e-4, against fp32 tolerances of 2e-6). Instrumentation only under --coverage.
+  local runtime_configuration=debug runtime_optimization=Onone
+  local -a runtime_flags=() runtime_env=(MLX_ENABLE_TF32=0) runtime_selection=(--filter Qwen3RuntimeTests)
+  if (( coverage )); then
+    runtime_flags+=(--enable-code-coverage)
+  fi
+  if (( shipped )); then
+    runtime_configuration=release
+    runtime_optimization=O
+    runtime_flags+=(-Xswiftc -enable-testing)
+    runtime_env=()
+    runtime_selection+=(
+      --skip Qwen3DecoderPartitionTests
+      --skip 'Qwen3CodePredictorCompiledTests/testCompiledPlanMatchesEagerPath'
+      --skip 'Qwen3TalkerGenerateLoopTests/(testAMultiTokenStepOnANonEmptyCacheMatchesStepByStepDecoding|testIncrementalKVCachedTalkerStepsMatchAFullSequencePass)'
+    )
+  fi
   local mlx_bundle="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release/mlx-swift_Cmlx.bundle"
   # The SwiftPM build and test compile MLX too, so they hold the host-wide
   # native lock like every xcodebuild does.
@@ -1509,15 +1558,16 @@ cmd_test() {
   if (( runtime_locked )) \
       && ensure_swiftpm_scratch_location "$runtime_package" "$QVOICE_SWIFTPM_RUNTIME_CACHE" \
       && swift build --package-path "$runtime_package" \
-      --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
+      --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration "$runtime_configuration" \
       --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
       --build-tests \
-      ${coverage:+--enable-code-coverage} \
+      ${runtime_flags[@]+"${runtime_flags[@]}"} \
       > "$artifacts/runtime-build.log" 2>&1; then
     local runtime_bin runtime_resources
     runtime_bin="$(swift build --package-path "$runtime_package" \
-      --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
+      --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration "$runtime_configuration" \
       --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
+      ${runtime_flags[@]+"${runtime_flags[@]}"} \
       --show-bin-path 2>/dev/null)"
     runtime_resources="$runtime_bin/MLXAudioPackageTests.xctest/Contents/Resources"
     if [[ -d "$mlx_bundle" ]]; then
@@ -1527,17 +1577,15 @@ cmd_test() {
       if assert_macho_arm64_only \
           "$runtime_bin/MLXAudioPackageTests.xctest/Contents/MacOS/MLXAudioPackageTests" \
           "MLXAudioPackageTests"; then
-        # Partition-invariance is a full-float determinism contract. Disabling
-        # TF32 also avoids MLX's NAX float32 GEMM path, whose runtime-compiled
-        # kernel is not accepted by the Metal compiler bundled with Xcode 26.5
-        # on GitHub's macOS 26 runner. No test is skipped or moved off Metal.
+        # No test moves off Metal; only --shipped-config skips the TF32-off contract (above).
         run_with_deadline "$(mac_test_deadline_seconds)" "$artifacts/runtime.log" \
-          run_runtime_test_command "$artifacts/runtime.log" env MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
-          --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
+          run_runtime_test_command "$artifacts/runtime.log" \
+          env ${runtime_env[@]+"${runtime_env[@]}"} swift test --package-path "$runtime_package" \
+          --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration "$runtime_configuration" \
           --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
           --skip-build \
-          ${coverage:+--enable-code-coverage} \
-          --filter Qwen3RuntimeTests || runtime_st=$?
+          ${runtime_flags[@]+"${runtime_flags[@]}"} \
+          "${runtime_selection[@]}" || runtime_st=$?
         write_mac_test_summary "$artifacts/runtime.log" || runtime_summary_st=$?
         if (( coverage )); then
           local codecov_path
@@ -1556,9 +1604,11 @@ cmd_test() {
         runtime_st=1
       fi
       if (( runtime_st == 0 && runtime_summary_st == 0 )); then
+        local runtime_configuration_label=Debug
+        (( shipped )) && runtime_configuration_label=Release
         write_build_provenance "$QVOICE_SWIFTPM_RUNTIME_CACHE/last-build.json" \
-          "scripts/macos_test.sh runtime" Qwen3RuntimeTests Debug \
-          "platform=macOS,arch=arm64" arm64 Onone unsigned \
+          "scripts/macos_test.sh runtime" Qwen3RuntimeTests "$runtime_configuration_label" \
+          "platform=macOS,arch=arm64" arm64 "$runtime_optimization" unsigned \
           "$QVOICE_SWIFTPM_RUNTIME_CACHE" "$QVOICE_SWIFTPM_RUNTIME_CACHE" \
           || runtime_st=$?
       fi

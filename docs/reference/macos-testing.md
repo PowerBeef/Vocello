@@ -7,6 +7,7 @@ sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ui_test.sh
   - scripts/lib/xctest_summary.py
+  - scripts/lib/mac_lane_data.py
   - scripts/lib/host_preflight.sh
   - Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift
   - Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift

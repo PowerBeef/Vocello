@@ -50,6 +50,9 @@ SCRIPT_DIR="$ROOT_DIR/scripts"
 . "$SCRIPT_DIR/lib/required_steps.sh"
 . "$SCRIPT_DIR/lib/test_models.sh"
 test_models_init "$ROOT_DIR"
+# The lane's data steps, tested in scripts/tests/test_mac_lane_data.py. Resolved once, so a
+# sandbox that moves SCRIPT_DIR still reaches the real module.
+LANE_DATA="$SCRIPT_DIR/lib/mac_lane_data.py"
 APP_NAME="Vocello"
 BUNDLE_ID="com.qwenvoice.app"
 APP_BUNDLE="$QVOICE_BUILD_ROOT/$APP_NAME.app"
@@ -309,34 +312,8 @@ write_mac_coverage() {
     -ignore-filename-regex='(/Tests/|/\.build/|/SourcePackages/|/DerivedData/|/build/|/Packages/VocelloQwen3Core/Tests/)' \
     "${objects[@]:1}" "${objects[1]}" > "$artifacts/coverage.json" 2>"$artifacts/coverage.err" || {
       warn "coverage: llvm-cov export failed (see $artifacts/coverage.err)"; return 1; }
-  python3 - "$artifacts/coverage.json" "$artifacts/coverage-summary.txt" "$ROOT_DIR" <<'PY'
-import json, pathlib, sys
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
-root = sys.argv[3].rstrip("/") + "/"
-groups = {}
-total_covered = total_count = 0
-for item in data.get("data", []):
-    for f in item.get("files", []):
-        name = f["filename"]
-        if not name.startswith(root):
-            continue
-        rel = name[len(root):]
-        if rel.startswith("build/"):
-            continue  # SwiftPM checkouts and DerivedData are not repository sources
-        top = "/".join(rel.split("/")[:2]) if rel.startswith(("Sources/", "Packages/")) else rel.split("/")[0]
-        lines = f["summary"]["lines"]
-        g = groups.setdefault(top, [0, 0])
-        g[0] += lines["covered"]; g[1] += lines["count"]
-        total_covered += lines["covered"]; total_count += lines["count"]
-out = []
-for top, (cov, cnt) in sorted(groups.items()):
-    pct = (100.0 * cov / cnt) if cnt else 0.0
-    out.append(f"{pct:6.1f}%  {cov:7d}/{cnt:<7d}  {top}")
-pct = (100.0 * total_covered / total_count) if total_count else 0.0
-out.append(f"{pct:6.1f}%  {total_covered:7d}/{total_count:<7d}  TOTAL (lines, repository sources)")
-pathlib.Path(sys.argv[2]).write_text("\n".join(out) + "\n")
-print(f"coverage={pct:.1f}% lines ({total_covered}/{total_count})")
-PY
+  python3 "$LANE_DATA" coverage-summary \
+    "$artifacts/coverage.json" "$artifacts/coverage-summary.txt" "$ROOT_DIR"
 }
 
 # Xcode embeds its universal ThreadSanitizer runtime in instrumented products even
@@ -1018,14 +995,7 @@ cmd_lang_bench() {
   while IFS= read -r model_id; do
     [[ -n "$model_id" ]] || continue
     require_mac_benchmark_models "$model_id"
-  done < <(python3 - "$matrix" "$subset" <<'PY'
-import json, sys
-matrix, subset = json.load(open(sys.argv[1])), sys.argv[2]
-cells = matrix["cells"] if subset == "full" else [c for c in matrix["cells"] if c.get("quick")]
-for model_id in sorted({f"pro_{cell['mode']}_{cell.get('variant', 'speed')}" for cell in cells}):
-    print(model_id)
-PY
-)
+  done < <(python3 "$LANE_DATA" language-models "$matrix" "$subset")
 
   local run_id
   run_id="mac-lang-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
@@ -1054,7 +1024,7 @@ PY
   python3 "$SCRIPT_DIR/language_bench_evidence.py" plan --run-id "$run_id" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" --output "$plan" >/dev/null \
     || die "lang-bench: the immutable language run plan could not be written"
-  planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
+  planned_count="$(python3 "$LANE_DATA" field "$plan" takeCount)"
 
   local take_line cell_count=0 cell_fail=0
   while IFS= read -r take_line; do
@@ -1096,21 +1066,7 @@ PY
       warn "lang-bench cell $cell_id: vocello generate exit $st"
       cell_fail=$((cell_fail + 1))
     fi
-  done < <(python3 - "$plan" "$corpus" <<'PY'
-import json, sys
-plan_path, corpus_path = sys.argv[1:3]
-scripts = {entry["id"]: entry["script"] for entry in json.load(open(corpus_path))["languages"]}
-for take in json.load(open(plan_path))["takes"]:
-    fields = [
-        take["cellID"], take["mode"], take.get("variant", "speed"), take.get("uiHint", "auto"),
-        str(take["seed"]), take.get("customSpeakerID") or "", take.get("designInstruction") or "",
-        scripts[take["scriptLang"]],
-    ]
-    if any("\x1f" in field or "\n" in field for field in fields):
-        raise SystemExit(f"{take['cellID']}: a planned field contains a separator")
-    print("\x1f".join(fields))
-PY
-)
+  done < <(python3 "$LANE_DATA" language-takes "$plan" "$corpus")
 
   unset QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_CELL
 
@@ -1241,8 +1197,7 @@ cmd_qc_takes() {
   # Read-only: downloads stay an explicit `models ensure` repair action.
   local -a models=(pro_custom_speed pro_design_speed)
   local planned_cells="$cells"
-  [[ -n "$planned_cells" ]] || planned_cells="$(python3 -c 'import json, sys
-print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
+  [[ -n "$planned_cells" ]] || planned_cells="$(python3 "$LANE_DATA" field "$policy" defaultCells --join ,)"
   [[ ",$planned_cells," != *",clone,"* ]] || models+=(pro_clone_speed)
   require_mac_benchmark_models "${models[@]}"
 
@@ -1269,8 +1224,8 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
     --references-dir "$artifacts/references" >"$batch_index" \
     || die "qc-takes: the batch line files could not be written"
   local planned_count batch_total
-  planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
-  batch_total="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["batchCount"])' "$plan")"
+  planned_count="$(python3 "$LANE_DATA" field "$plan" takeCount)"
+  batch_total="$(python3 "$LANE_DATA" field "$plan" batchCount)"
 
   # The engine front-trims its capped diagnostics logs (8 MB by default, about
   # 300 rows), so a long run lost its early takes' rows before its manifest bound
@@ -1395,14 +1350,8 @@ print(",".join(json.load(open(sys.argv[1]))["defaultCells"]))' "$policy")"
 
   local generated="?" rejected="?" failed="?" missing="?" introspection="?" limit="?"
   if (( manifest_st == 0 )); then
-    read -r generated rejected failed missing introspection limit < <(python3 -c 'import json, sys
-manifest = json.load(open(sys.argv[1]))
-counts = manifest["counts"]
-bound = manifest.get("introspection", {})
-limit = sum(1 for take in manifest["takes"] if take.get("status") == "failed"
-            and (take.get("failure") or {}).get("errorCode") == "generation.incomplete")
-print(counts["generated"], counts["rejected"], counts["failed"], counts["missing"],
-      "{}/{}".format(bound.get("bound", "?"), bound.get("bound", 0) + bound.get("unbound", 0)), limit)' "$manifest")
+    read -r generated rejected failed missing introspection limit \
+      < <(python3 "$LANE_DATA" takes-counts "$manifest")
   fi
 
   # QC v2 over the generated takes (docs/reference/qc.md, lane qc-takes: the two ASR
@@ -1777,22 +1726,8 @@ run_gate_bench() {
     || { echo "gate bench: missing bench-results.json" >>"$log"; return 1; }
 
   # audioQC must pass on every row of THIS run.
-  python3 - "$run_diag/engine/generations.jsonl" <<'PY' >>"$log" 2>&1 || return 1
-import json, sys
-fails = []
-for line in open(sys.argv[1], encoding="utf-8"):
-    line = line.strip()
-    if not line:
-        continue
-    row = json.loads(line)
-    qc = (row.get("audioQC") or {}).get("verdict")
-    if qc == "fail":
-        fails.append(row.get("generationID", "?"))
-if fails:
-    print(f"gate bench: audioQC fail on {len(fails)} row(s): {', '.join(fails)}", file=sys.stderr)
-    sys.exit(1)
-print("gate bench: audioQC pass on all rows")
-PY
+  python3 "$LANE_DATA" audio-qc "$run_diag/engine/generations.jsonl" \
+    >>"$log" 2>&1 || return 1
 
   # Freeze the exact validated take selection before any human summary or
   # comparison. The parent gate records it only after every gate step passes.

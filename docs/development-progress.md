@@ -17,7 +17,39 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 18, evening — the workflow programme runs alongside the release (resume here)
+### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
+
+`main` is pushed through `d85aadd9`. Push CI is green on Xcode 26.6.
+
+- **Landed today:**
+  - **P2-5 test adequacy (DW-03):**
+    - an injectable allocator control keeps the core tests off MLX (`e124f375`);
+    - seam suites for the model-load coordinator and the runtime;
+    - warm and prime fakes that fail inside the body (`7fe58fa2`);
+    - a nightly shipped-configuration run (`dfb51453`), which also stops the runtime suite
+      always building instrumented.
+  - **P3-3 (DW-04):** strict memory safety (`4c464df3`, with `@safe` forwards for the five
+    calls Swift 6.4 marks safe and 6.3 does not: `2375922b`, `d2cfb45c`) and
+    NonisolatedNonsendingByDefault (`50af9a6d`, 711 sites kept `@concurrent`).
+    - The UI stall gate passed on the NonisolatedNonsendingByDefault commit: a maximum of
+      460 ms against the 600 ms limit.
+    - CI's compile logs show both settings applied on 26.6.
+- **Pinned defects:** strict expected failures pin B-02 (ER-06) and a new BKL-20, where a rebuilt
+  overlay trusts weights that changed in place. B-04 is pinned as current behaviour (ER-02).
+- **Fixed lanes:**
+  - The Pyright gate counted Linux-only duplicates (`2894a5c1`).
+  - The macOS UI benchmark ran its checker under a `python3` without numpy (`d85aadd9`).
+    Its run was recorded as failed, then passed on re-check; nothing was published.
+- **Next:**
+  - P2-3, the per-product modules for the test-compiled files. The maintainer chose now; it
+    is multi-day.
+  - The Enhanced Security trial, which needs an arm64e lane option.
+  - P3-5, lane orchestration in Python.
+  - vDSP after measurement.
+- **Still waiting on an iPhone window:** the iOS runtime proof of the Observation migration and
+  of the strictness settings.
+
+### October 18, evening — the workflow programme runs alongside the release
 
 `main` is pushed through `1b02555f`; about 50 local commits wait for the maintainer's push request.
 
@@ -139,21 +171,3 @@ unavailable and no Mac XCUITest ran.
   decisions.
 - **Queued for the next iPhone window:** the full smoke, `--scenario long-form`, `background-warmup`,
   an iPhone memory benchmark on the new MLX, and the first take after the update (one-time compile).
-
-### October 16, evening — engine audit approved; the remediation starts on the Mac
-
-The maintainer asked for an exhaustive audit of the engine runtime and a step-by-step remediation
-plan; it is [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2026-10-16-engine-runtime-audit.md)
-(eight read-only auditors, a blind refuter, lead verification; about 200 findings). The iPhone is
-unavailable: work stays on the Mac, and device checks wait for a window the maintainer announces.
-
-- **Before the RF-09 freeze (still Oct 23):** RF-19 (iPhone install dead ends, a new blocker), RF-18
-  (long-form pacing: a Mac machine screen of full-text conditioning, D1), BG-01 hardened per the
-  audit, and the MLX refresh (CONV-21, authorized: mlx-swift 0.32.3 with its prerequisites).
-- **The engine-remediation-2026-10 programme starts now** (ER-01…ER-13): identity-safe, test-only or
-  doc-only items join the release plan while worked; unfinished items pause at the freeze until the
-  submission. It supersedes BKL-01/02/03/04/05/06/07/10/11/14, DA-05, DA-06 and PA-19, and re-homes
-  PA-16 and PA-33. ER-13 is the Qwen3-TTS model research and reference-doc overhaul.
-- **Focus lock** rewritten 2026-10-16: maxInFlight 4 until the freeze, 2 after.
-- **Queued for the next iPhone window:** smoke with the new `--scenario long-form`,
-  `background-warmup`, an iPhone memory benchmark after the repin.

@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import os
 @testable import QwenVoiceCore
@@ -732,14 +733,10 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertEqual(engine.loadState, .loaded(modelID: model.id))
         await engine.trimMemory(level: .hardTrim, reason: "test_post_generation_hard_trim")
         XCTAssertEqual(engine.loadState, .loaded(modelID: model.id), "a hard trim keeps the model")
+        let afterTrim = await coordinator.events
+        XCTAssertEqual(afterTrim, ["load"], "the hard trim unloaded nothing")
 
-        let deadline = ContinuousClock.now + .seconds(10)
-        while engine.loadState != .idle, ContinuousClock.now < deadline {
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTAssertEqual(engine.loadState, .idle, "idle unload must still run after the hard trim")
-        let events = await coordinator.events
-        XCTAssertEqual(events.filter { $0 == "unload" }.count, 1)
+        try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, after: afterTrim)
     }
 
     /// PA-22 / CORE-06: a load an unload superseded throws a raw cancellation
@@ -808,85 +805,219 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
     /// through the runtime. The model still resident publishes `.loaded` and
     /// gets back the idle unload the warm cancelled; a cold warm used to
     /// publish `.idle` over resident weights, and a warm one kept `.loaded`
-    /// with no idle unload armed.
+    /// with no idle unload armed. DW-03: the warm is cancelled inside its
+    /// body, after its descriptor lookup and while its load is in flight, so
+    /// the runtime's own cancellation check ends it, and the coordinator's
+    /// log shows it unloaded nothing before the idle window did.
     @MainActor
     func testACancelledWarmPrefetchReArmsIdleUnload() async throws {
         // Cold: another model is resident, so the warm publishes `.starting`.
-        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_design", warmed: "pro_custom")
+        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_design")
         // Warm: the warmed model is the resident one.
-        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_custom", warmed: "pro_custom")
+        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_custom")
     }
 
     @MainActor
     private func assertCancelledWarmPrefetchReArmsIdleUnload(
         resident: String,
-        warmed: String,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
-        try await withCancellingResidentEngine(resident: resident) { engine, coordinator in
-            let diagnostics = await engine.prefetchInteractiveReadinessIfNeeded(
-                for: GenerationRequest(
-                    mode: .custom,
-                    modelID: warmed,
-                    text: GenerationSemantics.canonicalCustomWarmText,
-                    outputPath: "",
-                    shouldStream: false,
-                    payload: .custom(
-                        speakerID: GenerationSemantics.canonicalCustomWarmSpeaker,
-                        deliveryStyle: nil
-                    )
-                )
-            )
-            XCTAssertNil(diagnostics, file: file, line: line)
+        try await withResidentEngine(resident: resident, warmRequests: .holdBodyLoad) { engine, coordinator, published in
+            let request = Self.customWarmRequest()
+            let warm = Task { @MainActor () -> Bool in
+                await engine.prefetchInteractiveReadinessIfNeeded(for: request) == nil
+            }
+            await waitUntilBodyLoadIsHeld(by: coordinator)
+            warm.cancel()
+            await coordinator.releaseHeldLoad()
+            let reportedNoDiagnostics = await warm.value
+            XCTAssertTrue(reportedNoDiagnostics, "a cancelled warm reports nothing", file: file, line: line)
+
+            let atCancellation = await coordinator.events
             XCTAssertEqual(
-                engine.loadState,
-                .loaded(modelID: resident),
-                "the runtime still holds the resident model",
+                atCancellation,
+                ["load", "capabilities", "load"],
+                "the warm looked up and loaded pro_custom, then ended at its prewarm slot; nothing unloaded",
                 file: file,
                 line: line
             )
-            try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, file: file, line: line)
+            XCTAssertEqual(
+                engine.loadState,
+                .loaded(modelID: "pro_custom"),
+                "the runtime holds the model the warm loaded",
+                file: file,
+                line: line
+            )
+            XCTAssertNil(engine.visibleErrorMessage, file: file, line: line)
+            try await Self.assertIdleUnloadRuns(
+                engine: engine,
+                coordinator: coordinator,
+                after: atCancellation,
+                file: file,
+                line: line
+            )
+            XCTAssertFalse(published.includesAFailure, "a cancelled warm is not a failure", file: file, line: line)
         }
     }
 
     /// AUD-10 (PA-31 review): a cancelled clone prime settles through the
     /// runtime too, whether it primes the resident model or another one, so
-    /// the model it leaves resident keeps its idle unload.
+    /// the model it leaves resident keeps its idle unload. DW-03: leaving
+    /// Clone cancels the prime's token while its load is in flight; the
+    /// token check after the load ends it, outside any unloading catch.
     @MainActor
     func testACancelledClonePrimeReArmsIdleUnload() async throws {
         for resident in ["pro_clone", "pro_custom"] {
-            try await withCancellingResidentEngine(resident: resident) { engine, coordinator in
-                do {
-                    try await engine.ensureCloneReferencePrimed(
-                        modelID: "pro_clone",
-                        reference: CloneReference(
-                            audioPath: "/nonexistent/aud10-reference.wav",
-                            transcript: "Hello."
+            try await withResidentEngine(resident: resident, warmRequests: .holdBodyLoad) { engine, coordinator, published in
+                let prime = Task { @MainActor () -> (any Error)? in
+                    do {
+                        try await engine.ensureCloneReferencePrimed(
+                            modelID: "pro_clone",
+                            reference: CloneReference(
+                                audioPath: "/nonexistent/aud10-reference.wav",
+                                transcript: "Hello."
+                            )
                         )
-                    )
-                    XCTFail("The prime must end cancelled")
-                } catch is CancellationError {}
+                        return nil
+                    } catch {
+                        return error
+                    }
+                }
+                await waitUntilBodyLoadIsHeld(by: coordinator)
+                await engine.cancelClonePreparationIfNeeded()
+                await coordinator.releaseHeldLoad()
+                let outcome = await prime.value
+                XCTAssertNotNil(
+                    outcome as? CancellationError,
+                    "resident \(resident): the prime must end cancelled, not \(String(describing: outcome))"
+                )
+
+                let atCancellation = await coordinator.events
+                XCTAssertEqual(
+                    atCancellation,
+                    ["load", "capabilities", "load"],
+                    "resident \(resident): the prime looked up and loaded pro_clone, then its token check ended it; nothing unloaded"
+                )
                 XCTAssertEqual(engine.clonePreparationState, .idle)
-                XCTAssertEqual(engine.loadState, .loaded(modelID: resident), "resident: \(resident)")
-                try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator)
+                XCTAssertEqual(
+                    engine.loadState,
+                    .loaded(modelID: "pro_clone"),
+                    "resident \(resident): the runtime holds the model the prime loaded"
+                )
+                XCTAssertNil(engine.visibleErrorMessage)
+                try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, after: atCancellation)
+                XCTAssertFalse(published.includesAFailure, "resident \(resident): a cancelled prime is not a failure")
             }
         }
     }
 
-    /// An initialized fixture engine with `resident` loaded through the
-    /// runtime and a short idle unload; its warm and prime requests end
-    /// cancelled. `body` runs with no suspension after the load, so the
-    /// load's own idle unload cannot fire first.
+    /// DW-03: a prewarm that ends inside its body, after its descriptor
+    /// lookup. The runtime releases the model at the step that ended it (its
+    /// load step's catch, or its warm catch), and the engine settles from
+    /// what the runtime still holds: a load an unload superseded publishes
+    /// `.idle` and no failure; a failed load or prewarm step publishes its
+    /// failure.
     @MainActor
-    private func withCancellingResidentEngine(
+    func testAPrewarmThatEndsInsideItsBodySettlesFromWhatTheRuntimeHolds() async throws {
+        let endings: [(ResidentLoadCoordinator.WarmRequests, [String], Bool)] = [
+            (.cancelBodyLoad, ["load", "capabilities", "load", "unload"], false),
+            (.failBodyLoad, ["load", "capabilities", "load", "unload"], true),
+            (.failPrewarmStep, ["load", "capabilities", "load", "capabilities", "unload"], true),
+        ]
+        for (warmRequests, expectedEvents, fails) in endings {
+            try await withResidentEngine(resident: "pro_custom", warmRequests: warmRequests) { engine, coordinator, published in
+                await engine.prewarmModelIfNeeded(for: Self.customWarmRequest())
+
+                let events = await coordinator.events
+                XCTAssertEqual(events, expectedEvents, "\(warmRequests): the body ran to the step that ended it")
+                if fails {
+                    if case .failed = engine.loadState {} else {
+                        XCTFail("\(warmRequests): the failure is published, not \(engine.loadState)")
+                    }
+                    XCTAssertNotNil(engine.visibleErrorMessage, "\(warmRequests)")
+                } else {
+                    XCTAssertEqual(engine.loadState, .idle, "\(warmRequests): the runtime holds nothing")
+                    XCTAssertNil(engine.visibleErrorMessage, "\(warmRequests)")
+                    XCTAssertFalse(published.includesAFailure, "\(warmRequests): a superseded load is not a failure")
+                }
+            }
+        }
+    }
+
+    /// B-02 (engine audit, open): a prewarm cancelled at its own prewarm
+    /// step is not a failure and should keep the model it loaded. Every warm
+    /// catch in `NativeEngineRuntime` unloads on any error, cancellation
+    /// included, so today the step releases the weights (the engine then
+    /// truthfully publishes `.idle`) and the next take reloads them.
+    @MainActor
+    func testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel() async throws {
+        try await withResidentEngine(resident: "pro_custom", warmRequests: .cancelPrewarmStep) { engine, coordinator, published in
+            await engine.prewarmModelIfNeeded(for: Self.customWarmRequest())
+
+            let events = await coordinator.events
+            XCTAssertEqual(
+                Array(events.prefix(4)),
+                ["load", "capabilities", "load", "capabilities"],
+                "the prewarm ran its body to its prewarm step"
+            )
+            XCTAssertNil(engine.visibleErrorMessage, "a cancelled prewarm is not a failure")
+            XCTAssertFalse(published.includesAFailure, "a cancelled prewarm is not a failure")
+            let settled = engine.loadState
+            XCTExpectFailure("B-02: a cancelled warm still unloads the model; remove this wrapper once B-02 lands") {
+                XCTAssertEqual(
+                    events,
+                    ["load", "capabilities", "load", "capabilities"],
+                    "a cancelled prewarm step unloads nothing"
+                )
+                XCTAssertEqual(settled, .loaded(modelID: "pro_custom"), "the warmed model stays resident")
+            }
+        }
+    }
+
+    /// Returns once `coordinator` holds the operation's load; fails, rather
+    /// than hangs, when the operation never reaches it.
+    @MainActor
+    private func waitUntilBodyLoadIsHeld(by coordinator: ResidentLoadCoordinator) async {
+        let held = expectation(description: "the operation's load is held")
+        Task {
+            await coordinator.waitUntilBodyLoadIsHeld()
+            held.fulfill()
+        }
+        await fulfillment(of: [held], timeout: 5)
+    }
+
+    /// The canonical Built-in Voice warm the Mac shell sends for `pro_custom`.
+    private static func customWarmRequest() -> GenerationRequest {
+        GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom",
+            text: GenerationSemantics.canonicalCustomWarmText,
+            outputPath: "",
+            shouldStream: false,
+            payload: .custom(
+                speakerID: GenerationSemantics.canonicalCustomWarmSpeaker,
+                deliveryStyle: nil
+            )
+        )
+    }
+
+    /// An initialized fixture engine with `resident` loaded through the
+    /// runtime, a short idle unload and a coordinator that ends warm and
+    /// prime requests as `warmRequests` says. `published` logs every load
+    /// state the engine publishes from then on. `body` starts with no
+    /// suspension after the load, and every operation under test cancels the
+    /// load's own idle unload as it begins, so that unload cannot fire first.
+    @MainActor
+    private func withResidentEngine(
         resident: String,
-        _ body: @MainActor (MLXTTSEngine, ResidentLoadCoordinator) async throws -> Void
+        warmRequests: ResidentLoadCoordinator.WarmRequests,
+        _ body: @MainActor (MLXTTSEngine, ResidentLoadCoordinator, PublishedLoadStates) async throws -> Void
     ) async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-cancelled-warm-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = ResidentLoadCoordinator(warmRequests: .cancel)
+        let coordinator = ResidentLoadCoordinator(warmRequests: warmRequests)
         let engine = Self.makeFixtureEngine(
             root: root,
             registry: try Self.contractRegistry(),
@@ -897,13 +1028,20 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         try await engine.initialize(appSupportDirectory: root)
         await engine.ensureModelLoadedIfNeeded(id: resident)
         XCTAssertEqual(engine.loadState, .loaded(modelID: resident))
-        try await body(engine, coordinator)
+        let published = PublishedLoadStates()
+        let subscription = engine.$loadState.sink { published.append($0) }
+        defer { subscription.cancel() }
+        try await body(engine, coordinator, published)
     }
 
+    /// Waits out the idle window until the engine publishes `.idle`, then
+    /// checks the coordinator logged exactly one event since `before`: the
+    /// idle unload, not one an earlier step left behind.
     @MainActor
     private static func assertIdleUnloadRuns(
         engine: MLXTTSEngine,
         coordinator: ResidentLoadCoordinator,
+        after before: [String],
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
@@ -911,9 +1049,9 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         while engine.loadState != .idle, ContinuousClock.now < deadline {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        XCTAssertEqual(engine.loadState, .idle, "idle unload must run after the cancelled warm", file: file, line: line)
+        XCTAssertEqual(engine.loadState, .idle, "the idle unload must run", file: file, line: line)
         let events = await coordinator.events
-        XCTAssertEqual(events.filter { $0 == "unload" }.count, 1, file: file, line: line)
+        XCTAssertEqual(events, before + ["unload"], "only the idle window unloaded the model", file: file, line: line)
     }
 
     private static func contractRegistry() throws -> ContractBackedModelRegistry {
@@ -978,40 +1116,83 @@ private actor SupersededLoadCoordinator: MLXModelCoordinating {
 }
 
 /// A model coordinator whose load succeeds with an unloaded runtime actor, so
-/// the engine's resident-model lifecycle (idle unload, trims) is observable
-/// without MLX weights. The model is never used to generate. A warm prefetch,
-/// prewarm or clone prime asks the runtime for capabilities first, before it
-/// touches MLX: with `.cancel` it ends cancelled there, as one whose intent
-/// changed does, and with `.fail` it fails there, as a prewarm or a clone
-/// prime whose reference cannot be conditioned does (PA-32), while an earlier
-/// load stays resident. Shared with `TTSEngineStoreTests`.
+/// the engine's resident-model lifecycle (idle unload, trims, warms and
+/// primes) is observable without MLX weights. The model is never used to
+/// generate. `events` is the ordered log of what the runtime asked of it.
+///
+/// A warm prefetch, prewarm or clone prime opens with a descriptor lookup,
+/// then runs its body: the load, then (a Built-in Voice or Voice Design warm)
+/// its prewarm step's own lookup, before it would reach MLX. `warmRequests`
+/// says where that body ends, while an earlier load stays resident. Shared
+/// with `TTSEngineStoreTests` and `ReferenceImportStorageTests`.
 actor ResidentLoadCoordinator: MLXModelCoordinating {
     enum WarmRequests {
+        /// Every lookup and load answers, so the body runs on: a Built-in
+        /// Voice prewarm then fails at the unloaded runtime actor, and a
+        /// clone prime of a missing reference fails at clone conditioning.
         case proceed
-        case cancel
-        case fail
+        /// Every descriptor lookup fails, before the runtime loads or warms
+        /// anything, so the weights an earlier load left stay resident
+        /// behind the failure (PA-32).
+        case failDescriptorLookup
+        /// The first load after a lookup suspends until `releaseHeldLoad()`,
+        /// then returns: a test cancels the warm's task or the prime's token
+        /// meanwhile, and the runtime's own check after the load ends it.
+        case holdBodyLoad
+        /// Every load after a lookup throws a raw cancellation, as a load an
+        /// unload superseded does (the real coordinator's load epoch).
+        case cancelBodyLoad
+        /// Every load after a lookup fails.
+        case failBodyLoad
+        /// The second lookup, a warm's prewarm step after its load, throws a
+        /// raw cancellation, as a warm whose intent changed there ends.
+        case cancelPrewarmStep
+        /// The second lookup, a warm's prewarm step, fails.
+        case failPrewarmStep
     }
 
-    /// The failure a `.fail` coordinator's warm and prime requests end with.
+    /// The failure the `fail…` modes end with.
     struct WarmRequestFailure: Error {}
 
-    /// "load", "unload" and one "capabilities" per warm, prime or take.
+    /// "capabilities" per descriptor lookup, "load" and "unload", in order.
     private(set) var events: [String] = []
     private let warmRequests: WarmRequests
+    private var lookups = 0
+    private var hasHeldALoad = false
+    private var heldLoad: CheckedContinuation<Void, Never>?
+    private var heldLoadWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(warmRequests: WarmRequests = .proceed) {
         self.warmRequests = warmRequests
     }
 
+    /// Returns once a `.holdBodyLoad` load is suspended.
+    func waitUntilBodyLoadIsHeld() async {
+        guard heldLoad == nil else { return }
+        await withCheckedContinuation { continuation in
+            heldLoadWaiters.append(continuation)
+        }
+    }
+
+    /// Lets the held load return.
+    func releaseHeldLoad() {
+        let held = heldLoad
+        heldLoad = nil
+        held?.resume()
+    }
+
     func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
         events.append("capabilities")
-        switch warmRequests {
-        case .proceed:
-            return Self.capabilities
-        case .cancel:
-            throw CancellationError()
-        case .fail:
+        lookups += 1
+        switch (warmRequests, lookups) {
+        case (.failDescriptorLookup, _):
             throw WarmRequestFailure()
+        case (.cancelPrewarmStep, 2):
+            throw CancellationError()
+        case (.failPrewarmStep, 2):
+            throw WarmRequestFailure()
+        default:
+            return Self.capabilities(for: id)
         }
     }
 
@@ -1020,6 +1201,25 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         capabilityProfile: NativeLoadCapabilityProfile
     ) async throws -> NativeModelLoadResult {
         events.append("load")
+        // A load before any lookup is the resident one a test starts from.
+        if lookups > 0 {
+            switch warmRequests {
+            case .holdBodyLoad where !hasHeldALoad:
+                hasHeldALoad = true
+                await withCheckedContinuation { continuation in
+                    heldLoad = continuation
+                    let waiters = heldLoadWaiters
+                    heldLoadWaiters.removeAll()
+                    waiters.forEach { $0.resume() }
+                }
+            case .cancelBodyLoad:
+                throw CancellationError()
+            case .failBodyLoad:
+                throw WarmRequestFailure()
+            default:
+                break
+            }
+        }
         let facts = VocelloQwen3LoadedModelFacts(
             identity: VocelloQwen3ModelIdentity(
                 modelID: id,
@@ -1036,7 +1236,7 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
             modelRuntimeIdentity: ModelRuntimeIdentity(resolvedModelID: id),
             didLoad: true,
             capabilityProfile: capabilityProfile,
-            qwen3Capabilities: Self.capabilities,
+            qwen3Capabilities: Self.capabilities(for: id),
             timingsMS: [:],
             booleanFlags: [:],
             stringFlags: [:]
@@ -1053,36 +1253,58 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
     func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
     func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
 
-    private static let capabilities = Qwen3TTSModelCapabilities(
-        modelSize: .pro1b7,
-        familyType: .customVoice,
-        supportsInstructionControl: true,
-        supportsVoiceClone: false,
-        supportsXVectorOnlyClone: false,
-        requiresSpeakerEncoder: false,
-        tokenizerProfile: Qwen3TTSTokenizerProfile(
-            name: "qwen3",
-            sampleRateHz: 24_000,
-            frameRateHz: 12.5,
-            decoderQuantizers: 16,
-            encoderValidQuantizers: 8,
-            encoderConfiguredQuantizers: 8,
-            codebookSize: 2_048,
-            semanticCodebookSize: 4_096
-        ),
-        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
-            checkpointMaxNewTokens: nil,
-            wrapperFallbackMaxNewTokens: 2_048,
-            appPolicyMaxNewTokens: 2_048,
-            temperature: 0.9,
-            topP: 1,
-            topK: 50,
-            doSample: true,
-            repetitionPenalty: 1.05,
-            source: .appPolicy
-        ),
-        artifactAvailability: .publicArtifact
-    )
+    /// The clone model declares Voice Cloning, so a prime passes the
+    /// runtime's capability check and runs its body.
+    private static func capabilities(for id: String) -> Qwen3TTSModelCapabilities {
+        let isClone = id.hasSuffix("_clone")
+        return Qwen3TTSModelCapabilities(
+            modelSize: .pro1b7,
+            familyType: isClone ? .baseClone : .customVoice,
+            supportsInstructionControl: !isClone,
+            supportsVoiceClone: isClone,
+            supportsXVectorOnlyClone: isClone,
+            requiresSpeakerEncoder: isClone,
+            tokenizerProfile: Qwen3TTSTokenizerProfile(
+                name: "qwen3",
+                sampleRateHz: 24_000,
+                frameRateHz: 12.5,
+                decoderQuantizers: 16,
+                encoderValidQuantizers: 8,
+                encoderConfiguredQuantizers: 8,
+                codebookSize: 2_048,
+                semanticCodebookSize: 4_096
+            ),
+            generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+                checkpointMaxNewTokens: nil,
+                wrapperFallbackMaxNewTokens: 2_048,
+                appPolicyMaxNewTokens: 2_048,
+                temperature: 0.9,
+                topP: 1,
+                topK: 50,
+                doSample: true,
+                repetitionPenalty: 1.05,
+                source: .appPolicy
+            ),
+            artifactAvailability: .publicArtifact
+        )
+    }
+}
+
+/// Every load state an engine published, in order.
+@MainActor
+private final class PublishedLoadStates {
+    private(set) var states: [EngineLoadState] = []
+
+    func append(_ state: EngineLoadState) {
+        states.append(state)
+    }
+
+    var includesAFailure: Bool {
+        states.contains { state in
+            if case .failed = state { return true }
+            return false
+        }
+    }
 }
 
 /// A model coordinator that records the prewarm-state resets and unloads a

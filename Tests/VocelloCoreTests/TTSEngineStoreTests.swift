@@ -1225,7 +1225,7 @@ final class TTSEngineStoreTests: XCTestCase {
 
     /// The real `MLXTTSEngine` behind the store, over a load coordinator whose
     /// loads keep an unloaded runtime actor resident and whose warm, prewarm
-    /// and prime requests fail or end cancelled before MLX (TSan lane).
+    /// and prime requests end where the test says, before MLX (TSan lane).
     private struct ResidentWeights {
         let engine: MLXTTSEngine
         let store: TTSEngineStore
@@ -1278,24 +1278,41 @@ final class TTSEngineStoreTests: XCTestCase {
         try await body(ResidentWeights(engine: engine, store: store, loads: loads, reported: reported))
     }
 
-    private func unloadCount(_ loads: ResidentLoadCoordinator) async -> Int {
-        await loads.events.filter { $0 == "unload" }.count
+    /// Returns once `loads` holds the operation's load; fails, rather than
+    /// hangs, when the operation never reaches it (the store's gates refused it).
+    private func waitUntilBodyLoadIsHeld(by loads: ResidentLoadCoordinator) async {
+        let held = expectation(description: "the operation's load is held")
+        Task {
+            await loads.waitUntilBodyLoadIsHeld()
+            held.fulfill()
+        }
+        await fulfillment(of: [held], timeout: 5)
     }
 
-    /// Waits out the idle window until the weights unload, then for the
-    /// engine to reopen admission and the store to report where it settled.
+    /// Waits out the idle window until the coordinator logs an event after
+    /// `before`, which must be the idle unload alone: the operation under
+    /// test left the weights resident, and only the idle window released
+    /// them. Then waits for the engine to reopen admission and the store to
+    /// report where it settled.
     private func waitForIdleUnload(
         _ weights: ResidentWeights,
+        after before: [String],
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
         let deadline = ContinuousClock.now + .seconds(10)
-        var unloads = await unloadCount(weights.loads)
-        while unloads == 0, ContinuousClock.now < deadline {
+        var events = await weights.loads.events
+        while events.count == before.count, ContinuousClock.now < deadline {
             try await Task.sleep(nanoseconds: 20_000_000)
-            unloads = await unloadCount(weights.loads)
+            events = await weights.loads.events
         }
-        XCTAssertEqual(unloads, 1, "The resident weights unload once after the idle window", file: file, line: line)
+        XCTAssertEqual(
+            events,
+            before + ["unload"],
+            "The resident weights unload once, after the idle window",
+            file: file,
+            line: line
+        )
         await waitUntil("the unload to reopen admission", file: file, line: line) { weights.engine.isReady }
         await waitUntil("the store to report the settled engine", file: file, line: line) {
             weights.store.isReady
@@ -1311,11 +1328,13 @@ final class TTSEngineStoreTests: XCTestCase {
         )
     }
 
-    /// The failure is published with the weights still resident, and it is
-    /// still published after the idle unload released them. Returns its copy.
+    /// The failure is published with the weights still resident, after the
+    /// coordinator saw exactly `eventsAtFailure`, and it is still published
+    /// after the idle unload released them. Returns its copy.
     @discardableResult
     private func assertFailureOutlivesIdleUnload(
         _ weights: ResidentWeights,
+        eventsAtFailure: [String],
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws -> String {
@@ -1331,10 +1350,16 @@ final class TTSEngineStoreTests: XCTestCase {
             file: file,
             line: line
         )
-        let unloadsAtFailure = await unloadCount(weights.loads)
-        XCTAssertEqual(unloadsAtFailure, 0, "The weights are still resident when the failure lands", file: file, line: line)
+        let atFailure = await weights.loads.events
+        XCTAssertEqual(
+            atFailure,
+            eventsAtFailure,
+            "The failure ended the operation where expected, with the weights still resident",
+            file: file,
+            line: line
+        )
 
-        try await waitForIdleUnload(weights, file: file, line: line)
+        try await waitForIdleUnload(weights, after: atFailure, file: file, line: line)
         XCTAssertEqual(weights.store.loadState, failedState, "The failure outlives the unload", file: file, line: line)
         XCTAssertEqual(weights.store.visibleErrorMessage, message, file: file, line: line)
         return message
@@ -1344,20 +1369,24 @@ final class TTSEngineStoreTests: XCTestCase {
     /// preparation and keeps the clone model resident; the weights still go
     /// after the idle window, and the failure stays until leaving Clone
     /// (the screen cancels preparation on a mode change) or a dismissal.
+    /// DW-03: the prime runs its body (lookup, load) and fails for real at
+    /// clone conditioning of the missing reference.
     func testAFailedClonePrimeUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
-        try await withResidentWeights("pro_clone", warmRequests: .fail) { weights in
+        try await withResidentWeights("pro_clone", warmRequests: .proceed) { weights in
             do {
                 try await weights.store.ensureCloneReferencePrimed(
                     modelID: "pro_clone",
                     reference: CloneReference(audioPath: "/nonexistent/pa32-reference.wav", transcript: "Hello.")
                 )
                 XCTFail("The prime must fail")
-            } catch is CancellationError {
-                XCTFail("A failed prime is not a cancellation")
-            } catch {}
+            } catch let error as NativeRuntimeError {
+                XCTAssertEqual(error.stage, .clonePreparation, "The prime failed inside its body, at clone conditioning")
+            } catch {
+                XCTFail("A failed prime surfaces the runtime's failure, not \(error)")
+            }
 
-            try await assertFailureOutlivesIdleUnload(weights)
+            try await assertFailureOutlivesIdleUnload(weights, eventsAtFailure: ["load", "capabilities", "load"])
             XCTAssertEqual(weights.store.clonePreparationState.phase, .failed)
 
             await weights.store.cancelClonePreparationIfNeeded()
@@ -1368,14 +1397,16 @@ final class TTSEngineStoreTests: XCTestCase {
         }
     }
 
-    /// A failed prewarm keeps the warmed model resident behind `.failed`; the
-    /// weights still unload, and the Mac warmup coordinator still refuses to
-    /// warm from the kept failure.
+    /// A prewarm whose descriptor lookup fails, before its body loads or
+    /// warms anything, keeps the resident model behind `.failed`; the weights
+    /// still unload, and the Mac warmup coordinator still refuses to warm
+    /// from the kept failure. (A failure inside the body releases the model
+    /// at once: `testAPrewarmThatEndsInsideItsBodySettlesFromWhatTheRuntimeHolds`.)
     func testAFailedPrewarmUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
-        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+        try await withResidentWeights("pro_custom", warmRequests: .failDescriptorLookup) { weights in
             await weights.store.prewarmModelIfNeeded(for: request())
-            try await assertFailureOutlivesIdleUnload(weights)
+            try await assertFailureOutlivesIdleUnload(weights, eventsAtFailure: ["load", "capabilities"])
 
             let warmup = warmupCoordinator(.mid16GBMac)
             let subscription = weights.store.snapshotChanges.sink { warmup.observe(snapshot: $0) }
@@ -1387,8 +1418,7 @@ final class TTSEngineStoreTests: XCTestCase {
             )
             await warmup.waitForScheduledWarmupCompletion()
             let events = await weights.loads.events
-            XCTAssertEqual(events.filter { $0 == "capabilities" }.count, 1, "No warm starts from .failed")
-            XCTAssertEqual(events.filter { $0 == "load" }.count, 1)
+            XCTAssertEqual(events, ["load", "capabilities", "unload"], "No warm starts from .failed")
             if case .failed = weights.store.loadState {} else {
                 XCTFail("The kept failure blocks the warm: \(weights.store.loadState)")
             }
@@ -1397,9 +1427,10 @@ final class TTSEngineStoreTests: XCTestCase {
 
     /// A take that fails short of a captured MLX failure keeps its model
     /// resident; the weights still unload after the idle window and the
-    /// failed take stays visible.
+    /// failed take stays visible. The prompt contract refuses this take
+    /// before any lookup, so the failure is the runtime's, not the fake's.
     func testAFailedTakeUnloadsItsWeightsAfterIdleAndStaysVisible() async throws {
-        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+        try await withResidentWeights("pro_custom", warmRequests: .failDescriptorLookup) { weights in
             do {
                 _ = try await weights.store.generate(Self.takeRefusedByThePromptContract())
                 XCTFail("The take must fail")
@@ -1407,7 +1438,7 @@ final class TTSEngineStoreTests: XCTestCase {
                 XCTFail("A failed take is not a cancellation")
             } catch {}
             XCTAssertFalse(weights.store.hasActiveGeneration)
-            try await assertFailureOutlivesIdleUnload(weights)
+            try await assertFailureOutlivesIdleUnload(weights, eventsAtFailure: ["load"])
         }
     }
 
@@ -1416,9 +1447,9 @@ final class TTSEngineStoreTests: XCTestCase {
     /// next mode publishes that model.
     func testTheNextUserActionEndsAFailureTheIdleUnloadKept() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
-        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+        try await withResidentWeights("pro_custom", warmRequests: .failDescriptorLookup) { weights in
             await weights.store.prewarmModelIfNeeded(for: request())
-            try await assertFailureOutlivesIdleUnload(weights)
+            try await assertFailureOutlivesIdleUnload(weights, eventsAtFailure: ["load", "capabilities"])
 
             weights.store.clearVisibleError()
             XCTAssertEqual(weights.store.loadState, .idle)
@@ -1426,9 +1457,9 @@ final class TTSEngineStoreTests: XCTestCase {
             XCTAssertEqual(weights.reported.snapshots.last?.loadState, .idle, "The store reports the dismissal")
             XCTAssertNil(weights.reported.snapshots.last?.visibleErrorMessage)
         }
-        try await withResidentWeights("pro_custom", warmRequests: .fail) { weights in
+        try await withResidentWeights("pro_custom", warmRequests: .failDescriptorLookup) { weights in
             await weights.store.prewarmModelIfNeeded(for: request())
-            let kept = try await assertFailureOutlivesIdleUnload(weights)
+            let kept = try await assertFailureOutlivesIdleUnload(weights, eventsAtFailure: ["load", "capabilities"])
 
             do {
                 _ = try await weights.store.generate(Self.takeRefusedByThePromptContract())
@@ -1451,21 +1482,45 @@ final class TTSEngineStoreTests: XCTestCase {
 
     /// A cancelled prime or prewarm is not a failure: it publishes no error,
     /// its resident model stays `.loaded`, and the idle unload publishes
-    /// `.idle` as for any loaded model.
+    /// `.idle` as for any loaded model. DW-03: each is cancelled inside its
+    /// body, once its descriptor lookup returned and while its load is in
+    /// flight: the prime through its preparation token (leaving Clone), the
+    /// prewarm through its task. The runtime's own check after the load ends
+    /// each, so the coordinator's log shows nothing unloaded before the idle
+    /// window. (A cancellation at the prewarm step itself still unloads,
+    /// B-02: `testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel`.)
     func testACancelledPrimeOrPrewarmIsNotAFailure() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
-        try await withResidentWeights("pro_clone", warmRequests: .cancel) { weights in
-            do {
-                try await weights.store.ensureCloneReferencePrimed(
-                    modelID: "pro_clone",
-                    reference: CloneReference(audioPath: "/nonexistent/pa32-reference.wav", transcript: "Hello.")
-                )
-                XCTFail("The prime must end cancelled")
-            } catch is CancellationError {}
+        try await withResidentWeights("pro_clone", warmRequests: .holdBodyLoad) { weights in
+            let store = weights.store
+            let prime = Task { @MainActor () -> (any Error)? in
+                do {
+                    try await store.ensureCloneReferencePrimed(
+                        modelID: "pro_clone",
+                        reference: CloneReference(audioPath: "/nonexistent/pa32-reference.wav", transcript: "Hello.")
+                    )
+                    return nil
+                } catch {
+                    return error
+                }
+            }
+            await waitUntilBodyLoadIsHeld(by: weights.loads)
+            await store.cancelClonePreparationIfNeeded()
+            await weights.loads.releaseHeldLoad()
+            let outcome = await prime.value
+            XCTAssertNotNil(outcome as? CancellationError, "The prime must end cancelled, not \(String(describing: outcome))")
             try await assertCancellationIsNotAFailure(weights, resident: "pro_clone")
         }
-        try await withResidentWeights("pro_custom", warmRequests: .cancel) { weights in
-            await weights.store.prewarmModelIfNeeded(for: request())
+        try await withResidentWeights("pro_custom", warmRequests: .holdBodyLoad) { weights in
+            let store = weights.store
+            let warmRequest = request()
+            let prewarm = Task { @MainActor in
+                await store.prewarmModelIfNeeded(for: warmRequest)
+            }
+            await waitUntilBodyLoadIsHeld(by: weights.loads)
+            prewarm.cancel()
+            await weights.loads.releaseHeldLoad()
+            await prewarm.value
             try await assertCancellationIsNotAFailure(weights, resident: "pro_custom")
         }
     }
@@ -1479,10 +1534,18 @@ final class TTSEngineStoreTests: XCTestCase {
         await waitUntil("the store to report the resident model", file: file, line: line) {
             weights.store.loadState == .loaded(modelID: resident)
         }
+        let atCancellation = await weights.loads.events
+        XCTAssertEqual(
+            atCancellation,
+            ["load", "capabilities", "load"],
+            "The operation looked up and loaded its model, then ended cancelled; nothing unloaded",
+            file: file,
+            line: line
+        )
         XCTAssertNil(weights.store.visibleErrorMessage, file: file, line: line)
         XCTAssertEqual(weights.store.clonePreparationState, .idle, file: file, line: line)
 
-        try await waitForIdleUnload(weights, file: file, line: line)
+        try await waitForIdleUnload(weights, after: atCancellation, file: file, line: line)
         XCTAssertEqual(weights.store.loadState, .idle, file: file, line: line)
         XCTAssertNil(weights.store.visibleErrorMessage, file: file, line: line)
         XCTAssertFalse(

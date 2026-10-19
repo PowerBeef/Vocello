@@ -8,16 +8,16 @@ import QwenVoiceCore
 /// Read-only runtime context (registry + model asset store) for commands that
 /// don't generate audio.
 @MainActor
-struct CLIRegistryContext {
-    let registry: ContractBackedModelRegistry
+public struct CLIRegistryContext {
+    public let registry: ContractBackedModelRegistry
     let modelAssetStore: LocalModelAssetStore
-    let modelsDirectory: URL
+    public let modelsDirectory: URL
 }
 
 @MainActor
-struct CLIRuntime {
-    let engine: MLXTTSEngine
-    let registry: ContractBackedModelRegistry
+public struct CLIRuntime {
+    public let engine: MLXTTSEngine
+    public let registry: ContractBackedModelRegistry
     let dataDirectory: URL
     /// PA-17: the invocation's recorded voice-cloning consent (`--confirm-consent`).
     /// Generation, clone-reference priming and enrollment go through `generate(_:)`,
@@ -25,7 +25,7 @@ struct CLIRuntime {
     /// `engine`, so the core policy refuses them first.
     let voiceCloningConsent: VoiceCloningConsentPolicy
 
-    static func bootstrap(
+    public static func bootstrap(
         dataDirectory: URL,
         manifestOverride: URL?,
         voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed
@@ -51,14 +51,14 @@ struct CLIRuntime {
 
     /// Same tiered prewarm policy as the macOS app: defer the dedicated custom
     /// prewarm on the 8 GB floor tier (the work folds into the first generation).
-    static func customPrewarmPolicy(for deviceClass: NativeDeviceMemoryClass) -> NativeCustomPrewarmPolicy {
+    public static func customPrewarmPolicy(for deviceClass: NativeDeviceMemoryClass) -> NativeCustomPrewarmPolicy {
         deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager
     }
 
     /// Every CLI generation: clone requests are refused without recorded consent,
     /// and a take the engine cancelled while no signal reached the command throws
     /// `CLIEngineCancellation` instead of the operator's `CancellationError` (P15-02).
-    func generate(_ request: GenerationRequest) async throws -> GenerationResult {
+    public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         try voiceCloningConsent.admitGeneration(request)
         do {
             return try await engine.generate(request)
@@ -70,13 +70,13 @@ struct CLIRuntime {
     /// Clone-reference priming conditions the engine on a reference voice, so it is
     /// refused like clone generation without recorded consent (as the apps'
     /// `AnyTTSEngineBackend` refuses it).
-    func primeCloneReference(modelID: String, reference: CloneReference) async throws {
+    public func primeCloneReference(modelID: String, reference: CloneReference) async throws {
         try voiceCloningConsent.admit(.generation)
         try await engine.ensureCloneReferencePrimed(modelID: modelID, reference: reference)
     }
 
     /// Every CLI saved-voice enrollment: refused without recorded consent.
-    func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
+    public func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
         try voiceCloningConsent.admit(.enrollment)
         return try await engine.enrollPreparedVoice(name: name, audioPath: audioPath, transcript: transcript)
     }
@@ -86,7 +86,7 @@ struct CLIRuntime {
     /// the engine (`initialize` loads no model but we skip it anyway to keep
     /// these commands instant). Reuses the same manifest → registry →
     /// `NativeRuntimeFactory.make` prefix as the full bootstrap.
-    static func bootstrapRegistryOnly(
+    public static func bootstrapRegistryOnly(
         dataDirectory: URL, manifestOverride: URL?
     ) throws -> CLIRegistryContext {
         let manifestURL = try manifestOverride ?? locateManifestURL()
@@ -105,7 +105,7 @@ struct CLIRuntime {
 
     /// Resolve a (mode, variant) to the variant-scoped model id the engine loads
     /// (e.g. `pro_custom_speed` / `pro_custom_quality`).
-    func modelID(mode: GenerationMode, quality: Bool) throws -> String {
+    public func modelID(mode: GenerationMode, quality: Bool) throws -> String {
         guard let base = registry.model(for: mode) else {
             throw CLIError("No model for mode '\(mode.rawValue)' in the manifest.")
         }
@@ -122,7 +122,7 @@ struct CLIRuntime {
     }
 
     /// Default Built-in Voice speaker id from the contract (e.g. Aiden).
-    var defaultSpeakerID: String { registry.defaultSpeaker.id }
+    public var defaultSpeakerID: String { registry.defaultSpeaker.id }
 
     // MARK: - Manifest / version
 
@@ -133,7 +133,7 @@ struct CLIRuntime {
         return url
     }
 
-    static func locateProductionCatalogURL() throws -> URL {
+    public static func locateProductionCatalogURL() throws -> URL {
         guard let url = locateTrustAnchor(named: "qwenvoice_production_model_catalog") else {
             throw CLIError("Could not locate authenticated production model catalog.")
         }
@@ -196,7 +196,7 @@ struct CLIRuntime {
     /// `<dir>/<relativePath>` (stops at the filesystem root). Lets the CLI find
     /// repo-relative dev assets (the contract, the summarizer script) regardless
     /// of which subdirectory it's launched from.
-    nonisolated static func findUpwards(
+    public nonisolated static func findUpwards(
         relativePath: String,
         from start: String,
         fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }

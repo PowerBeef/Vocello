@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import XCTest
+@testable import VocelloCLICore
 
 /// TEST-13: the CLI's argument parser, its command dispatch table and the
 /// `generate` option helpers (compiled into this bundle by path), plus where the

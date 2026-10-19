@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello deliveries` — list the built-in delivery presets (emotion x intensity)
 /// and the natural-language instruction each one sends to the model. Static +

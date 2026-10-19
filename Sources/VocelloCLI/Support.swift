@@ -6,9 +6,9 @@ import Darwin
 #endif
 
 /// A user-facing CLI error whose message is printed verbatim (no stack noise).
-struct CLIError: Error, CustomStringConvertible {
-    let description: String
-    init(_ message: String) { self.description = message }
+public struct CLIError: Error, CustomStringConvertible {
+    public let description: String
+    public init(_ message: String) { self.description = message }
 }
 
 /// A take the engine stopped on its own while no signal reached the command
@@ -17,16 +17,16 @@ struct CLIError: Error, CustomStringConvertible {
 /// `memory_pressure`. It is reported apart from an operator interrupt (exit
 /// 130): `vocello` exits `exitStatus` and a batch row ends `failed` with
 /// `errorCode`, never `cancelled`.
-struct CLIEngineCancellation: Error, LocalizedError, Equatable {
+public struct CLIEngineCancellation: Error, LocalizedError, Equatable {
     /// sysexits.h `EX_TEMPFAIL`: a temporary failure that a later retry may clear.
-    static let exitStatus: Int32 = 75
+    public static let exitStatus: Int32 = 75
 
     let reason: GenerationCancellationReason
 
     /// A batch row's `errorCode`: the typed reason (`memory_pressure`).
-    var errorCode: String { reason.rawValue }
+    public var errorCode: String { reason.rawValue }
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch reason {
         case .memoryPressure:
             return "the engine stopped this take under critical memory pressure, so no audio was written. "
@@ -65,12 +65,12 @@ struct CLIEngineCancellation: Error, LocalizedError, Equatable {
 /// Note: a value cannot itself begin with `--` (it would parse as a flag) — use
 /// the `--key=value` form for such values. Clean enough for a focused tool
 /// without pulling in an external arg-parser dependency.
-struct Args {
+public struct Args: Sendable {
     private var values: [String: String] = [:]
     private var flags: Set<String> = []
-    private(set) var positionals: [String] = []
+    public private(set) var positionals: [String] = []
 
-    init(_ argv: [String]) {
+    public init(_ argv: [String]) {
         var i = 0
         var flagsEnded = false
         while i < argv.count {
@@ -99,10 +99,10 @@ struct Args {
         }
     }
 
-    func string(_ key: String) -> String? { values[key] }
-    func flag(_ key: String) -> Bool { flags.contains(key) }
+    public func string(_ key: String) -> String? { values[key] }
+    public func flag(_ key: String) -> Bool { flags.contains(key) }
 
-    func require(_ key: String, _ hint: String) throws -> String {
+    public func require(_ key: String, _ hint: String) throws -> String {
         guard let v = values[key], !v.isEmpty else {
             throw CLIError("missing required --\(key) (\(hint))")
         }
@@ -112,7 +112,7 @@ struct Args {
 
 /// Which command `vocello <command> …` runs, and with which arguments. Pure, so the
 /// dispatch table is unit-tested apart from the commands it starts.
-enum CLICommandRoute: Equatable {
+public enum CLICommandRoute: Equatable, Sendable {
     case generate([String])
     case batch([String])
     case modes([String])
@@ -126,7 +126,7 @@ enum CLICommandRoute: Equatable {
     case unknown(String)
     case missingCommand
 
-    init(_ argv: [String]) {
+    public init(_ argv: [String]) {
         guard let command = argv.first else {
             self = .missingCommand
             return
@@ -165,7 +165,7 @@ enum CLICommandRoute: Equatable {
     }
 }
 
-enum CLIPaths {
+public enum CLIPaths {
     /// Resolve the runtime data directory the engine roots at (models/, cache/,
     /// outputs/, diagnostics/). Mirrors the app's AppPaths selection without
     /// depending on the app target: explicit --data-dir wins, else
@@ -173,7 +173,7 @@ enum CLIPaths {
     /// ~/Library/Application Support/QwenVoice
     /// (or QwenVoice-Debug when QWENVOICE_DEBUG is truthy — matching the app so
     /// the CLI shares the debug-isolated models/diagnostics during benchmarks).
-    static func dataDirectory(override: String?) -> URL {
+    public static func dataDirectory(override: String?) -> URL {
         if let override, !override.isEmpty {
             return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
         }
@@ -209,7 +209,7 @@ enum CLIVerbosity: Int, Comparable, Sendable {
     static func < (l: CLIVerbosity, r: CLIVerbosity) -> Bool { l.rawValue < r.rawValue }
 }
 
-enum CLIOutput {
+public enum CLIOutput {
     private static let storedVerbosity = Mutex(CLIVerbosity.normal)
 
     static var verbosity: CLIVerbosity {
@@ -218,7 +218,7 @@ enum CLIOutput {
     }
 
     /// Configure from parsed args (call once at the start of each command).
-    static func configure(_ args: Args) {
+    public static func configure(_ args: Args) {
         if args.flag("quiet") { verbosity = .quiet }
         else if args.flag("verbose") { verbosity = .verbose }
     }
@@ -226,13 +226,13 @@ enum CLIOutput {
 
 /// Human-facing progress note → stderr (stdout stays machine-readable). The one
 /// definition shared by every command. Suppressed under `--quiet`.
-func note(_ message: String) {
+public func note(_ message: String) {
     guard CLIOutput.verbosity >= .normal else { return }
     FileHandle.standardError.write(Data("• \(message)\n".utf8))
 }
 
 /// Extra per-step detail → stderr, only under `--verbose`.
-func noteVerbose(_ message: String) {
+public func noteVerbose(_ message: String) {
     guard CLIOutput.verbosity >= .verbose else { return }
     FileHandle.standardError.write(Data("  · \(message)\n".utf8))
 }
@@ -240,7 +240,7 @@ func noteVerbose(_ message: String) {
 // MARK: - JSON output + stdin
 
 /// Print a compact, stable-keyed JSON value to stdout (the machine-readable surface).
-func emitJSON<T: Encodable>(_ value: T) {
+public func emitJSON<T: Encodable>(_ value: T) {
     let enc = JSONEncoder()
     enc.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     if let data = try? enc.encode(value), let s = String(data: data, encoding: .utf8) {
@@ -250,7 +250,7 @@ func emitJSON<T: Encodable>(_ value: T) {
 
 /// Read all of stdin as UTF-8 when it isn't an interactive TTY (i.e. piped/redirected);
 /// nil otherwise. Lets `generate`/`batch` accept piped text.
-func readStdinText() -> String? {
+public func readStdinText() -> String? {
     if isatty(FileHandle.standardInput.fileDescriptor) != 0 { return nil }
     let data = FileHandle.standardInput.readDataToEndOfFile()
     guard !data.isEmpty else { return nil }
@@ -266,7 +266,7 @@ func isInteractiveStdin() -> Bool {
 // MARK: - Filesystem helpers (models command)
 
 /// Best-effort total byte size of all regular files under a directory (0 if absent).
-func directorySize(_ url: URL) -> Int64 {
+public func directorySize(_ url: URL) -> Int64 {
     let fm = FileManager.default
     guard let en = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return 0 }
     var total: Int64 = 0
@@ -278,7 +278,7 @@ func directorySize(_ url: URL) -> Int64 {
 }
 
 /// Human-readable byte size (e.g. "1.7 GB").
-func humanBytes(_ bytes: Int64) -> String {
+public func humanBytes(_ bytes: Int64) -> String {
     let fmt = ByteCountFormatter()
     fmt.allowedUnits = [.useGB, .useMB, .useKB]
     fmt.countStyle = .file
@@ -288,6 +288,6 @@ func humanBytes(_ bytes: Int64) -> String {
 /// Marketing version, preferring the built bundle's CFBundleShortVersionString so
 /// `version` and the store-version seed track the packaged binary. Unsupported
 /// bare `swiftc` builds have no embedded metadata and report an honest unknown.
-let vocelloCLIVersion: String =
+public let vocelloCLIVersion: String =
     (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
         .flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"

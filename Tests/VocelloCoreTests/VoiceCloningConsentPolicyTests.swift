@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import QwenVoiceCore
 import XCTest
+@testable import VocelloCLICore
 
 /// Thrown by `RecordingEngine` when a call reached the engine; the consent tests
 /// tell it apart from `VoiceCloningConsentRequiredError`.

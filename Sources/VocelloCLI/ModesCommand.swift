@@ -3,7 +3,7 @@ import QwenVoiceCore
 
 /// `vocello modes` — list the generation modes and what each needs, so users can
 /// discover how to select one. Static + instant (no engine/registry boot).
-enum ModesCommand {
+public enum ModesCommand {
     struct ModeJSON: Encodable {
         let mode: String
         let summary: String
@@ -20,7 +20,7 @@ enum ModesCommand {
     }
 
     @MainActor
-    static func run(_ argv: [String]) async throws {
+    public static func run(_ argv: [String]) async throws {
         var argv = argv
         if let first = argv.first?.lowercased(), first == "list" || first == "ls" { argv.removeFirst() }
         let args = Args(argv)

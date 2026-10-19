@@ -4,7 +4,7 @@ import QwenVoiceCore
 import Synchronization
 
 /// `vocello generate` — synthesize one clip headlessly via the in-process engine.
-enum GenerateCommand {
+public enum GenerateCommand {
     /// Machine-readable result emitted under `--json`.
     struct GenerateJSON: Encodable {
         let generationID: String
@@ -66,7 +66,7 @@ enum GenerateCommand {
     /// events; does NOT render chunks (no live playback). Shared by `generate --stream`
     /// and the `bench --ttfc` probe.
     @MainActor
-    static func generateObservingFirstChunk(
+    public static func generateObservingFirstChunk(
         _ runtime: CLIRuntime, _ request: GenerationRequest
     ) async throws -> (
         result: GenerationResult, firstChunkMS: Double?, chunkCount: Int?, firstChunkUptimeNS: UInt64?
@@ -142,7 +142,7 @@ enum GenerateCommand {
     }
 
     @MainActor
-    static func run(_ argv: [String]) async throws {
+    public static func run(_ argv: [String]) async throws {
         let args = Args(argv)
         if args.flag("help") { printHelp(); return }
         CLIOutput.configure(args)
@@ -314,7 +314,7 @@ enum GenerateCommand {
 
     /// `--seed N` — deterministic sampling: the same request + seed
     /// reproduces the same take (GitHub #47/#30).
-    static func parseSeed(_ args: Args) throws -> UInt64? {
+    public static func parseSeed(_ args: Args) throws -> UInt64? {
         guard let raw = args.string("seed") else { return nil }
         guard let seed = UInt64(raw) else {
             throw CLIError("invalid --seed '\(raw)' (use an unsigned integer)")
@@ -324,7 +324,7 @@ enum GenerateCommand {
 
     /// `--variation expressive|balanced|consistent` — talker sampling
     /// shaping (default expressive = official checkpoint sampling).
-    static func parseVariation(_ args: Args) throws -> Qwen3SamplingVariation? {
+    public static func parseVariation(_ args: Args) throws -> Qwen3SamplingVariation? {
         guard let raw = args.string("variation") else { return nil }
         guard let variation = Qwen3SamplingVariation(rawValue: raw.lowercased()) else {
             throw CLIError("invalid --variation '\(raw)' (use expressive | balanced | consistent)")
@@ -366,7 +366,7 @@ enum GenerateCommand {
 
     /// `--app-delivery` (P15-06): with no --delivery or --delivery-cell, send the
     /// apps' default delivery, as batch does. A bare flag; a value is refused.
-    static func parseAppDelivery(_ args: Args) throws -> Bool {
+    public static func parseAppDelivery(_ args: Args) throws -> Bool {
         if let value = args.string("app-delivery") {
             throw CLIError("--app-delivery takes no value (got \"\(value)\"): pass the bare flag --app-delivery")
         }
@@ -375,7 +375,7 @@ enum GenerateCommand {
 
     /// The payload options that need no engine, checked before boot by
     /// `generate` and again by `buildPayload` (which `batch` runs).
-    static func validatePayloadOptions(_ args: Args, mode: GenerationMode) throws {
+    public static func validatePayloadOptions(_ args: Args, mode: GenerationMode) throws {
         switch mode {
         case .custom:
             _ = try explicitSpeaker(args)
@@ -416,7 +416,7 @@ enum GenerateCommand {
 
     /// Mode for non-interactive callers (`batch`, the subcommand path): the `--mode`
     /// flag or the `custom` default — never prompts.
-    static func resolveMode(_ args: Args) throws -> GenerationMode {
+    public static func resolveMode(_ args: Args) throws -> GenerationMode {
         try parseModeString(args.string("mode") ?? "custom")
     }
 
@@ -469,7 +469,7 @@ enum GenerateCommand {
         }
     }
 
-    static func resolveQuality(_ args: Args) throws -> Bool {
+    public static func resolveQuality(_ args: Args) throws -> Bool {
         switch (args.string("variant") ?? "speed").lowercased() {
         case "speed", "fast": return false
         case "quality", "hq": return true
@@ -480,7 +480,7 @@ enum GenerateCommand {
     /// Build the payload for a (mode, args) pair. For clone this resolves the
     /// reference once; `batch` reuses it across all of its requests.
     @MainActor
-    static func buildPayload(_ args: Args, mode: GenerationMode, runtime: CLIRuntime) async throws -> GenerationRequest.Payload {
+    public static func buildPayload(_ args: Args, mode: GenerationMode, runtime: CLIRuntime) async throws -> GenerationRequest.Payload {
         try validatePayloadOptions(args, mode: mode)
         switch mode {
         case .custom:
@@ -503,7 +503,7 @@ enum GenerateCommand {
         }
     }
 
-    static func resolveDeliveryInstructionCellID(
+    public static func resolveDeliveryInstructionCellID(
         _ args: Args,
         mode: GenerationMode
     ) throws -> String? {

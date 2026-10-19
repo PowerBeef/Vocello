@@ -8,7 +8,7 @@ import QwenVoiceCore
 /// `CLIRuntime` refuses the operation through the shared core policy before any model
 /// work. The flag is accepted and ignored on other runs, so scripts may pass it
 /// uniformly.
-enum CLIVoiceCloningConsent {
+public enum CLIVoiceCloningConsent {
     /// Parsed as a bare flag (`--confirm-consent`), never as `--confirm-consent <value>`.
     static let flagName = "confirm-consent"
 
@@ -24,7 +24,7 @@ enum CLIVoiceCloningConsent {
     /// The invocation's recorded consent. The flag is bare: a value
     /// (`--confirm-consent yes`, `--confirm-consent=yes`) is rejected with a clear
     /// error instead of silently parsing as no consent.
-    static func policy(from args: Args) throws -> VoiceCloningConsentPolicy {
+    public static func policy(from args: Args) throws -> VoiceCloningConsentPolicy {
         if let value = args.string(flagName) {
             throw CLIError(
                 "--\(flagName) takes no value (got \"\(value)\"): pass the bare flag --\(flagName) to confirm you own or have permission to clone this voice"
@@ -34,5 +34,5 @@ enum CLIVoiceCloningConsent {
     }
 
     /// Fail closed for any caller that does not pass the invocation's flag.
-    static let notConfirmed = policy(confirmed: false)
+    public static let notConfirmed = policy(confirmed: false)
 }

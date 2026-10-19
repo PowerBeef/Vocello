@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello speakers` — list the Built-in Voice speakers from the contract,
 /// so users don't have to guess `--speaker` ids. Read-only: uses the lightweight

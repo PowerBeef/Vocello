@@ -283,7 +283,16 @@ targets:
     type: tool
     platform: macOS
     sources:
+      # The files VocelloCLICore owns compile there, once, for the CLI and its tests.
       - path: Sources/VocelloCLI
+        excludes:
+          - CLIProcessSupervisor.swift
+          - CLIBatchExecution.swift
+          - CLIVoiceCloningConsent.swift
+          - Support.swift
+          - CLIRuntime.swift
+          - GenerateCommand.swift
+          - ModesCommand.swift
       # Bundle the contract beside the binary so the CLI resolves it via the
       # Bundle sweep in CLIRuntime.locateManifestURL — no longer dependent on
       # being run from the repo root. Uses the explicit resources buildPhase
@@ -310,6 +319,36 @@ targets:
         # Ad-hoc signed, no hardened runtime: a plain CLI runs Metal/MLX fine
         # without the app's allow-unsigned-memory entitlement.
         CODE_SIGN_IDENTITY: "-"
+    dependencies:
+      - target: VocelloCLICore
+      - target: QwenVoiceCore
+      - package: MLXAudio
+        product: VocelloQwen3Core
+      - package: MLXSwift
+        product: MLX
+
+  # The CLI's runtime, argument parsing, consent and batch execution (workflow audit P2-3):
+  # one module the vocello executable links and VocelloCoreTests imports @testable, instead
+  # of the tests compiling these files a second time by path.
+  VocelloCLICore:
+    type: framework.static
+    platform: macOS
+    sources:
+      - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
+      - path: Sources/VocelloCLI/CLIBatchExecution.swift
+      - path: Sources/VocelloCLI/CLIVoiceCloningConsent.swift
+      - path: Sources/VocelloCLI/Support.swift
+      - path: Sources/VocelloCLI/CLIRuntime.swift
+      - path: Sources/VocelloCLI/GenerateCommand.swift
+      - path: Sources/VocelloCLI/ModesCommand.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.cli.core
+        PRODUCT_NAME: VocelloCLICore
+        PRODUCT_MODULE_NAME: VocelloCLICore
+        SWIFT_VERSION: "6"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: QwenVoiceCore
       - package: MLXAudio
@@ -509,18 +548,6 @@ targets:
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/Services/MacInterfaceText.swift
       - path: Sources/Services/MacInterfaceLanguage.swift
-      - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
-      - path: Sources/VocelloCLI/CLIBatchExecution.swift
-      # PA-17: the CLI's consent recording, its bare-flag parsing (Support.swift)
-      # and the CLIRuntime generate/enroll wrappers, so the refusal is unit-tested
-      # at the engine call around an uninitialized engine.
-      - path: Sources/VocelloCLI/CLIVoiceCloningConsent.swift
-      - path: Sources/VocelloCLI/Support.swift
-      - path: Sources/VocelloCLI/CLIRuntime.swift
-      # TEST-13: the `generate` option helpers (and the mode table its picker
-      # prints), tested beside the argument parser and dispatch in Support.swift.
-      - path: Sources/VocelloCLI/GenerateCommand.swift
-      - path: Sources/VocelloCLI/ModesCommand.swift
       - path: Sources/iOSSupport/Models/Generation.swift
       # Clone draft and enrollment configuration are deterministic value types.
       - path: Sources/iOSSupport/Models/GenerationDrafts.swift
@@ -604,6 +631,9 @@ targets:
       - path: Sources/SharedSupport/Services/ModelDeletionSequence.swift
     dependencies:
       - target: QwenVoiceCore
+      # The CLI's tested files (PA-17's consent refusal, TEST-13's generate options, the
+      # runtime wrappers) come from their module, imported @testable.
+      - target: VocelloCLICore
       - package: GRDB
     settings:
       base:

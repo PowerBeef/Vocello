@@ -44,8 +44,9 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
 
 - **Targets** (`project.yml`, Release only, macOS/iOS 26.0, Swift 6, warnings as errors):
   `QwenVoice` (macOS app `Vocello.app`), `VocelloiOS` (module `QVoiceiOS`), `VocelloCLI` (`vocello`),
-  static frameworks `QwenVoiceCore` (product engine) and `QwenVoiceBackendCore` (provenance/policy
-  vocabulary), `VocelloCoreTests` (macOS host for core and iOS-logic tests), compile-only
+  static frameworks `QwenVoiceCore` (product engine), `QwenVoiceBackendCore` (provenance/policy
+  vocabulary) and `VocelloCLICore` (the CLI's runtime and parsing, which the tests import instead of
+  compiling by path), `VocelloCoreTests` (macOS host for core and iOS-logic tests), compile-only
   `VocelloiOSLogicTests`, and three XCUITest bundles. The macOS target compiles about 20 `Sources/iOS`
   files by path; that shared code, not a shared data folder, is the "shared store".
 - **Layering:** `QwenVoiceBackendCore` ← `QwenVoiceCore` ← {apps, CLI}. Platform differences live only

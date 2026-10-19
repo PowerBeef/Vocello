@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// A bounded codec-loop replay branch of the diagnostic benchmark command
 /// (audio QC COD-LOOP, tier T2 of the 2026-09-25 audit, section 5.2). Each job

@@ -90,7 +90,8 @@ def validate_source_contract(root: Path) -> str:
             )
 
     definition = re.search(
-        r"^let vocelloCLIVersion: String =\n(?P<body>(?:[ \t]+.*\n)+)",
+        # VocelloCLICore exports it to the vocello executable, so it may be `public` (P2-3).
+        r"^(?:public )?let vocelloCLIVersion: String =\n(?P<body>(?:[ \t]+.*\n)+)",
         support,
         re.MULTILINE,
     )

@@ -2,6 +2,7 @@ import CryptoKit
 import Darwin
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello bench` — the deterministic benchmark/perf driver: drives the matrix
 /// (mode × variant × length × cold/warm) in-process with telemetry on,

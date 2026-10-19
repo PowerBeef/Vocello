@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello batch` — synthesize many clips that share one voice/mode/variant,
 /// reusing one process and loaded model with per-item terminal receipts. The headline

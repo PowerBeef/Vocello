@@ -4,10 +4,10 @@ import QwenVoiceCore
 /// Finite stop-on-first-failure batch. Every planned row survives failure; no
 /// retry, replacement seed, or implicit resume is performed.
 @MainActor
-enum CLIBatchExecution {
+public enum CLIBatchExecution {
     /// Every short-form line must hold one take; the error names the first
     /// line that does not.
-    nonisolated static func validateShortFormLines(_ lines: [String]) throws {
+    public nonisolated static func validateShortFormLines(_ lines: [String]) throws {
         for (index, line) in lines.enumerated() {
             do {
                 try GenerateCommand.validateSingleTakeText(line)
@@ -22,7 +22,7 @@ enum CLIBatchExecution {
     /// `captureCodecTrace` (`--capture-codec-trace`, internal diagnostics only)
     /// asks the engine for each take's bounded codec trace; it changes no
     /// sampled code or published sample.
-    static func makeRequests(
+    public static func makeRequests(
         lines: [String], mode: GenerationMode, modelID: String,
         outputDirectory: URL, filenamePrefix: String,
         payload: GenerationRequest.Payload, seed: UInt64?, variation: Qwen3SamplingVariation?,
@@ -44,7 +44,7 @@ enum CLIBatchExecution {
     /// One segment of a long-form project as the apps' runner requests it: a
     /// streaming take at the app cadence with the planner's derived subseed;
     /// the delivery cell travels on Custom only.
-    static func makeLongFormSegmentRequest(
+    public static func makeLongFormSegmentRequest(
         mode: GenerationMode, modelID: String, text: String, outputPath: String,
         payload: GenerationRequest.Payload, generationID: UUID, subseed: UInt64,
         variation: Qwen3SamplingVariation?, deliveryInstructionCellID: String?
@@ -64,7 +64,7 @@ enum CLIBatchExecution {
     /// control). Without the flag, programmatic requests stay uninstructed
     /// (`EmotionPreset.neutralPresetInstruction`); an explicit --delivery or
     /// --delivery-cell always wins, and Clone has no instruction channel.
-    static func applyingAppDefaultDelivery(to payload: GenerationRequest.Payload) -> GenerationRequest.Payload {
+    public static func applyingAppDefaultDelivery(to payload: GenerationRequest.Payload) -> GenerationRequest.Payload {
         switch payload {
         case .custom(let speakerID, .none):
             return .custom(speakerID: speakerID, deliveryStyle: EmotionPreset.neutralPresetInstruction)
@@ -75,30 +75,31 @@ enum CLIBatchExecution {
         }
     }
 
-    enum Status: String, Codable { case completed, failed, cancelled, notAttempted = "not_attempted" }
-    struct Row: Encodable {
-        let index: Int
+    public enum Status: String, Codable, Sendable { case completed, failed, cancelled, notAttempted = "not_attempted" }
+    public struct Row: Encodable, Sendable {
+        public let index: Int
         let generationID: UUID?
-        var status: Status = .notAttempted
+        public internal(set) var status: Status = .notAttempted
         var audioPath: String?
         var durationSeconds: Double?
         var finishReason: String?
-        var errorCode: String?
+        public internal(set) var errorCode: String?
         /// Set only on a `failed` row whose failure coincided with a
         /// cancellation request; the failure is still the reported outcome.
-        var cancellationRequested: Bool?
+        public internal(set) var cancellationRequested: Bool?
     }
-    struct Outcome {
-        let rows: [Row]
-        let results: [GenerationResult]
+    // Public types get no inferred Sendable conformance, so the value types state it.
+    public struct Outcome: Sendable {
+        public let rows: [Row]
+        public let results: [GenerationResult]
         /// The engine stopped a take on its own (P15-02); that row is `failed`
         /// with the reason as its code, and the command exits with its status.
-        var engineCancellation: CLIEngineCancellation?
-        var passed: Bool { rows.allSatisfy { $0.status == .completed } }
-        var cancelled: Bool { rows.contains { $0.status == .cancelled } }
+        public internal(set) var engineCancellation: CLIEngineCancellation?
+        public var passed: Bool { rows.allSatisfy { $0.status == .completed } }
+        public var cancelled: Bool { rows.contains { $0.status == .cancelled } }
     }
 
-    static func run(
+    public static func run(
         _ requests: [GenerationRequest],
         progress: (Int, Int) -> Void = { _, _ in },
         generate: @concurrent (GenerationRequest) async throws -> GenerationResult

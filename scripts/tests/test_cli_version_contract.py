@@ -35,7 +35,7 @@ targets:
 VALID_SUPPORT = """\
 import Foundation
 
-let vocelloCLIVersion: String =
+public let vocelloCLIVersion: String =
     (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
         .flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"
 """

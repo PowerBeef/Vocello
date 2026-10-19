@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello models` — read-only inventory of the contract's models: install state,
 /// on-disk size, and (for `status`) any missing required files. No download

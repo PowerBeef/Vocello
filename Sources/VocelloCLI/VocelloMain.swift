@@ -1,4 +1,5 @@
 import Foundation
+import VocelloCLICore
 
 /// `vocello` — headless Vocello TTS over the in-process MLX engine.
 /// User-facing generation without the UI + the deterministic benchmark/test driver.

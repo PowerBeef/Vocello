@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// `vocello voices` — manage saved (enrolled) clone voices.
 enum VoicesCommand {

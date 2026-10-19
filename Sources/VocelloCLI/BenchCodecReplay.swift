@@ -3,6 +3,7 @@ import Darwin
 import Foundation
 import QwenVoiceCore
 import VocelloQwen3Core
+import VocelloCLICore
 
 /// A bounded replay branch of the existing diagnostic benchmark command. It
 /// consumes a collected startup-reliability take; it never synthesizes text,

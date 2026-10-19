@@ -2,6 +2,7 @@ import Foundation
 import Synchronization
 import QwenVoiceCore
 import XCTest
+@testable import VocelloCLICore
 
 @MainActor
 final class CLIExecutionTests: XCTestCase {

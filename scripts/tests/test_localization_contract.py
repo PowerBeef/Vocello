@@ -27,6 +27,8 @@ settings:
 targets:
   VocelloCLI:
     type: tool
+  VocelloCLICore:
+    type: framework.static
   QwenVoice:
     type: application
     sources:

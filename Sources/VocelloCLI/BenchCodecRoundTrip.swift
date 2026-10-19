@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import QwenVoiceCore
+import VocelloCLICore
 
 /// A bounded codec round-trip branch of the diagnostic benchmark command (audit
 /// P9, audio QC population N2). It resynthesizes digest-bound mono PCM16 24 kHz

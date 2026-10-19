@@ -148,16 +148,22 @@ def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
                     str(item["rule_id"]), str(item.get("reason", "")),
                 ))
         elif tool == "pyright":
+            seen: set[Finding] = set()
             for item in payload["generalDiagnostics"]:
                 rule = str(item.get("rule") or "")
                 if item["severity"] not in ("error", "warning") or rule in PYRIGHT_IMPORT_RULES:
                     continue
                 start = item["range"]["start"]
-                findings.append(Finding(
+                finding = Finding(
                     # Zero-based positions; a syntax error carries no rule.
                     _relative(root, item["file"]), int(start["line"]) + 1, int(start["character"]) + 1,
                     rule or "pyright", str(item.get("message", "")).splitlines()[0] if item.get("message") else "",
-                ))
+                )
+                # The Linux runner's Pyright repeats some diagnostics at the same position (an `int()` of an
+                # `object` once per overload) where macOS reports one; one position is one finding.
+                if finding not in seen:
+                    seen.add(finding)
+                    findings.append(finding)
         else:
             raise LintBaselineError(f"unknown tool: {tool}")
     except (KeyError, TypeError, ValueError) as error:

@@ -363,6 +363,13 @@ class LintBaselineTests(unittest.TestCase):
         with self.assertRaises(MODULE.LintBaselineError):
             MODULE.parse_findings("pyright", json.dumps({"generalDiagnostics": [{"file": "x.py"}]}), self.root)
 
+    def test_pyright_counts_a_repeated_diagnostic_at_one_position_once(self) -> None:
+        output = pyright_output(self.root, ("scripts/b.py", 3, 4, "error", "reportArgumentType"),
+                                ("scripts/b.py", 3, 4, "error", "reportArgumentType"),
+                                ("scripts/b.py", 5, 4, "error", "reportArgumentType"))
+        self.assertEqual([(finding.line, finding.column) for finding in
+                          MODULE.parse_findings("pyright", output, self.root)], [(4, 5), (6, 5)])
+
     def test_pyright_checks_scripts_once_against_an_empty_interpreter(self) -> None:
         listing = "\0".join(["scripts/b.py", "website/x.py", "tools/y.py", "scripts/a.sh"]) + "\0"
         completed = subprocess.CompletedProcess([], 0, stdout=listing.encode(), stderr=b"")

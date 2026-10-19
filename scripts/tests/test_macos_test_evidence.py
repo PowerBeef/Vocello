@@ -78,5 +78,62 @@ cmd_core_test --only ExampleTests
                 self.assertIn(f"core={native_status}\ncore_summary=3", verdict)
 
 
+FAILED = COMPLETE.replace("passed (0.001", "failed (0.001").replace(
+    "'Selected tests' passed", "'Selected tests' failed").replace("0 failures", "1 failure")
+
+
+class CoreTestRepeatTests(unittest.TestCase):
+    """`core-test --repeat N` builds once and stops at the first failing iteration."""
+
+    def run_repeat(self, repeat: str, fail_on: int | None) -> tuple[int, str, int, list[list[str]], str]:
+        shell = LaneShell(self, "macos_test.sh")
+        root = shell.path / "repeat evidence"
+        (root / "tests").mkdir(parents=True)
+        count = shell.path / "iterations"
+        passing, failing = shell.path / "pass.log", shell.path / "fail.log"
+        passing.write_text(COMPLETE)
+        failing.write_text(FAILED)
+        body = f"""QVOICE_ARTIFACTS_MACOS={shlex.quote(str(root))}
+qv_stub build_mac_test_bundles
+run_mac_test_bundle() {{
+  local n=$(( $(cat {shlex.quote(str(count))} 2>/dev/null || echo 0) + 1 ))
+  echo "$n" > {shlex.quote(str(count))}
+  if [[ "$n" == "{fail_on or 0}" ]]; then cp {shlex.quote(str(failing))} "$2"; return 1; fi
+  cp {shlex.quote(str(passing))} "$2"
+}}
+cmd_core_test --only ExampleTests --repeat {shlex.quote(repeat)}
+"""
+        result = shell.run(body)
+        verdict_path = root / "tests/core-test.verdict.txt"
+        verdict = verdict_path.read_text() if verdict_path.exists() else ""
+        runs = int(count.read_text()) if count.exists() else 0
+        return result.returncode, verdict, runs, shell.calls_to("build_mac_test_bundles"), result.stderr
+
+    def test_every_iteration_passing_runs_all_of_them_after_one_build(self) -> None:
+        code, verdict, runs, builds, stderr = self.run_repeat("4", None)
+        self.assertEqual((code, runs, len(builds)), (0, 4, 1), stderr)
+        self.assertIn("core=0\ncore_summary=0\nrepeat=4\niterations=4\n", verdict)
+        self.assertIn("core-test PASS (4 of 4 iterations)", stderr)
+
+    def test_the_first_failure_stops_the_run_and_keeps_its_log(self) -> None:
+        code, verdict, runs, _builds, stderr = self.run_repeat("10", 3)
+        self.assertEqual((code, runs), (1, 3), stderr)
+        self.assertIn("core=1\ncore_summary=0\nrepeat=10\niterations=3\n", verdict)
+        self.assertIn("core-test FAIL on iteration 3 of 10", stderr)
+
+    def test_a_single_run_keeps_the_original_verdict(self) -> None:
+        code, verdict, runs, _builds, stderr = self.run_repeat("1", None)
+        self.assertEqual((code, runs), (0, 1), stderr)
+        self.assertEqual(verdict, "build=0\ncore=0\ncore_summary=0\n")
+
+    def test_a_count_that_is_not_positive_is_refused_before_building(self) -> None:
+        for repeat in ("0", "-2", "many", "10000"):
+            with self.subTest(repeat=repeat):
+                code, _verdict, runs, builds, stderr = self.run_repeat(repeat, None)
+                self.assertNotEqual(code, 0)
+                self.assertEqual((runs, builds), (0, []))
+                self.assertIn("--repeat must be a count", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

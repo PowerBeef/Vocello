@@ -573,6 +573,8 @@ def main(argv: list[str] | None = None) -> int:
     test = sub.add_parser("test", help="macOS XCTest bundles: changed classes, --only, or --all")
     test.add_argument("--only", help="comma-separated XCTestCase classes")
     test.add_argument("--all", action="store_true")
+    test.add_argument("--repeat", type=int, metavar="N",
+                      help="with --only: run the selection up to N times, stopping at the first failure")
     sub.add_parser("ios", help="generic device-SDK compile (incremental)")
     sub.add_parser("build", help="dev-signed macOS app build (for running, not verification)")
     sub.add_parser("run", help="build and launch the macOS app")
@@ -646,8 +648,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"==> Python tests: {selection['mode']} ({selection['reason']})", flush=True)
                 run_commands(python_test_commands(selection))
         elif command == "test":
+            if args.repeat is not None and not args.only:
+                parser.error("test --repeat needs --only: repeat a focused selection, not the suite")
             if args.only:
-                run_commands([["scripts/macos_test.sh", "core-test", "--only", args.only]])
+                repeat = ["--repeat", str(args.repeat)] if args.repeat is not None else []
+                run_commands([["scripts/macos_test.sh", "core-test", "--only", args.only, *repeat]])
             else:
                 run_commands(swift_test_commands(changed_paths(), everything=args.all) or [["scripts/macos_test.sh", "test"]])
         elif command == "ios":

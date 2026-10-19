@@ -35,7 +35,8 @@ usage: scripts/dev.sh <command>
   contracts                product and repository contracts
   py [--all | --lane product|research | tests...]
                            Python tests via pytest (changed consumers by default)
-  test [--only A,B | --all]  macOS XCTest bundles
+  test [--only A,B [--repeat N] | --all]
+                           macOS XCTest bundles (--repeat: until the first failure)
   ios                      generic device-SDK compile (incremental)
   build | run              dev-signed macOS app build / launch
   regen                    regenerate derived artifacts

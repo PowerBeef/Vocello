@@ -7,7 +7,10 @@
 #
 # usage:
 #   scripts/macos_test.sh preflight [--strict-models]  # Xcode + app + dSYMs + model status
-#   scripts/macos_test.sh core-test                 # VocelloCoreTests (core + host-runnable iOS policy, no models)
+#   scripts/macos_test.sh core-test [--only A,B] [--repeat N]
+#                                                    # VocelloCoreTests (core + host-runnable iOS policy, no models)
+#                                                    # --repeat N: build once, run up to N times, stop at the first
+#                                                    #   failure (flaky hunting; the log is the failing iteration's)
 #                                                    # opt-in: QWENVOICE_ENABLE_TSAN=1
 #   scripts/macos_test.sh tsan                      # core TSan subset (push CI blocking job + nightly cold run)
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
@@ -892,14 +895,17 @@ EOF
 
 # core-test: VocelloCoreTests (core semantics + host-runnable iOS policy, no models).
 cmd_core_test() {
-  local test_filter=""
+  local test_filter="" repeat=1
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --only) test_filter="${2:-}"; shift 2 ;;
       --only=*) test_filter="${1#*=}"; shift ;;
-      *) die "unknown core-test argument '$1' (try --only TestClass[/testMethod])" ;;
+      --repeat) repeat="${2:-}"; shift 2 ;;
+      --repeat=*) repeat="${1#*=}"; shift ;;
+      *) die "unknown core-test argument '$1' (try --only TestClass[/testMethod] or --repeat N)" ;;
     esac
   done
+  [[ "$repeat" =~ ^[1-9][0-9]{0,3}$ ]] || die "core-test --repeat must be a count from 1 to 9999"
   [[ -z "$test_filter" || "$test_filter" =~ ^[A-Za-z_][A-Za-z0-9_.]*(/[A-Za-z_][A-Za-z0-9_]*)?(,[A-Za-z_][A-Za-z0-9_.]*(/[A-Za-z_][A-Za-z0-9_]*)?)*$ ]] \
     || die "core-test --only must contain comma-separated TestClass or TestClass/testMethod identifiers"
   if [[ -n "$test_filter" ]]; then
@@ -911,21 +917,36 @@ cmd_core_test() {
   local test_log="$QVOICE_ARTIFACTS_MACOS/tests/core-test.log"
   rm -f "$test_log" "${test_log%.log}.test-results.json" "${test_log%.log}.verdict.txt"
   set +e
-  local build_st=0 st=0 summary_st=0
+  local build_st=0 st=0 summary_st=0 iteration=0
   build_mac_test_bundles "$build_log" || build_st=$?
   if (( build_st == 0 )); then
-    run_mac_test_bundle VocelloCoreTests "$test_log" 0 "$test_filter" || st=$?
-    write_mac_test_summary "$test_log" || summary_st=$?
+    # Each iteration overwrites the log and its summary, so after a failure they are the
+    # failing iteration's.
+    while (( iteration < repeat && st == 0 && summary_st == 0 )); do
+      iteration=$((iteration + 1))
+      (( repeat == 1 )) || note "core-test: iteration $iteration of $repeat"
+      run_mac_test_bundle VocelloCoreTests "$test_log" 0 "$test_filter" || st=$?
+      write_mac_test_summary "$test_log" || summary_st=$?
+    done
   else
     st="$build_st"
   fi
   set -e
   printf 'build=%s\ncore=%s\ncore_summary=%s\n' "$build_st" "$st" "$summary_st" \
     > "${test_log%.log}.verdict.txt"
+  if (( repeat > 1 )); then
+    printf 'repeat=%s\niterations=%s\n' "$repeat" "$iteration" >> "${test_log%.log}.verdict.txt"
+  fi
   if (( st == 0 && summary_st == 0 )); then
-    note "core-test PASS"
+    if (( repeat > 1 )); then
+      note "core-test PASS ($iteration of $repeat iterations)"
+    else
+      note "core-test PASS"
+    fi
   elif (( build_st != 0 )); then
     warn "core-test BUILD FAIL (see build/artifacts/macos/tests/core-test-build.log)"
+  elif (( repeat > 1 )); then
+    warn "core-test FAIL on iteration $iteration of $repeat (see build/artifacts/macos/tests/core-test.log)"
   else
     warn "core-test FAIL (see build/artifacts/macos/tests/core-test.log)"
   fi

@@ -83,7 +83,7 @@ scripts/dev.sh check --dry-run --json # the routed plan check would run
 scripts/dev.sh check                  # lint, contracts, selected tests, touched native lanes
 scripts/dev.sh check --since <ref>    # also everything committed since <ref>
 scripts/dev.sh check --paths <p...>   # only assigned paths when unrelated dirty work must wait
-scripts/dev.sh test --only Class      # targeted XCTest; Class/testMethod and A,B also work
+scripts/dev.sh test --only Class      # targeted XCTest; Class/testMethod and A,B also work; --repeat N hunts flakes
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
 "$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
 scripts/dev.sh lint                   # changed-file advisory SwiftLint, shellcheck, privacy

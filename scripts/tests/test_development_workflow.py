@@ -464,6 +464,22 @@ class CommandRunnerTests(unittest.TestCase):
             MODULE.main(["check", "--json"])
         self.assertEqual(error.exception.code, 2)
 
+    def test_test_repeat_passes_the_count_to_the_focused_core_test(self) -> None:
+        with mock.patch.object(MODULE, "run_commands") as run:
+            self.assertEqual(MODULE.main(["test", "--only", "ATests/testOne", "--repeat", "25"]), 0)
+        run.assert_called_once_with(
+            [["scripts/macos_test.sh", "core-test", "--only", "ATests/testOne", "--repeat", "25"]])
+        with mock.patch.object(MODULE, "run_commands") as run:
+            self.assertEqual(MODULE.main(["test", "--only", "ATests"]), 0)
+        run.assert_called_once_with([["scripts/macos_test.sh", "core-test", "--only", "ATests"]])
+
+    def test_test_repeat_without_a_focused_selection_is_refused(self) -> None:
+        with mock.patch.object(MODULE, "run_commands") as run, redirect_stderr(io.StringIO()), \
+                self.assertRaises(SystemExit) as error:
+            MODULE.main(["test", "--repeat", "5"])
+        self.assertEqual(error.exception.code, 2)
+        run.assert_not_called()
+
     def test_a_clean_tree_dry_run_plans_no_lane_and_points_at_since(self) -> None:
         stdout, stderr = io.StringIO(), io.StringIO()
         with mock.patch.object(MODULE, "changed_paths", return_value=[]), \

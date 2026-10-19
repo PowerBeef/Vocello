@@ -21,6 +21,7 @@ scripts/dev.sh check --dry-run       # what the dirty tree needs
 scripts/dev.sh check                 # lint, contracts, selected Python tests, native lanes touched
 scripts/dev.sh check --since origin/main  # the same over an unpushed batch of commits
 scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build
+scripts/dev.sh test --only FooTests --repeat 50  # flaky hunting: up to 50 runs, stops at the first failure
 scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)

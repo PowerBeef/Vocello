@@ -171,6 +171,15 @@
       "env": "QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
     },
     {
+      "id": "xcode-macos-enhanced-security-derived-data",
+      "path": "build/cache/xcode/macos-enhanced-security",
+      "class": "cache",
+      "owner": "The Enhanced Security trial CLI (arm64e, ENABLE_ENHANCED_SECURITY; workflow audit P3-3)",
+      "cleanup": "aggressive",
+      "retention": "Trial-only optimized arm64e macOS Xcode cache; kept apart so the -Onone and benchmark arenas never build arm64e",
+      "env": "QVOICE_XCODE_MACOS_ENHANCED_SECURITY_DERIVED"
+    },
+    {
       "id": "xcode-macos-tsan-derived-data",
       "path": "build/cache/xcode/macos-tsan",
       "class": "cache",
@@ -454,6 +463,11 @@
       "alternateTargetEntries": [
         "xcode-macos-optimized-derived-data"
       ]
+    },
+    {
+      "path": "build/vocello-enhanced-security",
+      "targetEntry": "xcode-macos-enhanced-security-derived-data",
+      "targetSuffix": "Build/Products/Release/vocello"
     }
   ],
   "externalXcodeDerivedData": {

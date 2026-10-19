@@ -13,6 +13,7 @@
 # usage:
 #   scripts/build.sh build            # fast local build, no launch (alias: debug)
 #   scripts/build.sh cli-optimized    # shipping-optimization CLI for benchmarks
+#   scripts/build.sh cli-enhanced-security  # Enhanced Security trial CLI (arm64e; never benchmarked)
 #   scripts/build.sh codeql-prepare   # CI-only: native dependency/Metal prebuild before tracing
 #   scripts/build.sh codeql           # CI-only: traced owned-Swift arm64 rebuild
 #   scripts/build.sh run [--logs|--telemetry|--verify|--debug]
@@ -63,6 +64,9 @@ commands:
   cli [args...]         Build the headless vocello CLI (build/vocello); runs it if args are given.
   cli-optimized [args...]
                         Build vocello with -O for shipping-performance evidence; runs args if given.
+  cli-enhanced-security [args...]
+                        Enhanced Security trial (P3-3): -O plus ENABLE_ENHANCED_SECURITY, arm64e, own
+                        arena, build/vocello-enhanced-security; never a benchmark or release binary.
   clean                 Bounded cache cleanup (equivalent to --aggressive).
   clobber --yes         Remove all ignored repository-local generated state.
   help                  Show this message.
@@ -306,6 +310,7 @@ build_cli() {
     # owned targets instead of recompiling MLX and the other packages.
     local -a optimization_settings=("${QVOICE_OWNED_DEV_SETTINGS[@]}")
     local command_identity="scripts/build.sh cli"
+    local architecture=arm64 cli_link="$CLI_BINARY"
     # One arena per optimization level (MV-01): an optimized build in the
     # -Onone arena flipped it and the next test or app build recompiled the
     # whole package graph. The optimized CLI and the -O XCUITest lanes share
@@ -318,6 +323,17 @@ build_cli() {
             GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO)
         command_identity="scripts/build.sh cli-optimized"
         DERIVED_DATA="$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
+    elif [ "$optimization" = "enhanced-security" ]; then
+        # The Enhanced Security trial (P3-3): the optimized settings plus pointer authentication,
+        # typed allocators and C++ hardening, built arm64e in an arena of its own so neither
+        # the -Onone nor the benchmark arena ever builds arm64e.
+        swift_optimization="-O"
+        optimization_settings=(SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule
+            GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO ENABLE_ENHANCED_SECURITY=YES)
+        architecture=arm64e
+        command_identity="scripts/build.sh cli-enhanced-security"
+        DERIVED_DATA="$QVOICE_XCODE_MACOS_ENHANCED_SECURITY_DERIVED"
+        cli_link="$BUILD_DIR/vocello-enhanced-security"
     elif [ "$optimization" != "Onone" ]; then
         echo "error: unsupported CLI optimization identity: $optimization" >&2
         return 2
@@ -341,7 +357,7 @@ build_cli() {
         -onlyUsePackageVersionsFromResolvedFile \
         -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR" \
         -disableAutomaticPackageResolution \
-        ARCHS=arm64 \
+        ARCHS="$architecture" \
         ONLY_ACTIVE_ARCH=YES \
         CODE_SIGN_STYLE=Manual \
         CODE_SIGN_IDENTITY="-" \
@@ -359,19 +375,24 @@ build_cli() {
     # binary — copying it elsewhere breaks metallib lookup. Expose a convenience
     # symlink at build/vocello; macOS resolves it to the real path, so the
     # bundles stay adjacent.
-    assert_macho_arm64_only "$CLI_BUILT" "vocello CLI"
+    if [ "$architecture" = arm64 ]; then
+        assert_macho_arm64_only "$CLI_BUILT" "vocello CLI"
+    elif [ "$(/usr/bin/lipo -archs "$CLI_BUILT" 2>/dev/null)" != "$architecture" ]; then
+        echo "error: the trial CLI must be $architecture-only (found: $(/usr/bin/lipo -archs "$CLI_BUILT" 2>/dev/null))" >&2
+        return 1
+    fi
     python3 "$SCRIPT_DIR/cli_version_contract.py" validate \
         --root "$ROOT_DIR" --binary "$CLI_BUILT"
     # Publish the convenience symlink only after the binary's identity passes.
-    rm -f "$CLI_BINARY"
-    ln -s "${CLI_BUILT#"$BUILD_DIR"/}" "$CLI_BINARY"
+    rm -f "$cli_link"
+    ln -s "${CLI_BUILT#"$BUILD_DIR"/}" "$cli_link"
     write_build_provenance "$DERIVED_DATA/last-build.json" \
-        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" arm64 \
+        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" "$architecture" \
         "$optimization" ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR"
     write_build_provenance "$CLI_BUILT.provenance.json" \
-        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" arm64 \
+        "$command_identity" "$CLI_TARGET" Release "$DESTINATION" "$architecture" \
         "$optimization" ad-hoc "$DERIVED_DATA" "$SOURCE_PACKAGES_DIR" "$CLI_BUILT"
-    echo "==> CLI ready: $CLI_BINARY → $CLI_BUILT"
+    echo "==> CLI ready: $cli_link → $CLI_BUILT"
 }
 
 cmd_cli() {
@@ -387,6 +408,14 @@ cmd_cli_optimized() {
     build_cli O
     if [ "$#" -gt 0 ]; then
         echo "==> Running optimized: vocello $*"
+        "$CLI_BUILT" "$@"
+    fi
+}
+
+cmd_cli_enhanced_security() {
+    build_cli enhanced-security
+    if [ "$#" -gt 0 ]; then
+        echo "==> Running the Enhanced Security trial CLI: vocello $*"
         "$CLI_BUILT" "$@"
     fi
 }
@@ -437,6 +466,10 @@ main() {
         cli-optimized)
             require_build_free_space development-build
             cmd_cli_optimized "$@"
+            ;;
+        cli-enhanced-security)
+            require_build_free_space development-build
+            cmd_cli_enhanced_security "$@"
             ;;
         release)
             cmd_release "$@"

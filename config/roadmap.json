@@ -2047,9 +2047,9 @@
         "scripts/check_project_inputs.sh",
         ".claude/agents/vocello-swift-review.md"
       ],
-      "updated": "2026-10-18",
+      "updated": "2026-10-19",
       "due": "2026-10-22",
-      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-1 lane ledger and dev.sh status --kpi (4a1f3c34; 257 retained runs classified), P1-3 parallel, path-selected contract gate (3c227dd1; about 11 s to 2-3 s), P1-4 and P1-5 deadline and report-only Main Thread Checker (a59c556d; 0 violations in 1,477 tests), P1-6 Swift Testing parser and the finding that the lane's raw xctest runner never runs Swift Testing, so an invariant keeps it out of Tests/ (c406eea2), P1-7 and P1-8 shellcheck and pinned ruff 0.17.1 against shrinking baselines (eb4ddab3; 0 and 44 findings), P1-11 (d4b08f21), P1-14 (9204b75d). P1-10 declined (see gate). Left: P1-2, P1-9, P1-12, P1-13, P1-15."
+      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-1 lane ledger and dev.sh status --kpi (4a1f3c34; 257 retained runs classified), P1-3 parallel, path-selected contract gate (3c227dd1; about 11 s to 2-3 s), P1-4 and P1-5 deadline and report-only Main Thread Checker (a59c556d; 0 violations in 1,477 tests), P1-6 Swift Testing parser and the finding that the lane's raw xctest runner never runs Swift Testing, so an invariant keeps it out of Tests/ (c406eea2), P1-7 and P1-8 shellcheck and pinned ruff 0.17.1 against shrinking baselines (eb4ddab3; 0 and 44 findings), P1-11 (d4b08f21), P1-14 (9204b75d). P1-10 declined (see gate). Also landed 2026-10-18: P1-9 behaviour tests over the shipped shell instead of script-text checks (27cdbdb9, 1e564f2a), P1-12 test-adequacy questions in the Swift review (f0559d98), P1-13 the engine audit's S1/S2 findings in the risk spine (e834b10f), and the agent guard refusing sourced lane code (325475af). Left: P1-2 UI readiness preflight and P1-15 the shared lane library, whose ios_device.sh halves wait for an iPhone window."
     },
     {
       "id": "DW-03",

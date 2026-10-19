@@ -1725,6 +1725,21 @@
       "notes": "Found 2026-10-18 by the DW-04 Observation smoke: test08's save-voice step asked for Speech Recognition, because the ad-hoc-signed lane build never matches an earlier grant. The system dialog covered the window, so test12, test13 and test14 failed on controls that were not hittable, and single-scenario reruns failed the same way until the maintainer answered it. macos-permissions.md describes this for the microphone only. Parked without investigation under the focus lock: test tooling, not a release blocker."
     },
     {
+      "id": "BKL-20",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A rebuilt prepared overlay trusts model weights that changed in place",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "When the weights change and the overlay is rebuilt, the checkpoint is not trusted until a load succeeds on the new weights, as on the valid-overlay path, and testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt passes without its XCTExpectFailure blocks.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift",
+        "Tests/VocelloCoreTests/MLXModelLoadCoordinatorSeamTests.swift"
+      ],
+      "updated": "2026-10-19",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-19 by the DW-03 seam tests (94dc16cd, 7fe58fa2). With the overlay marker missing or stale, readPersistedSourceQwenPreparedCheckpointTrust re-hashes the changed weights and rewrites the source trust file to the new digest. The rebuild then marks the checkpoint trusted before the loader runs, so weight verification relaxes to noUnusedKeys, and that trust survives a failed load. With a valid overlay, the same change is distrusted. Installed weights are SHA-256-verified at download, so this needs weights that change in place, then an overlay invalidation such as a descriptor bump or an iOS cache purge. Parked without investigation under the focus lock: hardening, not a release blocker."
+    },
+    {
       "id": "BG-01",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
@@ -1792,7 +1807,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "B-12 refines F-20 (kept in engineering-review-remediation-2026-08).",
+      "notes": "B-12 refines F-20 (kept in engineering-review-remediation-2026-08). B-04 (the loader still runs after an unload that came before it) is pinned as current behaviour in MLXModelLoadCoordinatorSeamTests.testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad (DW-03).",
       "blockedBy": [
         "ER-01"
       ]
@@ -1859,7 +1874,7 @@
       ],
       "updated": "2026-10-16",
       "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "Absorbs BKL-02, BKL-03, DA-05 and DA-06. DA-05's maintainer decision (speed after idle vs memory at the critical band) is still needed before its step.",
+      "notes": "Absorbs BKL-02, BKL-03, DA-05 and DA-06. DA-05's maintainer decision (speed after idle vs memory at the critical band) is still needed before its step. B-02 is pinned by a strict XCTExpectFailure in ActiveGenerationCoordinatorTests.testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel (DW-03, 7fe58fa2): fixing it fails that test until the wrapper is removed.",
       "legacyIds": [
         "BKL-02",
         "BKL-03",
@@ -2049,9 +2064,9 @@
         "Packages/VocelloQwen3Core/Package.swift",
         "Tests/VocelloCoreTests"
       ],
-      "updated": "2026-10-18",
+      "updated": "2026-10-19",
       "due": "2026-10-22",
-      "notes": "Maintainer decision 2026-10-18: runs now, alongside the release. Landed 2026-10-18: P2-1 owned-target optimization variables (a2147383; packages optimized in dev and test builds; core-suite gain 2%, kept for shipped-configuration parity; lineage keys restart). P2-6 MemberImportVisibility and project-level Swift 6 (a2147383), no first-party @preconcurrency imports (42b15022), SwiftLint as a CI gate on a shrinking baseline (1a4aaf6e, 6b8baa7f), a report-only nightly count of migrate-mode warnings (8f9bdbeb). P2-4 Swift Testing in the owned package only (c406eea2, 54842e39). P2-7 signposts, Logger and macOS MetricKit (adb556a2, 25192b69, 82c921a7) with crash-metadata redaction (dcfdcf07, bd891690). Declined with reasons: P2-2 dwarf test builds (dSYMs serve crash symbolication) and the compilation cache (disk-constrained host). Maintainer, later 2026-10-18: P2-5 next, then P2-3 now, not after the submission (multi-day: the 100 test-compiled files span the iOS app, Mac app and CLI, so per-product modules and public APIs). Open: P2-5, P2-3; package warnings-as-errors waits on the 15 MLXArray Sendable warnings (engine work)."
+      "notes": "Maintainer 2026-10-18: runs now, with the release; later that day: P2-5, then P2-3 now (multi-day: the 100 test-compiled files span the iOS app, Mac app and CLI). Landed: P2-1 owned-target optimization variables (a2147383; lineage keys restart). P2-6 MemberImportVisibility, project Swift 6 (a2147383), no first-party @preconcurrency imports (42b15022), SwiftLint gate (1a4aaf6e), nightly migrate-mode report (8f9bdbeb, group fix e32fb52f). P2-4 Swift Testing in the owned package (c406eea2, 54842e39). P2-7 signposts, Logger, macOS MetricKit (adb556a2, 25192b69, 82c921a7; redaction dcfdcf07). P2-5 2026-10-19: allocator seam so core tests stay off MLX (e124f375); seam suites for the load coordinator (19) and runtime (11), fakes cancelling inside warm and prime bodies, event-log assertions (94dc16cd, 957b3f58, a4163a47, 7fe58fa2; mutation-checked; B-02 and BKL-20 strict expected failures); nightly shipped-configuration run, and the runtime suite no longer always built instrumented (dfb51453). Declined: P2-2 dwarf test builds and the compilation cache. Open: P2-3; package warnings-as-errors waits on the MLXArray Sendable warnings."
     },
     {
       "id": "DW-04",

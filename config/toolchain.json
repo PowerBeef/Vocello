@@ -128,7 +128,9 @@
       "url": "https://github.com/peripheryapp/periphery/releases/download/3.8.0/periphery-3.8.0.zip",
       "sha256": "07d4e286e31dd79164df39097e0b59f533c94badbe18158464a455ea88a166d7",
       "archivePath": "periphery",
-      "versionArgs": ["version"]
+      "versionArgs": [
+        "version"
+      ]
     },
     "ruff": {
       "version": "0.17.1",
@@ -178,20 +180,20 @@
       "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
     },
     "actions/upload-artifact": {
-      "version": "v7.0.1",
-      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+      "version": "v7.0.2",
+      "sha": "cf430e030ddbb5b0abf93d22962f4752f3646cd9"
     },
     "actions/setup-node": {
-      "version": "v7.0.0",
-      "sha": "820762786026740c76f36085b0efc47a31fe5020"
+      "version": "v7.1.0",
+      "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1"
     },
     "actions/attest-build-provenance": {
-      "version": "v4.1.1",
-      "sha": "0f67c3f4856b2e3261c31976d6725780e5e4c373"
+      "version": "v4.2.2",
+      "sha": "4d101475d8b20a2381f78447822ac1eab6504dd8"
     },
     "github/codeql-action": {
-      "version": "v4.37.4",
-      "sha": "f205ea1c3313d32999d8d6a48b4f6530d4437b38"
+      "version": "v4.39.0",
+      "sha": "6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee"
     }
   }
 }

@@ -280,6 +280,11 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
         XCTAssertNotNil(failure)
         let loadedID = await coordinator.currentLoadedModelID()
         XCTAssertNil(loadedID)
+        // The rebuild path ran: without it this test would pin nothing about the rebuild.
+        XCTAssertEqual(
+            probes.diagnostics.details(of: "coordinator-load-after-prepare-local-cache").last?["rebuiltPreparedCache"],
+            "true"
+        )
         let loaderSawTrust = try XCTUnwrap(probes.loader.calls.last).trustedPreparedCheckpoint
         let sourceDigest = modelDigest(inTrust: jsonObject(at: sourceTrustURL(Self.folderA)))
         let markerDigest = modelDigest(inTrust: markerTrust(Self.folderA))
@@ -1064,7 +1069,7 @@ private func makeFixtureModel(id: String) -> UnsafeSpeechGenerationModel {
 }
 
 private func sha256Hex(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
 }
 
 private func jsonObject(at url: URL) -> [String: Any]? {

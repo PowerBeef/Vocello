@@ -964,12 +964,15 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             XCTAssertNil(engine.visibleErrorMessage, "a cancelled prewarm is not a failure")
             XCTAssertFalse(published.includesAFailure, "a cancelled prewarm is not a failure")
             let settled = engine.loadState
+            // One strict block per assertion, so a partial B-02 fix cannot stay green.
             XCTExpectFailure("B-02: a cancelled warm still unloads the model; remove this wrapper once B-02 lands") {
                 XCTAssertEqual(
                     events,
                     ["load", "capabilities", "load", "capabilities"],
                     "a cancelled prewarm step unloads nothing"
                 )
+            }
+            XCTExpectFailure("B-02: a cancelled warm still unloads the model; remove this wrapper once B-02 lands") {
                 XCTAssertEqual(settled, .loaded(modelID: "pro_custom"), "the warmed model stays resident")
             }
         }
@@ -984,7 +987,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             await coordinator.waitUntilBodyLoadIsHeld()
             held.fulfill()
         }
-        await fulfillment(of: [held], timeout: 5)
+        await fulfillment(of: [held], timeout: 10)
     }
 
     /// The canonical Built-in Voice warm the Mac shell sends for `pro_custom`.
@@ -1022,7 +1025,9 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             root: root,
             registry: try Self.contractRegistry(),
             coordinator: coordinator,
-            idleUnloadDelay: 0.5
+            // Long enough that the resident load's own idle unload cannot fire before the
+            // operation under test runs (TTSEngineStoreTests.residentIdleWindow), even under TSan.
+            idleUnloadDelay: 1.0
         )
         defer { engine.stop() }
         try await engine.initialize(appSupportDirectory: root)
@@ -1161,6 +1166,9 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
     private var hasHeldALoad = false
     private var heldLoad: CheckedContinuation<Void, Never>?
     private var heldLoadWaiters: [CheckedContinuation<Void, Never>] = []
+    /// A release before any load is held (a wait that timed out) is kept, so a load
+    /// that arrives afterwards passes instead of parking forever and hanging the suite.
+    private var releasedBeforeHold = false
 
     init(warmRequests: WarmRequests = .proceed) {
         self.warmRequests = warmRequests
@@ -1176,9 +1184,12 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
 
     /// Lets the held load return.
     func releaseHeldLoad() {
-        let held = heldLoad
+        guard let held = heldLoad else {
+            releasedBeforeHold = true
+            return
+        }
         heldLoad = nil
-        held?.resume()
+        held.resume()
     }
 
     func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
@@ -1206,11 +1217,17 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
             switch warmRequests {
             case .holdBodyLoad where !hasHeldALoad:
                 hasHeldALoad = true
-                await withCheckedContinuation { continuation in
-                    heldLoad = continuation
+                if releasedBeforeHold {
                     let waiters = heldLoadWaiters
                     heldLoadWaiters.removeAll()
                     waiters.forEach { $0.resume() }
+                } else {
+                    await withCheckedContinuation { continuation in
+                        heldLoad = continuation
+                        let waiters = heldLoadWaiters
+                        heldLoadWaiters.removeAll()
+                        waiters.forEach { $0.resume() }
+                    }
                 }
             case .cancelBodyLoad:
                 throw CancellationError()

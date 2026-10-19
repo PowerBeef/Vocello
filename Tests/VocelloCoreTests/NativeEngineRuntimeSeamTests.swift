@@ -277,11 +277,15 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         let holder = await startHoldingHardTrim(fixture)
         let whileHeld = fixture.log.entries
 
-        let cancelled = Task {
-            withUnsafeCurrentTask { $0?.cancel() }
+        // Bounded: a trim that stopped honouring cancellation would wait on the held slot,
+        // and the test must fail rather than hang.
+        let trimReturned = expectation(description: "the cancelled trim returns without the slot")
+        Task {
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
             await runtime.trimMemory(level: .hardTrim, reason: "seam_cancelled_trim")
+            trimReturned.fulfill()
         }
-        await cancelled.value
+        await fulfillment(of: [trimReturned], timeout: 10)
         XCTAssertEqual(fixture.log.entries, whileHeld, "a cancelled trim must not run its body")
 
         let warm = await startContendingWarm(fixture)

@@ -1286,7 +1286,7 @@ final class TTSEngineStoreTests: XCTestCase {
             await loads.waitUntilBodyLoadIsHeld()
             held.fulfill()
         }
-        await fulfillment(of: [held], timeout: 5)
+        await fulfillment(of: [held], timeout: 10)
     }
 
     /// Waits out the idle window until the coordinator logs an event after

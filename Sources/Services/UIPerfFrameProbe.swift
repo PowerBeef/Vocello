@@ -109,7 +109,7 @@ final class UIPerfFrameProbe: NSObject {
     /// Mode, thermal state). No host names, paths or hardware identifiers.
     private func appendEnvironmentSnapshot() {
         var loadValues = [Double](repeating: 0, count: 3)
-        let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
+        let loadCount = loadValues.withMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
             return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }

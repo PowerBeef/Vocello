@@ -53,7 +53,7 @@ import Synchronization
 
     @discardableResult
     public func write(_ samples: [Float]) -> Int {
-        samples.withUnsafeBufferPointer { buffer in
+        samples.captureBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return 0 }
             return unsafe write(base, count: buffer.count)
         }
@@ -74,7 +74,7 @@ import Synchronization
         let count = head - tail
         guard count > 0 else { return [] }
         var output = [Float](repeating: 0, count: count)
-        output.withUnsafeMutableBufferPointer { destination in
+        output.captureMutableBufferPointer { destination in
             let offset = tail % capacity
             let firstRun = min(count, capacity - offset)
             unsafe destination.baseAddress!.update(from: storage.baseAddress! + offset, count: firstRun)
@@ -101,7 +101,7 @@ public enum VocelloPlaybackCaptureWAV {
         var header = Data()
         func append<T: FixedWidthInteger>(_ value: T) {
             var little = value.littleEndian
-            withUnsafeBytes(of: &little) { unsafe header.append(contentsOf: $0) }
+            captureValueBytes(of: &little) { unsafe header.append(contentsOf: $0) }
         }
         header.append(contentsOf: Array("RIFF".utf8))
         append(UInt32(36 + pcm.count))
@@ -218,4 +218,40 @@ public struct VocelloPlaybackCaptureClock: Sendable {
         let delta = Double(Int64(bitPattern: hostTime &- referenceHostTime)) * nanosecondsPerHostTick
         return referenceEpochMS + delta / 1_000_000
     }
+}
+
+// The UI bundles do not link QwenVoiceCore, so this file keeps its own copies of its
+// ToolchainNeutralUnsafeAccess forwards (DW-04), under names that cannot collide with them where
+// VocelloCoreTests compiles both.
+extension Array {
+    @safe fileprivate func captureBufferPointer<Result>(
+        _ body: (UnsafeBufferPointer<Element>) throws -> Result
+    ) rethrows -> Result {
+#if compiler(>=6.4)
+        try withUnsafeBufferPointer(body)
+#else
+        unsafe try withUnsafeBufferPointer(body)
+#endif
+    }
+
+    @safe fileprivate mutating func captureMutableBufferPointer<Result>(
+        _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> Result
+    ) rethrows -> Result {
+#if compiler(>=6.4)
+        try withUnsafeMutableBufferPointer(body)
+#else
+        unsafe try withUnsafeMutableBufferPointer(body)
+#endif
+    }
+}
+
+@safe private func captureValueBytes<T, Result>(
+    of value: inout T,
+    _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result {
+#if compiler(>=6.4)
+    try withUnsafeBytes(of: &value, body)
+#else
+    unsafe try withUnsafeBytes(of: &value, body)
+#endif
 }

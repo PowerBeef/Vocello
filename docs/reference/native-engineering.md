@@ -199,7 +199,11 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - Trusting the local Xcode 27 compile for what CI's pinned Xcode 26.6 accepts: 26.6 flags a
   `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), and
   its region-isolation checker rejects a throwing `Task { … }` returning a value (return
-  `(any Error)?` from a non-throwing task, as the runtime tests do).
+  `(any Error)?` from a non-throwing task, as the runtime tests do). Under strict memory safety, Swift
+  6.4 annotates `Array.withUnsafeBufferPointer`, `withUnsafeMutableBufferPointer` and
+  `withUnsafeBytes(of:)` `@safe` while 26.6's Swift 6.3 does not, so a marker one needs the other
+  rejects: call `withBufferPointer`, `withMutableBufferPointer` and `withValueBytes(of:)`
+  (`Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift`) until CI moves to Xcode 27.
 - AppKit/SwiftUI traps: an `NSScrollView` representable without `sizeThatFits` (it must answer an
   infinite proposal); two same-named files in one target (they collide on `.stringsdata`, which is why
   the macOS `AppPaths.swift`/`AppDefaults` cannot join `VocelloCoreTests`, which compiles the iOS copy);

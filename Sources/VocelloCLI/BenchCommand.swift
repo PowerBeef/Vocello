@@ -890,7 +890,7 @@ enum BenchCommand {
 
     private static func captureEnvironment() -> BenchTakeEnvironment {
         var loads = [Double](repeating: 0, count: 3)
-        let loadCount = loads.withUnsafeMutableBufferPointer { buffer -> Int in
+        let loadCount = loads.withMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
             return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }

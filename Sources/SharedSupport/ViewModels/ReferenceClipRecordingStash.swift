@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import QwenVoiceCore
 
 /// The running app process a folder of reference recordings belongs to
 /// (MAC-25). The Mac app is unsandboxed, so every copy of it (a development
@@ -83,7 +84,7 @@ struct ReferenceClipRecordingOwner: Hashable, Sendable {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
         var info = unsafe kinfo_proc()
         var size = unsafe MemoryLayout<kinfo_proc>.stride
-        let status = mib.withUnsafeMutableBufferPointer { mib in
+        let status = mib.withMutableBufferPointer { mib in
             unsafe sysctl(mib.baseAddress, u_int(mib.count), &info, &size, nil, 0)
         }
         guard status == 0 else { return .unknown }

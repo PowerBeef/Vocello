@@ -334,8 +334,8 @@ final class CLIExecutionTests: XCTestCase {
         let code = await CLIProcessSupervisor.run(signals: [number]) {
             var current = sigaction()
             unsafe sigaction(number, nil, &current)
-            let handler = withUnsafeBytes(of: current.__sigaction_u) { unsafe $0.load(as: UInt.self) }
-            let ignore = withUnsafeBytes(of: SIG_IGN) { unsafe $0.load(as: UInt.self) }
+            let handler = withValueBytes(of: current.__sigaction_u) { unsafe $0.load(as: UInt.self) }
+            let ignore = withValueBytes(of: SIG_IGN) { unsafe $0.load(as: UInt.self) }
             let armed = handler == ignore
             observed.append(armed ? "armed" : "unarmed")
             guard armed else { return 1 }

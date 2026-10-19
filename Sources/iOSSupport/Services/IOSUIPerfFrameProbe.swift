@@ -207,7 +207,7 @@ final class IOSUIPerfFrameProbe: NSObject {
     /// inert to the cadence measurement.
     private func appendEnvironmentSnapshot() {
         var loadValues = [Double](repeating: 0, count: 3)
-        let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
+        let loadCount = loadValues.withMutableBufferPointer { buffer -> Int in
             guard let baseAddress = buffer.baseAddress else { return 0 }
             return unsafe Int(getloadavg(baseAddress, Int32(buffer.count)))
         }

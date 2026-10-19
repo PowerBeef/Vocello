@@ -215,7 +215,7 @@ struct WAVDataLayout {
         for value in samples {
             let scaled = value.isNaN ? 0 : (value * Self.pcm16Scale).rounded()
             let quantized = Int16(max(-32768.0, min(32767.0, scaled)))
-            withUnsafeBytes(of: quantized.littleEndian) { unsafe raw.append(contentsOf: $0) }
+            withValueBytes(of: quantized.littleEndian) { unsafe raw.append(contentsOf: $0) }
         }
         let handle = try FileHandle(forUpdating: url)
         defer { try? handle.close() }

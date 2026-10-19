@@ -290,8 +290,8 @@ import Foundation
         let count = samples.count
         guard count > 0 else { return }
         var input = [Double](repeating: 0, count: count)
-        samples.withUnsafeBufferPointer { source in
-            input.withUnsafeMutableBufferPointer { destination in
+        samples.withBufferPointer { source in
+            input.withMutableBufferPointer { destination in
                 var index = 0
                 while index < count {
                     let value = unsafe source[index]
@@ -300,7 +300,7 @@ import Foundation
                 }
             }
         }
-        input.withUnsafeBufferPointer { block in
+        input.withBufferPointer { block in
             unsafe observeMagnitudes(block)
             unsafe observeLoudness(block)
             unsafe observeTruePeak(block)
@@ -316,7 +316,7 @@ import Foundation
         let steps = Double(Constants.wadaMagnitudeGridSteps)
         let cap = Constants.wadaMagnitudeGridSteps
         var peak = samplePeak
-        magnitudeHistogram.withUnsafeMutableBufferPointer { histogram in
+        magnitudeHistogram.withMutableBufferPointer { histogram in
             var index = 0
             while index < block.count {
                 let magnitude = unsafe abs(block[index])
@@ -334,15 +334,15 @@ import Foundation
     private func observeLoudness(_ block: UnsafeBufferPointer<Double>) {
         guard let setup = unsafe biquadSetup, subBlockLength > 0, let base = block.baseAddress else { return }
         var weighted = [Double](repeating: 0, count: block.count)
-        weighted.withUnsafeMutableBufferPointer { output in
-            biquadDelay.withUnsafeMutableBufferPointer { delay in
+        weighted.withMutableBufferPointer { output in
+            biquadDelay.withMutableBufferPointer { delay in
                 unsafe vDSP_biquadD(setup, delay.baseAddress!, base, 1, output.baseAddress!, 1, vDSP_Length(block.count))
             }
         }
         var sum = subBlockSum
         var fill = subBlockFill
         let length = subBlockLength
-        weighted.withUnsafeBufferPointer { output in
+        weighted.withBufferPointer { output in
             var index = 0
             while index < output.count {
                 let value = unsafe output[index]
@@ -367,10 +367,10 @@ import Foundation
         unsafe extended.append(contentsOf: block)
         var output = [Double](repeating: 0, count: count)
         var maximum = truePeakMaximum
-        extended.withUnsafeBufferPointer { signal in
-            output.withUnsafeMutableBufferPointer { result in
+        extended.withBufferPointer { signal in
+            output.withMutableBufferPointer { result in
                 for filter in truePeakFilters {
-                    filter.withUnsafeBufferPointer { taps in
+                    filter.withBufferPointer { taps in
                         unsafe vDSP_convD(
                             signal.baseAddress!, 1,
                             taps.baseAddress!, 1,
@@ -446,7 +446,7 @@ import Foundation
         unsafe pending.append(contentsOf: block)
         var start = 0
         while pending.count - start >= fftSize {
-            pending.withUnsafeBufferPointer { samples in
+            pending.withBufferPointer { samples in
                 unsafe analyzeFrame(samples.baseAddress! + start)
             }
             start += hop
@@ -461,8 +461,8 @@ import Foundation
         let size = fftSize
         let half = size / 2
         var squares = 0.0
-        windowed.withUnsafeMutableBufferPointer { output in
-            window.withUnsafeBufferPointer { taper in
+        windowed.withMutableBufferPointer { output in
+            window.withBufferPointer { taper in
                 var index = 0
                 while index < size {
                     let value = unsafe frame[index] * taper[index]
@@ -477,9 +477,9 @@ import Foundation
 
         // Forward real FFT; vDSP returns twice the DFT and packs the Nyquist
         // term into the imaginary part of bin 0.
-        windowed.withUnsafeBufferPointer { input in
-            realParts.withUnsafeMutableBufferPointer { real in
-                imaginaryParts.withUnsafeMutableBufferPointer { imaginary in
+        windowed.withBufferPointer { input in
+            realParts.withMutableBufferPointer { real in
+                imaginaryParts.withMutableBufferPointer { imaginary in
                     var index = 0
                     while index < half {
                         unsafe real[index] = unsafe input[2 * index]
@@ -488,7 +488,7 @@ import Foundation
                     }
                     var split = unsafe DSPDoubleSplitComplex(realp: real.baseAddress!, imagp: imaginary.baseAddress!)
                     unsafe vDSP_fft_zripD(setup, &split, 1, log2FFTSize, FFTDirection(kFFTDirection_Forward))
-                    power.withUnsafeMutableBufferPointer { spectrum in
+                    power.withMutableBufferPointer { spectrum in
                         let dc = unsafe real[0] * 0.5
                         let nyquist = unsafe imaginary[0] * 0.5
                         unsafe spectrum[0] = dc * dc / energy
@@ -507,8 +507,8 @@ import Foundation
 
         observeFlux(frameIndex: stftFrameIndex)
         if meanSquare >= Constants.activeMeanSquare {
-            power.withUnsafeBufferPointer { spectrum in
-                ltas.withUnsafeMutableBufferPointer { average in
+            power.withBufferPointer { spectrum in
+                ltas.withMutableBufferPointer { average in
                     var bin = 0
                     while bin <= half {
                         unsafe average[bin] += spectrum[bin]
@@ -525,8 +525,8 @@ import Foundation
     private func observeFlux(frameIndex: Int) {
         let bins = logInput.count
         guard bins > 0 else { return }
-        power.withUnsafeBufferPointer { spectrum in
-            logInput.withUnsafeMutableBufferPointer { input in
+        power.withBufferPointer { spectrum in
+            logInput.withMutableBufferPointer { input in
                 var index = 0
                 while index < bins {
                     unsafe input[index] = unsafe max(spectrum[index + 1], Constants.spectralPowerFloor)
@@ -535,15 +535,15 @@ import Foundation
             }
         }
         var count = Int32(bins)
-        logInput.withUnsafeBufferPointer { input in
-            logOutput.withUnsafeMutableBufferPointer { output in
+        logInput.withBufferPointer { input in
+            logOutput.withMutableBufferPointer { output in
                 unsafe vvlog10(output.baseAddress!, input.baseAddress!, &count)
             }
         }
         var rise = 0.0
         let hadPrevious = hasPreviousLog
-        logOutput.withUnsafeBufferPointer { current in
-            previousLog.withUnsafeMutableBufferPointer { previous in
+        logOutput.withBufferPointer { current in
+            previousLog.withMutableBufferPointer { previous in
                 var index = 0
                 while index < bins {
                     let difference = unsafe current[index] - previous[index]
@@ -567,9 +567,9 @@ import Foundation
 
     private func observeFeatures(meanSquare: Double) {
         let bands = bandAccumulator.count
-        power.withUnsafeBufferPointer { spectrum in
-            bandEdges.withUnsafeBufferPointer { edges in
-                bandAccumulator.withUnsafeMutableBufferPointer { accumulator in
+        power.withBufferPointer { spectrum in
+            bandEdges.withBufferPointer { edges in
+                bandAccumulator.withMutableBufferPointer { accumulator in
                     var band = 0
                     while band < bands {
                         var sum = 0.0
@@ -828,10 +828,10 @@ import Foundation
             var dots = [Double](repeating: 0, count: pooled)
             for lag in Constants.repetitionMinimumLagFrames ... upper {
                 let span = pooled - lag
-                dots.withUnsafeMutableBufferPointer { sums in
+                dots.withMutableBufferPointer { sums in
                     unsafe vDSP_vclrD(sums.baseAddress!, 1, vDSP_Length(span))
                     for band in 0 ..< bands {
-                        featuresByBand[band].withUnsafeBufferPointer { feature in
+                        featuresByBand[band].withBufferPointer { feature in
                             unsafe vDSP_vmaD(
                                 feature.baseAddress!, 1,
                                 feature.baseAddress! + lag, 1,
@@ -842,9 +842,9 @@ import Foundation
                         }
                     }
                 }
-                featureActive.withUnsafeBufferPointer { active in
-                    dots.withUnsafeBufferPointer { sums in
-                        changingPrefix.withUnsafeBufferPointer { prefix in
+                featureActive.withBufferPointer { active in
+                    dots.withBufferPointer { sums in
+                        changingPrefix.withBufferPointer { prefix in
                             var start = -1
                             var frame = 0
                             while frame <= span {

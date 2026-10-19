@@ -147,7 +147,7 @@ public enum WAVProvenanceChunk {
     }
 
     private static func appendUInt32LE(_ value: UInt32, to data: inout Data) {
-        withUnsafeBytes(of: value.littleEndian) { unsafe data.append(contentsOf: $0) }
+        withValueBytes(of: value.littleEndian) { unsafe data.append(contentsOf: $0) }
     }
 
     private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {

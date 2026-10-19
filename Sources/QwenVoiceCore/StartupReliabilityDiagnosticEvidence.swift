@@ -452,7 +452,7 @@ public enum StartupReliabilityDiagnosticEvidence {
 
     private static func append<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
         var littleEndian = value.littleEndian
-        withUnsafeBytes(of: &littleEndian) { unsafe data.append(contentsOf: $0) }
+        withValueBytes(of: &littleEndian) { unsafe data.append(contentsOf: $0) }
     }
 
     private static func sha256(_ data: Data) -> String {

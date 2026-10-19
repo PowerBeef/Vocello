@@ -1345,7 +1345,7 @@ private enum SharedComponentIdentityValidation {
         for field in [domain] + fields {
             let data = Data(field.utf8)
             var length = UInt64(data.count).bigEndian
-            withUnsafeBytes(of: &length) { unsafe hasher.update(bufferPointer: $0) }
+            withValueBytes(of: &length) { unsafe hasher.update(bufferPointer: $0) }
             hasher.update(data: data)
         }
         return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()

@@ -618,7 +618,7 @@ private enum PCM16WAVWriter {
         }
 
         buffer.frameLength = frameCount
-        pcmSamples.withUnsafeBufferPointer { pointer in
+        pcmSamples.withBufferPointer { pointer in
             unsafe channelData.update(from: pointer.baseAddress!, count: pcmSamples.count)
         }
         return buffer
@@ -808,7 +808,7 @@ enum AtomicPCM16WAVWriter {
         let handle = try FileHandle(forWritingTo: url)
         do {
             try handle.write(contentsOf: header)
-            let pcmData = pcmSamples.withUnsafeBufferPointer { pointer -> Data in
+            let pcmData = pcmSamples.withBufferPointer { pointer -> Data in
                 guard let baseAddress = pointer.baseAddress else { return Data() }
                 return unsafe Data(
                     bytes: UnsafeRawPointer(baseAddress),
@@ -899,7 +899,7 @@ final class PCM16ScratchBuffer: @unchecked Sendable {
     }
 
     func pcm16LittleEndianData(from pcmSamples: [Int16]) -> Data {
-        pcmSamples.withUnsafeBufferPointer { pointer in
+        pcmSamples.withBufferPointer { pointer in
             guard let baseAddress = pointer.baseAddress else { return Data() }
             return unsafe Data(
                 bytes: UnsafeRawPointer(baseAddress),
@@ -1174,7 +1174,7 @@ struct PCM16StreamLimiter: Sendable {
         var localLastSlewLimited = lastSlewLimitedSample
         var localEnvelope = clickEnvelope
 
-        samples.withUnsafeBufferPointer { buffer in
+        samples.withBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return }
             let count = buffer.count
             for index in 0 ..< count {

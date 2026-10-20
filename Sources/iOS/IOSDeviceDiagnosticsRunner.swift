@@ -1079,7 +1079,7 @@ enum IOSDeviceDiagnosticsRunner {
                     intendedWarmState: actualWarmState
                 )
                 let generationID = UUID()
-                let outputFileName = String(
+                let outputFileName = unsafe String(
                     format: "take-%02d-%@.wav",
                     plan.takeIndex,
                     plan.expectedConditioningMode
@@ -1871,7 +1871,7 @@ enum IOSDeviceDiagnosticsRunner {
 
     private static func sha256Hex(forText text: String) -> String {
         SHA256.hash(data: Data(text.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
     }
 
@@ -2485,19 +2485,19 @@ enum IOSDeviceDiagnosticsRunner {
         var hasher = SHA256()
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
+            let count = unsafe stream.read(&buffer, maxLength: buffer.count)
             if count < 0 {
                 throw stream.streamError ?? DiagnosticsError("reference file read failed")
             }
             if count == 0 { break }
             hasher.update(data: Data(buffer[..<count]))
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     private static func sha256Text(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8))
-            .map { String(format: "%02x", $0) }
+            .map { unsafe String(format: "%02x", $0) }
             .joined()
     }
 

@@ -1,20 +1,32 @@
 ---
 status: historical
 owner: ios
-summary: Standing record of iPhone engine bring-up and optimization — measured memory/latency work, shipped changes, Jetsam posture, and the prioritized future items.
+reviewed: 2026-10-20
+summary: Historical record (June–August 2026, iOS 26) of the iPhone engine's bring-up and optimization — the in-process move, the Jetsam and memory posture, streaming-first, the canonical July record and the disposed levers — with its iOS 27 memory limit and RTF labels corrected; current numbers live in the engine audit and benchmarks/HISTORY.md.
 sourceOfTruth:
   - config/runtime-debug-knobs.json
   - config/memory-qualification-policy.json
+  - config/ios-memory-budget-policy.json
+  - Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift
 ---
 # iOS Engine Optimization — Progress & Roadmap
 
-> **Historical figures (2026-10-17).** The memory numbers below predate iOS 27. On the iPhone 17 Pro
-> (12 GB) under iOS 27.0.1 the per-app limit measured in the October 14 and 16 smoke diagnostics is
-> 8,192 MB, not ~6 GB, while the shipping memory bands still assume the older figure (engine audit
-> D-06, programme item ER-07). Current measured budgets are in section D of the
-> [engine audit](../audits/2026-10-16-engine-runtime-audit.md). An "RTF" above 1 in this record is a
-> decode-loop speedup (audio seconds per wall second), not the standard real-time factor (wall ÷ audio,
-> lower is faster).
+> **Historical record.** This document records the iPhone engine work of June to August 2026 under
+> iOS 26 and is no longer maintained as current guidance. Two corrections apply throughout
+> (reviewed 2026-10-20):
+>
+> - **Memory limit.** "~6 GB" was the iOS 26 entitled limit on the iPhone 17 Pro (12 GB). Under
+>   iOS 27.0.1 the October 14 and 16 smoke diagnostics measured **8,192 MB**, while the shipping
+>   memory bands still assume the older figure (engine audit D-06, programme item ER-07). The
+>   limit on 8 GB phones under iOS 27 is unmeasured.
+> - **"RTF" here is a decode speedup.** Every "RTF" above 1 in this record is the decode-loop speedup
+>   (audio seconds per wall second, `decodeSpeedupX`, higher is faster), not the standard real-time
+>   factor (wall ÷ audio, lower is faster), and the two never share a comparison key.
+>
+> Current measured budgets (iOS 27.0.1, mlx-swift 0.32.3) are in section D of the
+> [engine audit](../audits/2026-10-16-engine-runtime-audit.md); current records are in
+> [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md); MLX memory semantics are
+> [`mlx-guide.md`](mlx-guide.md) §5.
 
 The standing record of how Vocello's **iPhone** TTS engine was made to run on-device, what has
 been measured/optimized/shipped, and the prioritized future work. The iOS engine is a distinct
@@ -44,13 +56,14 @@ this doc.** All claims below are cited to a file or commit; re-verify before rel
   see §1). iPhone runs the 4-bit Speed variant only; 8-bit Quality is macOS-only by contract.
 - **Faster than realtime with bounded memory.** The clean 29-take schema-v2 record
   [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json)
-  measured per-cell median RTF **1.70–1.89** and peak physical footprint **2.56–3.52 GB**. Every
-  take recorded the allowed `memory.pressure.soft_trim` warning, with no memory warning or exit (§6).
+  measured a per-cell median decode speedup (recorded as "RTF") of **1.70–1.89** and peak physical
+  footprint **2.56–3.52 GB**. Every take recorded the allowed `memory.pressure.soft_trim` warning,
+  with no memory warning or exit (§6).
 - **Streaming-first is the headline RAM win.** The canonical path stays in the ~2.6–3.6 GB band
   vs ~7–8.7 GB for the legacy non-streaming bench path (`--no-stream`) — iOS never incurs the accumulation (§3).
 - **Entitlement enabled, self-serve.** `increased-memory-limit` is on the app App ID; measured
-  entitled per-app limit ≈ **~6 GB** on the 17 Pro, ~5–5.5 GB on 8 GB devices. No hard
-  `Memory.memoryLimit` on any tier (§2).
+  entitled per-app limit under iOS 26 ≈ **~6 GB** on the 17 Pro (iOS 27.0.1: 8,192 MB, D-06),
+  estimated ~5–5.5 GB on 8 GB devices. No hard `Memory.memoryLimit` on any tier (§2).
 - **Remaining work (§9):** an 8 GB-device proof (only the 17 Pro is measured) and the public App
   Store submission (credentials and a public TestFlight beta are in place). (The 0.6B variant evaluation was
   **ruled out 2026-07-02** — see §9 P2.)
@@ -89,10 +102,10 @@ community-estimated to ~75% — Apple publishes no exact number). The authoritat
 `os_proc_available_memory()` (bridged as `IOSMemorySnapshot.availableHeadroomBytes`); the entitled
 per-app limit is computed as `impliedProcessLimitBytes = physFootprint + availableHeadroom`.
 
-**Measured** (iPhone 17 Pro, 12 GB): entitled per-app limit ≈ **~6 GB**. 8 GB devices
-(15/16/17 non-Pro and Pro through 16 Pro Max) ≈ **~5–5.5 GB**. The latest clean canonical clone
-peak was 3.52 GB physical footprint (§6)
-fits every entitled device. The entitlement is **self-serve** (enable on the App ID, regenerate the
+**Measured under iOS 26** (iPhone 17 Pro, 12 GB): entitled per-app limit ≈ **~6 GB**. 8 GB devices
+(15/16/17 non-Pro and Pro through 16 Pro Max) ≈ **~5–5.5 GB**. **Under iOS 27.0.1** the same phone
+measured **8,192 MB** (engine audit D-06); 8 GB devices under iOS 27 are unmeasured. The clean
+canonical clone peak of the time, 3.52 GB physical footprint (§6), fit every entitled device. The entitlement is **self-serve** (enable on the App ID, regenerate the
 profile — no Apple grant) and is enabled on `com.patricedery.vocello`. Full detail + device-free
 verification: [`ios-increased-memory-entitlement-request.md`](ios-increased-memory-entitlement-request.md).
 
@@ -136,7 +149,9 @@ from **two independent criteria**, and the engine band is the worse of them:
 - **Footprint band** (`aggregateBand`): healthy < 4,500 MiB physFootprint, guarded ≥ 4,500 MiB,
   critical ≥ 5,200 MiB. (`pressureBand = maxBand(headroomBand, footprintBand)`.) Both bands'
   numbers are declared in `config/ios-memory-budget-policy.json`, which the benchmark publication
-  gate reads and a Swift test pins `IOSMemoryBudgetPolicy.iPhoneShippingDefault` to.
+  gate reads and a Swift test pins `IOSMemoryBudgetPolicy.iPhoneShippingDefault` to. The footprint
+  bands were sized for the ~6 GB iOS 26 limit; against iOS 27's measured 8,192 MB they trip at about
+  55% and 63% of the real limit (engine audit D-06, ER-07).
 
 > After the in-process migration these two bands measure the *single* app process (the second,
 > "engine extension" snapshot is gone — `72c95fc`). The footprint band is **not** dead: it is a
@@ -220,7 +235,8 @@ the current token cap (§9, OPTIMIZATION.md §F.2).
   gate that mis-fired; the runtime `os_proc_available_memory` read is authoritative.)
 - **No dedicated custom prewarm.** `customPrewarmPolicy: .skipDedicatedCustomPrewarm` — the prewarm
   cost moves into the first generation rather than a startup memory spike (matches the floor-8GB Mac
-  policy).
+  policy). The cost is measurable: the codec decoder is never warmed, so the first Custom take after
+  each launch pays about 0.21–0.23 s more (engine audit D-02).
 - **Proactive warm is band-gated only.** `TTSEngineStore.allowsProactiveWarmOperations` warms on the
   physical-device Release build when the memory band is healthy (the old blanket "disabled on Release"
   caution was removed once the entitlement + band guard were in place). Escape hatch:
@@ -236,9 +252,11 @@ the current token cap (§9, OPTIMIZATION.md §F.2).
 The owned Vocello Qwen3 Core runtime already implements the large majority of the standard
 iPhone-Qwen3-TTS optimization playbook (OPTIMIZATION.md "Grounding"): `small_to_mtp_projection`
 2048→1024 bridge, 2048-dim speaker embedding, interleaved MRoPE `[24,20,20]`, Q/K RMSNorm,
-`MLXFast.scaledDotProductAttention`, a single per-frame `eval()` (no per-step `.item()`), `asyncEval`
-streaming, the input-side decoder-drift fix (`4fab110`), per-tier `Memory.cacheLimit`, fp16 KV cache, and
-a `compile(shapeless:)` SwiGLU. Backend speed for 1.7B 4-bit on this stack is **bounded**, not freely
+`MLXFast.scaledDotProductAttention`, a single per-frame graph evaluation (a synchronous `eval()` at
+the time; production now submits each frame with `asyncEval` and makes the sampled-token read the
+step's one blocking read, `mlx-guide.md` §4.3), `asyncEval` streaming, the input-side decoder-drift
+fix (`4fab110`), per-tier `Memory.cacheLimit`, a KV cache in the bf16 compute dtype (this record
+first said fp16), and a `compile(shapeless:)` SwiGLU. Backend speed for 1.7B 4-bit on this stack is **bounded**, not freely
 improvable:
 
 - **GPU compute is ~61% of decode and fixed at this precision.** An os_signpost capture
@@ -247,7 +265,7 @@ improvable:
   4-bit on MLX 0.30.6. (OPTIMIZATION.md §F WS0b.)
 - **`compile()` the per-frame graph — tested and rejected.** Compiling the quantized talker MLP
   (`compile(inputs:…, shapeless: true)`) builds + runs correctly (audioQC pass) but **regressed warm
-  RTF ~5%** (eager 0.80 → compiled 0.76): declaring quantized params as `inputs:` marshals their packed
+  decode speedup ~5%** (eager 0.80 → compiled 0.76): declaring quantized params as `inputs:` marshals their packed
   state every call, costing more than the ~22% Swift build overhead it removes — and it scales *up*
   with region size. Do not pursue the fixed-shape-KV + compile rewrite. (OPTIMIZATION.md §F.)
 - **RoPE fusion (`MLXFast.RoPE`) is low-priority** — only a small slice of the build overhead, and the
@@ -272,7 +290,7 @@ takes · source `bcb5265a…` ·
 Warm rows below are per-cell medians across three takes; cold rows contain one take. Peak footprint is
 the maximum within the cell.
 
-| mode | state/length | median RTF | peak physFoot MB | max soft trims | audioQC |
+| mode | state/length | median decode speedup (recorded as RTF) | peak physFoot MB | max soft trims | audioQC |
 |---|---|---:|---:|---:|---|
 | custom | cold/medium | 1.701 | 2649 | 1 | pass |
 | custom | warm/short | 1.728 | 2564 | 1 | pass |
@@ -287,10 +305,10 @@ the maximum within the cell.
 | clone | warm/long | 1.842 | 3517 | 1 | pass |
 
 **Reading it:**
-- **Decode speedup > 1 in every canonical cell** (the figure this record called RTF; standard RTF < 1) — all three modes generated faster than realtime at this
-  pinned source. Clone was slower than Custom and Design, so “1.6–1.9 everywhere” was not accurate.
-- **Peak physical footprint was 2.56–3.52 GB** — under the ~6 GB implied entitled limit. Clone was
-  the heaviest because its encoders remain resident.
+- **Decode speedup > 1 in every canonical cell** (the figure this record called RTF) — the decode
+  loop of all three modes ran faster than realtime at this pinned source. Clone was slower than Custom and Design, so “1.6–1.9 everywhere” was not accurate.
+- **Peak physical footprint was 2.56–3.52 GB** — under the ~6 GB implied entitled limit of iOS 26.
+  Clone was the heaviest because its encoders remain resident.
 - **Every take performed one policy soft trim.** The run is therefore `passedWithWarnings`, not a
   zero-trim pass. It recorded no iOS memory warning, critical pressure, memory-limit exit, hard trim,
   or full unload. The run's worst thermal state was `fair`.
@@ -341,7 +359,8 @@ The blow-by-blow is in git history; per-run perf is in `benchmarks/HISTORY.md`.
 ## 9. Roadmap (prioritized)
 
 **P1 — 8 GB-device proof.** All on-device numbers are from the 12 GB iPhone 17 Pro. The 8 GB tier
-(entitled ≈ 5–5.5 GB) is where Clone (up to 3.52 GB in the current canonical record) + headroom is
+(entitled ≈ 5–5.5 GB under iOS 26; unmeasured under iOS 27) is where Clone (up to 3.52 GB in the
+July canonical record) + headroom is
 tightest. Run `ios_device.sh bench` Custom + Clone on a real 8 GB device and confirm RTF, bounded
 soft-trim behavior, no memory warning/exit or hard trim, and clone-gate-on. Until then, 8 GB
 viability is inferred from the bounded streaming evidence, not proven.
@@ -351,13 +370,13 @@ the full on-device matrix on the 17 Pro under the 8 GB tier's entitled budget �
 `scripts/ios_device.sh bench --memory-profile iphone15pro …` clamps the effective per-process limit to
 **5,000 MB** (the conservative bottom of the entitled band) inside `IOSMemorySnapshot.capture()`, so
 bands, admission, and the clone gate (5,000 ≥ 4,500 ⇒ stays ON) all behave as on the smaller device;
-rows self-stamp `notes.memoryProfile`. **Measured 2026-06-09 (iPhone 17 Pro, post-§H engine):
-custom/long RTF 1.89, physFoot 2,723 MB (margin 2,277 MB); clone RTF 1.62, physFoot 3,332 MB
+rows self-stamp `notes.memoryProfile`. **Measured 2026-06-09 (iPhone 17 Pro, post-§H engine;
+"RTF" = decode speedup): custom/long RTF 1.89, physFoot 2,723 MB (margin 2,277 MB); clone RTF 1.62, physFoot 3,332 MB
 (margin 1,668 MB); 0 trims, QC pass, clone gate ON (proven by execution) — profiled PASS on the
 memory dimension.** **The profile changes the memory budget only.** It cannot emulate compute:
 A17 Pro sustained GPU ≈ **0.60×** A19 Pro (band 0.55–0.65; LPDDR5 ~60 vs
-~68 GB/s; A17 throttles harder). The resulting **historical analytic 15 Pro projection was
-RTF ≈ 0.9–1.2** — brushing realtime, which is exactly why the real-device gate above
+~68 GB/s; A17 throttles harder). The resulting **historical analytic 15 Pro projection was a
+decode speedup ≈ 0.9–1.2** — brushing realtime, which is exactly why the real-device gate above
 stays open (streaming playback tolerance to sub-realtime decode is the question only hardware
 answers). A memory-profile row is labeled diagnostic evidence, never different-device proof.
 
@@ -376,11 +395,10 @@ without a new maintainer decision.
 **P3 — mlx-swift 0.31.6 / mlx-swift-lm 3.31.4 bump: done (2026-08-01).** Both pin sites
 (`project.yml` *and* owned `Packages/VocelloQwen3Core/Package.swift`) moved in lockstep and were kept
 after a same-day fixed-seed A/B on the canonical M2 floor: warm RTF within noise and identical QC
-verdict distributions (OPTIMIZATION.md §Q). A later bump follows the same procedure
-(OPTIMIZATION.md §E, `docs/reference/native-engineering.md` "SPM pins move in lockstep"): explicit maintainer
-authorization → lockstep pin bump → `regenerate_project.sh` → foundation builds → fixed-seed
-`vocello bench` vs the committed baseline + applicable automated language/prosody gates → keep only
-if RTF/quality/QC are unchanged.
+verdict distributions (OPTIMIZATION.md §Q). The next move, to mlx-swift 0.32.3 / mlx-swift-lm
+3.32.3 with swift-transformers 1.3.5 and swift-huggingface 1.0.0 (CONV-21, 2026-10-16), was kept on
+Mac evidence; its iPhone checks wait for the next device window. The current procedure is
+[`mlx-guide.md` §9.3](mlx-guide.md#93-upgrade-procedure).
 
 **P3 — thermal-state monitoring + proactive-warm gate: implemented.**
 `TTSEngineStore.startThermalObservation` observes `ProcessInfo.thermalState`; serious/critical state
@@ -391,7 +409,7 @@ out because Voice Design needs 1.7B.
 
 **Research question — Quality (8-bit) on a 12 GB iPhone.** Currently iPhone is Speed-4bit-only by
 contract (`platforms: ["iOS","macOS"]` for Speed, `["macOS"]` for Quality). The 17 Pro's ~6 GB
-entitled limit *might* fit 8-bit under the streaming path (the non-streaming ~5.7 GB+ figure is the
+entitled limit of the time (8,192 MB under iOS 27) *might* fit 8-bit under the streaming path (the non-streaming ~5.7 GB+ figure is the
 wrong yardstick, §3), but this is unproven and device-fragmenting (8 GB devices can't). Treat as a
 research spike behind the 8 GB proof + a streaming-path 8-bit footprint measurement, not a commitment.
 

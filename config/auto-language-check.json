@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "macOS Studio Auto-language check: each take leaves the language chip on Auto, generates, and proves the detected language reached the engine's request receipt. Corpus takes reuse the privacy-safe control-audit sentences; the edge sentences below are authored, privacy-safe text. scripts/auto_language_check.py prepare builds the run plan from this file and validate checks the engine rows against it.",
+  "description": "macOS Studio language check: each Auto take leaves the language chip on Auto, generates, and proves the detected language reached the engine's request receipt; each take with an explicit selection chooses that language first and proves the engine speaks it, even over a script the recognizer names as another language. Corpus takes reuse the privacy-safe control-audit sentences; the edge sentences below are authored, privacy-safe text (an edge take's optional textLanguage names the language the recognizer should see; unsupported text omits it). scripts/auto_language_check.py prepare builds the run plan from this file and validate checks the engine rows against it.",
   "corpus": "config/ios-control-audit-corpus.json",
   "takes": [
     {"takeID": "custom-english", "mode": "custom", "script": {"corpus": "english", "length": "short"}, "expectedChip": "english", "expectedEngine": "english"},
@@ -15,10 +15,15 @@
     {"takeID": "custom-portuguese", "mode": "custom", "script": {"corpus": "portuguese", "length": "short"}, "expectedChip": "portuguese", "expectedEngine": "portuguese"},
     {"takeID": "custom-mixed", "mode": "custom", "script": {"text": "The capital of Japan is 東京, a city of many trains."}, "expectedChip": "english", "expectedEngine": "english"},
     {"takeID": "custom-undetected", "mode": "custom", "script": {"text": "De ochtendtrein verliet het rustige station op tijd."}, "expectedChip": "auto", "expectedEngine": "english", "knownMismatch": "D6", "requireAudioPass": false},
+    {"takeID": "custom-explicit-french-over-english", "mode": "custom", "selection": "french", "script": {"corpus": "english", "length": "long"}, "expectedChip": "french", "expectedEngine": "french", "requireAudioPass": false},
+    {"takeID": "custom-explicit-japanese", "mode": "custom", "selection": "japanese", "script": {"corpus": "japanese", "length": "long"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
+    {"takeID": "custom-explicit-english-over-dutch", "mode": "custom", "selection": "english", "script": {"text": "Wij fietsen elke zondag samen naar het strand."}, "expectedChip": "english", "expectedEngine": "english", "requireAudioPass": false},
     {"takeID": "design-french", "mode": "design", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"},
     {"takeID": "design-japanese", "mode": "design", "script": {"corpus": "japanese", "length": "short"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
     {"takeID": "design-undetected", "mode": "design", "script": {"text": "Het oude huis aan de gracht werd vorig jaar verbouwd."}, "expectedChip": "auto", "expectedEngine": "auto", "requireAudioPass": false},
+    {"takeID": "design-explicit-spanish-over-french", "mode": "design", "selection": "spanish", "script": {"corpus": "french", "length": "long"}, "expectedChip": "spanish", "expectedEngine": "spanish", "requireAudioPass": false},
     {"takeID": "clone-japanese", "mode": "clone", "script": {"corpus": "japanese", "length": "short"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
-    {"takeID": "clone-french", "mode": "clone", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"}
+    {"takeID": "clone-french", "mode": "clone", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"},
+    {"takeID": "clone-explicit-english-over-japanese", "mode": "clone", "selection": "english", "script": {"corpus": "japanese", "length": "long"}, "expectedChip": "english", "expectedEngine": "english", "requireAudioPass": false}
   ]
 }

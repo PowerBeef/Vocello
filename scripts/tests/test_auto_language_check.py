@@ -22,10 +22,23 @@ SPEC.loader.exec_module(MODULE)
 TRACKED_SPEC = ROOT / "config" / "auto-language-check.json"
 CORPUS = json.loads((ROOT / "config" / "ios-control-audit-corpus.json").read_text(encoding="utf-8"))["scripts"]
 TEN = ("english", "chinese", "french", "japanese", "german", "korean", "spanish", "russian", "italian", "portuguese")
+EXPLICIT = {
+    # takeID: (selection, menu title, witnessLanguage, witness level, requireAudioPass)
+    "custom-explicit-french-over-english": ("french", "French", "english", "required", False),
+    "custom-explicit-japanese": ("japanese", "Japanese", "japanese", "advisory", True),
+    "custom-explicit-english-over-dutch": ("english", "English", None, "absent", False),
+    "design-explicit-spanish-over-french": ("spanish", "Spanish", "french", "required", False),
+    "clone-explicit-english-over-japanese": ("english", "English", "japanese", "advisory", False),
+}
+# Explicit takes whose script the recognizer names as another language than the selection.
+OVERRIDES = {take_id for take_id, (selection, _, witness, _, _) in EXPLICIT.items()
+             if witness is not None and witness != selection}
 TAKE_IDS = [
     *(f"custom-{language}" for language in TEN),
-    "custom-mixed", "custom-undetected", "design-french", "design-japanese", "design-undetected",
-    "clone-japanese", "clone-french",
+    "custom-mixed", "custom-undetected",
+    "custom-explicit-french-over-english", "custom-explicit-japanese", "custom-explicit-english-over-dutch",
+    "design-french", "design-japanese", "design-undetected", "design-explicit-spanish-over-french",
+    "clone-japanese", "clone-french", "clone-explicit-english-over-japanese",
 ]
 RUN_ID = "auto-language-20261020-000000"
 MODELS = {"custom": "pro_custom_speed", "design": "pro_design_speed", "clone": "pro_clone_speed"}
@@ -55,21 +68,32 @@ class AutoLanguagePlanTests(unittest.TestCase):
         plan = MODULE.build_plan(TRACKED_SPEC)
         self.assertEqual(plan["source"], "config/auto-language-check.json")
         self.assertEqual([take["takeID"] for take in plan["takes"]], TAKE_IDS)
+        self.assertEqual(len(plan["takes"]), 22)
         custom_corpus = {take["expectedChip"] for take in plan["takes"]
-                         if take["mode"] == "custom" and take["scriptKey"].startswith("corpus:")}
+                         if take["mode"] == "custom" and take["scriptKey"].startswith("corpus:")
+                         and take["selection"] == "auto"}
         self.assertEqual(custom_corpus, set(TEN))
         takes = {take["takeID"]: take for take in plan["takes"]}
         for take in plan["takes"]:
             with self.subTest(take=take["takeID"]):
                 self.assertEqual(set(take), MODULE.PLAN_TAKE_KEYS)
                 self.assertEqual(take["scriptDigest"], hashlib.sha256(take["script"].encode("utf-8")).hexdigest())
+                explicit = take["takeID"] in EXPLICIT
                 if take["scriptKey"].startswith("corpus:"):
                     language, length = take["scriptKey"][len("corpus:"):].split("/")
-                    self.assertEqual((language, length), (take["expectedChip"], "short"))
+                    if explicit:
+                        self.assertEqual((language, length), (take["witnessLanguage"], "long"))
+                    else:
+                        self.assertEqual((language, length), (take["expectedChip"], "short"))
                     self.assertEqual(take["script"], CORPUS[language][length])
                 else:
                     self.assertEqual(take["scriptKey"], "edge:" + take["takeID"])
                 self.assertIsInstance(take["requireAudioPass"], bool)
+                if not explicit:
+                    self.assertEqual(take["selection"], "auto")
+                    self.assertIsNone(take["selectionTitle"])
+                    self.assertEqual(take["witnessLanguage"],
+                                     None if take["witness"] == "absent" else take["expectedChip"])
         self.assertEqual(takes["custom-french"]["expectedChipValue"], "French, Auto")
         self.assertEqual(takes["custom-french"]["expectedRecommendedTitle"], "French — Detected")
         self.assertEqual(takes["clone-japanese"]["expectedRecommendedTitle"], "Japanese — Detected")
@@ -90,6 +114,23 @@ class AutoLanguagePlanTests(unittest.TestCase):
         self.assertEqual(witnesses["custom-mixed"], "advisory")
         self.assertEqual(witnesses["design-french"], "required")
         self.assertEqual(witnesses["clone-japanese"], "advisory")
+        # Explicit takes: the chip shows the plain name, the menu recommends nothing, and the
+        # witness is the language the script is written in, not the selection.
+        for take_id, (selection, title, witness_language, level, require_audio) in EXPLICIT.items():
+            with self.subTest(explicit=take_id):
+                take = takes[take_id]
+                self.assertEqual(take["selection"], selection)
+                self.assertEqual(take["selectionTitle"], title)
+                self.assertEqual((take["expectedChip"], take["expectedEngine"]), (selection, selection))
+                self.assertEqual(take["expectedChipValue"], title)
+                self.assertNotIn("Auto", take["expectedChipValue"])
+                self.assertIsNone(take["expectedRecommendedTitle"])
+                self.assertEqual(take["witnessLanguage"], witness_language)
+                self.assertEqual(take["witness"], level)
+                self.assertEqual(take["requireAudioPass"], require_audio)
+                self.assertIsNone(take["knownMismatch"])
+        self.assertEqual(takes["custom-explicit-english-over-dutch"]["script"],
+                         "Wij fietsen elke zondag samen naar het strand.")
         # The digest covers everything but itself and is stable across builds.
         self.assertEqual(plan["planDigest"], MODULE.plan_digest(plan))
         self.assertEqual(MODULE.build_plan(TRACKED_SPEC), plan)
@@ -135,6 +176,31 @@ class AutoLanguagePlanTests(unittest.TestCase):
             ("unknown take field", lambda s: take(s, "custom-english").update(seed=7), "unknown fields"),
             ("non-boolean audio requirement", lambda s: take(s, "design-undetected").update(requireAudioPass="no"),
              "requireAudioPass"),
+            ("unsupported selection", lambda s: take(s, "custom-explicit-japanese").update(selection="dutch"),
+             "unsupported selection"),
+            ("null selection", lambda s: take(s, "custom-english").update(selection=None), "unsupported selection"),
+            ("explicit chip is not the selection", lambda s: take(s, "design-explicit-spanish-over-french").update(
+                expectedChip="french"), "selects spanish but expects chip french"),
+            ("explicit engine is not the selection", lambda s: take(s, "clone-explicit-english-over-japanese").update(
+                expectedEngine="japanese"), "selects english but expects chip english and engine japanese"),
+            ("explicit selection with the auto chip", lambda s: take(s, "custom-explicit-japanese").update(
+                expectedChip="auto", expectedEngine="auto"), "selects japanese but expects chip auto"),
+            ("knownMismatch on an explicit take", lambda s: take(s, "custom-explicit-english-over-dutch").update(
+                knownMismatch="D6"), "only valid on auto takes"),
+            ("textLanguage on a corpus sentence", lambda s: take(s, "custom-explicit-japanese").update(
+                textLanguage="japanese"), "textLanguage on a corpus sentence"),
+            ("unsupported textLanguage", lambda s: take(s, "custom-explicit-english-over-dutch").update(
+                textLanguage="dutch"), "unsupported textLanguage"),
+            ("auto edge textLanguage disagrees with the chip", lambda s: take(s, "custom-mixed").update(
+                textLanguage="japanese"), "declares textLanguage japanese but expects chip english"),
+            ("auto edge textLanguage on an undetected take", lambda s: take(s, "design-undetected").update(
+                textLanguage="english"), "declares textLanguage english but expects chip auto"),
+            # An explicit Japanese corpus take never stands in for the Auto Japanese take.
+            ("explicit takes do not count toward the ten", lambda s: s["takes"].remove(take(s, "custom-japanese")),
+             "miss corpus languages: japanese"),
+            ("duplicate mode, script and selection", lambda s: s["takes"].append(
+                {**take(s, "custom-explicit-japanese"), "takeID": "custom-explicit-japanese-again"}),
+             "repeats another custom take's script and selection"),
         ]
         for name, mutate, message in cases:
             with self.subTest(case=name):
@@ -152,6 +218,42 @@ class AutoLanguagePlanTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("unsupported language", errors.getvalue())
         self.assertFalse((self.root / "p.json").exists())
+
+    def test_uniqueness_includes_the_selection(self):
+        # The same mode and script under another selection is a distinct take.
+        spec = copy.deepcopy(self.spec)
+        spec["takes"].append({"takeID": "custom-explicit-german-over-english", "mode": "custom",
+                              "selection": "german", "script": {"corpus": "english", "length": "short"},
+                              "expectedChip": "german", "expectedEngine": "german"})
+        spec["takes"].append({"takeID": "custom-explicit-english-over-english", "mode": "custom",
+                              "selection": "english", "script": {"corpus": "english", "length": "short"},
+                              "expectedChip": "english", "expectedEngine": "english"})
+        # An explicit edge take that declares its text's language takes that language as its witness.
+        spec["takes"].append({"takeID": "design-explicit-italian-over-german", "mode": "design",
+                              "selection": "italian", "script": {"text": "Der Zug fährt pünktlich ab."},
+                              "textLanguage": "german", "expectedChip": "italian", "expectedEngine": "italian"})
+        # textLanguage on an Auto edge take must agree with the chip it expects.
+        spec["takes"].append({"takeID": "clone-mixed-declared", "mode": "clone",
+                              "script": {"text": "The capital of Japan is 東京, a city of many trains."},
+                              "textLanguage": "english", "expectedChip": "english", "expectedEngine": "english"})
+        takes = {take["takeID"]: take for take in self.build(spec)["takes"]}
+        english = takes["custom-english"]
+        for take_id in ("custom-explicit-german-over-english", "custom-explicit-english-over-english"):
+            self.assertEqual(takes[take_id]["scriptDigest"], english["scriptDigest"])
+        self.assertEqual(takes["custom-explicit-german-over-english"]["witnessLanguage"], "english")
+        self.assertEqual(takes["custom-explicit-german-over-english"]["witness"], "required")
+        self.assertEqual(takes["custom-explicit-english-over-english"]["expectedChipValue"], "English")
+        self.assertEqual(takes["design-explicit-italian-over-german"]["witnessLanguage"], "german")
+        self.assertEqual(takes["design-explicit-italian-over-german"]["witness"], "required")
+        self.assertEqual(takes["clone-mixed-declared"]["witness"], "advisory")
+        self.assertEqual(takes["clone-mixed-declared"]["witnessLanguage"], "english")
+        # Spelling out the default selection is the same take as leaving it out.
+        spec = copy.deepcopy(self.spec)
+        spec["takes"].append({"takeID": "custom-english-again", "mode": "custom", "selection": "auto",
+                              "script": {"corpus": "english", "length": "short"},
+                              "expectedChip": "english", "expectedEngine": "english"})
+        with self.assertRaisesRegex(MODULE.ContractError, "repeats another custom take's script and selection"):
+            self.build(spec)
 
     def test_tampered_plan_fails_its_digest(self):
         plan = MODULE.build_plan(TRACKED_SPEC)
@@ -188,7 +290,7 @@ class AutoLanguageValidationTests(unittest.TestCase):
             "language": engine, "seed": 1000 + index, "seedSource": "generated",
             "variation": "balanced", "streaming": True, "warmState": "warm",
             "retryAttempt": retry, "operationGeneration": index,
-            "storedLanguageSelection": "auto", "finalModelLanguage": engine,
+            "storedLanguageSelection": take["selection"], "finalModelLanguage": engine,
             "languageTokenMode": "nothink" if engine == "auto" else "think",
             "conditioningMode": CONDITIONING[take["mode"]],
             "normalizedTargetTextDigest": take["scriptDigest"],
@@ -200,8 +302,9 @@ class AutoLanguageValidationTests(unittest.TestCase):
                 "runtimeProfileSignature": f"qwen3_tts|{CONDITIONING[take['mode']]}|8bit|24000|auto,english,french",
             },
         }
-        if take["expectedChip"] != "auto":
-            receipt["detectedTargetLanguage"] = take["expectedChip"]
+        # The recognizer names the script's own language, which an explicit selection may override.
+        if take["witnessLanguage"] is not None:
+            receipt["detectedTargetLanguage"] = take["witnessLanguage"]
         if take["mode"] == "custom":
             receipt["speakerID"] = "aiden"
         if take["mode"] == "clone":
@@ -296,8 +399,8 @@ class AutoLanguageValidationTests(unittest.TestCase):
         self.assertEqual(summary["result"], "pass")
         self.assertEqual(summary["runID"], RUN_ID)
         self.assertEqual(summary["planDigest"], self.plan["planDigest"])
-        self.assertEqual(summary["counts"]["plannedTakes"], 17)
-        self.assertEqual(summary["counts"]["manifestRecords"], 17)
+        self.assertEqual(summary["counts"]["plannedTakes"], 22)
+        self.assertEqual(summary["counts"]["manifestRecords"], 22)
         self.assertEqual(summary["counts"]["failedTakes"], 0)
         self.assertEqual([take["takeID"] for take in summary["takes"]], TAKE_IDS)
         for take in summary["takes"]:
@@ -315,6 +418,28 @@ class AutoLanguageValidationTests(unittest.TestCase):
         self.assertEqual(english["observed"]["fastQC"], {"outcome": "pass", "audioQCVerdict": "pass"})
         self.assertEqual(english["observed"]["speakerID"], "aiden")
         self.assertEqual(self.take_summary(summary, "clone-french")["observed"]["referenceTranscriptLanguage"], "english")
+        # Manual selection wins: the recognizer named the script's language and the engine spoke the choice.
+        for take_id, (selection, title, witness_language, _, _) in EXPLICIT.items():
+            with self.subTest(explicit=take_id):
+                take = self.take_summary(summary, take_id)
+                self.assertEqual(take["expected"]["selection"], selection)
+                self.assertEqual(take["expected"]["chipValue"], title)
+                self.assertEqual(take["expected"]["witnessLanguage"], witness_language)
+                self.assertEqual(take["observed"]["storedLanguageSelection"], selection)
+                self.assertEqual(take["observed"]["finalModelLanguage"], selection)
+                self.assertEqual(take["observed"]["languageTokenMode"], "think")
+                self.assertEqual(take["observed"]["detectedTargetLanguage"], witness_language)
+                self.assertEqual(take["observed"]["chip"], {"value": title, "stable": True})
+                if take_id in OVERRIDES:
+                    self.assertIn("explicit_selection_overrode_detection", take["observations"])
+                else:
+                    self.assertNotIn("explicit_selection_overrode_detection", take["observations"])
+        self.assertEqual(OVERRIDES, {"custom-explicit-french-over-english", "design-explicit-spanish-over-french",
+                                     "clone-explicit-english-over-japanese"})
+        for take in summary["takes"]:
+            if take["takeID"] not in EXPLICIT:
+                self.assertEqual(take["expected"]["selection"], "auto")
+                self.assertNotIn("explicit_selection_overrode_detection", take["observations"])
         data = (self.root / "summary.json").read_bytes()
         for take in self.plan["takes"]:
             self.assertNotIn(take["script"].encode("utf-8"), data)
@@ -395,6 +520,38 @@ class AutoLanguageValidationTests(unittest.TestCase):
              "receipt_invalid"),
             ("required take shows an error", "custom-english",
              lambda: self.records["custom-english"].update(visibleErrorShown=True), "visible_error"),
+            ("explicit selection stored as auto", "custom-explicit-french-over-english",
+             lambda: receipt("custom-explicit-french-over-english").update(storedLanguageSelection="auto"),
+             "stored_selection_mismatch"),
+            ("explicit selection stored as the detected language", "design-explicit-spanish-over-french",
+             lambda: receipt("design-explicit-spanish-over-french").update(storedLanguageSelection="french"),
+             "stored_selection_mismatch"),
+            ("detection beat the explicit selection", "custom-explicit-french-over-english",
+             lambda: speak("custom-explicit-french-over-english", "english"), "engine_language_mismatch"),
+            ("explicit chip disagrees with the engine", "clone-explicit-english-over-japanese",
+             lambda: speak("clone-explicit-english-over-japanese", "japanese"), "chip_engine_mismatch"),
+            ("explicit chip still shows Auto", "custom-explicit-japanese",
+             lambda: self.records["custom-explicit-japanese"]["chip"].update(observedValue="Japanese, Auto"),
+             "chip_value_mismatch"),
+            ("explicit chip still shows Auto is no plain-name chip", "custom-explicit-japanese",
+             lambda: self.records["custom-explicit-japanese"]["chip"].update(observedValue="Japanese, Auto"),
+             "chip_engine_mismatch"),
+            ("explicit witness compared to the script, not the selection", "design-explicit-spanish-over-french",
+             lambda: receipt("design-explicit-spanish-over-french").update(detectedTargetLanguage="spanish"),
+             "detected_target_mismatch"),
+            ("explicit required witness missing", "custom-explicit-french-over-english",
+             lambda: receipt("custom-explicit-french-over-english").pop("detectedTargetLanguage"),
+             "detected_target_mismatch"),
+            ("explicit advisory witness names the selection", "clone-explicit-english-over-japanese",
+             lambda: receipt("clone-explicit-english-over-japanese").update(detectedTargetLanguage="english"),
+             "detected_target_mismatch"),
+            ("explicit unsupported text names a target", "custom-explicit-english-over-dutch",
+             lambda: receipt("custom-explicit-english-over-dutch").update(detectedTargetLanguage="german"),
+             "detected_target_unexpected"),
+            ("explicit take without its language token", "custom-explicit-japanese",
+             lambda: receipt("custom-explicit-japanese").update(languageTokenMode="nothink"), "token_mode_mismatch"),
+            ("explicit take fell back to auto", "custom-explicit-english-over-dutch",
+             lambda: speak("custom-explicit-english-over-dutch", "auto"), "token_mode_mismatch"),
         ]
         for name, take_id, mutate, issue in cases:
             with self.subTest(case=name):
@@ -419,10 +576,19 @@ class AutoLanguageValidationTests(unittest.TestCase):
         def mutate_advisory():
             self.rows["custom-korean"][-1]["requestReceipt"].pop("detectedTargetLanguage")
 
+        def mutate_explicit_advisory():
+            self.rows["clone-explicit-english-over-japanese"][-1]["requestReceipt"].pop("detectedTargetLanguage")
+
+        def mutate_explicit_edge():
+            self.rows["custom-explicit-english-over-dutch"][-1].update(finishReason="max_tokens")
+
         cases = [
             (mutate_clone, "clone-french", {"clone_language_hint_differs"}),
             (mutate_edge, "custom-undetected", {"finish_not_eos", "fast_qc_failed", "audio_qc_failed"}),
             (mutate_advisory, "custom-korean", {"detected_target_absent"}),
+            # Without the recognizer's witness there is no override to prove, and nothing fails.
+            (mutate_explicit_advisory, "clone-explicit-english-over-japanese", {"detected_target_absent"}),
+            (mutate_explicit_edge, "custom-explicit-english-over-dutch", {"finish_not_eos"}),
         ]
         for mutate, take_id, expected in cases:
             with self.subTest(take=take_id):
@@ -433,6 +599,34 @@ class AutoLanguageValidationTests(unittest.TestCase):
                 take = self.take_summary(summary, take_id)
                 self.assertEqual(take["issues"], [])
                 self.assertTrue(expected.issubset(take["observations"]), take["observations"])
+                if take_id == "clone-explicit-english-over-japanese":
+                    self.assertNotIn("explicit_selection_overrode_detection", take["observations"])
+
+    def test_explicit_failures_withhold_the_override_observation(self):
+        def receipt(take_id):
+            return self.rows[take_id][-1]["requestReceipt"]
+
+        take_id = "custom-explicit-french-over-english"
+        # The engine followed the script's language: the override is not proven.
+        receipt(take_id).update(language="english", finalModelLanguage="english")
+        self.rows[take_id][-1]["notes"]["languageHint"] = "english"
+        code, summary = self.run_main()
+        self.assertEqual(code, 1)
+        take = self.take_summary(summary, take_id)
+        self.assertIn("engine_language_mismatch", take["issues"])
+        self.assertNotIn("explicit_selection_overrode_detection", take["observations"])
+        # An explicit take names its own stored-selection issue, never the Auto one.
+        self.rows, self.records = self.passing_fixture()
+        receipt(take_id).update(storedLanguageSelection="auto")
+        code, summary = self.run_main()
+        self.assertEqual(code, 1)
+        take = self.take_summary(summary, take_id)
+        self.assertEqual(take["issues"], ["stored_selection_mismatch"])
+        # An Auto take keeps its original name for the same drift.
+        self.rows, self.records = self.passing_fixture()
+        receipt("custom-french").update(storedLanguageSelection="french")
+        code, summary = self.run_main()
+        self.assertEqual(self.take_summary(summary, "custom-french")["issues"], ["stored_selection_not_auto"])
 
     def test_manifest_identity_errors_fail_closed(self):
         def conflicting():
@@ -490,7 +684,7 @@ class AutoLanguageValidationTests(unittest.TestCase):
         self.extra_lines = [self.manifest_line(self.records["custom-english"])] * 3
         code, summary = self.run_main()
         self.assertEqual(code, 0)
-        self.assertEqual(summary["counts"]["manifestRecords"], 17)
+        self.assertEqual(summary["counts"]["manifestRecords"], 22)
 
     def test_visible_error_takes_fall_back_to_the_prompt_digest(self):
         # A required take with a visible error: matched by digest, still a failure.
@@ -549,7 +743,7 @@ class AutoLanguageValidationTests(unittest.TestCase):
                 self.assertEqual(code, expected)
                 rows = [json.loads(line) for line in
                         (retained / "engine" / "generations.jsonl").read_text(encoding="utf-8").splitlines()]
-                self.assertEqual(len(rows), 18)  # 17 takes plus custom-english's earlier attempt
+                self.assertEqual(len(rows), 23)  # 22 takes plus custom-english's earlier attempt
                 self.assertTrue(all(row["notes"]["benchRunID"] == RUN_ID for row in rows))
                 log_path = self.root / "xcodebuild.log"
                 with contextlib.redirect_stdout(io.StringIO()):

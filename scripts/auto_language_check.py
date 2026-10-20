@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Plan and check the macOS Studio Auto-language UI check against engine receipts.
+"""Plan and check the macOS Studio language UI check against engine receipts.
 
 `prepare` turns the tracked spec (config/auto-language-check.json) into a run
-plan that the XCUITest receives as one base64 line. `validate` reads the
-test's per-take manifest records from the xcodebuild log, matches each take to
-this run's engine generation rows and checks that the language the chip showed
-is the language the engine was asked to speak. The summary carries digests,
+plan that the XCUITest receives as one base64 line. Most takes leave the
+language on Auto; a take with an explicit `selection` chooses that language
+first, so its chip shows the plain name and the engine must speak it even when
+the script is written in another language. `validate` reads the test's
+per-take manifest records from the xcodebuild log, matches each take to this
+run's engine generation rows and checks that the language the chip showed is
+the language the engine was asked to speak. The summary carries digests,
 labels and language codes, never the script text.
 """
 
@@ -41,6 +44,7 @@ NAME_TO_LANGUAGE = {name: language for language, name in LANGUAGE_NAMES.items()}
 # Latin-script languages whose corpus sentence the engine must name as its
 # detected target; the others carry it when present (advisory).
 WITNESS_REQUIRED = frozenset({"english", "french", "german", "spanish", "italian", "portuguese"})
+OPTIONAL_TAKE_FIELDS = frozenset({"knownMismatch", "requireAudioPass", "selection", "textLanguage"})
 KNOWN_MISMATCHES = {"D6": {"mode": "custom", "expectedChip": "auto", "expectedEngine": "english"}}
 D6_OVERRIDE_KEY = "QWENVOICE_CUSTOM_AUTO_LANGUAGE"
 MANIFEST_MARKER = "VOCELLO_AUTO_LANGUAGE_TAKE="
@@ -53,8 +57,9 @@ MAX_CHIP_VALUE_CHARACTERS = 128
 EXTRA_PRIVATE_KEYS = frozenset({"transcript", "prompt", "instruction", "spokentext"})
 PLAN_KEYS = {"schemaVersion", "source", "planDigest", "takes"}
 PLAN_TAKE_KEYS = {
-    "takeID", "mode", "scriptKey", "script", "scriptDigest", "expectedChip", "expectedEngine",
-    "expectedChipValue", "expectedRecommendedTitle", "witness", "requireAudioPass", "knownMismatch",
+    "takeID", "mode", "selection", "selectionTitle", "scriptKey", "script", "scriptDigest", "expectedChip",
+    "expectedEngine", "expectedChipValue", "expectedRecommendedTitle", "witness", "witnessLanguage",
+    "requireAudioPass", "knownMismatch",
 }
 MANIFEST_KEYS = {
     "schemaVersion", "runID", "planDigest", "takeID", "mode", "chip", "menu", "generationID",
@@ -76,15 +81,25 @@ class RowsNotPresent(Exception):
     pass
 
 
-def chip_value(language: str) -> str:
+def chip_value(language: str, selection: str = "auto") -> str:
+    """The chip's value: "<Name>, Auto" or "Auto" on Auto, the plain name for an explicit selection."""
+    if selection != "auto":
+        return LANGUAGE_NAMES[selection]
     return "Auto" if language == "auto" else f"{LANGUAGE_NAMES[language]}, Auto"
 
 
-def chip_language(value: Any) -> str | None:
-    """The language a chip value names, or None when it is not a chip value."""
+def chip_language(value: Any, selection: str = "auto") -> str | None:
+    """The language a chip value names, or None when it is not a chip value for this selection.
+
+    Auto reads only "Auto" or "<Name>, Auto"; an explicit selection reads only a plain name.
+    """
+    if not isinstance(value, str):
+        return None
+    if selection != "auto":
+        return NAME_TO_LANGUAGE.get(value)
     if value == "Auto":
         return "auto"
-    if isinstance(value, str) and value.endswith(", Auto"):
+    if value.endswith(", Auto"):
         return NAME_TO_LANGUAGE.get(value[: -len(", Auto")])
     return None
 
@@ -94,9 +109,17 @@ def recommended_title(language: str) -> str | None:
 
 
 def witness(language: str, from_corpus: bool) -> str:
+    """An Auto take's witness level for the language its chip expects."""
     if language == "auto":
         return "absent"
     return "required" if language in WITNESS_REQUIRED and from_corpus else "advisory"
+
+
+def explicit_witness(language: str | None) -> str:
+    """An explicit take's witness level for the language its script is written in."""
+    if language is None:
+        return "absent"
+    return "required" if language in WITNESS_REQUIRED else "advisory"
 
 
 def plan_digest(plan: dict[str, Any]) -> str:
@@ -135,6 +158,56 @@ def resolve_script(take_id: str, script: Any, corpus: dict[str, dict[str, str]])
     raise ContractError(f"take {take_id} script must be {{corpus, length}} or {{text}}")
 
 
+def take_expectations(
+    take_id: str, take: dict[str, Any], selection: str, from_corpus: bool, script_language: str | None,
+) -> dict[str, Any]:
+    """The chip, menu and witness expectations of one spec take.
+
+    `script_language` is the language the script is written in: the corpus language, the edge
+    text's declared textLanguage, or None for text the recognizer should not name.
+    """
+    mode, expected_chip, expected_engine = take["mode"], take["expectedChip"], take["expectedEngine"]
+    known = take.get("knownMismatch")
+    if selection != "auto":
+        if known is not None:
+            raise ContractError(f"take {take_id} knownMismatch is only valid on auto takes")
+        if (expected_chip, expected_engine) != (selection, selection):
+            raise ContractError(
+                f"take {take_id} selects {selection} but expects chip {expected_chip} and engine {expected_engine}"
+            )
+        return {
+            "selectionTitle": LANGUAGE_NAMES[selection],
+            "expectedChipValue": chip_value(selection, selection),
+            "expectedRecommendedTitle": None,
+            "witness": explicit_witness(script_language),
+            "witnessLanguage": script_language,
+            "knownMismatch": None,
+        }
+    if from_corpus and script_language != expected_chip:
+        raise ContractError(f"take {take_id} expects chip {expected_chip} for a {script_language} corpus sentence")
+    if script_language is not None and script_language != expected_chip:
+        raise ContractError(f"take {take_id} declares textLanguage {script_language} but expects chip {expected_chip}")
+    if known is not None:
+        rule = KNOWN_MISMATCHES.get(known)
+        if rule is None:
+            raise ContractError(f"take {take_id} names unknown knownMismatch {known!r}")
+        if mode != rule["mode"]:
+            raise ContractError(f"take {take_id} knownMismatch {known} is only valid for {rule['mode']} takes")
+        if (expected_chip, expected_engine) != (rule["expectedChip"], rule["expectedEngine"]):
+            raise ContractError(f"take {take_id} knownMismatch {known} expects chip {rule['expectedChip']} and engine {rule['expectedEngine']}")
+    elif expected_engine != expected_chip:
+        raise ContractError(f"take {take_id} expects the engine to diverge from the chip without a knownMismatch")
+    level = witness(expected_chip, from_corpus)
+    return {
+        "selectionTitle": None,
+        "expectedChipValue": chip_value(expected_chip),
+        "expectedRecommendedTitle": recommended_title(expected_chip),
+        "witness": level,
+        "witnessLanguage": None if level == "absent" else expected_chip,
+        "knownMismatch": known,
+    }
+
+
 def build_plan(spec_path: Path, *, root: Path = ROOT) -> dict[str, Any]:
     spec = jsonio.load_json(spec_path, error=ContractError, reject_duplicate_keys=True)
     if set(spec) != {"schemaVersion", "description", "corpus", "takes"} or spec["schemaVersion"] != SCHEMA_VERSION:
@@ -147,13 +220,13 @@ def build_plan(spec_path: Path, *, root: Path = ROOT) -> dict[str, Any]:
         raise ContractError("spec takes must contain 1...64 rows")
     required = {"takeID", "mode", "script", "expectedChip", "expectedEngine"}
     seen_ids: set[str] = set()
-    seen_scripts: set[tuple[str, str]] = set()
+    seen_scripts: set[tuple[str, str, str]] = set()
     custom_corpus_languages: set[str] = set()
     planned: list[dict[str, Any]] = []
     for position, take in enumerate(takes, 1):
         if not isinstance(take, dict) or not required.issubset(take):
             raise ContractError(f"take {position} is missing required fields")
-        if set(take) - (required | {"knownMismatch", "requireAudioPass"}):
+        if set(take) - (required | OPTIONAL_TAKE_FIELDS):
             raise ContractError(f"take {position} has unknown fields")
         take_id = take["takeID"]
         if not isinstance(take_id, str) or not SAFE_ID.fullmatch(take_id):
@@ -168,46 +241,47 @@ def build_plan(spec_path: Path, *, root: Path = ROOT) -> dict[str, Any]:
         for field, value in (("expectedChip", expected_chip), ("expectedEngine", expected_engine)):
             if not isinstance(value, str) or value not in LANGUAGES:
                 raise ContractError(f"take {take_id} has unsupported language {field}={value!r}")
+        selection = take.get("selection", "auto")
+        if not isinstance(selection, str) or selection not in LANGUAGES:
+            raise ContractError(f"take {take_id} has unsupported selection {selection!r}")
         script_key, sentence, from_corpus = resolve_script(take_id, take["script"], corpus)
-        if from_corpus and take["script"]["corpus"] != expected_chip:
-            raise ContractError(f"take {take_id} expects chip {expected_chip} for a {take['script']['corpus']} corpus sentence")
-        known = take.get("knownMismatch")
-        if known is not None:
-            rule = KNOWN_MISMATCHES.get(known)
-            if rule is None:
-                raise ContractError(f"take {take_id} names unknown knownMismatch {known!r}")
-            if mode != rule["mode"]:
-                raise ContractError(f"take {take_id} knownMismatch {known} is only valid for {rule['mode']} takes")
-            if (expected_chip, expected_engine) != (rule["expectedChip"], rule["expectedEngine"]):
-                raise ContractError(f"take {take_id} knownMismatch {known} expects chip {rule['expectedChip']} and engine {rule['expectedEngine']}")
-        elif expected_engine != expected_chip:
-            raise ContractError(f"take {take_id} expects the engine to diverge from the chip without a knownMismatch")
+        text_language = take.get("textLanguage")
+        if text_language is not None:
+            if from_corpus:
+                raise ContractError(f"take {take_id} declares textLanguage on a corpus sentence")
+            if not isinstance(text_language, str) or text_language not in LANGUAGE_NAMES:
+                raise ContractError(f"take {take_id} has unsupported textLanguage {text_language!r}")
+        script_language = take["script"]["corpus"] if from_corpus else text_language
+        expectations = take_expectations(take_id, take, selection, from_corpus, script_language)
         require_audio = take.get("requireAudioPass", True)
         if not isinstance(require_audio, bool):
             raise ContractError(f"take {take_id} requireAudioPass must be boolean")
         script_digest = jsonio.sha256_bytes(sentence.encode("utf-8"))
-        if (mode, script_digest) in seen_scripts:
-            raise ContractError(f"take {take_id} repeats another {mode} take's script")
-        seen_scripts.add((mode, script_digest))
-        if mode == "custom" and from_corpus:
+        if (mode, script_digest, selection) in seen_scripts:
+            raise ContractError(f"take {take_id} repeats another {mode} take's script and selection")
+        seen_scripts.add((mode, script_digest, selection))
+        if mode == "custom" and from_corpus and selection == "auto":
             custom_corpus_languages.add(expected_chip)
         planned.append({
             "takeID": take_id,
             "mode": mode,
+            "selection": selection,
+            "selectionTitle": expectations["selectionTitle"],
             "scriptKey": script_key,
             "script": sentence,
             "scriptDigest": script_digest,
             "expectedChip": expected_chip,
             "expectedEngine": expected_engine,
-            "expectedChipValue": chip_value(expected_chip),
-            "expectedRecommendedTitle": recommended_title(expected_chip),
-            "witness": witness(expected_chip, from_corpus),
+            "expectedChipValue": expectations["expectedChipValue"],
+            "expectedRecommendedTitle": expectations["expectedRecommendedTitle"],
+            "witness": expectations["witness"],
+            "witnessLanguage": expectations["witnessLanguage"],
             "requireAudioPass": require_audio,
-            "knownMismatch": known,
+            "knownMismatch": expectations["knownMismatch"],
         })
     missing = sorted(set(LANGUAGE_NAMES) - custom_corpus_languages)
     if missing:
-        raise ContractError("Custom takes miss corpus languages: " + ",".join(missing))
+        raise ContractError("Custom Auto takes miss corpus languages: " + ",".join(missing))
     source = spec_path.resolve()
     try:
         source_name = source.relative_to(root.resolve()).as_posix()
@@ -432,6 +506,9 @@ def check_take(
     issues: list[str] = []
     observations: list[str] = []
     require_audio = take["requireAudioPass"]
+    selection = take["selection"]
+    explicit = selection != "auto"
+    witness_language = take["witnessLanguage"]
 
     def audio(name: str) -> None:
         (issues if require_audio else observations).append(name)
@@ -498,8 +575,8 @@ def check_take(
                 issues.append("receipt_schema_too_old")
         except startup.ContractError:
             issues.append("receipt_invalid")
-        if receipt.get("storedLanguageSelection") != "auto":
-            issues.append("stored_selection_not_auto")
+        if receipt.get("storedLanguageSelection") != selection:
+            issues.append("stored_selection_mismatch" if explicit else "stored_selection_not_auto")
         if final != receipt.get("language"):
             issues.append("language_final_drift")
         known_d6 = take["knownMismatch"] == "D6"
@@ -507,27 +584,35 @@ def check_take(
             issues.append("d6_expectation_changed")
         elif final != take["expectedEngine"]:
             issues.append("engine_language_mismatch")
-        observed_chip = chip_language(record["chip"]["observedValue"]) if record is not None else None
+        observed_chip = chip_language(record["chip"]["observedValue"], selection) if record is not None else None
         if record is not None:
             if known_d6:
                 if observed_chip == "auto" and final == "english":
                     observations.append("known_d6_chip_auto_engine_english")
             elif observed_chip != final:
                 issues.append("chip_engine_mismatch")
-        expected_mode = "nothink" if final == "auto" else "think"
+        # An explicit selection always sends its language token; Auto thinks only when it resolved one.
+        expected_mode = "think" if explicit or final != "auto" else "nothink"
         if receipt.get("languageTokenMode") != expected_mode:
             issues.append("token_mode_mismatch")
+        # The witness is the language the text recognizer names for the script, which an explicit
+        # selection need not share.
         detected = receipt.get("detectedTargetLanguage")
         if take["witness"] == "required":
-            if detected != take["expectedChip"]:
+            if detected != witness_language:
                 issues.append("detected_target_mismatch")
         elif take["witness"] == "advisory":
             if detected is None:
                 observations.append("detected_target_absent")
-            elif detected != take["expectedChip"]:
+            elif detected != witness_language:
                 issues.append("detected_target_mismatch")
         elif detected is not None:
             issues.append("detected_target_unexpected")
+        if (explicit and witness_language is not None and witness_language != selection
+                and detected == witness_language and final == selection):
+            # The proof that a manual choice wins: the recognizer named another language and
+            # the engine still spoke the selected one.
+            observations.append("explicit_selection_overrode_detection")
         if notes.get("languageHint") != final:
             if take["mode"] == "clone":
                 observations.append("clone_language_hint_differs")
@@ -552,11 +637,13 @@ def check_take(
         "scriptKey": take["scriptKey"],
         "scriptDigest": take["scriptDigest"],
         "expected": {
+            "selection": selection,
             "chip": take["expectedChip"],
             "chipValue": take["expectedChipValue"],
             "engine": take["expectedEngine"],
             "recommendedTitle": take["expectedRecommendedTitle"],
             "witness": take["witness"],
+            "witnessLanguage": witness_language,
             "requireAudioPass": require_audio,
             "knownMismatch": take["knownMismatch"],
         },
@@ -631,7 +718,7 @@ def validate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan and check the macOS Studio Auto-language UI check.")
+    parser = argparse.ArgumentParser(description="Plan and check the macOS Studio language UI check (Auto and explicit).")
     sub = parser.add_subparsers(dest="command", required=True)
     prepare_parser = sub.add_parser("prepare", help="build the run plan from the tracked spec")
     prepare_parser.add_argument("--spec", required=True, type=Path)

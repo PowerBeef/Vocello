@@ -382,7 +382,7 @@ like every knob it needs the internal-diagnostics build and `QWENVOICE_DEBUG`
 Delivery-instruction language, including the one Mandarin preset cell, belongs to the
 [prompting guide §4.4](qwen3-tts-prompting-guide.md#44-instruction-language-separate-inputs-unresolved-comparative-quality).
 The language unit tests, the hint bench and the output round trip are in
-[`language-bench.md`](language-bench.md).
+[`telemetry-and-benchmarking.md` §5](telemetry-and-benchmarking.md#5-language-bench).
 
 ### 7.3 Dialects and accents
 
@@ -452,7 +452,7 @@ The in-memory clone prompt cache rarely helps today: every Clone take re-adopts 
 before that cache is consulted (B-16, ER-06).
 
 The device check for both conditioning modes, `scripts/ios_device.sh clone-conditioning`, is
-described in [`benchmarking-procedure.md`](benchmarking-procedure.md) (§4.7b).
+described in [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (§4.7b).
 
 ---
 

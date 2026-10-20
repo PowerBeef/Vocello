@@ -75,7 +75,7 @@ Clone generation waits for your consent in Settings, and **(3.0)** every take ca
 
 The real-time factor (RTF) is seconds of generation per second of audio, so lower is faster and anything under 1.0 plays ahead of generation. The speed figures pool warm takes of the Speed models from the canonical benchmark host, a Mac mini M6 with 16 GB; the chart under [Performance, measured](#performance-measured) breaks them down by mode and script length. The 8 GB Mac mini M2 is the support floor: its records (the last canonical one, `379db820`, measured warm RTF 0.53 to 0.82) form an earlier series that is never compared with the M6's. The memory figures come from that M2: streaming took the peak of the same take from about 8 GB to about 3 GB (`benchmarks/OPTIMIZATION.md` §F.1), and a 12-segment long-form project (smoke run `8f15c1fd`) ended 1.1% below its starting footprint.
 
-Every published record is in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md), and the method is in [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md).
+Every published record is in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md), and the method is in [`docs/reference/telemetry-and-benchmarking.md`](docs/reference/telemetry-and-benchmarking.md).
 
 </details>
 
@@ -256,7 +256,7 @@ The README art comes from the same tokens: `scripts/readme_art/render.sh` redraw
 | [Architecture](docs/ARCHITECTURE.md) | Ownership, the life of a take, the engine's invariants |
 | [Development setup](docs/reference/development-workflow.md#new-mac-setup) | A new Mac, from clone to first build |
 | [Testing runbook](docs/reference/testing-runbook.md) | Which lane proves what, on the Mac and on a paired iPhone |
-| [Benchmarking](docs/reference/benchmarking-procedure.md) | The protocol behind every published number |
+| [Benchmarking](docs/reference/telemetry-and-benchmarking.md) | The protocol behind every published number |
 | [Privacy and storage](docs/reference/privacy-storage.md) | What is stored where, and how it is deleted |
 | [iPhone app](docs/reference/ios-app-guide.md) | The iPhone app, including the 3.0 export purchase |
 | [Roadmap](docs/ROADMAP.md) | What is in flight for 3.0 and what follows |

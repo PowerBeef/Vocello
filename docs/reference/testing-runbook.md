@@ -31,9 +31,9 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |
 | Model download lifecycle | [Model delivery](model-delivery.md) | Explicit isolated root; preserve canonical data and failed evidence |
-| Benchmark operation / publication | [Benchmarking procedure](benchmarking-procedure.md) | Exact-source qualified PASS only; no automatic Git changes |
+| Benchmark operation / publication | [Benchmarking procedure](telemetry-and-benchmarking.md) | Exact-source qualified PASS only; no automatic Git changes |
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
-| Delivery bench | [Benchmarking procedure §4.6](benchmarking-procedure.md#46-delivery--prosody-cells) | Paired instructed/neutral takes with fail-closed instruction receipts; acoustic effects, not listener-proven delivery |
+| Delivery bench | [Benchmarking procedure §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells) | Paired instructed/neutral takes with fail-closed instruction receipts; acoustic effects, not listener-proven delivery |
 | Audio QC | [QC v2](qc.md) | Models run one at a time after TTS exits; report execution, coverage and qualification separately. Missing, stale or unqualified required evidence is NOT_ASSESSED; frozen thresholds and held-out qualification are required for acceptance |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/tooling-and-evidence.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |

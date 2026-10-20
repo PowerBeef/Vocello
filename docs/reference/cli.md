@@ -283,7 +283,7 @@ and instant. These ids are the
 Objective, reference-free delivery adherence (F0 / speaking-rate / duration deltas against a
 same-seed neutral take) is measured by `vocello bench --delivery` with
 `scripts/bench_delivery_prosody.py`; see
-[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
+[`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells).
 
 `generate` and `batch` accept `--delivery-cell <preset>.<intensity>` for repository-owned
 CustomVoice selections. That identity fails closed if its accompanying copy drifts. It also enables

@@ -506,7 +506,7 @@ BH-FDR. The valence ceiling was upgraded from hypothesis to result: the pre-regi
 p = 0.43 / 0.24), and `happy` fails FDR in both arms with `angry` as its top confusion each
 time. The 8-bit Quality arm separates no better than 4-bit, retiring quantization as a
 suspected adherence bottleneck. Measurement protocol and instruction provenance:
-[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
+[`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells).
 
 Consequence for prompt-writing: **wording cannot buy a distinction this instruction channel does
 not carry.** DP-3 (long versus short form), DP-4 (prosodic null), DP-5 (merge form), and DP-6 all
@@ -851,7 +851,7 @@ settled one.
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink`, Custom to English (D6) |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
-| Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery bench verifies them fail closed ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)) |
+| Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery bench verifies them fail closed ([`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells)) |
 
 The prompt strings, the system turn, the clone instruction path and the decode budget are not
 suspects when delivery sounds off. Vocello's input still differs from the reference in the streamed
@@ -990,7 +990,7 @@ parameters, seeds, script identities, instruction receipts and output hashes.
 
 That experiment layer was retired with the v1 audio QC stack on 2026-10-01; the findings recorded
 here stand. New delivery comparisons run as multi-seed `vocello bench --delivery` sweeps
-([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)), and the delivery bench keeps its own analyzers (QC-07 declined 2026-10-02). The
+([`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells)), and the delivery bench keeps its own analyzers (QC-07 declined 2026-10-02). The
 maintainer-directed 2026-08-24 production-copy checkpoint was not selected from those arms and makes
 no measured improvement claim. Concise and multidimensional prompts remain separate candidates
 because official examples support both and this repository has not shown either to dominate across
@@ -1088,7 +1088,7 @@ unvalidated prompt guidance is the failure mode this document exists to stop; ea
 measurement first.
 
 Measure with the delivery bench: [`scripts/bench_delivery_prosody.py`](../../scripts/bench_delivery_prosody.py)
-turns a `bench --delivery` run into a receipt-verified paired sidecar ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)). Each experiment
+turns a `bench --delivery` run into a receipt-verified paired sidecar ([`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells)). Each experiment
 below is a multi-seed sweep plus a paired comparison. Register its hypotheses, seeds, cells, arms
 and decision rule in the owning roadmap item's gate text before any generation (the commit
 timestamp is the registration proof), and append the results, coverage gaps included, to the same
@@ -1189,5 +1189,5 @@ Community, quality varies:
 - [`mimi-codec-guide.md`](mimi-codec-guide.md) — the 12 Hz speech tokenizer: clone-reference encoding and decode
 - [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md) — the sourced research behind this rewrite
 - [`../qwen_tone.md`](../qwen_tone.md) — the earlier app-facing tone guide this document supersedes for provenance questions
-- [`benchmarking-procedure.md`](benchmarking-procedure.md) — how to run the matrix the §10 experiments need
+- [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — how to run the matrix the §10 experiments need
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §4 — engine core and generation semantics

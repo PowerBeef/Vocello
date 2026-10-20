@@ -993,7 +993,7 @@ stay silent while a take is captured; the tap's destruction restores audible out
 Recording** grant: on macOS 26 a process tap never prompts, so it is added by hand in System
 Settings after the first lane run; on macOS 27 the first captured take prompts and blocks the
 runner until it is answered, so `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (the default) arms capture
-only when the TCC database shows a grant (see [`macos-permissions.md`](macos-permissions.md)).
+only when the TCC database shows a grant (see [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc)).
 Artifacts land under `<run-artifact-dir>/playback-capture/` (`capture-run.json`,
 `take-NN-<cell>.wav` and `.json`, `summary.json`); the WAVs stay untracked and only their digests
 enter the record. `scripts/lib/playback_capture.py` compares each capture with the published take

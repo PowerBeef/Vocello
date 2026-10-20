@@ -1264,7 +1264,7 @@ instruction), the resolved language hint, sampling seed evidence, the bench `del
 cell stamp, and — for any instructed take — the delivery-instruction receipt
 (`instructChars`/`instructDigest`) that the delivery bench verifies fail-closed against
 the bench manifest's instruction echo
-([`docs/reference/benchmarking-procedure.md`](reference/benchmarking-procedure.md#46-delivery--prosody-cells) §4.6). The transport layer records request acceptance, first-chunk,
+([`docs/reference/telemetry-and-benchmarking.md`](reference/telemetry-and-benchmarking.md#46-delivery--prosody-cells) §4.6). The transport layer records request acceptance, first-chunk,
 session/chunk/order/terminal evidence; the backend records typed stages/timings/counters, final barrier,
 atomic output, process-owned memory, and the audio QC report's (algorithm v8; split since v3) separate pre-limiter-instability and
 persisted-WAV written-output verdicts. Schema v8 adds absolute-uptime sample alignment, independent

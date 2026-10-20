@@ -88,7 +88,7 @@ exit code 3, nothing is published, and the gate prints `GATE: INCONCLUSIVE` and 
 or FAIL. The optimized CLI build logs to `cli-build.log`, the measurement to `bench.log`, and every
 threshold used, with the baseline digest, to `bench-verdict.json`. `QWENVOICE_GATE_BENCH_SEED=1`
 runs the same bench but adds the run to the staged baseline instead of comparing
-([benchmarking-procedure.md](benchmarking-procedure.md), baseline comparison).
+([telemetry-and-benchmarking.md](telemetry-and-benchmarking.md), baseline comparison).
 `release-readiness` is the packaging prerequisite `scripts/release.sh` invokes before signing; it
 needs no model fixture and no UI evidence.
 
@@ -199,7 +199,7 @@ Core Audio process tap, physical output muted while tapped, one
 manual System Audio Recording grant for the lane-re-signed `com.qwenvoice.app.uitests.xctrunner`), writes the captures under the run's
 `playback-capture/` directory and the checker compares each one with the published take WAV
 (`playbackCapture*` metrics, warn codes, and since 2026-09-14 a gate on captured takes; the smoke lane captures its completed-generation take as well; see
-[`benchmarking-procedure.md`](benchmarking-procedure.md) §4.10). A missing or denied capture never
+[`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) §4.10). A missing or denied capture never
 fails the lane; a planned take reads `playbackCaptureStatus: unavailable`.
 
 ## UI-performance lane (`macos perf`)
@@ -464,5 +464,5 @@ macOS signing, notarization, and packaging use deterministic release-readiness c
 benchmark XCUITest results are independent frontend QA artifacts and never a packaging prerequisite.
 
 See also [`testing-runbook.md`](testing-runbook.md),
-[`benchmarking-procedure.md`](benchmarking-procedure.md), and
+[`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md), and
 [`macos-release-qa.md`](macos-release-qa.md).

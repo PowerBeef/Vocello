@@ -907,7 +907,7 @@ artifact checks. Physical-device smoke and benchmark results are independent fro
 and never an archive, upload, or Git-publishing prerequisite.
 
 See also [`testing-runbook.md`](testing-runbook.md) and
-[`benchmarking-procedure.md`](benchmarking-procedure.md).
+[`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).
 
 ## Historical checkpoint references
 

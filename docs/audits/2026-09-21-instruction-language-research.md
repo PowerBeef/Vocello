@@ -257,7 +257,7 @@ new inference service, UI restriction, sampling adjustment or preset rewrite.
 
 **Proposed only. No generation, benchmark, device run or paid evaluator call was performed.** Reuse
 the delivery bench and its instruction receipts
-([benchmarking-procedure.md §4.6](../reference/benchmarking-procedure.md#46-delivery--prosody-cells)) and the
+([benchmarking-procedure.md §4.6](../reference/telemetry-and-benchmarking.md#46-delivery--prosody-cells)) and the
 QC v2 audio checks ([qc.md](../reference/qc.md)). Do not build another evaluation framework.
 
 ### 10.1 Start with a narrow, answerable question

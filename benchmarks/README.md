@@ -130,7 +130,7 @@ reject stale comparison metadata. New records key on what their kind measures
 reviewed per-kind measurement version); `lineage-replay` recomputes that identity for committed
 records from their own source commits without writing anything.
 
-See [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
+See [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
 for the operator runbook (workflows, preflight, reading results) and
 [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
 for the telemetry schema and knobs.

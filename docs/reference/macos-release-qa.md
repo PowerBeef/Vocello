@@ -79,7 +79,7 @@ release-readiness and artifact checks.
      --variants speed --lengths short,medium,long \
      --warm 3 --voice A_warm_elderly_woman --label "release-QA"
    ```
-   Full procedure: [`benchmarking-procedure.md`](benchmarking-procedure.md) §4.1.
+   Full procedure: [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) §4.1.
    Gate: clean audioQC on all required cells; RTF within noise of the latest
    `benchmarks/HISTORY.md` rows; fixed-seed evidence and any applicable automated
    language/prosody checks pass. Human listening is optional annotation.

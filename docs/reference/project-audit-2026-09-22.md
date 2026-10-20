@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-09-22
 summary: Whole-project audit at the Claude Code takeover — product, harness and governance map, verified defects (fixed or recorded as project-audit-2026-09 roadmap items) and corrected documentation drift.
@@ -11,6 +11,10 @@ sourceOfTruth:
   - scripts/ci/classify_changes.py
 ---
 # Project audit at the Claude Code takeover — September 22, 2026
+
+> Historical snapshot at `7e26f94b`; its pins, counts and harness are as of that date. Superseded by
+> the [October 6 deep audit](../audits/2026-10-06-deep-audit.md) and, for the harness, `CLAUDE.md`;
+> its parked follow-ups stay in plan `project-audit-2026-09` in `config/roadmap.json`.
 
 ## Scope and source identity
 
@@ -32,7 +36,7 @@ path. This document remains the plan's authority; the report holds the line-leve
 
 The same change returned development to Claude Code as the coding agent (at the time the sole one;
 since PA-27 a lead session with optional worktree agents, see
-[the development workflow](development-workflow.md#claude-code-development-workflow)): `CLAUDE.md`,
+[the development workflow](development-workflow.md#parallel-agents-and-worktrees)): `CLAUDE.md`,
 path-scoped `.claude/rules/`, user-invoked `.claude/skills/`, read-only subagents and
 `.claude/settings.json` hooks and permissions replace `AGENTS.md`, `.agents/` and `.codex/`.
 

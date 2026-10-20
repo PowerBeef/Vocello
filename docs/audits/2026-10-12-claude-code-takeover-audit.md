@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-10-12
-summary: Claude Code takeover audit — what bound the harness to Codex, how hooks, permissions, skills, agents, rules and instructions were moved to Claude Code, what was verified live, and the open follow-ups (DA-15).
+summary: Claude Code takeover audit — what bound the harness to Codex, how hooks, permissions, skills, agents, rules and instructions were moved to Claude Code, what was verified live, and its follow-ups (DA-15, done).
 sourceOfTruth:
   - CLAUDE.md
   - .claude/settings.json
@@ -10,6 +10,9 @@ sourceOfTruth:
   - scripts/tests/test_agent_hooks.py
 ---
 # Vocello: Claude Code takeover audit
+
+> Historical: its only follow-up, DA-15, closed on 2026-10-12. `CLAUDE.md` and the
+> [development workflow](../reference/development-workflow.md) describe the current harness.
 
 **Baseline:** `d14b070a`, reviewed October 12, 2026. The harness moved from Codex back to Claude Code
 in `446ea479` (worker ownership and doctor), `c5f8e290` (hook wiring and permissions), `14ad9393`

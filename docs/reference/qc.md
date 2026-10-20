@@ -1,3 +1,14 @@
+---
+status: active
+owner: release-qa
+summary: The offline, report-only audio QC v2 harness — its models, detectors, norms, calibration, levels, lanes, labels and data layout, and the coverage and qualification contract behind the strict gate's exit codes.
+sourceOfTruth:
+  - scripts/qc.py
+  - scripts/qc/lanes.py
+  - config/qc/models.json
+  - config/qc/detectors.json
+  - config/qc/thresholds-v1.json
+---
 # Audio QC v2
 
 The [ordered remediation implementation](audio-quality-remediation.md) covers independent local

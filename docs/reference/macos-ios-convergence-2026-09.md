@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 summary: The 2026-09-14 decision to make the iOS app the reference for both platforms — the macOS app hosts the engine in-process on the shared iOS store, then adopts the iOS UI adapted to macOS with its desktop features — with the step list, the accepted costs and the verification per step.
 sourceOfTruth:
@@ -9,6 +9,10 @@ sourceOfTruth:
   - project.yml
 ---
 # macOS converges on the iOS architecture and UI — 2026-09
+
+> Historical: the plan completed on 2026-09-15. [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) now
+> describes the converged app, and the [iOS-derived UI reset](macos-ios-ui-reset-2026-09.md)
+> superseded its UI prescriptions.
 
 > Narrative authority for the roadmap plan `macos-ios-convergence-2026-09`. The ledger in
 > [`docs/ROADMAP.md`](../ROADMAP.md) carries the live status; this document records the decision,

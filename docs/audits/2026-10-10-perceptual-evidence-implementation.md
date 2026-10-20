@@ -1,4 +1,18 @@
+---
+status: historical
+owner: backend-and-platform
+summary: Installed-model QC v2 evidence for French pronunciation, expected phone paths and intervals and Clone register, its retained-clip verification and the held-out normalization fix; diagnostic only, with no qualified pass/fail decision.
+sourceOfTruth:
+  - scripts/qc/evidence.py
+  - scripts/qc/pronunciation.py
+  - scripts/qc/fit.py
+  - config/roadmap.json
+---
 # Automatic audio-quality evidence: implementation and retained-clip verification
+
+> Historical: QC v2 stays a report-only diagnostic, and for 3.0 nobody listens (maintainer decision
+> 2026-10-13). [The QC reference](../reference/qc.md) holds the current contract; the follow-ups are
+> parked under QC-06 in `config/roadmap.json`.
 
 Date: 2026-10-10. Baseline: `9a1df218`. First integrated checkpoint: `17554ec9`.
 This implements the installed-model/offline phase of the

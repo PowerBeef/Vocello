@@ -1,10 +1,10 @@
 # Vocello Website
 
-This directory contains the public Vocello marketing site. It is a React + Vite app maintained inside the QwenVoice repo and deployed by Vercel with `website/` as the project root.
+This directory contains the public Vocello marketing site. It is a React + Vite app maintained inside the Vocello repository (`PowerBeef/Vocello`) and deployed by Vercel with `website/` as the project root.
 
 ## Commands
 
-Run these from the QwenVoice repo root:
+Run these from the repository root:
 
 ```sh
 npm --prefix website ci

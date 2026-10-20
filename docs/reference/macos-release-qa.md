@@ -269,8 +269,8 @@ version bump:
 
 ## Technical sections are maintained surfaces (standing per-release step)
 
-README "Under the hood" and the website Engineering section
-(`website/src/sections/Engineering.jsx`) are long-term whole-package surfaces: they
+The README's "For developers" section (chiefly "Engineering highlights") and the website Engineering
+section (`website/src/sections/Engineering.jsx`) are long-term whole-package surfaces: they
 present the owned-runtime derivation, the host architecture, the
 streaming/memory/determinism discipline, and the benchmark rigor as one curated story.
 

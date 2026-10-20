@@ -1,4 +1,18 @@
+---
+status: historical
+owner: backend-and-platform
+summary: Three uncalibrated QC v2 candidate producers (local phonation, isolated fragments and French word-boundary evidence) implemented at 5b141b4c, their place in the QC lane, and the qualification boundary.
+sourceOfTruth:
+  - scripts/qc/candidates.py
+  - scripts/qc/boundary.py
+  - scripts/qc/acoustics.py
+  - config/roadmap.json
+---
 # Local phonation, fragment and boundary evidence implementation
+
+> Historical: QC v2 stays a report-only diagnostic, and for 3.0 nobody listens (maintainer decision
+> 2026-10-13). [The QC reference](../reference/qc.md) holds the current contract; the follow-ups are
+> parked under QC-06 in `config/roadmap.json`.
 
 Date: October 10, 2026 (local). Implementation checkpoint: `5b141b4c`.
 Follows the [retained regression panel](2026-10-10-retained-audio-regression-panel.md),
@@ -185,7 +199,8 @@ records. Load was within the twelve-core limit; kernel memory-pressure level rem
 above the required normal level **1**. No audio run or inference started. A read-only free-memory
 query does not supersede that kernel-pressure criterion, and unrelated applications were not stopped.
 
-The repository [benchmark skill](../../.agents/skills/vocello-benchmark/SKILL.md) requires:
+The repository [benchmark skill](../../.claude/skills/vocello-benchmark/SKILL.md) (then under
+`.agents/skills/`) requires:
 “Join/stop workers first, keep host-wide native serialization and load/memory preflight.” The actual
 [host guard](../../scripts/lib/host_preflight.sh) refused the run. Its busy-host override requires
 an explicit request; it was not used. This is an execution limitation, not a product defect or a

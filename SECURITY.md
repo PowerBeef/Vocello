@@ -23,22 +23,27 @@ absolute paths, or local device data.
 
 `security.yml` runs the website npm advisory audit (high severity, lock-only) and CodeQL for
 JavaScript/TypeScript and Swift on a weekly schedule, on manual dispatch, and inside `release.yml` on
-the tagged commit. `Security required` aggregates those jobs into one exact-commit verdict. Ordinary
-pushes to `main` run `ci.yml` only; there is no per-pull-request security lane. Release SBOM
-generation continues to use the committed lock files as its authoritative input.
+the tagged commit. `Security required` aggregates those jobs into one exact-commit verdict. Every
+push to `main` runs `ci.yml`; a push that touches the release path (the release workflows, packaging
+and verification scripts, `project.yml`, the toolchain and release contracts) also runs the
+secrets-free `release-rehearsal.yml`. Neither runs the Security workflow. Pull requests run only
+`ci.yml`'s Linux jobs with a read-only token; there is no per-pull-request security lane. Release
+SBOM generation continues to use the committed lock files as its authoritative input.
 
 The repository intentionally permits its maintainer to develop directly on `main`, so that
 administrator bypass is treated as a residual risk rather than as release authorization. A release
 candidate requires an annotated version tag whose signature GitHub verifies as valid, a tag commit
-contained in `origin/main`, and a latest successful `CI required` check run on that exact commit;
-the release workflow then runs the Security workflow on that same commit before any packaging step.
+contained in `origin/main`, and a latest successful `CI required` check run on that exact commit.
+The release workflow runs the Security workflow on that same commit before it checks this source
+authority, and both must pass before any packaging step.
 A dispatched release must run from the tag's own ref, so a branch's edited copy of the workflow never
 receives signing secrets; the signing jobs use a tag-restricted `release` environment, grant only
 `codesign` access to the temporary keychain, restore no Actions cache and delete the signing material
-right after the signing step. A weekly, secrets-free release rehearsal exercises the same toolchain
-and packaging path between tags.
-Candidate creation and later public promotion both re-evaluate this authority and fail closed on lightweight or unsigned tags, missing checks, cross-commit evidence, or an
-incomplete check-run response.
+right after the signing step. The secrets-free release rehearsal (`release-rehearsal.yml`, weekly, on
+dispatch and on the release-path pushes above) exercises the same toolchain and packaging path
+between tags with ad-hoc signing and no notarization. Candidate creation and later public promotion
+both re-evaluate this authority and fail closed on lightweight or unsigned tags, missing checks,
+cross-commit evidence, or an incomplete check-run response.
 
 ## Open-source purchase boundary
 

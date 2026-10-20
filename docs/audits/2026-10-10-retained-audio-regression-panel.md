@@ -1,4 +1,18 @@
+---
+status: historical
+owner: backend-and-platform
+summary: Cache-only analysis of a retained, annotated French recording as a development regression case — what the installed detectors recover and miss, and why it cannot become an independent test.
+sourceOfTruth:
+  - scripts/qc/lanes.py
+  - scripts/qc/acoustics.py
+  - scripts/qc/label.py
+  - config/roadmap.json
+---
 # Retained audio regression panel: annotated defects and detector limits
+
+> Historical: QC v2 stays a report-only diagnostic, and for 3.0 nobody listens (maintainer decision
+> 2026-10-13). [The QC reference](../reference/qc.md) holds the current contract; the follow-ups are
+> parked under QC-06 in `config/roadmap.json`.
 
 Date: October 10, 2026 (local). New cache-only analysis checkpoint: `545bc80a`.
 This follows the [perceptual evidence implementation](2026-10-10-perceptual-evidence-implementation.md)

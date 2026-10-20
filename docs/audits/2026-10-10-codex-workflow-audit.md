@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-10-10
 summary: Source-grounded Codex takeover audit: runtime ownership, workflow correctness, evidence boundaries, and targeted migration acceptance.
@@ -9,6 +9,9 @@ sourceOfTruth:
   - config/runtime-refactor-contract.json
 ---
 # Vocello: Codex takeover and workflow audit
+
+> Historical: the Codex harness was retired on 2026-10-12 (`14ad9393`). The
+> [Claude Code takeover audit](2026-10-12-claude-code-takeover-audit.md) and `CLAUDE.md` superseded it.
 
 **Baseline:** `185444b`, reviewed October 10, 2026. This report supplements the
 [October 6 deep audit](2026-10-06-deep-audit.md), the

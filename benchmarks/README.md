@@ -1,3 +1,13 @@
+---
+status: active
+owner: release-qa
+summary: What the benchmark registry may hold, how successful runs are published into it, the privacy and size rules on committed records, and the canonical hardware and run classes.
+sourceOfTruth:
+  - scripts/benchmark_history.py
+  - scripts/publish_benchmark_history.py
+  - benchmarks/hardware-profiles.json
+  - benchmarks/schema-v3.json
+---
 # benchmarks/
 
 Validated, privacy-safe benchmark **summaries** live here. Raw telemetry, audio, screenshots, traces,

@@ -1,330 +1,352 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-16
-summary: Qwen3-TTS architecture reference — model variants, tokenizer profile, Talker/decoder, speaker roster, generation modes, and parameters.
+reviewed: 2026-10-20
+summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
-  - Sources/Resources/qwenvoice_contract.json
-  - Sources/QwenVoiceCore/EmotionPreset.swift
-  - Sources/QwenVoiceCore/GenerationSemantics.swift
-  - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift
+  - Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift
+  - Sources/QwenVoiceBackendCore/QwenVoiceBackendCore.swift
+  - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
+  - Sources/QwenVoiceCore/GenerationSemantics.swift
+  - Sources/QwenVoiceCore/SemanticTypes.swift
+  - Sources/QwenVoiceCore/NativeCloneSupport.swift
+  - Sources/Resources/qwenvoice_contract.json
   - docs/audits/2026-10-17-qwen3-tts-model-research.md
+  - docs/audits/2026-10-16-engine-runtime-audit.md
 ---
 
 # Qwen3-TTS Reference Guide
 
-A living reference for the Qwen3-TTS models that power Vocello (formerly QwenVoice). This document covers the model architecture, the three generation modes, the built-in speaker roster, emotion/delivery control, voice cloning, language handling, generation parameters, and the practical behaviors we have observed in the Swift + MLX implementation.
+The model reference for the Qwen3-TTS checkpoints that power Vocello. It owns the model family, the
+shipped checkpoints and their conversion recipe, the architecture, generation semantics, languages
+and speakers, the failure catalogue and the parity ledger. Other facts have one owner each:
 
-**When to update this file**
+| Fact | Owner |
+| --- | --- |
+| Wire format, instructions, presets, briefs, transcript and ICL input rules | [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) |
+| The 12 Hz speech tokenizer (encoder, RVQ, decoder internals) | [`mimi-codec-guide.md`](mimi-codec-guide.md) |
+| MLX semantics, error scopes, quantization mechanics, dependency pins | [`mlx-guide.md`](mlx-guide.md) |
+| Artifact bytes, digests, revisions and `artifactVersion` history | [`model-delivery.md`](model-delivery.md) |
+| Engine structure, memory tiers, streaming, prewarm and the clone host pipeline | [`ARCHITECTURE.md` §4](../ARCHITECTURE.md#4-engine-core-qwenvoicecore) |
 
-- Whenever `Sources/Resources/qwenvoice_contract.json` gains or changes a model variant, speaker, or generation default.
-- Whenever `EmotionPreset.swift`, `GenerationSemantics.swift`, `NativeCloneSupport.swift`, or `VoiceDesignBriefCatalog.swift` change the prompt contract, preset copy, clone pipeline, or design briefs.
-- Whenever we move the pinned `PowerBeef02` artifact revisions or quantization tiers.
-- Whenever benchmarking reveals new quality/latency/artifact behaviors.
+Every model fact below comes from Vocello's code, from the sourced research report
+[`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md) (upstream
+citations such as `MQ L615` or `QwenLM#239` use its source keys), or from the
+[engine runtime audit](../audits/2026-10-16-engine-runtime-audit.md) (finding IDs such as A-02 or
+G-01). Code citations are `path:line` at the commit that last reviewed this file.
 
-**Source-of-truth hierarchy**
-
-1. `Sources/Resources/qwenvoice_contract.json` — model IDs, repos, revisions, variants, tokenizer profile, generation defaults.
-2. `Sources/QwenVoiceCore/*.swift` — runtime prompt construction, speaker/language logic, clone conditioning, preset definitions.
-3. `Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift` — voice-design brief copy and limits.
-4. This document and `docs/reference/mlx-guide.md` (for MLX/performance details).
-5. Official Qwen3-TTS docs / paper (linked at the end).
+**Update this file** when `qwenvoice_contract.json` changes a model, variant, speaker or default;
+when the engine's sampling, decoding or conditioning changes (`UnsafeSpeechGenerationModel.swift`,
+`Generation.swift`, `Contracts.swift`, `Qwen3TTS.swift`); when a parity item's status changes; or
+when upstream publishes a new checkpoint.
 
 ---
 
 ## 1. What Qwen3-TTS is
 
-Qwen3-TTS is an open-weights text-to-speech family from Alibaba Cloud's Qwen team. It is built around a single neural audio tokenizer (a Mimi-style RVQ codec) and an autoregressive "Talker" language model. The same family supports three distinct usage patterns:
+Qwen3-TTS is an open-weight text-to-speech family from Alibaba Cloud's Qwen team, released on
+2026-01-21 under Apache-2.0. An autoregressive **talker** language model predicts one codec frame at a
+time, a small **code predictor** fills in the rest of each frame, and the **12 Hz speech tokenizer**
+decodes the frames to 24 kHz mono audio. The family serves three uses, each a separately weighted
+checkpoint:
 
-- **Custom Voice** — 9 built-in preset speakers with optional natural-language style instructions. (Upstream checkpoint name; the app's user-facing label for this mode is **Built-in Voice** since 2026-08-15. Internal mode id stays `custom`.)
-- **Voice Design** — describe a voice in plain text and synthesize speech in that voice.
-- **Voice Cloning** — clone a speaker from a short reference audio clip (Qwen: about 3 s is enough;
-  Vocello asks for 10–20 s, guidance that comes from Alibaba's hosted service rather than the open
-  model).
+- **CustomVoice**: 9 preset speakers, steered by a natural-language instruction. Vocello labels this
+  mode **Built-in Voice** (mode id `custom`).
+- **VoiceDesign**: a voice described in text, sampled anew on each call (`design`).
+- **Base**: a voice cloned from reference audio (`clone`).
 
-All three patterns generate **24 kHz mono PCM**. Vocello ships the **12 Hz tokenizer** family, the
-only one released: the 25 Hz models and tokenizer described in the technical report were never
-published (QwenLM#294). The sourced research behind this guide, including a parity ledger of every
-place Vocello departs from the reference implementation, is
-[`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md).
+The open-weight family has not changed since January 2026: the weights were never revised, the last
+inference-code change is `qwen-tts` 0.1.1 (2026-02-06), and the last repository commit (2026-03-17)
+touches fine-tuning only. The 25 Hz models, the 25 Hz tokenizer and 25Hz-VoiceEditing appear in the
+technical report and were never published (QwenLM#294, closed as not planned; QD#46). The hosted
+`qwen3-tts-flash` and `qwen-audio-3.x` API models share the name but not the weights, and their
+guidance (10–20 s references, a 60 s maximum, 500-character briefs) describes the hosted service,
+not the open checkpoints.
 
 ---
 
-## 2. Model families and variants
+## 2. The family and the shipped checkpoints
 
-Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (pinned there since 2026-07-26; the six repos are `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{8bit,4bit}`) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.09.14.1`.
+### 2.1 Upstream family
 
-| Family (mode) | Folder suffix | MLX repo suffix | Size | Platforms | Notes |
-| --- | --- | --- | --- | --- | --- |
-| **Custom Voice** (`custom`) | `…-CustomVoice-8bit` | `…-CustomVoice-8bit` | 1.7B | macOS only | Quality tier; supports instruction control. |
-| **Custom Voice** (`custom`) | `…-CustomVoice-4bit` | `…-CustomVoice-4bit` | 1.7B | iOS + macOS | Speed tier; instruction control. |
-| **Voice Design** (`design`) | `…-VoiceDesign-8bit` | `…-VoiceDesign-8bit` | 1.7B | macOS only | Quality tier; text-described voices. |
-| **Voice Design** (`design`) | `…-VoiceDesign-4bit` | `…-VoiceDesign-4bit` | 1.7B | iOS + macOS | Speed tier; text-described voices. |
-| **Voice Cloning** (`clone`) | `…-Base-8bit` | `…-Base-8bit` | 1.7B | macOS only | Quality tier; requires speaker encoder. |
-| **Voice Cloning** (`clone`) | `…-Base-4bit` | `…-Base-4bit` | 1.7B | iOS + macOS | Speed tier; requires speaker encoder. |
+| Checkpoint | Parameters | Role | Instruction | Vocello |
+| --- | --- | --- | --- | --- |
+| `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` | 1,916,676,352 | 9 preset speakers | yes | ships |
+| `Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` | 1,916,676,352 | voice from a description; no speakers | the description is the instruction | ships |
+| `Qwen/Qwen3-TTS-12Hz-1.7B-Base` | 1,928,677,440 | ICL or x-vector clone; fine-tuning base; carries the speaker encoder | no (QwenLM#25) | ships |
+| `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice` | 905.8 M | 9 preset speakers | no: the wrapper drops it (WM L799-800), although the model card claims it | not shipped |
+| `Qwen/Qwen3-TTS-12Hz-0.6B-Base` | 914,643,008 | clone | no | not shipped |
+| `Qwen/Qwen3-TTS-Tokenizer-12Hz` | 170.6 M, fp32 | codec encode and decode | — | ships as each artifact's `speech_tokenizer/` |
+| 25 Hz Base and CustomVoice, 25Hz-1.7B-VoiceEditing, Tokenizer-25Hz | — | paper only | — | never released |
 
-- **8-bit = Quality**, **4-bit = Speed**. macOS defaults to Quality unless the device is in the `floor8GBMac` memory class, in which case Speed is selected. iOS always uses the Speed variant.
-- Qwen3-TTS also publishes **0.6B** checkpoints. Vocello currently pins only the **1.7B** variants.
-- `supportsInstructionControl` is `true` for Custom Voice and Voice Design, `false` for the Base clone model.
-- `supportsXVectorOnlyClone` is explicitly `true` only for the Base clone model; audio-only
-  cloning fails before model preparation if a future checkpoint does not declare it.
-- `requiresSpeakerEncoder` is `true` only for the clone model.
+There is no 0.6B VoiceDesign. mlx-community publishes bf16, 4-, 5-, 6- and 8-bit conversions of all
+five models, unchanged since 2026-01-25; Vocello ships its own conversions instead (§2.2, §2.3).
+
+### 2.2 What Vocello ships
+
+Three model ids, each in two variants, all MLX conversions of the 1.7B checkpoints published as
+`PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{4bit,8bit}` at the revisions
+`qwenvoice_contract.json` pins (`artifactVersion` `2026.09.14.1`).
+
+| Mode (id) | Model id | Upstream checkpoint | Speed, 4-bit | Quality, 8-bit |
+| --- | --- | --- | --- | --- |
+| Built-in Voice (`custom`) | `pro_custom` | 1.7B-CustomVoice | iOS and macOS | macOS |
+| Voice Design (`design`) | `pro_design` | 1.7B-VoiceDesign | iOS and macOS | macOS |
+| Voice Cloning (`clone`) | `pro_clone` | 1.7B-Base | iOS and macOS | macOS |
+
+- **Variant selection** (`ModelDescriptor.preferredVariant`, `SemanticTypes.swift:494-512`): the
+  iPhone always takes Speed; a Mac takes Quality unless it is in the `floor8GBMac` memory class.
+- **Capabilities** (contract `qwen3Capabilities`): `supportsInstructionControl` is true for Custom
+  and Design; `supportsVoiceClone`, `supportsXVectorOnlyClone` and `requiresSpeakerEncoder` are true
+  only for Clone. An audio-only clone fails before model preparation on a model that does not
+  declare x-vector support (`NativeEngineRuntime.swift:1960-1972`).
+- Revisions, files, byte counts and digests: [`model-delivery.md`](model-delivery.md#artifact-provenance).
+
+### 2.3 Conversion recipe
+
+- **Quantization:** affine, group size 64, 4-bit (Speed) or 8-bit (Quality), over 251 modules in the
+  4-bit CustomVoice index: every talker and code-predictor projection, the 15 code-predictor heads,
+  `codec_head`, `small_to_mtp_projection` and `text_projection`.
+- **Text embedding:** `talker.model.text_embedding` is 8-bit in both tiers. This is Vocello's one change
+  to the weights (`scripts/convert_text_embedding_8bit.py`, 2026-07-26): 292 MB less on disk, 278 MB
+  less MLX peak on an 8 GB Mac, and a change to fixed-seed output.
+- **Kept unquantized:** the talker's codec embeddings, the 15 code-predictor codec embeddings, every
+  norm and bias (bf16); the Base speaker encoder (float); the speech tokenizer (fp32, byte-identical to
+  Qwen's release).
+- **Compute dtype** is bf16, so the talker KV cache is bf16.
+- **`generation_config.json`** is upstream's, unchanged.
+- **Marking:** every artifact also carries Meta's AudioSeal generator
+  (`marking/audioseal_wm16_generator_fp16.safetensors`).
+- **Precision caveat:** Qwen trained and evaluated in bf16 and recommends fp32 where bf16 is
+  unavailable, because the code predictor is "extremely sensitive to precision" (QwenLM#43). No
+  quantized checkpoint was ever evaluated upstream, and Vocello's 4-bit tier quantizes all 51
+  code-predictor linear and head tensors.
+
+### 2.4 Licenses
+
+The five Qwen3-TTS checkpoints, the 12 Hz tokenizer and the QwenLM/Qwen3-TTS repository are
+Apache-2.0; the technical report (arXiv:2601.15621) is CC BY 4.0; the AudioSeal generator each
+artifact bundles is MIT.
 
 ---
 
 ## 3. Architecture
 
-The pipeline has four parts. All numbers below are for the **1.7B** variant unless noted.
+Numbers are for the 1.7B checkpoints unless noted; upstream line citations are in the research report
+[§3](../audits/2026-10-17-qwen3-tts-model-research.md#3-architecture-as-implemented-upstream-17b-unless-noted).
 
 ```text
-Text  →  Qwen BPE tokenizer  →  Text embedding + projection  →  Talker (28-layer transformer)
-                                                                        ↓
-                                                           Codebook-0 / semantic token per frame
-                                                                        ↓
-                                              Code Predictor (5 layers × 15 passes) → codebooks 1-15
-                                                                        ↓
-                                              16 discrete codes per 80 ms frame
-                                                                        ↓
-                                              Speech Tokenizer Decoder (Mimi-style RVQ) → 24 kHz PCM
+Script ─► Qwen2 BPE ─► text embedding + text_projection ─┐
+Speaker row or x-vector (+ ICL reference codes) ─► codec ─┴─► Talker (28 layers)
+                                                                │  one codebook-0 token per frame
+                                                                ▼
+                                   Code predictor (5 layers × 15 passes) ─► codebooks 1–15
+                                                                │  16 codes per 80 ms frame
+                                                                ▼
+                                   12 Hz tokenizer decoder ─► 24 kHz mono PCM in [-1, 1]
 ```
 
-### 3.1 Audio representation (tokenizer profile)
-
-The canonical profile is defined once per model capability block in `qwenvoice_contract.json`:
-
-| Parameter | Value |
-| --- | --- |
-| Sample rate | 24,000 Hz |
-| Frame rate | 12.5 Hz (80 ms per frame) |
-| Decoder quantizers | 16 |
-| Encoder valid quantizers | 16 |
-| Encoder configured quantizers | 32 (training config; inference uses 16) |
-| Per-quantizer codebook size | 2,048 |
-| Semantic codebook size | 4,096 in the config only; no official code reads it, and every decoder codebook has 2,048 entries |
-| Effective bitrate | ~2.2 kbps (16 codebooks × 11 bits × 12.5 Hz) |
-| Compression ratio | ~175× vs. 16-bit 24 kHz PCM (~349× vs. float32 PCM). The `decodeUpsampleRate` is 1,920 (24,000 / 12.5). |
-
-Each frame is therefore a vector of 16 integers in `[0, 2047]`. The first codebook carries the most semantic content; later codebooks add prosody, speaker identity, and acoustic residuals.
-
-### 3.2 Talker (main LM)
+### 3.1 Talker
 
 | Parameter | 1.7B | 0.6B |
 | --- | --- | --- |
-| Text hidden size | 2,048 | 2,048 |
-| Talker hidden size | 2,048 | 1,024 |
-| Layers | 28 | 28 |
-| Attention heads | 16 | 16 |
-| KV heads (GQA) | 8 | 8 |
-| Head dimension | 128 | 128 |
-| Q dimension (heads × head dim) | 2,048 | 2,048 |
-| Intermediate FFN size | 6,144 | 3,072 |
-| Position encoding | M-RoPE, θ = 1e6, interleaved | same |
-| M-RoPE section | `[24, 20, 20]` | `[24, 20, 20]` |
-| Norm | RMSNorm (ε = 1e-6) | same |
-| Activation | SwiGLU (SiLU) | same |
-| Text projection | SiLU MLP: 2,048 → 2,048 → hidden size | same |
+| Hidden size | 2,048 | 1,024 |
+| SwiGLU intermediate size | 6,144 | 3,072 |
+| Layers | 28 | — |
+| Attention heads / KV heads / head dim | 16 / 8 / 128 (q dim 2,048) | q dim 2,048, larger than the hidden size |
+| Norm | RMSNorm, ε 1e-6 | — |
+| RoPE θ; max positions | 1e6; 32,768 | — |
+| Codec vocabulary; text vocabulary | 3,072; 151,936 | — |
+| Code groups per frame | 16 | — |
 
-Key implementation details:
+A dash means the research report lists no difference from 1.7B.
 
-- Q and K are **per-head RMSNorm'd** before RoPE.
-- RoPE is NeoX-style **split-half** (`rotate_half` over `cat(freqs, freqs)`), as upstream and
-  Vocello's `Qwen3TTSTalker.swift` both implement it. The config's `interleaved: true` only decides
-  which M-RoPE stream feeds each frequency.
-- For TTS, all three M-RoPE position dimensions are identical, so it behaves like standard RoPE.
-- The Talker predicts tokens from a separate **codec vocabulary** of size 3,072, not the text vocabulary.
+- **Q/K norm.** Per-head RMSNorm on q and k before RoPE.
+- **RoPE is split-half** (`rotate_half` over `cat(freqs, freqs)`), upstream (MQ L546-559, L615-619)
+  and in Vocello (`Qwen3TTSTalker.swift:8-21`). The config's `rope_scaling.interleaved` only chooses
+  which M-RoPE stream feeds each frequency, and all three position streams are equal, so this is plain
+  1-D RoPE.
+- **Text path.** `text_projection` is a SiLU MLP with bias; `codec_head` is untied.
+- **Step input.** Each step's input is the sum of the previous frame's 16 codebook embeddings
+  (codebook 0 from the talker's `codec_embedding`, 1–15 from the code predictor's) plus the text track
+  (`Qwen3TTS.swift:4023-4039`).
+- `position_id_per_seconds: 13` is in the config and read by no code.
 
-Special token IDs (codec vocabulary):
+### 3.2 Codec vocabulary and control ids
 
-| Token | ID |
+Ids 0–2047 are codebook-0 codes and the only ids the talker may sample; the rest are control,
+language and speaker ids. The defaults below match the checkpoint config and the loader
+(`Qwen3TTSConfig.swift:247-253`).
+
+| Id | Token | Id | Token |
+| --- | --- | --- | --- |
+| 2148 | `codec_pad` | 2154 | `think` |
+| 2149 | `codec_bos` | 2155 | `nothink` |
+| 2150 | `codec_eos` | 2156 | `think_bos` |
+| | | 2157 | `think_eos` |
+
+**Languages:** english 2050, german 2053, spanish 2054, chinese 2055, japanese 2058, french 2061,
+korean 2064, russian 2069, italian 2070, portuguese 2071; CustomVoice adds `sichuan_dialect` 2062 and
+`beijing_dialect` 2074. **Speakers** are in §4. The engine looks both up in the checkpoint's
+`codec_language_id` and `spk_id` tables, not in a hard-coded list (`Qwen3TTS.swift:1545-1570`).
+
+### 3.3 Text tokenizer
+
+`Qwen2Tokenizer` byte-level BPE from `vocab.json` and `merges.txt`, with no `tokenizer.json` and no chat
+template. Special ids: `<|im_start|>` 151644, `<|im_end|>` 151645, `assistant` 77091, `<tts_pad>`
+151671, `<tts_text_bos>` 151672, `<tts_text_eod>` 151673. The ChatML strings, the prefill order and the
+`think`/`nothink` branch are wire format:
+[prompting guide §1](qwen3-tts-prompting-guide.md#1-the-wire-format).
+
+### 3.4 Code predictor (multi-token prediction)
+
+Hidden 1,024, 5 layers, 16 heads / 8 KV heads, θ 1e6, vocabulary 2,048, with 15 codec embeddings at
+talker width, 15 heads and `small_to_mtp_projection` (2,048 → 1,024; identity on 0.6B). Each frame
+runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:3978-4017`), with its own
+sampling settings, no EOS and no repetition penalty (MQ L1671-1680, L1276-1299). The weights sit
+under `talker.code_predictor.model.codec_embedding.{0…14}` and `talker.code_predictor.lm_head.{0…14}`
+(`Qwen3TTSCodePredictor.swift:169-230`).
+
+### 3.5 Speaker encoder (Base only)
+
+An ECAPA-TDNN without BatchNorm (MQ L95-393) whose output is 2,048 wide on 1.7B (1,024 on 0.6B). It
+reads mono 24 kHz audio through a magnitude-mel frontend: 1,024-point FFT, hop 256, periodic Hann
+window, reflect padding 384, 128 Slaney mel bins up to 12 kHz, `sqrt(re² + im² + 1e-9)` and
+`log(max(·, 1e-5))`. Vocello's frontend, `qwen-speaker-mel-v1`, implements that contract
+(`Qwen3TTSSpeakerMelFrontend.swift:11-22`); the clone artifact format is in
+[`CLONE_ARTIFACT_FORMAT.md`](../../Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md). CustomVoice
+speakers are not encoder outputs: each is a row of the talker's codec embedding, addressed by its
+`spk_id`.
+
+### 3.6 The 12 Hz speech tokenizer
+
+The profile below is declared per model in `qwenvoice_contract.json` and checked at load
+(`Qwen3TTSConfig.swift:496-529`). Internals are in the
+[codec guide](mimi-codec-guide.md#3-qwen3-tts-speech-tokenizer-architecture).
+
+| Parameter | Value |
 | --- | --- |
-| `codec_pad` | 2,148 |
-| `codec_bos` | 2,149 |
-| `codec_eos` | 2,150 |
-| `think` | 2,154 |
-| `no_think` | 2,155 |
+| Sample rate; frame rate | 24,000 Hz; 12.5 Hz (80 ms per frame, `decode_upsample_rate` 1,920) |
+| Quantizers | 16 decode; 16 valid of the encoder's 32 configured |
+| Codebook size | 2,048 per quantizer |
+| `semantic_codebook_size` | 4,096 in the config only: no official code reads it, and Vocello only checks the value |
+| Bitrate | ~2.2 kbps (16 × 11 bits × 12.5 Hz), ~175× smaller than 16-bit 24 kHz PCM |
 
-Language IDs are also codec-vocabulary tokens, e.g. English = 2,050, Chinese = 2,055. Vocello's `Qwen3SupportedLanguage` enum maps these at runtime.
+Three model-level facts matter for parity (§12):
 
-### 3.3 Code Predictor (multi-token prediction)
-
-A 5-layer transformer that runs **15 sequential passes** per frame to predict codebooks 1 through 15, conditioned on the Talker's hidden states and previously predicted codebook tokens. Each pass has its own embedding and head:
-
-- `talker.code_predictor.model.codec_embedding.{g}` for g = 0…14
-- `talker.code_predictor.lm_head.{g}` for g = 0…14
-
-This means ~103 layer evaluations per 80 ms frame (28 Talker + 75 Code Predictor + decoder), or roughly **1,288 layer evaluations per second of output audio**.
-
-### 3.4 Speech Tokenizer Decoder
-
-A Mimi-based neural codec decoder that converts the 16-code frames back to a 24 kHz waveform. It is causal and streaming-friendly:
-
-- 8 pre-transformer layers (upstream gives every one a 72-frame sliding window; Vocello's decoder
-  attends causally over the whole take, engine audit A-03)
-- a SEANet decoder: an input conv, four SnakeBeta upsampling blocks (rates 8, 5, 4, 3), SnakeBeta
-  and an output conv
-- 2 ConvNeXt upsampling blocks before it
-- a final `clamp(-1, 1)` (no tanh) → float samples in `[-1, 1]`
-
-The speech-tokenizer weights ship as **fp32** (682,293,092 bytes, the file Vocello 2.4.0 carried), even when the Talker is quantized to 4/8 bit. The unified f16 codec promoted on 2026-08-01 was withdrawn on 2026-09-14 (artifactVersion `2026.09.14.1`): with the f16 weights the streaming decoder opened clone takes with a burst inside the first 50 ms (roadmap MV-07) — see `benchmarks/OPTIMIZATION.md` §R.
-
-### 3.5 Speaker encoding (voice cloning)
-
-There are **no separate speaker embedding tensors**. In Custom Voice, the 9 speakers are represented as tokens in the codec vocabulary (e.g. `serena` maps to a specific codec ID). In Voice Cloning, a small speaker-encoder network consumes the reference audio and produces a reusable `Qwen3TTSVoiceClonePrompt` that conditions the Base model at inference time.
+- **Encoder.** Transformers' `MimiModel` without its decoder. Its q/k weights are stored for
+  `rotate_half`, but Vocello's port applies `RoPE(traditional: true)`
+  (`Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift:130`; A-02, open). Its
+  attention is full causal (`Transformer.swift:168`), which matches upstream: the configured 250-frame
+  window applies only under FlashAttention-2, which the official loader does not select.
+- **Decoder.** Qwen's own code. Upstream gives each of its 8 transformer layers a 72-frame sliding
+  window; Vocello's decoder attends causally over the whole take (`Qwen3TTSSpeechTokenizer.swift:490-498`;
+  A-03, open).
+- **Output** ends in `clamp(-1, 1)`, not tanh (`Qwen3TTSSpeechTokenizer.swift:999`).
 
 ---
 
 ## 4. Built-in speakers
 
-The 9 preset speakers are defined in `Sources/Resources/qwenvoice_contract.json`. Each has a native language and a short description. The model-specific config (`talker_config.spk_id`) is the runtime source of truth for which speakers a checkpoint actually supports.
+The roster, native languages and descriptions come from `qwenvoice_contract.json`; the codec ids and
+dialect map come from the CustomVoice checkpoint config (`spk_id`, `spk_is_dialect`), which is what the
+engine reads at runtime.
 
-| ID | Display name | Native language | Description |
-| --- | --- | --- | --- |
-| `aiden` | Aiden | English | Sunny American male voice with a clear midrange. |
-| `ryan` | Ryan | English | Dynamic male voice with strong rhythmic drive — naturally expressive. |
-| `vivian` | Vivian | Chinese | Bright, slightly edgy young female voice. |
-| `serena` | Serena | Chinese | Warm, gentle young female voice. |
-| `uncle_fu` | Uncle Fu | Chinese | Seasoned male voice with a low, mellow timbre. |
-| `dylan` | Dylan | Chinese (Beijing dialect) | Youthful Beijing male voice with a clear, natural timbre. |
-| `eric` | Eric | Chinese (Sichuan dialect) | Lively Chengdu male voice with a slightly husky brightness. |
-| `ono_anna` | Ono Anna | Japanese | Playful Japanese female voice with a light, nimble timbre. |
-| `sohee` | Sohee | Korean | Warm Korean female voice with rich emotion. |
+| Id | Display name | Native language | Codec id | Description (contract) |
+| --- | --- | --- | --- | --- |
+| `aiden` | Aiden | English | 2861 | Sunny American male voice with a clear midrange |
+| `ryan` | Ryan | English | 3061 | Dynamic male voice with strong rhythmic drive |
+| `vivian` | Vivian | Chinese | 3065 | Bright, slightly edgy young female voice |
+| `serena` | Serena | Chinese | 3066 | Warm, gentle young female voice |
+| `uncle_fu` | Uncle Fu | Chinese | 3010 | Seasoned male voice with a low, mellow timbre |
+| `dylan` | Dylan | Chinese (Beijing dialect) | 2878 | Youthful male voice with a clear, natural timbre |
+| `eric` | Eric | Chinese (Sichuan dialect) | 2875 | Lively Chengdu male voice with a slightly husky brightness |
+| `ono_anna` | Ono Anna | Japanese | 2873 | Playful female voice with a light, nimble timbre |
+| `sohee` | Sohee | Korean | 2864 | Warm female voice with rich emotion |
 
-- The default speaker is `aiden`.
-- Speaker quality is best when the target text is in the speaker's native language, but all speakers can generate any of the 10 supported languages.
+- **Default speaker:** `aiden` is Vocello's default (`defaultSpeaker`); upstream has none.
+- **Cross-lingual use:** each speaker sounds best in its native language but can speak all ten
+  (RM L187).
+- **Dialect swap.** `spk_is_dialect` maps `eric` to `sichuan_dialect` and `dylan` to
+  `beijing_dialect`. With language Chinese or Auto, those two speakers take the dialect language id
+  instead (`Qwen3TTS.swift:1551-1556`), as upstream does (MQ L2118-2122). Production Custom never sends
+  Auto (§7.2, D6), so in practice the swap fires when the language resolves to Chinese.
 
 ---
 
 ## 5. Generation modes
 
-> Prompt-writing depth for all three modes — what each text surface does, how the modes differ in
-> what conditioning they accept, and which claims are sourced — lives in
-> [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md).
+What each mode accepts and what the host sends (`GenerationSemantics.qwen3PromptAssembly`,
+`GenerationSemantics.swift:617-696`). How to write the script, instruction and brief is the
+[prompting guide](qwen3-tts-prompting-guide.md)'s subject.
 
-### 5.1 Custom Voice
+| Mode | Voice identity from | Instruction | Reference transcript | Language when undetected |
+| --- | --- | --- | --- | --- |
+| Custom | the speaker's codec row | the delivery preset or free text, if the model supports it | — | `english` (D6) |
+| Design | the instruction | the brief and the delivery, as one instruction | — | `auto` |
+| Clone | the reference: x-vector, plus reference codes for ICL | none; the request type has no field for it | inline or saved-voice transcript | `auto` |
 
-Use a built-in speaker and optionally steer delivery with a natural-language instruction.
+Custom and Design instructions are refused if they ask for celebrity imitation or voice impersonation
+(`validateQwenPromptContract`, `GenerationSemantics.swift:891`).
 
-```swift
-Qwen3PromptAssembly(
-    mode: .customVoice,
-    text: "Hello, welcome to Vocello.",
-    language: "english",
-    instruct: "Speak happily and energetically.",
-    speakerID: "aiden"
-)
-```
+### 5.1 Built-in Voice (CustomVoice)
 
-- Instruction control is **only available on the 1.7B CustomVoice model**. The 0.6B model (not shipped in Vocello) does not support it.
-- For English text, `GenerationSemantics` appends a diction-reinforcement clause (`Native English pronunciation with clear English diction and natural stress.`) unless the feature is disabled via the debug-gated `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` diagnostic override. The append is suppressed when the instruction already asks for clarity, and that decision resolves **preset-wide**: if any intensity tier of a preset contains a diction word, every tier of that preset suppresses. Resolving per string instead let a preset's two tiers differ by 76 characters of boilerplate that says nothing about intensity, confounding normal-versus-strong comparisons (fixed 2026-08-02; `scripts/check_delivery_instructions.py`, run by `./scripts/check_project_inputs.sh` in `scripts/dev.sh check` (advisory) and in the CI `macos-tests` job on `main` (the gate), fails if it returns). Free-form user instructions still resolve per string. The clause is always its own sentence: a base without closing punctuation (a neutral-delivery Voice Design brief, whose final period `designInstruction` strips, or free-form delivery text) gets a period before it (P12-08, 2026-10-06).
-- Celebrity imitation / voice impersonation instructions are rejected by `validateQwenPromptContract`.
+A preset speaker plus an optional delivery instruction. Instruction control exists on the 1.7B
+CustomVoice checkpoint; upstream drops it on 0.6B, and the runtime keeps the same guard
+(`supportsCustomInstructionControl`). For English output the host appends a diction sentence to the
+instruction unless the instruction already asks for clarity; the rule, its exceptions and its
+measurements are in the [prompting guide §8.2](qwen3-tts-prompting-guide.md#82-the-one-defect-the-audit-found).
 
 ### 5.2 Voice Design
 
-Describe the voice in plain text; the model samples a new voice matching the description.
+The brief (at most 500 characters, `VoiceDesignBriefCatalog.descriptionLimit`) and the delivery form
+one instruction, and the model samples a new voice that fits it on every call (QwenLM#4): Design has
+no fixed speaker id. Design exists only at 1.7B. The English diction sentence applies here too
+(`GenerationSemantics.swift:666`). For a voice that stays the same across takes, design it once and
+clone the result (§5.4).
 
-```swift
-Qwen3PromptAssembly(
-    mode: .voiceDesign,
-    text: "The quick brown fox jumps over the lazy dog.",
-    language: "english",
-    instruct: "Voice character: A deep, low-pitched male narrator, warm and bass-resonant. Delivery: Calm and soothing.",
-    speakerID: nil
-)
-```
+### 5.3 Voice Cloning (Base)
 
-- Voice Design is **1.7B only**.
-- The brief (voice description) is limited to **500 characters** in the UI (`VoiceDesignBriefCatalog.descriptionLimit`).
-- There is **no fixed speaker ID**. Each call samples a fresh voice, so consistency across sessions requires the **design-then-clone** workflow (see below).
-- Effective descriptions are concrete and acoustic: name gender, age, pitch register, pace, timbre, emotion, and use-case. Avoid abstract persona-only prompts.
-- Accent/dialect hints are flavor, not guarantees.
+Two conditioning modes, chosen by whether a transcript resolves:
 
-### 5.3 Voice Cloning
+- **ICL (transcript-backed):** the speaker embedding plus the reference's codec codes and its
+  transcript. Upstream requires `ref_text` for ICL (WM L436-438), and it must cover the **whole**
+  reference: a transcript of only part of it makes ICL loop without EOS (MA#921).
+- **x-vector only (audio-only):** the speaker embedding alone. Upstream ignores any transcript here
+  and calls the quality lower (RM L243). An empty or whitespace transcript selects this mode; it never
+  falls back to Voice Design.
 
-Clone from a reference audio clip.
+A one-off reference uses only an inline transcript; a saved voice also reads its `.txt` sidecar
+(`NativeCloneSupport.swift:781-799`). The Base model does not support instructions (QwenLM#25), and
+Vocello's clone request has no field to carry one. Model-side conditioning details and Vocello's
+open clone gaps are in §8.
 
-```swift
-Qwen3PromptAssembly(
-    mode: .voiceClone,
-    text: "Hello, this is my cloned voice.",
-    language: "english",
-    instruct: nil,          // Base model ignores instructions
-    refText: "Reference transcript.",
-    speakerID: nil
-)
-```
+### 5.4 Design, then clone
 
-- Requires the **Base** model and the speaker encoder.
-- A transcript (`refText`) improves quality but is optional. A saved voice also uses its `.txt`
-  transcript sidecar; a one-off reference uses only the inline transcript, never a file that
-  happens to sit beside it. Inline or saved-voice text selects typed transcript-backed ICL
-  conditioning; absent, empty, or whitespace-only text selects true speaker-embedding-only
-  x-vector conditioning rather than falling back to Voice Design.
-- The Base model **does not follow delivery/emotion instructions**. To get a styled clone, use **design-then-clone**: generate a styled reference clip with Voice Design, build a clone prompt from it, then generate with the Base model using that prompt.
-
-### 5.4 Design-then-clone workflow
-
-This is the recommended way to create a reusable, styled character voice:
-
-1. Use **Voice Design** to synthesize a short reference clip that matches the desired persona and delivery.
-2. Call `createVoiceClonePrompt(refAudio:refText:)` to build a reusable `Qwen3TTSVoiceClonePrompt`.
-3. Use the Base model's `generate_voice_clone(voice_clone_prompt=...)` for all subsequent lines.
-
-Vocello caches the resulting clone prompt on disk and in memory to avoid recomputing it for every generation.
-The speaker encoder uses Qwen's own 24 kHz magnitude-mel frontend rather than the generic
-Whisper-style mel helper: reflect padding, periodic Hann, 1024-point FFT, 256-sample hop, 128
-Slaney-scale/Slaney-normalized bands, and natural-log scaling. Embeddings must be finite
-`float32 [1, D]` tensors matching the decoded encoder and talker dimensions.
-
-For a focused physical-device semantic check, `scripts/ios_device.sh clone-conditioning` runs the
-canonical saved reference twice in one process: first with its explicit transcript and prepared
-voice identity, then through an exact purpose-owned audio copy with no sidecar and no prepared voice
-identity. The compile-gated runner requires `transcript_backed` and `x_vector_only` runtime flags,
-distinct prompt-assembly digests, exact output/telemetry evidence, and cleanup of the temporary
-audio-only copy. This local acceptance command does not publish benchmark history and does not
-replace the XCUITest UI path for the visible saved-voice workflow.
+Qwen's recommended route to a reusable designed voice (RM L288-290; QwenLM#4): sample a design until
+one fits, then use that take as a clone reference with its exact script as the transcript, and
+generate every later line from the clone prompt.
 
 ---
 
-## 6. Delivery / emotion presets
+## 6. Delivery presets
 
-`Sources/QwenVoiceCore/EmotionPreset.swift` defines the single source of truth: **8 presets**, each
-shipping one instruction. Neutral is itself a real instructed preset (steady, slightly monotone).
-
-The user-facing **intensity control was retired 2026-08-02**, following the "subtle" tier on
-2026-08-01. Both went for the same reason and by the same test — a control whose effect cannot be
-verified is not a control. DP-3 measured the `strong` copy at nearly double the recognisability of
-`normal` (mean per-preset recall 0.278 against 0.157, chance 0.053) while showing the two tiers were
-not separable from each other. That measurement was taken in early August 2026 on the then-shipping
-ten-preset roster: for five presets the nearest cell in the whole space was its own other tier,
-seven of nine non-neutral presets moved *less* at strong than at normal, and the since-retired
-`dramatic` reversed outright (the roster was cut to 8 on 2026-08-03). Every
-preset therefore initially shipped its strong copy. The later measured shipped-tier policy keeps
-`happy` and `angry` at Normal while every other preset retains Strong; legacy drafts continue to
-use the exact raw instruction they stored. Since 2026-08-04 the eight presets also carry the
-measured recognizability split (`EmotionPreset.distinctDeliveryIDs`): Neutral, Calm,
-Whisper, and Sad present as distinct deliveries, while Happy, Angry, Fearful, and
-Surprised present as directional hints with advisory copy — the measured results are in
-[`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) and the measurement protocol in
-[`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells).
-
-`EmotionIntensity` survives internally, addressing both texts, so the delivery bench can keep
-measuring both tiers and drafts saved before the change resolve to exactly what they stored. The
-internal normal/strong pair and the copy that ships (`shippedIntensity`) live only in
-`EmotionPreset.swift`; this guide no longer restates them, because its copy went stale after the
-2026-08-24/25 remediation.
-
-> `narrator` and `news` are Voice Design brief archetypes, not delivery presets.
-
-Prompt-writing lessons baked into the preset copy. These were written without citations; each was
-sourced or retracted on 2026-08-02, and [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) §9
-carries the full adjudication with references. Summary:
-
-- **Concrete acoustic wording** (pitch, pace, timbre, volume) is followed more reliably than persona-only wording. *Supported* — InstructTTSEval scores our checkpoint at 77–83 on explicit acoustic specification versus 61–64 on role-play framing.
-- **Negative constraints work** (`"joyful but without laughing"`). *Suggested upstream, unmeasured* — a Qwen collaborator recommends "very happy but without laughing" (QwenLM#16), but no ablation measures it, and the nearest published ablation found bare paralinguistic tags reduced adherence.
-- **Stacked intensifiers do not work** (`"very very very happy"` adds no value). *Partly contradicted* — repetition adding nothing is defensible, but upstream's own examples are `"Very happy."` and `"Say it in a very angry and disappointed tone"`.
-- High-arousal instructions (`happy`, `surprised`) can otherwise trigger literal laughter or extra breath sounds. *Qwen acknowledges the symptom (QwenLM#16).* The shipped copy no longer carries "without laughing" or "no gasping" clauses; read the current copy in `EmotionPreset.swift`.
-- An intelligibility clause (`"keeping every word audible"`) helps bound extreme emotions. *Unverified as written* — the vendor-documented cousin is a closing recording-quality anchor, which is a different mechanism.
+`Sources/QwenVoiceCore/EmotionPreset.swift` defines eight presets — Neutral, Happy, Sad, Angry,
+Fearful, Surprised, Calm and Whisper — each shipping one instruction; Neutral is itself an instructed
+preset. The user-facing intensity control was retired on 2026-08-02. The prompting guide owns the
+preset copy, its measured recognizability and instruction language; it also adjudicates, in
+[§9](qwen3-tts-prompting-guide.md#9-adjudicating-the-claims-already-in-this-repository), the
+prompt-writing lessons this guide used to list. Two upstream facts frame them: emotive instructions
+can add laughter, and Qwen's own suggested remedy is a negative constraint such as "very happy but
+without laughing" (QwenLM#16); non-verbal sounds come out only implicitly (QwenLM#9).
 
 ---
 
@@ -332,250 +354,372 @@ carries the full adjudication with references. Summary:
 
 ### 7.1 Supported languages
 
-`Qwen3SupportedLanguage` enumerates 10 languages plus `auto`:
+`Qwen3SupportedLanguage` (`SemanticTypes.swift:32-43`) lists Chinese, English, Japanese, Korean,
+German, French, Russian, Portuguese, Spanish and Italian, plus `auto`. Each named language becomes its
+codec language id (§3.2) and selects the `think` branch; `auto` sends no language id and selects
+`nothink`. Qwen advises setting the language when it is known (RM L50, L167); its own evaluation
+ran Seed-TTS and InstructTTSEval with language `auto` and the other benchmarks with an explicit
+language (RM L465).
 
-`chinese`, `english`, `japanese`, `korean`, `german`, `french`, `russian`, `portuguese`, `spanish`, `italian`.
+### 7.2 How a take's language is chosen
 
-### 7.2 Language hint selection
+`GenerationSemantics.qwenLanguageHint` (`GenerationSemantics.swift:864-889`):
 
-`GenerationSemantics.qwenLanguageHint(for:resolvedCloneTranscript:)` decides which language token is sent to the model:
+1. An explicit language on the request wins in every mode.
+2. Otherwise the language is detected from the target script
+   (`detectedQwenLanguage`, `GenerationSemantics.swift:1172-1196`). A script decides only when it
+   carries most of the text: a mostly East Asian text resolves to Chinese, Japanese or Korean by the
+   proportion of kana, Hangul and Han; a mostly Cyrillic text to Russian; anything else goes to
+   `NLLanguageRecognizer` (`PromptLanguageDetector`), which separates the Latin-script languages and
+   returns nothing when unsure.
+3. Undetected: Custom falls back to `english` (D6), Design and Clone to `auto`.
 
-- **Custom Voice**: detect from the target text; fall back to `english`.
-- **Voice Design**: detect from the target text; fall back to `auto`.
-- **Voice Clone**: detect from the target text; an explicit output-language selection always wins,
-  and the reference transcript's language remains conditioning metadata only; fall back to `auto`.
+For Clone, the reference transcript's language is conditioning metadata and never redirects the
+target. D6's A/B knob, `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on`, sends Auto for undetected Custom takes;
+like every knob it needs the internal-diagnostics build and `QWENVOICE_DEBUG`
+(`config/runtime-debug-knobs.json`).
 
-### 7.3 Delivery-instruction language routing
+Delivery-instruction language, including the one Mandarin preset cell, belongs to the
+[prompting guide §4.4](qwen3-tts-prompting-guide.md#44-instruction-language-separate-inputs-unresolved-comparative-quality).
+The language unit tests, the hint bench and the output round trip are in
+[`language-bench.md`](language-bench.md).
 
-Canonical delivery instructions remain English by default. The sole versioned localized cell is
-`angry.normal`: CustomVoice uses its Mandarin instruction only when the selected speaker's
-`nativeLanguage` comes from `qwenvoice_contract.json` as Chinese and the resolved output language
-is also Chinese. Either predicate missing falls back to canonical English. Custom instructions and
-legacy History strings carry no delivery-cell identity, remain verbatim, and are never relocalized.
-The engine receipt records the actual instruction language and final digest; the English diction
-clause is retained for English output and is never appended to Mandarin.
+### 7.3 Dialects and accents
 
-Detection order:
-
-1. Japanese kana → `japanese`
-2. Hangul → `korean`
-3. Cyrillic → `russian`
-4. CJK → `chinese`
-5. Latin script → `PromptLanguageDetector` (NLLanguageRecognizer) to disambiguate French/German/Spanish/Portuguese/Italian/English; if confidence is too low, `auto`.
-
-Official guidance: **explicit language tokens outperform `auto`**. Vocello therefore tries to detect and only falls back to `auto` when ambiguous.
-
-**Unit tests:** `Tests/VocelloCoreTests/` covers `Qwen3SupportedLanguage.normalized`, `PromptLanguageDetector`, `LanguageSelectionPresentation`, and the `qwenLanguageHint` matrix. Run on macOS with `scripts/dev.sh test --only <TestClass>` (which dispatches to `scripts/macos_test.sh core-test --only`); the full bundle is also step 2 of `scripts/macos_test.sh gate`.
-
-**Headless hint bench (Phase 2):** `config/language-bench-matrix.json` + `scripts/ios_device.sh lang-bench` (device) or `scripts/macos_test.sh lang-bench` (CLI). Gated by `scripts/check_language_hints.py` on `notes.languageHint`. Both lanes are consent-bound (run only on explicit request), refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`), and need the QC v2 models and runtimes set up first (`qc.py models fetch --all`, `qc.py runtimes setup`) — nothing downloads automatically.
-
-**Output round-trip (Phase 3):** on iOS the same fixed-seed matrix retains and revalidates the
-exact generated WAV, runs three sequential locale-locked on-device Speech passes, and
-`scripts/check_language_output.py` requires exact transcript consensus and independently recomputes
-the primary edit metric against the tracked corpus: WER for word-delimited languages or CER for
-Chinese, Japanese and Korean, with the shared `MAX_ACCURACY_ERROR_RATE = 0.15` from
-`scripts/lib/language_metrics.py`. After generation has finished, both lanes score the takes with QC
-v2's Qwen3-ASR and Whisper large-v3 (`qc.py language-bench`, [qc.md](qc.md)); the two must agree per
-channel on both platforms, beside Apple Speech's in-app gate on iOS. Requires on-device Speech assets for non-EN/FR locales (iOS Settings → dictation
-languages + Wi-Fi download). See [`language-bench.md`](language-bench.md).
-
-### 7.4 Dialects and accents
-
-- Two built-in speakers carry Chinese dialect hints: `dylan` (Beijing) and `eric` (Sichuan/Chengdu).
-- Voice Design prompts can request accents, but the model treats them as suggestions, not guarantees.
-- Cross-lingual generation works (e.g. an English-native speaker speaking Chinese), but native-language combinations usually sound most natural.
+- Dylan and Eric take their dialect ids under Chinese (§4). Upstream reports dialect instructions as
+  ignored (QwenLM#248).
+- Accent requests in Voice Design are suggestions, not guarantees: Design in Spanish or French can
+  sound English (QD#230), and Vivian and Serena carry a Chinese accent in other languages (QwenLM#359).
+- Latin-script detection can be ambiguous on short texts; set the language explicitly when it
+  matters.
 
 ---
 
-## 8. Voice cloning pipeline
+## 8. Clone conditioning
 
-Implemented in `Sources/QwenVoiceCore/NativeCloneSupport.swift`.
+What the model receives for a clone, and where Vocello departs from upstream. The host pipeline
+(normalization, caches, persistence, review) is
+[`ARCHITECTURE.md` §4.8](../ARCHITECTURE.md#48-voice-cloning-cache); transcript and ICL input rules
+for users and the enrollment flow belong to the [prompting guide](qwen3-tts-prompting-guide.md).
 
-1. **Reference normalization**
-   - Compute a SHA-256 fingerprint of the source file.
-   - Convert to canonical 24 kHz mono WAV if needed.
-   - For a saved voice, mirror its sidecar `.txt` transcript if present.
-   - Cache the normalized result with LRU eviction.
+### 8.1 The clone prompt
 
-2. **Transcript resolution**
-   - Inline transcript from the UI/CLI.
-   - Else, for a saved voice only, its sidecar `<audio>.txt`.
-   - Else `nil` (the model can still clone from audio alone, but quality drops).
-   - The clone prompt built from the reference (codec codes, speaker embedding, transcript) does
-     not depend on the target language, so one prompt, in memory and persisted, serves a prime,
-     the saved-voice prebuild and takes in every language.
+- **Both modes** extract the speaker embedding with the speaker encoder (§3.5) from the unpadded
+  reference, a finite `float32 [1, D]` vector cast to the talker's dtype only at the prefix slot.
+- **ICL** also encodes the reference with the tokenizer's encoder. Before encoding, Vocello appends
+  0.5 s of silence (`Qwen3TTS.swift:611-621`, version `icl-ref-silence500ms-v2`); upstream pads
+  nothing, and the code comment's claim of upstream parity is wrong (A-12).
+- **ICL target text** gets exactly one leading space (`Qwen3TTS.swift:4657-4663`); upstream joins the
+  reference and target tokens with no separator. Vocello added the space for French first-word drops
+  (A-11, deliberate; screen before changing).
+- **ICL layout.** Vocello always lays the reference and target text over the reference's codec frames
+  in the non-streaming overlay (mlx-audio lineage, G-14). Upstream's `generate_voice_clone` defaults
+  to the streaming layout (WM L478), and a long reference in that layout speeds speech up
+  (QwenLM#239; PR #362, open, proposes non-streaming as the default).
+- **Decoder history.** Upstream's ICL decodes the reference codes plus the generated ones and drops
+  the reference's share of the samples (WM L612-633). Vocello's streamed clones start from a cold
+  decoder (A-04, open with A-26).
 
-3. **Reference decoding**
-   - Load the normalized WAV into an `MLXArray` at the model's sample rate.
-   - Cache the decoded array.
+### 8.2 Reference length and warnings
 
-4. **Quality warnings**
-   `referenceQualityWarnings` checks the normalized reference and returns tokens:
+Qwen advertises a "3-second rapid clone" (RM L77). Vocello's thresholds come from the hosted
+service's guidance, not from a documented limit of the open model
+(`NativeCloneSupport.swift:703-737`): under 10 s warns, 30–60 s warns, and over 60 s is the one
+hard block (`hardBlockingTokens`, `SemanticTypes.swift:862`), which stops a saved voice being kept.
+The audit found the policy weaker than it reads (G-08–G-11):
 
-   | Token | Meaning | Severity |
-   | --- | --- | --- |
-   | `reference_duration_short` | < 10 s | Soft warning |
-   | `reference_duration_long` | 30–60 s | Soft warning |
-   | `reference_duration_excessive` | > 60 s | **Hard block** — voice cannot be kept |
-   | `reference_sample_rate_noncanonical` | Not 24 kHz | Soft warning |
-   | `reference_channels_noncanonical` | Not mono | Soft warning |
-   | `reference_near_silence` | RMS < 0.0005 | Soft warning |
-   | `reference_possible_clipping` | Peak ≥ 0.98 | Soft warning |
-   | `reference_quality_unreadable` | Could not read file | Soft warning |
+- The sample-rate and channel warnings test the already-normalized 24 kHz mono file
+  (`AudioPreparation.swift:650-680`), so they never fire, and the silence and clipping warnings reach
+  only telemetry: 8 kHz phone audio enrolls silently.
+- An unreadable reference can still be kept, with a soft warning only.
+- The iPhone's Stop bypasses the 10 s minimum, which the Mac enforces.
+- Mac one-off references skip the duration policy entirely, sending 0–120 s straight into ICL (G-11).
 
-   The recommended reference window is **10–20 seconds of clean speech**.
+### 8.3 Identity and caching
 
-5. **Clone prompt creation**
-   - A resolved transcript calls
-     `createVoiceClonePrompt(refAudio:refText:xVectorOnlyMode: false)` and produces ICL reference
-     codes plus a speaker embedding.
-   - No resolved transcript calls
-     `createVoiceClonePrompt(refAudio: referenceAudio, refText: nil, xVectorOnlyMode: true)` and
-     produces a speaker-embedding-only prompt.
-   - Priming and direct generation consume the same typed prompt. The prompt is cached in memory
-     and persisted under `voicesDirectory`, keyed by model ID, reference fingerprint,
-     conditioning mode, the fixed `auto` prompt-language key, transcript hash when present, pinned model revision, artifact
-     version, installed integrity-manifest digest, runtime profile, and speaker-feature algorithm
-     version. Changed weights or a frontend/runtime change invalidates both cache tiers.
-   - Saved-voice persistence stages model output privately, then validates the audio digest and
-     store-owned transcript under the repository's cross-process mutation lock before atomic
-     publication. Delete/replacement wins over stale prompt work. Contention skips caching; an
-     explicit inline transcript remains a request override. Normalized-audio cache ownership is
-     a separate open follow-up in DA-13.
-   - Re-use the same prompt across multiple generations to avoid recomputing speaker features.
+A persisted clone prompt is valid only for the identity it was built under (the full key list is in
+[ARCHITECTURE §4.8](../ARCHITECTURE.md#48-voice-cloning-cache)). Its speaker-feature version composes
+the mel frontend version, the ICL reference-encode version and the MLX build
+(`qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`; `Qwen3TTS.swift:781-798`; F-06), so
+an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference. Two
+inputs are still unversioned:
+
+- the codec encoder's implementation, so the A-02 fix must add a version or saved voices keep their
+  old reference codes (G-03);
+- the host's audio preparation (G-13).
+
+The in-memory clone prompt cache rarely helps today: every Clone take re-adopts the prompt from disk
+before that cache is consulted (B-16, ER-06).
+
+The device check for both conditioning modes, `scripts/ios_device.sh clone-conditioning`, is
+described in [`benchmarking-procedure.md`](benchmarking-procedure.md) (§4.7b).
 
 ---
 
 ## 9. Generation parameters
 
-The runtime defaults are a stack of three layers:
+### 9.1 Defaults
 
-1. **Checkpoint defaults** (`generation_config.json`): `max_new_tokens = 8192`.
-2. **Wrapper fallback** (`Qwen3GenerationConfiguration.wrapperFallbackMaxNewTokens`): 2048.
-3. **App policy** (`qwenvoice_contract.json` / `Qwen3GenerationConfiguration.officialQualityDefault`): 2048.
-
-Vocello's effective defaults:
-
-| Parameter | Value | Source |
+| Knob | Upstream `generation_config.json` | Vocello |
 | --- | --- | --- |
-| `max_new_tokens` | 2048 | App policy |
-| `temperature` | 0.9 | App policy |
-| `top_k` | 50 | App policy |
-| `top_p` | 1.0 | App policy |
-| `do_sample` | true | App policy |
-| `repetition_penalty` | 1.05 | App policy |
+| `do_sample` / `temperature` / `top_k` / `top_p` | true / 0.9 / 50 / 1.0 | same (Expressive) |
+| `repetition_penalty` (talker codebook 0 only) | 1.05 | 1.05 |
+| `subtalker_*` sampling | true / 0.9 / 50 / 1.0 | same, for every variation |
+| `max_new_tokens` | 8,192 | 2,048 |
 
-The **Code Predictor** samples at 0.9 / top-k 50 / top-p 1.0 for every request, as upstream's
-subtalker does, whatever the variation sets for the talker (`UnsafeSpeechGenerationModel.swift`),
-and it never applies the repetition penalty. Until 2026-10-20 it copied the talker, so Balanced
-(0.8 / 0.95) and Consistent (0.7 / 0.9) narrowed it too; the RF-18 follow-up screen's pre-registered
-C1 arm, which restored the reference values, cut Consistent's failed long-form projects from 9 to
-2 of 56. Internal-diagnostics knobs can still set the subtalker separately.
+Upstream's precedence is an explicit argument, then `generation_config.json`, then the wrapper's own
+fallback (2,048; `model.generate` alone uses 4,096). Qwen's README examples and evaluation use 2,048
+(RM L465), which is Vocello's fixed cap: 2,048 frames are 163.8 s of audio. Vocello's defaults are
+`Qwen3GenerationConfiguration.officialQualityDefault`
+(`Sources/QwenVoiceBackendCore/QwenVoiceBackendCore.swift:12-42`) and the contract's
+`generationDefaults`.
 
-Streaming:
+### 9.2 Take variations
 
-- `appStreamingInterval = 0.32` s (configurable, used to batch decoder output into user-facing chunks).
-- PCM preview data is emitted by default on both platforms. A preview-policy environment override is
-  production-affecting and therefore requires an internal diagnostics build plus the
-  `QWENVOICE_DEBUG` master gate; distributed builds cannot enable it.
+The user-facing **take variation** changes only the talker
+(`UnsafeSpeechGenerationModel.swift:95-131`):
 
-`config/runtime-debug-knobs.json` is the exhaustive authority for these environment surfaces. Never
-add a behavior-changing reader outside `RuntimeDebugGate` or describe a debug-gated override as
-shipped product policy.
+| Variation | Talker temperature / top-p | Subtalker | Repetition penalty |
+| --- | --- | --- | --- |
+| Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
+| Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
+| Consistent | 0.7 / 0.9 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
+
+Top-k is 50 for both stages. Until 2026-10-20 the subtalker copied the talker, so Balanced and
+Consistent narrowed it too. The RF-18 follow-up screen's C1 arm restored the reference subtalker and
+cut Consistent's failed long-form projects from 9 to 2 of 56 (§11.2), and it shipped in `7a125aaf`.
+The internal-diagnostics knobs (`QWENVOICE_TALKER_*`, `QWENVOICE_SUBTALKER_*`) can still override
+either stage.
+
+### 9.3 Decoding
+
+The talker's sampler (`Qwen3TTS.swift:5223-5422`, called at `:3895-3916`) runs in this order:
+
+1. **Float32 logits.** Logits are cast to float32 before sampling, as the reference does (D3,
+   production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` samples in the model's precision).
+2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:3567-3568`), and EOS stays
+   suppressed until two frames exist (`productionMinimumGeneratedCodeTokensBeforeEOS`,
+   `Qwen3TTS.swift:1440`), matching upstream's `min_new_tokens=2`.
+3. **Repetition penalty.** 1.05 over the talker's previously generated codebook-0 ids.
+4. **Temperature**, then **top-k**, then **top-p** (temperature first, ported from mlx-audio
+   `a730a68`). Min-p is 0 in production.
+5. **EOS.** EOS is filtered like any other token (D2, production since 2026-10-20). With
+   `QWENVOICE_TALKER_FILTER_EOS=off`, the older mlx-audio behavior returns: the EOS logit is re-inserted
+   after the filters, and the engine labels the departure `reinserts_eos`.
+6. A categorical draw from the request's own random state. The take ends at the first EOS or at the
+   2,048-frame cap; a capped take ends as `maxTokens`, and its quality report records the cap.
+
+The code predictor runs the same sampler with the subtalker stage, float32 logits, no suppression,
+no EOS and no penalty (`Qwen3TTS.swift:4000-4013`). Both production constants live in one value,
+`.production = (fullTextConditioning: false, filtersEOS: true, float32Sampling: true)`, defined
+twice and kept equal: `Generation.swift:45-49` in the runtime and `Contracts.swift:123` in the facade.
+
+### 9.4 Text layout
+
+How the target text reaches the talker is generation semantics. The token-level layouts are in the
+[prompting guide §1](qwen3-tts-prompting-guide.md#1-the-wire-format).
+
+- **Streamed takes** (Studio, every long-form segment and x-vector clones) use the streaming text
+  layout: after the prefix, the text trails one token per codec frame, then `tts_pad` once it runs
+  out (`Qwen3TTS.swift:4023-4029`). Text enters at 12.5 tokens/s against about 4–5 spoken, so an
+  ~860-character segment's text is used up after about 16 s and the talker sees only `tts_pad` for
+  the remaining ~40 s (A-01).
+- **Upstream defaults** `generate_custom_voice` and `generate_voice_design` to
+  `non_streaming_mode=True`, the whole text up front (WM L642, L738), and streams only the audio.
+  Vocello's non-streamed (quality-first) takes already use that layout; D1 would extend it to
+  streamed Custom and Design takes. **D1 was not adopted** (RF-18, §12).
+- **ICL clones** use the non-streaming overlay (§8.1).
+
+### 9.5 Seeds and reproducibility
+
+Every request carries an effective seed (requested or random) and runs on its own MLX random state;
+the sampling algorithm version is 2 (`Generation.swift:74-84`). Seeded takes are deterministic on one
+build: a rerun of a fixed seed reproduced its PCM byte for byte in the RF-18 screens. A seed does not
+reproduce takes across these changes:
+
+- D3 float32 sampling (2026-10-13);
+- the CONV-21 refresh to mlx-swift 0.32.3 (2026-10-16), whose inverse-CDF categorical draws
+  differently for Vocello's `[1, V]` logits (ml-explore/mlx#4177; F-02, accepted with a release-note
+  line);
+- RF-18's subtalker and EOS changes (2026-10-20), which change Balanced and Consistent takes most.
+
+The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and swift-huggingface to
+1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in
+[§9.6](mlx-guide.md#96-known-032x-notes-2026-10-16).
+Since CONV-21, prewarm also draws once through the production sampler, with and without top-p, on a
+private seed-0 state that no take reads, and discards the draws (`Qwen3TTS.swift:1901-1937`). The
+sampler's kernels therefore compile during prewarm instead of in the first take, and no output
+changes.
+
+### 9.6 Streaming
+
+`GenerationSemantics.appStreamingInterval` is 0.32 s, 4 codec frames, the same size as the
+technical report's 4-token packet. Chunk policy, live preview and the preview knob are
+[ARCHITECTURE §4.6](../ARCHITECTURE.md#46-streaming); every knob is registered in
+`config/runtime-debug-knobs.json`.
+
+### 9.7 Long-form
+
+The long-form planner fills each segment up to a 300-unit budget (`LongFormPlanning.swift:131`; about
+867 characters, about 60 s; C-02), and each segment is one streamed take, so long segments meet A-01's
+text exhaustion. The RF-18 screens kept that budget: a 200-unit budget (C2) failed 15 of 56 projects
+under Consistent against 9 for the control, so C-02 was not adopted. Consistent's remaining
+long-form failures are a 3.0 known limitation (§11.2). Shipping behavior is in
+[`long-form-generation.md`](long-form-generation.md).
 
 ---
 
-## 10. Performance and memory
+## 10. Performance
 
-For Apple Silicon-specific optimization guidance (Metal, unified memory, KV cache, quantization, `eval`/streaming, MLX cache clearing) see [`mlx-guide.md`](./mlx-guide.md). This section covers Qwen3-TTS-specific numbers.
+### 10.1 Compute per frame
 
-### 10.1 Compute budget
-
-At 12.5 frames per second of audio:
-
-| Component | Evaluations per frame | Notes |
-| --- | --- | --- |
-| Talker | 28 layers × 1 pass | Q/K RMSNorm, M-RoPE, GQA 2:1 |
-| Code Predictor | 5 layers × 15 passes | One pass per residual codebook |
-| Speech decoder | 8 pre-transform + 7 conv + 2 upsample | fp32 weights (the f16 codec was withdrawn 2026-09-14) |
-| **Total** | **~103 layer evals/frame** | ~1,288 layer evals/second of audio |
+| Component | Work per 80 ms frame |
+| --- | --- |
+| Talker | 28 layers, one pass |
+| Code predictor | 5 layers × 15 passes = 75 layer passes |
+| **Transformer total** | **103 layer passes per frame, about 1,288 per second of audio**, before the decoder |
+| Decoder | RVQ decode, 8 transformer layers, two ×2 upsamplers and the SEANet decoder over each chunk (fp32 weights) |
 
 ### 10.2 Latency
 
-Official reference numbers (CUDA, torch.compile, CUDA Graph):
+Qwen's numbers (technical report Table 2; internal vLLM with torch.compile and CUDA Graphs; a packet
+is 4 tokens, 320 ms of audio):
 
-| Model | First-packet latency | RTF (real-time factor) |
+| Model | First packet | RTF |
 | --- | --- | --- |
-| 0.6B | ~97 ms | 0.288 |
-| 1.7B | ~101 ms | 0.313 |
+| 12Hz-0.6B | 97 ms | 0.288 |
+| 12Hz-1.7B | 101 ms | 0.313 |
+| 25Hz-1.7B (never released) | 150 ms | 0.253 |
 
-A packet is 4 tokens (320 ms of audio), which is where Vocello's 0.32 s streaming interval comes
-from.
-
-Apple Silicon MLX numbers depend heavily on quantization tier, model size, text length, and memory pressure. Use Vocello's built-in telemetry (`QWENVOICE_NATIVE_TELEMETRY_MODE=verbose`) to capture per-generation memory curves.
-
-### 10.3 Variant selection and memory classes
-
-`ModelDescriptor.preferredVariant` selects:
-
-- **iOS**: Speed (4-bit).
-- **macOS 8 GB**: Speed (4-bit) to stay within the `floor8GBMac` memory policy.
-- **macOS 16 GB+**: Quality (8-bit) by default.
-
-Model download sizes (approximate, from `qwenvoice_contract.json`):
-
-- 4-bit: ~2.05 GB
-- 8-bit: ~2.8 GB (Base slightly larger due to the speaker encoder)
-
-Since 2026-08-08 every artifact also bundles the AudioSeal fp16 marking generator
-(~29 MB). The f16 tokenizer promotion of 2026-08-01 (−341 MB per download) was
-withdrawn on 2026-09-14; artifactVersion `2026.09.14.1` ships the fp32 codec again.
+Measured on Vocello before the CONV-21 refresh (engine audit, section D): the iPhone 17 Pro's Speed
+token loop ran at 24.7 tokens/s (RTF 0.55–0.59), and the M6 Mac at 50–52 tokens/s (RTF 0.27). The
+refresh left RTF, memory and audio QC unchanged on the M6 and raised its warm first chunk from 146 to
+155 ms ([mlx-guide §9.6](mlx-guide.md#96-known-032x-notes-2026-10-16)). Memory policy per device is
+[ARCHITECTURE §4.5](../ARCHITECTURE.md#45-memory-policy).
 
 ---
 
-## 11. Known limitations and behaviors
+## 11. Failure catalogue
 
-These are compiled from the official docs, community reports, and Vocello's own QA pass.
+### 11.1 Upstream failure modes and their status in Vocello
 
-- **No instruction control on Base clone model.** If you need a styled clone, use design-then-clone.
-- **Voice Design has no fixed speaker.** Each call samples a fresh voice; reuse requires building a clone prompt.
-- **Accent/dialect control is suggestive, not deterministic.** It works better for broad language-native speakers than for fine-grained regional accents.
-- **Conflicting descriptions fail.** `"high-pitched deep bass voice"` will produce unpredictable results.
-- **High-arousal emotions can add sounds.** The shipped preset copy carries no anti-laughing clause; that remedy is unverified (see the prompting guide).
-- **Reference length.** Qwen claims a 3 s rapid clone; Vocello asks for 10–20 s and refuses more
-  than 60 s when a saved voice is kept, guidance that follows Alibaba's hosted service. Mac one-off
-  references skip that policy (engine audit G-11).
-- **Music and noise.** Qwen says the tokenizer preserves the acoustic environment, so a noisy or
-  musical reference carries its noise into the clone.
-- **Celebrity/voice impersonation requests are rejected** by the prompt validator.
-- **Long outputs can hit the 2048-token app cap.** If generation truncates, the finish reason will be `max_tokens`.
-- **Latin-script language detection can be ambiguous.** When in doubt, set the language explicitly in the UI.
-- **No 25 Hz checkpoint has been released**; the technical report describes them, and Qwen has
-  given no date (QwenLM#294). This guide covers only the 12 Hz family.
+From the research report [§5](../audits/2026-10-17-qwen3-tts-model-research.md#5-known-failure-modes),
+updated for RF-18.
+
+| Symptom | Upstream reports | In Vocello |
+| --- | --- | --- |
+| Missing EOS, run-on, noise | QwenLM#118 (~0.5% of Base runs never emit EOS), #305 (5 minutes of noise on a cross-lingual year), #258, #318; reproduced on official CUDA (VO#6158) | The 2,048-frame cap ends them as `maxTokens`. RF-18's runaway endings (the cap, or 10 s or more of terminal silence) ran only under Consistent: 3 in the control, 0 after the subtalker fix. VO#8569's budget and fresh-seed retry are ER-11 candidates |
+| Truncated last words | #55 (Japanese and Korean), #181 (last two words), QD#161; MA#882 (fixed by removing EOS re-insertion) | D2 adopted 2026-10-20; it changed no Expressive take (§11.2) |
+| Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (+16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; D1 not adopted; Consistent known limitation (§11.2) |
+| ICL loops without EOS | MA#921: a transcript covering only part of the reference | Enrollment can accept a partial transcript (G-01, ER-04) |
+| Clone identity, accent leaks and echoes | #80 (~20% wrong speaker), #134 (source accent), #341 (echo of the reference tail), #119, #200 (onset noise or stray syllable), #219 (cold-decoder first-token distortion) | References end abruptly before the 0.5 s pad (G-07, the #341 trigger); streamed clones decode from a cold decoder (A-04); cross-language references are not flagged (G-16–21) |
+| Numbers across languages | #68, #151, #305, #256, #328, QD#330 | The planner does not pre-normalize numbers |
+| Accents and dialects | #134, #359, QD#230, #248 | Design accents and dialect control are suggestive only (§7.3) |
+| Precision | #333 (NaN under FlashAttention-2), #355 (fp16 logit overflow) | D3: float32 sampling since 2026-10-13 |
+| Fine-tuning | #179, #278, #337, #371 and others | Out of scope: Vocello ships no fine-tuning |
+
+### 11.2 Vocello's known limitations
+
+- **Consistent long-form takes can still stall (3.0 known limitation).** About one-minute segments
+  under Consistent can pause for seconds or never reach end of speech; Fast QC refuses the segment.
+  RF-18's follow-up screen (pre-registered, Mac CLI on mlx-swift 0.32.3, 56 long-form projects per
+  arm; engine audit [A2](../audits/2026-10-16-engine-runtime-audit.md#a2-rf-18-long-form-pacing-due-oct-22)):
+
+  | Arm | Variation | Change | Failed projects of 56 | Runaway endings |
+  | --- | --- | --- | --- | --- |
+  | C0 | Consistent | none (control) | 9 | 3 |
+  | C1 | Consistent | reference subtalker | 2 | 0 |
+  | C2 | Consistent | planner budget 200 | 15 | 5 |
+  | C4 | Consistent | EOS filtered (D2) | 7 | 2 |
+  | E0 | Expressive | none (control) | 0 | 0 |
+  | E2 | Expressive | planner budget 200 | 0 | 0 |
+  | E4 | Expressive | EOS filtered (D2) | 0 | 0 |
+  | C1 + C4 | Consistent | both shipped changes | 2 | 0 |
+
+  C1 and D2 shipped together; C2 did not. E0 and E4 were byte-identical on all 56 projects, so the
+  effect is C1's. The first RF-18 screen had already rejected D1: pooled, D1-on failed 3 of 23 long
+  segments and D1-off 2 of 27, all under Consistent.
+- **Clone references.** The gaps in §8.2 and §8.3, plus "Use audio only" on a saved voice with a
+  transcript still conditions on that transcript (G-02).
+- **No human listening for 3.0.** Machine screens catch gross failures only; subtle defects ship as a
+  documented limitation ([v3.0.0 release notes](../releases/v3.0.0.md)).
+
+### 11.3 Model limits Qwen states
+
+- Base has no instruction support, because 12 Hz control is unstable (QwenLM#25).
+- Voice Design gives a new voice on every sample (QwenLM#4).
+- Emotive instructions can add laughter (QwenLM#16); non-verbal sounds come out only implicitly
+  (QwenLM#9).
+- Use fp32 where bf16 is unavailable (QwenLM#43).
+- The unreleased 25 Hz model is the steadier one for long-form (technical report §4.2.6).
 
 ---
 
-## 12. Source-of-truth files
+## 12. Parity ledger
+
+Every verified place Vocello's runtime departs from Qwen's reference implementation (`qwen_tts` at
+`022e286b98`, transformers 4.57.3), as of 2026-10-20. The research report
+[§8](../audits/2026-10-17-qwen3-tts-model-research.md#8-parity-ledger) carries the upstream citations.
+
+| ID | Divergence | Upstream | Vocello | Status | Owner |
+| --- | --- | --- | --- | --- | --- |
+| D1 / A-01 | Text layout of streamed Custom and Design takes | whole text up front; audio streamed | one text token per frame, then `tts_pad` | **not adopted** by RF-18's screen; `QWENVOICE_FULL_TEXT_CONDITIONING=on` is the A/B arm | ER-03 |
+| D2 | EOS after top-k/top-p | filtered like any token | filtered | **adopted** 2026-10-20; `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion | — |
+| D3 | Sampling precision | float32 logits | float32 logits | **adopted** 2026-10-13 | — |
+| — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every variation | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
+| D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | cold decoder | open, with A-26 | ER-04 |
+| D6 | Custom with no detected language | `nothink`, no language id | English plus the English diction sentence | open, by design; `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` is the A/B arm | ER-05 |
+| A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump | ER-04 |
+| A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |
+| — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
+| A-11 | ICL target text | no separator after the reference text | exactly one leading space | deliberate (French first-word drops); screen before changing | ER-04 |
+| A-12 | ICL reference padding | none | +0.5 s of silence; its comment wrongly claims parity | open; fix the comment | ER-04 |
+| G-14 | ICL layout | streaming by default (PR #362 proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
+| — | Repetition penalty scope | talker codebook 0 only | same | matches | — |
+| — | Minimum frames before EOS; special-id suppression | 2; 2048–3071 except EOS | same | matches | — |
+| — | Dialect speakers under Chinese or Auto | dialect language id | same | matches | — |
+| — | Talker RoPE; decoder output | `rotate_half`; `clamp(-1, 1)` | same | matches | — |
+| — | Token cap | 8,192 in the config; 2,048 in evaluation | 2,048 | deliberate (= evaluation) | — |
+| — | Codec precision | bf16 in the README setup; the file is fp32 | fp32 | deliberate (an f16 codec opened streamed clone takes with a burst; withdrawn 2026-09-14) | — |
+| — | Weights | bf16 | 4-bit or 8-bit affine, group 64, 8-bit text embedding | deliberate; never evaluated upstream | — |
+
+The audit's A-06 and A-07 are D2 and D6. One constraint follows from D1 (A-05): a talker KV window
+would evict the unspoken script under the streaming text layout, so a window is allowed only with a
+full-text layout.
+
+Everything else the audit compared matched: the chat template, the talker, the code predictor, the
+sampler order, the streaming decoder's conv state, the codec math, the speaker encoder and the
+quantized load. Ports and fixes in mlx-audio, mlx-audio-swift and vLLM-Omni since Vocello's fork are
+in the research report [§6](../audits/2026-10-17-qwen3-tts-model-research.md#6-ports-and-changes-since-the-fork).
+
+---
+
+## 13. Source-of-truth files
 
 | File | What it owns |
 | --- | --- |
-| `Sources/Resources/qwenvoice_contract.json` | Model list, variants, repos/revisions, tokenizer profile, generation defaults, speaker roster. |
-| `Sources/QwenVoiceCore/EmotionPreset.swift` | 8 delivery presets and their instruction copy (`shippedIntensity` picks the tier that ships — `normal` for `happy` and `angry`, `strong` for the rest; the internal normal/strong pair survives for the delivery matrix harness). |
-| `Sources/QwenVoiceCore/GenerationSemantics.swift` | Prompt assembly, language hint logic, English diction reinforcement, prompt validation. |
-| `Sources/QwenVoiceCore/NativeCloneSupport.swift` | Reference normalization, transcript resolution, clone prompt caching, quality warnings. |
-| `Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift` | Runtime model-family detection, capability validation, generation-defaults parsing. |
-| `Sources/QwenVoiceCore/SemanticTypes.swift` | Languages, modes, tokenizer profile structs, model capabilities. |
-| `Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift` | Voice Design brief copy, description limit, starting-point archetypes. |
-| `docs/reference/mlx-guide.md` | Apple Silicon / MLX performance and memory optimization. |
+| `Sources/Resources/qwenvoice_contract.json` | Models, variants, repositories and revisions, capabilities, tokenizer profile, generation defaults, speaker roster |
+| `Sources/QwenVoiceBackendCore/QwenVoiceBackendCore.swift` | `Qwen3GenerationConfiguration` defaults and the upstream provenance |
+| `Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift` | Request sampling: take variations, the subtalker stage, the diagnostics knobs and reference-parity arms |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`, `…/VocelloQwen3Core/Contracts.swift` | `Qwen3ReferenceParity.production` and the sampling policy types |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift` | Prefill, the generate loop, the sampler, clone prompts, prewarm |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift`, `Qwen3TTSCodePredictor.swift`, `Qwen3TTSConfig.swift` | Talker, code predictor and config defaults |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`, `…/MLXAudioCodecs/Mimi/Transformer.swift` | The 12 Hz tokenizer's decoder and encoder |
+| `Sources/QwenVoiceCore/GenerationSemantics.swift` | Prompt assembly, language selection, the diction sentence, prompt validation |
+| `Sources/QwenVoiceCore/NativeCloneSupport.swift` | Clone references: transcript resolution, warnings, prompt caching |
+| `Sources/QwenVoiceCore/EmotionPreset.swift` | The eight delivery presets |
+| `config/runtime-debug-knobs.json` | Every diagnostics knob named here |
 
 ---
 
-## 13. External references
+## 14. External references
 
-- Qwen3-TTS GitHub: https://github.com/QwenLM/Qwen3-TTS
-- Technical report: *Qwen3-TTS Technical Report*, arXiv:2601.15621
-- Vocello's research and parity ledger: [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md)
+- Qwen3-TTS repository: https://github.com/QwenLM/Qwen3-TTS (reviewed at `022e286b98`, 2026-03-17)
+- *Qwen3-TTS Technical Report*, arXiv:2601.15621
+- Vocello's research and its sources: [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md)
 - Vocello's pinned MLX conversions: https://huggingface.co/PowerBeef02
 - Mimi codec (Kyutai): https://kyutai.org/codec-explainer; paper: Moshi, arXiv:2410.00037
-- Not authoritative: the Mintlify "documentation site" (no publisher, not linked by Qwen) and the
-  community MODEL.md write-up, whose RoPE and tanh claims are wrong
+- **Not authoritative:** the official Hugging Face demo Space (it bundles pre-February tokenizer code
+  with the old transposed-conv trim and length rule), the Mintlify "documentation site" (no publisher,
+  not linked by Qwen), and the community MODEL.md write-up, whose RoPE, tanh, 4,096-codebook and
+  25 Hz claims are wrong

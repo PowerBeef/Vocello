@@ -19,7 +19,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through `26c419ce`; the P3-5 commits after it are local. Push CI is green on
+`main` is pushed through `12db497c`; the RF-18 adoption after it is local. Push CI is green on
 Xcode 26.6.
 
 - **Landed today:**
@@ -55,8 +55,15 @@ Xcode 26.6.
   - The Pyright gate counted Linux-only duplicates (`2894a5c1`).
   - The macOS UI benchmark ran its checker under a `python3` without numpy (`d85aadd9`).
     Its run was recorded as failed, then passed on re-check; nothing was published.
+  - **RF-18 adopted (7a125aaf):** the follow-up screen finished. Its E4 arm and the pre-registered
+    combined arm ran on a CLI that reproduced the stored control take byte for byte. C1, the
+    subtalker on the reference values, and D2, EOS filtered, both pass, as does their combination
+    (2 failed long-form Consistent projects of 56, against 9). The subtalker now keeps the
+    reference sampling for every variation, and production filters EOS. With no knobs,
+    production reproduces the screened take byte for byte. Device proof: RF-15's long-form row.
+  - **`@preconcurrency` ratchet (DW-03):** 34 → 21 imports (`9fca022a`). The iOS UI bundle's four
+    tolerated warnings were cleared too (`12db497c`).
 - **Next:**
-  - Push the P3-5 batch and watch CI.
   - The iOS-only lane snippets, `ios_device.sh`, and P1-2's and P1-15's iPhone halves wait for an
     iPhone window. DW-02 is parked until then: P1-2's Mac half was already met, with the
     `ui-preflight` failing before the build about 1 s into the run.

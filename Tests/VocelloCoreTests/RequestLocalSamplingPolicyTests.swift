@@ -15,7 +15,7 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         XCTAssertEqual(policy.talker.temperature, 0.8, accuracy: 0.0001)
         XCTAssertEqual(policy.talker.topP, 0.95, accuracy: 0.0001)
         XCTAssertEqual(policy.talker.topK, 50)
-        // The subtalker keeps the reference sampling (RF-18 C1, C-33).
+        // The subtalker keeps the reference sampling (RF-18 C1, ER-05).
         XCTAssertEqual(policy.subtalker, VocelloQwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0))
         // Shipped default; a different value requires the Stage 0.4 bench A/B
         // to win on deterministic QC first.
@@ -61,7 +61,7 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         )
     }
 
-    /// RF-18 C1 (C-33): the variation shapes only the talker. The subtalker keeps
+    /// RF-18 C1 (ER-05): the variation shapes only the talker. The subtalker keeps
     /// the reference sampling for every variation, so Expressive, whose talker is
     /// the reference, leaves both stages equal.
     func testSubtalkerKeepsReferenceSamplingWhateverTheVariation() {

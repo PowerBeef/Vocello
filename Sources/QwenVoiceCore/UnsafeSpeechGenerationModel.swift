@@ -118,11 +118,12 @@ enum Qwen3TalkerSamplingOverride {
             minP: envMinP ?? 0
         )
         // The subtalker keeps the reference's own sampling (0.9, top-p 1.0, top-k
-        // 50) whatever the variation, which shapes only the talker. Following it
-        // with Balanced's or Consistent's narrower values was the C-33 divergence:
-        // the RF-18 follow-up screen's pre-registered C1 arm cut Consistent's failed
-        // long-form projects from 9 to 2 of 56 with no new failure class
-        // (2026-10-17, adopted with D2 on 2026-10-20). Expressive is unchanged.
+        // 50) whatever the variation, which shapes only the talker. Following the
+        // talker down under Balanced or Consistent was the divergence ER-05 tracked
+        // (model research, item 7): the RF-18 follow-up screen's pre-registered C1
+        // arm cut Consistent's failed long-form projects from 9 to 2 of 56 with no
+        // new failure class (2026-10-17, adopted with D2 on 2026-10-20). Expressive
+        // is unchanged.
         let subtalker = VocelloQwen3SamplingStage(
             temperature: envSubtalkerTemperature ?? official.temperature,
             topP: envSubtalkerTopP ?? official.topP,

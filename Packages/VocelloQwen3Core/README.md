@@ -64,6 +64,12 @@ waveform; sample-stream consumers do not evaluate tensors in their proxy tasks. 
 product consumers of the former tensor payload and no persisted event format to migrate.
 The actor-owned shipping facade and sampling/chunk schedules are unchanged.
 
+Sampling is request-local. A request carries both stages (talker and subtalker) and, only from the
+host's internal-diagnostics knobs, a `VocelloQwen3ReferenceParity` departure. Without one, production
+takes `VocelloQwen3ReferenceParity.production`: float32 sampling logits (D3, 2026-10-13) and the
+talker's EOS filtered like any token (D2, 2026-10-20), with full-text conditioning for streamed takes
+(D1) off. The host gives the subtalker the reference sampling for every variation (RF-18).
+
 The actor closes its inert-reservation and critical-relief lifecycle explicitly.
 Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join
 one finalization. Typed cache-trim or full-unload relief carries the generation lease through the
@@ -72,7 +78,9 @@ relief claim clears ownership before session reconciliation so a concurrent ordi
 cannot strand the lease.
 
 Clone prompts remain actor-owned behind epoch-bound `VocelloQwen3CloneHandle` values. The default
-retained-handle capacity is one; an explicit larger capacity uses least-recently-used eviction.
+retained-handle capacity is one, and Vocello never raises it; an explicit larger capacity uses
+least-recently-used eviction. The host's own clone LRU is larger on bigger Macs, so its older slots
+hold invalidated handles (engine audit B-16; `docs/ARCHITECTURE.md` §4.8).
 Release is explicit and repeat-safe, a reservation keeps an already captured prompt, noncritical
 cache trim preserves valid handles, and model reload, critical trim, or full unload invalidates them.
 
@@ -82,7 +90,7 @@ boundary. The facade exposes owned Vocello contracts and opaque adapters; it doe
 MLX or `MLXAudio*` implementation declarations.
 
 Keep MLX dependency versions synchronized with `project.yml`; the lockstep rule is in
-`.claude/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.
+`.claude/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.3.
 
 ```swift
 .package(path: "Packages/VocelloQwen3Core")

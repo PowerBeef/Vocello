@@ -230,7 +230,7 @@ speakers are not encoder outputs: each is a row of the talker's codec embedding,
 
 The profile below is declared per model in `qwenvoice_contract.json` and checked at load
 (`Qwen3TTSConfig.swift:496-529`). Internals are in the
-[codec guide](mimi-codec-guide.md#3-qwen3-tts-speech-tokenizer-architecture).
+[codec guide](mimi-codec-guide.md#1-summary).
 
 | Parameter | Value |
 | --- | --- |
@@ -400,7 +400,7 @@ The language unit tests, the hint bench and the output round trip are in
 What the model receives for a clone, and where Vocello departs from upstream. The host pipeline
 (normalization, caches, persistence, review) is
 [`ARCHITECTURE.md` §4.8](../ARCHITECTURE.md#48-voice-cloning-cache); transcript and ICL input rules
-for users and the enrollment flow belong to the [prompting guide](qwen3-tts-prompting-guide.md).
+for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tts-prompting-guide.md#23-clone-input-the-transcript-and-the-reference).
 
 ### 8.1 The clone prompt
 
@@ -545,7 +545,7 @@ reproduce takes across these changes:
 
 The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and swift-huggingface to
 1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in
-[§9.6](mlx-guide.md#96-known-032x-notes-2026-10-16).
+[§9.5](mlx-guide.md#95-what-the-0323-move-changed).
 Since CONV-21, prewarm also draws once through the production sampler, with and without top-p, on a
 private seed-0 state that no take reads, and discards the draws (`Qwen3TTS.swift:1901-1937`). The
 sampler's kernels therefore compile during prewarm instead of in the first take, and no output
@@ -594,7 +594,7 @@ is 4 tokens, 320 ms of audio):
 Measured on Vocello before the CONV-21 refresh (engine audit, section D): the iPhone 17 Pro's Speed
 token loop ran at 24.7 tokens/s (RTF 0.55–0.59), and the M6 Mac at 50–52 tokens/s (RTF 0.27). The
 refresh left RTF, memory and audio QC unchanged on the M6 and raised its warm first chunk from 146 to
-155 ms ([mlx-guide §9.6](mlx-guide.md#96-known-032x-notes-2026-10-16)). Memory policy per device is
+155 ms ([mlx-guide §9.5](mlx-guide.md#95-what-the-0323-move-changed)). Memory policy per device is
 [ARCHITECTURE §4.5](../ARCHITECTURE.md#45-memory-policy).
 
 ---

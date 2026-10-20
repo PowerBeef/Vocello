@@ -19,7 +19,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through the ER-13 commits. Push CI is green on Xcode 26.6.
+`main` is pushed through the documentation consolidation. Push CI is green on Xcode 26.6.
 
 - **Landed today:**
   - **P2-5 test adequacy (DW-03):**
@@ -68,6 +68,14 @@ the last copy with every earlier checkpoint is at commit a0597deb).
     engine audit, with RF-18 and CONV-21 as shipped. Three documentation agents and the lead did
     this: the model reference, the prompting and 12 Hz tokenizer guides, the MLX guide and the
     package docs, ARCHITECTURE's engine sections and the package README. Links were checked.
+  - **Documentation audit and consolidation (DW-04):**
+    - About 40 stale or contradictory statements fixed. Release-relevant ones: the App Review
+      note's model path, the App Store Connect state, the README chart record.
+    - Three tooling gaps the docs misdescribed are closed: the agent guard now refuses subagent
+      shell writes to the roadmap, `dev.sh ci` runs CI's lint gates, and `check --paths` scopes
+      its gate.
+    - `docs/reference/` went from 49 to 32 files: dead docs deleted, dated reports moved to
+      `docs/audits/`, overlapping guides merged. No link is broken across the tracked Markdown.
 - **Next:**
   - The full Mac smoke needs someone at the Mac: BKL-19's Speech Recognition prompt would block
     an unattended run.

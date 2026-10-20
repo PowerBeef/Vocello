@@ -408,15 +408,17 @@ travel with the request instead of mutating process-global generation state.
   the reference values; Balanced 0.8 / 0.95; Consistent 0.7 / 0.9.
 - **Subtalker.** It keeps the reference values for every variation, adopted by the RF-18 follow-up
   screen on 2026-10-20.
-- **Reference-parity arms.** Production samples from float32 logits (D3) and filters the talker's
-  EOS like any token (D2); D1 is off. The arms reach the runtime only as request-local
-  `VocelloQwen3ReferenceParity` values from registered internal-diagnostics knobs. A request that
-  departs from production names its arms on the engine row (`reference_parity`).
-- **Text layout.** A streamed Custom or Design take feeds its script as trailing text, one text
-  token per codec frame and then `tts_pad` (`text_conditioning_mode=streaming_trailing_text`). A
-  quality-first take lays the whole text out up front (`full_text_non_streaming`). A clone ignores
-  the requested mode: in-context learning overlays the full target text on the reference codes, and
-  a speaker-only clone streams its trailing text.
+- **Reference-parity arms.** Production samples from float32 logits (D3), filters the talker's
+  EOS like any token (D2) and gives a single take its whole text (D1, RF-21). The arms reach the
+  runtime only as request-local `VocelloQwen3ReferenceParity` values: a long-form segment
+  (`GenerationRequest.longFormSegment`) turns D1 off, and registered internal-diagnostics knobs
+  turn any arm on or off. A request that departs from production names its arms on the engine row
+  (`reference_parity`).
+- **Text layout.** A Custom or Design single take, streamed or quality-first, lays the whole text
+  out up front (`text_conditioning_mode=full_text_non_streaming`). A long-form segment feeds its
+  script as trailing text, one text token per codec frame and then `tts_pad`
+  (`streaming_trailing_text`). A clone ignores the requested mode: in-context learning overlays the
+  full target text on the reference codes, and a speaker-only clone streams its trailing text.
 
 Explicit reserved/generating/aborting ownership prevents an
 abort-owned reservation from reopening generation and makes duplicate aborts join one finalization.

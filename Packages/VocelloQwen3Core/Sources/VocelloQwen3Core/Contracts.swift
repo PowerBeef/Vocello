@@ -112,15 +112,15 @@ public struct VocelloQwen3SamplingStage: Codable, Hashable, Sendable {
     }
 }
 
-/// RF-14 reference-parity arms (internal diagnostics only). Each flag puts one
-/// verified divergence from Qwen's reference implementation on the reference
-/// behavior for one request: D1 full-text conditioning for streamed Custom and
-/// Design takes, D2 EOS filtered like any token, D3 float32 sampling logits.
-/// A request without it takes production, where D2 and D3 are on and D1 is off
-/// (D2 since the RF-18 follow-up screen, 2026-10-20).
+/// RF-14 reference-parity arms. Each flag puts one verified divergence from
+/// Qwen's reference implementation on the reference behavior for one request:
+/// D1 full-text conditioning for streamed Custom and Design takes, D2 EOS
+/// filtered like any token, D3 float32 sampling logits. A request without it
+/// takes production, where all three are on (D2 and D1 since 2026-10-20, RF-18
+/// and RF-21). A long-form segment departs from it to keep trailing text.
 public struct VocelloQwen3ReferenceParity: Codable, Hashable, Sendable {
     /// What a request without `referenceParity` takes.
-    public static let production = Self(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)
+    public static let production = Self(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
 
     public let fullTextConditioning: Bool
     public let filtersEOS: Bool
@@ -161,9 +161,9 @@ public struct VocelloQwen3SamplingConfiguration: Codable, Hashable, Sendable {
     /// sets it; nil is the production path and 0 is the construction's sham
     /// (the same request with the hold armed at zero frames).
     public let eosSuppressionFrames: Int?
-    /// RF-14 reference-parity arms. Only the host's registered
-    /// internal-diagnostics knobs set it; nil is the production path (D2 and
-    /// D3 on, D1 off) and is never encoded.
+    /// RF-14 reference-parity arms. The host sets it for a long-form segment,
+    /// which keeps trailing text, and for its registered internal-diagnostics
+    /// knobs; nil is the production path (D1, D2 and D3 on) and is never encoded.
     public let referenceParity: VocelloQwen3ReferenceParity?
 
     public init(

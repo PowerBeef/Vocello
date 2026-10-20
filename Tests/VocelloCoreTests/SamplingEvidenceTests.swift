@@ -213,7 +213,8 @@ final class SamplingEvidenceTests: XCTestCase {
         let generationID = UUID()
         let request = GenerationRequest(
             mode: .custom, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
-            payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: generationID
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: generationID,
+            longFormSegment: true
         )
         let seeded = request.withSeed(42)
         XCTAssertEqual(seeded.seed, 42)
@@ -221,9 +222,29 @@ final class SamplingEvidenceTests: XCTestCase {
         XCTAssertEqual(
             GenerationRequest(
                 mode: .custom, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
-                payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: generationID, seed: 42
+                payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: generationID, seed: 42,
+                longFormSegment: true
             ),
             seeded
+        )
+    }
+
+    /// A long-form segment keeps its trailing-text layout (RF-21) when the
+    /// engine store or the engine gives it an identity.
+    func testWithGenerationIDChangesOnlyTheIdentity() {
+        let request = GenerationRequest(
+            mode: .design, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
+            payload: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil), seed: 5,
+            longFormSegment: true
+        )
+        let generationID = UUID()
+        XCTAssertEqual(
+            request.withGenerationID(generationID),
+            GenerationRequest(
+                mode: .design, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
+                payload: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil),
+                generationID: generationID, seed: 5, longFormSegment: true
+            )
         )
     }
 }

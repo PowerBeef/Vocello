@@ -1538,6 +1538,11 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     /// repository-owned preset cell. Missing means custom or legacy verbatim
     /// text. Optional synthesized Codable preserves older IPC payloads.
     public let deliveryInstructionCellID: String?
+    /// One segment of a long-form project. A segment keeps the streaming
+    /// trailing-text layout, which RF-18 qualified for long segments; every
+    /// other streamed take sees its whole text up front (RF-21). Optional
+    /// synthesized Codable preserves older IPC payloads.
+    public let longFormSegment: Bool?
 
     public init(
         mode: GenerationMode,
@@ -1556,7 +1561,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
         captureCodecTrace: Bool? = nil,
-        deliveryInstructionCellID: String? = nil
+        deliveryInstructionCellID: String? = nil,
+        longFormSegment: Bool? = nil
     ) {
         self.mode = mode
         self.modelID = modelID
@@ -1575,6 +1581,7 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         self.suppressStreamingPreview = suppressStreamingPreview
         self.captureCodecTrace = captureCodecTrace
         self.deliveryInstructionCellID = deliveryInstructionCellID
+        self.longFormSegment = longFormSegment
     }
 
     public init(
@@ -1593,7 +1600,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
         captureCodecTrace: Bool? = nil,
-        deliveryInstructionCellID: String? = nil
+        deliveryInstructionCellID: String? = nil,
+        longFormSegment: Bool? = nil
     ) {
         let resolvedMode: GenerationMode
         switch payload {
@@ -1622,7 +1630,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
-            deliveryInstructionCellID: deliveryInstructionCellID
+            deliveryInstructionCellID: deliveryInstructionCellID,
+            longFormSegment: longFormSegment
         )
     }
 
@@ -1652,7 +1661,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
-            deliveryInstructionCellID: deliveryInstructionCellID
+            deliveryInstructionCellID: deliveryInstructionCellID,
+            longFormSegment: longFormSegment
         )
     }
 
@@ -1676,7 +1686,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
-            deliveryInstructionCellID: deliveryInstructionCellID
+            deliveryInstructionCellID: deliveryInstructionCellID,
+            longFormSegment: longFormSegment
         )
     }
 }

@@ -740,10 +740,7 @@ actor NativeEngineRuntime {
             preserveActiveClonePrimeToken: false
         )
         let model = loadResult.model.bound(
-            to: Qwen3TalkerSamplingOverride.samplingConfiguration(
-                requestedSeed: request.seed,
-                variation: request.variation
-            ),
+            to: Qwen3TalkerSamplingOverride.samplingConfiguration(for: request),
             memory: requestMemory
         )
         await model.resetPreparationDiagnostics()
@@ -823,10 +820,7 @@ actor NativeEngineRuntime {
         // random state for the request; no process-global RNG or variation
         // override is mutated here.
         let samplingConfiguration = fixedSamplingConfiguration
-            ?? Qwen3TalkerSamplingOverride.samplingConfiguration(
-                requestedSeed: request.seed,
-                variation: request.variation
-            )
+            ?? Qwen3TalkerSamplingOverride.samplingConfiguration(for: request)
         // CORE-19: refuse a take that cannot finish before loading or spending
         // its whole token budget on it.
         if SingleTakeCodecBudget.certainlyExceeds(

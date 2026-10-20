@@ -115,15 +115,17 @@ Which layout a take uses:
 
 | Vocello take | Vocello layout | Upstream default |
 | --- | --- | --- |
-| Streamed Custom and Design (Studio, every long-form segment) | streaming | non-streaming (WM L642, L738, since `0c6a7cb`): the **D1** divergence, not adopted by RF-18 or RF-20 (§3.1) |
+| Streamed Custom and Design single takes (Studio) | non-streaming (D1, adopted 2026-10-20, RF-21) | non-streaming (WM L642, L738, since `0c6a7cb`) |
+| Long-form segments, Custom and Design | streaming: the **D1** divergence, kept by RF-18 (§3.1) | non-streaming |
 | Quality-first (non-streamed) Custom and Design | non-streaming | non-streaming |
 | Clone with a transcript (ICL) | non-streaming ICL | streaming (WM L478): **G-14**, deliberate (§2.3) |
 | Clone without a transcript (speaker only) | streaming | streaming |
 
 The clone rows follow `Qwen3TextConditioningMode` (`Qwen3TTS.swift` L411-430): a clone ignores the
-requested mode. The full-text layout for streamed takes exists only behind the internal-diagnostics
-knob `QWENVOICE_FULL_TEXT_CONDITIONING` (`Qwen3ReferenceParity.production`,
-`Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift` L46-50).
+requested mode. A long-form segment's request turns D1 off (`GenerationRequest.longFormSegment`,
+`Qwen3TalkerSamplingOverride.referenceParity`); the internal-diagnostics knob
+`QWENVOICE_FULL_TEXT_CONDITIONING` forces either layout for every streamed take
+(`Qwen3ReferenceParity.production`, `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`).
 
 ### 1.2 There is no chat template and no system turn
 
@@ -385,10 +387,10 @@ measurement in §2.3), and upstream defaults Custom and Design to the full-text 
 - **RF-18's screen did not adopt the full-text layout (D1), 2026-10-16.** D1 on failed 3 of 23 long
   segments, D1 off 2 of 27; the pre-registered rule needed at most 1 against at least 3. Every
   failure ran under the Consistent variation. Streamed takes keep the trailing-text layout.
-- **RF-20 did not adopt D1 for single takes either, 2026-10-20.** It halved the screen's gross
-  failures (5 against 10 of 251 takes) and recovered a take that had stranded its script, but it
-  garbled the end of one Japanese language-bench take that streaming text speaks correctly
-  (qwen3-tts-guide §11.2).
+- **D1 was adopted for single takes, 2026-10-20 (RF-21).** RF-20's screen halved gross failures
+  (5 against 10 of 251 takes) and recovered a take that had stranded its script; a two-family ASR
+  pass over the saved takes halved wrong-content takes (16 against 31 of 248). Long-form segments
+  keep the trailing-text layout (qwen3-tts-guide §11.2).
 - **The follow-up screen, 2026-10-17 to 2026-10-20**, 56 long-form projects per arm. Restoring the
   reference subtalker sampling cut Consistent's failed projects from 9 to 2; lowering the planner's
   segment budget from 300 to 200 made it worse (15); Expressive failed none in any arm. The subtalker
@@ -846,7 +848,7 @@ settled one.
 | Control tokens in user text | replaced with a space before tokenizing (§1) |
 | Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone payload or identity |
 | 0.6B instruction guard | present and matches upstream; defensive, since no 0.6B checkpoint ships |
-| Text layout of streamed Custom and Design takes | streaming trailing text, not upstream's full-text default (D1, not adopted by RF-18 or RF-20; §1.1, §3.1) |
+| Text layout of streamed Custom and Design takes | full text for single takes (D1, RF-21); streaming trailing text for long-form segments (RF-18; §1.1, §3.1) |
 | ICL layout | upstream's non-streaming clone layout, plus one leading space on the target (G-14, A-11; §2.3) |
 | Subtalker sampler | its own stage, at upstream's 0.9 / 50 / 1.0 for every variation since 2026-10-20 |
 | EOS | filtered like any token since 2026-10-20 (D2) |

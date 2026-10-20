@@ -454,6 +454,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertEqual(takes.map(\.text), f.request.lines)
         XCTAssertEqual(takes.map(\.seed), f.plan.segments.map { Optional($0.evidence.effectiveSubseed) })
         XCTAssertTrue(takes.allSatisfy { $0.shouldStream && $0.mode == .custom && $0.modelID == f.request.model.id })
+        XCTAssertTrue(takes.allSatisfy { $0.longFormSegment == true }, "Segments keep trailing text (RF-21)")
         let generationIDs = takes.compactMap(\.generationID)
         XCTAssertEqual(Set(generationIDs).count, 3, "Every take has its own identity")
         // Each take is submitted only once the previous one completed.
@@ -579,6 +580,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         let takes = f.engine.takeRequests
         let lines = f.request.lines
         XCTAssertEqual(takes.map(\.text), [lines[0], lines[1], lines[1], lines[2]], "Resume regenerates only what is missing")
+        XCTAssertTrue(takes.allSatisfy { $0.longFormSegment == true }, "A resumed segment keeps trailing text (RF-21)")
         XCTAssertEqual(
             takes[2].seed,
             f.plan.segments[1].evidence.effectiveSubseed,
@@ -1086,6 +1088,12 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
             ).languageHint
         }
         XCTAssertEqual(hints, Array(repeating: Qwen3SupportedLanguage.japanese.rawValue, count: auto.lines.count))
+        XCTAssertEqual(
+            auto.makeGenerationRequest(segmentIndex: 0, outputPath: "/tmp/segment-0.wav", generationID: UUID(), variation: nil)
+                .longFormSegment,
+            true,
+            "A segment keeps the trailing-text layout (RF-21)"
+        )
 
         let french = request(language: Qwen3SupportedLanguage.french.rawValue)
         XCTAssertEqual(french.languageHint, Qwen3SupportedLanguage.french.rawValue, "An explicit selection is kept")

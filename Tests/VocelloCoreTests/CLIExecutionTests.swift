@@ -105,6 +105,7 @@ final class CLIExecutionTests: XCTestCase {
         XCTAssertEqual(custom.seed, 42)
         XCTAssertEqual(custom.generationID, identifier)
         XCTAssertEqual(custom.deliveryInstructionCellID, "custom-fixture")
+        XCTAssertEqual(custom.longFormSegment, true, "a segment keeps the trailing-text layout (RF-21)")
         let design = CLIBatchExecution.makeLongFormSegmentRequest(
             mode: .design, modelID: "design", text: "One segment.", outputPath: "/fixture/project_segment_000.wav",
             payload: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil), generationID: UUID(),

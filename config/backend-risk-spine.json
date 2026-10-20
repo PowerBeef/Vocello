@@ -160,9 +160,15 @@
       "runtimeCapabilityID": "generation-contracts",
       "title": "Streamed takes feed text at one token per codec frame, so a long segment runs out of script and the talker sees only tts_pad (D1)",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open by decision: the 2026-10-16 RF-18 screen did not adopt full-text conditioning, and the Consistent long-form stall is a 3.0 known limitation; no test pins the production layout (ER-03)."
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests/testFullTextConditioningGivesAStreamedTakeTheQualityFirstCodes",
+        "VocelloCoreTests/RequestLocalSamplingPolicyTests/testALongFormSegmentKeepsTrailingTextAndASingleTakeTheWholeText",
+        "VocelloCoreTests/CLIExecutionTests/testLongFormSegmentRequestsStreamAtTheAppCadenceWithTheirSubseed"
+      ],
+      "status": "partial",
+      "remaining": [
+        "Long-form segments keep the trailing-text layout by decision (RF-18), so a long segment can still run out of script; the Consistent long-form stall stays a 3.0 known limitation (ER-03)."
+      ]
     },
     {
       "id": "A-02",

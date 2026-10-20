@@ -64,7 +64,7 @@ ledger ([`qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md)).
 | mlx-audio-swift `dbe5eaa` (v0.1.5): mlx-swift 0.32.3 / mlx-swift-lm 3.32.3 | pins match since CONV-21 (2026-10-16), moved independently |
 | mlx-audio-swift `dbe5eaa`: range slices replace the scalar gather in RVQ decode and MRoPE | not ported (ER-08, ER-12) |
 | mlx-audio-swift `dbe5eaa`: `streamingStep` evaluates before `sending` | not ported |
-| mlx-audio-swift PR #270 (open): non-streaming text for CustomVoice and VoiceDesign | = D1; not adopted after RF-18's and RF-20's screens (ER-03) |
+| mlx-audio-swift PR #270 (open): non-streaming text for CustomVoice and VoiceDesign | = D1; adopted for single takes 2026-10-20 (RF-21), long-form segments keep streaming text (RF-18) |
 | mlx-audio-swift PR #286 (open): stop the per-load initialization-graph leak | applies to Vocello's quantized load; not ported (ER-06, ER-07) |
 | mlx-audio `6549fc2`: Mimi `rope_traditional=False` | not fixed (A-02, ER-04, with G-03's version bump) |
 | mlx-audio `6549fc2`: EOS kept after top-k/top-p | inherited, then removed on 2026-10-20 (D2) |

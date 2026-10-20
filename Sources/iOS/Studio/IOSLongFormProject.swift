@@ -357,7 +357,8 @@ struct IOSLongFormProjectRequest {
             generationID: generationID,
             seed: seed,
             variation: variation,
-            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil
+            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil,
+            longFormSegment: true
         )
     }
 

@@ -27,9 +27,11 @@ public struct Qwen3SamplingStage: Hashable, Sendable {
 /// RF-14 reference-parity arms: each flag puts one verified divergence from
 /// Qwen's reference implementation on the reference behavior for one request.
 /// `.production` is the shipped engine: D3 (float32 sampling) by the
-/// maintainer's 2026-10-13 decision and D2 (EOS filtered) by the RF-18
-/// follow-up screen's pre-registered rule (2026-10-20), D1 off. The host departs from it
-/// only through its registered internal-diagnostics knobs.
+/// maintainer's 2026-10-13 decision, D2 (EOS filtered) by the RF-18 follow-up
+/// screen's pre-registered rule and D1 (full text) by the maintainer's RF-21
+/// decision on RF-20's content screen (both 2026-10-20). The host departs from
+/// it for a long-form segment, which keeps trailing text, and through its
+/// registered internal-diagnostics knobs.
 public struct Qwen3ReferenceParity: Hashable, Sendable {
     /// D1: a streamed Custom or Design take lays its whole target text over
     /// the prefix up front (the reference's `non_streaming_mode=True`, which
@@ -44,7 +46,7 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
     public let float32Sampling: Bool
 
     public static let production = Self(
-        fullTextConditioning: false,
+        fullTextConditioning: true,
         filtersEOS: true,
         float32Sampling: true
     )
@@ -55,11 +57,14 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
         self.float32Sampling = float32Sampling
     }
 
-    /// The engine's record of a request that departs from production: every
-    /// arm it asked for; empty on the production path. An arm can be a no-op for
-    /// one take (D1 on a clone or a quality-first take, D2 when EOS stays inside the
-    /// filters, D3 on float32 logits),
-    /// so a pair's audio, not this label, shows whether it changed anything.
+    /// The engine's record of a request whose arms differ from `.production`:
+    /// every arm it asked for; empty when they match. The label is relative to
+    /// `.production`, not a mark of a diagnostics run: a long-form segment, which
+    /// turns D1 off as shipped, records one, and a segment a knob forces to full
+    /// text records none (`text_conditioning_mode` shows its layout). An arm can
+    /// be a no-op for one take (D1 on a clone or a quality-first take, D2 when
+    /// EOS stays inside the filters, D3 on float32 logits), so a pair's audio, not
+    /// this label, shows whether it changed anything.
     var evidence: [String: String] {
         guard self != .production else { return [:] }
         let arms = [
@@ -78,8 +83,9 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 /// selected a random seed, so generation evidence can reproduce the take on the
 /// same source: version 2 samples from float32 logits since 2026-10-13 (RF-14
 /// D3), and since 2026-10-20 filters EOS like any token (D2) with a subtalker that
-/// keeps the reference sampling (RF-18), so one seed's takes differ across those
-/// changes.
+/// keeps the reference sampling (RF-18) and gives a single streamed Custom or
+/// Design take its whole text up front (D1, RF-21), so one seed's takes differ
+/// across those changes.
 public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     public static let currentAlgorithmVersion = 2
 

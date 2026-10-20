@@ -6,7 +6,8 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
     func testRequestedSeedAndVariationResolveIntoOneImmutablePolicy() throws {
         let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: 19_790_615,
-            variation: .balanced
+            variation: .balanced,
+            longFormSegment: false
         )
 
         XCTAssertEqual(policy.algorithmVersion, 2)
@@ -23,42 +24,81 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         // Production requests carry no EOS hold (the audio QC GEN-NOEOS knob is unset).
         XCTAssertNil(policy.eosSuppressionFrames)
         // Nor any RF-14 reference-parity override (its knobs are unset), so the
-        // runtime takes production: float32 sampling and EOS filtered (D3, D2), D1 off.
+        // runtime takes production: float32 sampling, EOS filtered and the whole
+        // text up front (D3, D2, D1).
         XCTAssertNil(policy.referenceParity)
         XCTAssertNoThrow(try policy.validated())
     }
 
-    /// The RF-14 D1-D3 knobs. Production samples from float32 logits and filters
-    /// EOS (D3 and D2) with D1 off, so a knob setting that leaves that unchanged
-    /// resolves to nil: D1 turns on only for an explicit on value, and D2 and D3
-    /// turn off only for an explicit off value.
+    /// The RF-14 D1-D3 knobs. Production samples from float32 logits, filters
+    /// EOS and gives a single take its whole text (D3, D2, D1), so a knob setting
+    /// that leaves that unchanged resolves to nil: an arm turns off only for an
+    /// explicit off value.
     func testReferenceParityKnobsDepartFromProductionOnlyExplicitly() {
-        let parse = Qwen3TalkerSamplingOverride.referenceParity
+        func parse(_ fullText: String?, _ filtersEOS: String?, _ float32: String?) -> VocelloQwen3ReferenceParity? {
+            Qwen3TalkerSamplingOverride.referenceParity(
+                fullTextConditioning: fullText, filtersEOS: filtersEOS, float32Sampling: float32,
+                longFormSegment: false
+            )
+        }
         XCTAssertEqual(
             VocelloQwen3ReferenceParity.production,
-            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)
+            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
         )
         XCTAssertNil(parse(nil, nil, nil))
-        XCTAssertNil(parse("off", "on", "on"))
+        XCTAssertNil(parse("on", "on", "on"))
         for unrecognized in ["", "full", "maybe"] {
             XCTAssertNil(parse(unrecognized, unrecognized, unrecognized), unrecognized)
         }
         XCTAssertEqual(
-            parse("on", nil, nil),
-            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
+            parse("off", nil, nil),
+            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)
         )
         XCTAssertEqual(
             parse(nil, " Off\n", nil),
-            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)
+            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true)
         )
         XCTAssertEqual(
             parse(nil, nil, " Off\n"),
-            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: false)
         )
         XCTAssertEqual(
-            parse("1", "no", "no"),
-            VocelloQwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: false)
+            parse("0", "no", "no"),
+            VocelloQwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: false)
         )
+    }
+
+    /// RF-21: a single streamed take sees its whole text up front (production),
+    /// while a long-form segment keeps the trailing-text layout RF-18 qualified.
+    /// The D1 knob forces either layout for both; the other arms are unchanged.
+    func testALongFormSegmentKeepsTrailingTextAndASingleTakeTheWholeText() {
+        let trailingText = VocelloQwen3ReferenceParity(
+            fullTextConditioning: false, filtersEOS: true, float32Sampling: true
+        )
+        func parity(longForm: Bool, knob: String? = nil) -> VocelloQwen3ReferenceParity? {
+            Qwen3TalkerSamplingOverride.referenceParity(
+                fullTextConditioning: knob, filtersEOS: nil, float32Sampling: nil, longFormSegment: longForm
+            )
+        }
+        XCTAssertNil(parity(longForm: false))
+        XCTAssertEqual(parity(longForm: true), trailingText)
+        XCTAssertNil(parity(longForm: true, knob: "on"))
+        XCTAssertEqual(parity(longForm: false, knob: "off"), trailingText)
+
+        // The knobs are unset in tests, so the policy the engine resolves from a
+        // request (every engine call site goes through it) carries exactly that.
+        func request(longFormSegment: Bool?) -> GenerationRequest {
+            GenerationRequest(
+                mode: .custom, modelID: "fixture", text: "One segment.", outputPath: "take.wav",
+                shouldStream: true, payload: .custom(speakerID: "aiden", deliveryStyle: nil), seed: 3,
+                longFormSegment: longFormSegment
+            )
+        }
+        let segment = Qwen3TalkerSamplingOverride.samplingConfiguration(for: request(longFormSegment: true))
+        XCTAssertEqual(segment.referenceParity, trailingText)
+        XCTAssertEqual(segment.effectiveSeed, 3)
+        XCTAssertNil(Qwen3TalkerSamplingOverride.samplingConfiguration(for: request(longFormSegment: nil)).referenceParity)
+        XCTAssertNil(Qwen3TalkerSamplingOverride.samplingConfiguration(for: request(longFormSegment: false)).referenceParity)
     }
 
     /// RF-18 C1 (ER-05): the variation shapes only the talker. The subtalker keeps
@@ -70,7 +110,9 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
             (.expressive, 0.9, 1), (nil, 0.9, 1), (.balanced, 0.8, 0.95), (.consistent, 0.7, 0.9),
         ]
         for (variation, temperature, topP) in talkers {
-            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(requestedSeed: 7, variation: variation)
+            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
+                requestedSeed: 7, variation: variation, longFormSegment: false
+            )
             let name = String(describing: variation)
             XCTAssertEqual(policy.talker.temperature, temperature, accuracy: 0.0001, name)
             XCTAssertEqual(policy.talker.topP, topP, accuracy: 0.0001, name)
@@ -93,11 +135,13 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
     func testUnseededRequestStillReceivesReplayableEffectiveSeed() {
         let first = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: .expressive
+            variation: .expressive,
+            longFormSegment: false
         )
         let second = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: .expressive
+            variation: .expressive,
+            longFormSegment: false
         )
 
         XCTAssertNil(first.seed)

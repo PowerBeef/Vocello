@@ -190,7 +190,7 @@
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "upstreamable",
       "upstreamEquivalentCommit": null,
-      "removalCriteria": "Remove the float32 cast only if upstream samples from float32 logits itself; remove a diagnostic arm (full-text conditioning for streamed takes, EOS filtered like any token) once a recorded decision adopts or retires it."
+      "removalCriteria": "Remove the float32 cast only if upstream samples from float32 logits itself; full-text conditioning (D1, single streamed takes, RF-21) and EOS filtered like any token (D2, RF-18) are adopted, and each keeps its knob as the reverting arm; remove a knob once a recorded decision retires its comparison."
     },
     {
       "id": "STREAM-001",

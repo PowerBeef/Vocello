@@ -64,11 +64,12 @@ waveform; sample-stream consumers do not evaluate tensors in their proxy tasks. 
 product consumers of the former tensor payload and no persisted event format to migrate.
 The actor-owned shipping facade and sampling/chunk schedules are unchanged.
 
-Sampling is request-local. A request carries both stages (talker and subtalker) and, only from the
-host's internal-diagnostics knobs, a `VocelloQwen3ReferenceParity` departure. Without one, production
-takes `VocelloQwen3ReferenceParity.production`: float32 sampling logits (D3, 2026-10-13) and the
-talker's EOS filtered like any token (D2, 2026-10-20), with full-text conditioning for streamed takes
-(D1) off. The host gives the subtalker the reference sampling for every variation (RF-18).
+Sampling is request-local. A request carries both stages (talker and subtalker) and, for a long-form
+segment or from the host's internal-diagnostics knobs, a `VocelloQwen3ReferenceParity` departure.
+Without one, production takes `VocelloQwen3ReferenceParity.production`: float32 sampling logits (D3,
+2026-10-13), the talker's EOS filtered like any token (D2, 2026-10-20) and full-text conditioning for
+streamed takes (D1, 2026-10-20, RF-21); a long-form segment turns D1 off to keep trailing text. The
+host gives the subtalker the reference sampling for every variation (RF-18).
 
 The actor closes its inert-reservation and critical-relief lifecycle explicitly.
 Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join

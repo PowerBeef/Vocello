@@ -3350,11 +3350,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let subtalkerSampling = samplingPolicy.subtalker
         // Audio QC GEN-NOEOS (diagnostics only): nil on every production request.
         var eosSuppression = samplingPolicy.eosSuppressionFrames.map(Qwen3EOSSuppressionWindow.init(frames:))
-        // RF-14 reference parity: `.production` (D3 float32 sampling) on every
-        // production request; the other arms are diagnostics only.
+        // RF-14 reference parity: `.production` (D1-D3 on) on every single
+        // take; a long-form segment turns D1 off, and the other departures are
+        // diagnostics only.
         let referenceParity = samplingPolicy.referenceParity
         // D1: streamed Custom and Design takes use the reference's full-text
-        // layout; clones ignore the requested mode (see `recordedLabel`).
+        // layout unless the request keeps trailing text; clones ignore the
+        // requested mode (see `recordedLabel`).
         let effectiveTextConditioningMode: Qwen3TextConditioningMode =
             referenceParity.fullTextConditioning ? .fullTextNonStreaming : textConditioningMode
 

@@ -25,29 +25,33 @@ enum Qwen3TalkerSamplingOverride {
         RuntimeDebugGate.value(for: "QWENVOICE_TALKER_EOS_SUPPRESSION_FRAMES")
     )
 
-    /// RF-14 reference-parity arms (`VocelloQwen3ReferenceParity`). Production
-    /// samples from float32 logits (D3, maintainer decision 2026-10-13) and
-    /// filters the talker's EOS like any token (D2, RF-18 follow-up screen,
-    /// 2026-10-20): `QWENVOICE_SAMPLER_FLOAT32=off` reverts to the model's own
-    /// precision and `QWENVOICE_TALKER_FILTER_EOS=off` re-inserts EOS after the
-    /// filters. D1 `QWENVOICE_FULL_TEXT_CONDITIONING` stays off unless set `on`.
-    static let envReferenceParity: VocelloQwen3ReferenceParity? = referenceParity(
-        fullTextConditioning: RuntimeDebugGate.value(for: "QWENVOICE_FULL_TEXT_CONDITIONING"),
-        filtersEOS: RuntimeDebugGate.value(for: "QWENVOICE_TALKER_FILTER_EOS"),
-        float32Sampling: RuntimeDebugGate.value(for: "QWENVOICE_SAMPLER_FLOAT32")
-    )
+    /// RF-14 reference-parity knobs (`VocelloQwen3ReferenceParity`). Production
+    /// samples from float32 logits (D3, maintainer decision 2026-10-13), filters
+    /// the talker's EOS like any token (D2, RF-18 follow-up screen, 2026-10-20)
+    /// and gives a single streamed take its whole text up front (D1, RF-21,
+    /// 2026-10-20). Each knob set `off` reverts its arm and set `on` forces it;
+    /// `QWENVOICE_FULL_TEXT_CONDITIONING=on` also reaches long-form segments.
+    static let envFullTextConditioning = RuntimeDebugGate.value(for: "QWENVOICE_FULL_TEXT_CONDITIONING")
+    static let envFiltersEOS = RuntimeDebugGate.value(for: "QWENVOICE_TALKER_FILTER_EOS")
+    static let envFloat32Sampling = RuntimeDebugGate.value(for: "QWENVOICE_SAMPLER_FLOAT32")
 
-    /// The arms the knobs select, or nil (the production path) when they leave
-    /// production unchanged. A knob set on or off overrides its arm; unset or
-    /// unrecognized, the arm keeps its production value.
+    /// The arms a request takes, or nil (the production path) when they match
+    /// production. A long-form segment keeps trailing text: RF-18's screen
+    /// rejected full text for long segments, while RF-20's content screen
+    /// adopted it for single takes. A knob set on or off overrides its arm;
+    /// unset or unrecognized, the arm keeps the request's default.
     static func referenceParity(
         fullTextConditioning: String?,
         filtersEOS: String?,
-        float32Sampling: String?
+        float32Sampling: String?,
+        longFormSegment: Bool
     ) -> VocelloQwen3ReferenceParity? {
         let production = VocelloQwen3ReferenceParity.production
         let parity = VocelloQwen3ReferenceParity(
-            fullTextConditioning: knob(fullTextConditioning, else: production.fullTextConditioning),
+            fullTextConditioning: knob(
+                fullTextConditioning,
+                else: production.fullTextConditioning && !longFormSegment
+            ),
             filtersEOS: knob(filtersEOS, else: production.filtersEOS),
             float32Sampling: knob(float32Sampling, else: production.float32Sampling)
         )
@@ -92,9 +96,20 @@ enum Qwen3TalkerSamplingOverride {
         return value
     }
 
+    /// A generation request's policy: its seed and variation, and the text
+    /// layout its kind of take keeps (a long-form segment trailing text).
+    static func samplingConfiguration(for request: GenerationRequest) -> VocelloQwen3SamplingConfiguration {
+        samplingConfiguration(
+            requestedSeed: request.seed,
+            variation: request.variation,
+            longFormSegment: request.longFormSegment == true
+        )
+    }
+
     static func samplingConfiguration(
         requestedSeed: UInt64?,
-        variation: Qwen3SamplingVariation?
+        variation: Qwen3SamplingVariation?,
+        longFormSegment: Bool
     ) -> VocelloQwen3SamplingConfiguration {
         let official = Qwen3GenerationConfiguration.officialQualityDefault
         var temperature = official.temperature
@@ -140,7 +155,12 @@ enum Qwen3TalkerSamplingOverride {
             maxNewTokens: official.maxNewTokens,
             requestedSeed: requestedSeed,
             eosSuppressionFrames: envEOSSuppressionFrames,
-            referenceParity: envReferenceParity
+            referenceParity: referenceParity(
+                fullTextConditioning: envFullTextConditioning,
+                filtersEOS: envFiltersEOS,
+                float32Sampling: envFloat32Sampling,
+                longFormSegment: longFormSegment
+            )
         )
     }
 }
@@ -207,7 +227,8 @@ final class UnsafeSpeechGenerationModel: Sendable {
     var samplingConfiguration: VocelloQwen3SamplingConfiguration {
         requestSampling ?? Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: nil
+            variation: nil,
+            longFormSegment: false
         )
     }
 

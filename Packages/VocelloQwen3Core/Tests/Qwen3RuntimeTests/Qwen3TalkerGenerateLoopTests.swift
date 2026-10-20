@@ -215,6 +215,13 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         return model
     }
 
+    /// Production with D1 off: the trailing-text layout a long-form segment keeps.
+    private static let trailingText = Qwen3ReferenceParity(
+        fullTextConditioning: false,
+        filtersEOS: true,
+        float32Sampling: true
+    )
+
     private static func samplingPolicy(
         seed: UInt64,
         maximumCodecTokens: Int = 16,
@@ -675,10 +682,11 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
 
     // MARK: - RF-14 reference-parity arms
 
-    /// D1: a streamed Design take armed with full-text conditioning lays its
+    /// D1 is production (RF-21, 2026-10-20): a streamed Design take lays its
     /// text out as quality-first does, so one seed samples the quality-first
-    /// take's codes frame for frame; the engine row records the layout and the
-    /// arm. Unarmed, the streamed take keeps trailing text and records no arm.
+    /// take's codes frame for frame, and the engine row records the layout and
+    /// no arm. With D1 off, as a long-form segment asks, the streamed take keeps
+    /// trailing text and names the arms it departs with.
     func testFullTextConditioningGivesAStreamedTakeTheQualityFirstCodes() async throws {
         let model = try Self.makeModel()
         let seed: UInt64 = 0x5EED_0D01
@@ -686,22 +694,15 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertFalse(qualityFirst.frames.isEmpty)
 
         model.resetPreparationDiagnostics()
-        let armed = try await streamed(
-            model,
-            seed: seed,
-            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
-        )
-        XCTAssertEqual(armed, qualityFirst.frames)
+        let production = try await streamed(model, seed: seed)
+        XCTAssertEqual(production, qualityFirst.frames)
         XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "full_text_non_streaming")
-        XCTAssertEqual(
-            model.latestPreparationStringFlags["reference_parity"],
-            "full_text_conditioning,filters_eos,float32_sampling"
-        )
+        XCTAssertNil(model.latestPreparationStringFlags["reference_parity"])
 
         model.resetPreparationDiagnostics()
-        _ = try await streamed(model, seed: seed)
+        _ = try await streamed(model, seed: seed, referenceParity: Self.trailingText)
         XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "streaming_trailing_text")
-        XCTAssertNil(model.latestPreparationStringFlags["reference_parity"])
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "filters_eos,float32_sampling")
     }
 
     /// D2 in the loop: at top-k 2 the talker's sampled distribution keeps two
@@ -725,25 +726,29 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         }
         let production = try await widths(.production)
         let reinserted = try await widths(
-            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)
+            Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: false, float32Sampling: true)
         )
-        // The departure names its arm, as model-precision sampling does.
-        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "reinserts_eos,float32_sampling")
+        // The departure names its arms, as model-precision sampling does.
+        XCTAssertEqual(
+            model.latestPreparationStringFlags["reference_parity"],
+            "full_text_conditioning,reinserts_eos,float32_sampling"
+        )
         XCTAssertTrue(reinserted.contains(3), "the re-insertion arm puts EOS back outside the top-k: \(reinserted)")
         XCTAssertFalse(production.isEmpty)
         XCTAssertTrue(production.allSatisfy { $0 <= 2 }, "production keeps only the top-k: \(production)")
     }
 
-    /// D3 is production (maintainer decision 2026-10-13), and so is D2 (RF-18
-    /// follow-up screen, 2026-10-20): every request without an override samples
-    /// from float32 logits and filters EOS like any token. A request that departs from
-    /// production names all its arms on the engine row, and production names
-    /// none. The tiny talker's logits are already float32, so model-precision
-    /// sampling leaves its codes unchanged.
+    /// D3 is production (maintainer decision 2026-10-13), and so are D2 (RF-18
+    /// follow-up screen) and D1 (RF-21, both 2026-10-20): every request without
+    /// an override samples from float32 logits, filters EOS like any token and
+    /// sees its whole text. A request that departs from production names all
+    /// its arms on the engine row, and production names none. The tiny talker's
+    /// logits are already float32, so model-precision sampling leaves its codes
+    /// unchanged.
     func testFloat32SamplingIsProductionAndDeparturesRecordTheirArms() async throws {
         XCTAssertEqual(
             Qwen3ReferenceParity.production,
-            Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)
+            Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
         )
         let model = try Self.makeModel()
         let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
@@ -767,21 +772,17 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let modelPrecision = try await generate(
             model,
             seed: seed,
-            referenceParity: Qwen3ReferenceParity(fullTextConditioning: false, filtersEOS: true, float32Sampling: false)
+            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: false)
         )
         XCTAssertEqual(modelPrecision.frames, production.frames)
-        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "filters_eos,model_precision_sampling")
-
-        model.resetPreparationDiagnostics()
-        _ = try await generate(
-            model,
-            seed: seed,
-            referenceParity: Qwen3ReferenceParity(fullTextConditioning: true, filtersEOS: true, float32Sampling: true)
-        )
         XCTAssertEqual(
             model.latestPreparationStringFlags["reference_parity"],
-            "full_text_conditioning,filters_eos,float32_sampling"
+            "full_text_conditioning,filters_eos,model_precision_sampling"
         )
+
+        model.resetPreparationDiagnostics()
+        _ = try await generate(model, seed: seed, referenceParity: Self.trailingText)
+        XCTAssertEqual(model.latestPreparationStringFlags["reference_parity"], "filters_eos,float32_sampling")
     }
 
     /// D3 on a lower-precision talker: with bf16 weights the raw logits are
@@ -846,7 +847,9 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let qualityFirst = try await generate(model, seed: 0x5EED_0E41, text: "A")
         XCTAssertFalse(qualityFirst.samples.isEmpty)
         model.resetPreparationDiagnostics()
-        let streamedFrames = try await streamed(model, seed: 0x5EED_0E41, text: "A")
+        let streamedFrames = try await streamed(
+            model, seed: 0x5EED_0E41, referenceParity: Self.trailingText, text: "A"
+        )
         XCTAssertFalse(streamedFrames.isEmpty)
         XCTAssertEqual(model.latestPreparationStringFlags["text_conditioning_mode"], "streaming_trailing_text")
 

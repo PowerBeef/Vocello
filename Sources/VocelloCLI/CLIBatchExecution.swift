@@ -42,8 +42,8 @@ public enum CLIBatchExecution {
     }
 
     /// One segment of a long-form project as the apps' runner requests it: a
-    /// streaming take at the app cadence with the planner's derived subseed;
-    /// the delivery cell travels on Custom only.
+    /// streaming take at the app cadence with the planner's derived subseed and
+    /// the segment's trailing-text layout; the delivery cell travels on Custom only.
     public static func makeLongFormSegmentRequest(
         mode: GenerationMode, modelID: String, text: String, outputPath: String,
         payload: GenerationRequest.Payload, generationID: UUID, subseed: UInt64,
@@ -54,7 +54,8 @@ public enum CLIBatchExecution {
             shouldStream: true,
             streamingInterval: GenerationSemantics.appStreamingInterval,
             payload: payload, generationID: generationID, seed: subseed, variation: variation,
-            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil
+            deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil,
+            longFormSegment: true
         )
     }
 

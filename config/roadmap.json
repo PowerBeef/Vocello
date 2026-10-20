@@ -184,6 +184,23 @@
       "due": "2026-10-22"
     },
     {
+      "id": "RF-21",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Single streamed takes see their whole script; long-form segments keep trailing text",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-22",
+      "gate": "Adopted by the maintainer on 2026-10-20 from RF-20's content screen. Done when deterministic tests pin each path's text layout (a single streamed Custom or Design take full text, a long-form segment trailing text, the D1 knob forcing either), the routed check passes, the default CLI replays the 2026-10-20 French failing take cleanly, the Mac auto-language lane passes and a Mac memory qualification passes. The iPhone proof is RF-15's acceptance of the candidate.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "Sources/QwenVoiceCore/SemanticTypes.swift",
+        "docs/reference/qwen3-tts-guide.md"
+      ],
+      "updated": "2026-10-20",
+      "notes": "RF-20 declined full text (D1) under its first rule because one Japanese language-bench take garbled its ending. At the maintainer's request both ASR families then scored all 496 saved screen takes under a rule written before any transcript (verdicts from language_metrics.qc_take_verdict): wrong-content takes fell from 31 to 16 of 248, failures with the Fast QC rejections from 34 to 19, and no mode-language cell got two more under D1; paired by seed, 16 control failures passed under D1 and 3 passes failed. Japanese content failures went from 6 to 0. Costs kept: Voice Design's longer trailing pause (3 terminal-silence rejections in 50) and seeds no longer reproducing pre-RF-21 takes. Long-form segments keep trailing text because RF-18's screen rejected full text for long segments."
+    },
+    {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
@@ -276,7 +293,8 @@
         "RF-14",
         "RF-18",
         "RF-19",
-        "RF-20"
+        "RF-20",
+        "RF-21"
       ]
     },
     {

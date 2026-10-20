@@ -1490,10 +1490,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         // existing allocation-recovery attempt. Resolving again after unload
         // would silently change an unpinned seed while claiming to retry the
         // same take.
-        let samplingConfiguration = Qwen3TalkerSamplingOverride.samplingConfiguration(
-            requestedSeed: request.seed,
-            variation: request.variation
-        )
+        let samplingConfiguration = Qwen3TalkerSamplingOverride.samplingConfiguration(for: request)
         let initialWarmState: EngineWarmState = loadState.currentModelID == request.modelID
             ? .warm
             : .cold

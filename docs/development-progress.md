@@ -53,13 +53,15 @@ test; #110 and #87 closed). The window's commits after it wait for the maintaine
   Manual selection followed (`aa0adfdd`, `64fbbbc9`): 22 of 22 takes pass
   (`macos-xcui-auto-language-20261020-204002-f86c7a46`). A pinned language reaches the engine even
   when the text is in another language, and returning to Auto follows detection again.
-- **RF-20 declined: full text up front (D1) not adopted for single takes.** The lane's French take
-  that whispered for 35 s had streamed its whole script during an opening sigh (A-01). The
-  pre-registered screen favored D1: 5 gross failures against 10 of 251 takes per arm, and the take
-  recovered. But the Mac language bench with D1 on garbled a Japanese take that streaming text speaks
-  correctly on the same seed (`mac-lang-bench-20261020-215933-4b3c7b82` against `…220248-067bb65c`).
-  The failure is a documented 3.0 known limitation (qwen3-tts-guide §11.2, v3.0.0 notes) that Fast
-  QC rejects. BKL-22 and BKL-23 park two language-bench tooling gaps.
+- **Full text up front (D1) adopted for single streamed takes (RF-21; RF-20 declined first).** The
+  lane's French take that whispered for 35 s had streamed its whole script during an opening sigh
+  (A-01). RF-20's screen favored D1 (5 gross failures against 10 of 251 takes per arm), but its rule
+  also required the Mac language bench, where D1 garbled one Japanese take
+  (`mac-lang-bench-20261020-215933-4b3c7b82` against `…220248-067bb65c`), so RF-20 closed declined.
+  At the maintainer's request both ASR families then scored the 496 saved screen takes under a rule
+  written first: wrong-content takes fell from 31 to 16, and the maintainer adopted D1. Long-form
+  segments keep trailing text (`GenerationRequest.longFormSegment`). BKL-22 and BKL-23 park two
+  language-bench tooling gaps.
 - **Next:**
   - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
     (BKL-19's Speech Recognition prompt).

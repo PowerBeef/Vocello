@@ -1740,6 +1740,21 @@
       "notes": "Found 2026-10-19 by the DW-03 seam tests (94dc16cd, 7fe58fa2). With the overlay marker missing or stale, readPersistedSourceQwenPreparedCheckpointTrust re-hashes the changed weights and rewrites the source trust file to the new digest. The rebuild then marks the checkpoint trusted before the loader runs, so weight verification relaxes to noUnusedKeys, and that trust survives a failed load. With a valid overlay, the same change is distrusted. Installed weights are SHA-256-verified at download, so this needs weights that change in place, then an overlay invalidation such as a descriptor bump or an iOS cache purge. Parked without investigation under the focus lock: hardening, not a release blocker."
     },
     {
+      "id": "BKL-21",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The startup-reliability receipt validator rejects every real receipt's model signature",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "ios_startup_reliability.validate_receipt accepts a real v3 receipt's modelRuntimeIdentity.runtimeProfileSignature (it contains | and , and runs to about 250 characters), with a test over a real-shaped signature, and every lane that calls it is re-checked.",
+      "sourceOfTruth": [
+        "scripts/ios_startup_reliability.py",
+        "scripts/auto_language_check.py"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 while building the macos auto-language lane: validate_receipt allows only [A-Za-z0-9._:-] up to 256 characters for runtimeProfileSignature, so all 22 real Mac receipts in the debug store failed it. scripts/auto_language_check.py checks that one field with its own pattern and passes the rest to validate_receipt. Other lanes that call validate_receipt on receipts carrying modelRuntimeIdentity likely share the gap. Parked without investigation under the focus lock: test tooling, not a release blocker."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

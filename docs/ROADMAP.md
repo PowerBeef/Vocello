@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/23 (57%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/24 (54%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -542,6 +542,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-18` | parked | iPhone Saved Voices Delete is offered while a Clone take primes its reference | — |
 | `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
 | `BKL-20` | parked | A rebuilt prepared overlay trusts model weights that changed in place | — |
+| `BKL-21` | parked | The startup-reliability receipt validator rejects every real receipt's model signature | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -574,6 +575,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-20`** (parked) — A rebuilt prepared overlay trusts model weights that changed in place.
   gate: When the weights change and the overlay is rebuilt, the checkpoint is not trusted until a load succeeds on the new weights, as on the valid-overlay path, and testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt passes without its XCTExpectFailure blocks.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-21`** (parked) — The startup-reliability receipt validator rejects every real receipt's model signature.
+  gate: ios_startup_reliability.validate_receipt accepts a real v3 receipt's modelRuntimeIdentity.runtimeProfileSignature (it contains | and , and runs to about 250 characters), with a test over a real-shaped signature, and every lane that calls it is re-checked.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

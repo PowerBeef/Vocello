@@ -44,6 +44,12 @@ test; #110 and #87 closed). The window's commits after it wait for the maintaine
     Xcode 27's simulated iPhone (`f1698bd8`); the doctor's "multiple devices" error is gone.
   - `scripts/ui_test.sh ios take-variation` restores Take variation through Settings, and session
     cleanup closes a History search keyboard first (`d549d45c`). The phone is back on Consistent.
+- **Auto language verified on the Mac (maintainer request):** `scripts/ui_test.sh macos auto-language`
+  (`4a4c31df`, `3f134082`) passed all 17 takes (`macos-xcui-auto-language-20261020-193808-e91827da`).
+  With Studio on Auto the request carries `auto`, the engine resolves the detected language and sends
+  its language token, and the chip agrees, in all ten languages and in Design and Clone. Dutch, which
+  Qwen3 does not speak, shows Auto: Built-in then sends English (D6, ER-05), Design sends no token.
+  BKL-21 parks the receipt-validator gap the checker works around. An iPhone run waits for a window.
 - **Next:**
   - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
     (BKL-19's Speech Recognition prompt).

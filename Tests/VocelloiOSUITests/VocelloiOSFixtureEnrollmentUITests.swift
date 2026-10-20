@@ -1,5 +1,5 @@
 import Foundation
-@unsafe @preconcurrency import XCTest
+import XCTest
 
 /// Explicit, opt-in enrollment of the benchmark clone voice through the genuine visible
 /// Files-import flow. This method is selected directly by

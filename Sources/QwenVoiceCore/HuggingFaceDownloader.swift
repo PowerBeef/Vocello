@@ -1,5 +1,5 @@
 import CryptoKit
-@unsafe @preconcurrency import Foundation
+import Foundation
 import OSLog
 import Synchronization
 

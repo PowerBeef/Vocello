@@ -1,4 +1,4 @@
-@unsafe @preconcurrency import AVFoundation
+import AVFoundation
 import Foundation
 import CryptoKit
 import VocelloQwen3Core

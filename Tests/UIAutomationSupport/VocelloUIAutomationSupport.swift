@@ -1,5 +1,5 @@
 import Foundation
-@unsafe @preconcurrency import XCTest
+import XCTest
 #if os(iOS)
 import UIKit
 #endif

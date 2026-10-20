@@ -1,4 +1,4 @@
-@unsafe @preconcurrency import AVFoundation
+import AVFoundation
 import Foundation
 @testable import QwenVoiceCore
 import XCTest

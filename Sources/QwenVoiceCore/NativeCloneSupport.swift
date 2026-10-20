@@ -1,5 +1,5 @@
 import CryptoKit
-@unsafe @preconcurrency import AVFoundation
+import AVFoundation
 import Foundation
 @unsafe @preconcurrency import MLX
 import VocelloQwen3Core

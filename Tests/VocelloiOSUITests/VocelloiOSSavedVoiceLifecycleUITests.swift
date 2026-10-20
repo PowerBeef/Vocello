@@ -1,5 +1,5 @@
 import Foundation
-@unsafe @preconcurrency import XCTest
+import XCTest
 
 /// Explicit physical-device acceptance for F-01 and ICI-4. This test begins in
 /// Studio Clone, imports a deliberately throwaway reference through the visible

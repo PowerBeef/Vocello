@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Darwin
-@unsafe @preconcurrency import XCTest
+import XCTest
 
 @MainActor
 final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {

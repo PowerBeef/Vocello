@@ -1,5 +1,5 @@
 import AVFoundation
-@unsafe @preconcurrency import XCTest
+import XCTest
 
 /// The macOS smoke suite: focused journeys that run in the numbered
 /// order (XCTest executes methods alphabetically). Each test owns a fresh

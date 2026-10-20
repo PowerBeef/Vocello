@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-@unsafe @preconcurrency import XCTest
+import XCTest
 
 /// Explicit, opt-in physical-device proof for background model delivery. This method is selected
 /// directly by `scripts/ui_test.sh ios model-download`; smoke, benchmarks, CI, and release never

@@ -1,12 +1,13 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-10-20
 summary: The single telemetry and benchmarking reference — per-generation typed telemetry across frontend/transport/backend, schema versions, knobs, artifacts, and how evidence stays cheap.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
   - scripts/benchmark_history.py
   - config/memory-qualification-policy.json
+  - config/macos-ui-stall-gate.json
 ---
 # Telemetry & benchmarking
 
@@ -485,7 +486,7 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   peak.
 - **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim.
   They sit at stage edges, not at the allocation spike, so sampled peaks still miss allocations
-  shorter than the sampler tick (250 ms on the floor tiers since 2026-09-25): in committed records 2,035 of 3,634 takes sampled
+  shorter than the sampler tick (250 ms on the 16 GB M6 and, since 2026-09-25, on the floor tiers): in committed records 2,035 of 3,634 takes sampled
   a Metal peak below the exact `mlxPeakMB` (the MLX allocator's own per-request high-water mark),
   by a median of about 120-460 MB per record kind. Treat sampled peaks as lower bounds and
   `mlxPeakMB` as the exact MLX figure. `benchmark_history.py validate` and `record` warn (without
@@ -530,10 +531,12 @@ samples (`samplerMaximumUnobservedGapMS`) may exceed the bound in
 `config/memory-qualification-policy.json` `unobservedGapBound`, max(twice the sampler's target
 interval, 500 ms), or max(twice the interval, 1,000 ms) on the floor tiers (an iPhone, or a Mac whose
 engine row stamps `floor_8gb_mac`); a longer gap fails publication, and each take records the bound it
-met as `samplerUnobservedGapLimitMS`. The bound is provisional until the first consented memory lane on
-the canonical M6 (250 ms cadence) calibrates it; the floor tiers moved from a 500 ms to a 250 ms
-cadence on 2026-09-25 and keep their 1,000 ms floor until an unforced iPhone or 8 GB Mac record
-calibrates it (`scripts/derive_memory_calibration.py`). Periodic coverage (`samplerCoverage`,
+met as `samplerUnobservedGapLimitMS`. The bound is calibrated: on 2026-09-25 the consented memory lane
+`mac-memory-qualification-20260926-011258-82f5f55c` on the canonical M6 (250 ms cadence) measured a
+longest gap of 274 ms over 11 takes, inside max(2 × cadence, 500 ms) with the 1.25 margin, so both
+values stayed. The floor tiers moved from a 500 ms to a 250 ms cadence on the same day and keep a
+provisional 1,000 ms floor until an unforced iPhone or 8 GB Mac record calibrates it
+(`scripts/derive_memory_calibration.py`); an M6 record never moves it. Periodic coverage (`samplerCoverage`,
 `samplerMissedDeadlineCount`) is still published but no longer gates, because it counts deadlines
 honoured rather than whether the peak was seen. Peak fidelity: `gpuPeakCaptureMissMB` is how far the sampled Metal peak fell below the exact
 `mlxPeakMB` (0 when it caught it). When the sampler read the kernel ledgers (samplers since
@@ -582,9 +585,10 @@ value includes the MLX cache. Each take now publishes `mlxEndActiveMB`/`mlxEndCa
 snapshot after that clear (else after the stream) and, when sampled, `graphicsFootprintEndMB`; v2's
 metric is each mode's growth of `mlxEndActiveMB` from the first retained take to the highest later
 one. It gates per mode only against a bound calibrated from a consented memory run on the platform's
-canonical host. Until a maintainer records that bound and its run ID, both platforms are
-`uncalibrated`: the record reports the growth with no bound and no verdict, and v1 alone decides
-publication.
+canonical host. macOS is calibrated at 16 MB per mode by the same M6 run
+(`mac-memory-qualification-20260926-011258-82f5f55c`). iOS stays `uncalibrated` until a maintainer
+records its bound and run ID: its record reports the growth with no bound and no verdict, and v1
+alone decides publication.
 
 On iOS, MetricKit's delayed daily aggregate is a complementary field signal. The app persists only
 a bounded privacy-reduced memory/exit summary; raw payload JSON, call stacks, identifiers, and paths
@@ -610,10 +614,12 @@ queued behind the main thread when the session ends counts as a censored observa
 rows without the field counted completed heartbeats only, which read low at the generation boundary).
 The UI benchmark records carry the same count as the take metric `censoredHeartbeatCount`, so a
 tracked `uiMaximumDelayedHeartbeatMS` names its definition: a take without the key predates it.
-The macOS UI benchmark judges this statistic under `config/macos-ui-stall-gate.json`: while the
-contract is `provisional` it only reports (the run publishes, with the run warning
-`stall.provisional.wouldfail(<above>/<gated>)` when a take exceeds the limit); once it is
-`calibrated` with its calibrating run IDs, a take above the limit fails the run.
+The macOS UI benchmark judges this statistic under `config/macos-ui-stall-gate.json`: a
+`provisional` contract only reports (the run publishes, with the run warning
+`stall.provisional.wouldfail(<above>/<gated>)` when a take exceeds the limit); a `calibrated` one,
+with its calibrating run IDs, fails the run when a take is above the limit. The committed contract is
+calibrated: 600 ms on `mac-mini-m6-16gb` since 2026-09-27 (see
+[`benchmarking-procedure.md`](benchmarking-procedure.md) §4.10).
 
 App telemetry also records bounded playback health: chunks received, continuity failures,
 underruns, queued chunks/audio at playback scheduling, and minimum queue duration. This makes UI

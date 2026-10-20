@@ -19,11 +19,14 @@ sourceOfTruth:
 > lifecycle, persistence, model management, and telemetry. When this doc disagrees
 > with the code, **the code wins** — fix this doc.
 >
-> October 10 takeover checkpoint: source-traced runtime ownership, cancellation and streaming,
-> app/CLI adapters, History recovery, model delivery, diagnostics, and CI/release workflows.
 > This is static architecture verification; it is not fresh model, device, UI, or performance
-> evidence. The [takeover audit](audits/2026-10-10-codex-workflow-audit.md) maps coverage and
-> outstanding boundaries. Historical September checkpoints remain in Git history.
+> evidence. The development loop, agents and tool routing live in
+> [`reference/development-workflow.md`](reference/development-workflow.md); the
+> [October 18 development-workflow audit](audits/2026-10-18-dev-workflow-audit.md) is the current
+> review of that workflow. The Codex harness was retired on 2026-10-12
+> ([Claude Code takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)), so the
+> [October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md) and its coverage map
+> are historical. Earlier checkpoints remain in Git history.
 
 ## TL;DR
 
@@ -59,9 +62,9 @@ release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta*
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 10 targets split into **cross-platform frameworks** and
-**apps/CLI/tests**; since 2026-09-15 no target is macOS-only except the app, the CLI
-and their test bundles.
+2.46.0). There are 11 targets split into **frameworks** and **apps/CLI/tests**; since
+2026-09-15 no target is macOS-only except the app, the CLI, the CLI's `VocelloCLICore` framework
+(2026-10-19) and their test bundles.
 
 ```mermaid
 graph TD
@@ -76,6 +79,8 @@ graph TD
 
     QwenVoiceCore["QwenVoiceCore<br/>(engine core · iOS+macOS)"]:::fw
     QwenVoiceBackendCore["QwenVoiceBackendCore<br/>(provenance + policy vocabulary · iOS+macOS)"]:::fw
+    VocelloCLICore["VocelloCLICore<br/>(CLI runtime + parsing · macOS)"]:::macfw
+    VocelloCoreTests["VocelloCoreTests<br/>(macOS unit tests)"]:::app
 
     GRDB["GRDB.swift"]:::spm
     MLXAudio["VocelloQwen3Core<br/>(MLXAudio Core, Codecs, TTS) — owned"]:::spm
@@ -88,7 +93,12 @@ graph TD
     VocelloiOS --> QwenVoiceCore
     VocelloiOS --> GRDB
 
+    VocelloCLI --> VocelloCLICore
     VocelloCLI --> QwenVoiceCore
+    VocelloCLICore --> QwenVoiceCore
+
+    VocelloCoreTests --> QwenVoiceCore
+    VocelloCoreTests -.->|"@testable import"| VocelloCLICore
 
     QwenVoiceCore --> QwenVoiceBackendCore
 
@@ -99,8 +109,9 @@ graph TD
 
 (SPM products are also linked directly by the apps and the CLI where
 needed; the owned package uses `MLXRandom` for request-local seeding. Only
-the architectural edges are shown above; see `project.yml` for the exact link
-graph.)
+the architectural edges are shown above, and of the test bundles only `VocelloCoreTests`, which
+imports `VocelloCLICore` `@testable` instead of compiling the CLI's files by path; see `project.yml`
+for the exact link graph.)
 
 ### Targets
 
@@ -146,7 +157,10 @@ single aggregate — and `scripts/dev.sh ci` reproduces that list serially. The 
 `scripts/ios_device.sh bench|lang-bench|memory|gate` and the XCUITest benchmark and perf lanes)
 refuse to start on a busy host through `require_quiet_host` (load within twice the cores, no kernel
 memory pressure, no other holder of the host-wide native lock, no active delegated worker;
-`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues). A public promotion is routed separately: `promotionRouting` in
+`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues). `scripts/macos_test.sh qc-takes`
+(audio-QC calibration takes) runs the same check with `agents-allowed`: it measures outputs, not
+timing, so code-only agents may work beside it, while load, memory pressure and a held native lock
+still refuse it. A public promotion is routed separately: `promotionRouting` in
 `config/quality-promotion-contract.json` maps the paths changed since the previous release to the
 capability lanes it must prove, and `python3 scripts/quality_promotion.py classify --base <tag>`
 lists them.
@@ -207,7 +221,6 @@ Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 | swift-system | `1.6.4` | System types (transitive). |
 | swift-asn1 | `1.7.0` | ASN.1 parsing (transitive). |
 | EventSource | `1.4.1` | Server-sent events (transitive). |
-| swift-argument-parser | `1.8.2` | CLI argument parsing (transitive). |
 | swift-syntax | `603.0.2` | Macro support (transitive). |
 
 Shipped models (`Sources/Resources/qwenvoice_contract.json`): Qwen3-TTS 1.7B in
@@ -272,7 +285,7 @@ Defined in `Sources/QwenVoiceCore/TTSEngine.swift`. `TTSEngine` is an
 companion `TTSEngineEventStreaming` protocol (`func events(for generationID: UUID) -> AsyncStream<GenerationEvent>`).
 
 `MLXTTSEngine` (`MLXTTSEngine.swift`) is the single concrete implementation. It
-exposes generation, batch generation, model load/unload, prewarm, clone-reference
+exposes generation, model load/unload, prewarm, clone-reference
 priming, cancellation, and capability queries; it publishes `loadState`,
 `clonePreparationState`, `latestEvent`, and snapshot state. Around it sit several
 actors that own the heavy, isolated work:
@@ -516,8 +529,10 @@ Prewarm identity keys are per mode (e.g.
 `custom:<speakerID>:<instruction-hash>`); `NativeCustomPrewarmPolicy` is `.eager`
 on capable Macs and `.skipDedicatedCustomPrewarm` on `.floor8GBMac` and on the iPhone
 (`IOSAppBootstrap`), which is why the first Custom take after an iPhone launch pays about 0.2 s to
-warm the decoder (engine audit D-02). Depth is
-tunable via `CustomVoicePrewarmDepth { .full, .skipDecoderBucket, .skipStreamStep }`.
+warm the decoder (engine audit D-02). Depth is the owned package's file-private
+`Qwen3CustomVoicePrewarmDepth { .full, .skipDecoderBucket, .skipStreamStep }`, chosen by raw
+value: `NativeEngineRuntime.customPrewarmDepth` passes `skip-decoder-bucket` for a Custom script of
+30 characters or fewer, and anything else resolves to `.full`.
 
 ### 4.8 Voice cloning cache
 
@@ -595,7 +610,9 @@ Before `open`, an error aborts the inert reservation instead of taking the after
 path. `GenerationOutputAdapterChoreographyTests` exercises this production helper with a scripted
 reservation, including terminal-before-release ordering. It does not execute concrete `run` with
 loaded weights, `EngineReservedTake`, the limiter, file writer, telemetry, and transport together;
-that integration boundary remains explicit in the takeover audit.
+that integration boundary is finding CW-06 of the historical
+[October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition),
+parked in `config/roadmap.json`.
 
 **MLX failures.** Every actor entry point that runs MLX work does so inside an MLX error scope, so
 an MLX error ends the operation as a typed `VocelloQwen3RuntimeFailure` (allocation reaches the
@@ -814,16 +831,21 @@ concrete type. Key iOS behaviors:
 
 ## 7. CLI (`VocelloCLI`)
 
-`Sources/VocelloCLI/CLIRuntime.swift` (`@MainActor struct CLIRuntime`) bootstraps
+`Sources/VocelloCLI/CLIRuntime.swift` (`@MainActor public struct CLIRuntime`, compiled into the
+`VocelloCLICore` framework with the argument parsing and routing, consent, process supervision,
+batch execution and the `generate` and `modes` commands; the `vocello` executable keeps
+`VocelloMain` and the other commands and links it) bootstraps
 the in-process engine the same way the iOS app does — `NativeRuntimeFactory.make`
 over a data directory — and reuses models already installed by the app. It is
 both a user-facing generator and the deterministic driver for
 benchmarks/quality gates (no Python, no bundled weights).
 
-`bootstrap` resolves the contract via `locateManifestURL()`, which searches (in
-order): the bundled resource (shipped CLI), repo-relative
-`Sources/Resources/qwenvoice_contract.json` (dev + benchmarks), next to the
-executable, then walking up from the cwd. Commands (`VocelloMain.swift`):
+`bootstrap` resolves the contract via `locateManifestURL()` (`resolveTrustAnchor`, SEC-09), which
+searches in order: the bundled resource, the file next to the executable, then, only outside a
+sealed payload (no `package-manifest.json` beside the executable), the repository's
+`Sources/Resources/qwenvoice_contract.json` under the working directory or one of its parents
+(dev + benchmarks). Commands (`VocelloMain.swift`, routed by
+`CLICommandRoute` in `Support.swift`):
 `generate`, `custom`/`design`/`clone`, `batch`, `modes`, `deliveries`, `voices`, `speakers`,
 `models`, `bench`, `version`. stdout is machine-readable (a path, or JSON with `--json`); progress
 goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
@@ -968,7 +990,8 @@ the old-schema path separately from fresh creation. One characterized v3 boundar
 rebuilding the table copies surviving row IDs but does not preserve a larger deleted
 AUTOINCREMENT high-water mark (retained ID 41 / deleted ID 900 becomes sequence 41, next ID 42).
 This is tracked separately from workflow migration; do not assume historical IDs remain globally
-unused across that upgrade. See the [takeover audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition).
+unused across that upgrade. See finding CW-05 of the historical
+[October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition).
 
 **Locations** (release vs debug):
 
@@ -1051,10 +1074,11 @@ plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any pers
 ### Repository-local generated output
 
 `config/build-output-policy.json` is the machine-readable owner and lifetime contract for native
-repository output under `build/`. Local development has four persistent Xcode caches —
+repository output under `build/`. Local development has five persistent Xcode caches —
 `build/cache/xcode/macos/` (`-Onone`), `build/cache/xcode/macos-optimized/` (optimized CLI and
-XCUITest lanes), `build/cache/xcode/macos-tsan/` (the TSan subset, blocking in push CI) and
-`build/cache/xcode/ios-device/` — plus one shared package checkout at
+XCUITest lanes), `build/cache/xcode/macos-enhanced-security/` (the arm64e Enhanced Security trial
+CLI, `scripts/build.sh cli-enhanced-security`, never benchmarked), `build/cache/xcode/macos-tsan/`
+(the TSan subset, blocking in push CI) and `build/cache/xcode/ios-device/` — plus one shared package checkout at
 `build/cache/xcode/source-packages/`; every Xcode/SwiftPM command is serialized by the host-wide
 native lock (`hostNativeLock`, outside the checkout so agent worktrees share it). The owned Qwen3 Core runtime uses its separate
 policy-owned SwiftPM scratch cache and must not leave `.build` state in the source tree.
@@ -1063,12 +1087,14 @@ Release, XcodeBuildMCP, package-resolution, CI, and compile-safety DerivedData a
 `build/scratch/`; no unregistered persistent cache is permitted. Validator-owned telemetry,
 profiles, UI results, crash data, and UUID-matched current dSYMs live below `build/artifacts/`.
 Signing, archives, exports, and packages live below `build/dist/` and are never removed by routine
-or aggressive cache cleanup. The compatibility paths `build/Vocello.app` and `build/vocello` are
-symlinks to the canonical macOS cache products, not copied binaries.
+or aggressive cache cleanup. The compatibility paths `build/Vocello.app`, `build/vocello` and
+`build/vocello-enhanced-security` are symlinks to the canonical macOS cache products, not copied
+binaries.
 
 Every supported build records an atomic `last-build.json` provenance stamp with its producer,
 scheme, configuration, destination, architecture, optimization, signing class, DerivedData, and
-package store. Local macOS app, CLI, and relevant framework products are arm64-only. Preserved
+package store. Local macOS app, CLI, and relevant framework products are arm64-only, apart from
+the arm64e Enhanced Security trial CLI. Preserved
 dSYMs are accepted only when their Mach-O UUIDs match the current app or iOS product. Run
 `python3 scripts/build_output_policy.py status|validate`; use
 `scripts/clean_build_caches.sh --routine --dry-run` before bounded cleanup. The generated owner and
@@ -1082,7 +1108,8 @@ publication-repair evidence, compacts resolved failures and unrepairable unpubli
 includes the opt-in model-download lane. Failed Instruments traces remain explicit diagnostics:
 the status inventory reports them separately and only `--compact-profile-failure RUN_ID` (or a
 newer profile of the same platform/kind) may remove their raw trace. Persistent caches can be
-reclaimed independently with `--cache macos|ios|packages|runtime`; ordinary successful builds never
+reclaimed independently with `--cache macos|macos-optimized|macos-tsan|ios|packages|runtime|all`;
+ordinary successful builds never
 run a global cleanup as a side effect. Leftover confirmation cache roots of the retired v1 delivery
 analysis go only through `--prune-confirmation-caches`, while the host analysis lock is free (the
 retired v1 audio QC data goes through `--qc-v1`).
@@ -1406,8 +1433,10 @@ Most-frequent imports across `Sources/**/*.swift`:
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
 - [`CLAUDE.md`](../CLAUDE.md) — repo operating instructions and links to native/tooling safeguards.
+- [`reference/development-workflow.md`](reference/development-workflow.md) — the current local loop, commit lint, CI routing, agents and tool routing.
+- [`audits/2026-10-18-dev-workflow-audit.md`](audits/2026-10-18-dev-workflow-audit.md) — the current development-workflow audit and its phased improvement programme.
 - [`audits/2026-10-12-claude-code-takeover-audit.md`](audits/2026-10-12-claude-code-takeover-audit.md) — the return to Claude Code: harness changes, live observations and open follow-ups (DA-15).
-- [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — source-traced takeover findings and coverage map; static review is distinguished from fresh runtime evidence.
+- [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — historical: the Codex-era takeover findings and coverage map, from before the Codex harness was retired on 2026-10-12.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
 - Per-subsystem deep-dives in `docs/reference/`:
@@ -1442,7 +1471,10 @@ debugging, and retained-log/trace analysis; they do not define a second source o
 native serialization, performance admissibility, or release authority. Scripts remain usable on
 CI and on hosts without personal plugins.
 
-Use the [takeover coverage map](audits/2026-10-10-codex-workflow-audit.md#coverage-map) when choosing
-verification: helper-level deterministic tests, compile-only bundles, explicit native UI/device
-execution, and measured model lanes answer different questions. A successful build or passing
-schema test never implies background delivery, audible playback, or benchmark qualification.
+Choose verification with [`reference/development-workflow.md`](reference/development-workflow.md)
+and the [October 18 workflow audit](audits/2026-10-18-dev-workflow-audit.md): helper-level
+deterministic tests, compile-only bundles, explicit native UI/device execution, and measured model
+lanes answer different questions. The historical
+[October 10 coverage map](audits/2026-10-10-codex-workflow-audit.md#coverage-map) records the same
+split as of that date. A successful build or passing schema test never implies background delivery,
+audible playback, or benchmark qualification.

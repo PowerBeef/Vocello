@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-20
+reviewed: 2026-10-20
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
 sourceOfTruth:
   - Sources/Views
@@ -323,7 +323,7 @@ The shell harness owns deterministic proof and evidence:
 | Lane | Purpose |
 |------|---------|
 | `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
-| `scripts/ui_test.sh macos smoke` | Thirteen ordered focused journeys (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (two planned segments by default), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content; `--scenario layout\|studio-content\|generation-errors` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
+| `scripts/ui_test.sh macos smoke` | Fifteen ordered focused journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History with played-audio capture, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (two planned segments by default; `--long-form-segments 2`–`12` scales it for local evidence), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content, long-form recovery Discard, Saved Voices empty and error states; `--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
 | `scripts/ui_test.sh macos perf` | Eleven scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 | `scripts/ui_test.sh macos marketing` | Product image refresh (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`, `--scenario models` for the Model Downloads image): two demo takes and one saved designed voice through visible controls at a 1040×680 window, captures attached for export; `evidenceClass: marketing-assets`, never acceptance or benchmark evidence |
@@ -374,7 +374,8 @@ macOS controls not currently targeted by the minimal smoke/benchmark lanes:
 - Individual delivery/language menu items.
 - Model "Manage" popover menu items.
 - `batch_resumeLongFormButton` exists but is not yet exercised by the minimal lanes; the long-form
-  journey regenerates segment 0 through `batch_regenerateSegment_0` (F-16).
+  journey only asserts its absence after a clean run, then regenerates segment 0 through
+  `batch_regenerateSegment_0` (F-16).
 - The History "Reveal in Finder" context menu item (the pin-seed item carries
   `history_pinSeedButton`).
 

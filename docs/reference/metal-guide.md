@@ -1,18 +1,19 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-10-20
 summary: Project-specific Metal reference — how MLX uses Metal for the Qwen3 engine, memory/latency implications, and direct-Metal patterns for potential future custom kernels.
 sourceOfTruth:
   - project.yml
+  - Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift
+  - Sources/QwenVoiceCore/IOSMemorySnapshot.swift
 ---
 # Metal Guide for Vocello
 
 > **Living document.** A project-specific reference for Apple's Metal API and Metal performance optimization as it applies to Vocello's Qwen3-TTS engine on Apple Silicon macOS and iOS. Most GPU work today is abstracted by MLX; this doc explains how MLX uses Metal, what that means for memory and latency, and the direct-Metal patterns that would matter if future work adds custom kernels or DSP. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-29; MLX pin updated 2026-10-16 (CONV-21): `mlx-swift` **0.32.3**. Toolchain: Swift 6, Xcode 26, macOS 26+/iOS 26+.
-> The latest project-manifest change adds iOS support/attribution UI only and does not alter MLX,
-> Metal dispatch, pins, metallibs, or memory policy.
+> MLX pin updated 2026-10-16 (CONV-21): `mlx-swift` **0.32.3**. Toolchain: Swift 6, macOS 26+/iOS 26+;
+> CI pins Xcode 26.6 and local Xcode 27 also builds.
 
 ---
 
@@ -428,7 +429,7 @@ Start with **Performance Limiter** counters. They point to the slowest subsystem
 
 iOS terminates apps whose physical footprint crosses a per-process limit. Because memory is unified, Metal allocations count against that limit. Vocello's iOS target enables `com.apple.developer.kernel.increased-memory-limit`, which raises the ceiling on supported devices, but the app must still fit within the runtime budget measured by `os_proc_available_memory()`.
 
-Telemetry shows that Vocello's streaming path peaks at about **2.2–3.5 GB physical footprint** on iPhone (Clone heaviest), comfortably under the entitled ceiling (~5–6 GB) but not with much margin.
+The entitled ceiling depends on the OS. On the iPhone 17 Pro under iOS 26 it was about 6 GB (5–5.5 GB on 8 GB phones), and the streaming path peaked at about **2.2–3.5 GB physical footprint** (Clone heaviest): under the ceiling, but without much margin (the historical record is [`ios-engine-optimization.md`](ios-engine-optimization.md)). Under iOS 27.0.1 the same phone measured **8,192 MB** in the October 14 and 16 smoke diagnostics (engine audit D-06), with peak use of 2.1–2.6 GB on Speed. The limit on 8 GB phones under iOS 27 is unmeasured; see [`mlx-guide.md`](mlx-guide.md#55-ios-memory-specifics).
 
 ### 8.2 Thermal throttling and sustained performance
 
@@ -470,7 +471,7 @@ This entitlement is required for Vocello iOS to load the 1.7 B model. It is self
 2. **Use `asyncEval` to overlap CPU and GPU.** Let the CPU prepare the next graph while the GPU executes the current one.
 3. **Minimize `.item()` / printing during generation.** These force GPU→CPU sync.
 4. **Tune `Memory.cacheLimit` per tier.** iOS needs a small cache (128 MB) to keep footprint flat; Macs can keep more.
-5. **Call `Memory.clearCache()` at boundaries.** Vocello does this per chunk on iOS and after generation on constrained Macs.
+5. **Call `Memory.clearCache()` at boundaries.** Vocello does this per streamed chunk on iOS and the 8 and 16 GB Macs, and after generation on iOS and the 8 GB Mac (`NativeMemoryPolicyResolver`).
 6. **Profile with Instruments Metal System Trace.** CPU timers alone are misleading because of lazy evaluation.
 
 ### 9.2 For future direct-Metal work

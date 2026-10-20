@@ -1,12 +1,15 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-01
+reviewed: 2026-10-20
 summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app and iOS device paths, expected artifacts, and how to read results.
 sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - benchmarks/baselines/mac-gate-bench.json
+  - config/macos-ui-stall-gate.json
+  - config/memory-qualification-policy.json
 ---
 # Benchmarking procedure — operator runbook
 
@@ -95,7 +98,7 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
-| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Eleven scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 | **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS UI numbers. Compare like with
@@ -513,8 +516,8 @@ text stays fixed so device benchmark history remains comparable. The extended >2
 corpus below remains the macOS/CLI definition.
 
 Requires a paired, unlocked physical iPhone and a valid XCUITest destination. Simulator is not
-supported. The benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`; without filters it
-runs the canonical 29-take matrix.
+supported. The benchmark accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy` and
+`--matrix-version` (as on macOS, §4.10); without filters it runs the canonical 29-take matrix.
 
 Artifacts are the `.xcresult` bundle, exported XCTest screenshots, run-scoped engine/app telemetry,
 and the atomic `benchmark-evidence.json`. The validator maps the test-owned ordered matrix directly
@@ -638,7 +641,8 @@ publication unless `--keep-trace`, and it is an instrumented record, never canon
 The macOS memory profile records one cold long take. This captures model-load plus sustained
 allocation/VM peaks. The lane uses Apple's Allocations template for its Allocations and VM Tracker
 tracks because that template disables automatic VM snapshots; adding standalone VM Tracker to a
-Blank trace enables stop-the-world snapshots that create real holes in the target's 500 ms sampler.
+Blank trace enables stop-the-world snapshots that create real holes in the target's memory sampler
+(250 ms on the M6).
 Publication verifies the captured template setting and applies the same unobserved-gap gate as
 every memory-qualified take (no gap above the policy bound: twice the cadence, at least 500 ms, or
 1,000 ms on the floor tiers). The
@@ -719,31 +723,30 @@ python3 scripts/check_macos_ui_bench.py ~/Library/Application\ Support/QwenVoice
 ```
 
 For the strict contract, use `scripts/ui_test.sh macos benchmark`. Internally it passes the exact
-`--modes`, `--lengths`, `--warm`, and `--label` values plus
-`--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed
---build-provenance <run-artifact-dir>/last-build.json --playback-capture-dir
-<run-artifact-dir>/playback-capture --outputs-dir <QwenVoice-Debug>/outputs`. The build receipt names the app executable
+`--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy`, `--allocation` and `--matrix-version`
+values plus `--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed
+--build-provenance <run-artifact-dir>/last-build.json --outputs-dir <QwenVoice-Debug>/outputs`, and
+`--playback-capture-dir <run-artifact-dir>/playback-capture` when capture is armed. The build receipt names the app executable
 and its digest, and the gate copies its optimization level into `toolchain.optimization` only after
 re-hashing that executable. Never add the crash-delta assertion to a manual command unless the
 caller actually captured and compared the pre/post crash snapshots.
 
 The lane also passes `--stall-contract config/macos-ui-stall-gate.json --variant speed`. The stall
-contract names the gate's statistic, its limit and the profile it is calibrated for; today it is the
-provisional "no heartbeat delayed more than 250 ms" on `mac-mini-m6-16gb`, uncalibrated until one
-exploratory M6 run records the per-take distribution and the contract is re-declared `calibrated`
-with that run. The contract's status decides what the limit does (maintainer decision 2026-09-25): a
-**provisional** limit reports only and never fails a run; the checker still records the full
-distribution and whether the run would have failed (`stallGate.enforced: false` and
-`stallGate.wouldFail` in the evidence manifest; a run over the limit publishes with the run warning
-`stall.provisional.wouldfail(<takes above>/<gated takes>)`). Only a **calibrated** contract, which must
-name its calibrating run IDs in `calibrationRuns`, fails a run with a take above the limit. The checker
-prints the distribution to `benchmark-gate.txt` either way: the summary (median, p90, maximum, takes
-above the limit, would fail, censored heartbeats) and every gated take's `cell=value`. Expect the
-calibration run to exceed the provisional limit: replayed on the 464 canonical M2 takes, 250 ms is
-exceeded by 189 (40.7%) and in all 16 runs, and the four 2026-09-14 runs have 16 to 23 of 29 takes
-above it (per-run medians 295-353 ms). Under the report-only contract all 16 would have published,
-each with its would-fail warning. A contract naming another profile than the registry's canonical one
-fails the gate.
+contract names the gate's statistic, its limit and the profile it is calibrated for. The contract's
+status decides what the limit does (maintainer decision 2026-09-25): a **provisional** limit reports
+only and never fails a run (the checker records `stallGate.enforced: false` and `stallGate.wouldFail`
+in the evidence manifest, and a run over the limit publishes with the run warning
+`stall.provisional.wouldfail(<takes above>/<gated takes>)`); a **calibrated** contract, which must
+name its calibrating run IDs in `calibrationRuns`, fails a run with a take above the limit. The
+committed contract (`macos-ui-stall-gate-m6-600ms`) is calibrated: no gated take's
+`maximumDelayedHeartbeatMS` may exceed 600 ms on `mac-mini-m6-16gb`. AV-17 step 2 set it on
+2026-09-27 from the first canonical M6 UI benchmark (`macos-xcui-benchmark-20260927-101957-c37aa311`,
+29 gated takes: median 188 ms, p90 259 ms, maximum 480 ms), as that maximum times the 1.25 floor the
+ui-perf ceilings use, replacing the provisional 250 ms limit. Apple's 250 ms hang threshold stays a
+report. The checker prints the distribution to `benchmark-gate.txt` either way: the summary (median,
+p90, maximum, takes above the limit, would fail, censored heartbeats) and every gated take's
+`cell=value`. Recalibrate when the matrix, the watchdog definition or the host changes. A contract
+naming another profile than the registry's canonical one fails the gate.
 
 Every take must have run the declared variant (Speed), whatever the tier recommends (the 16 GB tier
 recommends Quality). Before the first take the benchmark makes Speed the active variant of each
@@ -824,11 +827,13 @@ complete without its matching deterministic History/WAV assertion.
 above) through a Core Audio process tap (`mutedWhenTapped`), so the speakers stay silent while a
 take is captured; the tap's
 destruction restores audible output. The runner (`com.qwenvoice.app.uitests.xctrunner`, re-signed
-unsandboxed by the lane) needs one manual **System Audio Recording** grant, added in System Settings
-after the first lane run because a process tap never prompts (see
-[`macos-permissions.md`](macos-permissions.md)); until granted, the lane passes and every planned
-take's `playbackCaptureStatus` is `unavailable` or `silent` (takes outside the plan carry no capture
-fields). A captured take that fails the played-audio gate
+unsandboxed by the lane) needs one **System Audio Recording** grant: on macOS 26 a process tap never
+prompts, so it is added by hand in System Settings after the first lane run; on macOS 27 the first
+captured take prompts and blocks the runner until it is answered, so
+`QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (the default) arms capture only when the TCC database shows a
+grant (see [`macos-permissions.md`](macos-permissions.md)). Without a grant the lane passes: an
+unarmed run carries no capture evidence, and an armed but ungranted take's `playbackCaptureStatus` is
+`unavailable` or `silent` (takes outside the plan carry no capture fields). A captured take that fails the played-audio gate
 (coverage < 0.98, residual > −25 dBFS, a dropout, or an audible onset more than 500 ms from the
 scheduling stamp; thresholds from the three canonical runs of 2026-09-14) fails the lane. Artifacts land under
 `<run-artifact-dir>/playback-capture/` (`capture-run.json`, `take-NN-<cell>.wav` and `.json`,
@@ -964,8 +969,8 @@ relative range and MAD beside the median within-run 3-MAD threshold, and replays
 leave-one-run-out with the summarizer's own `pooled_cells` and `compare_summaries`, so a flagged
 metric is a false regression on identical source. It never edits a threshold; a gate-MAD change
 needs at least four identical-source runs on the canonical host (each left-out run then faces a
-pool of three, the gate's minimum). Replayed on the three M6 seed runs of the current baseline
-(848e140a): between-run RTF range 0.46 % against 3 within-run MADs of 0.20 %, physical footprint
+pool of three, the gate's minimum). Replayed on the three seed runs of the first M6 baseline
+(848e140a, since re-pooled; see Baseline comparison below): between-run RTF range 0.46 % against 3 within-run MADs of 0.20 %, physical footprint
 1.93 % against 0.69 %, `mlxPeakMB` 0.001 %; no false regression, because the floors (5 %, 30 %,
 2 %) dominate; three runs are not enough to change the rule.
 
@@ -999,9 +1004,13 @@ consecutive samples of the series may exceed the unobserved-gap bound declared i
 500 ms, so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a take). The floor
 tiers (the iPhone, and a Mac whose engine row stamps `floor_8gb_mac`) keep a 1,000 ms floor
 (`floorTiers`): they moved from a 500 ms to a 250 ms cadence on 2026-09-25, and only the M6 has
-calibration data. The bound is provisional: the first consented memory lane on the canonical M6
-calibrates it, and each take records the bound it met as `samplerUnobservedGapLimitMS`. After that
-lane, `python3 scripts/derive_memory_calibration.py benchmarks/runs/memory-qualification/<run-id>.json`
+calibration data. The main bound is calibrated: the consented M6 memory lane
+`mac-memory-qualification-20260926-011258-82f5f55c` (2026-09-25) measured a longest gap of 274 ms
+over 11 takes at the 250 ms cadence, inside the bound with the 1.25 margin, so both values stayed.
+The floor tiers' 1,000 ms stays provisional until an unforced iPhone or 8 GB Mac memory record
+calibrates it; an M6 record never moves it. Each take records the bound it met as
+`samplerUnobservedGapLimitMS`. After a memory lane,
+`python3 scripts/derive_memory_calibration.py benchmarks/runs/memory-qualification/<run-id>.json`
 prints what the run measured and the bounds it proposes: from a Mac above the floor tiers, the gap
 multiple (never below 2, the floor unchanged) that covers every take's longest gap with a 1.25
 margin; from an iPhone or 8 GB Mac record, the floor tiers' floor (the largest such bound rounded up
@@ -1087,7 +1096,7 @@ crash inspection, preflight, and standalone analysis tools do not publish benchm
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of physical RAM |
 | `prosody-calibration` | `publish_benchmark_history.py prosody` (producer `prosody_calibration.py` deleted 2026-10-01, `c44d0205`) | Required corpus coverage with no analysis failure |
-| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`); iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
+| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` | Structural gate PASS (every expected scenario once each: eleven on macOS, nine on iOS; coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`); iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
 
 `HISTORY.md` is a generated index grouped by kind, platform, hardware, and comparable
 configuration. It computes a delta against the nearest earlier compatible clean record; a delta is
@@ -1159,11 +1168,13 @@ promote. With `--require-baseline-identity` (the gate passes it) an identity mis
 the gate reports BASELINE INVALID with the exact seed command for that run's paths; the gate's
 preflight predicts the same mismatch from the live host and the gate matrix before any build.
 
-The committed baseline is the first canonical Mac mini M6 baseline (AV-17 step 1, 2026-09-25): three
-seeded gate runs from commit 848e140a on `mac-mini-m6-16gb` (`mid_16gb_mac`, macOS 27.0 26A428,
-Xcode 27.0 27A266a), whose between-run ranges were at most 0.7% for RTF, first chunk and tokens per
-second and 1.9% for footprint, so every threshold sits at its floor. A new OS or Xcode build number
-changes the identity and needs a re-seed; the retired M2 baseline stays in git history only.
+The committed baseline was re-pooled on 2026-10-16 (`20496dc4`, CONV-21) after a same-host A/B of
+the mlx-swift 0.32.3 repin: three seeded gate runs from commit `57196483` on `mac-mini-m6-16gb`
+(`mid_16gb_mac`, macOS 27.0.1 26A434, Xcode 27.1 27A9275, Swift 6.4 swiftlang-6.4.0.34.1). The warm
+cell's between-run ranges are at most 0.7% (RTF 0.5%, first chunk 0.6%, footprint 0.2%, tokens per
+second 0.4%), so every warm threshold sits at its floor. A new OS or Xcode build number changes the
+identity and needs a re-seed; the first M6 baseline (AV-17 step 1, 2026-09-25, commit 848e140a,
+macOS 27.0 and Xcode 27.0) and the retired M2 baseline stay in git history only.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

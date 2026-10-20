@@ -29,8 +29,8 @@ choice does to the *next* segment:
    the mechanism that manufactures orphan tails.
 
 Roadmap basis: Q2 "text first — adjacent-sentence text into segment planning, no
-acoustic risk" (`docs/reference/optimization-report-review-2026-07-25.md`, Stage 5; deleted 2026-09-11 in
-`f2efacde`, see Git history).
+acoustic risk" (Stage 5 of the July 25, 2026 optimization report review, a reference doc deleted
+on 2026-09-11 in `f2efacde`; it lives in Git history only).
 
 ## Design
 

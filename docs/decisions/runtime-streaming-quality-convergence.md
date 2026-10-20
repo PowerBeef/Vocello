@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-10-20
 summary: The living convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
 sourceOfTruth:
   - config/runtime-refactor-contract.json
@@ -124,7 +124,9 @@ than assumed from a single benchmark record.
 
 ## Non-goals
 
-- Replacing the macOS XPC or iPhone in-process topology.
+- Replacing the macOS XPC or iPhone in-process topology (superseded 2026-09-15, after this program
+  closed: plan `macos-ios-convergence-2026-09` moved the Mac engine in-process, as on the iPhone, and
+  retired the XPC service).
 - Adding a second backend, permanent dual session, Simulator, or alternate UI driver.
 - Upgrading MLX dependencies during convergence.
 - Parallel model candidates, hidden retries, or hidden sampling/memory globals.

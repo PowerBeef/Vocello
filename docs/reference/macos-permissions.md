@@ -1,10 +1,15 @@
 ---
 status: active
 owner: macos
-summary: macOS TCC permissions, code signing, and the dev loop — what users experience, why the historical friction is gone, and permissions_doctor.sh diagnosis.
+reviewed: 2026-10-20
+summary: macOS TCC permissions, code signing, and the dev loop — what users experience, why the historical friction is gone, the UI test runner's grants, and permissions_doctor.sh diagnosis.
 sourceOfTruth:
   - scripts/permissions_doctor.sh
+  - scripts/lib/dev_signing.sh
+  - scripts/ui_test.sh
   - Sources/QwenVoice.entitlements
+  - Tests/VocelloMacUITests/VocelloUIWindowFrame.swift
+  - config/runtime-debug-knobs.json
 ---
 # macOS permissions (TCC), code signing, and the dev loop
 
@@ -56,16 +61,18 @@ the recurring permission pain.
   ("codesign wants to sign…") — choose **Always Allow**.
 - Switching ad-hoc → certificate leaves stale TCC rows behind; reset once:
   `scripts/permissions_doctor.sh --reset-tcc` (then grant on next launch).
-- **System Audio Recording for the UI test runner.** `scripts/ui_test.sh macos benchmark` taps the
-  app's own audio output from `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests.xctrunner`, usage
-  string in `project.yml`). Xcode signs that runner sandboxed, which would block the tap and the
-  capture files, so the lane re-signs it without entitlements after the build, with the same
-  Apple Development identity `build.sh` uses (ad hoc only when none is installed). On macOS 26
+- **System Audio Recording for the UI test runner.** `scripts/ui_test.sh macos benchmark` and the
+  smoke lane's completed-generation journey (`test02`, PC-02) tap the app's own audio output from
+  `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests.xctrunner`, usage string in `project.yml`).
+  Xcode signs that runner sandboxed, which would block the tap and the capture files, so both lanes
+  re-sign it without entitlements after the build, with the same Apple Development identity
+  `build.sh` uses (ad hoc only when none is installed). On macOS 26
   creating a process tap never prompts (an ungranted runner receives silence), so add the runner
   once by hand under System Settings → Privacy & Security → Screen & System Audio Recording →
   *System Audio Recording Only* (plus button, Cmd+Shift+G,
-  `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
-  the login password) **after** a benchmark lane has re-signed it. On macOS 27 the first captured
+  `build/cache/xcode/macos-optimized/Build/Products/Release/VocelloMacUITests-Runner.app`, the
+  optimized UI-lane cache; the pane asks for the login password) **after** a benchmark or smoke lane
+  has re-signed it. On macOS 27 the first captured
   take raises « VocelloMacUITests-Runner souhaite enregistrer le contenu audio système »: click
   **Autoriser** once while the lane runs, so the grant attaches to the re-signed runner (a grant
   added in System Settings before that binds to whatever build is on disk). An identity-signed
@@ -73,7 +80,9 @@ the recurring permission pain.
   every rebuild. The prompt blocks the runner until it is answered, so an unattended benchmark
   lane arms capture only when it can: `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (default) skips
   capture when the TCC database shows no grant, `off` always skips it, `on` always arms it.
-  Unarmed, the takes pace and play out the same and the record carries no capture evidence.
+  Unarmed, the takes pace and play out the same and the record carries no capture evidence. The
+  smoke lane has no such switch: its one capture is always armed, and its `ui-preflight` warns when
+  the runner has no System Audio Recording decision.
   Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
   Every macOS lane also verifies the runner's signature before launching it and re-signs it in
   place when a build interrupted between Xcode's Info.plist rewrite and its CodeSign step left
@@ -84,7 +93,11 @@ the recurring permission pain.
   microphone request from a lane-built app prompts fresh, and answering it re-keys the row to that
   build's throwaway identity (the next real-mic use of the dev-signed app may then prompt once —
   grant it; stable signing keeps it). In practice lane builds only reach the real-mic path when the
-  virtual-microphone fixture is broken, which the smoke suite asserts explicitly. The lane's
+  virtual-microphone fixture is broken, which the smoke suite asserts explicitly. Speech
+  Recognition has no such fixture: on 2026-10-18 the smoke journey `test08` asked for it at its
+  save-voice step after a lane rebuild, and the unanswered dialog covered the window, so `test12`,
+  `test13` and `test14` failed on controls that were not hittable until a human answered it
+  (BKL-19, parked). The lane's
   advisory `ui-preflight` checks TCC row existence per bundle id and cannot see this identity
   mismatch.
 
@@ -178,7 +191,7 @@ Grant it once, the same way the System Audio Recording grant is handled above:
    identity — the grant binds to the designated requirement, so a stable identity survives rebuilds
    while an ad-hoc signature does not.
 2. System Settings → Privacy & Security → Accessibility → **+**, then add
-   `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app` and enable it.
+   `build/cache/xcode/macos-optimized/Build/Products/Release/VocelloMacUITests-Runner.app` and enable it.
 
 `VocelloUIWindowFrame.diagnosis()` reports which of the three failure modes applies (untrusted
 runner, no running process, or an accessibility error on a process that was found), and every

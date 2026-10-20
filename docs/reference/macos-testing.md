@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-20
+reviewed: 2026-10-20
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -9,6 +9,7 @@ sourceOfTruth:
   - scripts/lib/xctest_summary.py
   - scripts/lib/mac_lane_data.py
   - scripts/lib/host_preflight.sh
+  - config/ui-perf-thresholds.json
   - Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift
   - Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift
 ---
@@ -236,20 +237,21 @@ refresh interval). On a PASS the checker evaluates the **warn-only** ceilings
 in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
 (a breach marks the run `passedWithWarnings`, never fails it). The contract names the profile and
 refresh interval its ceilings were derived on (`calibrationProfile`,
-`calibrationRefreshIntervalMS`); a run on any other, which today means every run on the canonical
-Mac mini M6 because the ceilings come from the retired M2, carries one
-`uiperf.uncalibrated:<profile>` code instead of ceiling verdicts. A contract whose scenarios changed
-meaning after its derivation names why in `calibrationStale`, and its runs carry the same code on
-any profile: the committed M2 ceilings are stale since 2026-09-25, when sidebar-navigation became
-pure UI with a new driver (warms suppressed, phased polls) and `uiMaxGapMS` became clipped to the
-window (audit #32, #33, #81), so no one may carry them over to the M6 by changing the profile.
-Roadmap item AV-17 step 3 re-derives them from at least three counted M6 sessions of the new driver
-(a derived contract never carries `calibrationStale`):
+`calibrationRefreshIntervalMS`); a run on any other carries one `uiperf.uncalibrated:<profile>`
+code instead of ceiling verdicts. A contract whose scenarios changed meaning after its derivation
+names why in `calibrationStale`, and its runs carry the same code on any profile; a derived contract
+never carries the field. The committed contract is calibrated on `mac-mini-m6-16gb` at 16.67 ms
+with no `calibrationStale`: AV-17 step 3 re-derived it on 2026-09-27 from three counted M6 runs of
+the 2026-09-25 driver (`calibrationRuns`), for the five confirmatory scenarios idle-baseline,
+sidebar-navigation, delivery-menu, settings-scroll and composer-typing. It supersedes the
+baseline-v3 M2 ceilings, which judged quantities that driver no longer measures (sidebar-navigation
+became pure UI with warms suppressed and phased polls, and `uiMaxGapMS` became clipped to the
+window; audit #32, #33, #81). A re-derivation runs
 `python3 scripts/check_macos_ui_perf.py --derive-thresholds <run IDs...> --write
 config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, max(1.3 × the
 median, the median + 3 × the run-to-run range), which is the median times max(1.3, 1 + 3 × the
 relative range) whenever the median is above zero; hitch rounded up to 0.5 ms/s with a 5 ms/s floor,
-gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the committed M2 ceilings). The derivation
+gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the retired M2 ceilings). The derivation
 accepts only canonical records of one comparison lineage (one `comparison.key`), so dirty or
 exploratory sessions and other builds never shape the contract. A confirmatory
 window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a warn-only
@@ -294,7 +296,7 @@ source). Ceilings come only from the counted runs' own spread, through `--derive
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Fifteen journeys in method-name order (`test00`–`test14`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|line-batch\|long-form-recovery\|saved-voices-states` runs `test00`, `test12`, `test11`, `test07`, `test13` or `test14` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard) and `test14` (Saved Voices empty and error states), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows; while it runs, Navigate ▸ History is disabled and File ▸ Open Output Folder is not, read from the open menus) |
+| Smoke | Fifteen journeys in method-name order (`test00`–`test14`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states` runs `test00`, `test12`, `test11`, `test08`, `test09`, `test06`, `test07`, `test13` or `test14` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard) and `test14` (Saved Voices empty and error states), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows; while it runs, Navigate ▸ History is disabled and File ▸ Open Output Folder is not, read from the open menus) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching
@@ -317,7 +319,10 @@ while no build input changed; a commit that only publishes records or touches do
 the roadmap keeps the skip), and write a per-test verdict sidecar
 (`test-results.json`) next to `run.json`.
 
-Benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`. Filters are explicit diagnostic
+Benchmark accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy cell-hash-v1|generated`
+(default `cell-hash-v1`: each take's seed derives from its cell, audit #29) and `--matrix-version NAME`
+(a declared matrix in `config/ui-bench-matrix.json`; any version but the canonical one publishes
+focused records, audit #30). Filters are explicit diagnostic
 runs; invoking the command without filters is the canonical 29-take matrix on the tracked Mac mini
 `Mac18,5` / Apple M6 / 16 GB profile (canonical since 2026-09-22; the retired Mac mini M2 8 GB
 records stay history). The lane refuses to build on any other Mac ("non-canonical host; benchmark
@@ -443,11 +448,14 @@ artifacts.
 
 macOS -Onone development builds and deterministic tests reuse `build/cache/xcode/macos/`; the optimized
 CLI and every macOS UI lane (compiled at -O) reuse `build/cache/xcode/macos-optimized/`, so an optimized
-build never recompiles the -Onone arena; shared package checkouts live
+build never recompiles the -Onone arena; the TSan subset and the arm64e Enhanced Security trial CLI
+keep their own `build/cache/xcode/macos-tsan/` and `build/cache/xcode/macos-enhanced-security/`;
+shared package checkouts live
 under `build/cache/xcode/source-packages/`. Result bundles, diagnostics, profiles, and current dSYMs
 are untracked artifacts under `build/artifacts/`, while release packaging is isolated under
-`build/scratch/derived-data/release-macos/` and `build/dist/macos/`. `build/Vocello.app` and
-`build/vocello` are public symlinks to current canonical products, not copied applications. See the
+`build/scratch/derived-data/release-macos/` and `build/dist/macos/`. `build/Vocello.app`,
+`build/vocello` and `build/vocello-enhanced-security` are public symlinks to current canonical
+products, not copied applications. See the
 authoritative owner/lifetime table in [`privacy-storage.md`](privacy-storage.md).
 
 ## Release boundary

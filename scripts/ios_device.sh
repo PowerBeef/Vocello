@@ -981,6 +981,21 @@ wait_device_diagnostics_sentinel() {
   die "no sentinel after ${timeout}s for runID=$run_id — Device state: $(probe_device_state 2>/dev/null || echo unknown)"
 }
 
+# run_diagnostics_dir DEST SENTINEL
+# The directory whose engine/generations.jsonl a lane reads. The pulled mirror holds every
+# run's subtree (smoke, benchmark and diagnostics runs mirror there too), so a lane reads the
+# rows beside its own sentinel, and falls back to the whole mirror only when there are none;
+# the first generations.jsonl a search returns can be another run's (CONV-21).
+run_diagnostics_dir() {
+  local dest="$1" own
+  own="$(dirname "$2")"
+  if [[ -f "$own/engine/generations.jsonl" ]]; then
+    printf '%s\n' "$own"
+  else
+    printf '%s\n' "$dest"
+  fi
+}
+
 # wait_memory_qualification_sentinel RUN_ID TIMEOUT DEST [DEVICE PID]
 # Same bounded physical-device polling contract as the single-take helper. The PASS result
 # remains the only publishable barrier; a separate failure marker stops the wait promptly.
@@ -2236,10 +2251,8 @@ cmd_bench() {
   fi
   [[ -n "$sentinel" && -f "$sentinel" ]] || die "no sentinel after ${timeout}s — device diagnostics did not write. Device state: $(probe_device_state 2>/dev/null || echo unknown). Diagnose live with: $diagnostic_hint"
 
-  # The summarizer reads <dir>/engine/generations.jsonl — find the dir that holds it.
-  local diag="$dest"
-  local engine_jsonl; engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
-  [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
+  # The summarizer reads <dir>/engine/generations.jsonl: this run's, beside its sentinel.
+  local diag; diag="$(run_diagnostics_dir "$dest" "$sentinel")"
 
   note "── device diagnostics result ──────────────────"
   # Heredoc (quoted delimiter) so the Python body needs no shell-quote escaping.
@@ -2623,9 +2636,7 @@ PY
     || die "profiled generation did not produce a success sentinel"
   require_uninterrupted_success_sentinel "$sentinel" \
     || die "profiled generation failed or was interrupted"
-  local diag="$dest"
-  local engine_jsonl; engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
-  [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
+  local diag; diag="$(run_diagnostics_dir "$dest" "$sentinel")"
   PROFILE_TRACE_PHASE="evidence-validation"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" ios-profile \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
@@ -2772,10 +2783,7 @@ if [take.get("takeIndex") for take in takes] != list(range(1, 10)):
 if [take.get("cell") for take in takes] != expected_cells:
     raise SystemExit(4)
 PY
-  local diag="$dest"
-  local engine_jsonl
-  engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
-  [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
+  local diag; diag="$(run_diagnostics_dir "$dest" "$sentinel")"
   local output_dir
   output_dir="$(dirname "$sentinel")/outputs"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" memory-qualification \
@@ -2824,7 +2832,7 @@ cmd_clone_conditioning() {
   capture_benchmark_source "$artifacts"
   rm -rf "$dest"
 
-  local dev env_json target_pid cleanup_command sentinel diag engine_jsonl output_dir
+  local dev env_json target_pid cleanup_command sentinel diag output_dir
   dev="$(resolve_device)"
   export QVOICE_IOS_DEVICE_CLONE_CONDITIONING_ACCEPTANCE=1
   export QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID="$MAC_TEST_CLONE_VOICE_NAME"
@@ -2877,9 +2885,7 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   trap - EXIT
   cmd_pull "$dest" >/dev/null 2>&1 || true
 
-  diag="$dest"
-  engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
-  [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
+  diag="$(run_diagnostics_dir "$dest" "$sentinel")"
   output_dir="$(dirname "$sentinel")/outputs"
   python3 "$ROOT_DIR/scripts/check_ios_clone_conditioning.py" \
     --result "$sentinel" --diagnostics "$diag" --outputs "$output_dir" \
@@ -3177,10 +3183,7 @@ for e in r.get("interruptions") or []:
 sys.exit(0 if r.get("status") == "ok" else 1)
 PY
   require_uninterrupted_success_sentinel "$sentinel" || return 1
-  local diag="$dest"
-  local engine_jsonl
-  engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
-  [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
+  local diag; diag="$(run_diagnostics_dir "$dest" "$sentinel")"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" ios-engine \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --run-id "$run_id" --sentinel "$sentinel" --diagnostics "$diag" \

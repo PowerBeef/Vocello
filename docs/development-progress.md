@@ -19,8 +19,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through `12db497c`; the RF-18 adoption after it is local. Push CI is green on
-Xcode 26.6.
+`main` is pushed through `d54bb6f7`. Push CI is green on Xcode 26.6.
 
 - **Landed today:**
   - **P2-5 test adequacy (DW-03):**
@@ -63,7 +62,11 @@ Xcode 26.6.
     production reproduces the screened take byte for byte. Device proof: RF-15's long-form row.
   - **`@preconcurrency` ratchet (DW-03):** 34 → 21 imports (`9fca022a`). The iOS UI bundle's four
     tolerated warnings were cleared too (`12db497c`).
+  - **CONV-21's owed Mac smoke scenarios pass on the adopted engine:** `--scenario long-form`
+    (3 segments, 150.7 s of audio, project RTF 0.42) and `--scenario long-form-recovery`.
 - **Next:**
+  - The full Mac smoke needs someone at the Mac: BKL-19's Speech Recognition prompt would block
+    an unattended run.
   - The iOS-only lane snippets, `ios_device.sh`, and P1-2's and P1-15's iPhone halves wait for an
     iPhone window. DW-02 is parked until then: P1-2's Mac half was already met, with the
     `ui-preflight` failing before the build about 1 s into the run.

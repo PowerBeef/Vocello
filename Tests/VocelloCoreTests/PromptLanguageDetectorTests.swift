@@ -12,6 +12,10 @@ final class PromptLanguageDetectorTests: XCTestCase {
         XCTAssertEqual(PromptLanguageDetector.detect(LanguageFixtures.ambiguousLatin), .auto)
     }
 
+    func testUnsupportedLatinLanguageReturnsAuto() {
+        XCTAssertEqual(PromptLanguageDetector.detect(LanguageFixtures.dutch), .auto)
+    }
+
     func testDetectsLatinLanguages() {
         XCTAssertEqual(PromptLanguageDetector.detect(LanguageFixtures.english), .english)
         XCTAssertEqual(PromptLanguageDetector.detect(LanguageFixtures.french), .french)

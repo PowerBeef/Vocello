@@ -19,4 +19,8 @@ enum LanguageFixtures {
 
     /// Long enough but not natural language — stays `.auto` at the confidence floor.
     static let ambiguousLatin = "x7k9 m2p4 q8w1 z3n6"
+
+    /// Confidently Dutch, which Qwen3 does not speak, so detection yields `.auto`
+    /// (the `macos auto-language` lane's undetected edge take).
+    static let dutch = "De ochtendtrein verliet het rustige station op tijd."
 }

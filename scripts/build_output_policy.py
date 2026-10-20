@@ -100,6 +100,7 @@ HEAVY_LANE_IDS = {
     "ui-saved-voice-lifecycle",
     "ui-screen-protection",
     "ui-take-variation",
+    "ui-auto-language",
     "ui-purchase",
     "release",
 }

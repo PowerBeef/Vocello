@@ -308,3 +308,243 @@ extension VocelloMacSmokeUITests {
         }
     }
 }
+
+/// Studio Auto language reaches the engine (`scripts/ui_test.sh macos auto-language`).
+/// With every mode left on Auto, each planned take types a tracked sentence, waits for
+/// the language chip to follow detection ("French, Auto"), reads the chip's menu
+/// without choosing anything, generates, and prints a manifest without the script that
+/// `scripts/auto_language_check.py` joins to the engine's request receipt. It never
+/// changes a language selection, saves no voice and records nothing (BKL-19).
+@MainActor
+final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
+    private struct Plan: Decodable {
+        let planDigest: String
+        let takes: [Take]
+    }
+
+    private struct Take: Decodable {
+        let takeID: String
+        let mode: String
+        let script: String
+        let expectedChipValue: String
+        let expectedRecommendedTitle: String?
+        let requireAudioPass: Bool
+    }
+
+    private struct Generation {
+        let generationID: String?
+        let visibleError: Bool
+        let timedOut: Bool
+    }
+
+    private static let completedCardPrefix = "studio_inlinePlayer_generation_"
+
+    private var runID: String {
+        ProcessInfo.processInfo.environment["QVOICE_MAC_AUTO_LANGUAGE_RUN_ID"] ?? ""
+    }
+
+    /// The registered QVOICE_MAC_BENCH_RUN_ID knob only stamps `notes.benchRunID` on the
+    /// engine rows, which is how the checker finds this run's receipts.
+    override var additionalLaunchEnvironment: [String: String] {
+        ["QVOICE_MAC_BENCH_RUN_ID": runID]
+    }
+
+    func testAutoLanguageReachesTheEngine() throws {
+        let encoded = try XCTUnwrap(
+            ProcessInfo.processInfo.environment["QVOICE_MAC_AUTO_LANGUAGE_PLAN_B64"],
+            "Use scripts/ui_test.sh macos auto-language; the plan is missing"
+        )
+        XCTAssertFalse(runID.isEmpty, "Use scripts/ui_test.sh macos auto-language; the run ID is missing")
+        let plan = try JSONDecoder().decode(Plan.self, from: try XCTUnwrap(Data(base64Encoded: encoded)))
+        // Process-scoped argument-domain defaults, like -AppleLanguages: typed words
+        // must reach the composer exactly as planned.
+        beginSession(additionalArguments: [
+            "-NSAutomaticSpellingCorrectionEnabled", "NO",
+            "-NSAutomaticTextCompletionEnabled", "NO",
+            "-NSAutomaticCapitalizationEnabled", "NO",
+        ])
+        defer { endSession() }
+        assertVisibleSpeedModelReadiness()
+        selectVisibleSpeedVariant(for: [.custom, .design, .clone])
+        assertSavedCloneVoice()
+        ensureCloneConsentEnabled()
+
+        var problems: [String] = []
+        var preparedMode: VocelloUIBenchMatrix.Mode?
+        for take in plan.takes {
+            let mode = try XCTUnwrap(VocelloUIBenchMatrix.Mode(rawValue: take.mode))
+            let chip = element(Self.languagePickerID(for: mode))
+            if preparedMode != mode {
+                prepare(mode: mode)
+                replaceScript(with: "")
+                // With an empty script the chip reads "Auto" only while Auto is the
+                // stored selection; this lane never changes a selection.
+                let start = stableValue(of: chip, equalTo: "Auto")
+                guard start.stable else {
+                    VocelloUIScreenshot.attach(app.windows.firstMatch, named: "auto-language-\(take.mode)-not-auto")
+                    XCTFail("\(take.mode) language is not on Auto (the chip reads \(start.value ?? "nothing"))")
+                    return
+                }
+                preparedMode = mode
+            }
+            // Reset first, so the previous take's chip cannot pass for this one.
+            replaceScript(with: "")
+            _ = stableValue(of: chip, equalTo: "Auto")
+            replaceScript(with: take.script)
+            let chipObservation = stableValue(of: chip, equalTo: take.expectedChipValue)
+            let menu = inspectLanguageMenu(
+                of: chip,
+                recommendedTitle: take.expectedRecommendedTitle,
+                valueBefore: chipObservation.value
+            )
+            VocelloUIScreenshot.attach(app.windows.firstMatch, named: "auto-language-\(take.takeID)")
+            let generation = generate(mode: mode)
+            try emit([
+                "schemaVersion": 1,
+                "runID": runID,
+                "planDigest": plan.planDigest,
+                "takeID": take.takeID,
+                "mode": take.mode,
+                "chip": [
+                    "expectedValue": take.expectedChipValue,
+                    "observedValue": chipObservation.value as Any? ?? NSNull(),
+                    "stable": chipObservation.stable,
+                ] as [String: Any],
+                "menu": menu,
+                "generationID": generation.generationID as Any? ?? NSNull(),
+                "visibleErrorShown": generation.visibleError,
+            ])
+
+            if !chipObservation.stable || chipObservation.value != take.expectedChipValue {
+                problems.append("\(take.takeID): chip read \(chipObservation.value ?? "nothing"), expected \(take.expectedChipValue)")
+            }
+            if menu["valueUnchanged"] as? Bool != true || menu["autoItemSeen"] as? Bool != true
+                || (take.expectedRecommendedTitle != nil && menu["recommendedSeen"] as? Bool != true) {
+                problems.append("\(take.takeID): language menu \(menu)")
+            }
+            if generation.timedOut {
+                problems.append("\(take.takeID): the take neither completed nor showed an error")
+            } else if generation.visibleError && take.requireAudioPass {
+                problems.append("\(take.takeID): the take showed a generation error")
+            }
+        }
+        if !problems.isEmpty {
+            XCTFail(problems.joined(separator: "\n"))
+        }
+    }
+
+    private static func languagePickerID(for mode: VocelloUIBenchMatrix.Mode) -> String {
+        switch mode {
+        case .custom: "customVoice_languagePicker"
+        case .design: "voiceDesign_languagePicker"
+        case .clone: "voiceCloning_languagePicker"
+        }
+    }
+
+    /// The chip's accessibility value once it has held `expected` for 1.5 s, longer than
+    /// the 350 ms detection debounce, so a stale value cannot pass. It never fails the
+    /// test itself; the caller records what it saw.
+    private func stableValue(
+        of chip: XCUIElement,
+        equalTo expected: String,
+        timeout: TimeInterval = 20
+    ) -> (value: String?, stable: Bool) {
+        let clock = ProcessInfo.processInfo
+        let deadline = clock.systemUptime + timeout
+        var last: String?
+        var since = clock.systemUptime
+        repeat {
+            let value = chip.exists ? chip.value as? String : nil
+            let now = clock.systemUptime
+            if value != last {
+                last = value
+                since = now
+            }
+            if value == expected, now - since >= 1.5 { return (value, true) }
+            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "language chip settles")], timeout: 0.25)
+        } while clock.systemUptime < deadline
+        return (last, false)
+    }
+
+    /// Opens the chip's menu, notes the Auto row and the detected row, and closes it with
+    /// Escape without choosing anything; the chip must read the same afterwards.
+    private func inspectLanguageMenu(
+        of chip: XCUIElement,
+        recommendedTitle: String?,
+        valueBefore: String?
+    ) -> [String: Any] {
+        guard VocelloUIPrimaryAction.perform(on: chip, timeout: 20) else {
+            return [
+                "opened": false, "autoItemSeen": false, "valueUnchanged": false,
+                "recommendedSeen": recommendedTitle == nil ? NSNull() as Any : false as Any,
+            ]
+        }
+        let items = chip.descendants(matching: .menuItem)
+        let auto = items.matching(NSPredicate(format: "title == %@", "Auto")).firstMatch
+        let autoItemSeen = auto.waitForExistence(timeout: 10)
+        var recommendedSeen: Any = NSNull()
+        if let recommendedTitle {
+            recommendedSeen = items.matching(NSPredicate(format: "title == %@", recommendedTitle))
+                .firstMatch.waitForExistence(timeout: 5)
+        }
+        app.typeKey(.escape, modifierFlags: [])
+        _ = XCTWaiter.wait(
+            for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == false"), object: auto)],
+            timeout: 10
+        )
+        let after = stableValue(of: chip, equalTo: valueBefore ?? "", timeout: 10)
+        return [
+            "opened": autoItemSeen,
+            "autoItemSeen": autoItemSeen,
+            "recommendedSeen": recommendedSeen,
+            "valueUnchanged": after.stable && after.value == valueBefore,
+        ]
+    }
+
+    /// Generates the current script and waits, without failing the test, for a new
+    /// completed card (its generation ID), a visible generation error or a backend error.
+    private func generate(mode: VocelloUIBenchMatrix.Mode) -> Generation {
+        assertReadyToGenerate(mode: mode)
+        let cards = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", Self.completedCardPrefix)
+        )
+        let cardsBefore = Set(cards.allElementsBoundByIndex.map(\.identifier))
+        let cancel = button("textInput_cancelButton")
+        let visibleError = element("textInput_generationError")
+        let backendFailures = [element("sidebar_backendStatus_error"), element("sidebar_backendStatus_crashed")]
+        let errorBefore = visibleError.exists
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generationAction, timeout: 30))
+        let clock = ProcessInfo.processInfo
+        let deadline = clock.systemUptime + 300
+        var started = false
+        repeat {
+            started = started || cancel.exists
+            let fresh = Set(cards.allElementsBoundByIndex.map(\.identifier)).subtracting(cardsBefore)
+            if let card = fresh.first, !cancel.exists {
+                return Generation(
+                    generationID: String(card.dropFirst(Self.completedCardPrefix.count)).lowercased(),
+                    visibleError: false,
+                    timedOut: false
+                )
+            }
+            if visibleError.exists, !cancel.exists, started || !errorBefore {
+                return Generation(generationID: nil, visibleError: true, timedOut: false)
+            }
+            if backendFailures.contains(where: \.exists) {
+                return Generation(generationID: nil, visibleError: true, timedOut: false)
+            }
+            _ = XCTWaiter.wait(for: [XCTestExpectation(description: "take completes")], timeout: 0.5)
+        } while clock.systemUptime < deadline
+        return Generation(generationID: nil, visibleError: false, timedOut: true)
+    }
+
+    /// One manifest line per take on the runner's output, plus a kept attachment.
+    private func emit(_ record: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+        print("VOCELLO_AUTO_LANGUAGE_TAKE=" + data.base64EncodedString())
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "auto-language-take-\(record["takeID"] as? String ?? "unknown")"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

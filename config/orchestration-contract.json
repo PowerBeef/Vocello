@@ -536,6 +536,21 @@
         "ui-build"
       ]
     },
+    "ui-macos-auto-language": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "auto-language-plan",
+        "xcuitest",
+        "crash-delta",
+        "auto-language-validation"
+      ],
+      "optionalSteps": [
+        "result-retention",
+        "ui-preflight",
+        "ui-build"
+      ]
+    },
     "ui-macos-marketing": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

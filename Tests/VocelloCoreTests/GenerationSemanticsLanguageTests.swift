@@ -177,6 +177,24 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
         )
     }
 
+    /// An unsupported language (Dutch) is undetected: Built-in sends English (D6),
+    /// Design and Clone send Auto, and the chip shows Auto in every mode.
+    func testUnsupportedLanguageFollowsEachModesUndetectedFallback() {
+        for (mode, expected) in [
+            (GenerationMode.custom, GenerationSemantics.canonicalCustomWarmLanguage),
+            (.design, Qwen3SupportedLanguage.auto.rawValue),
+            (.clone, Qwen3SupportedLanguage.auto.rawValue),
+        ] {
+            let request = LanguageTestSupport.makeRequest(
+                mode: mode,
+                text: LanguageFixtures.dutch,
+                languageHint: Qwen3SupportedLanguage.auto.rawValue
+            )
+            XCTAssertEqual(GenerationSemantics.qwenLanguageHint(for: request), expected, "\(mode)")
+        }
+        XCTAssertEqual(GenerationSemantics.autoDetectedLanguage(in: LanguageFixtures.dutch), .auto)
+    }
+
     func testDesignAutoDetectsSpanishScript() {
         let request = LanguageTestSupport.makeRequest(
             mode: .design,

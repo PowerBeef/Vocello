@@ -20,7 +20,8 @@
         "screen-protection",
         "take-variation",
         "purchase",
-        "perf"
+        "perf",
+        "auto-language"
       ],
       "keepPassingPerPlatformLane": 1,
       "keepUnresolvedFailuresPerPlatformLane": 1
@@ -131,6 +132,10 @@
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-take-variation": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-auto-language": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },

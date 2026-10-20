@@ -28,6 +28,14 @@ SPEC.loader.exec_module(ledger_module)
 
 class RequiredStepLedgerTests(unittest.TestCase):
 
+    def test_mac_auto_language_lane_binds_its_plan_and_receipt_check(self) -> None:
+        contract = json.loads(CONTRACT.read_text())
+        lane = contract["workflows"]["ui-macos-auto-language"]
+        self.assertEqual(lane["producer"], "scripts/ui_test.sh")
+        for step in ("auto-language-plan", "xcuitest", "crash-delta", "auto-language-validation"):
+            with self.subTest(step=step):
+                self.assertIn(step, lane["requiredSteps"])
+
     def test_operator_setting_lanes_are_explicit_and_ledger_bound(self) -> None:
         contract = json.loads(CONTRACT.read_text())
         for workflow in ("ui-ios-screen-protection", "ui-ios-take-variation"):

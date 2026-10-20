@@ -167,7 +167,22 @@ scripts/ui_test.sh macos smoke --long-form-segments 10
 scripts/ui_test.sh macos perf
 # Product image refresh (asset workflow, never acceptance or benchmark evidence):
 scripts/ui_test.sh macos marketing [--scenario all|models]
+# Studio Auto language reaches the engine (about 15-25 minutes, unattended):
+scripts/ui_test.sh macos auto-language
 ```
+
+`auto-language` proves that Studio's Auto language is sent to the engine, not only shown. With
+every mode left on Auto (a mode on another language fails closed; the lane never changes one), each
+take of `config/auto-language-check.json` types a tracked sentence, waits for the language chip's
+value to settle on the detected language ("French, Auto"), reads the chip's menu without choosing
+anything and generates. The takes cover Built-in Voice in all ten languages, Design and Clone, an
+English sentence with one Japanese word, and Dutch, which no Qwen3 language matches: Built-in then
+shows Auto and sends English (the D6 fallback, recorded as an observation), Design sends no language
+token. `scripts/auto_language_check.py` joins each take, by its generation ID, to the engine's
+request receipt and checks that the request carried `auto`, that the model language and the chip
+agree, the token mode, the recognizer witness and the prompt digest; the summary and the run's rows
+stay under the run directory, without the scripts. It needs the benchmark clone voice, saves no
+voice and records nothing, so no Speech Recognition prompt interrupts it (BKL-19).
 
 `design-enrollment` runs the existing Design brief/player and actual-audio enrollment journey;
 `clone-reference` runs saved-reference hydration, editing and completed Clone playback; `long-form`

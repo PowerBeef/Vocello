@@ -36,6 +36,7 @@ Usage:
   scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
+  scripts/ui_test.sh macos auto-language
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N [--retain-result]
@@ -107,6 +108,11 @@ Only the standalone test runner is built/installed. Distribution acceptance rema
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
 It never runs as part of another lane. Run it after all device work, before leaving the phone idle.
+`auto-language` checks on the Mac that Studio's Auto language reaches the engine. With every mode left on
+Auto (it never changes a selection), each take of config/auto-language-check.json types a tracked
+sentence, waits for the language chip to follow detection, generates, and prints a manifest without the
+script; scripts/auto_language_check.py then joins each take to its engine request receipt. It needs the
+benchmark clone voice, saves no voice and records nothing, so no permission prompt interrupts it.
 `take-variation` reads Vocello's Take variation through the visible Settings control; only an explicit
 value selects it and verifies the result. It restores a variation an interrupted journey left pinned
 (the long-form journey pins Expressive) and never runs as part of another lane.
@@ -122,8 +128,9 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "take-variation" || "$lane" == "purchase" ]] || usage
+[[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "take-variation" || "$lane" == "purchase" || "$lane" == "auto-language" ]] || usage
 [[ "$lane" != "marketing" || "$platform" == "macos" ]] || usage
+[[ "$lane" != "auto-language" || "$platform" == "macos" ]] || usage
 [[ "$lane" != "purchase" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "control-audit" || "$platform" == "ios" ]] || usage
@@ -363,7 +370,8 @@ fi
 # AUD-09: full smoke and the localization walk read the benchmark clone voice
 # (test01, test02) but never create it, so a store without it stops here, before
 # the build and before the app changes anything.
-if [[ "$platform" == "macos" && ( "$lane" == "localization" || ( "$lane" == "smoke" && -z "$scenario_argument" ) ) ]]; then
+if [[ "$platform" == "macos" && ( "$lane" == "localization" || "$lane" == "auto-language" \
+    || ( "$lane" == "smoke" && -z "$scenario_argument" ) ) ]]; then
   mac_test_clone_fixture_current \
     || die "absent fixture: macOS $lane needs the benchmark clone voice $MAC_TEST_CLONE_VOICE_NAME in the debug store and never creates it; run: scripts/macos_test.sh models ensure"
 fi
@@ -1182,6 +1190,27 @@ validate_macos_benchmark() {
     >"$out/telemetry-summary.txt" 2>&1
 }
 
+validate_macos_auto_language() {
+  local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
+  local status deadline=$((SECONDS + 10))
+  # The app has quit, so its rows are final; only the checker's "rows not yet
+  # present" outcome (75) is retried, as the benchmark gate does. This run's
+  # rows are copied beside the evidence so the verdict can be re-derived.
+  while :; do
+    status=0
+    python3 "$ROOT_DIR/scripts/auto_language_check.py" validate \
+      --plan "$out/auto-language-plan.json" --xcodebuild-log "$out/xcodebuild.log" \
+      --diagnostics "$diagnostics" --run-id "$run_id" \
+      --retain-rows "$out/auto-language-diagnostics" \
+      --output "$out/auto-language-summary.json" >"$out/auto-language-validator.log" 2>&1 || status=$?
+    (( status == 75 && SECONDS < deadline )) || break
+    note "auto-language rows not yet present; validating again"
+    sleep 1
+  done
+  cat "$out/auto-language-validator.log" >&2
+  return "$status"
+}
+
 validate_ios_benchmark() {
   local diagnostics="$out/diagnostics"
   local evidence="$out/benchmark-evidence.json"
@@ -1418,6 +1447,17 @@ elif [[ "$platform" == "macos" ]]; then
     # UI-performance scenarios (frame probe + marked windows).
     only_test="VocelloMacUITests/VocelloMacPerfUITests"
     perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
+  elif [[ "$lane" == "auto-language" ]]; then
+    only_test="VocelloMacUITests/VocelloMacAutoLanguageUITests/testAutoLanguageReachesTheEngine"
+    # A stale benchmark current-take file would stamp bench notes into the rows.
+    rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
+    required_step_run "$step_ledger" auto-language-plan python3 "$ROOT_DIR/scripts/auto_language_check.py" \
+      prepare --spec "$ROOT_DIR/config/auto-language-check.json" --output "$out/auto-language-plan.json" \
+      --encoded-output "$out/auto-language-plan.b64" >"$out/auto-language-plan.log" 2>&1 \
+      || die "could not build the auto-language plan (see $out/auto-language-plan.log)"
+    export TEST_RUNNER_QVOICE_MAC_AUTO_LANGUAGE_RUN_ID="$run_id"
+    TEST_RUNNER_QVOICE_MAC_AUTO_LANGUAGE_PLAN_B64="$(<"$out/auto-language-plan.b64")"
+    export TEST_RUNNER_QVOICE_MAC_AUTO_LANGUAGE_PLAN_B64
   else
     only_test="VocelloMacUITests/VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
     rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
@@ -1508,7 +1548,13 @@ elif [[ "$platform" == "macos" ]]; then
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$MAC_DERIVED" \
     -resultBundlePath "$result" -only-testing:"$only_test" \
-    || { status=$?; warn "macOS XCUITest failed (see $out/xcodebuild.log)"; exit "$status"; }
+    || {
+      status=$?
+      warn "macOS XCUITest failed (see $out/xcodebuild.log)"
+      # The takes that ran still get a receipt verdict.
+      [[ "$lane" != "auto-language" ]] || validate_macos_auto_language || true
+      exit "$status"
+    }
   mac_crash_delta_attempted=1
   required_step_run "$step_ledger" crash-delta check_mac_crash_delta \
     || die "new Vocello crash report detected (see $out/new-crashes.txt)"
@@ -1547,6 +1593,9 @@ elif [[ "$platform" == "macos" ]]; then
   [[ "$lane" != "perf" ]] || required_step_run "$step_ledger" \
     perf-validation validate_macos_ui_perf \
     || die "macOS ui-perf evidence gate failed"
+  [[ "$lane" != "auto-language" ]] || required_step_run "$step_ledger" \
+    auto-language-validation validate_macos_auto_language \
+    || die "macOS auto-language check failed (see $out/auto-language-summary.json)"
   terminate_macos_app
 else
   probe="$(ios_probe)"

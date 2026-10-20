@@ -21,7 +21,7 @@ sourceOfTruth:
 > findings list (performance and design together — design items are a maintainer
 > pick-list, never pre-committed work), and the measured fix waves. Mirrors the
 > completed macOS arc's structure
-> ([`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)). Work items:
+> ([`macos-ui-refresh-2026-08.md`](2026-08-04-macos-ui-refresh.md)). Work items:
 > plan `ios-ui-2026-08` in [`docs/ROADMAP.md`](../ROADMAP.md), which is the
 > status authority; this document interprets and records evidence.
 
@@ -128,7 +128,7 @@ retained probe JSONL (re-pulled; all 63 files present under the 64-file
 retention cap) joined to the captured lane logs' marker lines, bucketed per
 run by lane-start epoch. Canonical-hardware verification ran live inside each
 counted lane's `perf-validation` step. Protocol correction recorded in
-[`ios-device-testing.md`](ios-device-testing.md): copy
+[`ios-device-testing.md`](../reference/ios-device-testing.md): copy
 `ui-perf-report.json` out of the run directory after every counted run, as
 the macOS baseline protocol already instructed.
 

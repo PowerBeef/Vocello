@@ -24,12 +24,12 @@ for current measurement semantics. Git history and `LEGACY_HISTORY.md` retain th
 
 ## Reference baseline
 
-[`baseline-2026-05-31-641a541.md`](baseline-2026-05-31-641a541.md) — pre-optimization reference, CLI-driven
+`baseline-2026-05-31-641a541.md` (deleted 2026-10-20; in git history) — pre-optimization reference, CLI-driven
 (`vocello bench`), native floor **8 GB** tier. Headline: **RTF 0.20–0.89 (slower than realtime)**; the
 **decode loop dominates wall time** and scales ~linearly with length; **clone is the heaviest** per length
 and on memory (~7.4–8.7 GB physFoot in-process); `trims = 0` everywhere.
 
-[`baseline-2026-06-16-45720dd-streaming-default.md`](baseline-2026-06-16-45720dd-streaming-default.md) —
+`baseline-2026-06-16-45720dd-streaming-default.md` (deleted 2026-10-20; in git history) —
 **streaming-default** baseline after switching `vocello bench` / `vocello generate` to streaming by default.
 Custom/Design Speed RTF **0.95–1.04**, physFoot **2.4–3.8 GB** (down from ~7–8 GB non-streaming); Custom
 Quality RTF **0.77–0.84**, physFoot **3.1–3.6 GB**. All QC pass; `trims = 0`. Design Quality not installed

@@ -107,7 +107,7 @@
       "owner": "backend-and-platform",
       "adopted": "2026-09-17",
       "goal": "Resolve the twelve existing audit items using the September 18 independent revalidation of the September 17 findings. Distinguish confirmed code properties, hypotheses requiring device evidence, policy decisions and documentation drift; preserve identifiers and existing assignment status. Application remediation is separately assigned from collaboration setup.",
-      "authority": "docs/reference/project-review-2026-09-18.md"
+      "authority": "docs/audits/2026-09-18-project-review.md"
     },
     {
       "id": "project-audit-2026-09",
@@ -116,7 +116,7 @@
       "owner": "backend-and-platform",
       "adopted": "2026-09-22",
       "goal": "Resolve the defects and maintainability findings the September 22 whole-project audit confirmed in source at the Claude Code takeover: a prewarm-slot leak, diagnostics that do not fail closed, harness isolation and routing gaps, release-workflow toolchain drift, dead code and duplicated platform logic. Each fix keeps the existing product boundaries and lands with its own deterministic proof.",
-      "authority": "docs/reference/project-audit-2026-09-22.md"
+      "authority": "docs/audits/2026-09-22-project-audit.md"
     },
     {
       "id": "benchmark-telemetry-audit-2026-09",
@@ -1059,7 +1059,7 @@
         "docs/reference/ios-device-testing.md"
       ],
       "evidence": [
-        "doc:docs/reference/ios-control-audit-remediation-2026-08-29.md",
+        "doc:docs/audits/2026-08-29-ios-control-audit-remediation.md",
         "doc:docs/reference/ios-device-testing.md"
       ],
       "updated": "2026-09-25",
@@ -1204,7 +1204,7 @@
         "Sources/iOS/App/RootView.swift",
         "Sources/iOSSupport/Services/IOSStartupRecovery.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P1); see project-review-2026-09-18.md. Startup Retry landed 2026-09-24 (a32a0f7f); 7bf815d6 queued opened files at the app root until onboarding is gone (a cold-launch open was otherwise lost while async startup ran). 2026-10-13 remediation: IOSStartupRunner owns each pass (fail, Retry, succeed is tested over fakes; the container only adapts iOS); the registered knob QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE with scripts/ui_test.sh ios smoke --scenario startup-retry proves Retry on the device build (distribution builds compile the knob out); RootView imports one opened file at a time: the copy comes first (a failure closes nothing), then it closes its own sheet, recorder, picker and earlier import and presents only once nothing is presented over the root, so the cover is never dropped. 2026-10-13 device proof of Retry: scripts/ui_test.sh ios smoke --scenario startup-retry PASS on the paired iPhone (ios-xcui-smoke-20261013-202516-b175375f, clean crash delta). Still unproven on a device: a file opened while the player sheet or the recorder is up. Closure needs RF-15's device run.",
+      "notes": "Revalidated 2026-09-18 (P1); see docs/audits/2026-09-18-project-review.md. Startup Retry landed 2026-09-24 (a32a0f7f); 7bf815d6 queued opened files at the app root until onboarding is gone (a cold-launch open was otherwise lost while async startup ran). 2026-10-13 remediation: IOSStartupRunner owns each pass (fail, Retry, succeed is tested over fakes; the container only adapts iOS); the registered knob QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE with scripts/ui_test.sh ios smoke --scenario startup-retry proves Retry on the device build (distribution builds compile the knob out); RootView imports one opened file at a time: the copy comes first (a failure closes nothing), then it closes its own sheet, recorder, picker and earlier import and presents only once nothing is presented over the root, so the cover is never dropped. 2026-10-13 device proof of Retry: scripts/ui_test.sh ios smoke --scenario startup-retry PASS on the paired iPhone (ios-xcui-smoke-20261013-202516-b175375f, clean crash delta). Still unproven on a device: a file opened while the player sheet or the recorder is up. Closure needs RF-15's device run.",
       "plan": "release-first-3-0-2026-09",
       "updated": "2026-10-13",
       "blockedBy": [

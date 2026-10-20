@@ -231,7 +231,7 @@ class ClassificationTests(unittest.TestCase):
 
     def test_inert_paths_route_nowhere(self) -> None:
         for path in ("Packages/VocelloQwen3Core/README.md", "Packages/VocelloQwen3Core/UPSTREAM.md",
-                     "benchmarks/OPTIMIZATION.md", "benchmarks/baseline-2026-05-30-06166f0.md",
+                     "benchmarks/OPTIMIZATION.md", "benchmarks/LEGACY_HISTORY.md",
                      "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", "CLAUDE.md"):
             self.assertEqual(self.lanes(path), set(), path)
         self.assertEqual(self.lanes("config/roadmap.json"), {"python"})

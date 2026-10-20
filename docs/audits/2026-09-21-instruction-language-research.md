@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-mlx
 reviewed: 2026-09-21
 summary: Evidence review of instruction versus speech language in local Qwen3-TTS, with French recommendations and an unexecuted controlled evaluation proposal.
@@ -10,6 +10,10 @@ sourceOfTruth:
 ---
 # Should voice descriptions and delivery instructions match the spoken language?
 
+> Historical (moved from `docs/reference/` on 2026-10-20). The prompting guide
+> ([`qwen3-tts-prompting-guide.md`](../reference/qwen3-tts-prompting-guide.md)) owns the current instruction and
+> language rules.
+
 Research date: **September 21, 2026**. Local source baseline: `cf373d7d`.
 Scope: Vocello's local Qwen3-TTS 12Hz 1.7B CustomVoice, VoiceDesign and Base paths,
 with particular attention to French. This is source research, not a new audio experiment.
@@ -18,7 +22,7 @@ with particular attention to French. This is source research, not a new audio ex
 are presented in the selected speech language so users can understand and edit them. A selected
 starter becomes the actual editable input; fixed delivery presets retain their canonical internal
 instructions. Existing drafts are never translated on a language change. This is an accessibility
-and usability decision, not a new comparative audio-quality finding. See [localization](localization.md).
+and usability decision, not a new comparative audio-quality finding. See [localization](../reference/localization.md).
 
 **Subsequent experiment, September 21:** a 216-clip pilot (192 paired treatments and 24 shared
 Neutral controls) completed with no terminal failure. French instructions scored higher on generic
@@ -253,8 +257,8 @@ new inference service, UI restriction, sampling adjustment or preset rewrite.
 
 **Proposed only. No generation, benchmark, device run or paid evaluator call was performed.** Reuse
 the delivery bench and its instruction receipts
-([benchmarking-procedure.md §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)) and the
-QC v2 audio checks ([qc.md](qc.md)). Do not build another evaluation framework.
+([benchmarking-procedure.md §4.6](../reference/benchmarking-procedure.md#46-delivery--prosody-cells)) and the
+QC v2 audio checks ([qc.md](../reference/qc.md)). Do not build another evaluation framework.
 
 ### 10.1 Start with a narrow, answerable question
 

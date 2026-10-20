@@ -546,7 +546,7 @@ is best, or that Chinese instructions improve French output.
 `UNVERIFIED`. Comparative EN/FR/ZH adherence with the speech held constant remains unqualified.
 Keep canonical English as the operational baseline, preserve freeform text, and do not expand
 translation/routing based on cross-dataset scores. The
-[dated instruction-language research](instruction-language-research-2026-09-21.md) contains the
+[dated instruction-language research](../audits/2026-09-21-instruction-language-research.md) contains the
 primary sources, French recommendations, mode distinctions and proposed controlled experiment.
 
 `MEASURED-HERE`, **maintainer-directed routing checkpoint, 2026-08-26.** Vocello now uses the

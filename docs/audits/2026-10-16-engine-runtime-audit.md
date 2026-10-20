@@ -484,7 +484,7 @@ open questions.
 | `docs/reference/ios-engine-optimization.md` | The iOS 27 8 GB limit (D-06) and measured budgets (section D) |
 | Package docs | `README`, `UPSTREAM`, `ORIGINS`, `PERFORMANCE`, `CLONE_ARTIFACT_FORMAT` refreshed |
 | `docs/ARCHITECTURE.md` | Engine sections (§4.5/§4.8 stale cache docs, B-16), the take lifecycle, error scopes |
-| Other docs that repeat model facts (`qwen3-core-maintenance.md`, `instruction-language-research-2026-09-21.md`, `docs/qwen_tone.md`, `cli.md`, `model-delivery.md`) | Reconcile, or replace repeated facts with links (one owner per fact) |
+| Other docs that repeat model facts (`qwen3-core-maintenance.md`, `docs/audits/2026-09-21-instruction-language-research.md`, `docs/qwen_tone.md`, `cli.md`, `model-delivery.md`) | Reconcile, or replace repeated facts with links (one owner per fact) |
 
 **Two passes:**
 - Pass 1 (Oct 18–20): facts that don't depend on pending decisions.

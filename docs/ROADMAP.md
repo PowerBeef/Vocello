@@ -249,7 +249,7 @@ Narrative authority: [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2
 
 Resolve the twelve existing audit items using the September 18 independent revalidation of the September 17 findings. Distinguish confirmed code properties, hypotheses requiring device evidence, policy decisions and documentation drift; preserve identifiers and existing assignment status. Application remediation is separately assigned from collaboration setup.
 
-Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/project-review-2026-09-18.md)
+Narrative authority: [`docs/audits/2026-09-18-project-review.md`](audits/2026-09-18-project-review.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
@@ -602,7 +602,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 Resolve the defects and maintainability findings the September 22 whole-project audit confirmed in source at the Claude Code takeover: a prewarm-slot leak, diagnostics that do not fail closed, harness isolation and routing gaps, release-workflow toolchain drift, dead code and duplicated platform logic. Each fix keeps the existing product boundaries and lands with its own deterministic proof.
 
-Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/project-audit-2026-09-22.md)
+Narrative authority: [`docs/audits/2026-09-22-project-audit.md`](audits/2026-09-22-project-audit.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |

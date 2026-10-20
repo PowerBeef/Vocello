@@ -534,7 +534,7 @@ only when the retained log proves a SpringBoard notification banner and
 `NotificationShortLookView`, the `.xcresult` proves exactly one identified wait timeout, and no
 product, harness, crash, generation, or QC failure coexists. It never turns the run into PASS and
 never authorizes an automatic retry. See the
-[historical infrastructure findings](ios-control-audit-remediation-2026-08-29.md); their dated
+[historical infrastructure findings](../audits/2026-08-29-ios-control-audit-remediation.md); their dated
 runs do not qualify new source or guarantee Xcode bootstrap reliability.
 
 ### UI-performance lane (`ios perf`)
@@ -562,7 +562,7 @@ record. Warn-only ceilings live in
 sessions; a breach marks the scenario and run `passedWithWarnings`, never
 failed), and on the canonical iPhone profile a PASS emits registry evidence
 and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
-([`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)).
+([`ios-ui-refresh-2026-08.md`](../audits/2026-08-29-ios-ui-refresh.md)).
 
 ## Headless device diagnostics
 

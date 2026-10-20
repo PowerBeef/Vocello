@@ -18,7 +18,7 @@ sourceOfTruth:
 ## Measurement basis
 
 The SwiftUI frame-health lane (`scripts/ui_test.sh macos perf`, landed `9d283a9`; lane
-reference: [`macos-testing.md`](macos-testing.md) "UI-performance lane") drove nine
+reference: [`macos-testing.md`](../reference/macos-testing.md) "UI-performance lane") drove nine
 scripted scenarios against the real app. Baseline session 2026-08-05: one discarded
 warm-up plus five counted runs on the canonical Mac mini M2 8 GB, 60 Hz panel, AC
 power, cursor parked, thermals nominal in every counted run. *Hitch* = summed excess

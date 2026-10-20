@@ -636,7 +636,7 @@ both texts and drafts saved earlier resolve to exactly what they stored. Or writ
 pitch + timbre; negative constraints like "without laughing" work; English is the current preset
 baseline, while freeform directions need not match the spoken language; describe the sound, not a
 persona). Comparative instruction-language quality remains unqualified; see the
-[dated language research](instruction-language-research-2026-09-21.md).
+[dated language research](../audits/2026-09-21-instruction-language-research.md).
 
 ### Languages — `GenerationSemantics` / language picker
 

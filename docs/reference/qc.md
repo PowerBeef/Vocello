@@ -11,8 +11,8 @@ sourceOfTruth:
 ---
 # Audio QC v2
 
-The [ordered remediation implementation](audio-quality-remediation.md) covers independent local
-review, real-failure reproduction, protected qualification, causal fixes and separate Fast QC finishing.
+The earlier human-review remediation plan (`audio-quality-remediation.md`) was retired on 2026-10-20:
+RF-14 closed and nobody listens to 3.0 takes (maintainer decision 2026-10-13). It is in git history.
 
 QC v2 is the local audio QC harness, rebuilt on 2026-10-01. It produces diagnostic evidence;
 calibration and qualification apply to individual dimensions and exact scoring identities:

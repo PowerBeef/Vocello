@@ -25,7 +25,7 @@ qualification. Open-work status belongs exclusively to [the roadmap](../../confi
 The findings below reuse all twelve existing AUD identifiers; there is no new application defect
 with sufficient independent evidence to justify another identifier in this review.
 
-The [September 17 audit](ui-rework-audit-2026-09-17.md) is historical evidence. This revalidation
+The September 17 audit (`ui-rework-audit-2026-09-17.md`, in git history) is historical evidence. This revalidation
 narrows several of its claims: view-created tasks are registered with a coordinator; clone requests
 retain their transcript after optional priming; database deletion errors are surfaced; unverified
 StoreKit transactions must not be assigned an unconditional finish policy on the current evidence.
@@ -294,7 +294,7 @@ were preserved. Local compatibility is not a substitute for the pinned CI verdic
 ## Handoff and activation limitation
 
 > Superseded 2026-09-22: Codex, `AGENTS.md`, `.agents/` and `.codex/` were retired at the Claude Code
-> takeover ([project audit](project-audit-2026-09-22.md)); the Codex hook-trust step below is history.
+> takeover ([project audit](2026-09-22-project-audit.md)); the Codex hook-trust step below is history.
 
 The existing primary roadmap remains authoritative; this setup does not reprioritize UI work or
 authorize application remediation. Claude should inspect the actual commit/diff and dirty tree before

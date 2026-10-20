@@ -17,9 +17,9 @@ sourceOfTruth:
 Every finding ID was re-checked against source at `0beb6331` and live GitHub state before this
 report landed on `main`. The report holds overall: no finding is invented, and where it is off it
 overstates impact or cites stale lines. Remediation is tracked in plan `project-audit-2026-09` in
-[`config/roadmap.json`](../../config/roadmap.json); the takeover audit
-[`project-audit-2026-09-22.md`](../reference/project-audit-2026-09-22.md) is the plan's authority and
-links here.
+[`config/roadmap.json`](../../config/roadmap.json), and this report is the plan's authority. (Its
+summary, `docs/reference/project-audit-2026-09-22.md`, was deleted on 2026-10-20 and is in git
+history.)
 
 **Already fixed on `main`:**
 - CI-06, the TSan lane base (`b36c1418`).

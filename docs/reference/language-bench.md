@@ -255,7 +255,7 @@ the better score, substitute their transcripts, or relabel a retained failure au
 Settings remains useful for confirming enabled Dictation languages, but the explicit command owns
 asset installation and machine verification. This is an operational prerequisite, not a subjective
 audio review.
-Vocello UI expectations remain documented in [`ios-ui-reference.md`](ios-ui-reference.md).
+Vocello UI expectations remain documented in [the iOS app guide's UI state map](ios-app-guide.md#7-compact-ui-state-map).
 Language-benchmark labels are opaque privacy-safe identifiers matching
 `[A-Za-z0-9][A-Za-z0-9._-]{0,95}`; they are not free-form notes.
 

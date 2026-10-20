@@ -498,7 +498,7 @@ Narrative authority: [`docs/reference/ios-built-in-startup-reliability.md`](refe
 
 Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.
 
-Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-reference.md)
+Narrative authority: [`docs/reference/ios-app-guide.md`](reference/ios-app-guide.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |

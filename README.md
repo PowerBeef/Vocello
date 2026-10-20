@@ -194,7 +194,7 @@ The charts regenerate from the named records with `scripts/generate_readme_chart
 
 ### Build from source
 
-You need full Xcode (the CI version is pinned in `config/toolchain.json`) on an Apple Silicon Mac with macOS 26 or newer, plus the pinned xcodegen, ripgrep and Python packages. [`docs/reference/development-setup.md`](docs/reference/development-setup.md) sets up a new Mac step by step.
+You need full Xcode (the CI version is pinned in `config/toolchain.json`) on an Apple Silicon Mac with macOS 26 or newer, plus the pinned xcodegen, ripgrep and Python packages. [New Mac setup](docs/reference/development-workflow.md#new-mac-setup) sets up a new Mac step by step.
 
 ```sh
 git clone https://github.com/PowerBeef/Vocello.git
@@ -254,7 +254,7 @@ The README art comes from the same tokens: `scripts/readme_art/render.sh` redraw
 | | |
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Ownership, the life of a take, the engine's invariants |
-| [Development setup](docs/reference/development-setup.md) | A new Mac, from clone to first build |
+| [Development setup](docs/reference/development-workflow.md#new-mac-setup) | A new Mac, from clone to first build |
 | [Testing runbook](docs/reference/testing-runbook.md) | Which lane proves what, on the Mac and on a paired iPhone |
 | [Benchmarking](docs/reference/benchmarking-procedure.md) | The protocol behind every published number |
 | [Privacy and storage](docs/reference/privacy-storage.md) | What is stored where, and how it is deleted |

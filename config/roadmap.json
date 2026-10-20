@@ -53,7 +53,7 @@
       "owner": "ios",
       "adopted": "2026-08-20",
       "goal": "Reorganize the Settings tab around user tasks, move model lifecycle management into a dedicated destination, and align the resulting controls with Vocello's compact custom iOS design language without weakening native semantics, Dynamic Type, VoiceOver, or physical-device acceptance.",
-      "authority": "docs/reference/ios-ui-reference.md"
+      "authority": "docs/reference/ios-app-guide.md"
     },
     {
       "id": "autonomous-validation-remediation-2026-08",
@@ -685,7 +685,7 @@
       "evidence": [
         "file:scripts/tests/test_check_ios_smoke_acceptance.py",
         "doc:docs/reference/ios-app-guide.md",
-        "doc:docs/reference/ios-ui-reference.md",
+        "doc:docs/reference/ios-app-guide.md",
         "file:scripts/repo_invariants.sh",
         "file:Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift"
       ],

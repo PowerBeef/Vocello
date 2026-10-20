@@ -8,7 +8,7 @@ integrated worktrees), follows [`CLAUDE.md`](CLAUDE.md) and the
 ## Before starting
 
 - Use an Apple Silicon Mac with full Xcode (CI pins the version in `config/toolchain.json`) and set
-  it up with [`docs/reference/development-setup.md`](docs/reference/development-setup.md): Xcode
+  it up with [New Mac setup](docs/reference/development-workflow.md#new-mac-setup): Xcode
   components, the pinned command-line tools, Python and Node. The selected Xcode must expose usable
   iOS Platform Support and a compatible iOS runtime component for the no-phone
   `-destination generic/platform=iOS` compile; this toolchain prerequisite does not authorize

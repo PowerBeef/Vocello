@@ -737,7 +737,6 @@
     {"file": "scripts/tests/test_swift_dependency_snapshot.py", "code": "reportIndexIssue", "fingerprint": "95714db444e9d225", "count": 1},
     {"file": "scripts/tests/test_swift_dependency_snapshot.py", "code": "reportIndexIssue", "fingerprint": "e748e28729b6f890", "count": 1},
     {"file": "scripts/tests/test_swift_dependency_updates.py", "code": "reportArgumentType", "fingerprint": "5f65d4119c5569a8", "count": 1},
-    {"file": "scripts/tests/test_ui_failure_finalization.py", "code": "reportAttributeAccessIssue", "fingerprint": "c8e4720cc2c3eb0f", "count": 1},
     {"file": "scripts/tests/test_verify_ios_release_artifacts.py", "code": "reportArgumentType", "fingerprint": "22d51f213e181af4", "count": 1},
     {"file": "scripts/tests/test_verify_ios_release_artifacts.py", "code": "reportArgumentType", "fingerprint": "559a2106cc05707a", "count": 1},
     {"file": "scripts/tests/test_verify_ios_release_artifacts.py", "code": "reportArgumentType", "fingerprint": "d178d4a35270f8d2", "count": 1},

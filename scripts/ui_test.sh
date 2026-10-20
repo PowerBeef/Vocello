@@ -12,6 +12,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
 . "$ROOT_DIR/scripts/lib/ui_finalization.sh"
 . "$ROOT_DIR/scripts/lib/dev_signing.sh"
+# The runner's data steps, tested in scripts/tests/test_ui_lane_data.py.
+UI_LANE_DATA="$ROOT_DIR/scripts/lib/ui_lane_data.py"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 # Every macOS UI lane compiles the app at -O (benchmark-grade), so it shares the
 # optimized arena with the benchmark CLI and leaves the -Onone arena alone (MV-01).
@@ -273,17 +275,7 @@ fi
 if [[ "$lane" == "startup-parity" ]]; then
   [[ -f "$startup_parity_script_file" ]] || die "startup-parity requires a readable --script-file"
   startup_parity_script="$(<"$startup_parity_script_file")"
-  python3 - "$startup_parity_script_file" <<'PY' || exit $?
-import pathlib, sys
-path = pathlib.Path(sys.argv[1])
-data = path.read_bytes()
-try:
-    text = data.decode("utf-8")
-except UnicodeDecodeError:
-    raise SystemExit("error: --script-file must be UTF-8")
-if not text.strip() or "\x00" in text or not 1 <= len(text) <= 2000:
-    raise SystemExit("error: --script-file must contain 1...2000 non-NUL characters")
-PY
+  python3 "$UI_LANE_DATA" script-file "$startup_parity_script_file" || exit $?
 elif [[ -n "$startup_parity_script_file" ]]; then
   die "--script-file is accepted only by the startup-parity lane"
 fi
@@ -331,21 +323,7 @@ if [[ -n "$long_form_segments" ]]; then
     || die "--long-form-segments must be an integer between 2 and 12"
 fi
 
-python3 - "$modes" "$lengths" "$warm" <<'PY' || exit $?
-import sys
-modes = [v.strip() for v in sys.argv[1].split(',') if v.strip()]
-lengths = [v.strip() for v in sys.argv[2].split(',') if v.strip()]
-try:
-    warm = int(sys.argv[3])
-except ValueError:
-    raise SystemExit("error: --warm must be an integer")
-if not modes or len(modes) != len(set(modes)) or set(modes) - {"custom", "design", "clone"}:
-    raise SystemExit("error: --modes must be a unique subset of custom,design,clone")
-if not lengths or len(lengths) != len(set(lengths)) or set(lengths) - {"short", "medium", "long"}:
-    raise SystemExit("error: --lengths must be a unique subset of short,medium,long")
-if warm < 1:
-    raise SystemExit("error: --warm must be at least 1")
-PY
+python3 "$UI_LANE_DATA" matrix "$modes" "$lengths" "$warm" || exit $?
 
 if [[ "$platform" == "ios" ]]; then
   require_ios_xcode_platform \
@@ -433,111 +411,10 @@ printf '%s\n' "${label:-$run_id}" >"$out/label.txt"
 
 write_run_metadata() {
   local status="$1" finished_at="${2:-}" exit_code="${3:-}"
-  python3 - "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
+  python3 "$UI_LANE_DATA" run-metadata "$out/run.json" "$platform" "$lane" "$run_id" "$modes" "$lengths" \
     "$warm" "${label:-$run_id}" "$started_at" "$finished_at" "$status" "$exit_code" \
     "$audit_source_id" "$control_scenario" "$control_resume" "$control_resume_run_ids" \
-    "$control_resume_take_start" "$control_take_limit" "$candidate_evidence" "$scenario_argument" <<'PY'
-import json, os, pathlib, sys, tempfile
-
-path = pathlib.Path(sys.argv[1])
-payload = {
-    "platform": sys.argv[2], "lane": sys.argv[3], "runID": sys.argv[4],
-    "modes": sys.argv[5].split(','), "lengths": sys.argv[6].split(','),
-    "warm": int(sys.argv[7]), "label": sys.argv[8], "status": sys.argv[11],
-    "startedAt": sys.argv[9], "finishedAt": sys.argv[10] or None,
-    "exitCode": int(sys.argv[12]) if sys.argv[12] else None,
-    "schemaVersion": 2,
-}
-if payload["lane"] == "marketing":
-    payload["evidenceClass"] = "marketing-assets"
-    payload["scenario"] = sys.argv[20]
-    payload["warm"] = 0
-    payload["lengths"] = []
-if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20]:
-    payload["scenario"] = sys.argv[20]
-    payload["evidenceClass"] = "focused-smoke"
-    if sys.argv[20] in ("design-enrollment", "clone-reference", "long-form", "line-batch"):
-        payload["modes"] = [{"design-enrollment": "design", "clone-reference": "clone"}.get(sys.argv[20], "custom")]
-        payload["lengths"] = []
-        payload["warm"] = 0
-    if sys.argv[20] in ("long-form-recovery", "saved-voices-states"):
-        payload["modes"] = []
-        payload["lengths"] = []
-        payload["warm"] = 0
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "foreground-exit":
-    payload["scenario"] = "foreground-exit"
-    payload["evidenceClass"] = "focused-smoke"
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "startup-retry":
-    payload["scenario"] = "startup-retry"
-    payload["evidenceClass"] = "focused-smoke"
-    payload["modes"] = []
-    payload["lengths"] = []
-    payload["warm"] = 0
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "background-warmup":
-    payload["scenario"] = "background-warmup"
-    payload["evidenceClass"] = "focused-smoke"
-    payload["modes"] = ["clone", "custom"]
-    payload["lengths"] = []
-    payload["warm"] = 0
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "long-form":
-    payload["scenario"] = "long-form"
-    payload["evidenceClass"] = "focused-smoke"
-    payload["modes"] = ["custom"]
-    payload["lengths"] = []
-    payload["warm"] = 0
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "record-then-play":
-    payload["scenario"] = "record-then-play"
-    payload["evidenceClass"] = "focused-smoke"
-    payload["modes"] = []
-    payload["lengths"] = []
-    payload["warm"] = 0
-if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "update-models":
-    payload["scenario"] = "update-models"
-    payload["evidenceClass"] = "device-maintenance"
-    payload["modes"] = []
-    payload["lengths"] = []
-    payload["warm"] = 0
-if sys.argv[13]:
-    payload["treeFingerprint"] = sys.argv[13]
-    payload["controlAuditScenario"] = sys.argv[14]
-    payload["controlObservationSchemaVersion"] = 2
-    payload["controlEvidenceVersion"] = 2
-    payload["controlTakeStart"] = int(sys.argv[17])
-    payload["controlTakeLimit"] = int(sys.argv[18])
-if sys.argv[15]:
-    payload["resumedFrom"] = sys.argv[15]
-if sys.argv[16]:
-    payload["resumeRunIDs"] = sys.argv[16].split(",")
-if sys.argv[19]:
-    payload["evidenceClass"] = "preinstalled-candidate-black-box"
-    payload["lane"] = "candidate-smoke"
-    payload["modes"] = []
-    payload["lengths"] = []
-    payload["warm"] = 0
-    identity = path.parent / "candidate-identity.json"
-    if identity.is_file():
-        payload["candidateIdentity"] = json.loads(identity.read_text())
-if sys.argv[20] == "history-transcript":
-    payload["scenario"] = "history-transcript"
-    payload["evidenceClass"] = "read-only-history-observation"
-    payload["modes"] = []
-    payload["lengths"] = []
-    payload["warm"] = 0
-path.parent.mkdir(parents=True, exist_ok=True)
-descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-try:
-    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-        json.dump(payload, stream, indent=2, sort_keys=True)
-        stream.write("\n")
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.replace(temporary, path)
-finally:
-    try:
-        os.unlink(temporary)
-    except FileNotFoundError:
-        pass
-PY
+    "$control_resume_take_start" "$control_take_limit" "$candidate_evidence" "$scenario_argument"
 }
 
 run_finalized=0
@@ -609,49 +486,7 @@ export_attachments() {
   [[ -d "$result" ]] || { warn "missing XCUITest result bundle"; return 2; }
   attachments_attempted=1
   local export_status=0
-  if python3 - "$result" "$out/attachments" <<'PY' >"$out/attachments.log" 2>&1
-import os, signal, subprocess, sys
-
-class ExportInterrupted(BaseException):
-    def __init__(self, signum):
-        self.signum = signum
-
-def interrupted(signum, _frame):
-    raise ExportInterrupted(signum)
-
-for sig in (signal.SIGINT, signal.SIGTERM):
-    signal.signal(sig, interrupted)
-p = None
-status = 1
-try:
-    p = subprocess.Popen(["xcrun", "xcresulttool", "export", "attachments", "--path", sys.argv[1],
-                          "--output-path", sys.argv[2]], start_new_session=True)
-    status = p.wait(timeout=60)
-except subprocess.TimeoutExpired:
-    status = 124
-except ExportInterrupted as interruption:
-    status = 128 + interruption.signum
-finally:
-    # Signals can arrive while the export group is being retired. Preserve the
-    # first outcome and always finish cleanup before returning it to the shell.
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    signal.signal(signal.SIGTERM, signal.SIG_IGN)
-    if p is not None:
-        def stop_group(sig):
-            try:
-                os.killpg(p.pid, sig)
-            except ProcessLookupError:
-                pass
-        stop_group(signal.SIGTERM)
-        try:
-            p.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            pass
-        # Retire descendants even when the export parent already exited.
-        stop_group(signal.SIGKILL)
-        p.wait()
-raise SystemExit(status)
-PY
+  if python3 "$UI_LANE_DATA" export-attachments "$result" "$out/attachments" >"$out/attachments.log" 2>&1
   then
     return 0
   else
@@ -1230,123 +1065,7 @@ summarize_long_form_project_if_present() {
   # token makes grep fail the whole pipeline and silently kill the lane here.
   wall=$(grep -oE 'LONGFORM_WALL_SECONDS=[0-9.]+' "$out_dir/xcodebuild.log" 2>/dev/null | tail -1 | cut -d= -f2 || true)
   [[ -n "$wall" ]] || return 0
-  python3 - "$wall" "$out_dir/long-form-project-summary.txt" "$out_dir" <<'PY'
-import glob, json, os, shutil, sys
-
-wall = float(sys.argv[1])
-out_dir = sys.argv[3]
-outputs = os.path.expanduser(
-    "~/Library/Application Support/QwenVoice-Debug/outputs/CustomVoice"
-)
-manifests = sorted(
-    glob.glob(os.path.join(outputs, "long_form_manifest_*.json")),
-    key=os.path.getmtime,
-)
-if not manifests:
-    raise SystemExit(0)
-manifest = json.load(open(manifests[-1]))
-assembly = manifest.get("assembly") or {}
-frames = assembly.get("outputFrameCount") or 0
-sample_rate = assembly.get("sampleRate") or 24_000
-audio = frames / sample_rate if sample_rate else 0
-segment_rows = (manifest.get("execution") or {}).get("segments", [])
-segments = len(segment_rows)
-rtf = wall / audio if audio else 0
-lines = [
-    f"long-form project: {segments} segments, audio {audio:.1f}s, "
-    f"wall {wall:.1f}s (plan+stream+QC+assembly), project RTF {rtf:.2f}"
-]
-
-# Per-segment memory trend (local evidence only). The engine telemetry rows
-# already carry physical-footprint summaries; segments have no generationID
-# in the manifest, so match the contiguous run of engine rows whose audio
-# durations best fit the manifest's per-segment durations.
-def flat(obj, found):
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if isinstance(value, (dict, list)):
-                flat(value, found)
-            elif isinstance(value, (int, float)) and key not in found:
-                found[key] = value
-    elif isinstance(obj, list):
-        for value in obj:
-            flat(value, found)
-    return found
-
-diag = os.path.expanduser("~/Library/Application Support/QwenVoice-Debug/diagnostics")
-engine_log = os.path.join(diag, "engine", "generations.jsonl")
-durations = [s.get("audioDurationSeconds") or 0 for s in segment_rows]
-if segments >= 2 and durations and os.path.isfile(engine_log):
-    rows = []
-    with open(engine_log) as handle:
-        for raw in handle:
-            raw = raw.strip()
-            if not raw:
-                continue
-            try:
-                rows.append(flat(json.loads(raw), {}))
-            except json.JSONDecodeError:
-                continue
-    audio_key = "audioSeconds"
-    usable = [r for r in rows if audio_key in r]
-    best = None
-    for start in range(0, max(0, len(usable) - segments) + 1):
-        window = usable[start:start + segments]
-        if len(window) < segments:
-            break
-        cost = sum(abs(w[audio_key] - d) for w, d in zip(window, durations))
-        if best is None or cost < best[0]:
-            best = (cost, window)
-    # Accept the match only when durations genuinely line up (<0.75 s mean
-    # error) so a stale log cannot masquerade as this run's segments.
-    if best and best[0] / segments < 0.75:
-        lines.append(
-            "per-segment memory (engine physical footprint, MB; matched by "
-            "audio duration):"
-        )
-        cumulative = 0.0
-        ends = []
-        for index, row in enumerate(best[1]):
-            cumulative += row.get(audio_key, 0)
-            end_mb = row.get("physFootprintEndMB")
-            ends.append(end_mb)
-            lines.append(
-                f"  segment {index:>2}: audio={row.get(audio_key, 0):6.1f}s "
-                f"cumulative={cumulative:7.1f}s "
-                f"start={row.get('physFootprintStartMB', float('nan')):7.1f} "
-                f"end={end_mb if end_mb is not None else float('nan'):7.1f} "
-                f"peak={row.get('physFootprintPeakMB', float('nan')):7.1f}"
-            )
-        known_ends = [e for e in ends if e is not None]
-        if len(known_ends) >= 2:
-            growth = known_ends[-1] - known_ends[0]
-            lines.append(
-                f"  end-footprint growth first→last: {growth:+.1f} MB "
-                f"({100 * growth / known_ends[0]:+.2f}% of first segment end)"
-            )
-    else:
-        lines.append(
-            "per-segment memory: no contiguous engine-row window matched the "
-            "manifest durations; inspect diagnostics manually"
-        )
-
-# Retain the compact per-generation logs beside the run artifacts (sample
-# sidecars stay in the app support tree; they are bounded but large).
-kept = os.path.join(out_dir, "diagnostics")
-os.makedirs(kept, exist_ok=True)
-for layer in ("app", "engine"):
-    source = os.path.join(diag, layer, "generations.jsonl")
-    if os.path.isfile(source):
-        shutil.copy2(source, os.path.join(kept, f"{layer}-generations.jsonl"))
-merged = os.path.join(diag, "generations-merged.jsonl")
-if os.path.isfile(merged):
-    shutil.copy2(merged, os.path.join(kept, "generations-merged.jsonl"))
-
-with open(sys.argv[2], "w") as f:
-    f.write("\n".join(lines) + "\n")
-for line in lines:
-    print(f"==> {line}")
-PY
+  python3 "$UI_LANE_DATA" long-form-summary "$wall" "$out_dir/long-form-project-summary.txt" "$out_dir"
 }
 
 run_xcodebuild() {
@@ -1730,24 +1449,7 @@ elif [[ "$platform" == "macos" ]]; then
   # journey. It must live in /tmp: the app cannot read the runner's per-app
   # temporary directory without a TCC prompt, and the Xcode test runner
   # cannot write /tmp itself.
-  python3 - <<'WAV'
-import math, struct, wave
-path = "/tmp/vocello-ui-virtual-mic.wav"
-sr = 24000
-frames = int(sr * 12.0)
-with wave.open(path, "wb") as w:
-    w.setnchannels(1)
-    w.setsampwidth(2)
-    w.setframerate(sr)
-    data = bytearray()
-    for i in range(frames):
-        t = i / sr
-        syllable = abs(math.sin(2 * math.pi * 2.4 * t))
-        phrase = 1.0 if math.sin(2 * math.pi * 0.22 * t) > -0.55 else 0.0
-        tone = 0.7 * math.sin(2 * math.pi * 175 * t) + 0.3 * math.sin(2 * math.pi * 330 * t)
-        data += struct.pack("<h", int(0.28 * tone * syllable * phrase * 32767))
-    w.writeframes(bytes(data))
-WAV
+  python3 "$UI_LANE_DATA" virtual-mic
 
   # Two-phase execution: an explicitly skippable build-for-testing (repeat
   # lanes on an unchanged tree skip the multi-minute rebuild entirely),

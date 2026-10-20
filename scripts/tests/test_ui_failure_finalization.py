@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import shlex
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -16,8 +17,12 @@ from unittest import mock
 from shell_stubs import ui_function as function
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNNER = ROOT / "scripts/ui_test.sh"
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from lib import ui_lane_data  # noqa: E402
+
 HELPER = ROOT / "scripts/lib/ui_finalization.sh"
+LANE_DATA = ROOT / "scripts/lib/ui_lane_data.py"
 
 
 class UIFinalizationTests(unittest.TestCase):
@@ -116,19 +121,17 @@ write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
         self.assertEqual((self.out / "metadata").read_text(), "failed 1\n")
 
     def test_attachment_export_has_bounded_group_cleanup(self):
-        body = function("export_attachments")
-        program = body.split("<<'PY'", 1)[1].split("\n", 1)[1].split("\nPY\n", 1)[0]
         process = mock.Mock(pid=123)
         process.wait.side_effect = [subprocess.TimeoutExpired("export", 60),
                                     subprocess.TimeoutExpired("export", 2), 0]
         with mock.patch("subprocess.Popen", return_value=process) as launch, \
                 mock.patch("os.killpg") as kill, \
-                mock.patch("signal.signal"), \
-                mock.patch("sys.argv", ["export", "result with spaces", "attachments with spaces"]):
-            with self.assertRaises(SystemExit) as exit_status:
-                exec(compile(program, str(RUNNER), "exec"), {})
-        self.assertEqual(exit_status.exception.code, 124)
+                mock.patch("signal.signal"):
+            status = ui_lane_data.export_attachments("result with spaces", "attachments with spaces")
+        self.assertEqual(status, 124)
         self.assertTrue(launch.call_args.kwargs["start_new_session"])
+        self.assertEqual(launch.call_args.args[0][-4:], ["--path", "result with spaces",
+                                                       "--output-path", "attachments with spaces"])
         self.assertEqual(kill.call_args_list, [mock.call(123, signal.SIGTERM),
                                              mock.call(123, signal.SIGKILL)])
         self.assertEqual(process.wait.call_args_list,
@@ -178,7 +181,6 @@ printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
         self.assert_process_retired(int((self.out / "child-pid").read_text()))
 
     def test_export_interruption_retires_separate_process_group(self):
-        program = function("export_attachments").split("<<'PY'", 1)[1].split("\n", 1)[1].split("\nPY\n", 1)[0]
         binaries = self.out / "bin"
         binaries.mkdir()
         executable = binaries / "xcrun"
@@ -189,7 +191,8 @@ printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
         for sig in (signal.SIGTERM, signal.SIGINT):
             with self.subTest(signal=sig):
                 (self.out / "exporter-pid").unlink(missing_ok=True)
-                process = subprocess.Popen([os.sys.executable, "-c", program, "result", "attachments"], env=env)
+                process = subprocess.Popen([sys.executable, str(LANE_DATA), "export-attachments",
+                                            "result", "attachments"], env=env)
                 try:
                     deadline = time.monotonic() + 3
                     while not (self.out / "exporter-pid").exists():
@@ -263,6 +266,7 @@ required_steps_finalize "$step_ledger"
 source {shlex.quote(str(HELPER))}
 out={shlex.quote(str(self.out))}
 result="$out/result.xcresult"
+UI_LANE_DATA={shlex.quote(str(LANE_DATA))}
 warn() {{ :; }}
 {function("export_attachments")}
 trap 'exit 143' TERM

@@ -328,6 +328,7 @@ def ui_lane_sandbox(test: unittest.TestCase) -> ScriptSandbox:
             "MAC_TEST_CLONE_VOICE_NAME=fixture-voice\nqv_stub test_models_init\n"
             "qv_stub mac_test_clone_fixture_current\n"
         ),
+        "scripts/lib/ui_lane_data.py": None,
     })
     sandbox.helper("scripts/ui_bench_allocation.py",
                    'case " $* " in *" --field name "*) echo canonical-fixture ;; esac')
@@ -348,6 +349,7 @@ class UIFunctionShell(_Sandbox):
             "set -euo pipefail\n"
             f". {quote(self.record)}\n"
             f". {quote(ROOT / 'scripts/lib/shared.sh')}\n"
+            f"UI_LANE_DATA={quote(ROOT / 'scripts/lib/ui_lane_data.py')}\n"
             + "".join(ui_function(name) + "\n" for name in names)
             + body
         )

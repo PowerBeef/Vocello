@@ -57,8 +57,9 @@ Xcode 26.6.
     Its run was recorded as failed, then passed on re-check; nothing was published.
 - **Next:**
   - Push the P3-5 batch and watch CI.
-  - DW-02's P1-2 (UI readiness preflight) has a Mac half that can land now.
-  - The iOS-only lane snippets, `ios_device.sh` and P1-15 wait for an iPhone window.
+  - The iOS-only lane snippets, `ios_device.sh`, and P1-2's and P1-15's iPhone halves wait for an
+    iPhone window. DW-02 is parked until then: P1-2's Mac half was already met, with the
+    `ui-preflight` failing before the build about 1 s into the run.
 - **Still waiting on an iPhone window:** the iOS runtime proof of the Observation migration and
   of the strictness settings.
 

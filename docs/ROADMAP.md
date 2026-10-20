@@ -58,7 +58,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
 | `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
-| `DW-02` | in-flight | Development workflow: structural tooling (audit Phase 1) | — |
+| `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
 | `DW-03` | in-flight | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | in-flight | Development workflow: longer-term modernization (audit Phase 3) | — |
 | `ER-13` | in-flight | Qwen3-TTS model research and reference documentation | — |
@@ -122,8 +122,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`DW-02`** (in-flight, due 2026-10-22) — Development workflow: structural tooling (audit Phase 1).
+- **`DW-02`** (parked) — Development workflow: structural tooling (audit Phase 1).
   gate: Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.
+  unparkWhen: The next announced iPhone window: P1-2's iPhone readiness preflight and P1-15's ios_device.sh half run there.
 
 - **`DW-03`** (in-flight, due 2026-10-22) — Development workflow: product-side quality (audit Phase 2).
   gate: Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.

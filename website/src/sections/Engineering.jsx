@@ -125,9 +125,9 @@ export const Engineering = () => (
         <p className="section-note">Measured, not promised</p>
         <h2 id="eng-title" className="section-title">A first-party engine, measured take by take.</h2>
         <p className="section-sub">
-          These figures were measured on Vocello's benchmark host, a Mac mini M6 with 16 GB;
-          the chart comes from a Vocello 3.0 build from source. The 8 GB Mac mini M2 remains
-          the support floor.
+          The speed figures were measured on Vocello's benchmark host, a Mac mini M6 with 16 GB;
+          the chart comes from a Vocello 3.0 build from source. The memory figures come from
+          the 8 GB Mac mini M2, the support floor.
           Speed is the real-time factor: seconds of generation per second of audio.
           Below 1.0, audio generates ahead of playback, and every number here traces
           to a tracked record in the open repository.

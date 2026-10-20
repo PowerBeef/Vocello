@@ -68,6 +68,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.54 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
 
+## engine-generation / ios / iphone-17-pro / config `e01c4260a459`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-10-20 | [`ios-engine-20261020-175501-9d08fde9`](runs/engine-generation/ios-engine-20261020-175501-9d08fde9.json) | focused | focused | passed | qualified | 1 | 0.51 | `bf9d0da26f07` | `e01c4260a459` | baseline | conv21-first-take |
+
 ## engine-generation / ios / iphone-17-pro / config `e8b9dd91c1fe`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

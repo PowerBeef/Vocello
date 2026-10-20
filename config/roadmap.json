@@ -184,22 +184,6 @@
       "due": "2026-10-22"
     },
     {
-      "id": "RF-20",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Single streamed takes see the whole script, so a bad opening cannot strand the text",
-      "status": "in-flight",
-      "blockedBy": [],
-      "due": "2026-10-22",
-      "gate": "Pre-registered 2026-10-20, before any result: a Mac machine screen with no listening. Streamed vocello CLI takes at Expressive with the Studio default delivery: the ten corpus short sentences in Built-in Voice with Aiden and Vivian, seeds 1-10 (200 takes per arm), and in Voice Design with one brief, seeds 1-5 (50 per arm), plus the 2026-10-20 failing take (French, Aiden, seed 9432062726036573763). Control is streaming text; the arm is full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on). A gross failure is a Fast QC rejection or a take longer than 2.5 times its sentence's control median. D1 is adopted for single (not long-form) streamed takes only if its gross failures are at most the control's, it recovers the failing take, each sentence's median duration stays within 25% of the control's, and a Mac language bench with D1 on passes spoken content and language on both ASR families; otherwise the defect stays a 3.0 known limitation that Fast QC rejects. Long-form segments keep streaming text (RF-18). On adoption: deterministic tests pin each path's text layout, and the Mac language lane and a Mac memory qualification are rerun; the iPhone proof is RF-15's acceptance of the candidate.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
-        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
-        "docs/reference/qwen3-tts-guide.md"
-      ],
-      "updated": "2026-10-20",
-      "notes": "Found 2026-10-20 in the Mac language lane: a French Built-in take (Aiden, seed 9432062726036573763) opened with a sigh and about 4 s of silence, then 30 s of whispered mumbling, and Fast QC rejected it. Its 19 text tokens were all streamed during the sigh (1.52 s), so the talker then saw only tts_pad (engine audit A-01). The CLI replays it to the same 35.12 s. Ruled out: EOS filtering (identical failure with re-insertion; no likely EOS before the last step), the token cap and language routing. Upstream feeds the whole text for Custom and Design (non_streaming_mode=True). The maintainer chose to fast-track D1 for single takes before the freeze, with only the checks the change touches."
-    },
-    {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
@@ -1770,6 +1754,36 @@
       "updated": "2026-10-20",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-20 while building the macos auto-language lane: validate_receipt allows only [A-Za-z0-9._:-] up to 256 characters for runtimeProfileSignature, so all 22 real Mac receipts in the debug store failed it. scripts/auto_language_check.py checks that one field with its own pattern and passes the rest to validate_receipt. Other lanes that call validate_receipt on receipts carrying modelRuntimeIdentity likely share the gap. Parked without investigation under the focus lock: test tooling, not a release blocker."
+    },
+    {
+      "id": "BKL-22",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Benchmark history publishes runs armed with a runtime diagnostics override",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "benchmark_history.py record (or the publisher before it) refuses, or marks exploratory, a run whose engine rows name runtimeDebugProvenance.activeOverrideKeys, with a test over an armed row, and every lane that publishes is re-checked.",
+      "sourceOfTruth": [
+        "scripts/benchmark_history.py",
+        "scripts/publish_benchmark_history.py"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 running RF-20's Mac language bench with QWENVOICE_FULL_TEXT_CONDITIONING=on: nothing in the publishers reads activeOverrideKeys, so a passing armed run would have published as a production record. That run failed, so nothing was published. Parked without investigation under the focus lock: evidence tooling, not a release blocker."
+    },
+    {
+      "id": "BKL-23",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac language bench fails production on a single recognizer's language call",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A take both families transcribe accurately is not failed by one family's language identification alone (or the cell's expectation says why it should be), with a test over that case, and a production Mac language bench passes.",
+      "sourceOfTruth": [
+        "scripts/qc.py",
+        "config/language-bench-matrix.json"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 in RF-20's control run (mac-lang-bench-20261020-220248-067bb65c, production streaming text): custom-es-auto came out inconclusive because Whisper labelled a correct Spanish take English (word error rate 0.048; Qwen3-ASR heard Spanish at 0), which fails spoken content and the lane. Parked without investigation under the focus lock: no release gate runs this bench."
     },
     {
       "id": "ER-01",

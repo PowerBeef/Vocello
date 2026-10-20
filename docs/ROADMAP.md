@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 15/41 (37%) |
+| `release-first-3-0-2026-09` | active | release-qa | 16/41 (39%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/24 (54%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/26 (50%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -68,7 +68,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-20` | in-flight | Single streamed takes see the whole script, so a bad opening cannot strand the text | — |
 
 ### Open items in detail
 
@@ -152,9 +151,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
-
-- **`RF-20`** (in-flight, due 2026-10-22) — Single streamed takes see the whole script, so a bad opening cannot strand the text.
-  gate: Pre-registered 2026-10-20, before any result: a Mac machine screen with no listening. Streamed vocello CLI takes at Expressive with the Studio default delivery: the ten corpus short sentences in Built-in Voice with Aiden and Vivian, seeds 1-10 (200 takes per arm), and in Voice Design with one brief, seeds 1-5 (50 per arm), plus the 2026-10-20 failing take (French, Aiden, seed 9432062726036573763). Control is streaming text; the arm is full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on). A gross failure is a Fast QC rejection or a take longer than 2.5 times its sentence's control median. D1 is adopted for single (not long-form) streamed takes only if its gross failures are at most the control's, it recovers the failing take, each sentence's median duration stays within 25% of the control's, and a Mac language bench with D1 on passes spoken content and language on both ASR families; otherwise the defect stays a 3.0 known limitation that Fast QC rejects. Long-form segments keep streaming text (RF-18). On adoption: deterministic tests pin each path's text layout, and the Mac language lane and a Mac memory qualification are rerun; the iPhone proof is RF-15's acceptance of the candidate.
 
 ## Engine remediation programme (2026-10-16 audit)
 
@@ -547,6 +543,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
 | `BKL-20` | parked | A rebuilt prepared overlay trusts model weights that changed in place | — |
 | `BKL-21` | parked | The startup-reliability receipt validator rejects every real receipt's model signature | — |
+| `BKL-22` | parked | Benchmark history publishes runs armed with a runtime diagnostics override | — |
+| `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -583,6 +581,14 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-21`** (parked) — The startup-reliability receipt validator rejects every real receipt's model signature.
   gate: ios_startup_reliability.validate_receipt accepts a real v3 receipt's modelRuntimeIdentity.runtimeProfileSignature (it contains | and , and runs to about 250 characters), with a test over a real-shaped signature, and every lane that calls it is re-checked.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-22`** (parked) — Benchmark history publishes runs armed with a runtime diagnostics override.
+  gate: benchmark_history.py record (or the publisher before it) refuses, or marks exploratory, a run whose engine rows name runtimeDebugProvenance.activeOverrideKeys, with a test over an armed row, and every lane that publishes is re-checked.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-23`** (parked) — The Mac language bench fails production on a single recognizer's language call.
+  gate: A take both families transcribe accurately is not failed by one family's language identification alone (or the cell's expectation says why it should be), with a test over that case, and a production Mac language bench passes.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

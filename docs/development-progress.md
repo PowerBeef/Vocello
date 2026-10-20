@@ -50,6 +50,16 @@ test; #110 and #87 closed). The window's commits after it wait for the maintaine
   its language token, and the chip agrees, in all ten languages and in Design and Clone. Dutch, which
   Qwen3 does not speak, shows Auto: Built-in then sends English (D6, ER-05), Design sends no token.
   BKL-21 parks the receipt-validator gap the checker works around. An iPhone run waits for a window.
+  Manual selection followed (`aa0adfdd`, `64fbbbc9`): 22 of 22 takes pass
+  (`macos-xcui-auto-language-20261020-204002-f86c7a46`). A pinned language reaches the engine even
+  when the text is in another language, and returning to Auto follows detection again.
+- **RF-20 declined: full text up front (D1) not adopted for single takes.** The lane's French take
+  that whispered for 35 s had streamed its whole script during an opening sigh (A-01). The
+  pre-registered screen favored D1: 5 gross failures against 10 of 251 takes per arm, and the take
+  recovered. But the Mac language bench with D1 on garbled a Japanese take that streaming text speaks
+  correctly on the same seed (`mac-lang-bench-20261020-215933-4b3c7b82` against `…220248-067bb65c`).
+  The failure is a documented 3.0 known limitation (qwen3-tts-guide §11.2, v3.0.0 notes) that Fast
+  QC rejects. BKL-22 and BKL-23 park two language-bench tooling gaps.
 - **Next:**
   - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
     (BKL-19's Speech Recognition prompt).

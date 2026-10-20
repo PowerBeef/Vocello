@@ -527,7 +527,7 @@ How the target text reaches the talker is generation semantics. The token-level 
 - **Upstream defaults** `generate_custom_voice` and `generate_voice_design` to
   `non_streaming_mode=True`, the whole text up front (WM L642, L738), and streams only the audio.
   Vocello's non-streamed (quality-first) takes already use that layout; D1 would extend it to
-  streamed Custom and Design takes. **D1 was not adopted** (RF-18, §12).
+  streamed Custom and Design takes. **D1 was not adopted** (RF-18 and RF-20; §11.2, §12).
 - **ICL clones** use the non-streaming overlay (§8.1).
 
 ### 9.5 Seeds and reproducibility
@@ -610,7 +610,7 @@ updated for RF-18.
 | --- | --- | --- |
 | Missing EOS, run-on, noise | QwenLM#118 (~0.5% of Base runs never emit EOS), #305 (5 minutes of noise on a cross-lingual year), #258, #318; reproduced on official CUDA (VO#6158) | The 2,048-frame cap ends them as `maxTokens`. RF-18's runaway endings (the cap, or 10 s or more of terminal silence) ran only under Consistent: 3 in the control, 0 after the subtalker fix. VO#8569's budget and fresh-seed retry are ER-11 candidates |
 | Truncated last words | #55 (Japanese and Korean), #181 (last two words), QD#161; MA#882 (fixed by removing EOS re-insertion) | D2 adopted 2026-10-20; it changed no Expressive take (§11.2) |
-| Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (+16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; D1 not adopted; Consistent known limitation (§11.2) |
+| Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (+16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; D1 not adopted (RF-18, RF-20); Consistent and stranded-text known limitations (§11.2) |
 | ICL loops without EOS | MA#921: a transcript covering only part of the reference | Enrollment can accept a partial transcript (G-01, ER-04) |
 | Clone identity, accent leaks and echoes | #80 (~20% wrong speaker), #134 (source accent), #341 (echo of the reference tail), #119, #200 (onset noise or stray syllable), #219 (cold-decoder first-token distortion) | References end abruptly before the 0.5 s pad (G-07, the #341 trigger); streamed clones decode from a cold decoder (A-04); cross-language references are not flagged (G-16–21) |
 | Numbers across languages | #68, #151, #305, #256, #328, QD#330 | The planner does not pre-normalize numbers |
@@ -639,6 +639,18 @@ updated for RF-18.
   C1 and D2 shipped together; C2 did not. E0 and E4 were byte-identical on all 56 projects, so the
   effect is C1's. The first RF-18 screen had already rejected D1: pooled, D1-on failed 3 of 23 long
   segments and D1-off 2 of 27, all under Consistent.
+- **A short streamed take can strand its script (3.0 known limitation).** A streamed Built-in Voice
+  or Voice Design take feeds its text one token per codec frame (A-01). When a take opens with a
+  sigh or a long pause, the whole script can be fed before speech starts; the talker then sees only
+  `tts_pad` and whispers or mumbles until it stops or reaches the token cap. Fast QC rejects it when
+  the stall leaves a long silent gap, as on the 2026-10-20 French take (Aiden, 35 s), and a retry
+  draws a new take. RF-20's pre-registered screen (Mac CLI, Expressive, 251 takes per arm) counted
+  3 rejections and 7 takes past 2.5 times their sentence's median length with streaming text,
+  against 3 and 2 with the full text up front (D1); whether the 7 long takes stranded their text was
+  not checked. D1 still failed its rule: on the Mac language bench it garbled the end of a Japanese
+  take that streaming text speaks correctly on the same seed (character error rate 0.44 and 0.50
+  against 0.06 on the two ASR families), and its three Design rejections were 1.2–1.5 s of
+  trailing silence after a complete sentence.
 - **Clone references.** The gaps in §8.2 and §8.3, plus "Use audio only" on a saved voice with a
   transcript still conditions on that transcript (G-02).
 - **No human listening for 3.0.** Machine screens catch gross failures only; subtle defects ship as a
@@ -663,7 +675,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 
 | ID | Divergence | Upstream | Vocello | Status | Owner |
 | --- | --- | --- | --- | --- | --- |
-| D1 / A-01 | Text layout of streamed Custom and Design takes | whole text up front; audio streamed | one text token per frame, then `tts_pad` | **not adopted** by RF-18's screen; `QWENVOICE_FULL_TEXT_CONDITIONING=on` is the A/B arm | ER-03 |
+| D1 / A-01 | Text layout of streamed Custom and Design takes | whole text up front; audio streamed | one text token per frame, then `tts_pad` | **not adopted** by RF-18's or RF-20's screen (§11.2); `QWENVOICE_FULL_TEXT_CONDITIONING=on` is the A/B arm | ER-03 |
 | D2 | EOS after top-k/top-p | filtered like any token | filtered | **adopted** 2026-10-20; `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion | — |
 | D3 | Sampling precision | float32 logits | float32 logits | **adopted** 2026-10-13 | — |
 | — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every variation | **adopted** 2026-10-20 (RF-18's C1 arm) | — |

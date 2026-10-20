@@ -26,16 +26,17 @@ Repository scripts are the authoritative interface:
 ```sh
 scripts/dev.sh check                     # lint, contracts, selected tests, the native lanes the dirty tree touches
 ./scripts/regenerate_project.sh --fast   # after editing project.yml (never edit the .xcodeproj)
-scripts/dev.sh ci                        # exactly what push CI runs, serially
+scripts/dev.sh ci                        # every gate push CI runs, serially (no lane skipped by routing)
 ```
 
 `scripts/dev.sh check` is advisory: it routes the dirty tree into the Python, native and website lanes
 without scheduling model generation, UI acceptance or release operations. The commit lint is the only
 local block and CI on `main` is the gate. Use the [development workflow](docs/reference/development-workflow.md)
 for the single-lane commands and cache policy. State exactly what ran and any deferred acceptance in the pull request.
-`CI required` runs on every push to `main` (`ci.yml` has no pull-request lane), so a contribution from
-a fork gets its verdict when a maintainer pushes it to `main`; jobs skipped by path routing (for
-example docs-only changes) count as passing, and a red push is fixed forward or reverted.
+`CI required` runs on every push to `main` and on pull requests against `main`. A pull request runs
+only the Linux jobs (contracts, Python, website) with a read-only token and no secrets; the macOS
+lanes run when a maintainer pushes the change to `main`. Jobs skipped by path routing (for example
+docs-only changes) count as passing, and a red push is fixed forward or reverted.
 
 The Xcode project is generated from [`project.yml`](project.yml). Never edit `QwenVoice.xcodeproj/project.pbxproj` directly. Native output belongs under the paths declared by [`config/build-output-policy.json`](config/build-output-policy.json); do not add another DerivedData root or a `.build` directory inside vendored source.
 

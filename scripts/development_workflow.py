@@ -59,10 +59,18 @@ def _git(*args: str) -> bytes:
 # `check --since REF` exports this so the contract gate's Python selection (a
 # child process) plans for the same committed-plus-dirty path set.
 SINCE_ENV = "QVOICE_CHANGED_SINCE"
+# `check --paths` exports its paths here, so the contract gate (scripts/lib/contract_gate.py) and the
+# Python selection the gate runs plan for them instead of the whole dirty tree.
+PATHS_ENV = "QVOICE_CHANGED_PATHS"
 
 
 def changed_paths(since: str | None = None) -> list[str]:
-    """Dirty paths, plus every path changed between `since` (or $QVOICE_CHANGED_SINCE) and HEAD."""
+    """Dirty paths, plus every path changed between `since` (or $QVOICE_CHANGED_SINCE) and HEAD.
+
+    `$QVOICE_CHANGED_PATHS` (one path per line), set by `check --paths`, replaces the dirty tree."""
+    explicit = os.environ.get(PATHS_ENV)
+    if explicit is not None:
+        return sorted({line.strip().removeprefix("./") for line in explicit.splitlines() if line.strip()})
     since = since or os.environ.get(SINCE_ENV) or None
     queries = [("diff", "--name-only", "-z"), ("diff", "--cached", "--name-only", "-z"),
                ("ls-files", "--others", "--exclude-standard", "-z")]
@@ -72,6 +80,17 @@ def changed_paths(since: str | None = None) -> list[str]:
     for args in queries:
         paths.update(part.decode("utf-8", errors="surrogateescape") for part in _git(*args).split(b"\0") if part)
     return sorted(paths)
+
+
+def normalized_path(path: str) -> str:
+    """A repository-relative path, from a relative, `./` or absolute spelling inside the checkout."""
+    candidate = Path(path)
+    if candidate.is_absolute():
+        try:
+            return candidate.resolve().relative_to(ROOT.resolve()).as_posix()
+        except ValueError:
+            return path
+    return path.removeprefix("./")
 
 
 def _load(relative: str):
@@ -242,9 +261,13 @@ def changed_swift_test_classes(paths: list[str]) -> list[str]:
 
 # ---------------------------------------------------------------- command builders
 
-def lint_commands(paths: list[str]) -> list[list[str]]:
-    commands: list[list[str]] = [["git", "diff", "--check"]]
+def lint_commands(paths: list[str], *, scoped: bool = False) -> list[list[str]]:
+    """`scoped` (check --paths) limits `git diff --check` to the given paths too."""
     present = [p for p in paths if (ROOT / p).exists()]  # a committed range can include deletions
+    # Scoped, every given path stays in the pathspec (a deleted one matches nothing); an empty pathspec
+    # after `--` would check the whole tree.
+    commands: list[list[str]] = [["git", "diff", "--check", "--", *paths] if scoped and paths
+                                 else ["git", "diff", "--check"]]
     if present:
         commands.append(["python3", "scripts/privacy_scan.py", "--paths", *present])
     shell = [p for p in paths if p.endswith(".sh") and (ROOT / p).is_file()]
@@ -417,13 +440,13 @@ def project_generation_status(paths: list[str]) -> dict | None:
     return generation.status(ROOT)
 
 
-def check_plan(paths: list[str]) -> dict:
+def check_plan(paths: list[str], *, scoped: bool = False) -> dict:
     lanes = lanes_for(paths)
     commands: list[list[str]] = []
     generation = project_generation_status(paths)
     if generation and generation["needsRegeneration"]:
         commands.append(["./scripts/regenerate_project.sh", "--fast"])
-    commands.extend(lint_commands(paths))
+    commands.extend(lint_commands(paths, scoped=scoped))
     commands.append(["./scripts/check_project_inputs.sh", "--local"])
     if lanes["swift"]:
         # A swift lane that schedules nothing verifies nothing: fall back to the whole lane.
@@ -446,6 +469,11 @@ CI_COMMANDS: list[list[str]] = [
     # suite runs in the python job); locally one gate call covers both.
     ["./scripts/regenerate_project.sh", "--fast"],
     ["./scripts/check_project_inputs.sh"],
+    # The contracts job's lint gates: new findings against config/lint-baseline/ fail.
+    ["python3", "scripts/lint_baseline.py", "shellcheck"],
+    ["python3", "scripts/lint_baseline.py", "ruff"],
+    ["python3", "scripts/lint_baseline.py", "swiftlint"],
+    ["python3", "scripts/lint_baseline.py", "pyright"],
     ["scripts/macos_test.sh", "test"],
     ["scripts/macos_test.sh", "tsan"],
     ["./scripts/build.sh", "cli", "--version"],
@@ -560,7 +588,7 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="lint, contracts, selected tests and the native lanes the dirty tree touches")
     check.add_argument("--dry-run", action="store_true", help="print the commands without running them")
     check.add_argument("--json", action="store_true", help="emit structured planning data (requires --dry-run)")
-    check.add_argument("--paths", nargs="+", help="plan for these paths instead of the dirty tree")
+    check.add_argument("--paths", nargs="+", help="plan, lint and gate only these paths instead of the dirty tree")
     check.add_argument("--since", metavar="REF",
                        help="also plan for everything committed since REF (for example origin/main): "
                             "verifies an unpushed batch after its commits leave the tree clean")
@@ -579,7 +607,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("build", help="dev-signed macOS app build (for running, not verification)")
     sub.add_parser("run", help="build and launch the macOS app")
     sub.add_parser("regen", help="regenerate derived artifacts and stale project inputs or membership")
-    sub.add_parser("ci", help="exactly what push CI runs, serially")
+    sub.add_parser("ci", help="every gate push CI runs, serially (no lane skipped by routing)")
     status_parser = sub.add_parser("status", help="branch, dirty paths, lanes, primary plan")
     status_parser.add_argument("--kpi", action="store_true",
                                help="also print lane pass rates and failed-minute shares from the lane ledger")
@@ -610,7 +638,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.since:
                 _git("rev-parse", "--verify", "--quiet", f"{args.since}^{{commit}}")
                 os.environ[SINCE_ENV] = args.since
-            plan = check_plan(args.paths or changed_paths(args.since))
+            if args.paths:
+                args.paths = sorted({normalized_path(path) for path in args.paths})
+                os.environ[PATHS_ENV] = "\n".join(args.paths)
+            plan = check_plan(args.paths or changed_paths(args.since), scoped=bool(args.paths))
             if not plan["changedPaths"]:
                 hint = (f"clean tree and nothing committed since {args.since}: no lane to run" if args.since
                         else "clean tree: no lane to run; `check --since origin/main` plans for committed work")

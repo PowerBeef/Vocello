@@ -418,10 +418,38 @@ class CommandRunnerTests(unittest.TestCase):
             "./scripts/build_ui_test_bundles.sh all --gate",
         ):
             self.assertIn(expected, joined)
+        # Every lint gate the contracts job runs, so `dev.sh ci` fails where push CI would.
+        workflow = (MODULE.ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        gates = re.findall(r"run: (python3 scripts/lint_baseline\.py \w+)$", workflow, re.MULTILINE)
+        self.assertEqual(sorted(gates), ["python3 scripts/lint_baseline.py " + tool
+                                         for tool in ("pyright", "ruff", "shellcheck", "swiftlint")])
+        for gate in gates:
+            self.assertIn(gate, joined)
         # The gate compile reuses the arenas the deterministic builds warmed, so it follows them.
         self.assertGreater(joined.index("./scripts/build_ui_test_bundles.sh all --gate"),
                            joined.index("./scripts/build_foundation_targets.sh ios --incremental"))
         self.assertNotIn("checkpoint", " ".join(joined))
+
+    def test_paths_scope_the_gate_the_python_selection_and_the_whitespace_check(self) -> None:
+        # `check --paths` plans for the given paths only: the contract gate and the Python
+        # selection it runs read $QVOICE_CHANGED_PATHS, and `git diff --check` takes the paths.
+        environment = {k: v for k, v in MODULE.os.environ.items() if k not in (MODULE.SINCE_ENV, MODULE.PATHS_ENV)}
+        with mock.patch.dict(MODULE.os.environ, environment, clear=True), \
+                mock.patch.object(MODULE, "run_commands") as run, redirect_stderr(io.StringIO()):
+            self.assertEqual(MODULE.main(["check", "--paths", "README.md", "docs/reference/cli.md"]), 0)
+            self.assertEqual(MODULE.os.environ[MODULE.PATHS_ENV], "README.md\ndocs/reference/cli.md")
+            self.assertEqual(MODULE.changed_paths(), ["README.md", "docs/reference/cli.md"])
+        [commands] = run.call_args.args
+        self.assertEqual(commands[0], ["git", "diff", "--check", "--", "README.md", "docs/reference/cli.md"])
+        self.assertIn(["./scripts/check_project_inputs.sh", "--local"], commands)
+        # Without --paths the whole tree is checked, as before.
+        self.assertEqual(MODULE.lint_commands(["README.md"])[0], ["git", "diff", "--check"])
+        # A deleted or mistyped path stays in the pathspec: `git diff --check --` alone checks everything.
+        self.assertEqual(MODULE.lint_commands(["gone/deleted.md"], scoped=True)[0],
+                         ["git", "diff", "--check", "--", "gone/deleted.md"])
+        # ./ and absolute spellings inside the checkout plan as repository-relative paths.
+        self.assertEqual(MODULE.normalized_path("./README.md"), "README.md")
+        self.assertEqual(MODULE.normalized_path(str(MODULE.ROOT / "docs/reference/cli.md")), "docs/reference/cli.md")
 
     def test_since_adds_committed_paths_and_reaches_child_selection(self) -> None:
         # A batch verified after its commits: the tree is clean, but `--since`
@@ -432,7 +460,7 @@ class CommandRunnerTests(unittest.TestCase):
             ("ls-files", "--others", "--exclude-standard", "-z"): b"",
             ("diff", "--name-only", "-z", "base...HEAD"): b"Sources/iOS/A.swift\0scripts/roadmap.py\0",
         }
-        environment = {k: v for k, v in MODULE.os.environ.items() if k != MODULE.SINCE_ENV}
+        environment = {k: v for k, v in MODULE.os.environ.items() if k not in (MODULE.SINCE_ENV, MODULE.PATHS_ENV)}
         with mock.patch.object(MODULE, "_git", side_effect=lambda *args: responses[args]), \
                 mock.patch.dict(MODULE.os.environ, environment, clear=True):
             self.assertEqual(MODULE.changed_paths(), [])
@@ -445,7 +473,8 @@ class CommandRunnerTests(unittest.TestCase):
 
     def test_dry_run_prints_the_plan_without_running(self) -> None:
         buffer = io.StringIO()
-        with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer):
+        with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer), \
+                mock.patch.dict(MODULE.os.environ):
             self.assertEqual(MODULE.main(["check", "--dry-run", "--paths", "docs/reference/cli.md"]), 0)
         run.assert_not_called()
         self.assertIn("git diff --check", buffer.getvalue())
@@ -453,8 +482,9 @@ class CommandRunnerTests(unittest.TestCase):
 
     def test_json_dry_run_is_the_exact_executable_plan(self) -> None:
         buffer = io.StringIO()
-        expected = MODULE.check_plan(["docs/reference/cli.md"])
-        with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer):
+        expected = MODULE.check_plan(["docs/reference/cli.md"], scoped=True)
+        with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer), \
+                mock.patch.dict(MODULE.os.environ):
             self.assertEqual(MODULE.main(["check", "--dry-run", "--json", "--paths", "docs/reference/cli.md"]), 0)
         run.assert_not_called()
         self.assertEqual(json.loads(buffer.getvalue()), expected)

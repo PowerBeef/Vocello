@@ -20,7 +20,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 ## How verification is organised
 
 - `scripts/dev.sh check` is the local loop; nothing local blocks a commit except the commit lint. CI on
-  `main` is the gate. `scripts/dev.sh ci` reproduces it serially.
+  `main` is the gate. `scripts/dev.sh ci` runs every gate it runs, serially, without routing.
 - `./scripts/check_project_inputs.sh` is the deterministic contract gate: product contracts,
   `scripts/repo_invariants.sh` (exact greps for product invariants), `scripts/privacy_scan.py`, the
   roadmap validator and the Python suite (`pytest -n auto`, on Linux and macOS alike; the `research`

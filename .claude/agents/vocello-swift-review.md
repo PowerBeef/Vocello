@@ -19,7 +19,14 @@ Check, and cite the rule for each finding:
 2. Concurrency: every new `@unchecked Sendable` or `nonisolated(unsafe)` is registered in
    `config/concurrency-safety.json`; no MLX array crosses an isolation boundary; actor-owned
    reservations and typed cancellation barriers hold, and every acquired slot or reservation is
-   released on every throw (prewarm pairing).
+   released on every throw (prewarm pairing). With NonisolatedNonsendingByDefault on, new
+   `nonisolated async` work that must leave the caller's actor is `@concurrent` (with an explicit
+   `async` on closures); with InferIsolatedConformances on, an Objective-C delegate conformance a
+   framework calls off the main actor is written `nonisolated`.
+   Strict memory safety: new unsafe constructs are marked `unsafe`, using the toolchain-neutral
+   forwards (`ToolchainNeutralUnsafeAccess.swift`) where Swift 6.4 and CI's 6.3 disagree. A new
+   `@preconcurrency import` carries `@unsafe` and is justified. With MemberImportVisibility on, a file
+   imports every module whose members it uses.
 3. MLX facade: product targets import only `VocelloQwen3Core`, never `MLXAudio*` implementation
    modules; request-local sampling and memory; exact pins unchanged unless the change is a declared bump.
 4. Lifecycle and audio: one actor-owned lifecycle, serialized prewarm, frame-bounded suspending audio;

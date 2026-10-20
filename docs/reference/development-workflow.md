@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-12
+reviewed: 2026-10-20
 summary: The local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -26,7 +26,7 @@ scripts/dev.sh py                    # Python consumers of the changed tooling (
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
 scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts, attributions
-scripts/dev.sh ci                    # what push CI runs, serially, when you want the push green first time
+scripts/dev.sh ci                    # every gate push CI runs, serially, when you want the push green first time
 git add <assigned-files>
 git commit
 git push  # only after an explicit request
@@ -169,7 +169,7 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | Job | Runner | Runs when | Warm / cold |
 | --- | --- | --- | --- |
 | `changes` | ubuntu | always | seconds |
-| `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
+| `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history), then the shellcheck, ruff, SwiftLint and Pyright gates, each failing on findings absent from `config/lint-baseline/` (`scripts/lint_baseline.py`) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
 | `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, build configs, the lane's own scripts and the `scripts/` modules their Python imports; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
 | `macos-tsan` | macos-26 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
@@ -193,7 +193,7 @@ triggers no new run), would cost more than the one command. Concurrency is keyed
 and the ref, so a newer push cancels the previous push run, a PR update cancels only that PR's run,
 and a manual measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci` replays that job
 graph serially: project regeneration, the complete `check_project_inputs.sh` (the Linux `contracts`
-job runs it with `--python none`), `scripts/macos_test.sh test`, `scripts/macos_test.sh tsan`, the
+job runs it with `--python none`), the four `lint_baseline.py` gates, `scripts/macos_test.sh test`, `scripts/macos_test.sh tsan`, the
 CLI version identity, `build_foundation_targets.sh ios --incremental`, `build_ui_test_bundles.sh all
 --gate`, the website supply-chain
 check and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it
@@ -214,7 +214,9 @@ UTC and on dispatch) runs a cold pass of the TSan subset (`tsan`), the complete 
 macOS app optimized with warnings as errors); a failure keeps one open issue labelled `nightly`,
 titled "Nightly lane failing", commenting on it rather than filing a second
 (`scripts/ci/failure_issue.py`). Its report-only jobs file no issue and gate nothing: `coverage`,
-`migration-warnings` and `dead-code`, where `scripts/dead_code_report.sh` compiles the macOS app,
+`migration-warnings`, `shipped-config` (`scripts/macos_test.sh test --shipped-config`: owned code
+`-O` whole-module, the runtime package in release with TF32 on) and `dead-code`, where
+`scripts/dead_code_report.sh` compiles the macOS app,
 the CLI and the iOS app into one scratch root with the index store kept (`QVOICE_INDEX_STORE=1`),
 runs the pinned Periphery over all three schemes and keeps owned code only, and
 `scripts/ci/periphery_report.py` summarizes the findings. `release-rehearsal.yml` runs weekly, on
@@ -382,8 +384,8 @@ External writes include GitHub, the Vercel CLI and App Store Connect. On Hugging
 
 `deny` covers force and non-main pushes, hand-made branches and worktrees, `update-ref`, stashing,
 broad staging, releases, `.xcodeproj` edits and `hf auth token`, which prints the stored credential. It
-also covers unsupported-destination and UI-driving MCP tools (by wildcard, so no literal tool name
-enters the tree) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
+also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, a dozen
+MobileBuildMCP UI tools by name) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
 wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
 overrides and cannot lift a tracked deny.
 
@@ -423,8 +425,9 @@ unavailable. Without restarting the interactive session (for example when workin
 from the repository root exercises the same SessionStart and SessionEnd hooks in a fresh session; its
 init message lists the tools, agents and skills it received. The 2026-10-12 migration session already observed settings applying live, the wildcard
 deny rules removing those MCP tools and the three Axiom simulator/test agents, the tooling rule loading
-through its symlink, and a denied `git add -A` being refused; SessionStart, worker receipts and
-SubagentStart/Stop still need the fresh-session check.
+through its symlink, and a denied `git add -A` being refused. SessionStart, worker receipts and
+SubagentStart/Stop have since been observed in live sessions (a subagent receives the SubagentStart
+context from `worker_lifecycle.py`).
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
@@ -439,7 +442,7 @@ SubagentStart/Stop still need the fresh-session check.
 | Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
 | Model research | Receipts, exact pins and maintenance contracts | The `hf` CLI and the `hf-mcp-server` MCP for hub search, cards, file sizes, licenses and papers; downloads, Space runs and Jobs need a specific request; no implied repin |
-| Audio quality | `scripts/qc.py`, labels and the maintainer's ear (`docs/reference/qc.md`) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
+| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.0 (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
 | Code navigation | Source, tests and the reference rules | swift-lsp (clangd-lsp for C) through the LSP tool when a symbol server is configured (development-setup.md) |
 | Claude Code configuration | Tracked `.claude/`, `CLAUDE.md` and `scripts/tests/test_agent_hooks.py` | skill-creator for project skills; claude-md-management for `CLAUDE.md` upkeep; `/update-config` for settings |
 

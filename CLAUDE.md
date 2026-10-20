@@ -42,7 +42,9 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
 
 ## Architecture
 
-- **Targets** (`project.yml`, Release only, macOS/iOS 26.0, Swift 6, warnings as errors):
+- **Targets** (`project.yml`, Release only, macOS/iOS 26.0, Swift 6, warnings as errors except the iOS
+  UI-test bundle; strict memory safety, NonisolatedNonsendingByDefault, InferIsolatedConformances and
+  MemberImportVisibility on):
   `QwenVoice` (macOS app `Vocello.app`), `VocelloiOS` (module `QVoiceiOS`), `VocelloCLI` (`vocello`),
   static frameworks `QwenVoiceCore` (product engine), `QwenVoiceBackendCore` (provenance/policy
   vocabulary) and `VocelloCLICore` (the CLI's runtime and parsing, which the tests import instead of
@@ -61,8 +63,8 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
   `MLXTTSEngine` directly.
 - **Owned package** `Packages/VocelloQwen3Core` (SwiftPM name `MLXAudio`): a Qwen3-TTS-only fork. App code
   imports only the `VocelloQwen3Core` facade; `FACADE_API_BASELINE.json` and
-  `scripts/qwen3_core_contract.py` enforce it. mlx-swift, mlx-swift-lm and swift-transformers pins are
-  exact and move together only with authorization and benchmark review.
+  `scripts/qwen3_core_contract.py` enforce it. mlx-swift, mlx-swift-lm, swift-transformers and
+  swift-huggingface pins are exact and move together only with authorization and benchmark review.
 - **Model delivery:** `Sources/Resources/qwenvoice_contract.json` (models, speakers) and the generated
   production catalog (from `config/model-artifact-receipts.json`) carry exact sizes and SHA-256 digests.
   Hosts download, verify, then atomically activate complete artifacts; never infer checksums.
@@ -82,7 +84,7 @@ scripts/dev.sh status
 scripts/dev.sh check --dry-run --json # the routed plan check would run
 scripts/dev.sh check                  # lint, contracts, selected tests, touched native lanes
 scripts/dev.sh check --since <ref>    # also everything committed since <ref>
-scripts/dev.sh check --paths <p...>   # only assigned paths when unrelated dirty work must wait
+scripts/dev.sh check --paths <p...>   # plan, lint and gate only these paths while unrelated dirty work waits
 scripts/dev.sh test --only Class      # targeted XCTest; Class/testMethod and A,B also work; --repeat N hunts flakes
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
 "$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
@@ -122,10 +124,13 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   the Agent tool with `isolation: "worktree"` (`.claude/worktrees/<name>` on `worktree-<name>`, based on
   local HEAD; commit the checkpoint first because uncommitted files do not carry over). Give each a
   disjoint file set. Agents commit only on their branch, never push, never run native builds, devices,
-  models or measured lanes, and never edit the roadmap or checkpoint; `agent_guard.py` enforces this
-  for every call that carries an `agent_id`. The lead integrates with
+  models or measured lanes, and never edit the roadmap or checkpoint. `agent_guard.py` screens every
+  call that carries an `agent_id`: edit tools, `roadmap.py`'s writing verbs, and recognisable shell
+  or inline-script writes to those files. It is a guardrail, not a sandbox. The lead integrates with
   `git cherry-pick` or `git merge --ff-only`, validates warm on `main`, then runs `git worktree remove
-  .claude/worktrees/<name>` and `git branch -d worktree-<name>`. Never discard unintegrated work.
+  .claude/worktrees/<name>` and deletes the branch. A cherry-picked branch is never merged, so
+  `git branch -d` refuses it. When `git cherry main worktree-<name>` prints only `-` lines,
+  `git branch -D` loses nothing. Never discard unintegrated work.
 - **Native execution:** every Xcode/SwiftPM build and test goes through the repository scripts and the
   host-wide native lock and owned caches. Join or stop agents before measurements.
 - **Physical iPhone only:** generic iOS compilation is phone-free; Simulator routes are unsupported.

@@ -31,7 +31,7 @@ usage: scripts/dev.sh <command>
   check [--dry-run [--json]] [--paths P...] [--since REF]
                            lint, contracts, selected tests, native lanes the dirty tree touches
                            (--since: also everything committed since REF, e.g. origin/main)
-  lint                     git diff --check, privacy scan, shellcheck on changed shell
+  lint                     git diff --check, privacy scan, shellcheck and SwiftLint on changed files
   contracts                product and repository contracts
   py [--all | --lane product|research | tests...]
                            Python tests via pytest (changed consumers by default)
@@ -40,7 +40,7 @@ usage: scripts/dev.sh <command>
   ios                      generic device-SDK compile (incremental)
   build | run              dev-signed macOS app build / launch
   regen                    regenerate derived artifacts
-  ci                       exactly what push CI runs, serially
+  ci                       every gate push CI runs, serially
   status                   branch, dirty paths, lanes, primary plan
   doctor [--json]          read-only prerequisites and optional capabilities
   triage RUN [--json]      summarize retained evidence without rerunning

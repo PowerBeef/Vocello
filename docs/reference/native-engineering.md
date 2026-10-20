@@ -164,8 +164,20 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 
 ## Build hygiene
 
-- **Warnings are errors** for every owned target (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`); the
-  owned MLX package keeps its own settings. Fix the warning, do not silence it with a pragma.
+- **Warnings are errors** for every owned target except the iOS UI-test bundle
+  (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`); the owned MLX package keeps its own settings.
+  Fix the warning; don't silence it with a pragma. The iOS UI-test bundle compiles with warnings
+  tolerated, so check its log for new ones.
+- **Strict memory safety is on** (`SWIFT_STRICT_MEMORY_SAFETY`):
+  - Mark every unsafe construct with `unsafe`.
+  - A `@preconcurrency import` needs `@unsafe` as well.
+  - Swift 6.4 marks five buffer and pointer calls `@safe` that CI's Swift 6.3 does not. For those,
+    use the toolchain-neutral forwards in
+    `Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift` (`withBufferPointer`,
+    `withValueBytes(of:)` and the rest), so the code compiles on both without an `unsafe` the newer
+    compiler rejects.
+- **MemberImportVisibility is on:** import every module whose members a file uses; a transitive import
+  no longer makes them visible.
 - **Flaky tests are quarantined, not deleted or retried.** List the test in `config/test-quarantine.json`
   and call `try TestQuarantine.skipIfListed(self)`; push CI skips it, nightly still runs it, and the entry
   expires after 30 days.

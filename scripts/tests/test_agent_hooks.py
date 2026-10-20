@@ -116,6 +116,19 @@ AGENT_REFUSED = (
     "source scripts/ios_device.sh help; build", ". ./scripts/macos_test.sh help", "source scripts/dev.sh help",
     'source "$PWD/scripts/ui_test.sh" --help', "bash -c 'source scripts/lib/build_cache.sh; xcb_run build'",
     ". scripts/lib/dev_signing.sh", "xcb_run build -scheme QwenVoice",
+    # The roadmap and checkpoint are the lead's: roadmap.py's writing verbs, shell writes, inline scripts.
+    "python3 scripts/roadmap.py set RF-09 --status done", "python3 scripts/roadmap.py note DW-04 x",
+    "python3 scripts/roadmap.py close X --status done", "python3 scripts/roadmap.py render",
+    "sed -i '' 's/a/b/' config/roadmap.json", "echo x > docs/development-progress.md",
+    "echo x >> config/roadmap.json", "printf x >config/roadmap-archive.json", "cat a | tee docs/ROADMAP.md",
+    "cp /tmp/a config/roadmap.json", "mv x.json ./config/roadmap.json", "perl -pi -e 's/a/b/' config/roadmap.json",
+    "python3 -c \"open('config/roadmap.json','w').write('x')\"",
+    "python3 - <<'EOF'\nimport pathlib\npathlib.Path('config/roadmap.json').write_text('x')\nEOF\n",
+    "bash -c \"echo x > config/roadmap.json\"", "bash -lc 'echo x >> docs/development-progress.md'",
+    "bash <<'EOF'\necho x > config/roadmap.json\nEOF\n", "echo x >| config/roadmap.json",
+    "dd if=/tmp/a of=config/roadmap.json", "python3 scripts/roadmap.py --root . set RF-09 --status done",
+    '"$(python3 scripts/select_python.py)" -c "open(\'config/roadmap.json\',\'w\').write(\'x\')"',
+    "node -e \"require('fs').writeFileSync('config/roadmap.json','x')\"",
 )
 AGENT_ALLOWED = (
     "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
@@ -133,6 +146,15 @@ AGENT_ALLOWED = (
     "scripts/dead_code_report.sh help", "./scripts/dead_code_report.sh --help",
     "xcodebuild -version", "/usr/bin/xcodebuild -version", "xcrun xcodebuild -version",
     "xcodebuild -version -sdk iphoneos", "xcodebuild -showsdks", "xcodebuild -showsdks -json",
+    # Reading the roadmap stays open, and so do roadmap.py's read-only verbs and dry runs.
+    "python3 scripts/roadmap.py validate", "python3 scripts/roadmap.py status", "python3 scripts/roadmap.py render --check",
+    "python3 scripts/roadmap.py set RF-09 --status done --dry-run", "cat config/roadmap.json",
+    "grep -n DW config/roadmap.json", "git log -p -- config/roadmap.json", "cp config/roadmap.json /tmp/copy.json",
+    "python3 -c \"import json; print(json.load(open('config/roadmap.json'))['focusLock'])\"",
+    "sed -n 1,20p docs/development-progress.md", "dd if=config/roadmap.json of=/tmp/x",
+    "python3 scripts/roadmap.py set --help",
+    "python3 -c \"import json,sys; json.dump(json.load(open('config/roadmap.json'))['focusLock'], sys.stdout)\"",
+    "python3 -c \"import sys,json; d=json.load(open('config/roadmap.json')); sys.stdout.write(str(len(d)))\"",
     "source .venv/bin/activate", ". website/scripts/env.sh", "cat scripts/lib/build_cache.sh",
 )
 SIMULATOR_REFUSED = (

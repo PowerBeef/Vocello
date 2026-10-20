@@ -5,7 +5,9 @@ Only a subagent's hook input carries `agent_id`; the lead's never does, so lead 
 pass straight through. A subagent may read, edit its assigned files, run the
 deterministic Python and lint checks and commit in its own worktree. It never pushes,
 commits in the main checkout, runs native builds, tests, devices, models or measured
-lanes, or edits the roadmap or the checkpoint; the lane scripts' usage text and the
+lanes, or edits the roadmap or the checkpoint (through an edit tool, `roadmap.py`'s writing
+verbs, or a recognisable shell or inline-script write: a guardrail, not a sandbox); the lane
+scripts' usage text and the
 reporting `xcodebuild -version` and `-showsdks` stay open (`-list` can resolve
 packages), but sourcing a lane script or a `scripts/lib` library does not: it leaves
 the lane's functions callable by bare name. Exit 2 with the reason on stderr blocks the call. Parser defects fail open,
@@ -26,7 +28,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agent_hook_input as adapter  # noqa: E402
 import git_commands  # noqa: E402
 
-PROTECTED_FILES = {"config/roadmap.json", "docs/development-progress.md"}
+PROTECTED_FILES = {"config/roadmap.json", "config/roadmap-archive.json", "docs/ROADMAP.md",
+                   "docs/development-progress.md"}
+# `roadmap.py` verbs that write the roadmap (all of them take --dry-run; `render --check` only reads).
+ROADMAP_WRITE_VERBS = {"set", "note", "close", "render"}
+# Shell commands that write their file operands (`sed`/`perl` only with -i); for the copiers only the
+# destination, the last operand, is written.
+WRITERS = {"tee", "truncate", "touch", "rm", "unlink", "sponge"}
+COPIERS = {"cp", "mv", "install", "rsync", "ln", "ditto"}
+IN_PLACE = {"sed", "perl", "gsed"}
+INTERPRETERS = re.compile(r"(^|[\s/(\"'`])(python(3(\.\d+)?)?|node|ruby|perl)([\s)\"'`]|$)")
+# Write calls in an inline script; writes to stdout or stderr are reads' output, not writes.
+SCRIPT_WRITE = re.compile(r"write_text|write_bytes|(?<!stdout)(?<!stderr)\.write\(|json\.dump\((?!.{0,200}sys\.std)|"
+                          r"os\.replace|os\.rename|shutil\.(copy\w*|move)|unlink\(|"
+                          r"open\([^)]*['\"][wax]\+?b?['\"]|(writeFile|appendFile)(Sync)?\(|File\.write")
 # Repository scripts that build, test, drive devices or run models or measured lanes.
 LANE_SCRIPTS = {"macos_test.sh", "ui_test.sh", "ios_device.sh", "build.sh", "build_foundation_targets.sh",
                 "build_ui_test_bundles.sh", "dead_code_report.sh", "release.sh", "create_dmg.sh",
@@ -123,6 +138,10 @@ def command_violation(command: str, depth: int = 0) -> str:
             return f"`{script}` builds, tests, drives devices or runs models or measured lanes"
         if script == "dev.sh" and (verb in DEV_NATIVE_VERBS or (verb == "check" and "--dry-run" not in args)):
             return f"`scripts/dev.sh {verb}` can run native builds or tests"
+        roadmap_verb = next((word for word in operands if word in ROADMAP_WRITE_VERBS), "")
+        if (script == "roadmap.py" and roadmap_verb and "--dry-run" not in args and not HELP_WORDS & set(args)
+                and not (roadmap_verb == "render" and "--check" in args)):
+            return f"`roadmap.py {roadmap_verb}` writes the roadmap; the lead owns the roadmap and checkpoint"
         if script == "qc.py" and verb in QC_MODEL_VERBS:
             return f"`scripts/qc.py {verb}` runs scoring models"
         if name == "xcodebuild" and not _xcodebuild_reports_only(args):
@@ -139,6 +158,73 @@ def command_violation(command: str, depth: int = 0) -> str:
             return f"`swift {verb}` is a native build or test"
         if name == "vocello" and (verb in CLI_MODEL_VERBS or operands[:2] == ["models", "install"]):
             return f"`vocello {' '.join(operands[:2]) if verb == 'models' else verb}` loads or downloads models"
+    return ""
+
+
+def _protected(word: str) -> str:
+    """The protected file a word names (relative, `./`, absolute or inside a worktree), else ''."""
+    word = word.strip("'\"")
+    for name in PROTECTED_FILES:
+        if word == name or word.endswith("/" + name):
+            return name
+    return ""
+
+
+def roadmap_write_violation(command: str, depth: int = 0) -> str:
+    """Why this shell text writes the roadmap or the checkpoint, else ''.
+
+    A guardrail for honest mistakes, not a sandbox: it reads shell redirections, the usual file
+    writers, `sed -i`/`perl -i`, nested `bash -c` and shell heredocs, and inline scripts that name a
+    protected file beside a write call (so such a script that writes a report elsewhere is refused
+    too; run it as a file)."""
+    if depth > 3:
+        return ""
+    stripped, bodies = adapter.shell_fed_bodies(command)
+    for body in bodies:
+        reason = roadmap_write_violation(body, depth + 1)
+        if reason:
+            return reason
+    named = sorted(name for name in PROTECTED_FILES
+                   if re.search(r"(^|[\s'\"/=(])" + re.escape(name) + r"($|[\s'\",;)|&<>])", command))
+    if named and INTERPRETERS.search(command) and SCRIPT_WRITE.search(command):
+        return f"an inline script writes `{named[0]}`"
+    for words in adapter._simple_commands(stripped):
+        while words and (words[0].rsplit("/", 1)[-1] in adapter.WRAPPERS | git_commands.TRANSPARENT_PREFIXES
+                         or git_commands.ASSIGNMENT.match(words[0])):
+            words = words[1:]
+        if not words:
+            continue
+        name = words[0].rsplit("/", 1)[-1]
+        if name in git_commands.SHELLS:
+            flags = [index for index, word in enumerate(words[1:], 1)
+                     if word.startswith("-") and not word.startswith("--") and "c" in word]
+            if flags and flags[0] + 1 < len(words):
+                reason = roadmap_write_violation(words[flags[0] + 1], depth + 1)
+                if reason:
+                    return reason
+                continue
+        for index, word in enumerate(words):
+            target = ""
+            if re.match(r"^[0-9&]*>[>|]?$", word) and index + 1 < len(words):
+                target = _protected(words[index + 1])
+            elif re.match(r"^[0-9&]*>[>|]?.", word):
+                target = _protected(re.sub(r"^[0-9&]*>[>|]?", "", word))
+            if target:
+                return f"a redirection writes `{target}`"
+        operands = [word for word in git_commands._without_redirections(words[1:]) if not word.startswith("-")]
+        if name == "dd":
+            targets = [word[3:] for word in words[1:] if word.startswith("of=")]
+        elif name in WRITERS:
+            targets = operands
+        elif name in COPIERS:
+            targets = operands[-1:]
+        elif name in IN_PLACE and any(word.startswith("-") and "i" in word.lstrip("-")[:3] for word in words[1:]):
+            targets = operands
+        else:
+            continue
+        for word in targets:
+            if _protected(word):
+                return f"`{name}` writes `{_protected(word)}`"
     return ""
 
 
@@ -189,7 +275,8 @@ def main() -> int:
             command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
             if not isinstance(command, str):
                 return 0
-            reason = git_violation(command, cwd if cwd.is_absolute() else root) or command_violation(command)
+            reason = (git_violation(command, cwd if cwd.is_absolute() else root) or command_violation(command)
+                      or roadmap_write_violation(command))
         elif payload.get("tool_name") in adapter.EDIT_PATH_KEYS:
             reason = edit_violation(payload, root)
         else:

@@ -21,7 +21,7 @@ struct NativeClonePromptCreationContract: Equatable, Sendable {
     }
 }
 
-struct ResolvedCloneConditioning: @unchecked Sendable {
+struct ResolvedCloneConditioning: Sendable {
     let uiIdentity: GenerationSemantics.CloneReferenceIdentity
     let internalIdentity: GenerationSemantics.CloneReferenceIdentity
     let normalizedReference: AudioNormalizationResult

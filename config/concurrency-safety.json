@@ -3,7 +3,7 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 28,
+    "maximumUncheckedSendableDeclarations": 27,
     "maximumNonisolatedUnsafeDeclarations": 2,
     "reviewCadenceDays": 365
   },
@@ -85,20 +85,6 @@
       "removalCondition": "Remove when AudioToolbox exposes a Sendable callback context or conversion input can be provided without a mutable cross-callback reference box.",
       "tests": [
         "Tests/VocelloCoreTests/AtomicWAVPublicationTests.swift"
-      ]
-    },
-    {
-      "id": "clone-conditioning",
-      "source": "Sources/QwenVoiceCore/NativeCloneSupport.swift",
-      "types": [
-        "ResolvedCloneConditioning"
-      ],
-      "owner": "NativePreparedCloneConditioningCache actor",
-      "invariant": "MLX arrays remain actor-confined and are never concurrently mutated outside the active generation owner.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove when clone conditioning no longer carries MLXArray across the actor boundary or MLX provides checked Sendable immutable tensor handles.",
-      "tests": [
-        "Tests/VocelloCoreTests/CloneConditioningContractTests.swift"
       ]
     },
     {

@@ -17,7 +17,40 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
+### October 20 — iPhone window: BG-01 and RF-18 close; CONV-21's iPhone half passes (resume here)
+
+`main` is pushed through `5c0b5203` (PR #110's zsh completion with its missing flags and a drift
+test; #110 and #87 closed). The window's commits after it wait for the maintainer's push request.
+
+- **iPhone window (iPhone 17 Pro, iOS 27.0.1, the adopted engine and the MLX refresh):**
+  - **RF-18 closed:** `smoke --scenario long-form` passed (`ios-xcui-smoke-20261020-160313-80e6aba4`).
+    The first attempt finished the project, then failed at History search when notifications
+    interrupted the phone (`…153705-0a3bf3f5`, kept).
+  - **BG-01 closed:** `background-warmup` passed with a clean crash delta (`…161737-a54444f8`).
+  - **CONV-21, iPhone half done:**
+    - The full iPhone smoke passed (`…162655-207aa53e`), the first full pass in 30 days.
+    - The memory qualification passed: 60 MB maximum retained growth, 0.5% of RAM
+      (`ios-memory-qualification-20261020-175216-613bb02a`, record `bf9d0da2`).
+    - The first take after launch reached audio 0.61 s after load, so no gemv compile stall
+      (`ios-engine-20261020-175501-9d08fde9`, record `3bff8143`).
+  - These lanes ran the app with the Observation migration and the strictness settings in place.
+- **Defects the window found, all fixed and tested:**
+  - Saved-voice Clone failed on the iPhone once a voice's artifact identity changed, as the MLX
+    refresh does (`6a2a29f6`, reviewed). Publication compared `standardizedFileURL` spellings,
+    which drop `/private` only from existing paths, and iOS spells the App Group `/private/var`.
+    A refused publication now skips the cache instead of failing the take.
+  - The device-diagnostics build failed under strict memory safety (`c368d7df`).
+  - Device lanes read another run's engine rows from the pulled mirror (`bd494cb7`) and counted
+    Xcode 27's simulated iPhone (`f1698bd8`); the doctor's "multiple devices" error is gone.
+  - `scripts/ui_test.sh ios take-variation` restores Take variation through Settings, and session
+    cleanup closes a History search keyboard first (`d549d45c`). The phone is back on Consistent.
+- **Next:**
+  - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
+    (BKL-19's Speech Recognition prompt).
+  - RF-15 and the items behind it run on the processed TestFlight candidate after the freeze.
+  - DW-02 and P1-15's `ios_device.sh` shared library stay deferred until after the submission.
+
+### October 19 — the strictness settings are on; P2-5's seam suites land
 
 `main` is pushed through the documentation consolidation. Push CI is green on Xcode 26.6.
 
@@ -175,35 +208,3 @@ On local `main`, not pushed (pushes wait for the maintainer's request).
      one-time Metal compile, F-05).
 - **Freeze day:** a Security run on the exact freeze commit (the weekly run is on Tuesdays, so a
   dispatch on request), ASR-08's manual build-24 check, the push, and `focusLock.freeze`.
-
-### October 16, night — RF-19 closes; BG-01, the MLX refresh and the model research land on the Mac
-
-All on local `main`, not pushed (pushes wait for the maintainer's request). The iPhone stayed
-unavailable and no Mac XCUITest ran.
-
-- **RF-19 closed on the Mac:** the four install fixes (NET-3, E-02, NET-1, E-01) plus a review
-  follow-up (a Retry checks space only for the bytes it still needs; a stale artifact's staging is
-  discarded; the unexpected-stop row is localized). Device proof: RF-15's onboarding and download
-  row. The integrated agent branch `worktree-agent-a3e1e1ebe4bc3aef0` remains; deleting it needs
-  `git branch -D`, the maintainer's call.
-- **RF-18 decided:** the pre-registered Mac screen does not adopt full-text conditioning (D1): D1-on
-  failed 3 of 23 long segments, D1-off 2 of 27, all under Consistent, Expressive clean, Fast QC
-  refused them all. The Consistent stall is a 3.0 known limitation in the release notes; the
-  long-form smoke now pins Expressive and runs alone (`ui_test.sh ios smoke --scenario long-form`).
-  For the maintainer: C-02 (shorter segments) and the subtalker hypothesis on ER-05.
-- **BG-01's hardening landed** with tests: the foreground permit (also when the engine starts in
-  the background), cancellation of the clone prime and the chained prompt prebuilds, a check before
-  marking, MLX error scopes on clone adoption, persistence and replay, the CPU finite check and the
-  evaluated ICL encode. Left: `background-warmup` on the iPhone.
-- **CONV-21 landed:** mlx-swift 0.32.3, mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and
-  swift-huggingface 1.0.0 with their prerequisites. A same-host A/B kept RTF, memory and audio QC
-  unchanged; the warm first chunk rose 146 → 155 ms, and the first cold run paid a one-time Metal
-  compile, so prewarm now also runs the production sampler. Gate baseline re-pooled, memory
-  qualification, a 336-take qc-takes screen and `dev.sh ci` (TSan included) pass; seeds changed
-  (release note). Left: the Mac smoke lanes and the iPhone checks.
-- **ER-13:** the sourced research report
-  ([`2026-10-17-qwen3-tts-model-research.md`](audits/2026-10-17-qwen3-tts-model-research.md)) and
-  docs pass 1, which corrected the wrong model facts in the guides. Pass 2 follows the freeze
-  decisions.
-- **Queued for the next iPhone window:** the full smoke, `--scenario long-form`, `background-warmup`,
-  an iPhone memory benchmark on the new MLX, and the first take after the update (one-time compile).

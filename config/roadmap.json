@@ -179,8 +179,8 @@
         "project.yml",
         "scripts/macos_test.sh"
       ],
-      "notes": "Opened 2026-09-15 when the Mac moved to macOS 27 / Xcode 27 and the iPhone to iOS 27; deployment targets stay 26 and CI stays on Xcode 26.6 until the runners offer 27. Re-homed into the release plan on 2026-10-16 (engine audit DEP-1, DEP-2, F-01 to F-20). Landed 2026-10-16: the prerequisites (F-03, F-06, F-11, F-20) and the repin (57196483). Same-host A/B of three seeded gate runs per side (20496dc4): RTF, MLX peak and audio QC unchanged; warm first chunk 146 → 155 ms (F-04); prewarm now also runs the production sampler (bf19e2c6, F-05). Gate baseline re-pooled; memory qualification passes (mac-memory-qualification-20261017-011445-7c69c6e2); 336 en/fr qc-takes had no Fast QC rejection. 2026-10-20 on d54bb6f7 (with RF-18's adoption): Mac smoke --scenario long-form (macos-xcui-smoke-20261020-040647-1c5c7528) and long-form-recovery (macos-xcui-smoke-20261020-041251-ffbf3dfe) pass. Left: the full Mac smoke, attended (BKL-19's Speech Recognition prompt), and the iPhone smoke, background-warmup, memory benchmark and first-take compile check in the next announced window.",
-      "updated": "2026-10-16",
+      "notes": "Opened 2026-09-15 (Mac on macOS 27 / Xcode 27, iPhone on iOS 27; targets stay 26, CI on Xcode 26.6). Re-homed into the release plan 2026-10-16 (engine audit DEP-1, DEP-2, F-01 to F-20). Landed 2026-10-16: the prerequisites and the repin (57196483); the Mac A/B, gate baseline, memory qualification and qc-takes screen pass (figures: git log -p -- config/roadmap.json). 2026-10-20: Mac smoke long-form and long-form-recovery pass. 2026-10-20 iPhone window, iOS 27.0.1: smoke (ios-xcui-smoke-20261020-162655-207aa53e), background-warmup and memory qualification (ios-memory-qualification-20261020-175216-613bb02a: max retained growth 60 MB, 0.5% of RAM) pass; the first take after launch reaches audio 0.61 s after load (ios-engine-20261020-175501-9d08fde9), no gemv compile stall. The window found and fixed: saved-voice Clone failing on the iPhone once its artifact identity changed (6a2a29f6), the diagnostics build under strict memory safety (c368d7df), device lanes reading another run rows (bd494cb7) and counting a simulated iPhone (f1698bd8). Left: the full Mac smoke, attended (BKL-19 Speech Recognition prompt).",
+      "updated": "2026-10-20",
       "due": "2026-10-22"
     },
     {
@@ -1738,41 +1738,6 @@
       "updated": "2026-10-19",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-19 by the DW-03 seam tests (94dc16cd, 7fe58fa2). With the overlay marker missing or stale, readPersistedSourceQwenPreparedCheckpointTrust re-hashes the changed weights and rewrites the source trust file to the new digest. The rebuild then marks the checkpoint trusted before the loader runs, so weight verification relaxes to noUnusedKeys, and that trust survives a failed load. With a valid overlay, the same change is distrusted. Installed weights are SHA-256-verified at download, so this needs weights that change in place, then an overlay invalidation such as a descriptor bump or an iOS cache purge. Parked without investigation under the focus lock: hardening, not a release blocker."
-    },
-    {
-      "id": "BG-01",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
-      "status": "in-flight",
-      "due": "2026-10-22",
-      "blockedBy": [],
-      "gate": "Proactive model work (the Clone prime, the saved-voice prompt prebuild, model-only warms) is refused unless the app is active and is cancelled when it stops being active; a take checks cancellation before marking; clone-artifact adoption, persistence and codec replay run inside MLX error scopes with the embedding's finite check on the CPU stream, and the ICL reference encode is evaluated inside its own scope and lease (engine audit B-01, F-01, B-14, F-07). Deterministic tests pin each. scripts/ui_test.sh ios smoke --scenario background-warmup runs in the next announced iPhone window; the MLX refresh (CONV-21) adds the mechanism-level fix.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-16-engine-runtime-audit.md",
-        "docs/audits/2026-10-13-core-engine-review.md",
-        "Sources/iOS/TTSEngineStore.swift",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift"
-      ],
-      "updated": "2026-10-16",
-      "notes": "Maintainer decision 2026-10-13: device checks before classifying. The strengthened check passed (ios-xcui-smoke-20261014-013015-ab48517b): six exits with work visibly in flight (Preparing reference; a cold take's load and warm) left the app running with a clean crash delta; the prompt prebuild after Save voice and end-of-take marking have no visible signal. 2026-10-16: the maintainer chose the engine audit's hardening as the fix, with the MLX refresh (CONV-21). Landed on the Mac the same day: the foreground permit (also applied when the engine starts in the background); leaving cancels the clone prime and the chained prompt prebuilds; a take checks cancellation before marking; clone adoption, persistence and codec replay run in MLX error scopes, where only an evaluation or allocation failure unloads the model; the CPU finite check; the evaluated ICL encode. Tests pin the permit, the chain, adoption's typed failure and the unload rule; the pre-marking check is verified by review only. Left: smoke --scenario background-warmup in the next announced iPhone window."
-    },
-    {
-      "id": "RF-18",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Long-form segments keep their pacing (RF-15's long-form row)",
-      "status": "in-flight",
-      "due": "2026-10-22",
-      "gate": "A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
-        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
-        "Sources/QwenVoiceCore/LongFormPlanning.swift",
-        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
-        "docs/audits/2026-10-16-engine-runtime-audit.md"
-      ],
-      "updated": "2026-10-17",
-      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23): ~60 s streamed segments under the phone's Consistent variation pause or never finish. 2026-10-16 screen: D1 not adopted (D1-on 3 of 23 long segments failed, D1-off 2 of 27; all under Consistent). Follow-up screen (pre-registered, A2), finished 2026-10-20; failed projects of 56: C0 9, C1 (subtalker at reference 0.9/50/1.0) 2, C2 (budget 200) 15, C4 (EOS filtered) 7, E0 0, E2 0, E4 0, C1+C4 2. C1 and D2 pass, the combination passes, C2 fails; EOS filtering is nearly inert (E0 and E4 byte-identical). Adopted in 7a125aaf: the subtalker keeps the reference sampling for every variation and production filters EOS (QWENVOICE_TALKER_FILTER_EOS=off restores re-insertion); audit A2, release notes and risk spine updated. With no knobs, production Consistent reproduces the C1+C4 take byte for byte. Consistent's remaining failures stay the 3.0 known limitation. Left: the device proof, RF-15's long-form row (scripts/ui_test.sh ios smoke --scenario long-form), in the next announced iPhone window."
     },
     {
       "id": "ER-01",

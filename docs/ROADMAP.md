@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 13/40 (32%) |
+| `release-first-3-0-2026-09` | active | release-qa | 15/40 (38%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -55,7 +55,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
-| `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
 | `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
@@ -69,7 +68,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-18` | in-flight | Long-form segments keep their pacing (RF-15's long-form row) | — |
 
 ### Open items in detail
 
@@ -112,9 +110,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`AUD-09`** (planned, due 2026-10-30) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
-- **`BG-01`** (in-flight, due 2026-10-22) — Prove or rule out GPU work outliving the foreground (engine review BG-1).
-  gate: Proactive model work (the Clone prime, the saved-voice prompt prebuild, model-only warms) is refused unless the app is active and is cancelled when it stops being active; a take checks cancellation before marking; clone-artifact adoption, persistence and codec replay run inside MLX error scopes with the embedding's finite check on the CPU stream, and the ICL reference encode is evaluated inside its own scope and lease (engine audit B-01, F-01, B-14, F-07). Deterministic tests pin each. scripts/ui_test.sh ios smoke --scenario background-warmup runs in the next announced iPhone window; the MLX refresh (CONV-21) adds the mechanism-level fix.
-
 - **`CONV-21`** (in-flight, due 2026-10-22) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: Authorized by the maintainer on 2026-10-16 before the freeze: mlx-swift 0.32.3 (never 0.32.2), mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and swift-huggingface 1.0.0 move together, after BG-01's error scopes, readback failure probes (F-03), a golden seeded-sampling canary recorded on the old pin (F-20), the MLX version in the clone-artifact identity (F-06) and the Tokenizers-only product (F-11). The seed change is accepted with a release-note line (F-02) and prewarm covers the runtime-compiled gemv shapes (F-04, F-05). config/toolchain.json pins a CI toolchain GitHub's runners provide; the deployment targets stay at 26; the move is reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline, re-pooled from three seeded runs) and a clean unit lane; scripts/dev.sh ci is green; Mac memory qualification and a qc-takes screen pass. The iPhone smoke, background-warmup and memory benchmark run in the next announced iPhone window.
 
@@ -156,9 +151,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
-
-- **`RF-18`** (in-flight, due 2026-10-22) — Long-form segments keep their pacing (RF-15's long-form row).
-  gate: A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.
 
 ## Engine remediation programme (2026-10-16 audit)
 

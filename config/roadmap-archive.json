@@ -5116,6 +5116,48 @@
         "commit:ff6699de",
         "doc:docs/audits/2026-10-17-qwen3-tts-model-research.md"
       ]
+    },
+    {
+      "id": "BG-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Prove or rule out GPU work outliving the foreground (engine review BG-1)",
+      "status": "done",
+      "due": "2026-10-22",
+      "blockedBy": [],
+      "gate": "Proactive model work (the Clone prime, the saved-voice prompt prebuild, model-only warms) is refused unless the app is active and is cancelled when it stops being active; a take checks cancellation before marking; clone-artifact adoption, persistence and codec replay run inside MLX error scopes with the embedding's finite check on the CPU stream, and the ICL reference encode is evaluated inside its own scope and lease (engine audit B-01, F-01, B-14, F-07). Deterministic tests pin each. scripts/ui_test.sh ios smoke --scenario background-warmup runs in the next announced iPhone window; the MLX refresh (CONV-21) adds the mechanism-level fix.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-16-engine-runtime-audit.md",
+        "docs/audits/2026-10-13-core-engine-review.md",
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Maintainer decision 2026-10-13: device checks before classifying; the strengthened check passed (ios-xcui-smoke-20261014-013015-ab48517b). 2026-10-16: the maintainer chose the engine audit hardening as the fix, with the MLX refresh (CONV-21). Landed the same day: the foreground permit (also when the engine starts in the background); leaving cancels the clone prime and the chained prompt prebuilds; a take checks cancellation before marking; clone adoption, persistence and codec replay run in MLX error scopes, where only an evaluation or allocation failure unloads the model; the CPU finite check; the evaluated ICL encode. Tests pin the permit, the chain, adoption typed failure and the unload rule; the pre-marking check is verified by review only. 2026-10-20 iPhone window, iOS 27.0.1 with the MLX refresh: smoke --scenario background-warmup passed, every exit with model work in flight leaving the app running and the crash delta clean (ios-xcui-smoke-20261020-161737-a54444f8).",
+      "evidence": [
+        "run:ios-xcui-smoke-20261020-161737-a54444f8"
+      ]
+    },
+    {
+      "id": "RF-18",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Long-form segments keep their pacing (RF-15's long-form row)",
+      "status": "done",
+      "due": "2026-10-22",
+      "gate": "A pre-registered Mac machine screen, with no listening (scripts/macos_test.sh qc-takes --cells long-form plus the RF-15 fixture through the vocello CLI), compares streaming with full-text conditioning (D1) under Expressive and Consistent. If D1-on fails at most 1 of 24 or more segments of 45 s or longer against 3 or more for D1-off, with no new gross-failure class, D1 becomes production (both .production constants, tests, the knob registry and the release notes); otherwise the defect is recorded as the 3.0 known limitation naming Consistent. The long-form smoke journey pins Expressive and runs alone as scripts/ui_test.sh ios smoke --scenario long-form. A lower planner budget (C-02) lands only if D1 alone is not enough. Device proof: RF-15's long-form row; the iPhone scenario runs in the next announced window.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift",
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
+        "Sources/QwenVoiceCore/LongFormPlanning.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
+        "docs/audits/2026-10-16-engine-runtime-audit.md"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Opened 2026-10-16 from the engine audit (C-01, A-01, C-02, C-03, A-23): ~60 s streamed segments under the phone Consistent variation paused or never finished. The 2026-10-16 screen did not adopt D1; the pre-registered follow-up screen (A2, finished 2026-10-20) passed C1 (subtalker at the reference 0.9/50/1.0), D2 (EOS filtered) and their combination (2 failed long-form Consistent projects of 56, against 9); C2 failed. Adopted in 7a125aaf: the subtalker keeps the reference sampling for every variation and production filters EOS (QWENVOICE_TALKER_FILTER_EOS=off restores re-insertion). Consistent remaining failures stay the 3.0 known limitation. 2026-10-20 iPhone window: smoke --scenario long-form passed on the adopted engine (ios-xcui-smoke-20261020-160313-80e6aba4); the first attempt (ios-xcui-smoke-20261020-153705-0a3bf3f5) finished the project and failed at History search when notifications interrupted the phone. RF-15 repeats the row on the candidate. Earlier detail: git log -p -- config/roadmap.json.",
+      "evidence": [
+        "run:ios-xcui-smoke-20261020-160313-80e6aba4",
+        "commit:7a125aaf"
+      ]
     }
   ]
 }

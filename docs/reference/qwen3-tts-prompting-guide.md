@@ -1,26 +1,36 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-16
-summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
+reviewed: 2026-10-20
+summary: Sourced reference for everything Qwen3-TTS reads as text — the ChatML wire format and prefill layouts, the script, the delivery instruction, the voice description, the presets, and the transcript and reference rules for clones — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
-  - config/delivery-instruction-contract.json
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - Sources/QwenVoiceCore/GenerationSemantics.swift
   - Sources/QwenVoiceCore/EmotionPreset.swift
+  - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
+  - config/delivery-instruction-contract.json
   - scripts/bench_delivery_prosody.py
+  - docs/audits/2026-10-17-qwen3-tts-model-research.md
 ---
 # Qwen3-TTS Prompting Guide
 
-A sourced reference for the three text surfaces that reach the model: the **script text**, the
-**delivery instruction**, and the **voice description**. It covers what each one does, how the
-three generation modes differ, and what upstream actually specifies versus what this repository
-invented.
+A sourced reference for what reaches the model as text: the **wire format** (the ChatML strings and
+the prefill layouts), the **script text**, the **delivery instruction**, the **voice description**,
+the presets, and the **transcript and reference rules** for clones. It covers what each one does, how
+the three generation modes differ, and what upstream specifies versus what this repository invented.
 
-Companion to [`qwen3-tts-guide.md`](qwen3-tts-guide.md), which is the *architecture* reference
-(model variants, tokenizer profile, Talker/decoder, speaker roster, parameters). This file is the
-*input* reference. Where they overlap, the architecture guide owns the runtime facts and this file
-owns the prompt-writing facts.
+**One owner per fact.** This guide owns the wire format, instructions, presets and the
+transcript/ICL input rules. [`qwen3-tts-guide.md`](qwen3-tts-guide.md) owns the model family,
+checkpoints, architecture, generation semantics, the failure catalogue and the parity ledger (the
+sourced ledger is [research §8](../audits/2026-10-17-qwen3-tts-model-research.md#8-parity-ledger)).
+The 12 Hz tokenizer is in [`mimi-codec-guide.md`](mimi-codec-guide.md), MLX semantics in
+[`mlx-guide.md`](mlx-guide.md), artifact bytes and digests in [`model-delivery.md`](model-delivery.md).
 
-_First written 2026-08-02, from a primary-source research pass plus a code audit of this checkout._
+_First written 2026-08-02 from a primary-source research pass and a code audit; rewritten 2026-10-20
+against the [ER-13 model research](../audits/2026-10-17-qwen3-tts-model-research.md) and the
+[engine audit](../audits/2026-10-16-engine-runtime-audit.md), after RF-18 and CONV-21 shipped.
+Upstream line numbers (`WM`, `MQ`, `RM`) are QwenLM/Qwen3-TTS at `022e286b98`, keyed as in the
+research report; finding IDs (A-11, G-01, D6…) are the audit's._
 
 ## How to read this document
 
@@ -29,7 +39,7 @@ substantive claim below carries a provenance label:
 
 | Label | Means |
 | --- | --- |
-| `OFFICIAL` | Stated by the Qwen team: repository source, model card, README, technical report, Alibaba Cloud Model Studio docs, or a maintainer answering an issue. |
+| `OFFICIAL` | Stated by the Qwen team: repository source, model card, README, technical report, Alibaba Cloud Model Studio docs, or a Qwen maintainer or collaborator answering an issue. |
 | `RESEARCH` | Published peer-reviewed or preprint work, including the benchmark Qwen3-TTS is evaluated against. Applies to the model family or to description-conditioned TTS generally, not necessarily to this checkpoint. |
 | `MEASURED-HERE` | Established in this repository, either by reading this checkout's code or by a recorded measurement. The measurement and its date are named. |
 | `COMMUNITY` | Third-party report — a GitHub issue, a vendor's own docs for a different product, a blog. Quality varies and is called out. |
@@ -41,55 +51,88 @@ or the [native engineering rules](native-engineering.md) only after they are val
 against our own model, because the alternative — shipping unvalidated guidance — is how the current
 preset copy came to be.
 
+**Seeds moved.** The CONV-21 repin (mlx-swift 0.32.3) changed MLX's categorical sampler, and RF-18
+changed the subtalker's sampling for Balanced and Consistent (§7), so a seed no longer reproduces a
+take recorded before them. The DP measurements below stand as recorded; a rerun is a new
+measurement, not a reproduction.
+
 ---
 
 ## 1. The wire format
 
 `OFFICIAL`. The instruction is not a parameter, a tag, or a field. It is a ChatML **user turn**
-prepended to the speech prompt. Upstream's reference implementation
-([`qwen3_tts_model.py`](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py)) builds it as:
+placed before the speech prompt. Upstream's wrapper
+([`qwen3_tts_model.py`](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py),
+WM L269-276) builds three strings:
 
-```python
-def _build_instruct_text(self, instruct: str) -> str:
-    return f"<|im_start|>user\n{instruct}<|im_end|>\n"
-
-def _build_assistant_text(self, text: str) -> str:
-    return f"<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n"
+```text
+instruct:   <|im_start|>user\n{instruct}<|im_end|>\n
+target:     <|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n
+reference:  <|im_start|>assistant\n{ref_text}<|im_end|>\n        (ICL clones only)
 ```
 
-`MEASURED-HERE`. This checkout matches byte for byte. In
-[`Qwen3TTS.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
-(`buildConditioningPrefix`):
+Reference and target are tokenized separately and concatenated, so no separator joins them
+(MQ L2178, L2190-2191, L2207).
 
-```swift
-let instructText = "<|im_start|>user\n\(instruct)<|im_end|>\n"
-```
+`MEASURED-HERE`. This checkout builds the same strings
+([`Qwen3TTS.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
+L1661-1665 for the role and instruct turns, L1722 and L1759 for the target, L4650 and L4663 for ICL;
+the one ICL difference is a leading space, §2.3). Before tokenizing, it replaces ChatML, `<tts_…>`
+and think/tool control tokens in the script, instruction and transcript with a space
+(`Qwen3ChatTemplateText`, L6674-6691), so user text cannot open a turn. Instructions and briefs are
+not NFC-normalized (engine audit A-18, open in ER-05).
 
-The prompt format is **not** a suspect for delivery problems.
+The prompt strings are **not** a suspect for delivery problems.
 
-### 1.1 What surrounds it
+### 1.1 The prefill, position by position
 
-`OFFICIAL`, from upstream's `modeling_qwen3_tts.py`. The full conditioning prefix is:
+`OFFICIAL` (MQ L2068-2233; [research §3](../audits/2026-10-17-qwen3-tts-model-research.md#3-architecture-as-implemented-upstream-17b-unless-noted)),
+`MEASURED-HERE` (`buildConditioningPrefix`, `Qwen3TTS.swift` L1609-1703). The instruct turn and the
+role header are text-only positions. From the codec prefix on, every position is the **sum** of a
+text-lane embedding and a codec-lane embedding:
 
-1. `textProjection(embed("<|im_start|>user\n{instruct}<|im_end|>\n"))` — optional; absent when
-   there is no instruction.
-2. `textProjection(embed("<|im_start|>assistant\n"))` — the role prefix, always present.
-3. The codec prefix: `think` (or `nothink` for Auto), `think_bos`, the **language** id (absent for
-   Auto), `think_eos`, the speaker embedding (a CustomVoice speaker row or a Base x-vector), then
-   `codec_pad` and `codec_bos`. The text lane under it carries `tts_pad` and, on `codec_pad`,
-   `tts_bos`.
+| Segment | Text lane | Codec lane |
+| --- | --- | --- |
+| 1. Instruct turn (optional; absent without an instruction) | the whole instruct string | none: text-only positions |
+| 2. Role header | `<|im_start|>`, `assistant`, `\n` | none: text-only positions |
+| 3. Codec prefix | `tts_pad` at each position, except `tts_bos` over `codec_pad` | `think`, `think_bos`, language id, `think_eos` (for Auto: `nothink`, `think_bos`, `think_eos`), then the speaker vector, then `codec_pad` |
 
-From the codec prefix on, text and codec lanes are **summed**, not concatenated: the same position
-carries both. The instruct turn and the role prefix above are text-only positions (upstream
-`modeling_qwen3_tts.py` L2068-2186; the research report's §3).
+`tts_pad` and `tts_bos` belong to the **text** lane; the codec lane carries the think tokens, the
+language, the speaker and `codec_pad`. The speaker vector is a CustomVoice speaker row or a Base
+x-vector; Voice Design has none. `codec_bos` is held back to open the continuation, which takes one
+of three layouts:
+
+- **Streaming** (`non_streaming_mode=False`). The first text token is summed with `codec_bos`; the
+  rest of the text, ending in `tts_eos`, trails one token per generated frame, and after it the
+  talker sees `tts_pad` (`prepareInputs`, L1705-1740). The wrapper's docstring says this mode only
+  *simulates* streaming text input (WM L513-515).
+- **Non-streaming** (`non_streaming_mode=True`). All the text and `tts_eos`, each over `codec_pad`,
+  then `tts_pad` summed with `codec_bos`; the talker then sees only `tts_pad`
+  (`prepareFullTextNonStreamingInputs`, L1742-1788).
+- **ICL clone.** Reference and target text plus the reference's codec frames (§2.3).
+
+Which layout a take uses:
+
+| Vocello take | Vocello layout | Upstream default |
+| --- | --- | --- |
+| Streamed Custom and Design (Studio, every long-form segment) | streaming | non-streaming (WM L642, L738, since `0c6a7cb`): the **D1** divergence, not adopted (§3.1) |
+| Quality-first (non-streamed) Custom and Design | non-streaming | non-streaming |
+| Clone with a transcript (ICL) | non-streaming ICL | streaming (WM L478): **G-14**, deliberate (§2.3) |
+| Clone without a transcript (speaker only) | streaming | streaming |
+
+The clone rows follow `Qwen3TextConditioningMode` (`Qwen3TTS.swift` L411-430): a clone ignores the
+requested mode. The full-text layout for streamed takes exists only behind the internal-diagnostics
+knob `QWENVOICE_FULL_TEXT_CONDITIONING` (`Qwen3ReferenceParity.production`,
+`Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift` L46-50).
 
 ### 1.2 There is no chat template and no system turn
 
-`OFFICIAL`. `chat_template` in the checkpoint's `tokenizer_config.json` is `None`. There is no
-Jinja template to retrieve and `apply_chat_template` is not part of the TTS path; the ChatML
-strings are hardcoded in Python exactly as quoted above. Only two roles appear anywhere in the
-upstream codebase: `user` (the instruction) and `assistant` (the text). **There is no
-`<|im_start|>system` in Qwen3-TTS.** Anything placed in a system turn is off-distribution.
+`OFFICIAL`. The checkpoint ships `vocab.json` and `merges.txt` for a `Qwen2Tokenizer`, with no
+`tokenizer.json` and no chat template (research §3). There is no Jinja template to retrieve and
+`apply_chat_template` is not part of the TTS path; the ChatML strings are hardcoded in Python exactly
+as quoted above. Only two roles appear anywhere in the upstream codebase: `user` (the instruction)
+and `assistant` (the text). **There is no `<|im_start|>system` in Qwen3-TTS.** Anything placed in a
+system turn is off-distribution.
 
 ### 1.3 The language prefill selects a "thinking" branch
 
@@ -105,21 +148,38 @@ during training to improve instruction following, especially for complex descrip
 credits this mechanism specifically for instruction following, and again for the voice-design
 result.
 
-`MEASURED-HERE`. This checkout implements both branches faithfully
-(`resolvedLanguageIdentifier` plus the two `codecPrefill` arms in `Qwen3TTS.swift`). But **which
-branch a request takes depends on language detection**, and the fallbacks differ per mode
+`OFFICIAL`, and it cuts the other way: Qwen's own evaluation ran Seed-TTS and InstructTTSEval with
+language `auto`, the **nothink** branch, and set the language explicitly for the other benchmarks
+(RM L465; research §4). The instruction-following scores in §4.2 were measured without the
+thinking pattern. Qwen also advises setting the language when it is known (RM L50, L167).
+
+`OFFICIAL` and `MEASURED-HERE`, the dialect swap: a dialect speaker (Dylan → Beijing, Eric → Sichuan)
+whose language is Chinese or Auto gets its dialect id instead of a language id (MQ L2118-2122);
+Vocello does the same (`resolvedLanguageIdentifier`, `Qwen3TTS.swift` L1545-1556).
+
+`MEASURED-HERE`. This checkout implements both branches faithfully, but **which branch a request
+takes depends on language detection**, and the fallbacks differ per mode
 ([`GenerationSemantics.swift`](../../Sources/QwenVoiceCore/GenerationSemantics.swift),
-`qwenLanguageHint`):
+`qwenLanguageHint`, L864-889). An explicit language other than Auto always wins.
 
 | Mode | Fallback when detection fails | Branch taken |
 | --- | --- | --- |
-| Custom | `english` | `think` + language id |
+| Custom | `english` | `think` + English id (D6) |
 | Design | `auto` | `nothink` |
-| Clone | `auto` | `nothink` |
+| Clone | `auto` | `nothink`; the language describes the target text, never the reference |
 
-`UNVERIFIED`. Whether the `nothink` branch measurably weakens instruction adherence is not
-documented and upstream publishes no ablation. It is a cheap A/B (§10.4) and the paper's own
-framing makes it worth running.
+`MEASURED-HERE`, **D6: Custom never takes the Auto branch** (open, by design; ER-05). Upstream sends
+Auto as `nothink` with no language token. When detection fails, Vocello's Custom mode falls back to
+English (`customUndetectedLanguage`, L852-862), which takes the `think` branch with the English id
+and also brings the English diction sentence of §8.2: any Custom or Design take whose language
+resolves to English gets it, and with no delivery instruction that sentence becomes the whole
+instruct turn (`englishDictionReinforcedInstruction`, L801-815). A Dylan or Eric take that falls back
+this way loses its dialect id. The internal-diagnostics knob `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on`
+restores the reference behaviour for A/B work.
+
+`UNVERIFIED`. Whether the `nothink` branch measurably weakens instruction adherence on this
+checkpoint is not measured, and upstream publishes no ablation; its own instruction scores come from
+`nothink`. It is a cheap A/B (§10.4).
 
 ---
 
@@ -148,12 +208,15 @@ interfaces**, and the differences are not symmetric.
 > will support both cloning and instruct."
 
 Upstream's `generate_voice_clone()` has **no `instruct` parameter at all**, and upstream drops the
-instruction outright on the 0.6B CustomVoice model:
+instruction outright on the 0.6B CustomVoice model (WM L799-800):
 
 ```python
 if self.model.tts_model_size in "0b6":  # for 0b6 model, instruct is not supported
     instruct = None
 ```
+
+The Hugging Face card for 0.6B-CustomVoice claims instruction control anyway; the README (RM L78)
+and that code contradict it (research §2). There is no 0.6B VoiceDesign checkpoint.
 
 `COMMUNITY`, corroborating from at least five independent reporters across upstream discussions
 #218, #231, HF discussions #28 and #38, and mlx-audio #453: passing an instruction to Base does
@@ -168,19 +231,20 @@ passes a delivery instruction while running Base will prepend an instruct turn t
 trained on — roughly 15 to 40 off-distribution tokens at the very front of the prefix.
 
 `MEASURED-HERE`, **and this checkout is not exposed to it.** Vocello's clone path cannot carry an
-instruction, structurally: `GenerationSessionIdentity.clone` has no `deliveryStyle` field
-(`GenerationSemantics.swift`), and the runtime's `prepareVoiceCloneInputs` takes only text, clone
-prompt, and language. There is no code path by which a Vocello clone request reaches the instruct
-branch. The one guard that *is* present in the owned runtime is the 0.6B one
-(`supportsCustomInstructionControl` in `Qwen3TTS.swift`), which matches upstream.
+instruction, structurally: the clone payload and `GenerationSessionIdentity.clone` have no
+`deliveryStyle` (`SemanticTypes.swift` L1483-1486, `GenerationSemantics.swift` L373-392), and the
+runtime's `prepareVoiceCloneInputs` takes only text, clone prompt, and language. There is no code path
+by which a Vocello clone request reaches the instruct branch. The runtime also keeps the 0.6B guard
+(`supportsCustomInstructionControl`, `Qwen3TTS.swift` L1514-1516), which matches upstream, but it is
+defensive only: Vocello ships no 0.6B checkpoint, just the three 1.7B models in
+[`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json).
 
 ### 2.2 Voice Design re-invents the voice on every call
 
-`OFFICIAL`, from a Qwen maintainer (quoted in koboldcpp discussion #2192): VoiceDesign *"can create
-voices with accurate instructions. However, the voice can vary, as it cannot re-use a voice."*
-Base *"supports consistent voice cloning from a reference audio, however you cannot use any
-instructions on the voice."* The maintainer's recommended workflow is to design the voice once,
-then clone it for consistency.
+`OFFICIAL`. Voice design gives a new voice on every sample; a Qwen collaborator recommends sampling a
+design several times and then cloning the one you want (QwenLM#4), and the README's route to a
+reusable designed voice is to design it, then clone it (RM L288-290). Base clones consistently from
+reference audio but takes no instruction (§2.1).
 
 The consequence is a genuine architectural fork, and it cannot be avoided by prompt wording:
 
@@ -202,6 +266,78 @@ identity.
 `MEASURED-HERE`. Vocello's Custom mode is the third row — preset speaker plus instruction — so it
 gets both. Design mode is the first row and its identity drift per call is expected upstream
 behavior, not a defect in our prompt assembly.
+
+### 2.3 Clone input: the transcript and the reference
+
+Base reads two inputs: reference audio and, for in-context learning (ICL), the reference's
+transcript. Both are prompts in the sense of this guide, and both can break a take.
+
+**Two clone modes.** `OFFICIAL`. ICL conditions on the reference's codec frames *and* its transcript
+(`ref_text`), which it requires (WM L436-438). x-vector-only mode conditions on the speaker vector
+alone, ignores any transcript, and is lower quality (RM L243). Qwen advertises a "3-second rapid
+clone" (RM L77), and the open code caps neither reference nor text length. The 10–20 s reference
+length and 60 s maximum in Alibaba's documentation are for its hosted service, not the open weights
+(research §2). `MEASURED-HERE`: a Vocello clone prompt with reference codes and a
+non-empty transcript runs ICL; one without a transcript runs speaker-only
+(`prepareVoiceCloneInputs`, `Qwen3TTS.swift` L4770-4817).
+
+**The ICL layout.** `MEASURED-HERE` (`prepareICLGenerationInputs`, `Qwen3TTS.swift` L4629-4768), in
+order:
+
+1. the role header (text-only positions);
+2. the codec prefix of §1.1, with the reference's x-vector in the speaker slot and the target's
+   language id (a clone has no preset speaker, so there is no dialect swap);
+3. a text block: the reference transcript, the target text and `tts_eos`, each over `codec_pad`;
+4. a codec block: `codec_bos`, then each reference frame (the sum of its 16 codebook embeddings),
+   each over `tts_pad`.
+
+After that the talker sees only `tts_pad`. This is upstream's **non-streaming** clone layout.
+Upstream's clone default is streaming (`non_streaming_mode=False`, WM L478), which overlays the text
+on the reference frames instead (MQ L1977-2019). Vocello always uses the non-streaming layout, an
+inheritance from mlx-audio (G-14, deliberate; ER-03 owns any change, by screen). The upstream evidence
+favours that choice: a long reference in the streaming layout speeds speech up (QwenLM#239), and the
+open PR #362 measured +16.7% with a 12.9 s reference streaming against 0.0% non-streaming, and
+proposes non-streaming as the clone default.
+
+**Transcript rules.**
+
+- **Cover the whole reference.** `COMMUNITY`, checked against the official code by the research: a
+  `ref_text` that covers only part of the reference makes ICL loop without EOS (mlx-audio #921, 3 of
+  3 degenerate on PyTorch). `MEASURED-HERE`, **G-01 (open, ER-04)**: saved-voice enrollment accepts a
+  partial recognition transcript (for example only the second sentence of a 16 s clip) and reaches
+  ready with Save enabled. The planned fix requires review when recognition does not cover the
+  clip's edges.
+- **"Use audio only" must drop the transcript.** **G-02 (open, ER-04)**: on a saved voice that has a
+  transcript, the option still conditions on the stored one, so the user's remedy for bad ICL output
+  does nothing.
+- **Shape the transcript like the script.** **G-15 (open)**: recognized transcripts carry no
+  punctuation and skip the text planner the target goes through. **G-12 (open)**: stored transcripts
+  keep their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim,
+  so the prebuild never matches a Studio take.
+- **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
+  `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends exactly one space to the target
+  (`Qwen3TTS.swift` L4657-4662). The tokenizer is byte-level BPE without a prefix space, so the
+  first target word otherwise glues to the transcript; the space was added after French first words
+  were dropped. It also changes the first tokens of CJK targets. Screen before changing it (ER-04).
+- **`language` names the script's language, never the reference's** (`GenerationSemantics.swift`
+  L881-887). `COMMUNITY`: a reference in another language than the script produced the wrong speaker
+  in about 20% of takes (QwenLM#80) and leaks its accent (#134). Vocello does not flag cross-language
+  references (G-16–G-21).
+
+**Reference audio rules.**
+
+- **The tail can echo.** `COMMUNITY`: the end of the reference can reappear at the start of the take
+  (QwenLM#341); onset noise and stray syllables are reported too (#119, #200). `MEASURED-HERE`,
+  **G-07 (open, ER-04)**: Vocello's recorded references end abruptly — a hard stop at 20.4 s or on
+  Stop, with no trim and no fade — and then get 0.5 s of zeros appended to a non-zero last sample,
+  which is the documented trigger.
+- **Trailing silence (A-12, open, ER-04).** Vocello appends 0.5 s of silence before the codec encode
+  (`codecEncodeTrailingSilenceSamples`, `Qwen3TTS.swift` L615; version `icl-ref-silence500ms-v2`,
+  L621); the x-vector uses the unpadded audio. Upstream pads nothing, so the code comment's claim of
+  upstream parity (L611-614) is wrong.
+- **Codes and decode.** The reference codes come from an encoder with the wrong rotary convention
+  (A-02), and streamed clones decode without the reference's history (D5/A-04). Both are in the
+  [12 Hz tokenizer guide](mimi-codec-guide.md).
 
 ---
 
@@ -230,15 +366,41 @@ Not reliable pause cues:
 
 For a longer beat, end the sentence and start a new one. For a paragraph break, use a blank line.
 
+### 3.1 Long takes drift: the mechanism and the measurements
+
 `COMMUNITY`. Long single generations tend to speed up and compress pauses toward the end. Splitting
 into paragraph-sized generations re-asserts the delivery instruction at each boundary and holds
 pacing steadier. This is what
 [`../../Sources/QwenVoiceCore/LongFormPlanning.swift`](../../Sources/QwenVoiceCore/LongFormPlanning.swift)
 already does for long-form projects.
 
+`MEASURED-HERE`, **the mechanism** (engine audit A-01). A streamed take uses the streaming layout of
+§1.1: the script enters one text token per codec frame, 12.5 tokens/s against about 4–5 spoken. An
+~860-character segment's text is used up after about 16 s, and the talker then sees only `tts_pad`,
+its end-of-utterance cue, for the rest. Upstream reports the same drift (QwenLM#239, with PR #362's
+measurement in §2.3), and upstream defaults Custom and Design to the full-text layout (§1.1).
+
+`MEASURED-HERE`, **the measurements** (engine audit A2, Mac M6, no listening; the gate was Fast QC):
+
+- **RF-18's screen did not adopt the full-text layout (D1), 2026-10-16.** D1 on failed 3 of 23 long
+  segments, D1 off 2 of 27; the pre-registered rule needed at most 1 against at least 3. Every
+  failure ran under the Consistent variation. Streamed takes keep the trailing-text layout.
+- **The follow-up screen, 2026-10-17 to 2026-10-20**, 56 long-form projects per arm. Restoring the
+  reference subtalker sampling cut Consistent's failed projects from 9 to 2; lowering the planner's
+  segment budget from 300 to 200 made it worse (15); Expressive failed none in any arm. The subtalker
+  change and EOS filtering shipped (§7). Consistent's remaining failures are a documented 3.0 known
+  limitation.
+
+The planner still fills each segment to about 60 s (C-02); shorter segments need their own screen.
+Long-form behaviour is in [`long-form-generation.md`](long-form-generation.md).
+
+### 3.2 Numbers and normalization
+
 `COMMUNITY`. Qwen3-TTS inherits Qwen3's text understanding, so unnormalized text with punctuation
 intact is the right input; pre-normalizing numbers and abbreviations into words removes information
-the model uses.
+the model uses. `UNVERIFIED` as a rule: upstream issues report numbers misread across languages
+(#68, #151, #256, #305, #328), and Vocello's planner does not pre-normalize them (research §5).
+Neither side has been measured here.
 
 ---
 
@@ -596,7 +758,8 @@ empty, `neutral`, `normal tone`, `neutral tone` (`isNeutralDeliveryInstruction`)
 Neutral **preset** is not empty; it sends a 140-character instruction asking for an even, level,
 slightly monotone read. That was deliberate: an uninstructed request left cross-seed delivery
 unconstrained. It does mean "Neutral" is an instructed delivery, not the absence of one, and any
-experiment using Neutral as a control must account for that.
+experiment using Neutral as a control must account for that. Even a typed neutral synonym is not an
+empty prompt for English output: the instruct turn then carries the diction sentence alone (§8.2).
 
 ---
 
@@ -613,64 +776,98 @@ experiment using Neutral as a control must account for that.
 ```
 
 `OFFICIAL`. The published InstructTTSEval scores in §4.2 were produced at exactly these defaults,
-with `max_new_tokens=2048` and bf16. That is the strongest available statement about sampling:
-these settings are what the reported instruction-following numbers were measured at.
+with `max_new_tokens=2048`, bf16 and language `auto`, the `nothink` branch (RM L465; §1.3). That
+is the strongest available statement about sampling: these settings are what the reported
+instruction-following numbers were measured at.
 
-`MEASURED-HERE`. [`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json)
-matches on every value. The owned runtime carries the **subtalker sampler as its own stage**
-(`Qwen3RequestSamplingPolicy.subtalker`), and production fills it with upstream's values,
-0.9 / 50 / 1.0, whatever the talker uses (`UnsafeSpeechGenerationModel.swift`). Balanced and
-Consistent narrow only the talker. Until 2026-10-20 the subtalker followed the talker down; every
-failure in RF-18's long-form screen ran under Consistent, and restoring the reference subtalker (the
-follow-up screen's C1 arm) cut Consistent's failed projects from 9 to 2 of 56.
+`MEASURED-HERE`. The talker values ship as Vocello's defaults:
+[`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json) records temperature 0.9,
+top-p 1.0, top-k 50, repetition penalty 1.05 and the 2,048-token app cap, and
+`Qwen3GenerationConfiguration` carries them in code. The subtalker's values are not in the contract;
+they come from code. The take **variation** narrows only the talker
+(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift` L95-144):
+
+| Variation | Talker temperature / top-p | Subtalker (code predictor) |
+| --- | --- | --- |
+| Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / top-p 1.0 |
+| Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / top-p 1.0 |
+| Consistent | 0.7 / 0.9 | 0.9 / top-k 50 / top-p 1.0 |
+
+The runtime keeps the subtalker as its own sampling stage (`Qwen3RequestSamplingPolicy.subtalker`),
+and since RF-18 (2026-10-20) production fills it with upstream's values whatever the variation, as
+upstream does. Before that, Balanced and Consistent lowered the subtalker with the talker; restoring
+the reference values cut Consistent's failed long-form projects from 9 to 2 of 56 (§3.1). Only
+internal-diagnostics knobs change the subtalker now.
+
+`MEASURED-HERE`. Two more sampling facts that change audio, both reference parity. The talker's EOS
+goes through top-k and top-p like any other token (D2, adopted 2026-10-20; mlx-audio removed the same
+re-insertion in MA#882), and logits are cast to float32 before sampling (D3, 2026-10-13)
+(`Qwen3ReferenceParity.production`, `Generation.swift` L46-50). The repetition penalty applies to the
+talker's codebook 0 only, as upstream. The full generation semantics are in
+[`qwen3-tts-guide.md`](qwen3-tts-guide.md).
 
 `MEASURED-HERE`. The decode budget is a **fixed constant**
-(`Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens`, 2048), not derived from text length. A slow or heavy delivery therefore cannot clip against a text-proportional
-budget — a failure mode reported against other MLX TTS ports. Reaching the cap before EOS is
-detected and the output discarded rather than silently truncated (`GenerationOutputAdapter`).
+(`Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens`, 2048, the evaluation's cap;
+the checkpoint's own default is 8192), not derived from text length. A slow or heavy delivery
+therefore cannot clip against a text-proportional budget — a failure mode reported against other MLX
+TTS ports. A take that reaches the cap before EOS ends as `.maxTokens`, a terminal failure, not a
+success (`GenerationOutputAdapter.swift` L133-143).
 
 `OFFICIAL`, negative findings, stated plainly: there is **no classifier-free guidance, no guidance
 scale, and no instruction-weighting parameter** in Qwen3-TTS. And **no upstream source anywhere
 links instruction-following quality to sampling settings.** Any claim that lowering temperature
 improves instruction adherence here is `UNVERIFIED`.
 
-`UNVERIFIED`. Upstream benchmarks are bf16; Vocello ships 8-bit quants. No upstream evaluation of
-instruction adherence under quantization exists. Instruction following is generally the first
-capability to degrade under quantization, so this is a real open question (§10.6) rather than a
+`OFFICIAL` and `UNVERIFIED`. Qwen trained and evaluated in bf16, recommends fp32 where bf16 is
+unavailable because the code predictor is "extremely sensitive to precision" (QwenLM#43), and never
+evaluated a quantized checkpoint. Vocello ships 4-bit (Speed) and 8-bit (Quality) quantizations that
+quantize every code-predictor projection and head (research §1, finding 8, and research §7). No
+upstream evaluation of instruction adherence under quantization exists. Instruction following is generally the first
+capability to degrade under quantization, so this is a real open question (§10.7) rather than a
 settled one.
 
 ---
 
 ## 8. What Vocello sends today
 
-`MEASURED-HERE`, from a code audit of this checkout on 2026-08-02.
+`MEASURED-HERE`, from a code audit of this checkout on 2026-08-02, updated against the code on
+2026-10-20.
 
 ### 8.1 The audit
 
 | Property | State |
 | --- | --- |
-| ChatML instruct turn | matches upstream byte for byte |
+| ChatML instruct turn | matches upstream byte for byte (§1) |
 | System turn | none (correct) |
-| Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone identity |
-| 0.6B instruction guard | present, matches upstream |
-| Subtalker sampler | its own stage, but filled from the talker's values (upstream keeps it at 0.9 / 50 / 1.0) |
+| Control tokens in user text | replaced with a space before tokenizing (§1) |
+| Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone payload or identity |
+| 0.6B instruction guard | present and matches upstream; defensive, since no 0.6B checkpoint ships |
+| Text layout of streamed Custom and Design takes | streaming trailing text, not upstream's full-text default (D1, not adopted; §1.1, §3.1) |
+| ICL layout | upstream's non-streaming clone layout, plus one leading space on the target (G-14, A-11; §2.3) |
+| Subtalker sampler | its own stage, at upstream's 0.9 / 50 / 1.0 for every variation since 2026-10-20 |
+| EOS | filtered like any token since 2026-10-20 (D2) |
 | Decode budget | fixed constant, not text-derived |
-| Sampling defaults | match the checkpoint exactly |
-| `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink` |
+| Sampling defaults | Expressive matches the checkpoint; Balanced and Consistent narrow the talker only |
+| `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink`, Custom to English (D6) |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |
 | Instruction receipt (updated 2026-08-26) | every instructed take records the final model-facing instruction digest, instruction language, and optional canonical delivery-cell identity; the delivery bench verifies them fail closed ([`benchmarking-procedure.md` §4.6](benchmarking-procedure.md#46-delivery--prosody-cells)) |
 
-Three of the four hazards that the research pass flagged as likely causes of "delivery sounds off"
-in MLX ports do not apply to this checkout. That is worth stating plainly, because it narrows the
-search.
+The prompt strings, the system turn, the clone instruction path and the decode budget are not
+suspects when delivery sounds off. Vocello's input still differs from the reference in the streamed
+text layout, the ICL join and padding, the Custom fallback (D6) and the diction sentence; the
+parity ledger tracks each.
 
 ### 8.2 The one defect the audit found
 
-`MEASURED-HERE`. Every instruction for English output is candidate for an appended 76-character boilerplate
-sentence:
+`MEASURED-HERE`. Every Custom or Design instruction for English output is a candidate for an
+appended boilerplate sentence, 75 characters plus its separating space
+(`GenerationSemantics.englishDictionReinforcement`, L507-508):
 
 > `Native English pronunciation with clear English diction and natural stress.`
+
+An English take with no instruction at all gets this sentence as its whole instruct turn (§1.3), so
+"uninstructed" English Custom takes are not uninstructed on the wire.
 
 The append is skipped when the base instruction already contains any of eight diction tokens
 (`clear`, `clearly`, `diction`, `articulation`, `pronunciation`, `clarity`, `intelligible`,
@@ -813,7 +1010,7 @@ each is actually worth.
 | Concrete acoustic wording beats persona-only wording | **`RESEARCH`, supported.** InstructTTSEval APS 77–83 versus RP 61–64 on our checkpoint. The strongest-supported item on either list. |
 | Combine emotion + pace + pitch + timbre | **`OFFICIAL`, supported.** Alibaba's "be multi-dimensional, not one-dimensional". The twelve APS features go further: volume, speed, and tone-distinct-from-emotion are also first-class and our copy is thin on them. |
 | Imperative verbs (Speak / Whisper / Narrate) are followed more reliably | **`UNVERIFIED`.** Upstream examples use both imperative (`Speak slowly and professionally`) and descriptive (`Male, 17 years old, tenor range…`) forms with no stated preference. Plausible, unsourced. |
-| Negative constraints work (`no laughing`, `never shout`) | **`OFFICIAL` suggestion, unmeasured, and the one nearby datapoint is negative.** A Qwen collaborator recommends "very happy but without laughing" (QwenLM#16); no ablation measures it. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation that nothing supports (roster cut to 8 on 2026-08-03; the surviving copy still carries negation clauses). |
+| Negative constraints work (`no laughing`, `never shout`) | **`OFFICIAL` suggestion, unmeasured, and the one nearby datapoint is negative.** A Qwen collaborator recommends "very happy but without laughing" (QwenLM#16); no ablation measures it. OV-InstructTTS (arXiv:2601.01459) Table 3 found bare paralinguistic tags *reduced* adherence by 0.72 while reasoning-mediated attributes raised it by 2.08. Eight of the ten then-shipped presets spent characters on negation clauses that no measurement supports (roster cut to 8 on 2026-08-03; the surviving copy still carries them). |
 | Intelligibility clauses help bound extreme emotions | **`UNVERIFIED` as written, with a documented cousin.** The vendor-supported version is a *recording-quality anchor* at the end ("Perfect broadcast quality audio."), which addresses texture-mistaken-for-degradation. Ours is a *command to the speaker* ("stay fully audible") in the middle. Different mechanism, and ours is what trips the §8.2 boilerplate rule. |
 | Avoid stacked intensifiers; `very very very happy` adds no value | **Partly contradicted.** Upstream's own examples are `Very happy.` and `Say it in a very angry and disappointed tone`. The defensible claim is that *repetition* adds nothing; our copy over-generalized it into avoiding intensifiers, and further into avoiding naming the emotion plainly at all — while emotion is an explicit APS feature. |
 | High-arousal instructions trigger literal laughter or breath sounds | **`OFFICIAL` acknowledgement.** Qwen confirms emotive instructs can add laughter (QwenLM#16) and that non-verbal sounds come out only implicitly (QwenLM#9). The `no laughing` remedy is Qwen's suggestion, still unmeasured. |
@@ -829,7 +1026,8 @@ roster has since been cut to 8 presets (2026-08-03) and the user-facing intensit
 
 `MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
 work and are officially endorsed" and "the official instruction-writing principle" to upstream
-without a link. The first is unverified per the table above. The second is real — it is Alibaba's
+without a link. The first overstates the source: Qwen suggests one negative form (QwenLM#16), but
+nothing measures it (table above). The second is real — it is Alibaba's
 "be multi-dimensional" — but the attribution was never traceable. Its prescription that "1–3 dense
 sentences is the sweet spot" is reasonable for *voice descriptions* (two independent community
 guides converge on it) and unsupported for *delivery instructions*, where the official examples are
@@ -911,14 +1109,28 @@ gate.
    seeds; see §6.1 for the numbers and §5.4 for the anchor. Reproduce with
    `QWENVOICE_DESIGN_MERGE_FORM=plain|anchored`. The labeled-over-plain margin is directional
    rather than settled — worth revisiting at higher seed count if Design work resumes.
-3. ~~**The English diction sentence.**~~ **SETTLED 2026-08-02 — prosodic null; kept.** See §8.3.
-   The tier-parity half of this item was a bug and was fixed separately (§8.2).
-4. **`language="english"` versus `auto` on Design.** Different `think`/`nothink` prefill branch
-   (§1.3), and the technical report credits the thinking pattern specifically for instruction
-   following.
+3. ~~**The English diction sentence.**~~ **SETTLED 2026-08-02 — prosodic null; kept.** See DP-4 in
+   §8.2, which also records the tier-parity half of this item: a bug, fixed separately.
+4. **`language="english"` versus `auto`** on Design, and on Custom through the D6 knob
+   (`QWENVOICE_CUSTOM_AUTO_LANGUAGE`). A different `think`/`nothink` prefill branch (§1.3): the
+   technical report credits the thinking pattern for instruction following, yet Qwen's own
+   instruction scores were measured under `nothink`. D6 is ER-05's to decide by screen.
 5. **A Chinese instruction against the English one** on CustomVoice, output text held constant.
    This requires a controlled comparison; Table 8's separate language datasets do not predict
    the result (§4.4). The dated research also proposes French-output comparisons.
+6. **Negative constraints and intensifiers**, individually. Eight of the then-shipping ten presets
+   carried a negation clause, and most of the surviving eight-preset roster's copy still does. Qwen
+   suggests one negative form (QwenLM#16), nothing measures it, and OV-InstructTTS's ablation points
+   the other way.
+7. **8-bit versus bf16 instruction adherence.** Partially answered by DP-18 (2026-08-04): the
+   4-bit and 8-bit quantizations were measured head-to-head on fresh seeds and the 8-bit arm
+   separates no *better* (UAR 0.375 vs 0.477, overlapping per-cell intervals) — quantization is
+   not the adherence bottleneck between our own tiers. The bf16 comparison itself remains
+   unmeasured; upstream measures bf16 only, we ship quantized (§7).
+8. **The clone input.** The ICL join's leading space (A-11), the reference's trailing silence
+   (A-12) and the clone layout (G-14) each change what the model reads (§2.3). They are ER-04's and
+   ER-03's to screen before any change; none is a copy question.
+
 `MEASURED-HERE`, **DP-6, 2026-08-03 — an instruction clause can be simply ignored.** Over 23 seeds
 the shipped `angry` copy moves pitch **+5.98 semitones** (d=1.40, win rate 0.91), confirming the
 `required` +1 expectation. But the retired `angry.normal` copy asks for *"a lower clipped tone"* and
@@ -933,19 +1145,11 @@ pitch at n=12 and fails to survive correction at n=23 on a different seed range,
 12-seed matrix as indicative only.** The tier decision in §8.2 leaned on such rows; the aggregate
 that decision actually rested on was much stronger than any single cell in it.
 
-6. **Negative constraints and intensifiers**, individually. Eight of the then-shipping ten presets
-   carried a negation clause that no source supports, and most of the surviving eight-preset
-   roster's copy still does; OV-InstructTTS's ablation points the other way.
-7. **8-bit versus bf16 instruction adherence.** Partially answered by DP-18 (2026-08-04): the
-   4-bit and 8-bit quantizations were measured head-to-head on fresh seeds and the 8-bit arm
-   separates no *better* (UAR 0.375 vs 0.477, overlapping per-cell intervals) — quantization is
-   not the adherence bottleneck between our own tiers. The bf16 comparison itself remains
-   unmeasured; upstream measures bf16 only, we ship quantized (§7).
-
-`UNVERIFIED`, and worth stating so nobody re-derives it: upstream's answer for emotion control on
-*cloned* voices is `Qwen3-TTS-25Hz-1.7B-VoiceEditing`, announced by a maintainer with no committed
-date. Until it exists, the supported path is to bake the delivery into a designed reference and
-clone that.
+`OFFICIAL`, and worth stating so nobody re-derives it: upstream's answer for emotion control on
+*cloned* voices was `Qwen3-TTS-25Hz-1.7B-VoiceEditing`, announced in issue #25 and the technical
+report. It was never released: the 25 Hz models and tokenizer remain unpublished, and the request
+to release them (QwenLM#294) was closed as not planned (research §1, §2). The supported path is to
+bake the delivery into a designed reference and clone that.
 
 ---
 
@@ -957,7 +1161,8 @@ Official:
 - [Qwen3-TTS Technical Report (arXiv:2601.15621)](https://arxiv.org/abs/2601.15621)
 - [Qwen3-TTS-12Hz-1.7B-CustomVoice model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) · [VoiceDesign model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign) · [Voice Design demo space](https://huggingface.co/spaces/Qwen/Qwen3-TTS-Voice-Design)
 - [Model Studio: Voice Design](https://www.alibabacloud.com/help/en/model-studio/qwen-tts-voice-design) · [qwen-tts](https://www.alibabacloud.com/help/en/model-studio/qwen-tts) · [realtime TTS](https://www.alibabacloud.com/help/en/model-studio/qwen-tts-realtime)
-- Maintainer statements: upstream issues [#25](https://github.com/QwenLM/Qwen3-TTS/issues/25) and [#14](https://github.com/QwenLM/Qwen3-TTS/issues/14)
+- Maintainer and collaborator statements: upstream issues [#4](https://github.com/QwenLM/Qwen3-TTS/issues/4), [#9](https://github.com/QwenLM/Qwen3-TTS/issues/9), [#16](https://github.com/QwenLM/Qwen3-TTS/issues/16), [#25](https://github.com/QwenLM/Qwen3-TTS/issues/25), [#43](https://github.com/QwenLM/Qwen3-TTS/issues/43), [#294](https://github.com/QwenLM/Qwen3-TTS/issues/294)
+- Line-numbered upstream citations (`WM`, `MQ`, `RM`) and the parity ledger: [ER-13 model research](../audits/2026-10-17-qwen3-tts-model-research.md)
 
 Research:
 
@@ -975,11 +1180,14 @@ Community, quality varies:
 
 - Upstream [issue #248](https://github.com/QwenLM/Qwen3-TTS/issues/248) (best-evidenced: 12 systematic tests with audio) · discussions [#218](https://github.com/QwenLM/Qwen3-TTS/discussions/218), [#231](https://github.com/QwenLM/Qwen3-TTS/discussions/231), [#238](https://github.com/QwenLM/Qwen3-TTS/discussions/238)
 - HF discussions [#28](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/discussions/28), [#38](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/discussions/38)
+- Clone input and pacing: upstream issues [#80](https://github.com/QwenLM/Qwen3-TTS/issues/80), [#134](https://github.com/QwenLM/Qwen3-TTS/issues/134), [#239](https://github.com/QwenLM/Qwen3-TTS/issues/239), [#341](https://github.com/QwenLM/Qwen3-TTS/issues/341) and PR [#362](https://github.com/QwenLM/Qwen3-TTS/pull/362); mlx-audio [#921](https://github.com/Blaizzy/mlx-audio/issues/921) (partial `ref_text`) and [#882](https://github.com/Blaizzy/mlx-audio/issues/882) (EOS re-insertion removed)
 - Vendor guidance for *other* products, borrowed where it generalizes: [Inworld Voice Design](https://docs.inworld.ai/tts/best-practices/voice-design) · [ElevenLabs Voice Design](https://elevenlabs.io/docs/eleven-creative/voices/voice-design) · [Hume acting instructions](https://dev.hume.ai/docs/text-to-speech-tts/acting-instructions)
 
 ## Related documents
 
-- [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — architecture, model variants, speaker roster, parameters
+- [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — model family, architecture, speaker roster, generation semantics, failure catalogue and parity ledger
+- [`mimi-codec-guide.md`](mimi-codec-guide.md) — the 12 Hz speech tokenizer: clone-reference encoding and decode
+- [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md) — the sourced research behind this rewrite
 - [`../qwen_tone.md`](../qwen_tone.md) — the earlier app-facing tone guide this document supersedes for provenance questions
 - [`benchmarking-procedure.md`](benchmarking-procedure.md) — how to run the matrix the §10 experiments need
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §4 — engine core and generation semantics

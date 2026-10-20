@@ -309,12 +309,14 @@ extension VocelloMacSmokeUITests {
     }
 }
 
-/// Studio Auto language reaches the engine (`scripts/ui_test.sh macos auto-language`).
-/// With every mode left on Auto, each planned take types a tracked sentence, waits for
-/// the language chip to follow detection ("French, Auto"), reads the chip's menu
-/// without choosing anything, generates, and prints a manifest without the script that
-/// `scripts/auto_language_check.py` joins to the engine's request receipt. It never
-/// changes a language selection, saves no voice and records nothing (BKL-19).
+/// Studio's Auto and manual language reach the engine (`scripts/ui_test.sh macos
+/// auto-language`). Each mode starts on Auto. An Auto take types a tracked sentence and
+/// waits for the language chip to follow detection ("French, Auto"); a manual take first
+/// picks its language from the chip's menu on an empty script, checks that the chip keeps
+/// it ("French") once the sentence is typed, and returns the mode to Auto after the take.
+/// Every take then reads the chip's menu without choosing anything, generates, and prints
+/// a manifest without the script that `scripts/auto_language_check.py` joins to the
+/// engine's request receipt. It saves no voice and records nothing (BKL-19).
 @MainActor
 final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
     private struct Plan: Decodable {
@@ -325,6 +327,8 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
     private struct Take: Decodable {
         let takeID: String
         let mode: String
+        let selection: String
+        let selectionTitle: String?
         let script: String
         let expectedChipValue: String
         let expectedRecommendedTitle: String?
@@ -378,7 +382,7 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
                 prepare(mode: mode)
                 replaceScript(with: "")
                 // With an empty script the chip reads "Auto" only while Auto is the
-                // stored selection; this lane never changes a selection.
+                // stored selection; a mode on another language fails closed.
                 let start = stableValue(of: chip, equalTo: "Auto")
                 guard start.stable else {
                     VocelloUIScreenshot.attach(app.windows.firstMatch, named: "auto-language-\(take.mode)-not-auto")
@@ -390,6 +394,13 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
             // Reset first, so the previous take's chip cannot pass for this one.
             replaceScript(with: "")
             _ = stableValue(of: chip, equalTo: "Auto")
+            if let title = take.selectionTitle {
+                // Picked on an empty script, where every row carries its plain name.
+                let picked = chooseLanguage(titled: title, on: chip)
+                if !picked || !stableValue(of: chip, equalTo: title).stable {
+                    problems.append("\(take.takeID): could not select \(title) from the language menu")
+                }
+            }
             replaceScript(with: take.script)
             let chipObservation = stableValue(of: chip, equalTo: take.expectedChipValue)
             let menu = inspectLanguageMenu(
@@ -426,6 +437,16 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
                 problems.append("\(take.takeID): the take neither completed nor showed an error")
             } else if generation.visibleError && take.requireAudioPass {
                 problems.append("\(take.takeID): the take showed a generation error")
+            }
+            if take.selectionTitle != nil {
+                // Back to Auto, so the next take starts as the plan assumes.
+                replaceScript(with: "")
+                let restored = chooseLanguage(titled: "Auto", on: chip)
+                guard restored, stableValue(of: chip, equalTo: "Auto").stable else {
+                    VocelloUIScreenshot.attach(app.windows.firstMatch, named: "auto-language-\(take.takeID)-not-restored")
+                    XCTFail((problems + ["\(take.takeID): could not return \(take.mode) to Auto"]).joined(separator: "\n"))
+                    return
+                }
             }
         }
         if !problems.isEmpty {
@@ -464,6 +485,26 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
             _ = XCTWaiter.wait(for: [XCTestExpectation(description: "language chip settles")], timeout: 0.25)
         } while clock.systemUptime < deadline
         return (last, false)
+    }
+
+    /// Picks a row of the chip's menu by its visible title (AppKit drops the rows'
+    /// identifiers), moving through the open menu with the arrow keys when needed.
+    private func chooseLanguage(titled title: String, on chip: XCUIElement) -> Bool {
+        guard VocelloUIPrimaryAction.perform(on: chip, timeout: 20) else { return false }
+        let item = chip.descendants(matching: .menuItem)
+            .matching(NSPredicate(format: "title == %@", title)).firstMatch
+        guard item.waitForExistence(timeout: 10) else {
+            app.typeKey(.escape, modifierFlags: [])
+            return false
+        }
+        let menu = chip.descendants(matching: .menu).firstMatch
+        if !item.isHittable, menu.exists {
+            let direction: XCUIKeyboardKey = item.frame.midY < menu.frame.midY ? .upArrow : .downArrow
+            for _ in 0..<20 where !item.isHittable {
+                app.typeKey(direction, modifierFlags: [])
+            }
+        }
+        return VocelloUIPrimaryAction.perform(on: item, timeout: 10)
     }
 
     /// Opens the chip's menu, notes the Auto row and the detected row, and closes it with

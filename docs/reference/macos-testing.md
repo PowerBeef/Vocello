@@ -178,10 +178,14 @@ value to settle on the detected language ("French, Auto"), reads the chip's menu
 anything and generates. The takes cover Built-in Voice in all ten languages, Design and Clone, an
 English sentence with one Japanese word, and Dutch, which no Qwen3 language matches: Built-in then
 shows Auto and sends English (the D6 fallback, recorded as an observation), Design sends no language
-token. `scripts/auto_language_check.py` joins each take, by its generation ID, to the engine's
-request receipt and checks that the request carried `auto`, that the model language and the chip
-agree, the token mode, the recognizer witness and the prompt digest; the summary and the run's rows
-stay under the run directory, without the scripts. It needs the benchmark clone voice, saves no
+token. Manual takes pick a language from the chip's menu on an empty script, mostly one that differs
+from the text (French over English, Spanish over French, English over Japanese and over Dutch), check
+that the chip keeps it once the sentence is typed, and return the mode to Auto afterwards.
+`scripts/auto_language_check.py` joins each take, by its generation ID, to the engine's request
+receipt and checks that the request carried the selection (`auto` or the picked language), that the
+model language and the chip agree, the token mode, the recognizer witness (for a manual take, the
+text's own language, which the selection overrides) and the prompt digest; the summary and the run's
+rows stay under the run directory, without the scripts. It needs the benchmark clone voice, saves no
 voice and records nothing, so no Speech Recognition prompt interrupts it (BKL-19).
 
 `design-enrollment` runs the existing Design brief/player and actual-audio enrollment journey;

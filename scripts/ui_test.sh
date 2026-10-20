@@ -108,11 +108,13 @@ Only the standalone test runner is built/installed. Distribution acceptance rema
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
 It never runs as part of another lane. Run it after all device work, before leaving the phone idle.
-`auto-language` checks on the Mac that Studio's Auto language reaches the engine. With every mode left on
-Auto (it never changes a selection), each take of config/auto-language-check.json types a tracked
-sentence, waits for the language chip to follow detection, generates, and prints a manifest without the
-script; scripts/auto_language_check.py then joins each take to its engine request receipt. It needs the
-benchmark clone voice, saves no voice and records nothing, so no permission prompt interrupts it.
+`auto-language` checks on the Mac that Studio's Auto and manual language reach the engine. Each mode
+starts on Auto (a mode on another language fails closed). Each take of config/auto-language-check.json
+types a tracked sentence; Auto takes wait for the language chip to follow detection, manual takes pick
+their language from the chip's menu first and return the mode to Auto afterwards. Each take generates
+and prints a manifest without the script; scripts/auto_language_check.py then joins each take to its
+engine request receipt. It needs the benchmark clone voice, saves no voice and records nothing, so no
+permission prompt interrupts it.
 `take-variation` reads Vocello's Take variation through the visible Settings control; only an explicit
 value selects it and verifies the result. It restores a variation an interrupted journey left pinned
 (the long-form journey pins Expressive) and never runs as part of another lane.

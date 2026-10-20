@@ -1078,6 +1078,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-26 | [`mac-lang-bench-20260926-015446-923dc005`](runs/language/mac-lang-bench-20260926-015446-923dc005.json) | focused | focused | passed | qualified | 7 | 0.27 | `4270b1109e61` | `eb462c990534` | baseline | mac-lang-bench-20260926-015446-923dc005 |
 
+## memory-qualification / ios / iphone-17-pro / config `619e26fa7139`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-10-20 | [`ios-memory-qualification-20261020-175216-613bb02a`](runs/memory-qualification/ios-memory-qualification-20261020-175216-613bb02a.json) | focused | focused | passed | qualified | 9 | 0.52 | `f1698bd85a8c` | `619e26fa7139` | baseline | ios-memory-qualification-20261020-175216-613bb02a |
+
 ## memory-qualification / ios / iphone-17-pro / config `7482ce732e47`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -2017,24 +2017,6 @@
       "due": "2026-10-22"
     },
     {
-      "id": "DW-01",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Development workflow: tooling quick wins (audit Phase 0)",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Audit P0-1 to P0-12 land with tests: a roadmap-only check selects at most 10 Python modules and runs under 20 s; every swift-lane input schedules a native command; the session hook prints the whole current checkpoint and cache health; the checkpoint keeps its newest five entries; roadmap.py gains set, close and note; the guard corpus passes every known false positive and still blocks every true positive; stale docs are fixed; CI shows failing test names and its build cache re-saves when a warm run recompiled more than 200 files; pyrightconfig.json exists; the local arenas are regenerated and warm.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-18-dev-workflow-audit.md",
-        "scripts/development_workflow.py",
-        "scripts/hooks/",
-        "scripts/roadmap.py",
-        ".github/workflows/ci.yml"
-      ],
-      "updated": "2026-10-18",
-      "due": "2026-10-20",
-      "notes": "Started 2026-10-18 on the maintainer's go. P0-10 done the same day: auto mode's user-level config made project-neutral (two soft-deny rules for unrequested pushes and account writes), the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice. P0-1 to P0-9, P0-11 and P0-12 landed the same day (a7b765c2 to f49a4c4f, plus a roadmap validate cache): a roadmap-only check selects 6 Python modules and takes 29 s (was about 75 s; validate itself 2.9 s to 0.05 s); the 20 s target waits on P1-3's contract gate. The CI failure summary and cache re-save are proven at the next push's CI run. Measured after P1-3: a roadmap-only check takes 19.7 s (6 of 36 contract validators, 277 Python tests)."
-    },
-    {
       "id": "DW-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: structural tooling (audit Phase 1)",
@@ -2082,7 +2064,7 @@
       ],
       "updated": "2026-10-19",
       "due": "2026-10-30",
-      "notes": "Maintainer 2026-10-18: now, one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 daily Xcode 27 preview run (848046e6). P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint. P3-2 @Observable view models (1406ebaf; iOS runtime proof waits for an iPhone window), NSLock to Mutex, AnyView 21 to 10. P3-3: InferIsolatedConformances (335bac7d); strict memory safety (4c464df3, with @safe forwards for the calls Swift 6.4 marks safe and 6.3 does not); NonisolatedNonsendingByDefault (50af9a6d, 711 sites kept @concurrent; UI stall gate max 460 ms of 600). Enhanced Security trial (49702a2c): an arm64e CLI with ENABLE_ENHANCED_SECURITY builds, MLX included, and its takes pass Fast QC at RTF 0.31-0.32 against 0.31-0.33, with 0.5-2% more peak RSS (exploratory). The hardened-process entitlements (memory tagging, guard objects) and the apps need the app capability and provisioning: after the submission. Open: vDSP after measurement (P3-2); P3-5 lane orchestration in Python."
+      "notes": "Maintainer 2026-10-18: now, one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 daily Xcode 27 preview run (848046e6). P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint. P3-2 @Observable view models (1406ebaf; iOS runtime proof waits for an iPhone window), NSLock to Mutex, AnyView 21 to 10; vDSP declined after measurement: the assembly's per-sample loops cost about 28 ms per 10 minutes of audio at -O (vDSP about 3 ms) against about 186 s of generation, and would change the assembled samples. P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600), Enhanced Security CLI trial (49702a2c; entitlements and apps after the submission). P3-5: macos_test.sh's data steps (349ddc34) and ui_test.sh's shared ones (da0200b1) are tested modules; core-test --repeat N hunts flakes (68c796d9). Open: the iOS-only lane snippets and ios_device.sh, in an iPhone window; CI on Xcode 27 once runners offer it."
     }
   ]
 }

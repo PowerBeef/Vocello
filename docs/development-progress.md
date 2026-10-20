@@ -19,7 +19,8 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through `49702a2c`. Push CI is green on Xcode 26.6.
+`main` is pushed through `26c419ce`; the P3-5 commits after it are local. Push CI is green on
+Xcode 26.6.
 
 - **Landed today:**
   - **P2-5 test adequacy (DW-03):**
@@ -41,6 +42,13 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   - **P2-3 step 1 (DW-03):** the CLI's runtime and parsing became `VocelloCLICore`, which the tests
     import instead of compiling by path (`cd4843eb`). Step 2 waits for the submission: the Mac-only
     files depend on shared by-path code that has to move first.
+  - **P3-5 (DW-04):** the inline Python of `macos_test.sh` (`349ddc34`) and the shared steps of
+    `ui_test.sh` (`da0200b1`) became tested modules. Each matched the original output on
+    retained artifacts and in a differential run (1,566 checks). `dev.sh test --only X --repeat N`
+    hunts flaky tests (`68c796d9`).
+  - **vDSP declined after measurement:** the assembly's per-sample loops cost about 28 ms per
+    10 minutes of audio at -O, against about 186 s of generation.
+  - **DW-01 closed:** CI proved the failing-test summary and the drifted-cache re-save.
 - **Pinned defects:** strict expected failures pin B-02 (ER-06) and a new BKL-20, where a rebuilt
   overlay trusts weights that changed in place. B-04 is pinned as current behaviour (ER-02).
 - **Fixed lanes:**
@@ -48,8 +56,9 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   - The macOS UI benchmark ran its checker under a `python3` without numpy (`d85aadd9`).
     Its run was recorded as failed, then passed on re-check; nothing was published.
 - **Next:**
-  - P3-5, lane orchestration in Python.
-  - vDSP after measurement.
+  - Push the P3-5 batch and watch CI.
+  - DW-02's P1-2 (UI readiness preflight) has a Mac half that can land now.
+  - The iOS-only lane snippets, `ios_device.sh` and P1-15 wait for an iPhone window.
 - **Still waiting on an iPhone window:** the iOS runtime proof of the Observation migration and
   of the strictness settings.
 

@@ -5066,6 +5066,31 @@
         "run:macos-xcui-smoke-20261017-035201-7351edbb",
         "run:macos-xcui-smoke-20261017-035412-8f96c736"
       ]
+    },
+    {
+      "id": "DW-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: tooling quick wins (audit Phase 0)",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Audit P0-1 to P0-12 land with tests: a roadmap-only check selects at most 10 Python modules and runs under 20 s; every swift-lane input schedules a native command; the session hook prints the whole current checkpoint and cache health; the checkpoint keeps its newest five entries; roadmap.py gains set, close and note; the guard corpus passes every known false positive and still blocks every true positive; stale docs are fixed; CI shows failing test names and its build cache re-saves when a warm run recompiled more than 200 files; pyrightconfig.json exists; the local arenas are regenerated and warm.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "scripts/development_workflow.py",
+        "scripts/hooks/",
+        "scripts/roadmap.py",
+        ".github/workflows/ci.yml"
+      ],
+      "updated": "2026-10-19",
+      "due": "2026-10-20",
+      "notes": "Started 2026-10-18 on the maintainer's go. P0-10: auto mode's user-level config made project-neutral, the user-scoped clangd LSP uninstalled, the redundant local push allow removed; the unused user skills stay by the maintainer's choice. P0-1 to P0-9, P0-11 and P0-12 landed the same day (a7b765c2 to f49a4c4f). Gate met: a roadmap-only check selects 6 Python modules and takes 19.7 s after P1-3 (was about 75 s); every swift-lane input schedules a native command; the session hook prints the whole checkpoint and cache health; roadmap.py set, note and close; the guard corpus; stale docs fixed; pyrightconfig.json; the arenas warm. CI proof: run 39179358233 recompiled 537 files and saved new build-cache snapshots; runs 39309602712 and 39317708660 named their failures in the job summary.",
+      "evidence": [
+        "commit:a7b765c2",
+        "commit:45771f92",
+        "commit:f49a4c4f",
+        "doc:docs/audits/2026-10-18-dev-workflow-audit.md",
+        "run:ci-39179358233"
+      ]
     }
   ]
 }

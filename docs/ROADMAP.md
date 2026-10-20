@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 11/40 (28%) |
+| `release-first-3-0-2026-09` | active | release-qa | 12/40 (30%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -58,7 +58,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BG-01` | in-flight | Prove or rule out GPU work outliving the foreground (engine review BG-1) | — |
 | `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
-| `DW-01` | in-flight | Development workflow: tooling quick wins (audit Phase 0) | — |
 | `DW-02` | in-flight | Development workflow: structural tooling (audit Phase 1) | — |
 | `DW-03` | in-flight | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | in-flight | Development workflow: longer-term modernization (audit Phase 3) | — |
@@ -122,9 +121,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
-
-- **`DW-01`** (in-flight, due 2026-10-20) — Development workflow: tooling quick wins (audit Phase 0).
-  gate: Audit P0-1 to P0-12 land with tests: a roadmap-only check selects at most 10 Python modules and runs under 20 s; every swift-lane input schedules a native command; the session hook prints the whole current checkpoint and cache health; the checkpoint keeps its newest five entries; roadmap.py gains set, close and note; the guard corpus passes every known false positive and still blocks every true positive; stale docs are fixed; CI shows failing test names and its build cache re-saves when a warm run recompiled more than 200 files; pyrightconfig.json exists; the local arenas are regenerated and warm.
 
 - **`DW-02`** (in-flight, due 2026-10-22) — Development workflow: structural tooling (audit Phase 1).
   gate: Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.

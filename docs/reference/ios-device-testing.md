@@ -253,6 +253,22 @@ privately. `scripts/ios_device.sh device-state` proves reachability, not lock st
 another device lane after final protection. If this route fails, stop unattended device work and
 report that protection still requires operator action.
 
+### Restoring Take variation
+
+A journey that pins Take variation (the long-form journey pins Expressive) restores the original
+on exit. When that cleanup cannot run, as when an interruption left the History search keyboard
+covering the tab dock on 2026-10-20, restore it explicitly:
+
+```sh
+scripts/ui_test.sh ios take-variation --scenario inspect
+scripts/ui_test.sh ios take-variation --scenario consistent
+```
+
+The default `inspect` reads the selection through the visible Settings control and changes
+nothing. A named value (`expressive`, `balanced` or `consistent`) selects it through the same
+control and verifies the readback; the retained `take-variation.json` records the value before
+and after. It never runs as part of another lane.
+
 ## Explicit XCUITest lanes
 
 Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so

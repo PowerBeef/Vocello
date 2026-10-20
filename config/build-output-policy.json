@@ -18,6 +18,7 @@
         "model-download",
         "startup-parity",
         "screen-protection",
+        "take-variation",
         "purchase",
         "perf"
       ],
@@ -126,6 +127,10 @@
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-screen-protection": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-take-variation": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },

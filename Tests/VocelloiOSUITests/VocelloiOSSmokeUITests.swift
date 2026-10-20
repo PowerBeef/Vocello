@@ -155,6 +155,39 @@ final class VocelloiOSScreenProtectionUITests: XCTestCase {
     }
 }
 
+/// Explicit operator recovery of the Take variation preference, isolated from
+/// every acceptance journey (scripts/ui_test.sh ios take-variation). It reads the
+/// visible Settings control and, only when the lane names a value, selects that
+/// value through the same control, e.g. after a journey that pinned Expressive
+/// could not restore the original.
+@MainActor
+final class VocelloiOSTakeVariationUITests: VocelloiOSUITestCase {
+    func testConfiguredTakeVariation() throws {
+        let requested = ProcessInfo.processInfo.environment["QVOICE_IOS_TAKE_VARIATION"] ?? ""
+        guard ["inspect", "expressive", "balanced", "consistent"].contains(requested) else {
+            XCTFail("Use the explicit take-variation lane; the requested value is missing")
+            return
+        }
+        beginSession()
+        let before = selectedVariationID()
+        if requested != "inspect", before != requested {
+            selectVariation(requested)
+        }
+        let after = selectedVariationID()
+        let attachment = XCTAttachment(
+            data: try JSONSerialization.data(
+                withJSONObject: ["schemaVersion": 1, "requested": requested, "before": before, "after": after],
+                options: [.sortedKeys]
+            ),
+            uniformTypeIdentifier: "public.json"
+        )
+        attachment.name = "take-variation.json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertEqual(after, requested == "inspect" ? before : requested)
+    }
+}
+
 /// One explicit physical-device journey. It exercises visible production UI
 /// in a single app session, cancels one active streamed Custom generation,
 /// and then completes exactly one Custom generation.

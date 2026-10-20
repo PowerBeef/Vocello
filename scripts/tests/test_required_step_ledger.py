@@ -28,12 +28,14 @@ SPEC.loader.exec_module(ledger_module)
 
 class RequiredStepLedgerTests(unittest.TestCase):
 
-    def test_screen_protection_is_explicit_and_ledger_bound(self) -> None:
+    def test_operator_setting_lanes_are_explicit_and_ledger_bound(self) -> None:
         contract = json.loads(CONTRACT.read_text())
-        lane = contract["workflows"]["ui-ios-screen-protection"]
-        self.assertEqual(lane["producer"], "scripts/ui_test.sh")
-        self.assertIn("xcuitest", lane["requiredSteps"])
-        self.assertIn("crash-delta", lane["requiredSteps"])
+        for workflow in ("ui-ios-screen-protection", "ui-ios-take-variation"):
+            with self.subTest(workflow=workflow):
+                lane = contract["workflows"][workflow]
+                self.assertEqual(lane["producer"], "scripts/ui_test.sh")
+                self.assertIn("xcuitest", lane["requiredSteps"])
+                self.assertIn("crash-delta", lane["requiredSteps"])
 
     @staticmethod
     def write_source_identity(path: Path) -> None:

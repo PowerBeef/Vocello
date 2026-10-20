@@ -56,6 +56,7 @@ Usage:
   scripts/ui_test.sh ios saved-voice-lifecycle
   scripts/ui_test.sh ios purchase [--scenario lifecycle|exports] --retain-result
   scripts/ui_test.sh ios screen-protection --scenario inspect|enable
+  scripts/ui_test.sh ios take-variation --scenario inspect|expressive|balanced|consistent
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `marketing` captures authored Mac product images, generates two demo takes, and saves one designed
@@ -106,6 +107,9 @@ Only the standalone test runner is built/installed. Distribution acceptance rema
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
 It never runs as part of another lane. Run it after all device work, before leaving the phone idle.
+`take-variation` reads Vocello's Take variation through the visible Settings control; only an explicit
+value selects it and verifies the result. It restores a variation an interrupted journey left pinned
+(the long-form journey pins Expressive) and never runs as part of another lane.
 Append `--retain-result` to explicitly pin a campaign member against routine UI-result pruning;
 remove its untracked `retention-pin.json` only after the evidence set is retired.
 RUN_ID is an opaque 1-96 character identifier using letters, digits, dot, underscore, or hyphen.
@@ -118,7 +122,7 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "purchase" ]] || usage
+[[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "take-variation" || "$lane" == "purchase" ]] || usage
 [[ "$lane" != "marketing" || "$platform" == "macos" ]] || usage
 [[ "$lane" != "purchase" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
@@ -128,6 +132,7 @@ shift 2
 [[ "$lane" != "enroll-clone-fixture" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "saved-voice-lifecycle" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "screen-protection" || "$platform" == "ios" ]] || usage
+[[ "$lane" != "take-variation" || "$platform" == "ios" ]] || usage
 
 modes="custom,design,clone"
 lengths="short,medium,long"
@@ -228,6 +233,11 @@ elif [[ "$lane" == "screen-protection" ]]; then
   scenario_argument="${scenario_argument:-inspect}"
   [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "enable" ]] \
     || die "screen-protection --scenario must be inspect or enable"
+elif [[ "$lane" == "take-variation" ]]; then
+  scenario_argument="${scenario_argument:-inspect}"
+  [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "expressive" \
+      || "$scenario_argument" == "balanced" || "$scenario_argument" == "consistent" ]] \
+    || die "take-variation --scenario must be inspect, expressive, balanced or consistent"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
         || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \
@@ -249,7 +259,7 @@ elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
     || die "purchase --scenario must be lifecycle or exports"
 elif [[ -n "$scenario_argument" ]]; then
-  die "--scenario requires model-download, control-audit, screen-protection, or development ios smoke"
+  die "--scenario requires model-download, control-audit, screen-protection, take-variation, or development ios smoke"
 fi
 if [[ -n "$history_row_id" && "$scenario_argument" != "history-transcript" ]]; then
   die "--history-row-id requires ios smoke --scenario history-transcript"
@@ -1625,6 +1635,10 @@ else
     only_test="VocelloiOSUITests/VocelloiOSScreenProtectionUITests/testConfiguredAutoLockAction"
     # Runner-only authorization; never forwarded into a product process.
     export TEST_RUNNER_QVOICE_IOS_SCREEN_PROTECTION_ACTION="$scenario_argument"
+  elif [[ "$lane" == "take-variation" ]]; then
+    only_test="VocelloiOSUITests/VocelloiOSTakeVariationUITests/testConfiguredTakeVariation"
+    # Runner-only; the test changes the preference only through the visible Settings control.
+    export TEST_RUNNER_QVOICE_IOS_TAKE_VARIATION="$scenario_argument"
   elif [[ "$lane" == "control-audit" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSControlAuditUITests/testConfiguredControlAuditScenario"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_RUN_ID="$run_id"

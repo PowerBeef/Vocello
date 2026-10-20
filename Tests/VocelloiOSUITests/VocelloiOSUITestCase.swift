@@ -59,6 +59,13 @@ class VocelloiOSUITestCase: XCTestCase {
             pendingInterfaceLanguageRestore = nil
             pendingVariationRestore = nil
         }
+        // The software keyboard covers the floating tab dock, so a journey that
+        // ended mid-entry (a History search an interruption cut short) submits
+        // its field before the restores navigate to Settings (CONV-21).
+        if session != nil, app.keyboards.firstMatch.exists,
+           app.textFields["historySearchField"].firstMatch.exists {
+            dismissHistorySearchKeyboardIfNeeded()
+        }
         restorePendingAutoplayPreference()
         if let original = pendingVariationRestore, session != nil {
             restoreVariation(original)

@@ -519,14 +519,25 @@ actor PreparedVoiceRepository {
         defer { releaseStoreLock(lock) }
         try reconcileLocked()
         try validateIdentifier(voiceID)
-        let promptRoot = voicesDirectory.appendingPathComponent("\(voiceID).clone_prompt", isDirectory: true)
-        guard sourceURL.standardizedFileURL.deletingLastPathComponent() == voicesDirectory.standardizedFileURL,
+        // The checks read the URLs the publication then uses: leaf names as text,
+        // and each parent as the existing directory it names on disk, symbolic
+        // links and `..` included. standardizedFileURL drops a leading /private
+        // only from a path that exists, and iOS spells the App Group container
+        // /private/var/…, so a new artifact beside an older one (after an MLX or
+        // model update) never matched its prompt root and every take of that
+        // voice failed (CONV-21).
+        let voicesRoot = Self.resolvedDirectoryPath(voicesDirectory)
+        let modelDirectory = destination.deletingLastPathComponent()
+        let promptRoot = modelDirectory.deletingLastPathComponent()
+        guard Self.resolvedDirectoryPath(sourceURL.deletingLastPathComponent()) == voicesRoot,
               sourceURL.deletingPathExtension().lastPathComponent == voiceID,
               supportedAudioExtensions.contains(sourceURL.pathExtension.lowercased()),
-              staging.standardizedFileURL.deletingLastPathComponent() == voicesDirectory.standardizedFileURL,
+              Self.resolvedDirectoryPath(staging.deletingLastPathComponent()) == voicesRoot,
               staging.lastPathComponent.hasPrefix(".clone-prompt-staging-"),
-              destination.standardizedFileURL.deletingLastPathComponent().deletingLastPathComponent()
-                == promptRoot.standardizedFileURL else {
+              Self.isPlainComponent(destination.lastPathComponent),
+              Self.isPlainComponent(modelDirectory.lastPathComponent),
+              promptRoot.lastPathComponent == "\(voiceID).clone_prompt",
+              Self.resolvedDirectoryPath(promptRoot.deletingLastPathComponent()) == voicesRoot else {
             throw PreparedVoiceRepositoryError.invalidIdentifier
         }
         try fault(.beforeClonePromptPublication)
@@ -1027,6 +1038,16 @@ actor PreparedVoiceRepository {
               URL(fileURLWithPath: id).lastPathComponent == id else {
             throw PreparedVoiceRepositoryError.invalidIdentifier
         }
+    }
+
+    /// One spelling per directory, however the caller spelled it (`/var` or
+    /// `/private/var`); only meaningful for a directory that exists.
+    private static func resolvedDirectoryPath(_ directory: URL) -> String {
+        directory.resolvingSymlinksInPath().path
+    }
+
+    private static func isPlainComponent(_ component: String) -> Bool {
+        !component.isEmpty && component != "." && component != ".." && !component.contains("/")
     }
 
     private func candidateDirectory(for id: UUID) -> URL {

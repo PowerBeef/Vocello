@@ -469,9 +469,11 @@ actor NativePreparedCloneConditioningCache {
                 checksStoredTranscript: checksStoredTranscript,
                 expectedStoredTranscript: expectedStoredTranscript
             )
-        } catch PreparedVoiceRepositoryError.storeBusy {
+        } catch PreparedVoiceRepositoryError.storeBusy, PreparedVoiceRepositoryError.invalidIdentifier {
             // A prompt is a rebuildable cache; never delay a take or hold an
-            // executor while another process owns the saved-voice transaction.
+            // executor while another process owns the saved-voice transaction,
+            // and never fail a take whose handle is built because publication
+            // refused its paths (CONV-21): nothing was published, staging goes.
             return false
         }
     }

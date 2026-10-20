@@ -213,11 +213,13 @@
       "audit": "docs/audits/2026-10-16-engine-runtime-audit.md",
       "severity": "S2",
       "runtimeCapabilityID": "qwen3-loading-and-sampling",
-      "title": "EOS is re-inserted into the sampled logits (D2), which can truncate a take",
+      "title": "EOS was re-inserted into the sampled logits (D2), which could truncate a take; production filters it like any token since RF-18 (2026-10-20)",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open: the RF-18 follow-up screen's EOS arms (C4, E4) decide D2; E4 has not run (ER-05)."
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests/testFilteringEOSStopsTheLoopFromReinsertingIt"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "A-07",
@@ -491,9 +493,13 @@
       "severity": "S1",
       "title": "About 60 s single takes drift into silences of 2 s or more late in the take; long-form fails in ordinary use",
       "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open by decision: a 3.0 known limitation naming Consistent; the RF-18 follow-up screen (subtalker C1 passing, budget C2 failing, EOS arms pending) decides the fix, and the iOS long-form smoke is the device proof."
+      "tests": [
+        "VocelloCoreTests/RequestLocalSamplingPolicyTests/testSubtalkerKeepsReferenceSamplingWhateverTheVariation"
+      ],
+      "status": "partial",
+      "remaining": [
+        "The RF-18 follow-up screen's adopted subtalker and EOS changes cut Consistent's failed long-form projects from 9 to 2 of 56 on the Mac; the rest stays a 3.0 known limitation naming Consistent, and the iOS long-form smoke is the device proof."
+      ]
     },
     {
       "id": "C-02",

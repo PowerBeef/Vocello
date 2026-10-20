@@ -465,11 +465,12 @@ Vocello's effective defaults:
 | `do_sample` | true | App policy |
 | `repetition_penalty` | 1.05 | App policy |
 
-The **Code Predictor** copies the talker's effective temperature, top-p and top-k
-(`UnsafeSpeechGenerationModel.swift`), and it never applies the repetition penalty. That matches
-upstream only under Expressive: upstream keeps its subtalker at 0.9 / top-k 50 / top-p 1.0 for every
-request, so Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) depart from it (research ledger;
-ER-05). Internal-diagnostics knobs can set the subtalker separately.
+The **Code Predictor** samples at 0.9 / top-k 50 / top-p 1.0 for every request, as upstream's
+subtalker does, whatever the variation sets for the talker (`UnsafeSpeechGenerationModel.swift`),
+and it never applies the repetition penalty. Until 2026-10-20 it copied the talker, so Balanced
+(0.8 / 0.95) and Consistent (0.7 / 0.9) narrowed it too; the RF-18 follow-up screen's pre-registered
+C1 arm, which restored the reference values, cut Consistent's failed long-form projects from 9 to
+2 of 56. Internal-diagnostics knobs can still set the subtalker separately.
 
 Streaming:
 

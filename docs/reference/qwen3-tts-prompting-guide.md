@@ -618,12 +618,11 @@ these settings are what the reported instruction-following numbers were measured
 
 `MEASURED-HERE`. [`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json)
 matches on every value. The owned runtime carries the **subtalker sampler as its own stage**
-(`Qwen3RequestSamplingPolicy.subtalker`), but production fills it from the talker's values
-(`UnsafeSpeechGenerationModel.swift`): under Expressive both are 0.9 / 50 / 1.0, as upstream, while
-Balanced and Consistent lower the subtalker with the talker. Upstream keeps the subtalker at
-0.9 / 50 / 1.0 whatever the talker uses, so this checkout does pin the residual-codebook sampler for
-the two non-default variations (ER-05; every failure in RF-18's long-form screen ran under
-Consistent).
+(`Qwen3RequestSamplingPolicy.subtalker`), and production fills it with upstream's values,
+0.9 / 50 / 1.0, whatever the talker uses (`UnsafeSpeechGenerationModel.swift`). Balanced and
+Consistent narrow only the talker. Until 2026-10-20 the subtalker followed the talker down; every
+failure in RF-18's long-form screen ran under Consistent, and restoring the reference subtalker (the
+follow-up screen's C1 arm) cut Consistent's failed projects from 9 to 2 of 56.
 
 `MEASURED-HERE`. The decode budget is a **fixed constant**
 (`Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens`, 2048), not derived from text length. A slow or heavy delivery therefore cannot clip against a text-proportional

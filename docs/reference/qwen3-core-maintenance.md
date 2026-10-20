@@ -55,10 +55,11 @@ with a fresh upstream tree. Direct SwiftPM work must use
 
 - Custom, Design, and Clone use the bounded streaming pipeline. Non-final chunk evaluation may
   overlap token generation; the final chunk is synchronized before terminal completion.
-- Talker and subtalker sampling use official checkpoint behavior under the default Expressive
-  variation, unless an explicit diagnostic override is active. Balanced and Consistent, the
-  subtalker's inheritance of the talker's values and the EOS re-insertion (D2) are deliberate
-  departures, recorded in the research report's parity ledger
+- The subtalker samples with the official values for every variation, and the talker filters EOS
+  like any token (D2); both follow the reference since the RF-18 follow-up screen (2026-10-20). The
+  talker uses the official values under the default Expressive variation unless an explicit
+  diagnostic override is active. Balanced and Consistent, which narrow only the talker, are the
+  deliberate departure, recorded in the research report's parity ledger
   (`docs/audits/2026-10-17-qwen3-tts-model-research.md`).
 - `maxTokens` is a quality failure, not a successful truncated result.
 - Clone prompt artifacts are atomically published and fail closed on file, digest, shape, dtype,

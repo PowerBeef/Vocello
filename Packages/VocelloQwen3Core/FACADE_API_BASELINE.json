@@ -78,7 +78,7 @@
     "Sources/VocelloQwen3Core/Contracts.swift::public let minP: Float",
     "Sources/VocelloQwen3Core/Contracts.swift::public init(temperature: Float, topP: Float, topK: Int, minP: Float = 0)",
     "Sources/VocelloQwen3Core/Contracts.swift::public struct VocelloQwen3ReferenceParity: Codable, Hashable, Sendable",
-    "Sources/VocelloQwen3Core/Contracts.swift::public static let production = Self(fullTextConditioning: false, filtersEOS: false, float32Sampling: true)",
+    "Sources/VocelloQwen3Core/Contracts.swift::public static let production = Self(fullTextConditioning: false, filtersEOS: true, float32Sampling: true)",
     "Sources/VocelloQwen3Core/Contracts.swift::public let fullTextConditioning: Bool",
     "Sources/VocelloQwen3Core/Contracts.swift::public let filtersEOS: Bool",
     "Sources/VocelloQwen3Core/Contracts.swift::public let float32Sampling: Bool",
@@ -455,7 +455,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "66a0e85dd238bde87cd4dd0c35719c57a8a7ad4de4c1665ae54ef5b6e92c3ad0"
+      "sha256": "a59c52eb800ff6ad461054c1d77f004a34214e5bc442ade8feaf4e0af89bf7cb"
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",

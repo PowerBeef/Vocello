@@ -77,9 +77,9 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
         XCTAssertEqual(processed([4, 2, -4], temperature: 0, topK: 1, suppress: [0]), [-.infinity, 2, -4])
     }
 
-    /// RF-14 D2: production re-inserts an eligible EOS after top-k, top-p and
-    /// min-p; the reference arm filters it like any token. Without an EOS id
-    /// the two paths are the same filter.
+    /// RF-14 D2: production filters EOS like any token, as the reference does
+    /// (RF-18, 2026-10-20); the re-insertion arm puts an eligible EOS back after
+    /// top-k, top-p and min-p. Without an EOS id the two paths are the same filter.
     func testReferenceEOSFilteringDropsTheReinsertion() {
         XCTAssertEqual(processed([4, 2, -4], topK: 1, eos: 2), [4, -.infinity, -4])
         XCTAssertEqual(processed([4, 2, -4], topK: 1, eos: 2, reinsertsEOS: false), [4, -.infinity, -.infinity])

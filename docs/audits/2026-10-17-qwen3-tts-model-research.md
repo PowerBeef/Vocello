@@ -60,7 +60,8 @@ Vocello paths: `Q` = `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3
 3. **D2 was an mlx-audio invention, and mlx-audio removed it.** EOS re-insertion entered with mlx-audio
    `6549fc2` (2026-01-25) and was removed by `d2d02bf` (2026-08-19, MA#882, "early silent EOS
    truncation at sentence tail"), stating that the reference runs plain HF `generate()` with no such
-   exemption. Vocello still re-inserts EOS (`Qwen3ReferenceParity.production.filtersEOS = false`).
+   exemption. Vocello re-inserted EOS until 2026-10-20, when the RF-18 follow-up screen adopted
+   filtering (`Qwen3ReferenceParity.production.filtersEOS = true`).
 4. **The Mimi encoder RoPE bug (A-02) is confirmed and unfixed in the Swift port.** The 12 Hz encoder is
    HF `MimiModel`, which applies `rotate_half` to q/k weights stored in permuted ("sliced rotary")
    layout (HFM L542-560, L668). mlx-audio fixed its port with `rope_traditional=False` (`6549fc2`);
@@ -83,6 +84,7 @@ Vocello paths: `Q` = `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3
    top-p 1.0 whatever the talker uses; Vocello's subtalker copies the talker
    (`Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift:119-124`, **verified**), so Balanced
    (0.8/0.95) and Consistent (0.7/0.9) diverge. Every failure in RF-18's screen ran under Consistent.
+   **Resolved 2026-10-20:** the RF-18 follow-up screen's C1 arm adopted the reference subtalker.
 8. **Precision.** Qwen trained and evaluated in bf16 and recommends fp32 where bf16 is unavailable,
    because the code predictor is "extremely sensitive to precision" (QwenLM#43). No quantized
    checkpoint was ever evaluated upstream; Vocello's 4-bit artifacts quantize all 51 code-predictor
@@ -318,7 +320,7 @@ ARCHITECTURE §11 does not say.
 | ID | Divergence | Upstream | Vocello | Status (2026-10-16) | Owner |
 |---|---|---|---|---|---|
 | D1 / A-01 | Text layout of streamed Custom/Design takes | non-streaming (full text up front), audio streamed | streaming text: one text token per frame, then `tts_pad` | **not adopted**: RF-18's pre-registered Mac screen (D1-on failed 3 of 23 long segments, D1-off 2 of 27, all under Consistent) | ER-03 |
-| D2 | EOS after top-k/top-p | filtered like any token | re-inserted (`filtersEOS = false`) | open; mlx-audio removed the same re-insertion (MA#882) | ER-05 |
+| D2 | EOS after top-k/top-p | filtered like any token | filtered since 2026-10-20 (`filtersEOS = true`) | **adopted** by the RF-18 follow-up screen's rule; mlx-audio removed the same re-insertion (MA#882) | — |
 | D3 | Sampling precision | bf16 logits (fp16 overflow reported, #355) | float32 logits | **adopted** 2026-10-13 | — |
 | D5 / A-04 | Decoder history for streamed clones | ICL decodes reference + generated codes, then trims | streamed clones decode from a cold decoder | open (with A-26) | ER-04 |
 | D6 | Custom under Auto | nothink, no language token | English fallback plus a diction instruction | open, by design | ER-05 |

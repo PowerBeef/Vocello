@@ -27,7 +27,8 @@ public struct Qwen3SamplingStage: Hashable, Sendable {
 /// RF-14 reference-parity arms: each flag puts one verified divergence from
 /// Qwen's reference implementation on the reference behavior for one request.
 /// `.production` is the shipped engine: D3 (float32 sampling) by the
-/// maintainer's 2026-10-13 decision, the others off. The host departs from it
+/// maintainer's 2026-10-13 decision and D2 (EOS filtered) by the RF-18
+/// follow-up screen's pre-registered rule (2026-10-20), D1 off. The host departs from it
 /// only through its registered internal-diagnostics knobs.
 public struct Qwen3ReferenceParity: Hashable, Sendable {
     /// D1: a streamed Custom or Design take lays its whole target text over
@@ -44,7 +45,7 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 
     public static let production = Self(
         fullTextConditioning: false,
-        filtersEOS: false,
+        filtersEOS: true,
         float32Sampling: true
     )
 
@@ -56,13 +57,14 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 
     /// The engine's record of a request that departs from production: every
     /// arm it asked for; empty on the production path. An arm can be a no-op for
-    /// one take (D1 on a clone or a quality-first take, D3 on float32 logits),
+    /// one take (D1 on a clone or a quality-first take, D2 when EOS stays inside the
+    /// filters, D3 on float32 logits),
     /// so a pair's audio, not this label, shows whether it changed anything.
     var evidence: [String: String] {
         guard self != .production else { return [:] }
         let arms = [
             fullTextConditioning ? "full_text_conditioning" : nil,
-            filtersEOS ? "filters_eos" : nil,
+            filtersEOS ? "filters_eos" : "reinserts_eos",
             float32Sampling ? "float32_sampling" : "model_precision_sampling",
         ].compactMap { $0 }
         return ["reference_parity": arms.joined(separator: ",")]
@@ -75,7 +77,9 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 /// effective seed is always present, including for requests where the product
 /// selected a random seed, so generation evidence can reproduce the take on the
 /// same source: version 2 samples from float32 logits since 2026-10-13 (RF-14
-/// D3), so one seed's takes differ before and after that change.
+/// D3), and since 2026-10-20 filters EOS like any token (D2) with a subtalker that
+/// keeps the reference sampling (RF-18), so one seed's takes differ across those
+/// changes.
 public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     public static let currentAlgorithmVersion = 2
 

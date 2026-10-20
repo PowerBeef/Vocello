@@ -1926,7 +1926,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     // and later steps hold: MLX picks different binary kernels.
                     generatedTokenIDs: topP < 1 ? [0, 1] : [0],
                     suppressTokens: suppressTokens,
-                    eosTokenId: eosTokenId
+                    eosTokenId: eosTokenId,
+                    reinsertsEOSAfterFiltering: !Qwen3ReferenceParity.production.filtersEOS
                 ))
                 if let codeLogits {
                     draws.append(sampleToken(codeLogits, temperature: 0.9, topP: topP, topK: 50))
@@ -3997,8 +3998,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     codePredictorScratch = Qwen3SamplerScratch(vocabSize: codeLogits.dim(-1))
                 }
                 // Subtalker (code-predictor) sampling is explicitly request
-                // owned. It defaults to the talker stage, but may vary without
-                // inheriting the talker's repetition penalty.
+                // owned and never inherits the talker's repetition penalty. The
+                // host gives it the reference values whatever the variation
+                // (RF-18 C1); only the generic `official` helper copies the talker.
                 let nextCode = Self.sampleToken(
                     codeLogits,
                     temperature: subtalkerSampling.temperature,
@@ -5231,7 +5233,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         scratch: Qwen3SamplerScratch? = nil,
         allowsEOS: Bool = true,
         castsLogitsToFloat32: Bool = true,
-        reinsertsEOSAfterFiltering: Bool = true,
+        reinsertsEOSAfterFiltering: Bool = !Qwen3ReferenceParity.production.filtersEOS,
         observe: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)? = nil
     ) -> MLXArray {
         var logitsSlice = logits[0..., (-1)..., 0...].squeezed(axis: 1) // [batch, vocab_size]
@@ -5299,8 +5301,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             logitsSlice = logitsSlice / temperature
         }
 
-        // Preserve EOS logit so top-k/top-p/min-p do not permanently suppress it.
-        // RF-14 D2 (diagnostics only): the reference filters EOS like any token.
+        // RF-14 D2: production filters EOS like any token, as the reference does
+        // (RF-18 follow-up screen, 2026-10-20). Re-insertion keeps the EOS logit
+        // past top-k/top-p/min-p; it remains for QWENVOICE_TALKER_FILTER_EOS=off.
         let eosLogit: MLXArray? = if reinsertsEOSAfterFiltering,
             let eosTokenId, eosTokenId >= 0, eosTokenId < logitsSlice.dim(-1) {
             logitsSlice[0..., eosTokenId ..< (eosTokenId + 1)]

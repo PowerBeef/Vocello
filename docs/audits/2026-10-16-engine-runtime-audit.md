@@ -246,6 +246,41 @@ a device. An optional download-race scenario needs a separate go for multi-GB do
        otherwise re-insertion stays, documented as a deliberate divergence.
      - **Combinations:** if more than one change is adopted, a combined Consistent arm must fail at
        most one project more than the best single arm before the combination ships.
+   - **Follow-up screen result (2026-10-17, finished 2026-10-20).**
+
+     | Arm | Failed projects of 56 | Runaway endings | Dropouts | Failure classes |
+     |---|---|---|---|---|
+     | C0 | 9 | 3 | 7 | dropout, terminal silence, slow speaking rate |
+     | C1 | 2 | 0 | 2 | dropout, slow speaking rate |
+     | C2 | 15 | 5 | 12 | dropout, terminal silence, slow speaking rate |
+     | C4 | 7 | 2 | 5 | dropout, terminal silence, slow speaking rate |
+     | E0 | 0 | 0 | 0 | none |
+     | E2 | 0 | 0 | 0 | none |
+     | E4 | 0 | 0 | 0 | none |
+     | C1 + C4 | 2 | 0 | 2 | dropout, slow speaking rate |
+
+     - **Verdicts.**
+       - The control reproduced the defect.
+       - C1 passes its rule (2 against at most 4.5, no new class).
+       - C2 fails its rule (15).
+       - D2 passes its rule:
+         - C4's runaway endings (2) and failed projects (7) do not exceed C0's (3 and 9);
+         - E4 fails no project;
+         - no new class appears.
+       - The combined arm fails 2 projects, within one of C1's, so the combination ships.
+     - **The effect is C1's.** EOS filtering changed no Expressive take: E0 and E4 are byte-identical
+       on all 56 projects. Under Consistent it changed 1 of the 41 projects comparable with C0, and
+       with C1 none of the 54 readable ones.
+     - **Comparable across the pause.** The arms after the pause (E4 and the combined arm) ran on a
+       CLI rebuilt from `12db497c`. Before them, a rerun of E0's fixture at seed 1 on that CLI
+       reproduced the stored take's PCM byte for byte.
+     - **Adopted (2026-10-20).**
+       - The subtalker keeps the reference sampling, 0.9 / top-k 50 / top-p 1.0, for every variation.
+       - Production filters EOS like any token.
+       - `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion.
+       - C-02's lower budget is not adopted.
+       - Consistent's remaining failures stay the 3.0 known limitation, and the iOS long-form smoke
+         is the device proof.
 3. **D1 adoption (if the rule passes).**
    - Flip both `.production` constants together: `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`
      45-49 and `Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift` 122.

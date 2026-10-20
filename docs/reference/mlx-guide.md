@@ -221,9 +221,11 @@ The decoder uses input-side overlap-and-discard (`inputContext`) to avoid chunk-
 Sampling algorithm v2 resolves one immutable `VocelloQwen3SamplingConfiguration` per request.
 Every request has a recorded effective seed and owns a fresh `MLXRandom.RandomState`; all talker and
 Code Predictor categorical draws run under that state and do not advance MLX's process-global RNG.
-Talker and subtalker stages carry their own temperature, top-k, top-p, and min-p values, but
-production fills the subtalker from the talker's (see `qwen3-tts-guide.md` §9; RF-18's follow-up
-screen tests the reference's independent subtalker). The
+Talker and subtalker stages carry their own temperature, top-k, top-p, and min-p values.
+Production gives the subtalker the reference's own values (0.9, top-k 50, top-p 1.0) whatever the
+variation sets for the talker (RF-18's follow-up screen, adopted 2026-10-20; see
+`qwen3-tts-guide.md` §9), and filters the talker's EOS like any token (D2;
+`QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion). The
 subtalker never inherits repetition penalty. Both stages sample from float32 logits whatever the
 model's precision, as Qwen's reference does (RF-14 D3, the default since 2026-10-13;
 `QWENVOICE_SAMPLER_FLOAT32=off` restores model-precision sampling for comparison). The order matters:
@@ -238,8 +240,8 @@ Vocello applies temperature scaling before top-p/min-p truncation. Talker defaul
 Debug-gated environment values may be used for A/B experiments
 (`QWENVOICE_TALKER_TEMP`, `QWENVOICE_TALKER_TOPP`, etc.), but they are resolved into the request
 before model invocation and are never mutable runtime authority. Sampling v2 can differ from
-historical v1 byte output, and v2 takes before and after the float32 change differ for one seed, so
-reproducibility within v2 holds on one source identity. Promotion requires that reproducibility plus
+historical v1 byte output, and v2 takes differ for one seed across the float32 change and the
+2026-10-20 subtalker and EOS changes, so reproducibility within v2 holds on one source identity. Promotion requires that reproducibility plus
 the normal fixed-seed QC and applicable ASR/prosody evidence.
 
 ### 4.5 The single per-frame `eval()`

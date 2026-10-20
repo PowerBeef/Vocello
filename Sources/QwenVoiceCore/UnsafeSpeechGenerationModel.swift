@@ -26,10 +26,11 @@ enum Qwen3TalkerSamplingOverride {
     )
 
     /// RF-14 reference-parity arms (`VocelloQwen3ReferenceParity`). Production
-    /// samples from float32 logits (D3, maintainer decision 2026-10-13):
-    /// `QWENVOICE_SAMPLER_FLOAT32=off` reverts to the model's own precision. D1
-    /// `QWENVOICE_FULL_TEXT_CONDITIONING` and D2 `QWENVOICE_TALKER_FILTER_EOS`
-    /// stay off unless set `on`.
+    /// samples from float32 logits (D3, maintainer decision 2026-10-13) and
+    /// filters the talker's EOS like any token (D2, RF-18 follow-up screen,
+    /// 2026-10-20): `QWENVOICE_SAMPLER_FLOAT32=off` reverts to the model's own
+    /// precision and `QWENVOICE_TALKER_FILTER_EOS=off` re-inserts EOS after the
+    /// filters. D1 `QWENVOICE_FULL_TEXT_CONDITIONING` stays off unless set `on`.
     static let envReferenceParity: VocelloQwen3ReferenceParity? = referenceParity(
         fullTextConditioning: RuntimeDebugGate.value(for: "QWENVOICE_FULL_TEXT_CONDITIONING"),
         filtersEOS: RuntimeDebugGate.value(for: "QWENVOICE_TALKER_FILTER_EOS"),
@@ -116,10 +117,16 @@ enum Qwen3TalkerSamplingOverride {
             topK: envTopK ?? official.topK,
             minP: envMinP ?? 0
         )
+        // The subtalker keeps the reference's own sampling (0.9, top-p 1.0, top-k
+        // 50) whatever the variation, which shapes only the talker. Following it
+        // with Balanced's or Consistent's narrower values was the C-33 divergence:
+        // the RF-18 follow-up screen's pre-registered C1 arm cut Consistent's failed
+        // long-form projects from 9 to 2 of 56 with no new failure class
+        // (2026-10-17, adopted with D2 on 2026-10-20). Expressive is unchanged.
         let subtalker = VocelloQwen3SamplingStage(
-            temperature: envSubtalkerTemperature ?? talker.temperature,
-            topP: envSubtalkerTopP ?? talker.topP,
-            topK: envSubtalkerTopK ?? talker.topK,
+            temperature: envSubtalkerTemperature ?? official.temperature,
+            topP: envSubtalkerTopP ?? official.topP,
+            topK: envSubtalkerTopK ?? official.topK,
             minP: talker.minP
         )
         let effectiveSeed = requestedSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)

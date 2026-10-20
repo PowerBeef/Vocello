@@ -63,14 +63,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install pinned numpy, pytest and ripgrep
+      # zsh runs the shell-completion test, which catches CLI flags its completion lacks.
+      - name: Install pinned numpy, pytest, ripgrep and zsh
         run: |
           set -euo pipefail
           NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
           PYTEST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest']['version'])")"
           XDIST_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['pytest-xdist']['version'])")"
           python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" "pytest==${PYTEST_PIN}" "pytest-xdist==${XDIST_PIN}"
-          sudo apt-get install -y --no-install-recommends ripgrep
+          sudo apt-get install -y --no-install-recommends ripgrep zsh
 
       - name: Run the complete Python suite
         run: python3 -m pytest -n auto

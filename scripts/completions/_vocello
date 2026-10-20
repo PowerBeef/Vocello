@@ -1,7 +1,8 @@
 #compdef vocello
 
-# Keep this list in step with Sources/VocelloCLI/VocelloMain.swift and the
-# command help in Sources/VocelloCLI/*Command.swift.
+# Keep these lists in step with the command table (CLICommandRoute in
+# Sources/VocelloCLI/Support.swift) and each command's printHelp() in
+# Sources/VocelloCLI/*Command.swift; scripts/tests/test_zsh_completion.py fails when they drift.
 _vocello() {
   local command action previous option value
   local -a commands actions options common runtime generate batch bench
@@ -41,7 +42,7 @@ _vocello() {
     --telemetry) _values 'telemetry' off lightweight verbose; return ;;
     --force-class) _values 'memory class' 8gb 16gb high iphone; return ;;
     --memory-qualification) _values 'qualification' retained-memory-v1; return ;;
-    --file|--text-file|--reference|--audio|--manifest|--prosody-profile|--codec-replay|--codec-trace|--script-file)
+    --file|--text-file|--reference|--audio|--manifest|--prosody-profile|--codec-replay|--codec-trace|--script-file|--codec-roundtrip|--codec-loop|--reference-wav)
       _files; return ;;
     --out) _files; return ;;
     --take-sha256) return ;;
@@ -63,6 +64,7 @@ _vocello() {
     '--transcript:Supply a reference transcript'
     '--confirm-consent:Confirm permission to clone the voice'
     '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
+    '--app-delivery:Use the delivery a new app draft uses'
     '--language:Select a language hint' '--seed:Use a deterministic seed'
     '--variation:Select sampling variation' '--out:Write a WAV file'
     '--stream:Use streaming synthesis' '--no-stream:Disable streaming synthesis'
@@ -76,9 +78,12 @@ _vocello() {
     '--reference:Use a reference WAV' '--transcript:Supply a reference transcript'
     '--confirm-consent:Confirm permission to clone the voice'
     '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
+    '--app-delivery:Use the delivery a new app draft uses'
     '--out-dir:Write WAV files to a directory' '--seed:Use a deterministic seed'
-    '--variation:Select sampling variation' '--play:Play the results'
-    '--json:Write JSON output' $runtime $common
+    '--variation:Select sampling variation'
+    '--long-form:Run each line as a long-form project'
+    '--capture-codec-trace:Keep codec traces (internal diagnostics)'
+    '--play:Play the results' '--json:Write JSON output' $runtime $common
   )
   bench=(
     '--modes:Select benchmark modes' '--variants:Select model qualities'
@@ -89,7 +94,7 @@ _vocello() {
     '--confirm-consent:Confirm permission to clone the voice'
     '--delivery:Add delivery cells' '--prosody-profile:Use a prosody profile'
     '--continue-delivery-failures:Retain diagnostic failures'
-    '--label:Label the run' '--run-id:Set the run identifier'
+    '--label:Label the run'
     '--force-class:Force a memory tier' '--telemetry:Select telemetry level'
     '--memory-qualification:Select a memory qualification protocol'
     '--seed:Use a deterministic seed' '--no-stream:Disable streaming'
@@ -100,6 +105,9 @@ _vocello() {
     '--take-sha256:Specify a take digest' '--codec-trace:Specify a codec trace'
     '--output-dir:Write diagnostic output to a directory'
     '--script-file:Supply the original script file'
+    '--reference-wav:Supply the canonical reference WAV'
+    '--codec-roundtrip:Resynthesize reference WAVs (internal diagnostics)'
+    '--codec-loop:Decode repeated codec spans (internal diagnostics)'
     $runtime $common
   )
 

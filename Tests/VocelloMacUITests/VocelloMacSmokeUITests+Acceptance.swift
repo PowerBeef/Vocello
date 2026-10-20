@@ -545,13 +545,19 @@ final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
     /// Generates the current script and waits, without failing the test, for a new
     /// completed card (its generation ID), a visible generation error or a backend error.
     private func generate(mode: VocelloUIBenchMatrix.Mode) -> Generation {
-        assertReadyToGenerate(mode: mode)
+        let visibleError = element("textInput_generationError")
+        if visibleError.exists {
+            // After a rejected take the Studio's one action is the error's Retry, which
+            // generates the current script; readiness reads "Engine needs attention" until then.
+            XCTAssertTrue(VocelloUIWait.enabled(visibleError, timeout: 60))
+        } else {
+            assertReadyToGenerate(mode: mode)
+        }
         let cards = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH %@", Self.completedCardPrefix)
         )
         let cardsBefore = Set(cards.allElementsBoundByIndex.map(\.identifier))
         let cancel = button("textInput_cancelButton")
-        let visibleError = element("textInput_generationError")
         let backendFailures = [element("sidebar_backendStatus_error"), element("sidebar_backendStatus_crashed")]
         let errorBefore = visibleError.exists
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generationAction, timeout: 30))

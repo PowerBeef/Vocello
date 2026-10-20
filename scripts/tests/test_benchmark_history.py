@@ -390,6 +390,10 @@ class HostProbeParsingTests(unittest.TestCase):
             ("other-transport", [device("bluetooth")], 0,
              {**base, "transport": "physical-device", "osVersion": "26.6.1", "osBuild": "23G83"}),
             ("ambiguous", [device("wired"), device("wired")], 0, {**base, "transport": "physical-device"}),
+            # Xcode 27 also lists Simulator runtimes with the same product type.
+            ("beside a simulated twin", [{**device("localNetwork"), "hardwareProperties": {"reality": "simulated"}},
+                                         {**device("wired"), "hardwareProperties": {"reality": "physical"}}], 0,
+             {**base, "transport": "wired", "osVersion": "26.6.1", "osBuild": "23G83"}),
             ("failed", [device("wired")], 1, {**base, "transport": "physical-device"}),
         ):
             with self.subTest(name=name), mock.patch.object(

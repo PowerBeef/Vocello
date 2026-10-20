@@ -1429,7 +1429,12 @@ def ios_runtime_hardware(profile: dict[str, Any]) -> dict[str, Any]:
         )
         if command.returncode == 0:
             payload = load_json(Path(temporary))
-            devices = payload.get("result", {}).get("devices", [])
+            # Xcode 27's CoreDevice also lists Simulator runtimes, with the same
+            # product type; only the physical iPhone measured the run.
+            devices = [
+                device for device in payload.get("result", {}).get("devices", [])
+                if (device.get("hardwareProperties") or {}).get("reality") != "simulated"
+            ]
             if len(devices) == 1:
                 device = devices[0]
                 properties = device.get("deviceProperties", {})

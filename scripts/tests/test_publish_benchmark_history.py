@@ -1545,6 +1545,28 @@ class PublisherTests(unittest.TestCase):
         ):
             publisher.verify_canonical_hardware("ios", ios_evidence=evidence)
 
+        # Xcode 27's CoreDevice also lists Simulator runtimes as paired devices,
+        # here with the same product type and OS version as the phone.
+        product_type = "iPhone18,1"
+
+        def with_simulated_twin(command, **kwargs):
+            result = run(command, **kwargs)
+            output = Path(command[command.index("--json-output") + 1])
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            payload["result"]["devices"].insert(0, {
+                "hardwareProperties": {"platform": "iOS", "productType": product_type, "reality": "simulated"},
+                "deviceProperties": {"osVersionNumber": "26.5"},
+                "connectionProperties": {"pairingState": "paired"},
+            })
+            output.write_text(json.dumps(payload), encoding="utf-8")
+            return result
+
+        with mock.patch.object(publisher.subprocess, "run", side_effect=with_simulated_twin):
+            self.assertEqual(
+                publisher.verify_canonical_hardware("ios", ios_evidence=evidence),
+                {"profileID": "iphone-17-pro"},
+            )
+
     def test_ios_headless_hardware_evidence_uses_exact_run_manifest(self) -> None:
         run_id = "ios-memory-run"
         run_dir = self.root / run_id

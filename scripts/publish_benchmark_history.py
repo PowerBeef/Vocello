@@ -243,6 +243,8 @@ def verify_canonical_hardware(
         )
         if (
             hardware.get("platform") == "iOS"
+            # Xcode 27's CoreDevice also lists Simulator runtimes as paired devices.
+            and hardware.get("reality") != "simulated"
             and properties.get("osVersionNumber") == expected_version
             and reachable
         ):

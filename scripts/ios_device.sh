@@ -331,7 +331,10 @@ devs = (data.get("result") or {}).get("devices") or []
 def connected(d):
     cp = d.get("connectionProperties") or {}
     return cp.get("pairingState") == "paired" or cp.get("tunnelState") in ("connected", "available")
-cands = [d for d in devs if connected(d)]
+# Xcode 27 CoreDevice also lists Simulator runtimes as paired devices; the lanes drive the
+# physical iPhone only, as scripts/lib/ios_coredevice_probe.py does.
+cands = [d for d in devs if connected(d)
+         and (d.get("hardwareProperties") or {}).get("reality") != "simulated"]
 if not cands:
     sys.exit(3)
 preferred = "iPhone 17 Pro"

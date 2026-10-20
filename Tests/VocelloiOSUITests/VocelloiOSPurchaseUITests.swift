@@ -25,7 +25,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             throw XCTSkip("Requires explicit scripts/ui_test.sh ios purchase invocation")
         }
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "VocelloExports", withExtension: "storekit"))
-        let digest = SHA256.hash(data: try Data(contentsOf: fixture)).map { String(format: "%02x", $0) }.joined()
+        let digest = SHA256.hash(data: try Data(contentsOf: fixture)).map { unsafe String(format: "%02x", $0) }.joined()
         XCTAssertEqual(digest, expectedDigest)
         guard digest == expectedDigest else { throw Failure.observation }
         let store = try SKTestSession(contentsOf: fixture)

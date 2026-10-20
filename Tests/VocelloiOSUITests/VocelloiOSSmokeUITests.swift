@@ -38,10 +38,10 @@ final class VocelloiOSHistoryObservationUITests: VocelloiOSUITestCase {
 /// No product launch environment or hidden app UI participates in this action.
 @MainActor
 final class VocelloiOSScreenProtectionUITests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         // XCTest assertion failures can abort before a Swift defer executes.
         XCUIDevice.shared.press(.home)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testConfiguredAutoLockAction() throws {

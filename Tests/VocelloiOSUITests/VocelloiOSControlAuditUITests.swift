@@ -17,7 +17,7 @@ private struct IOSControlAuditTake: Codable {
     let rowDigest: String
 }
 
-private struct IOSControlAuditHistoryOwnership: Codable {
+private struct IOSControlAuditHistoryOwnership: Encodable {
     let schemaVersion = 1
     let rowID: String
     let beforeRowIDs: [String]
@@ -62,7 +62,7 @@ private struct IOSControlAuditStudioSnapshot {
     let cloneLanguageID: String
 }
 
-private struct IOSControlAuditObservation: Codable {
+private struct IOSControlAuditObservation: Encodable {
     let schemaVersion: Int
     let sequence: Int
     let phase: String

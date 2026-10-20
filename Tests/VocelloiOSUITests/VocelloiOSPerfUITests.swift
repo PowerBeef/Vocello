@@ -132,7 +132,7 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
             }
         )
         // "0399" appears only in the highest-index seeded row's transcript.
-        let token = String(format: "%04d", Self.seededHistoryRows - 1)
+        let token = unsafe String(format: "%04d", Self.seededHistoryRows - 1)
         searchField.typeText(token)
         XCTAssertTrue(
             VocelloUIWait.condition("History search to match the sentinel token", timeout: 15) {

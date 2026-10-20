@@ -170,8 +170,8 @@ Maintained iPhone subtrees:
   the paid-mode external copy, not internal persistence; export manually after verification.
   Outputs do not move into Files-visible Documents. Existing document sharing and personal files
   are unchanged. StoreKit handles billing; verified access is held in app memory, without an app
-  server, receipt logging or preference unlock. Apple's billing/privacy disclosures remain RF-02
-  account-review work. Storage-failure and original-reference recovery remain free. New generated
+  server, receipt logging or preference unlock. App Privacy is published as Data Not Collected
+  (2026-10-12, RF-02); the Paid Apps agreement remains RF-02 work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
   When that metadata cannot be read, the voice's own Vocello provenance decides, so a generated
   voice stays locked and a recording stays free.

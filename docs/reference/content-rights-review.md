@@ -17,8 +17,9 @@ machine-readable contracts, and `config/roadmap.json` remain authoritative. A so
 not become a qualified legal conclusion merely because it is recorded here.
 
 Apple's [upload requirements](https://developer.apple.com/news/upcoming-requirements/) were rechecked
-September 6: iOS uploads require Xcode 26 or later and the iOS 26 SDK or later. The installed iOS
-26.5 SDK clears that minimum; signed-candidate verification is still separate. Apple's
+September 6: iOS uploads require Xcode 26 or later and the iOS 26 SDK or later. CI's pinned
+Xcode 26.6 (`config/toolchain.json`) and the local Xcode 27.1 both clear that minimum;
+signed-candidate verification is still separate. Apple's
 [privacy definition](https://developer.apple.com/app-store/app-privacy-details/) still requires
 consideration of third-party partner collection. No disclosure decision is inferred from local
 inference alone.
@@ -165,7 +166,7 @@ A qualified decision is complete only when it records:
 ASR-04 may move to `done` only after all rows have an affirmative qualified decision or the affected
 asset/surface has been removed and the removal is verified in source and the release artifact.
 
-Currency review (2026-09-04, status reconciled 2026-09-11): the roadmap has kept ASR-04 `parked`
+Currency review (2026-09-04, status reconciled 2026-09-26): the roadmap has kept ASR-04 `parked`
 since 2026-09-26 — source remediation is shipped, and only the qualified counsel decisions above remain open. A fresh authenticated,
 read-only App Store Connect inventory again found the third-party-content declaration; it proves only
 the account field and does not replace the qualified model-redistribution, voice/publicity,
@@ -178,18 +179,25 @@ accessibility, privacy, financial, and regional account fields.
 The September 5 read-only inventory again confirms `USES_THIRD_PARTY_CONTENT`, the configured
 Support URL, and no existing App Store build for source 3.0.0/build 24. The current iOS version
 record does not match 3.0.0; pricing/availability and configured-version readiness remain
-unavailable. This packet groups the outstanding decisions without creating another status ledger
+unavailable. **Superseded on 2026-10-12 (RF-02):**
+- version 3.0.0 replaced the 1.0 draft;
+- the app is free in 175 territories, iPhone only;
+- the age rating is 4+;
+- App Privacy is published as Data Not Collected.
+
+The rows below record what each decision needed, with the outcome where it is decided. This
+packet groups the outstanding decisions without creating another status ledger
 or authorizing account changes. Retained summaries live in the ignored `rf02-20260905-readonly`
 artifact directory.
 
 | Decision and authority | Owner class | Evidence needed to close |
 | --- | --- | --- |
-| Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels; do not infer “Data Not Collected” from local synthesis. |
+| Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels. **Decided 2026-10-12:** Data Not Collected, on the facts recorded under ASR-02 above, and published the same day. |
 | Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. |
-| Source/account version and build — ASR-08 | Release maintainer | Authorize reconciliation to 3.0.0, confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
+| Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
 | Distribution profile and entitlements — ASR-10 | Signing/release owner | Decode the exact profile, match private-key identity and entitlements, then verify the command-bound archive/IPA. Local identity availability and earlier remote capability reads are not archive evidence. |
-| Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Review the actual user-content/generation capabilities, current questionnaire and source encryption declaration against the processed candidate. A readable account field is not proof its answers are correct. |
-| Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Resolve unavailable account surfaces, document selected territories and applicable obligations, and capture approved readback. The agent cannot accept agreements, select trading status or provide legal clearance. |
+| Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02). Remaining: check the encryption declaration against the processed candidate. |
+| Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). Remaining: the Paid Apps agreement, banking, tax and DSA trader status, which are the account holder's. The agent cannot accept agreements, select trading status or provide legal clearance. |
 
 Apple's [privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) require
 considering third-party practices and retention beyond real-time request service. Hugging Face's

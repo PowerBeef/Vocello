@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-16
+reviewed: 2026-10-20
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -74,7 +74,8 @@ download it automatically.
       2026-09-04 found configured 2.4.0/build 23 state and one `en-US` localization. The 3.0.0 account
       version exists (Prepare for Submission), and a read-only check on 2026-10-14 found build 24
       unused, with no build in the 3.0.0 train (ASR-08); the check repeats right before archiving.
-      Category and the rest of the live account remain part of ASR-11.
+      On 2026-10-12 version 3.0.0 replaced the unreleased 1.0 draft, and the category became
+      Productivity (secondary Music) (RF-02).
 - [x] App Store installation eligibility matches the app's runtime hardware floor before the first
       public version. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
@@ -82,11 +83,15 @@ download it automatically.
 
 ## 1. Privacy + compliance (App Store Connect)
 
-**Implemented source, purchase acceptance pending (RF-13):** the iOS app remains free to generate
-and listen in all three modes, with free Built-in output export. The StoreKit entitlement owner and
-output-provenance export boundary are implemented. The product and price schedule were created on
-September 8 with explicit authorization; it remains **MISSING_METADATA, not purchase-qualified or
-submitted**. Finish metadata and focused purchase acceptance before freeze.
+**Implemented and locally accepted (RF-13, closed 2026-10-16); live product entered (RF-02,
+2026-10-12):** the iOS app remains free to generate and listen in all three modes, with free
+Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
+implemented, and the local StoreKit exports scenario passed all 26 phases. The product has en-US,
+fr-CA and fr-FR names and descriptions. Still open:
+- the Paid Apps agreement and its banking, tax and EU trader (DSA) steps, which are the maintainer's
+  (RF-02);
+- the product's review screenshot and the purchase checks on the processed TestFlight build (RF-12);
+- review, which happens with the first submission.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
 GitHub Releases with unrestricted exports; neither macOS nor CLI gains an entitlement requirement.
 
@@ -94,7 +99,8 @@ The approved identifier is `com.patricedery.vocello.design_clone_export`, refere
 **Design & Clone Export**. The approved US base price is **USD 19.99**, with Apple-managed regional
 pricing and no manual regional overrides. Readback confirmed USA/USD, one manual base price and
 automatic schedules for 174 other territories. Family Sharing was not enabled during creation;
-the API readback omits that flag. Localized product metadata, availability and review remain pending.
+the API readback omits that flag; it was confirmed off in the web portal on 2026-10-12, when the
+localized names and descriptions were entered (RF-02). Review remains pending until submission.
 The rejected earlier hyphenated identifier created no product. The local-only
 `Tests/Fixtures/VocelloExports.storekit` uses a TEST product and arbitrary fixture price, not an
 approved live offer. It is not bundled in the app or activated in shipping schemes. RF-02 owns the
@@ -176,29 +182,36 @@ campaign; prepare the approved test purchase before freezing it.
 
 - [x] Approve product identifier/reference name, USD 19.99 and automatic regional pricing; create
       the non-consumable and price schedule under explicit authorization, leaving Family Sharing off.
-- [ ] Complete localized product details and territory availability; verify Family Sharing in
-      App Store Connect if the API continues omitting the field. No submission is authorized.
-- [ ] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
-      refund/revocation, including every output export surface and Built-in free-export controls.
-      Internal History/playback and original imported references must remain accessible.
-- [ ] Verify required paid-app agreements, tax and banking readiness for IAP, even though the app
-      download itself is free. These owner/account decisions are not completed by source tests.
-- [ ] Prepare localized product details and an IAP review screenshot; attach the first IAP to the
-      app version for review. Explain the free/paid boundary and restore path in reviewer notes
-      after implementation, and verify purchases in the separately authorized processed candidate.
+- [x] Complete localized product details (en-US, fr-CA, fr-FR) and territory availability (free in
+      175 territories, iPhone only); Family Sharing confirmed off (2026-10-12, RF-02). No submission
+      is authorized.
+- [x] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
+      refund/revocation, including every output export surface and Built-in free-export controls,
+      in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`).
+- [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
+- [ ] Accept the Paid Apps agreement and complete tax, banking and EU trader (DSA) status. The
+      agreement stopped at Apple's two-factor prompt on 2026-10-12; these steps are the maintainer's
+      (RF-02).
+- [ ] Capture the IAP review screenshot from the processed TestFlight build at the live USD 19.99
+      (decision 2026-10-13), and attach the first IAP to the app version for review. Explain the
+      free/paid boundary and the restore path in the reviewer notes.
 
 Apple references: [purchase types](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-types),
 [IAP configuration](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/overview-for-configuring-in-app-purchases),
 [review rules](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
 
-Current account checkpoint (2026-09-04): authentication and exact app resolution succeeded in a
-bounded read-only inventory. The exact `en-US` Support URL and `USES_THIRD_PARTY_CONTENT`
-declaration remain configured. App/version, release, localization, app-info, content-rights,
-age-rating, and review-state reads succeeded; no metadata, build, TestFlight, or submission state
-changed. Pricing/availability has no readable initialized record, strict readiness for the currently
-configured 2.4.0 version is unavailable, and App Privacy publication, agreements/tax/banking, DSA,
-and regional fields still require owner/web or qualified review. Empty accessibility and encryption
-declaration lists are observations, not completed questionnaires.
+Current account state (2026-10-12, set in the web portal with the maintainer's approval; RF-02):
+- version 3.0.0, which replaced the unreleased 1.0 draft;
+- category Productivity, secondary Music;
+- free in all 175 territories, iPhone only (Apple-silicon Mac and Vision Pro availability off);
+- age rating 4+;
+- App Privacy published as Data Not Collected, with the privacy policy URL;
+- the export purchase entered as above.
+
+The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
+- the Paid Apps agreement, banking, tax and EU trader status;
+- the accessibility declaration;
+- the processed candidate's export-compliance check.
 
 App Store Connect readiness is a manual, read-only pass: review the live app identity, platforms,
 category, pricing/availability, metadata, localizations and URLs, screenshots, review contact,
@@ -211,10 +224,10 @@ owner/web checks; record an unavailable answer as pending, never as PASS. Keep o
 (states and counts), never credentials or account identifiers. ASR-11 remains open until that pass
 is complete.
 
-- [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
+- [x] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → Privacy & Permissions → Privacy Policy row links to the same URL).
-- [ ] **App Privacy "nutrition label"**: select **Data Not Collected** (the maintainer's ASR-02
-      decision of 2026-10-12). The rationale and the source facts it rests on are in the
+- [x] **App Privacy "nutrition label"**: published as **Data Not Collected** on 2026-10-12 (the
+      maintainer's ASR-02 decision of the same day). The rationale and the source facts it rests on are in the
       [content-rights review](content-rights-review.md#asr-02-app-privacy-label-is-data-not-collected).
       Mic audio, transcripts, prompts and generated audio stay local; Hugging Face's request logging
       during model downloads is its own processing as the host and is disclosed in the privacy
@@ -224,16 +237,13 @@ is complete.
       and the 2026-09-04 API read returned no separate encryption-declaration resource. Answer "No"
       to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity), then verify
       that the processed 3.0.0 candidate does not request additional export-compliance information.
-- [ ] **Age rating**: complete the current App Store Connect questionnaire from actual product and
-      content-rights behavior. A declaration is readable and contains three answered fields, but that
-      does not establish a complete/current rating. Do not predeclare a rating from this runbook;
-      preserve the account result as read-only evidence under ASR-11.
+- [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Revisit it if the
+      product's content behavior changes.
 - [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
       from the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs.
-- [ ] **Pricing and availability**: initialize and review the intended territories, price/free status,
-      preorder/release behavior, and new-territory policy. The read-only API currently returns no
-      availability record, so absence is a submission dependency rather than a passing default.
+- [x] **Pricing and availability**: free in all 175 territories, iPhone only (2026-10-12, RF-02).
+      Review the release behavior and new-territory policy at submission.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [ ] EU DSA trader status: complete if distributing in the EU.
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
@@ -244,7 +254,7 @@ is complete.
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
 > Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
-> small. On first launch, open Settings → Voice Models and tap **Install** for the Studio mode you want:
+> small. On first launch, open Settings → Models & Files → Voice Models and tap **Install** for the Studio mode you want:
 > Built-in Voice is 2,049,696,897 bytes, Voice Design is 2,049,696,404 bytes, and Voice Cloning is
 > 2,073,713,977 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
 > at least 4.5 GB of free space available before each installation; completion time depends on the review network and may take several
@@ -267,10 +277,11 @@ catalog total, even when components can be reused. Current admission needs are a
 runtime policy or a guarantee against concurrent storage use. Recheck against the candidate
 catalog before pasting these notes into App Store Connect.
 
-Before using these notes, close ASR-09 with anonymous availability evidence from all representative
-regions. On 2026-09-01 the North America host passed range and full SHA-256 verification of the
-three exact iOS artifacts. Regional closure still requires qualified, fresh Europe and East Asia
-execution evidence; a locally relabeled probe is rejected by the closure composer.
+Before using these notes, close ASR-09. By the maintainer's 2026-10-12 decision, North America,
+where App Review runs, is the verified download region, and Europe and East Asia stay unverified as
+a recorded residual risk. On 2026-09-01 the North America host passed range and full SHA-256
+verification of the three exact iOS artifacts. A fresh full-artifact North America proof within 24
+hours of submission remains (ASR-09).
 
 ## 3. Screenshots + metadata
 
@@ -288,8 +299,9 @@ execution evidence; a locally relabeled probe is rejected by the closure compose
       link it, and Settings opens the exact route. `scripts/support_contact_contract.py` rejects drift,
       placeholders, insecure URLs, and ungoverned response-time promises.
 - [x] The production support route returned HTTPS 200 with the expected monitored contact, response owner,
-      and privacy link. The sole iOS 1.0 localization (`en-US`) read back the exact governed Support URL in
-      App Store Connect on 2026-08-27. Add and verify the same URL when another localization is introduced.
+      and privacy link. The `en-US` localization read back the exact governed Support URL in App Store
+      Connect on 2026-08-27, on the 1.0 draft that version 3.0.0 replaced. Verify it again on 3.0.0,
+      and add the same URL to any new localization.
 - [x] The accessible in-app Open Source & Licenses browser reads the deterministic offline manifest generated
       from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all six catalog-pinned model cards.
       Archive/IPA verification rejects a missing, malformed, duplicated, or byte-different manifest.

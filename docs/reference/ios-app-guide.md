@@ -17,9 +17,11 @@ sourceOfTruth:
 
 Generation, listening, internal History and voice enrollment remain free. One iOS non-consumable
 unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
-The approved product and USD 19.99 US-base/automatic-regional price schedule exist in App Store
-Connect. Product metadata/availability and physical purchase acceptance remain pending under
-RF-13/RF-02/RF-12; this is not an available or reviewed purchase.
+The product exists in App Store Connect with its USD 19.99 US base and automatic regional prices,
+and its en-US, fr-CA and fr-FR names and descriptions (RF-02, 2026-10-12). The local StoreKit
+acceptance passed (RF-13, closed 2026-10-16). The Paid Apps agreement (RF-02) and the
+processed-build purchase checks (RF-12) remain, so this is not yet an available or reviewed
+purchase.
 
 This is the official iOS app's export purchase, not a restriction on the MIT-licensed source.
 Self-built forks may change the checks; they do not acquire an official Apple entitlement by doing

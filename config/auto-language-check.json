@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "description": "macOS Studio Auto-language check: each take leaves the language chip on Auto, generates, and proves the detected language reached the engine's request receipt. Corpus takes reuse the privacy-safe control-audit sentences; the edge sentences below are authored, privacy-safe text. scripts/auto_language_check.py prepare builds the run plan from this file and validate checks the engine rows against it.",
+  "corpus": "config/ios-control-audit-corpus.json",
+  "takes": [
+    {"takeID": "custom-english", "mode": "custom", "script": {"corpus": "english", "length": "short"}, "expectedChip": "english", "expectedEngine": "english"},
+    {"takeID": "custom-chinese", "mode": "custom", "script": {"corpus": "chinese", "length": "short"}, "expectedChip": "chinese", "expectedEngine": "chinese"},
+    {"takeID": "custom-french", "mode": "custom", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"},
+    {"takeID": "custom-japanese", "mode": "custom", "script": {"corpus": "japanese", "length": "short"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
+    {"takeID": "custom-german", "mode": "custom", "script": {"corpus": "german", "length": "short"}, "expectedChip": "german", "expectedEngine": "german"},
+    {"takeID": "custom-korean", "mode": "custom", "script": {"corpus": "korean", "length": "short"}, "expectedChip": "korean", "expectedEngine": "korean"},
+    {"takeID": "custom-spanish", "mode": "custom", "script": {"corpus": "spanish", "length": "short"}, "expectedChip": "spanish", "expectedEngine": "spanish"},
+    {"takeID": "custom-russian", "mode": "custom", "script": {"corpus": "russian", "length": "short"}, "expectedChip": "russian", "expectedEngine": "russian"},
+    {"takeID": "custom-italian", "mode": "custom", "script": {"corpus": "italian", "length": "short"}, "expectedChip": "italian", "expectedEngine": "italian"},
+    {"takeID": "custom-portuguese", "mode": "custom", "script": {"corpus": "portuguese", "length": "short"}, "expectedChip": "portuguese", "expectedEngine": "portuguese"},
+    {"takeID": "custom-mixed", "mode": "custom", "script": {"text": "The capital of Japan is 東京, a city of many trains."}, "expectedChip": "english", "expectedEngine": "english"},
+    {"takeID": "custom-undetected", "mode": "custom", "script": {"text": "De ochtendtrein verliet het rustige station op tijd."}, "expectedChip": "auto", "expectedEngine": "english", "knownMismatch": "D6", "requireAudioPass": false},
+    {"takeID": "design-french", "mode": "design", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"},
+    {"takeID": "design-japanese", "mode": "design", "script": {"corpus": "japanese", "length": "short"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
+    {"takeID": "design-undetected", "mode": "design", "script": {"text": "Het oude huis aan de gracht werd vorig jaar verbouwd."}, "expectedChip": "auto", "expectedEngine": "auto", "requireAudioPass": false},
+    {"takeID": "clone-japanese", "mode": "clone", "script": {"corpus": "japanese", "length": "short"}, "expectedChip": "japanese", "expectedEngine": "japanese"},
+    {"takeID": "clone-french", "mode": "clone", "script": {"corpus": "french", "length": "short"}, "expectedChip": "french", "expectedEngine": "french"}
+  ]
+}

@@ -1,12 +1,16 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-10
+reviewed: 2026-10-20
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
   - config/runtime-refactor-contract.json
   - Sources/Resources/qwenvoice_contract.json
+  - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
+  - Sources/QwenVoiceCore/NativeCloneSupport.swift
+  - Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift
+  - docs/audits/2026-10-16-engine-runtime-audit.md
 ---
 # Vocello (QwenVoice) — Architecture Reference
 
@@ -383,6 +387,24 @@ immutable request-owned values: sampling algorithm v2 gives every request an eff
 fresh `MLXRandom.RandomState`, while talker/subtalker stages and per-request cache/window policy
 travel with the request instead of mutating process-global generation state.
 
+**Sampling and text layout as shipped** (`Qwen3TalkerSamplingOverride.samplingConfiguration` in
+`UnsafeSpeechGenerationModel.swift`; the model facts are owned by
+[`qwen3-tts-guide.md`](reference/qwen3-tts-guide.md)):
+
+- **Talker.** The take variation sets the talker's values: Expressive 0.9 / top-p 1.0 / top-k 50,
+  the reference values; Balanced 0.8 / 0.95; Consistent 0.7 / 0.9.
+- **Subtalker.** It keeps the reference values for every variation, adopted by the RF-18 follow-up
+  screen on 2026-10-20.
+- **Reference-parity arms.** Production samples from float32 logits (D3) and filters the talker's
+  EOS like any token (D2); D1 is off. The arms reach the runtime only as request-local
+  `VocelloQwen3ReferenceParity` values from registered internal-diagnostics knobs. A request that
+  departs from production names its arms on the engine row (`reference_parity`).
+- **Text layout.** A streamed Custom or Design take feeds its script as trailing text, one text
+  token per codec frame and then `tts_pad` (`text_conditioning_mode=streaming_trailing_text`). A
+  quality-first take lays the whole text out up front (`full_text_non_streaming`). A clone ignores
+  the requested mode: in-context learning overlays the full target text on the reference codes, and
+  a speaker-only clone streams its trailing text.
+
 Explicit reserved/generating/aborting ownership prevents an
 abort-owned reservation from reopening generation and makes duplicate aborts join one finalization.
 Typed cache-trim/full-unload relief transfers the generation lease directly into critical relief;
@@ -424,7 +446,7 @@ Mac for the classification, the store's footprint bands (`MacMemoryBudgetPolicy`
 Metal working set; it is how the canonical M6 produces exploratory 8 GB floor evidence (policy and
 footprint only).
 
-| Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence |
+| Tier (`NativeDeviceMemoryClass`) | MLX cache | Host clone slots† | Idle-unload | Token clear cadence |
 | --- | --- | --- | --- | --- |
 | `.floor8GBMac` | 256 MB | 1 | 120 s | 50 |
 | `.mid16GBMac` | 512 MB | 8 | 600 s | 50 |
@@ -442,6 +464,9 @@ dismisses it (PA-32). The Mac warmup coordinator does not warm from `.failed`. T
 the longest because 2 to 3 GB of idle weights is a small share of 32 GB or more, while an unload
 makes the next take pay a cold load and prewarm; only the floor tier shortens its window under
 pressure.
+
+† The host's clone-handle LRU (`NativePreparedCloneConditioningCache`). The runtime actor retains
+one clone handle whatever the tier, so only the most recent host slot holds a live handle (see §4.8).
 
 \* iPhone cache default 128 MB, diagnostically overridable with
 `QVOICE_IOS_MLX_CACHE_LIMIT_MB` only behind the internal capability and `QWENVOICE_DEBUG`.
@@ -496,12 +521,27 @@ tunable via `CustomVoicePrewarmDepth { .full, .skipDecoderBucket, .skipStreamSte
 
 ### 4.8 Voice cloning cache
 
-`NativePreparedCloneConditioningCache` (actor, `NativeCloneSupport.swift`) keeps a three-level
-cache keyed by audio fingerprint, conditioning mode, and transcript hash: normalized reference
-audio → decoded `MLXArray` → a `Qwen3TTSVoiceClonePrompt` artifact. Transcript-backed mode
-persists the speaker embedding, reference codes, and transcript identity; audio-only mode persists
-a genuine speaker-embedding-only x-vector prompt. Those modes never share cache or artifact identity. Capacities per tier come
-from `NativeMemoryPolicyResolver.cloneCacheCapacity(...)`.
+`NativePreparedCloneConditioningCache` (actor, `NativeCloneSupport.swift`) resolves a Clone take's
+prompt by its identity: the reference fingerprint, the conditioning mode and the transcript, bound to
+the model and runtime identity. It looks in three places, in this order:
+
+1. **The prompt artifact on disk.** A saved voice's artifact, or a transient one. If it exists, the
+   runtime adopts it: the digest is verified, the arrays are loaded and evaluated. So every Clone take
+   with an artifact re-adopts the prompt from disk before the in-memory cache is consulted. A prompt
+   that fails adoption is deleted and rebuilt.
+2. **The host's in-memory handle cache.** An LRU of `cloneCacheCapacity(...)` slots per tier (1 on
+   the 8 GB Mac and iPhone, 8 and 16 on larger Macs). The runtime validates each handle before use.
+3. **A fresh build.** The prompt is built from the normalized reference (`makeCloneHandle`), cached,
+   and persisted as the artifact.
+
+The runtime actor retains one clone handle, the package default that production never raises, so a
+host slot beyond the most recent one holds a handle the actor has already invalidated and fails
+validation. Evicting a host slot clears MLX's cache but frees no prompt memory. This is engine audit
+B-16 (PERF-L), owned by ER-06's clone prompt cache redesign.
+
+Transcript-backed mode persists the speaker embedding, reference codes, and transcript identity;
+audio-only mode persists a genuine speaker-embedding-only x-vector prompt. Those modes never share
+cache or artifact identity.
 
 Speaker embeddings use the official Qwen magnitude-mel contract, not the shared Whisper-style mel
 helper. The runtime validates finite canonical `float32 [1, D]` storage against the decoded speaker
@@ -1088,7 +1128,8 @@ The shipped model ids:
 
 The exact pinned revisions and file digests live in `config/model-artifact-receipts.json` (Quality)
 and `Sources/Resources/qwenvoice_ios_model_catalog.json` (Speed), from which the production catalog
-is generated (`scripts/model_catalog_contract.py`).
+is generated (`scripts/model_catalog_contract.py`); [`model-delivery.md`](reference/model-delivery.md)
+owns the bytes, digests and artifact history.
 
 `ContractBackedModelRegistry` loads the contract and is expanded per-platform
 (`expandedForPlatform(_:deviceClass:includeBaseAliases:)`). Built-in speakers:

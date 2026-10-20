@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 15/40 (38%) |
+| `release-first-3-0-2026-09` | active | release-qa | 15/41 (37%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -63,11 +63,12 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19` |
+| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
+| `RF-20` | in-flight | Single streamed takes see the whole script, so a bad opening cannot strand the text | — |
 
 ### Open items in detail
 
@@ -151,6 +152,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
+
+- **`RF-20`** (in-flight, due 2026-10-22) — Single streamed takes see the whole script, so a bad opening cannot strand the text.
+  gate: Pre-registered 2026-10-20, before any result: a Mac machine screen with no listening. Streamed vocello CLI takes at Expressive with the Studio default delivery: the ten corpus short sentences in Built-in Voice with Aiden and Vivian, seeds 1-10 (200 takes per arm), and in Voice Design with one brief, seeds 1-5 (50 per arm), plus the 2026-10-20 failing take (French, Aiden, seed 9432062726036573763). Control is streaming text; the arm is full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on). A gross failure is a Fast QC rejection or a take longer than 2.5 times its sentence's control median. D1 is adopted for single (not long-form) streamed takes only if its gross failures are at most the control's, it recovers the failing take, each sentence's median duration stays within 25% of the control's, and a Mac language bench with D1 on passes spoken content and language on both ASR families; otherwise the defect stays a 3.0 known limitation that Fast QC rejects. Long-form segments keep streaming text (RF-18). On adoption: deterministic tests pin each path's text layout, and the Mac language lane and a Mac memory qualification are rerun; the iPhone proof is RF-15's acceptance of the candidate.
 
 ## Engine remediation programme (2026-10-16 audit)
 

@@ -184,6 +184,22 @@
       "due": "2026-10-22"
     },
     {
+      "id": "RF-20",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Single streamed takes see the whole script, so a bad opening cannot strand the text",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-22",
+      "gate": "Pre-registered 2026-10-20, before any result: a Mac machine screen with no listening. Streamed vocello CLI takes at Expressive with the Studio default delivery: the ten corpus short sentences in Built-in Voice with Aiden and Vivian, seeds 1-10 (200 takes per arm), and in Voice Design with one brief, seeds 1-5 (50 per arm), plus the 2026-10-20 failing take (French, Aiden, seed 9432062726036573763). Control is streaming text; the arm is full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on). A gross failure is a Fast QC rejection or a take longer than 2.5 times its sentence's control median. D1 is adopted for single (not long-form) streamed takes only if its gross failures are at most the control's, it recovers the failing take, each sentence's median duration stays within 25% of the control's, and a Mac language bench with D1 on passes spoken content and language on both ASR families; otherwise the defect stays a 3.0 known limitation that Fast QC rejects. Long-form segments keep streaming text (RF-18). On adoption: deterministic tests pin each path's text layout, and the Mac language lane and a Mac memory qualification are rerun; the iPhone proof is RF-15's acceptance of the candidate.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "docs/reference/qwen3-tts-guide.md"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Found 2026-10-20 in the Mac language lane: a French Built-in take (Aiden, seed 9432062726036573763) opened with a sigh and about 4 s of silence, then 30 s of whispered mumbling, and Fast QC rejected it. Its 19 text tokens were all streamed during the sigh (1.52 s), so the talker then saw only tts_pad (engine audit A-01). The CLI replays it to the same 35.12 s. Ruled out: EOS filtering (identical failure with re-insertion; no likely EOS before the last step), the token cap and language routing. Upstream feeds the whole text for Custom and Design (non_streaming_mode=True). The maintainer chose to fast-track D1 for single takes before the freeze, with only the checks the change touches."
+    },
+    {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
@@ -275,7 +291,8 @@
         "RF-13",
         "RF-14",
         "RF-18",
-        "RF-19"
+        "RF-19",
+        "RF-20"
       ]
     },
     {

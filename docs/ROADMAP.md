@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 16/42 (38%) |
+| `release-first-3-0-2026-09` | active | release-qa | 17/42 (40%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -68,7 +68,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-21` | in-flight | Single streamed takes see their whole script; long-form segments keep trailing text | — |
 
 ### Open items in detail
 
@@ -152,9 +151,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
-
-- **`RF-21`** (in-flight, due 2026-10-22) — Single streamed takes see their whole script; long-form segments keep trailing text.
-  gate: Adopted by the maintainer on 2026-10-20 from RF-20's content screen. Done when deterministic tests pin each path's text layout (a single streamed Custom or Design take full text, a long-form segment trailing text, the D1 knob forcing either), the routed check passes, the default CLI replays the 2026-10-20 French failing take cleanly, the Mac auto-language lane passes and a Mac memory qualification passes. The iPhone proof is RF-15's acceptance of the candidate.
 
 ## Engine remediation programme (2026-10-16 audit)
 

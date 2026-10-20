@@ -5180,6 +5180,29 @@
         "doc:docs/reference/qwen3-tts-guide.md"
       ],
       "reason": "Not adopted under its pre-registered rule (2026-10-20). The screen favored full text (D1): 5 gross failures against the control's 10 of 251 takes per arm, the failing French take recovered, sentence medians within 16%. But the Mac language bench with D1 on failed spoken content: custom-ja-auto garbled its last clause (character error rate 0.44 and 0.50 on the two ASR families), where streaming text speaks the same seed correctly (0.06). D1's three Design rejections were also a new kind, 1.2-1.5 s of trailing silence after a complete sentence. The control bench failed too, but only on a recognizer language disagreement over a correct Spanish take (BKL-23). The stranded-text failure stays a 3.0 known limitation that Fast QC rejects (qwen3-tts-guide 11.2, v3.0.0 release notes)."
+    },
+    {
+      "id": "RF-21",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Single streamed takes see their whole script; long-form segments keep trailing text",
+      "status": "done",
+      "blockedBy": [],
+      "due": "2026-10-22",
+      "gate": "Adopted by the maintainer on 2026-10-20 from RF-20's content screen. Done when deterministic tests pin each path's text layout (a single streamed Custom or Design take full text, a long-form segment trailing text, the D1 knob forcing either), the routed check passes, the default CLI replays the 2026-10-20 French failing take cleanly, the Mac auto-language lane passes and a Mac memory qualification passes. The iPhone proof is RF-15's acceptance of the candidate.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Contracts.swift",
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "Sources/QwenVoiceCore/SemanticTypes.swift",
+        "docs/reference/qwen3-tts-guide.md"
+      ],
+      "updated": "2026-10-20",
+      "notes": "RF-20 declined D1 over one garbled Japanese language-bench take. At the maintainer's request both ASR families scored the 496 saved screen takes under a rule written first: wrong-content takes fell from 31 to 16 of 248 (19 against 34 with the rejections), no cell two worse, Japanese 6 to 0; the maintainer adopted D1. Kept costs: Design's longer trailing pause, and pre-RF-21 seeds no longer reproduce. Verified on 9cd075bd: the routed check passes (1,522 core, 198 runtime tests; the plumbing test fails if the long-form flag is dropped). The default CLI replays the French take clean (6.24 s). A long-form segment's PCM equals QWENVOICE_FULL_TEXT_CONDITIONING=off and differs from =on. The Mac auto-language lane passes 22 of 22; the Mac memory qualification passes with every MLX peak within 0.03 MB of 2026-10-17 (Design's process footprint 120-160 MB higher, same MLX peak). iPhone proof: RF-15's acceptance of the candidate.",
+      "evidence": [
+        "commit:9cd075bd",
+        "run:macos-xcui-auto-language-20261020-231517-484006e1",
+        "run:mac-memory-qualification-20261020-233325-d9f14b0a",
+        "run:language-bench-20261020-224646-4f99"
+      ]
     }
   ]
 }

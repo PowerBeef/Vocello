@@ -60,8 +60,11 @@ test; #110 and #87 closed). The window's commits after it wait for the maintaine
   (`mac-lang-bench-20261020-215933-4b3c7b82` against `…220248-067bb65c`), so RF-20 closed declined.
   At the maintainer's request both ASR families then scored the 496 saved screen takes under a rule
   written first: wrong-content takes fell from 31 to 16, and the maintainer adopted D1. Long-form
-  segments keep trailing text (`GenerationRequest.longFormSegment`). BKL-22 and BKL-23 park two
-  language-bench tooling gaps.
+  segments keep trailing text (`GenerationRequest.longFormSegment`). Landed in `9cd075bd` and
+  verified there: the French take replays clean, a long-form segment matches forced trailing text
+  byte for byte, the auto-language lane passes 22 of 22 (`…231517-484006e1`) and the Mac memory
+  qualification passes with unchanged MLX peaks (`mac-memory-qualification-20261020-233325-d9f14b0a`).
+  RF-21 is done; the iPhone proof is RF-15's. BKL-22 and BKL-23 park two language-bench tooling gaps.
 - **Next:**
   - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
     (BKL-19's Speech Recognition prompt).

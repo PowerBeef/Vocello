@@ -584,7 +584,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Stop before the permission-sensitive scenario: accepting the clip
         // starts transcript auto-fill, which can raise the speech-recognition
         // TCC dialog — a system prompt only a human may answer (see
-        // docs/reference/macos-permissions.md). Cancel discards the take and
+        // docs/reference/macos-app-guide.md). Cancel discards the take and
         // leaves no persisted state behind for later journeys.
         XCTAssertTrue(
             VocelloUIPrimaryAction.perform(on: button("recordClip_cancel", in: sheet), timeout: 10)

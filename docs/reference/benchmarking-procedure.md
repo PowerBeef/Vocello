@@ -831,7 +831,7 @@ unsandboxed by the lane) needs one **System Audio Recording** grant: on macOS 26
 prompts, so it is added by hand in System Settings after the first lane run; on macOS 27 the first
 captured take prompts and blocks the runner until it is answered, so
 `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (the default) arms capture only when the TCC database shows a
-grant (see [`macos-permissions.md`](macos-permissions.md)). Without a grant the lane passes: an
+grant (see [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc)). Without a grant the lane passes: an
 unarmed run carries no capture evidence, and an armed but ungranted take's `playbackCaptureStatus` is
 `unavailable` or `silent` (takes outside the plan carry no capture fields). A captured take that fails the played-audio gate
 (coverage < 0.98, residual > −25 dBFS, a dropout, or an audible onset more than 500 ms from the

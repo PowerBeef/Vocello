@@ -9,7 +9,7 @@
 # Background: TCC keys permission grants to bundle ID + code identity. Ad-hoc
 # dev builds used to get a new identity every rebuild (grants invalidated each
 # time); build.sh now signs with a stable Apple Development identity so grants
-# survive. See docs/reference/macos-permissions.md.
+# survive. See docs/reference/macos-app-guide.md.
 #
 # usage:
 #   scripts/permissions_doctor.sh             # diagnose

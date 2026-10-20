@@ -303,7 +303,7 @@ digest of the typed evidence. It stores no recognized text, raw error, or source
 language describes the conditioning clip only; it never selects the language of a future Clone
 output. On macOS, transcription additionally requires Siri to be enabled (an OS gate — the system
 silently refuses speech-recognition authorization otherwise); the app detects this and links the
-relevant System Settings panes. Full permission model: [`macos-permissions.md`](macos-permissions.md).
+relevant System Settings panes. Full permission model: [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc).
 
 ## Diagnostics
 

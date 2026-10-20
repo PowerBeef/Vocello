@@ -32,7 +32,7 @@ facts have one owner each:
 | The 12 Hz speech tokenizer (codec) | [`mimi-codec-guide.md`](mimi-codec-guide.md) |
 | Artifact bytes, digests, quantization map and artifact history | [`model-delivery.md`](model-delivery.md) |
 | Engine structure, memory tiers, event router, prewarm, cancellation | [`ARCHITECTURE.md` §4](../ARCHITECTURE.md#4-engine-core-qwenvoicecore) |
-| Metal under MLX | [`metal-guide.md`](metal-guide.md) |
+| Metal under MLX | [`performance-guide.md` §11](performance-guide.md#11-metal-fundamentals) |
 | The owned package's maintenance and upstream intake | [`qwen3-core-maintenance.md`](qwen3-core-maintenance.md) |
 
 ---

@@ -498,7 +498,7 @@ export_attachments() {
 
 # Advisory only: an undecided mic/speech TCC grant means macOS can raise a
 # system permission dialog mid-run. Warn so the operator settles the grant once
-# (docs/reference/macos-permissions.md); never blocks the lane. Degrades
+# (docs/reference/macos-app-guide.md); never blocks the lane. Degrades
 # gracefully when the terminal lacks Full Disk Access to read the TCC database.
 # Known limitation: this checks row EXISTENCE for the bundle id only — TCC keys
 # grants to bundle id + code identity, and the lane's ad-hoc-signed app may not
@@ -524,7 +524,7 @@ mac_bench_playback_capture_enabled() {
   esac
   if rows="$(sqlite3 -readonly "$HOME/Library/Application Support/com.apple.TCC/TCC.db"       "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests.xctrunner';"       2>/dev/null)"; then
     if [[ "$rows" != *2* ]]; then
-      note "playback capture off: the UI test runner has no System Audio Recording grant (docs/reference/macos-permissions.md); the record carries no capture evidence"
+      note "playback capture off: the UI test runner has no System Audio Recording grant (docs/reference/macos-app-guide.md); the record carries no capture evidence"
       return 1
     fi
     return 0
@@ -542,7 +542,7 @@ mac_bench_playback_capture_enabled() {
 # ad-hoc signature binds that grant to one code hash and every rebuild of the
 # test bundle voids it. Creating a process tap never prompts on macOS 26 (the
 # grant is added by hand once); macOS 27 prompts at the first tap, and one
-# Autoriser on the re-signed runner lasts (docs/reference/macos-permissions.md).
+# Autoriser on the re-signed runner lasts (docs/reference/macos-app-guide.md).
 prepare_runner_for_playback_capture() {
   local runner="$MAC_DERIVED/Build/Products/Release/VocelloMacUITests-Runner.app"
   local plist="$runner/Contents/Info.plist"
@@ -607,7 +607,7 @@ mac_ui_preflight() {
   # XCUITest drives the app through macOS Automation Mode. Where enabling it
   # needs authentication, an unattended run times out "enabling automation
   # mode" after the build instead of testing; a locked session cannot be
-  # driven at all. Both fail here, before the build (docs/reference/macos-permissions.md).
+  # driven at all. Both fail here, before the build (docs/reference/macos-app-guide.md).
   automation="$(automationmodetool 2>/dev/null || true)"
   if [[ "$automation" == *"Automation Mode is disabled"* && "$automation" == *"requires user authentication"* ]]; then
     die "ui-preflight: macOS Automation Mode is off and needs authentication to turn on, so XCUITest would time out; run once on this Mac: sudo automationmodetool enable-automationmode-without-authentication"
@@ -624,7 +624,7 @@ mac_ui_preflight() {
       continue
     fi
     if [[ -z "$rows" ]]; then
-      warn "ui-preflight: no $svc decision recorded for com.qwenvoice.app — a system permission dialog may appear mid-run; settle it once (docs/reference/macos-permissions.md). Note: an existing row keyed to a different code identity can still prompt for the ad-hoc lane build."
+      warn "ui-preflight: no $svc decision recorded for com.qwenvoice.app — a system permission dialog may appear mid-run; settle it once (docs/reference/macos-app-guide.md). Note: an existing row keyed to a different code identity can still prompt for the ad-hoc lane build."
     fi
   done
   # Played-audio capture (PC-01): the XCUITest runner taps the app's output and
@@ -636,7 +636,7 @@ mac_ui_preflight() {
         2>/dev/null)"; then
       note "ui-preflight: TCC database unreadable (no Full Disk Access) — cannot verify kTCCServiceAudioCapture"
     elif [[ -z "$rows" ]]; then
-      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — the benchmark lane runs without capture; grant it once (macOS 27 prompts at the first captured take; docs/reference/macos-permissions.md)"
+      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — the benchmark lane runs without capture; grant it once (macOS 27 prompts at the first captured take; docs/reference/macos-app-guide.md)"
     fi
   fi
   return 0

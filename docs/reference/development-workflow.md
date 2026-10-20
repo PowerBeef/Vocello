@@ -141,7 +141,7 @@ Never copy `build/` from another machine; rebuild it.
   Sign in under Xcode → Settings → Accounts, or import the old Mac's certificate together with its
   private key. Release signing lives only in CI secrets.
 - **Permissions.** Run `scripts/permissions_doctor.sh` and follow
-  [`macos-permissions.md`](macos-permissions.md): the UI-test runner's System Audio Recording and
+  [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc): the UI-test runner's System Audio Recording and
   Accessibility grants are added by hand in System Settings, and reading the privacy database needs
   Full Disk Access for the terminal. macOS UI lanes also need Automation Mode without a password
   prompt: run `sudo automationmodetool enable-automationmode-without-authentication` once, and keep

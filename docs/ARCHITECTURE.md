@@ -1443,8 +1443,7 @@ Most-frequent imports across `Sources/**/*.swift`:
   [`mlx-guide.md`](reference/mlx-guide.md),
   [`qwen3-tts-guide.md`](reference/qwen3-tts-guide.md),
   [`mimi-codec-guide.md`](reference/mimi-codec-guide.md),
-  [`metal-guide.md`](reference/metal-guide.md),
-  [`swift-performance-guide.md`](reference/swift-performance-guide.md),
+  [`performance-guide.md`](reference/performance-guide.md) (Swift and Metal),
   [`ios-engine-optimization.md`](reference/ios-engine-optimization.md),
   [`telemetry-and-benchmarking.md`](reference/telemetry-and-benchmarking.md),
   [`cli.md`](reference/cli.md),
@@ -1453,7 +1452,7 @@ Most-frequent imports across `Sources/**/*.swift`:
   [`testing-runbook.md`](reference/testing-runbook.md),
   [`ios-app-guide.md`](reference/ios-app-guide.md),
   [`privacy-storage.md`](reference/privacy-storage.md),
-  [`macos-permissions.md`](reference/macos-permissions.md),
+  [`macos-app-guide.md`](reference/macos-app-guide.md) (including permissions),
   [`qwen3-core-maintenance.md`](reference/qwen3-core-maintenance.md).
 
 ## 18. Website and developer tooling boundaries

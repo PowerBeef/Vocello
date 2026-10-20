@@ -1999,24 +1999,6 @@
       "notes": "Covers PA-26's B6 part (PA-26 stays in project-audit-2026-09)."
     },
     {
-      "id": "ER-13",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Qwen3-TTS model research and reference documentation",
-      "status": "in-flight",
-      "gate": "A sourced research report on the shipped Qwen3-TTS checkpoints and their upstream family (docs/audits/2026-10-17-qwen3-tts-model-research.md) is committed, and the model reference docs (qwen3-tts-guide, qwen3-tts-prompting-guide, mimi-codec-guide, mlx-guide, ios-engine-optimization, the package README, UPSTREAM, ORIGINS, PERFORMANCE and CLONE_ARTIFACT_FORMAT, and ARCHITECTURE's engine sections) are rewritten against it and the audit's verified facts, with a parity ledger, one owner per fact and current front matter; a second pass reflects RF-18 and CONV-21 as shipped.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-17-qwen3-tts-model-research.md",
-        "docs/audits/2026-10-16-engine-runtime-audit.md",
-        "docs/reference/qwen3-tts-guide.md",
-        "docs/reference/mimi-codec-guide.md",
-        "docs/reference/mlx-guide.md"
-      ],
-      "updated": "2026-10-16",
-      "unparkWhen": "Re-homed into release-first-3-0-2026-09 while it is worked before the RF-09 freeze (identity-safe, test-only or doc-only steps only); otherwise right after the 3.0 iOS submission lifts the focus lock.",
-      "notes": "Requested by the maintainer on 2026-10-16; doc-only, so it may run before the freeze. Re-homed into the release plan on 2026-10-16 while worked (doc-only). The research report is in (two read-only research agents plus the lead's verification against code); its §9 gap analysis is pass 1's work list, and pass 2 follows RF-18 and CONV-21 as shipped.",
-      "due": "2026-10-22"
-    },
-    {
       "id": "DW-02",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: structural tooling (audit Phase 1)",

@@ -19,7 +19,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 19 — the strictness settings are on; P2-5's seam suites land (resume here)
 
-`main` is pushed through `d54bb6f7`. Push CI is green on Xcode 26.6.
+`main` is pushed through the ER-13 commits. Push CI is green on Xcode 26.6.
 
 - **Landed today:**
   - **P2-5 test adequacy (DW-03):**
@@ -64,6 +64,10 @@ the last copy with every earlier checkpoint is at commit a0597deb).
     tolerated warnings were cleared too (`12db497c`).
   - **CONV-21's owed Mac smoke scenarios pass on the adopted engine:** `--scenario long-form`
     (3 segments, 150.7 s of audio, project RTF 0.42) and `--scenario long-form-recovery`.
+  - **ER-13 closed:** the Qwen3-TTS reference docs were rewritten against the model research and the
+    engine audit, with RF-18 and CONV-21 as shipped. Three documentation agents and the lead did
+    this: the model reference, the prompting and 12 Hz tokenizer guides, the MLX guide and the
+    package docs, ARCHITECTURE's engine sections and the package README. Links were checked.
 - **Next:**
   - The full Mac smoke needs someone at the Mac: BKL-19's Speech Recognition prompt would block
     an unattended run.

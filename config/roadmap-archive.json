@@ -5091,6 +5091,31 @@
         "doc:docs/audits/2026-10-18-dev-workflow-audit.md",
         "run:ci-39179358233"
       ]
+    },
+    {
+      "id": "ER-13",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Qwen3-TTS model research and reference documentation",
+      "status": "done",
+      "gate": "A sourced research report on the shipped Qwen3-TTS checkpoints and their upstream family (docs/audits/2026-10-17-qwen3-tts-model-research.md) is committed, and the model reference docs (qwen3-tts-guide, qwen3-tts-prompting-guide, mimi-codec-guide, mlx-guide, ios-engine-optimization, the package README, UPSTREAM, ORIGINS, PERFORMANCE and CLONE_ARTIFACT_FORMAT, and ARCHITECTURE's engine sections) are rewritten against it and the audit's verified facts, with a parity ledger, one owner per fact and current front matter; a second pass reflects RF-18 and CONV-21 as shipped.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-17-qwen3-tts-model-research.md",
+        "docs/audits/2026-10-16-engine-runtime-audit.md",
+        "docs/reference/qwen3-tts-guide.md",
+        "docs/reference/mimi-codec-guide.md",
+        "docs/reference/mlx-guide.md"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Requested by the maintainer on 2026-10-16; doc-only, so it may run before the freeze. The research report (docs/audits/2026-10-17-qwen3-tts-model-research.md) is in; its §9 gap analysis drove pass 1, and pass 2 reflects RF-18 (7a125aaf: reference subtalker, EOS filtered, D1 not adopted) and CONV-21 (mlx-swift 0.32.3 and its coordinated pins) as shipped. Landed 2026-10-20: the model reference (5b83f4a7), the prompting and 12 Hz tokenizer guides (b759da89), the MLX guide, UPSTREAM as a review-point ledger, the maintenance doc, PERFORMANCE, CLONE_ARTIFACT_FORMAT and the historical iOS optimization doc (4fb00b89), ARCHITECTURE's engine sections (fc9a24fa) and the package README (ff6699de); ORIGINS was already accurate. One owner per fact, links checked, front matter reviewed 2026-10-20.",
+      "due": "2026-10-22",
+      "evidence": [
+        "commit:5b83f4a7",
+        "commit:b759da89",
+        "commit:4fb00b89",
+        "commit:fc9a24fa",
+        "commit:ff6699de",
+        "doc:docs/audits/2026-10-17-qwen3-tts-model-research.md"
+      ]
     }
   ]
 }

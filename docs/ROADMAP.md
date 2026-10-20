@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 12/40 (30%) |
+| `release-first-3-0-2026-09` | active | release-qa | 13/40 (32%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -61,7 +61,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
 | `DW-03` | in-flight | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | in-flight | Development workflow: longer-term modernization (audit Phase 3) | — |
-| `ER-13` | in-flight | Qwen3-TTS model research and reference documentation | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
@@ -131,9 +130,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`DW-04`** (in-flight, due 2026-10-30) — Development workflow: longer-term modernization (audit Phase 3).
   gate: Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.
-
-- **`ER-13`** (in-flight, due 2026-10-22) — Qwen3-TTS model research and reference documentation.
-  gate: A sourced research report on the shipped Qwen3-TTS checkpoints and their upstream family (docs/audits/2026-10-17-qwen3-tts-model-research.md) is committed, and the model reference docs (qwen3-tts-guide, qwen3-tts-prompting-guide, mimi-codec-guide, mlx-guide, ios-engine-optimization, the package README, UPSTREAM, ORIGINS, PERFORMANCE and CLONE_ARTIFACT_FORMAT, and ARCHITECTURE's engine sections) are rewritten against it and the audit's verified facts, with a parity ledger, one owner per fact and current front matter; a second pass reflects RF-18 and CONV-21 as shipped.
 
 - **`F-01`** (planned, due 2026-10-30) — High — make saved-voice review transactional and add iOS deletion.
   gate: Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).

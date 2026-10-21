@@ -19,8 +19,11 @@ final class CLIEngineHostingTests: XCTestCase {
             .appendingPathComponent("CLIEngineHosting-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        // The macOS-expanded registry, as `CLIRuntime.bootstrap` builds it.
+        let registry = try ContractBackedModelRegistry(manifestURL: Self.contract)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
         let components = try NativeRuntimeFactory.make(
-            manifestURL: Self.contract, paths: .rooted(at: root), storeVersionSeed: "rf27-hosting-fixture"
+            registry: registry, paths: .rooted(at: root), storeVersionSeed: "rf27-hosting-fixture"
         )
         let host = DesktopEngineHost(
             engine: components.engine, consent: VoiceCloningConsentPolicy(isConsentRecorded: hostConsent),
@@ -28,8 +31,7 @@ final class CLIEngineHostingTests: XCTestCase {
         )
         let runtime = CLIRuntime(
             engine: components.engine,
-            registry: try ContractBackedModelRegistry(manifestURL: Self.contract)
-                .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true),
+            registry: registry,
             dataDirectory: root,
             voiceCloningConsent: VoiceCloningConsentPolicy(isConsentRecorded: runtimeConsent),
             host: host
@@ -106,4 +108,45 @@ final class CLIEngineHostingTests: XCTestCase {
                            "withConsent reaches the host's store: \(error)")
         }
     }
+
+    /// Review S2 (c6725d84): the headless long-form driver runs the apps' runner
+    /// over the host's store and reports one terminal per submitted take, then a
+    /// typed failure, leaving nothing behind (the fixture engine cannot generate).
+    @MainActor
+    func testTheHeadlessRunnerReportsEachTakeAndATypedFailure() async throws {
+        let (runtime, host, root) = try hostedRuntime(runtimeConsent: true, hostConsent: true)
+        defer { runtime.engine.stop() }
+        let plan = try CLILongFormProject.plan(
+            "The lighthouse keeper climbed the stairs again, counting each step aloud.", seed: 3
+        )
+        let folder = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let log = EventLog()
+        let outcome = await host.runLongForm(
+            DesktopLongFormRequest(
+                mode: .custom, modelID: try runtime.modelID(mode: .custom, quality: false), plan: plan,
+                payload: .custom(speakerID: runtime.defaultSpeakerID, deliveryStyle: nil),
+                deliveryInstructionCellID: nil, languageHint: nil, variation: nil, directory: folder
+            ),
+            defaultSpeakerID: runtime.defaultSpeakerID
+        ) { event in
+            switch event {
+            case .segmentStarted(let index, _, _): log.lines.append("started \(index)")
+            case .segmentSaved(let index, _, _): log.lines.append("saved \(index)")
+            case .segmentFailed(let index, _, let qcRejected): log.lines.append("failed \(index) qc=\(qcRejected)")
+            case .segmentCancelled(let index, _): log.lines.append("cancelled \(index)")
+            }
+        }
+        XCTAssertEqual(outcome.status, .failed)
+        XCTAssertEqual(log.lines, ["started 0", "failed 0 qc=false"], "one terminal per submitted take")
+        XCTAssertEqual(outcome.segments.first?.status, .failed)
+        XCTAssertNil(outcome.manifestPath)
+        XCTAssertNotNil(outcome.message)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), [], "a failed take leaves nothing")
+    }
+}
+
+@MainActor
+private final class EventLog {
+    var lines: [String] = []
 }

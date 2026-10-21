@@ -298,7 +298,7 @@ public enum GenerateCommand {
             args.string("out-dir").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }
                 ?? dataDir.appendingPathComponent("outputs/cli", isDirectory: true)
         }
-        if longFormPlan != nil, let reference = args.string("reference") {
+        if longFormPlan != nil, mode == .clone, let reference = args.string("reference") {
             // Refused before boot when the path is known; a saved voice's is checked once resolved.
             let path = URL(fileURLWithPath: (reference as NSString).expandingTildeInPath).path
             try CLILongFormProject.refuseReferenceAlias(
@@ -814,11 +814,22 @@ public enum GenerateCommand {
         else {
             throw CLIError(.internalError, "a completed long-form project has no joined output")
         }
+        func discardJoined() {
+            try? FileManager.default.removeItem(atPath: joined)
+            // The manifest describes the joined output by its digest.
+            if let manifest = outcome.manifestPath { try? FileManager.default.removeItem(atPath: manifest) }
+        }
+        // A signal that arrived after the runner finished still wins: nothing is published.
+        if Task.isCancelled {
+            discardJoined()
+            keepOrDiscardSegments()
+            throw CancellationError()
+        }
         // The project folder is a new subfolder of the output's folder, so the
         // rename is atomic: an existing --out is replaced whole or not at all.
         guard unsafe rename(joined, output.path) == 0 else {
             let failure = Errno(rawValue: errno)
-            try? FileManager.default.removeItem(atPath: joined)
+            discardJoined()
             keepOrDiscardSegments()
             throw CLIError(.outputUnavailable, "could not write \(output.path): \(failure)")
         }

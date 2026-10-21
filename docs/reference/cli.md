@@ -274,8 +274,9 @@ streaming take at the app's cadence (with the seed derived from the base seed `-
 one) that must pass the engine's Fast QC and the apps' audio QC, the bounded assembler joins them, the
 joined output must pass the apps' QC too, and the manifest v4 is written. A Design project without a
 delivery gets the Neutral one, as the apps send it. Segment takes and the manifest stay in
-`<output stem>_segments/` beside the output; the joined file replaces `--out` only once the project
-passed. The result adds `longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`,
+`<output stem>_segments/` beside the output (`<output stem>_segments-<attempt>/` when that folder
+already exists: an attempt never reuses one); the joined file replaces `--out` only once the project
+passed, and never after a signal. The result adds `longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`,
 `longFormLanguage`, `longFormManifestPath`, `longFormSegments` (each kept segment's index, boundary,
 pause, seed, generation id, path, duration, finish reason and QC warnings) and `longFormAssembly`;
 `finishReason` is `max_tokens` when any segment was truncated. A rejected segment or join fails with

@@ -189,9 +189,18 @@ public enum CLILongFormProject {
                     "code": qcRejected ? .string(VocelloErrorCode.qcRejected.rawValue) : .null,
                 ])
             case .segmentCancelled(let index, let generationID):
-                CLIPresenter.event(.generationCancelled, generationID: generationID, data: [
-                    "index": .integer(projectIndex), "segment": .integer(index),
-                ])
+                // Only a signal cancels this task; otherwise the engine stopped the
+                // take on its own (memory pressure), a failure as for a single take.
+                if Task.isCancelled {
+                    CLIPresenter.event(.generationCancelled, generationID: generationID, data: [
+                        "index": .integer(projectIndex), "segment": .integer(index),
+                    ])
+                } else {
+                    CLIPresenter.event(.generationFailed, generationID: generationID, data: [
+                        "index": .integer(projectIndex), "segment": .integer(index),
+                        "code": .string(VocelloErrorCode.memoryPressure.rawValue),
+                    ])
+                }
             }
         }
         return report(result, into: outcome, lastSubmitted: submissions.last, signalled: Task.isCancelled)
@@ -240,8 +249,10 @@ public enum CLILongFormProject {
             let (code, detail) = classify(result.failure, failing: failing)
             // The join, not a take, failed: no take is named.
             if result.failure == .joinedQCRejected || result.failure == .assembly { outcome.generationID = nil }
+            // The apps' copy names Studio actions (Resume, Regenerate); the hint is the CLI's.
+            let hint = code == .qcRejected ? "retry with another --seed; completed segments are kept" : nil
             outcome.stop = .failed(
-                CLIError(code, result.message ?? "the long-form project failed", detail: detail),
+                CLIError(code, result.message ?? "the long-form project failed", hint: hint, detail: detail),
                 code: code, cancellationRequested: signalled
             )
         }

@@ -193,24 +193,32 @@ extension DesktopEngineHost {
         let hooks = HeadlessLongFormHooks(presentation: presentation, variation: request.variation)
         let services = HeadlessLongFormServices(directory: request.directory, total: request.plan.segments.count, events: events)
         let studio = StudioGenerationCoordinator(mode: request.mode, presentation: { presentation }, announce: { _ in })
+        // A fresh coordinator has no attempt running, so it always starts one.
         guard let attempt = studio.start() else {
-            return DesktopLongFormOutcome(
-                status: .failed, failure: .other, message: presentation.longFormJoinFailed, segments: [],
-                languageHint: projectRequest.languageHint, joinedPath: nil, durationSeconds: nil, manifestPath: nil,
-                assembly: nil
-            )
+            preconditionFailure("a new Studio coordinator refused its first attempt")
         }
+        let cancellationState = IOSLongFormCancellationState()
         let runner = IOSLongFormProjectRunner(
             ttsEngine: store, audioPlayer: HeadlessLongFormPlayback(),
-            cancellationState: IOSLongFormCancellationState(), hooks: hooks, services: services
+            cancellationState: cancellationState, hooks: hooks, services: services
         )
         let initial = projectRequest.lines.enumerated().map { IOSLongFormSegmentState(index: $0, line: $1, status: .pending) }
-        let outcome = await runner.run(
-            request: projectRequest, initialSegments: initial, priorReplacements: [],
-            onProgress: { _ in },
-            onSegmentsUpdated: { services.observe($0) },
-            studioCoordinator: studio, studioAttempt: attempt
-        )
+        // A signal cancels this task; the runner also honours the Stop the apps
+        // request, which closes the window between the join and its acceptance
+        // (finalization refuses once a Stop is accepted, A1-01, U24).
+        let outcome = await withTaskCancellationHandler {
+            await runner.run(
+                request: projectRequest, initialSegments: initial, priorReplacements: [],
+                onProgress: { _ in },
+                onSegmentsUpdated: { services.observe($0) },
+                studioCoordinator: studio, studioAttempt: attempt
+            )
+        } onCancel: {
+            Task { @MainActor in
+                _ = studio.requestCancellation(cancelsTask: false)
+                await cancellationState.request()
+            }
+        }
         return Self.report(outcome, request: projectRequest, accepted: services.accepted)
     }
 
@@ -354,6 +362,11 @@ private final class HeadlessLongFormServices: IOSLongFormProjectServices {
             case .failed where segment.qualityReport?.passed == false:
                 reported.insert(id)
                 events(.segmentFailed(index: segment.index, generationID: id, qcRejected: true))
+            case .cancelled where submitted[id] != nil:
+                // A take stopped after the engine finished it (during its QC) has
+                // no `recordFailed`; its terminal is reported here.
+                reported.insert(id)
+                events(.segmentCancelled(index: segment.index, generationID: id))
             default:
                 continue
             }

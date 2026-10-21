@@ -316,6 +316,10 @@ enum BatchCommand {
             rows[index].generationID = outcome.generationID
             // A stopped project keeps the segment takes it completed.
             if !outcome.segments.isEmpty { rows[index].longFormSegments = outcome.segments }
+            if outcome.stop != nil, outcome.segments.isEmpty {
+                // Nothing this attempt made is worth keeping.
+                try? FileManager.default.removeItem(at: projectFolder)
+            }
             switch outcome.stop {
             case .failed(_, let code, let cancellationRequested)?:
                 rows[index].status = .failed
@@ -343,11 +347,22 @@ enum BatchCommand {
                   let assembly = outcome.assembly else {
                 throw CLIError(.internalError, "a completed long-form project has no joined output")
             }
+            // A signal that arrived after the runner finished still wins: nothing is published.
+            if Task.isCancelled {
+                try? FileManager.default.removeItem(atPath: joined)
+                rows[index].generationID = nil
+                rows[index].status = .cancelled
+                rows[index].errorCode = "cancelled"
+                cancelled = true
+                stopped = true
+                break projects
+            }
             // The project's folder is inside the output folder, so the move is a rename.
             let joinedPath = outDir.appendingPathComponent("\(name).wav").path
             do {
                 try FileManager.default.moveItem(atPath: joined, toPath: joinedPath)
             } catch {
+                try? FileManager.default.removeItem(atPath: joined)
                 rows[index].generationID = nil
                 rows[index].status = .failed
                 rows[index].errorCode = VocelloErrorCode.outputUnavailable.rawValue

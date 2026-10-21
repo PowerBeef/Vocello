@@ -8,7 +8,7 @@
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-21): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release.
+**Focus lock** (decided 2026-10-21): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release. On 2026-10-21 the maintainer started the CLI overhaul (parity with the Mac app, an agent contract and a vocello mcp server, a signed .pkg installer, History and settings shared with the app; docs/audits/2026-10-21-cli-overhaul-plan.md) as items of this plan: RF-08 re-gated and RF-25 to RF-31. None changes the iPhone candidate; work that touches iPhone-compiled files (RF-30) and the publication (RF-31) wait for the submission.
 Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 **Frozen** at `0919e998fcc4543f36e3a35638a8948b149a1b41`: every later commit names an item of this plan in its subject.
@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 20/45 (44%) |
+| `release-first-3-0-2026-09` | active | release-qa | 20/53 (38%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/29 (45%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/28 (46%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -64,12 +64,20 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
+| `RF-08` | in-flight | package the downloadable optimized CLI | — |
 | `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21`, `RF-22`, `RF-24` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-23` | in-flight | The Mac app offers new versions and installs them through Sparkle | — |
+| `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
+| `RF-25` | in-flight | CLI command model and machine contract | — |
+| `RF-26` | planned | CLI desktop core and read-only parity | — |
+| `RF-27` | planned | CLI generation on the app's pipeline | — |
+| `RF-28` | planned | CLI saved voices, models and settings writes | — |
+| `RF-29` | planned | vocello mcp server | — |
+| `RF-30` | parked | Cross-process History for the app and the CLI | — |
+| `RF-31` | parked | CLI parity record, documentation and qualification | — |
 
 ### Open items in detail
 
@@ -136,6 +144,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
   unparkWhen: The maintainer resumes the App Store Connect account steps: the Paid Apps agreement (Apple's two-factor prompt), banking, tax and EU trader (DSA) status.
 
+- **`RF-08`** (in-flight, due 2026-11-06) — package the downloadable optimized CLI.
+  gate: In the existing release workflow (formerly F-17): one sealed optimized arm64 CLI payload shipped twice from the same bytes: a Developer ID Installer-signed, notarized and stapled <output>-cli.pkg (receipt com.qwenvoice.cli) that installs it at /usr/local/lib/vocello, links /usr/local/bin/vocello and the zsh completion, removes only a previous installed payload before upgrading, and ships an uninstaller that forgets the receipt and never touches the shared data store; and the <output>-cli.dmg folder as the no-administrator fallback. Requirements: complete libraries, resources, notices and instructions; discovery through the symlink without a checkout; inside-out Developer ID Application signatures with the hardened runtime under the macos-cli entitlement role, confirmed by a real take per mode; non-relocatable bundles; arm64 and macOS 26 host checks; checksums, attestations and SBOM entries for both CLI artifacts; expanded-package verification proving the payload equals the sealed manifest, and a CI install, upgrade and uninstall on an ephemeral runner. Not allowed: a Homebrew route, shell-profile edits, a CLI auto-updater or a second release system; only the pkg asks for administrator rights, and only to write under /usr/local.
+
 - **`RF-09`** (planned, due 2026-10-23) — verify the coherent tree and freeze the 3.0.0 candidate.
   gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 still match config/public-product-facts.json candidateRelease and ASR-08's fresh read-only check shows build 24 unused; (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json, and the annotated v3.0.0 tag is a separate maintainer action proved by scripts/release_source_authority.py; (4) RF-14's winning defaults and the release blockers' code fixes have landed, with their device proof left to RF-15; (5) the freeze commit is recorded as focusLock.freeze in config/roadmap.json, so every later commit names an item of this plan in its subject.
 
@@ -152,8 +163,31 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
 
-- **`RF-23`** (in-flight, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
+- **`RF-23`** (planned, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.
+
+- **`RF-25`** (in-flight, due 2026-10-27) — CLI command model and machine contract.
+  gate: A declarative in-house command model drives the parser (strict unknown flags, -h anywhere, global flags anywhere, help <cmd>), help, generated completions and the static capabilities; every command speaks one envelope with typed error codes and the exit table (0, 1, 2, 66, 69, 73, 74, 75, 77, 78, 130, 143) in json and ndjson modes, with errors on stdout as envelopes, --no-input, stdin only when named, SIGPIPE handled; schemas under config/cli-contract/v1 rendered from the Swift types and validated by scripts/cli_contract.py; the existing JSON callers migrated; no iPhone-compiled file changes; tests and the routed check pass.
+
+- **`RF-26`** (planned, due 2026-10-30) — CLI desktop core and read-only parity.
+  gate: A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.
+
+- **`RF-27`** (planned, due 2026-11-06) — CLI generation on the app's pipeline.
+  gate: Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.
+
+- **`RF-28`** (planned, due 2026-11-10) — CLI saved voices, models and settings writes.
+  gate: voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.
+
+- **`RF-29`** (planned, due 2026-11-13) — vocello mcp server.
+  gate: An in-house stdio MCP server serving the 2026-07-28 and initialize-era protocols, with the read and write tools on the shared service, progress and typed cancellation, per-request consent, confined paths, one warm engine with a single-flight gate, install_model only behind --allow-model-install, and config helpers; transcript tests pass and a real generate and cancel work from Claude Code.
+
+- **`RF-30`** (parked) — Cross-process History for the app and the CLI.
+  gate: A History process lock wraps every History mutation in the app and the CLI, with a macOS busy timeout, a schema-skew guard, change notifications the app observes and the engine lease in the app; CLI History on by default with delete, clear and recover; iOS behaviour identical; cross-process tests and the Mac smoke pass.
+  unparkWhen: The iOS 3.0 submission is done.
+
+- **`RF-31`** (parked) — CLI parity record, documentation and qualification.
+  gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
+  unparkWhen: The iOS 3.0 submission is done.
 
 ## Engine remediation programme (2026-10-16 audit)
 
@@ -552,7 +586,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
 | `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
-| `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
 
 ### Open items in detail
@@ -612,10 +645,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
   unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
-
-- **`RF-08`** (parked) — package the downloadable optimized CLI.
-  gate: In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
-  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
 
 - **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
   gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.

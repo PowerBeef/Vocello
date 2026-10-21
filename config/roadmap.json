@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-21",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release.",
+    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release. On 2026-10-21 the maintainer started the CLI overhaul (parity with the Mac app, an agent contract and a vocello mcp server, a signed .pkg installer, History and settings shared with the app; docs/audits/2026-10-21-cli-overhaul-plan.md) as items of this plan: RF-08 re-gated and RF-25 to RF-31. None changes the iPhone candidate; work that touches iPhone-compiled files (RF-30) and the publication (RF-31) wait for the submission.",
     "maxInFlight": 2,
     "freeze": {
       "commit": "0919e998fcc4543f36e3a35638a8948b149a1b41"
@@ -217,11 +217,10 @@
     },
     {
       "id": "RF-08",
-      "plan": "post-3-0-backlog-2026-10",
+      "plan": "release-first-3-0-2026-09",
       "title": "package the downloadable optimized CLI",
-      "status": "parked",
-      "unparkWhen": "The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.",
-      "gate": "In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.",
+      "status": "in-flight",
+      "gate": "In the existing release workflow (formerly F-17): one sealed optimized arm64 CLI payload shipped twice from the same bytes: a Developer ID Installer-signed, notarized and stapled <output>-cli.pkg (receipt com.qwenvoice.cli) that installs it at /usr/local/lib/vocello, links /usr/local/bin/vocello and the zsh completion, removes only a previous installed payload before upgrading, and ships an uninstaller that forgets the receipt and never touches the shared data store; and the <output>-cli.dmg folder as the no-administrator fallback. Requirements: complete libraries, resources, notices and instructions; discovery through the symlink without a checkout; inside-out Developer ID Application signatures with the hardened runtime under the macos-cli entitlement role, confirmed by a real take per mode; non-relocatable bundles; arm64 and macOS 26 host checks; checksums, attestations and SBOM entries for both CLI artifacts; expanded-package verification proving the payload equals the sealed manifest, and a CI install, upgrade and uninstall on an ephemeral runner. Not allowed: a Homebrew route, shell-profile edits, a CLI auto-updater or a second release system; only the pkg asks for administrator rights, and only to write under /usr/local.",
       "sourceOfTruth": [
         "project.yml",
         "scripts/release.sh",
@@ -231,11 +230,118 @@
         "config/orchestration-contract.json",
         ".github/workflows/release.yml"
       ],
-      "updated": "2026-09-13",
-      "notes": "Parked off the iOS critical path (September 6 class: deferred non-iOS qualification). The release workflow's CLI DMG packaging and the opt-in serial qualifier are implemented; 52 package, source-authority and promotion fixtures pass. Historical ad hoc 2.4.0/build 23 source 089328d3 passed three-mode strict QC, cancellation exit 130 and public failure exits 2/1: execution evidence, not signed-candidate or Clone-fidelity proof. The qualifier accepts an optional real Clone transcript, retains WAVs and atomic partial results, refuses report overwrite and kills subprocess groups on deadlines; requested seed and streaming are not represented as observed receipts. Signed-candidate inference and the two-item batch stay with RF-10. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-10-21",
+      "notes": "Parked off the iOS critical path (September 6 class: deferred non-iOS qualification). The release workflow's CLI DMG packaging and the opt-in serial qualifier are implemented; 52 package, source-authority and promotion fixtures pass. Historical ad hoc 2.4.0/build 23 source 089328d3 passed three-mode strict QC, cancellation exit 130 and public failure exits 2/1: execution evidence, not signed-candidate or Clone-fidelity proof. The qualifier accepts an optional real Clone transcript, retains WAVs and atomic partial results, refuses report overwrite and kills subprocess groups on deadlines; requested seed and streaming are not represented as observed receipts. Signed-candidate inference and the two-item batch stay with RF-10. (Earlier history: git log -p -- config/roadmap.json.) 2026-10-21: re-gated into the release plan for a signed .pkg at the maintainer's request (CLI overhaul, docs/audits/2026-10-21-cli-overhaul-plan.md). Maintainer step: a Developer ID Installer certificate and the release-environment secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD.",
       "legacyIds": [
         "F-17"
-      ]
+      ],
+      "due": "2026-11-06"
+    },
+    {
+      "id": "RF-25",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI command model and machine contract",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "A declarative in-house command model drives the parser (strict unknown flags, -h anywhere, global flags anywhere, help <cmd>), help, generated completions and the static capabilities; every command speaks one envelope with typed error codes and the exit table (0, 1, 2, 66, 69, 73, 74, 75, 77, 78, 130, 143) in json and ndjson modes, with errors on stdout as envelopes, --no-input, stdin only when named, SIGPIPE handled; schemas under config/cli-contract/v1 rendered from the Swift types and validated by scripts/cli_contract.py; the existing JSON callers migrated; no iPhone-compiled file changes; tests and the routed check pass.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/Support.swift",
+        "scripts/cli_package.py",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "due": "2026-10-27"
+    },
+    {
+      "id": "RF-26",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI desktop core and read-only parity",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.",
+      "sourceOfTruth": [
+        "project.yml",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "due": "2026-10-30"
+    },
+    {
+      "id": "RF-27",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI generation on the app's pipeline",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/GenerateCommand.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "due": "2026-11-06"
+    },
+    {
+      "id": "RF-28",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI saved voices, models and settings writes",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/VoicesCommand.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "due": "2026-11-10"
+    },
+    {
+      "id": "RF-29",
+      "plan": "release-first-3-0-2026-09",
+      "title": "vocello mcp server",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "An in-house stdio MCP server serving the 2026-07-28 and initialize-era protocols, with the read and write tools on the shared service, progress and typed cancellation, per-request consent, confined paths, one warm engine with a single-flight gate, install_model only behind --allow-model-install, and config helpers; transcript tests pass and a real generate and cancel work from Claude Code.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/Support.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "due": "2026-11-13"
+    },
+    {
+      "id": "RF-30",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Cross-process History for the app and the CLI",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A History process lock wraps every History mutation in the app and the CLI, with a macOS busy timeout, a schema-skew guard, change notifications the app observes and the engine lease in the app; CLI History on by default with delete, clear and recover; iOS behaviour identical; cross-process tests and the Mac smoke pass.",
+      "sourceOfTruth": [
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission.",
+      "unparkWhen": "The iOS 3.0 submission is done."
+    },
+    {
+      "id": "RF-31",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI parity record, documentation and qualification",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "unparkWhen": "The iOS 3.0 submission is done."
     },
     {
       "id": "RF-09",
@@ -271,7 +377,7 @@
       "id": "RF-23",
       "plan": "release-first-3-0-2026-09",
       "title": "The Mac app offers new versions and installs them through Sparkle",
-      "status": "in-flight",
+      "status": "planned",
       "blockedBy": [],
       "due": "2026-10-30",
       "gate": "Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.",

@@ -12,14 +12,14 @@ enum AudioService {
     }
 
     static var shouldAutoPlay: Bool {
-        if defaults.object(forKey: "autoPlay") == nil {
+        if defaults.object(forKey: MacAppSettingsKeys.autoPlay) == nil {
             return true
         }
-        return defaults.bool(forKey: "autoPlay")
+        return defaults.bool(forKey: MacAppSettingsKeys.autoPlay)
     }
 
     private static var configuredOutputsRoot: URL {
-        let configuredPath = (defaults.string(forKey: "outputDirectory") ?? "")
+        let configuredPath = (defaults.string(forKey: MacAppSettingsKeys.outputDirectory) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if configuredPath.isEmpty {
             return AppPaths.outputsDir
@@ -34,7 +34,7 @@ enum AudioService {
     /// to the default outputs folder; Settings surfaces this message so the
     /// fallback isn't a mystery.
     static func configuredOutputDirectoryIssue() -> String? {
-        let configuredPath = (defaults.string(forKey: "outputDirectory") ?? "")
+        let configuredPath = (defaults.string(forKey: MacAppSettingsKeys.outputDirectory) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !configuredPath.isEmpty else { return nil }
 

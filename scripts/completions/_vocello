@@ -213,6 +213,7 @@ _vocello() {
       case $sub in
         list|ls) key=models_list ;;
         status) key=models_status ;;
+        active) key=models_active ;;
         verify) key=models_verify ;;
         install) key=models_install ;;
         '') ;;
@@ -223,6 +224,7 @@ _vocello() {
           'list:List the contract'\''s models and their install state'
           'ls:List the contract'\''s models and their install state'
           'status:List models with missing or stale files'
+          'active:Show the package each mode uses, resolved as the app resolves it'
           'verify:Check every installed file'\''s size and SHA-256 against the catalog'
           'install:Download and verify a model into the shared store'
         )
@@ -559,6 +561,18 @@ _vocello() {
         '--help:show help for the command'
       ) ;;
     models_status)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    models_active)
       options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'

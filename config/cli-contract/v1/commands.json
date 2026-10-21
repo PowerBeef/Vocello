@@ -889,6 +889,7 @@
       "subcommands": [
         "list",
         "status",
+        "active",
         "verify",
         "install"
       ],
@@ -935,6 +936,19 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "List models with missing or stale files",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "active",
+      "operands": [],
+      "options": [],
+      "path": "models.active",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Show the package each mode uses, resolved as the app resolves it",
       "usage": []
     },
     {

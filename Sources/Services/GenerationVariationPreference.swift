@@ -6,7 +6,7 @@ import QwenVoiceCore
 /// (debug-isolated like every preference) and stamped onto every
 /// `GenerationRequest` by the mode coordinators and the batch runner.
 enum GenerationVariationPreference {
-    static let key = "generationVariation"
+    static let key = MacAppSettingsKeys.generationVariation
     static let defaultValue = Qwen3SamplingVariation.expressive.rawValue
 
     /// The variation to stamp on requests. Returns nil for `expressive`

@@ -110,15 +110,14 @@ struct TTSModel: Identifiable, Hashable, Sendable, Codable {
 }
 
 enum MacModelVariantPreferences {
-    private static let keyPrefix = "QwenVoice.MacModelVariantPreference."
     /// "Prefer lower-memory models": when true, a mode without an explicit
     /// stored choice resolves to its Speed variant instead of the hardware
     /// recommendation (`MacModelVariantResolution`). The legacy key name is
     /// retained for existing preferences.
-    static let preferSpeedEverywhereKey = "QwenVoice.PreferSpeedEverywhere"
+    static let preferSpeedEverywhereKey = MacAppSettingsKeys.preferSpeedEverywhere
 
     static func key(for mode: GenerationMode) -> String {
-        keyPrefix + mode.rawValue
+        MacAppSettingsKeys.variantPreference(for: mode)
     }
 
     /// The stored explicit choice for `mode`, or nil when there is none.

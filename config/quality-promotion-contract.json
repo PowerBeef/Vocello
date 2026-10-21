@@ -475,7 +475,8 @@
           "Sources/iOSSupport/**",
           "Sources/SharedSupport/Services/**",
           "Sources/SharedSupport/Database/**",
-          "Sources/SharedSupport/Telemetry/**"
+          "Sources/SharedSupport/Telemetry/**",
+          "Sources/DesktopShared/**"
         ],
         "requiredEvidence": [
           "macos-ui-performance",
@@ -622,9 +623,10 @@
       },
       {
         "paths": [
-          "Sources/VocelloCLI/**"
+          "Sources/VocelloCLI/**",
+          "Sources/VocelloDesktopCore/**"
         ],
-        "reason": "The CLI has no promotion lane; its downloadable package is qualified separately (RF-10). Its generation and model commands route through their classes."
+        "reason": "The CLI and its shared desktop core have no promotion lane; its downloadable package is qualified separately (RF-10). Its generation and model commands route through their classes."
       },
       {
         "paths": [

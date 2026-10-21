@@ -180,6 +180,10 @@
         ],
         "options": {}
       },
+      "models.active": {
+        "aliases": [],
+        "options": {}
+      },
       "models.install": {
         "aliases": [],
         "options": {}

@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import VocelloCLICore
+import VocelloDesktopCore
 
 /// `vocello models` — read-only inventory of the contract's models: install state,
 /// on-disk size, and (for `status`) any missing required files. No download
@@ -77,6 +78,10 @@ enum ModelsCommand {
             try await runVerify(args)
             return
         }
+        if action == "active" {
+            try runActive(args)
+            return
+        }
         let detailed = (action == "status")
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
@@ -129,6 +134,42 @@ enum ModelsCommand {
                 for p in r.missingPaths { print("    missing: \(p)") }
                 for p in r.stalePaths { print("    stale: \(p)") }
             }
+        }
+    }
+
+    struct Active: Encodable, Sendable {
+        let prefersLowerMemory: Bool
+        let memoryClass: String
+        let modes: [DesktopModelSelection.Choice]
+    }
+
+    /// `vocello models active`: which package each mode uses, as the app picks it.
+    @MainActor
+    static func runActive(_ args: Args) throws {
+        let ctx = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+        let settings = DesktopAppSettings()
+        let deviceClass = NativeMemoryPolicyResolver.deviceClass()
+        let choices = DesktopModelSelection.resolve(
+            registry: ctx.registry,
+            explicitVariantID: { settings.explicitVariantID(for: $0) },
+            prefersLowerMemory: settings.prefersLowerMemory,
+            deviceClass: deviceClass,
+            isInstalled: { id in
+                if case .available = ctx.registry.availability(forModelID: id, in: ctx.modelsDirectory) { return true }
+                return false
+            }
+        )
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Active(
+                prefersLowerMemory: settings.prefersLowerMemory, memoryClass: deviceClass.rawValue, modes: choices
+            ))
+            return
+        }
+        for choice in choices {
+            let installed = choice.activeInstalled ? "" : "  (not installed; takes use \(choice.generationVariant ?? "none"))"
+            print("\(choice.mode)\t\(choice.activeVariant ?? "-")\t\(choice.source)\(installed)")
         }
     }
 

@@ -159,6 +159,9 @@ public enum VocelloCommandTree {
                 positionals: [CLIPositionalSpec("id", "show only this model")]
             ),
             CLICommandSpec(
+                name: "active", summary: "Show the package each mode uses, resolved as the app resolves it"
+            ),
+            CLICommandSpec(
                 name: "verify", summary: "Check every installed file's size and SHA-256 against the catalog",
                 discussion: "Reads every byte of each installed model (several GB); exits 1 (integrity_failed) when a file differs.",
                 positionals: [CLIPositionalSpec("id", "verify only this model")]

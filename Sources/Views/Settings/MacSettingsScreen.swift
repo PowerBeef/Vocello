@@ -13,10 +13,10 @@ struct MacSettingsScreen: View {
     @Binding var highlightedMode: GenerationMode?
     private let showsNavigationTitle: Bool
 
-    @AppStorage("autoPlay", store: AppDefaults.store) private var autoPlay = true
+    @AppStorage(MacAppSettingsKeys.autoPlay, store: AppDefaults.store) private var autoPlay = true
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
     private var cloneConsentAcknowledged = false
-    @AppStorage("outputDirectory", store: AppDefaults.store) private var outputDirectory = ""
+    @AppStorage(MacAppSettingsKeys.outputDirectory, store: AppDefaults.store) private var outputDirectory = ""
     @AppStorage(GenerationVariationPreference.key, store: AppDefaults.store)
     private var generationVariation = GenerationVariationPreference.defaultValue
 

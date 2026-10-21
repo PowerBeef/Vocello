@@ -152,6 +152,12 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(DesktopAppSettings(debug: false).domain, "com.qwenvoice.app")
     }
 
+    @MainActor
+    func testTheInterfaceLanguageKeyIsTheOneBothAppsWrite() {
+        let appKey = IOSAppLanguage.preferenceKey
+        XCTAssertEqual(DesktopAppSettings.interfaceLanguageKey, appKey)
+    }
+
     func testBriefsAndDeliveryBanksFollowTheApp() {
         XCTAssertEqual(DesktopBriefCatalog.briefs().count, 8)
         XCTAssertEqual(DesktopBriefCatalog.briefs(in: .french).count, 8)

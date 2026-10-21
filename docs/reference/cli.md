@@ -406,6 +406,7 @@ reports the actual model-facing instruction language, digest, and cell identity.
 vocello models list [--json]
 vocello models status [<id>] [--json]      # adds missing-file detail
 vocello models verify [<id>] [--json]      # every installed file's size and SHA-256
+vocello models active [--json]             # the package each mode uses, as the app resolves it
 vocello models install <id> [--verbose]    # headless download into the shared models dir
 ```
 

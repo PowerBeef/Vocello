@@ -369,6 +369,9 @@ targets:
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
       - path: Sources/SharedSupport/Services/GenerationOutputFileName.swift
       - path: Sources/Services/MacFileSaveCopy.swift
+      - path: Sources/Services/MacModelVariantResolution.swift
+      # Mac-only pieces the app and the CLI share (the app compiles Sources/DesktopShared too).
+      - path: Sources/DesktopShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.desktop.core

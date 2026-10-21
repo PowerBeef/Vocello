@@ -51,6 +51,10 @@ debug_models_dir() {
   echo "$(_test_models_app_support_base)/QwenVoice-Debug/models"
 }
 
+# The vocello stdout reader (vocello_cli_json.py) beside this file: it reads today's bare JSON
+# and the v1 envelope alike, so the checks below hold for either CLI.
+_TEST_MODELS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Caller must invoke once before other helpers.
 test_models_init() {
   TEST_MODELS_ROOT_DIR="${1:?test_models_init: root dir required}"
@@ -122,19 +126,17 @@ vocello_model_installed() {
     json="$("$TEST_MODELS_VOCELLO" models status "$model_id" --json 2>/dev/null || true)"
   fi
   [[ -n "$json" ]] || return 1
-  MODEL_ID="$model_id" JSON="$json" python3 - <<'PY'
-import json, os, sys
-raw = os.environ.get("JSON", "").strip()
-if not raw:
-    sys.exit(1)
+  MODEL_ID="$model_id" JSON="$json" python3 - "$_TEST_MODELS_LIB_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import vocello_cli_json as cli
 try:
-    data = json.loads(raw)
-except json.JSONDecodeError:
+    rows = cli.rows(cli.read_result(os.environ.get("JSON", "")), "models")
+except (cli.VocelloCLIOutputError, cli.VocelloCLIError):
     sys.exit(1)
-rows = data if isinstance(data, list) else [data]
 mid = os.environ["MODEL_ID"]
 for row in rows:
-    if row.get("id") == mid and row.get("installed") is True:
+    if isinstance(row, dict) and row.get("id") == mid and row.get("installed") is True:
         sys.exit(0)
 sys.exit(1)
 PY
@@ -240,20 +242,17 @@ vocello_clone_voice_present() {
     json="$("$TEST_MODELS_VOCELLO" voices list --json 2>/dev/null || true)"
   fi
   [[ -n "$json" ]] || return 1
-  VOICE_NAME="$MAC_TEST_CLONE_VOICE_NAME" JSON="$json" python3 - <<'PY'
-import json, os, sys
-raw = os.environ.get("JSON", "").strip()
+  VOICE_NAME="$MAC_TEST_CLONE_VOICE_NAME" JSON="$json" python3 - "$_TEST_MODELS_LIB_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import vocello_cli_json as cli
 name = os.environ["VOICE_NAME"]
-if not raw:
-    sys.exit(1)
 try:
-    voices = json.loads(raw)
-except json.JSONDecodeError:
-    sys.exit(1)
-if not isinstance(voices, list):
+    voices = cli.rows(cli.read_result(os.environ.get("JSON", "")), "voices")
+except (cli.VocelloCLIOutputError, cli.VocelloCLIError):
     sys.exit(1)
 for v in voices:
-    if v.get("name") == name or v.get("id") == name:
+    if isinstance(v, dict) and (v.get("name") == name or v.get("id") == name):
         sys.exit(0)
 sys.exit(1)
 PY

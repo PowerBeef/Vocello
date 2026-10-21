@@ -3,7 +3,8 @@
 
 No model runs: the batch outputs are the `vocello batch --json` shapes of
 `Sources/VocelloCLI/BatchCommand.swift` (BatchJSON, the schemaVersion 2
-FailedBatchJSON and their `--long-form` forms), written by the tests beside
+FailedBatchJSON and their `--long-form` forms, bare or inside the v1 envelope of
+`config/cli-contract/v1/`), written by the tests beside
 placeholder WAV bytes; the clone cell reads fixture speaker-corpus manifests
 in the extraction layout `scripts/qc/corpora.py` reads.
 """
@@ -564,6 +565,55 @@ class ManifestTests(Fixture):
         take = {t["takeID"]: t for t in manifest["takes"]}[take_id]
         self.assertEqual((take["status"], take["failure"]), ("failed", {"errorCode": "model.load_failed"}))
         self.assertEqual(validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)["status"], "PASS")
+
+    @staticmethod
+    def _enveloped(payload: dict) -> dict:
+        """The v1 envelope a contract CLI prints for the same batch: a stopped batch keeps its rows."""
+        stopped = payload.get("schemaVersion") == 2
+        error = {"code": "batch_incomplete", "category": "failure", "exitCode": 1, "message": "stopped",
+                 "retryable": False, "retryAfterMs": None, "hint": None, "detail": None} if stopped else None
+        return {"schemaVersion": 1, "ok": not stopped, "command": "batch", "requestID": "req-1", "result": payload,
+                "error": error, "warnings": [],
+                "meta": {"vocelloVersion": "3.0.0", "build": "24", "contractRevision": 1, "durationMs": 9,
+                         "replayed": False}}
+
+    def test_enveloped_outputs_bind_like_bare_ones(self) -> None:
+        failed, absent, *rest = self.plan_value["batches"]
+        first = self._emit(failed, self._enveloped(self._batch_json(failed, failed_at=1)))
+        self.assertEqual(next_segment_offset(first, 0, len(failed["takeIDs"])),
+                         "2" if len(failed["takeIDs"]) > 2 else "done")
+        for batch in rest:
+            self._emit(batch, self._enveloped(self._batch_json(batch)))
+        self._emit(absent, {"schemaVersion": 1, "ok": False, "command": "batch", "requestID": "req-2",
+                            "result": None, "warnings": [], "meta": self._enveloped({})["meta"],
+                            "error": {"code": "model_not_installed", "category": "precondition", "exitCode": 69,
+                                      "message": "missing", "retryable": False, "retryAfterMs": None,
+                                      "hint": None, "detail": None}})
+        manifest = self._manifest()
+        by_id = {take["takeID"]: take for take in manifest["takes"]}
+        head, second, *later = failed["takeIDs"]
+        self.assertEqual((by_id[head]["status"], by_id[head]["textBinding"]), ("generated", "index"))
+        self.assertEqual(by_id[second]["missingReason"], "batch-failed:generation_failed")
+        for take_id in later:
+            self.assertEqual(by_id[take_id]["missingReason"], "batch-not_attempted")
+        for take_id in absent["takeIDs"]:
+            self.assertEqual(by_id[take_id]["missingReason"], "no-batch-output")
+        missing = len(failed["takeIDs"]) - 1 + len(absent["takeIDs"])
+        self.assertEqual(manifest["counts"], {"planned": 16, "generated": 16 - missing, "rejected": 0,
+                                              "failed": 0, "missing": missing})
+        self.assertEqual(validate_manifest(manifest, self.plan_value, manifest_dir=self.run_dir)["status"], "PASS")
+
+    def test_a_missing_published_output_reads_with_its_v1_code(self) -> None:
+        batch, *rest = self.plan_value["batches"]
+        payload = self._batch_json(batch, failed_at=1)
+        payload["items"][1]["errorCode"] = "published_output_missing"
+        self._emit(batch, payload)
+        for other in rest:
+            self._emit(other, self._batch_json(other))
+        by_id = {take["takeID"]: take for take in self._manifest()["takes"]}
+        self.assertEqual(by_id[batch["takeIDs"][1]]["missingReason"], "batch-failed:output_missing")
+        self.assertEqual(next_segment_offset(self.results / f"{batch['batchID']}.json", 0, len(batch["takeIDs"])),
+                         "stop", "only a generation failure resumes")
 
     def test_next_offset_resumes_only_after_a_generation_failure(self) -> None:
         batch = self.plan_value["batches"][0]

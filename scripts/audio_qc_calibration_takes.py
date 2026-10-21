@@ -94,6 +94,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib import jsonio  # noqa: E402
+from lib import vocello_cli_json  # noqa: E402
 from qc import corpora  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
     LANGUAGE_LOCALE_CODES,
@@ -1240,7 +1241,10 @@ def batch_row_line(row: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------- #
 
 def _parse_batch_stdout(path: Path) -> Any:
-    """The batch's `--json` stdout: one JSON object (the last JSON line if anything precedes it)."""
+    """The batch's `--json` stdout, read by `lib/vocello_cli_json.py`: today's BatchJSON or the
+    schemaVersion 2 rows of a stopped batch, bare or as a v1 envelope's result (a stopped batch's
+    envelope keeps its rows, with v1 row codes). None when there is no output or the CLI failed
+    before any item (an envelope without rows); "unparseable" when stdout holds no batch object."""
     try:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -1250,15 +1254,11 @@ def _parse_batch_stdout(path: Path) -> Any:
     if not raw.strip():
         return None
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        for line in reversed(raw.splitlines()):
-            if line.strip().startswith("{"):
-                try:
-                    return json.loads(line)
-                except json.JSONDecodeError:
-                    break
-    return "unparseable"
+        return vocello_cli_json.read_batch(raw).payload
+    except vocello_cli_json.VocelloCLIError:
+        return None
+    except vocello_cli_json.VocelloCLIOutputError:
+        return "unparseable"
 
 
 def _number(value: Any) -> float | None:

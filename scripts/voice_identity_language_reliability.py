@@ -24,6 +24,7 @@ from typing import Any
 
 from check_language_output import audio_edge_evidence_issues
 from lib import jsonio  # noqa: E402
+from lib import vocello_cli_json  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -1089,9 +1090,10 @@ def delivery_roster(binary: Path, data_dir: Path) -> dict[str, str]:
     )
     if process.returncode:
         raise ReliabilityError("delivery roster preflight failed")
+    # Today's bare array or the v1 envelope's {"deliveries": [...]}.
     try:
-        rows = json.loads(process.stdout)
-    except json.JSONDecodeError as error:
+        rows = vocello_cli_json.rows(vocello_cli_json.read_result(process.stdout), "deliveries")
+    except (vocello_cli_json.VocelloCLIOutputError, vocello_cli_json.VocelloCLIError) as error:
         raise ReliabilityError("delivery roster emitted invalid JSON") from error
     return {row["id"]: row["instruction"] for row in rows if isinstance(row, dict)}
 
@@ -1196,10 +1198,13 @@ def execute_plan(
                 "errorDigest": hashlib.sha256(material).hexdigest(),
             }
         else:
+            # Today's GenerateJSON object or the v1 envelope's result (the same object).
             try:
-                payload = json.loads(process.stdout)
-            except json.JSONDecodeError as error:
+                payload = vocello_cli_json.read_result(process.stdout)
+            except (vocello_cli_json.VocelloCLIOutputError, vocello_cli_json.VocelloCLIError) as error:
                 raise ReliabilityError(f"{row['takeID']}: CLI result is not JSON") from error
+            if not isinstance(payload, dict):
+                raise ReliabilityError(f"{row['takeID']}: CLI result is not JSON")
             if not output.is_file():
                 raise ReliabilityError(f"{row['takeID']}: CLI passed without audio")
             expected_conditioning = "clone_audio_only" if row.get("transcriptArm") == "audio-only" else (

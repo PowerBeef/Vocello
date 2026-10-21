@@ -184,6 +184,62 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
                 binary=fake_binary, run_dir=run_dir, max_takes=0,
             )
 
+    def _fake_vocello(self, output_format: str, cells: list[str]) -> Path:
+        """A stand-in CLI printing today's bare JSON ("bare") or the v1 envelope ("envelope")."""
+        binary = self.root / f"vocello-{output_format}"
+        roster = [{"id": cell, "preset": cell.split(".")[0], "intensity": "strong", "label": cell,
+                   "instruction": f"Deliver it {cell}."} for cell in cells]
+        binary.write_text(f"""#!{sys.executable}
+import json, pathlib, sys
+FORMAT = {output_format!r}
+args = sys.argv[1:]
+def emit(result, command, key=None):
+    if FORMAT == "envelope":
+        result = {{"schemaVersion": 1, "ok": True, "command": command, "requestID": "req-1",
+                   "result": {{key: result}} if key else result, "error": None, "warnings": [],
+                   "meta": {{"vocelloVersion": "3.0.0", "build": "24", "contractRevision": 1,
+                            "durationMs": 7, "replayed": False}}}}
+    print(json.dumps(result, sort_keys=True))
+if args[0] == "deliveries":
+    emit({json.dumps(roster)}, "deliveries.list", "deliveries")
+elif args[0] == "generate":
+    pathlib.Path(args[args.index("--out") + 1]).write_bytes(b"RIFF-fixture-take")
+    emit({{"generationID": "3b0e6f1c-5d2a-4c8e-9f17-2a6b8c4d0e93", "durationSeconds": 2.5,
+           "finishReason": "eos", "requestReceiptSchemaVersion": 3, "storedLanguageSelection": "auto",
+           "detectedTargetLanguage": "french", "finalModelLanguage": "french",
+           "conditioningMode": "voice_design", "audioQC": {{"passed": True}}}}, "generate")
+else:
+    sys.exit(2)
+""", encoding="utf-8")
+        binary.chmod(0o755)
+        return binary
+
+    def test_the_delivery_roster_reads_alike_from_both_cli_outputs(self):
+        cells = ["calm.strong", "excited.strong"]
+        rosters = [VLR.delivery_roster(self._fake_vocello(form, cells), self.runtime)
+                   for form in ("bare", "envelope")]
+        self.assertEqual(rosters[0], {"calm.strong": "Deliver it calm.strong.",
+                                      "excited.strong": "Deliver it excited.strong."})
+        self.assertEqual(rosters[0], rosters[1])
+
+    def test_a_generated_take_is_observed_alike_from_both_cli_outputs(self):
+        plan = VLR.build_plan(contract=self.contract, bundle=self.bundle, source_identity="f" * 64)
+        cells = sorted({row["deliveryCellID"] for row in plan["takes"] if row.get("deliveryCellID")})
+        observations = []
+        for form in ("bare", "envelope"):
+            run_dir = self.root / f"run-{form}"
+            with unittest.mock.patch.object(VLR, "tree_fingerprint", return_value="f" * 64):
+                summary = VLR.execute_plan(plan=plan, contract=self.contract, bundle_root=self.bundle_root,
+                                           binary=self._fake_vocello(form, cells), run_dir=run_dir, max_takes=1)
+            self.assertEqual(summary["status"], "partial")
+            generated = [row for row in VLR.read_jsonl(run_dir / "observations.jsonl") if "generationID" in row]
+            self.assertEqual(len(generated), 1)
+            observations.append(generated[0])
+        self.assertEqual(observations[0], observations[1])
+        self.assertEqual(observations[0]["generationID"], "3b0e6f1c-5d2a-4c8e-9f17-2a6b8c4d0e93")
+        self.assertEqual(observations[0]["durationSeconds"], 2.5)
+        self.assertEqual(observations[0]["audioSHA256"], hashlib.sha256(b"RIFF-fixture-take").hexdigest())
+
     def test_analysis_manifest_excludes_failures_and_binds_audio(self):
         plan = VLR.build_plan(
             contract=self.contract, bundle=self.bundle, source_identity="e" * 64

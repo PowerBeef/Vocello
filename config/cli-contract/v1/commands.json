@@ -182,7 +182,7 @@
           "placeholder": "folder",
           "summary": "with --line-by-line: the folder for the takes (default <data>/outputs/cli)",
           "takesValue": true,
-          "type": "file",
+          "type": "directory",
           "valueOptional": false
         },
         {

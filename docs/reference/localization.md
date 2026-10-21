@@ -99,7 +99,8 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   failed load and a failed clone preparation read the interface language too. Errors without a typed
   reason keep their own description.
 - `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`; the macOS app, and also compiled
-  into `VocelloCoreTests`, so it must not reference app-only types) owns the macOS
+  into `VocelloCoreTests` and, because `MacLineBatchRequest` names it, `VocelloDesktopCore`, where no CLI
+  path reaches its copy; so it must not reference app-only types) owns the macOS
   interface copy: sidebar, menus, Settings, Saved Voices, History, the generation surfaces and their
   sheets read plain `String`s from `vocello.mac.*` entries with all ten locales and translator context.
   Since 2026-09-14 no direct presentation literal remains under `Sources/Views` except the empty

@@ -277,7 +277,7 @@ _vocello() {
     --language) :; return ;;
     --out) _files; return ;;
     --long-form) _values 'long-form' auto always never; return ;;
-    --out-dir) _files; return ;;
+    --out-dir) _files -/; return ;;
     --client-request-id) :; return ;;
     --file) _files; return ;;
     --request) _files; return ;;

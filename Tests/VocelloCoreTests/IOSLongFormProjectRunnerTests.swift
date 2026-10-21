@@ -14,7 +14,7 @@ private struct LongFormFixtureEngineFailure: LocalizedError {
 /// barrier ends it. Like the engine's atomic publication, a cancelled take
 /// leaves no file.
 @MainActor
-private final class LongFormFixtureEngine: StoreFixtureEngine {
+final class LongFormFixtureEngine: StoreFixtureEngine {
     enum Take: Equatable {
         case speech
         case silence

@@ -146,7 +146,169 @@ final class CLIEngineHostingTests: XCTestCase {
     }
 }
 
-/// RF-27: engines on one data root say so with a lease, and a second engine is
+/// RF-27: the headless long-form driver over the apps' runner and the host's
+/// store, driven by the runner tests' fixture engine (a tone per take, or
+/// silence, or a take held until released).
+final class DesktopLongFormDriverTests: XCTestCase {
+    private static let contract = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+
+    @MainActor
+    private struct Fixture {
+        let engine: LongFormFixtureEngine
+        let host: DesktopEngineHost
+        let request: DesktopLongFormRequest
+        let folder: URL
+    }
+
+    @MainActor
+    private func fixture() throws -> Fixture {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DesktopLongFormDriver-\(UUID().uuidString)", isDirectory: true)
+            .resolvingSymlinksInPath()
+        let folder = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let registry = try ContractBackedModelRegistry(manifestURL: Self.contract)
+        let model = try XCTUnwrap(registry.models.first { $0.mode == .custom })
+        let engine = LongFormFixtureEngine(modelRegistry: registry)
+        let host = DesktopEngineHost(
+            engine: engine, consent: VoiceCloningConsentPolicy(isConsentRecorded: true), deviceClass: .mid16GBMac
+        )
+        let plan = try LongFormPlanner.plan(
+            spokenTextPlan: try SpokenTextPlanner.plan(
+                originalText: "Gulls circled the pier. Rain fell on the harbor. Lamps lit the long quay."
+            ),
+            configuration: LongFormPlanningConfiguration(runtimeTokenLimit: 12, baseSeed: 19)
+        )
+        XCTAssertEqual(plan.segments.count, 3, "one segment per sentence")
+        return Fixture(
+            engine: engine, host: host,
+            request: DesktopLongFormRequest(
+                mode: .custom, modelID: model.id, plan: plan, payload: .custom(speakerID: "aiden", deliveryStyle: nil),
+                deliveryInstructionCellID: nil, languageHint: "english", variation: nil, directory: folder
+            ),
+            folder: folder
+        )
+    }
+
+    @MainActor
+    private func run(_ fixture: Fixture, log: EventLog) async -> DesktopLongFormOutcome {
+        await fixture.host.runLongForm(fixture.request, defaultSpeakerID: "aiden") { log.record($0) }
+    }
+
+    @MainActor
+    func testACompletedProjectKeepsItsTakesAndWritesItsManifest() async throws {
+        let fixture = try fixture()
+        let log = EventLog()
+        let outcome = await run(fixture, log: log)
+        XCTAssertEqual(outcome.status, .completed)
+        XCTAssertEqual(log.lines, ["started 0", "saved 0", "started 1", "saved 1", "started 2", "saved 2"])
+        XCTAssertEqual(outcome.segments.map(\.status), [.saved, .saved, .saved])
+        XCTAssertEqual(outcome.segments.map(\.seed), fixture.request.plan.segments.map(\.evidence.effectiveSubseed))
+        XCTAssertEqual(outcome.segments.compactMap(\.qcPassed), [true, true, true])
+        let manifest = try XCTUnwrap(outcome.manifestPath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.joinedPath)))
+        XCTAssertEqual(URL(fileURLWithPath: manifest).deletingLastPathComponent().path, fixture.folder.path)
+        XCTAssertTrue(outcome.segments.allSatisfy { $0.audioPath?.hasPrefix(fixture.folder.path + "/segment_") == true })
+        XCTAssertNotNil(outcome.assembly)
+        XCTAssertEqual(fixture.engine.takeRequests.map(\.longFormSegment), [true, true, true])
+    }
+
+    @MainActor
+    func testARejectedSegmentFailsTypedAndIsNotKept() async throws {
+        let fixture = try fixture()
+        fixture.engine.scriptedTakes = [1: .silence]
+        let log = EventLog()
+        let outcome = await run(fixture, log: log)
+        XCTAssertEqual(outcome.status, .failed)
+        XCTAssertEqual(outcome.failure, .segmentQCRejected(index: 1))
+        XCTAssertEqual(log.lines, ["started 0", "saved 0", "started 1", "failed 1 qc=true"])
+        XCTAssertNil(outcome.segments[1].audioPath, "the rejected take is removed")
+        XCTAssertNil(outcome.manifestPath)
+    }
+
+    /// Review B1 (c6725d84): a signal while a take runs stops the project; the
+    /// take gets its terminal and nothing is accepted.
+    @MainActor
+    func testASignalStopsTheProjectBeforeAnythingIsAccepted() async throws {
+        let fixture = try fixture()
+        fixture.engine.heldTakes = [1]
+        let log = EventLog()
+        let host = fixture.host
+        let request = fixture.request
+        let project = Task { @MainActor in
+            await host.runLongForm(request, defaultSpeakerID: "aiden") { log.record($0) }
+        }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(10))
+        while fixture.engine.takeRequests.count < 2, clock.now < deadline { await Task.yield() }
+        XCTAssertEqual(fixture.engine.takeRequests.count, 2, "the second take is held")
+        project.cancel()
+        fixture.engine.releaseGeneration()
+        let outcome = await project.value
+        XCTAssertEqual(outcome.status, .cancelled)
+        XCTAssertEqual(log.lines, ["started 0", "saved 0", "started 1", "cancelled 1"])
+        XCTAssertEqual(outcome.segments.map(\.status), [.saved, .cancelled, .cancelled])
+        XCTAssertNil(outcome.manifestPath)
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(atPath: fixture.folder.path).contains { $0.hasPrefix("long_form_") },
+            "no joined output and no manifest"
+        )
+    }
+}
+
+/// RF-27: publishing a project's joined output (review of fc1c4e05, item 4).
+final class LongFormPublishTests: XCTestCase {
+    private func project() throws -> (outcome: CLILongFormProject.Outcome, root: URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LongFormPublish-\(UUID().uuidString)", isDirectory: true)
+        let folder = root.appendingPathComponent("story_segments", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let joined = folder.appendingPathComponent("long_form_joined.wav")
+        let manifest = folder.appendingPathComponent("long_form_manifest.json")
+        try Data([1, 2]).write(to: joined)
+        try Data("{}".utf8).write(to: manifest)
+        var outcome = CLILongFormProject.Outcome(baseSeed: 1, planDigest: "d")
+        outcome.audioPath = joined.path
+        outcome.manifestPath = manifest.path
+        return (outcome, root)
+    }
+
+    func testAPassedProjectReplacesTheOutputWhole() throws {
+        let (outcome, root) = try project()
+        let output = root.appendingPathComponent("story.wav")
+        try Data([9]).write(to: output)
+        try CLILongFormProject.publishJoined(outcome, to: output, signalled: false)
+        XCTAssertEqual(try Data(contentsOf: output), Data([1, 2]))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.manifestPath)), "the manifest stays")
+    }
+
+    func testASignalOrAFailedMovePublishesNothing() throws {
+        let (outcome, root) = try project()
+        let output = root.appendingPathComponent("story.wav")
+        try Data([9]).write(to: output)
+        XCTAssertThrowsError(try CLILongFormProject.publishJoined(outcome, to: output, signalled: true)) {
+            XCTAssertTrue($0 is CancellationError)
+        }
+        XCTAssertEqual(try Data(contentsOf: output), Data([9]), "an existing output is left as it was")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.audioPath)))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.manifestPath)),
+                       "the manifest names the discarded output by its digest")
+
+        let (second, secondRoot) = try project()
+        let unwritable = secondRoot.appendingPathComponent("missing/story.wav")
+        XCTAssertThrowsError(try CLILongFormProject.publishJoined(second, to: unwritable, signalled: false)) {
+            XCTAssertEqual(($0 as? CLIError)?.code, .outputUnavailable)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(second.manifestPath)))
+    }
+}
+
+/// RF-27: engines on this Mac say so with a lease, and a second engine is
 /// refused only where two cannot fit.
 final class EngineHostLeaseTests: XCTestCase {
     private func makeRoot() throws -> URL {
@@ -158,24 +320,77 @@ final class EngineHostLeaseTests: XCTestCase {
     }
 
     func testALeaseIsLiveWhileHeldAndStaleOnceNobodyHoldsIt() throws {
-        let root = try makeRoot()
-        let lease = try EngineHostLease.acquire(dataDirectory: root, kind: "cli")
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let lease = try EngineHostLease.acquire(in: folder, kind: "cli")
         XCTAssertEqual(lease.host.pid, getpid())
-        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [lease.host], "a held lease is live to any reader")
-        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root, excluding: lease), [])
-        let folder = root.appendingPathComponent("engine-hosts")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [lease.host], "a held lease is live to any reader")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder, excluding: lease), [])
         let mode = try FileManager.default.attributesOfItem(atPath: folder.path)[.posixPermissions] as? NSNumber
         XCTAssertEqual(mode?.intValue, 0o700)
         lease.release()
         lease.release()
-        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [], "a released lease is gone")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [], "a released lease is gone")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), [])
 
         // A lease whose process died is a file nobody holds: stale, and removed.
         let stale = folder.appendingPathComponent("99999-stale.lease")
         try JSONEncoder().encode(EngineHostLease.Host(pid: 99999, kind: "cli", startedAt: "2026-10-21T00:00:00Z"))
             .write(to: stale)
-        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [])
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
         XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path))
+        XCTAssertTrue(EngineHostLease.sharedFolder.path.hasSuffix("com.qwenvoice.vocello/engine-hosts"),
+                      "one folder per user, whatever the data folder")
+    }
+
+    /// Review items 4 and 5 (fc1c4e05): admission refuses, waits, warns and
+    /// stops on a signal, with its lease given back while it waits.
+    @MainActor
+    func testAdmissionRefusesWaitsAndWarns() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let other = try EngineHostLease.acquire(in: folder, kind: "cli")
+        do {
+            _ = try await CLIRuntime.admitEngineHost(
+                deviceClass: .floor8GBMac, concurrency: CLIEngineConcurrency(), appRunning: { false },
+                sleep: { _ in XCTFail("no wait without --wait-for-engine") }, folder: folder
+            )
+            XCTFail("an 8 GB Mac refuses a second engine")
+        } catch {
+            XCTAssertEqual((error as? CLIError)?.code, .engineBusy)
+        }
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder, excluding: other), [], "a refused process keeps no lease")
+
+        var waits = 0
+        let waited = try await CLIRuntime.admitEngineHost(
+            deviceClass: .floor8GBMac, concurrency: CLIEngineConcurrency(allow: false, wait: true), appRunning: { false },
+            sleep: { _ in
+                waits += 1
+                XCTAssertEqual(EngineHostLease.liveHosts(in: folder, excluding: other), [], "no lease while waiting")
+                other.release()
+            },
+            folder: folder
+        )
+        XCTAssertEqual(waits, 1)
+        XCTAssertNotNil(waited, "admitted once the other engine exited")
+        waited?.release()
+
+        do {
+            _ = try await CLIRuntime.admitEngineHost(
+                deviceClass: .floor8GBMac, concurrency: CLIEngineConcurrency(allow: false, wait: true), appRunning: { true },
+                sleep: { _ in throw CancellationError() }, folder: folder
+            )
+            XCTFail("a signal ends the wait")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "the running app counts, and a signal ends the wait")
+        }
+        let warned = try await CLIRuntime.admitEngineHost(
+            deviceClass: .mid16GBMac, concurrency: CLIEngineConcurrency(), appRunning: { true },
+            sleep: { _ in XCTFail("no wait on a larger Mac") }, folder: folder
+        )
+        XCTAssertNotNil(warned, "a larger Mac runs beside the app, warned")
+        warned?.release()
+
+        let args = try CLIParser.args(["--text", "Hi.", "--wait-for-engine", "--allow-concurrent-engine"], for: "generate")
+        XCTAssertEqual(CLIEngineConcurrency(args), CLIEngineConcurrency(allow: true, wait: true))
     }
 
     func testASecondEngineIsRefusedOnlyWhereTwoCannotFit() {
@@ -196,4 +411,13 @@ final class EngineHostLeaseTests: XCTestCase {
 @MainActor
 private final class EventLog {
     var lines: [String] = []
+
+    func record(_ event: DesktopLongFormEvent) {
+        switch event {
+        case .segmentStarted(let index, _, _): lines.append("started \(index)")
+        case .segmentSaved(let index, _, _): lines.append("saved \(index)")
+        case .segmentFailed(let index, _, let qcRejected): lines.append("failed \(index) qc=\(qcRejected)")
+        case .segmentCancelled(let index, _): lines.append("cancelled \(index)")
+        }
+    }
 }

@@ -12,8 +12,9 @@ public final class DesktopEngineHost {
     let store: TTSEngineStore
     private var consent: VoiceCloningConsentPolicy
 
-    public init(
-        engine: MLXTTSEngine,
+    /// Any engine: the CLI hosts `MLXTTSEngine`; tests host the fixture engines.
+    public init<Engine: TTSEngine & AnyObject>(
+        engine: Engine,
         consent: VoiceCloningConsentPolicy,
         deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass()
     ) {

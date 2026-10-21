@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import System
 import VocelloDesktopCore
 
 /// One long-form project, run by the apps' own runner (`IOSLongFormProjectRunner`
@@ -135,6 +136,31 @@ public enum CLILongFormProject {
                 .invalidInput, "the output must not replace the clone reference audio",
                 hint: "choose a different --out"
             )
+        }
+    }
+
+    /// Moves a completed project's joined output onto `destination` by a rename
+    /// (the project folder sits beside it, on its volume, so an existing file is
+    /// replaced whole or not at all), unless `signalled`: a signal that arrived
+    /// after the runner finished still wins, and nothing is published. On a
+    /// signal or a failed rename the joined output and the manifest, which names
+    /// it by its digest, are removed; the segments stay with the caller.
+    public static func publishJoined(_ outcome: Outcome, to destination: URL, signalled: Bool) throws {
+        guard let joined = outcome.audioPath else {
+            throw CLIError(.internalError, "a completed long-form project has no joined output")
+        }
+        func discard() {
+            try? FileManager.default.removeItem(atPath: joined)
+            if let manifest = outcome.manifestPath { try? FileManager.default.removeItem(atPath: manifest) }
+        }
+        if signalled {
+            discard()
+            throw CancellationError()
+        }
+        guard unsafe rename(joined, destination.path) == 0 else {
+            let failure = Errno(rawValue: errno)
+            discard()
+            throw CLIError(.outputUnavailable, "could not write \(destination.path): \(failure)")
         }
     }
 

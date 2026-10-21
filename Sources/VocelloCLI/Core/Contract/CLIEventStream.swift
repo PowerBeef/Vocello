@@ -150,10 +150,12 @@ public final class CLIEventStream: Sendable {
         let record = Record(type: type, generationID: generationID, data: data, elapsed: elapsedSeconds())
         let accepted = state.withLock { state -> Bool in
             guard !state.closing, !state.broken else { return false }
-            if type.coalesces,
-               let index = state.queue.lastIndex(where: { $0.type == type && $0.generationID == generationID }) {
-                state.queue[index].data = record.data
-                state.queue[index].elapsed = record.elapsed
+            // Only the newest queued record coalesces, so a running record never
+            // reports what records queued after it have not yet said.
+            if type.coalesces, let last = state.queue.indices.last,
+               state.queue[last].type == type, state.queue[last].generationID == generationID {
+                state.queue[last].data = record.data
+                state.queue[last].elapsed = record.elapsed
                 return false
             }
             if state.queue.count >= Self.queueBound,

@@ -250,12 +250,14 @@ support check, consent admission, busy refusal and memory admission, runs under 
 guard and is followed by its post-take trims. Consent is always the invocation's or the request's,
 never the app's Settings acknowledgment. `bench` keeps driving the raw engine for its measurements.
 
-**One engine at a time on an 8 GB Mac.** A hosted engine holds a lease on its data folder
-(`<data>/engine-hosts/`, a locked file that dies with its process). Before booting, `generate`, `batch`
-and `run` read the others' leases, and count the Vocello app when it runs on the same data folder. On
-an 8 GB Mac a second engine is refused (`engine_busy`, exit 75); pass `--wait-for-engine` to wait for
-the other to exit, or `--allow-concurrent-engine` to run anyway. On a larger Mac it runs, with the
-warning `concurrent_engine`.
+**One engine at a time on an 8 GB Mac.** A hosted engine holds a lease in one per-user folder
+(`~/Library/Caches/com.qwenvoice.vocello/engine-hosts/`, a locked file that dies with its process),
+whatever data folder it serves: memory belongs to the Mac. Before booting, `generate`, `batch` and
+`run` read the others' leases and count the Vocello app whenever it runs. On an 8 GB Mac a second
+engine is refused (`engine_busy`, exit 75); pass `--wait-for-engine` to wait for the other to exit (a
+`queued` event says so once), or `--allow-concurrent-engine` to run anyway. On a larger Mac it runs,
+with the warning `concurrent_engine`. Lanes that drive the CLI on an 8 GB Mac therefore need the app
+closed.
 
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
@@ -301,7 +303,7 @@ takes are `<stamp>_<mode>_<id>_<NNN>.wav` in `--out-dir`. The result is `{lineBy
 variant, variantSource, modelID, language, batchSeed, count, wallSeconds, items[]}`, each item `{index,
 text, audioPath, durationSeconds, finishReason, seed, generationID}`. It stops at the first failed line
 and then keeps every planned row, as `batch` does. `--out`, `--long-form` and `--no-stream` are
-refused with it. Unlike `batch`, whose items sample on their seed and text alone (the QC lanes resume a
+refused with it (`--long-form auto`, the default, is accepted). Unlike `batch`, whose items sample on their seed and text alone (the QC lanes resume a
 batch from any item on that property), these takes follow the app.
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs

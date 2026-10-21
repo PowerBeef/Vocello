@@ -12,13 +12,13 @@ public enum VocelloCommandTree {
         "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)"
     )
 
-    /// The voice and delivery options `generate` and `batch` share.
-    /// What a product command does when another engine already runs on its data root.
+    /// What a product command does when another engine already runs on this Mac.
     static let engineOptions: [CLIOptionSpec] = [
         .flag("allow-concurrent-engine", "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)"),
         .flag("wait-for-engine", "wait for another Vocello engine on this Mac to exit instead of refusing"),
     ]
 
+    /// The voice and delivery options `generate` and `batch` share.
     static let voiceOptions: [CLIOptionSpec] = [
         .value("mode", .choice(modes), "mode", "custom (default) | design | clone"),
         .value("variant", .choice(variants), "variant", "speed | quality (default: the package the app uses for the mode)"),
@@ -60,7 +60,7 @@ public enum VocelloCommandTree {
             .value("long-form", .choice(["auto", "always", "never"]), "when",
                    "run the script as a long-form project: auto (default, past one take, as the apps route it) | always | never"),
             .flag("line-by-line", "one take per line, as the Mac app's line batch runs them (one batch seed, one script language)"),
-            .value("out-dir", .file, "folder", "with --line-by-line: the folder for the takes (default <data>/outputs/cli)"),
+            .value("out-dir", .directory, "folder", "with --line-by-line: the folder for the takes (default <data>/outputs/cli)"),
             .flag("stream", "streaming synthesis at the app's cadence (the default)"),
             .flag("no-stream", "accumulate the whole take before decoding"),
             .flag("play", "play the take when done"),

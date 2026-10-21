@@ -42,7 +42,7 @@ public struct CLIRuntime {
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         let lease = hostedLikeTheApp
-            ? try await admitEngineHost(dataDirectory: dataDirectory, deviceClass: deviceClass, concurrency: concurrency)
+            ? try await admitEngineHost(deviceClass: deviceClass, concurrency: concurrency)
             : nil
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
             .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
@@ -71,27 +71,30 @@ public struct CLIRuntime {
         )
     }
 
-    /// Admits this process as an engine host on `dataDirectory` beside the others
+    /// Admits this process as an engine host beside the others on this Mac
     /// (`EngineHostAdmission`) and returns its lease. The lease is taken before
     /// the others are read, so two processes starting together see each other;
-    /// a waiting one gives its lease back between tries. A lease that cannot be
-    /// written only warns: it is advisory.
+    /// a waiting one gives its lease back between tries and says so once
+    /// (`queued`). A lease that cannot be written only warns: it is advisory.
+    /// `appRunning`, `sleep` and `folder` are seams for tests.
     static func admitEngineHost(
-        dataDirectory: URL, deviceClass: NativeDeviceMemoryClass, concurrency: CLIEngineConcurrency
+        deviceClass: NativeDeviceMemoryClass, concurrency: CLIEngineConcurrency,
+        appRunning: () -> Bool = DesktopAppPresence.isAppRunning,
+        sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        folder: URL = EngineHostLease.sharedFolder
     ) async throws -> EngineHostLease? {
         var announcedWait = false
         while true {
             let lease: EngineHostLease?
             do {
-                lease = try EngineHostLease.acquire(dataDirectory: dataDirectory, kind: "cli")
+                lease = try EngineHostLease.acquire(in: folder, kind: "cli")
             } catch {
-                CLIPresenter.warn("engine_lease_unavailable", "could not record this engine on the data folder: \(error)")
+                CLIPresenter.warn("engine_lease_unavailable", "could not record this engine for other Vocello processes: \(error)")
                 lease = nil
             }
             let decision = EngineHostAdmission.decide(
-                otherHosts: EngineHostLease.liveHosts(dataDirectory: dataDirectory, excluding: lease),
-                appRunning: DesktopAppPresence.isAppRunning() && DesktopAppPresence.isAppDataRoot(dataDirectory),
-                deviceClass: deviceClass, allowConcurrent: concurrency.allow
+                otherHosts: EngineHostLease.liveHosts(in: folder, excluding: lease),
+                appRunning: appRunning(), deviceClass: deviceClass, allowConcurrent: concurrency.allow
             )
             switch decision {
             case .proceed:
@@ -109,14 +112,14 @@ public struct CLIRuntime {
                 }
                 if !announcedWait {
                     note("waiting: \(message)")
+                    CLIPresenter.event(.queued, data: ["reason": .string(message)])
                     announcedWait = true
                 }
                 // Jitter, so two waiters never keep seeing each other.
-                try await Task.sleep(for: .milliseconds(Int.random(in: 1500 ... 3000)))
+                try await sleep(.milliseconds(Int.random(in: 1500 ... 3000)))
             }
         }
     }
-
 
     /// Same tiered prewarm policy as the macOS app: defer the dedicated custom
     /// prewarm on the 8 GB floor tier (the work folds into the first generation).
@@ -131,7 +134,8 @@ public struct CLIRuntime {
     public func withConsent(_ consent: VoiceCloningConsentPolicy) -> CLIRuntime {
         host?.setConsent(consent)
         return CLIRuntime(
-            engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent, host: host
+            engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent, host: host,
+            lease: lease
         )
     }
 

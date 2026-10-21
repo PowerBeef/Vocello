@@ -352,11 +352,13 @@ targets:
       - package: MLXSwift
         product: MLX
 
-  # The UI-free app logic the CLI shares with the Mac app (RF-26): History,
-  # settings and catalogs. It compiles the app's own files by path, read-only
-  # where the app's store owns writes, so both read one store the same way.
-  # Never GenerationPersistence, AudioPlayerViewModel, MacInterfaceText, either
-  # AppPaths or either TTSModel.
+  # The UI-free app logic the CLI shares with the Mac app (RF-26, RF-27): History,
+  # settings, catalogs, the engine store, the long-form runner and the line batch
+  # plan. It compiles the app's own files by path, read-only where the app's store
+  # owns writes, so both read one store the same way. Never GenerationPersistence,
+  # AudioPlayerViewModel, either AppPaths or either TTSModel. MacInterfaceText is
+  # compiled only because MacLineBatchRequest names it (its validation and mode
+  # label); no CLI path reaches that copy.
   VocelloDesktopCore:
     type: framework.static
     platform: macOS

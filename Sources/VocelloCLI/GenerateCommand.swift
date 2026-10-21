@@ -754,8 +754,10 @@ public enum GenerateCommand {
         let items = outcome.results.enumerated().map { index, result in
             LineTakeJSON(
                 index: index, text: lines[index], audioPath: result.audioPath, durationSeconds: result.durationSeconds,
-                finishReason: result.finishReason?.rawValue, seed: String(batch.seed(forLineAt: index)),
-                generationID: (requests[index].generationID ?? UUID()).uuidString.lowercased()
+                finishReason: result.finishReason?.rawValue,
+                // The seed the engine's receipt records, as for a single take.
+                seed: String(result.completionReceipt?.request.seed ?? batch.seed(forLineAt: index)),
+                generationID: requests[index].generationID.map { $0.uuidString.lowercased() } ?? ""
             )
         }
         let totalAudio = items.reduce(0.0) { $0 + $1.durationSeconds }
@@ -812,28 +814,14 @@ public enum GenerateCommand {
             case .engine(let engineStop): throw engineStop
             }
         }
-        guard let joined = outcome.audioPath, let duration = outcome.durationSeconds, let assembly = outcome.assembly
-        else {
+        guard let duration = outcome.durationSeconds, let assembly = outcome.assembly else {
             throw CLIError(.internalError, "a completed long-form project has no joined output")
         }
-        func discardJoined() {
-            try? FileManager.default.removeItem(atPath: joined)
-            // The manifest describes the joined output by its digest.
-            if let manifest = outcome.manifestPath { try? FileManager.default.removeItem(atPath: manifest) }
-        }
-        // A signal that arrived after the runner finished still wins: nothing is published.
-        if Task.isCancelled {
-            discardJoined()
+        do {
+            try CLILongFormProject.publishJoined(outcome, to: output, signalled: Task.isCancelled)
+        } catch {
             keepOrDiscardSegments()
-            throw CancellationError()
-        }
-        // The project folder is a new subfolder of the output's folder, so the
-        // rename is atomic: an existing --out is replaced whole or not at all.
-        guard unsafe rename(joined, output.path) == 0 else {
-            let failure = Errno(rawValue: errno)
-            discardJoined()
-            keepOrDiscardSegments()
-            throw CLIError(.outputUnavailable, "could not write \(output.path): \(failure)")
+            throw error
         }
         let wall = started.elapsedSeconds
         // Each segment had its own started and completed events; the project publishes once.

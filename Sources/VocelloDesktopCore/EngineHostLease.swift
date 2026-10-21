@@ -3,12 +3,12 @@ import QwenVoiceCore
 import Synchronization
 import System
 
-/// A process hosting the engine on a data root says so with a lease: a file
-/// under `<data>/engine-hosts/` it holds locked (flock) for as long as its
-/// engine may be loaded. The lock dies with the process, so a lease nobody
-/// holds is stale and is removed by the next reader. RF-27: the CLI takes a
-/// lease and reads the others'; the Mac app adopts leases with RF-30 (until
-/// then `DesktopAppPresence` stands in for it).
+/// A process hosting the engine says so with a lease: a file in one per-user
+/// folder (`sharedFolder`; memory belongs to the Mac, not to a data folder) that
+/// it holds locked (flock) for as long as its engine may be loaded. The lock
+/// dies with the process, so a lease nobody holds is stale and is removed by the
+/// next reader. RF-27: the CLI takes a lease and reads the others'; the Mac app
+/// adopts leases with RF-30 (until then `DesktopAppPresence` stands in for it).
 public final class EngineHostLease: Sendable {
     public struct Host: Codable, Sendable, Equatable {
         public let pid: Int32
@@ -35,14 +35,17 @@ public final class EngineHostLease: Sendable {
 
     deinit { release() }
 
-    static func directory(in dataDirectory: URL) -> URL {
-        dataDirectory.appendingPathComponent("engine-hosts", isDirectory: true)
+    /// The per-user folder every engine host's lease lives in, whatever data
+    /// folder it serves: `~/Library/Caches/com.qwenvoice.vocello/engine-hosts`.
+    public static var sharedFolder: URL {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
+        return caches.appendingPathComponent("com.qwenvoice.vocello/engine-hosts", isDirectory: true)
     }
 
-    /// Takes a lease for this process. The file is written and locked under a
-    /// temporary name and renamed into place, so no reader sees it unlocked.
-    public static func acquire(dataDirectory: URL, kind: String) throws -> EngineHostLease {
-        let folder = directory(in: dataDirectory)
+    /// Takes a lease for this process in `folder`. The file is written and locked
+    /// under a temporary name and renamed into place, so no reader sees it unlocked.
+    public static func acquire(in folder: URL = sharedFolder, kind: String) throws -> EngineHostLease {
         try FileManager.default.createDirectory(
             at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
         )
@@ -66,13 +69,22 @@ public final class EngineHostLease: Sendable {
         return EngineHostLease(host: host, url: final, descriptor: descriptor)
     }
 
-    /// The hosts that hold a lease on `dataDirectory`, other than `excluding`.
-    /// Stale leases (their process is gone) are removed on the way.
-    public static func liveHosts(dataDirectory: URL, excluding: EngineHostLease? = nil) -> [Host] {
-        let folder = directory(in: dataDirectory)
-        let urls = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+    /// The hosts holding a lease in `folder`, other than `excluding`. Stale
+    /// leases (their process is gone) and abandoned temporary files are removed
+    /// on the way. A held lease that cannot be read still counts, as an unknown host.
+    public static func liveHosts(in folder: URL = sharedFolder, excluding: EngineHostLease? = nil) -> [Host] {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
         var hosts: [Host] = []
-        for url in urls where url.pathExtension == "lease" && url.standardizedFileURL != excluding?.url.standardizedFileURL {
+        for url in urls {
+            if url.pathExtension == "tmp" {
+                // A lease whose writer died before its rename.
+                let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                if let modified, Date().timeIntervalSince(modified) > 60 { try? FileManager.default.removeItem(at: url) }
+                continue
+            }
+            guard url.pathExtension == "lease", url.lastPathComponent != excluding?.url.lastPathComponent else { continue }
             guard let descriptor = try? FileDescriptor.open(FilePath(url.path), .readOnly, options: [.closeOnExec]) else {
                 continue
             }
@@ -82,9 +94,9 @@ public final class EngineHostLease: Sendable {
                 try? FileManager.default.removeItem(at: url)
                 continue
             }
-            if let data = try? Data(contentsOf: url), let host = try? JSONDecoder().decode(Host.self, from: data) {
-                hosts.append(host)
-            }
+            let data = try? Data(contentsOf: url)
+            hosts.append(data.flatMap { try? JSONDecoder().decode(Host.self, from: $0) }
+                ?? Host(pid: 0, kind: "unknown", startedAt: ""))
         }
         return hosts
     }
@@ -109,12 +121,19 @@ public enum EngineHostAdmission: Equatable, Sendable {
     case refuse(String)
 
     /// On an 8 GB Mac two engines do not fit together, so a second is refused
-    /// unless the caller insists; elsewhere it is allowed with a warning.
+    /// unless the caller insists; elsewhere it is allowed with a warning. The app
+    /// counts whenever it runs, whatever data folder it uses: memory is the Mac's.
     public static func decide(
         otherHosts: [EngineHostLease.Host], appRunning: Bool, deviceClass: NativeDeviceMemoryClass,
         allowConcurrent: Bool
     ) -> EngineHostAdmission {
-        var names = otherHosts.map { $0.kind == "app" ? "the Vocello app" : "vocello (pid \($0.pid))" }
+        var names = otherHosts.map { host in
+            switch host.kind {
+            case "app": "the Vocello app"
+            case "cli": "vocello (pid \(host.pid))"
+            default: "another engine host"
+            }
+        }
         if appRunning, !otherHosts.contains(where: { $0.kind == "app" }) { names.append("the Vocello app") }
         guard !names.isEmpty else { return .proceed }
         let others = names.joined(separator: ", ")

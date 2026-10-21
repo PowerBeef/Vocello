@@ -343,29 +343,24 @@ enum BatchCommand {
             case nil:
                 break
             }
-            guard let joined = outcome.audioPath, let duration = outcome.durationSeconds,
-                  let assembly = outcome.assembly else {
+            guard let duration = outcome.durationSeconds, let assembly = outcome.assembly else {
                 throw CLIError(.internalError, "a completed long-form project has no joined output")
             }
-            // A signal that arrived after the runner finished still wins: nothing is published.
-            if Task.isCancelled {
-                try? FileManager.default.removeItem(atPath: joined)
-                rows[index].generationID = nil
-                rows[index].status = .cancelled
-                rows[index].errorCode = "cancelled"
-                cancelled = true
-                stopped = true
-                break projects
-            }
-            // The project's folder is inside the output folder, so the move is a rename.
             let joinedPath = outDir.appendingPathComponent("\(name).wav").path
             do {
-                try FileManager.default.moveItem(atPath: joined, toPath: joinedPath)
+                try CLILongFormProject.publishJoined(
+                    outcome, to: URL(fileURLWithPath: joinedPath), signalled: Task.isCancelled
+                )
             } catch {
-                try? FileManager.default.removeItem(atPath: joined)
                 rows[index].generationID = nil
-                rows[index].status = .failed
-                rows[index].errorCode = VocelloErrorCode.outputUnavailable.rawValue
+                if error is CancellationError {
+                    rows[index].status = .cancelled
+                    rows[index].errorCode = "cancelled"
+                    cancelled = true
+                } else {
+                    rows[index].status = .failed
+                    rows[index].errorCode = VocelloErrorCode.outputUnavailable.rawValue
+                }
                 stopped = true
                 break projects
             }

@@ -44,6 +44,27 @@ final class CLIEventStreamTests: XCTestCase {
         )
     }
 
+    /// A running record coalesces only into the newest queued one, so a `progress`
+    /// count never runs ahead of the take records queued after it (review 13).
+    func testARunningRecordNeverOvertakesTheRecordsAfterIt() throws {
+        let output = GatedSink()
+        let stream = CLIEventStream(requestID: "fixture", sink: output.sink)
+        stream.emit(.started, data: .object(["command": "batch"]))
+        XCTAssertEqual(output.firstWriteStarted.wait(timeout: .now() + 5), .success)
+        stream.emit(.progress, data: .object(["finished": .integer(1)]))
+        stream.emit(.generationCompleted, generationID: "take-2")
+        stream.emit(.progress, data: .object(["finished": .integer(2)]))
+        output.gate.signal()
+        stream.finish(result: envelope())
+        let records = try output.records()
+        XCTAssertEqual(
+            records.compactMap { $0["type"] as? String },
+            ["started", "progress", "generation_completed", "progress", "result"]
+        )
+        XCTAssertEqual((records[1]["data"] as? [String: Any])?["finished"] as? Int, 1)
+        XCTAssertEqual((records[3]["data"] as? [String: Any])?["finished"] as? Int, 2)
+    }
+
     func testRunningRecordsCoalesceWhileTerminalRecordsSurviveInOrder() throws {
         let output = GatedSink()
         let stream = CLIEventStream(requestID: "fixture", sink: output.sink)

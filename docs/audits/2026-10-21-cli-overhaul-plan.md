@@ -53,7 +53,12 @@ Constraints that shape the plan:
   `VoiceDesignBriefCatalog`, `SavedVoicesBusyRetryPolicy`, `ModelDeletionSequence`,
   `MacModelVariantResolution` — added only as the compiler demands. Never `GenerationPersistence`,
   `AudioPlayerViewModel`, `MacInterfaceText`, either `AppPaths`, either `TTSModel`, `TTSContract`, or
-  either `ModelManagerViewModel`.
+  either `ModelManagerViewModel`. (As built, RF-27: the long-form runner and `MacLineBatchRequest` are
+  compiled by path rather than extracted, so no app file changes before the submission;
+  `MacInterfaceText` comes with the latter, unreached from the CLI. `batch` keeps its own semantics for
+  the QC lanes, and `generate --line-by-line` carries the app's line batch. The CLI writes no History
+  until RF-30's lock, instead of an opt-in interim. Engine leases live in one per-user folder,
+  `EngineHostLease` in `VocelloDesktopCore` until the app adopts it.)
 - **New `Sources/DesktopShared/`** (Mac-only pure logic, compiled by the Mac app's glob and by
   `VocelloDesktopCore`): extractions from Mac files so both share one implementation — `MacSettingsKeys`,
   `MacModelSelection` and `ModelInventory` (from `ModelManagerViewModel`), `MacLineBatchPlan` (from

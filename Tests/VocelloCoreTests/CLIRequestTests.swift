@@ -124,6 +124,14 @@ final class CLIRequestTests: XCTestCase {
         XCTAssertNotEqual(seeded, hello)
         let reported = try await identity(["--text", "Hello there.", "--quiet", "--client-request-id", "a"], root: root)
         XCTAssertEqual(reported, hello, "how a command reports is not what it asks for")
+        let waiting = try await identity(["--text", "Hello there.", "--wait-for-engine", "--allow-concurrent-engine"], root: root)
+        XCTAssertEqual(waiting, hello, "how a take waits for the engine is not what it asks for")
+        let elsewhere = try await identity(["--text", "Hello there.", "--line-by-line", "--out-dir", "takes"], root: root)
+        let elsewhereAbsolute = try await identity(
+            ["--text", "Hello there.", "--line-by-line", "--out-dir", FileManager.default.currentDirectoryPath + "/takes"],
+            root: root
+        )
+        XCTAssertEqual(elsewhere, elsewhereAbsolute, "--out-dir counts as the absolute folder it names")
         let accumulated = try await identity(["--text", "Hello there.", "--no-stream"], root: root)
         XCTAssertNotEqual(accumulated, hello)
 

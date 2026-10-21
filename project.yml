@@ -340,6 +340,9 @@ targets:
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
         INFOPLIST_KEY_CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # RF-28: `voices enroll --transcribe` recognizes the reference on device;
+        # macOS refuses Speech to a binary without this string.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Vocello transcribes a reference clip on this Mac so a saved voice records what it says."
         # Ad-hoc signed, no hardened runtime: a plain CLI runs Metal/MLX fine
         # without the app's allow-unsigned-memory entitlement.
         CODE_SIGN_IDENTITY: "-"
@@ -405,6 +408,12 @@ targets:
       - path: Sources/Services/MacInterfaceLanguage.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift
+      # RF-28: saved-voice enrollment as the app's voice sheet does it (on-device
+      # transcription, the review state, its naming and take-to-voice rules).
+      - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift
+      - path: Sources/Views/Voices/SavedVoiceSheetConfiguration.swift
+      - path: Sources/SharedSupport/Services/HantHansFoldTable.swift
+      - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
       # Mac-only pieces the app and the CLI share (the app compiles Sources/DesktopShared too).
       - path: Sources/DesktopShared
     settings:

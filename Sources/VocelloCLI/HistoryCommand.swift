@@ -34,21 +34,26 @@ enum HistoryCommand {
                 throw CLIError(.internalError, "no handler for history \(action)")
             }
         } catch let error as DesktopHistoryError {
-            switch error {
-            case .schemaNewer:
-                throw CLIError(.historySchemaNewer, error.errorDescription ?? "", hint: "update the CLI to the app's version")
-            case .schemaOlder:
-                throw CLIError(.configError, error.errorDescription ?? "", hint: "open Vocello once, then retry")
-            case .busy:
-                throw CLIError(.storeBusy, error.errorDescription ?? "", hint: "the app is writing History; retry")
-            case .appRunning:
-                throw CLIError(
-                    .storeBusy, error.errorDescription ?? "",
-                    hint: "quit Vocello and retry; a shared History lock (RF-30) will lift this"
-                )
-            case .damaged:
-                throw CLIError(.ioError, error.errorDescription ?? "", hint: "open Vocello, which recovers History")
-            }
+            throw cliError(for: error)
+        }
+    }
+
+    /// A History read refusal as the contract reports it.
+    static func cliError(for error: DesktopHistoryError) -> CLIError {
+        switch error {
+        case .schemaNewer:
+            CLIError(.historySchemaNewer, error.errorDescription ?? "", hint: "update the CLI to the app's version")
+        case .schemaOlder:
+            CLIError(.configError, error.errorDescription ?? "", hint: "open Vocello once, then retry")
+        case .busy:
+            CLIError(.storeBusy, error.errorDescription ?? "", hint: "the app is writing History; retry")
+        case .appRunning:
+            CLIError(
+                .storeBusy, error.errorDescription ?? "",
+                hint: "quit Vocello and retry; a shared History lock (RF-30) will lift this"
+            )
+        case .damaged:
+            CLIError(.ioError, error.errorDescription ?? "", hint: "open Vocello, which recovers History")
         }
     }
 

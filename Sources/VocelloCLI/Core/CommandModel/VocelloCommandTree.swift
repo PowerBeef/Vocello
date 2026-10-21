@@ -12,6 +12,17 @@ public enum VocelloCommandTree {
         "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)"
     )
 
+    /// How a saved voice's transcript and quality warnings are decided (enroll, replace, save-take).
+    static let enrollmentOptions: [CLIOptionSpec] = [
+        .value("transcript", .text, "text", "the clip's words"),
+        .flag("audio-only", "save no transcript: the voice conditions on the audio alone"),
+        .value("transcribe", .choice(["auto", "always", "never"]), "when",
+               "recognize the clip on this Mac without a transcript: auto (default, only if Speech is allowed) | always | never"),
+        .value("language", .text, "language", "the reference's language (default: detected from the transcript)"),
+        .value("on-warnings", .choice(["keep", "discard", "fail"]), "policy",
+               "a reference with quality warnings: keep it | discard it | fail (default)"),
+    ]
+
     /// What a product command does when another engine already runs on this Mac.
     static let engineOptions: [CLIOptionSpec] = [
         .flag("allow-concurrent-engine", "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)"),
@@ -122,21 +133,39 @@ public enum VocelloCommandTree {
                 positionals: [CLIPositionalSpec("voice", "the saved voice's name or id", required: true)]
             ),
             CLICommandSpec(
-                name: "enroll", aliases: ["add"], summary: "Save a clone voice from a reference clip",
-                usage: ["vocello voices enroll --name <name> --audio <wav> [--transcript \"…\"] --confirm-consent"],
+                name: "enroll", aliases: ["add"], summary: "Save a clone voice from a reference clip, as the app does",
+                usage: ["vocello voices enroll --name <name> --audio <wav> [--transcript \"…\" | --audio-only] --confirm-consent"],
+                discussion: """
+                Without --transcript or --audio-only the clip is recognized on this Mac when Speech is already \
+                allowed (--transcribe auto, never prompts). A transcript needs its language: detected, or --language. \
+                A reference with quality warnings is refused unless --on-warnings keep (a hard-blocking one always is).
+                """,
                 options: [
                     .value("name", .text, "name", "the voice's name"),
                     .value("audio", .file, "wav", "the reference clip"),
-                    .value("transcript", .text, "text", "the clip's words"),
-                    consent,
-                ]
+                ] + enrollmentOptions + [consent] + engineOptions
+            ),
+            CLICommandSpec(
+                name: "replace", summary: "Give a saved voice a new reference clip",
+                options: [
+                    .value("audio", .file, "wav", "the new reference clip"),
+                    .value("name", .text, "name", "a new name (default: the voice's own)"),
+                ] + enrollmentOptions + [consent] + engineOptions,
+                positionals: [CLIPositionalSpec("id", "the saved voice id (see `vocello voices list`)", required: true)]
+            ),
+            CLICommandSpec(
+                name: "save-take", summary: "Save a Design or Clone take from History as a voice",
+                options: [
+                    .value("name", .text, "name", "the voice's name (default: as the app suggests it)"),
+                ] + enrollmentOptions + [consent] + engineOptions,
+                positionals: [CLIPositionalSpec("id", "the History id (see `vocello history list`)", required: true)]
             ),
             CLICommandSpec(
                 name: "banks", summary: "List saved voices grouped into Clone delivery banks (<Name> and <Name> (<Preset>))"
             ),
             CLICommandSpec(
                 name: "delete", aliases: ["rm"], summary: "Delete a saved voice",
-                options: [.value("id", .text, "id", "the saved voice id (see `vocello voices list`)"), consent]
+                options: [.value("id", .text, "id", "the saved voice id (see `vocello voices list`)"), consent] + engineOptions
             ),
         ],
         defaultSubcommand: "list"

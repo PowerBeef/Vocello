@@ -28,7 +28,7 @@ public struct CLIRuntime {
     let voiceCloningConsent: VoiceCloningConsentPolicy
     /// RF-27: product commands (generate, batch, run) host the engine as the Mac
     /// app does, through the shared store; bench drives the raw engine (nil).
-    var host: DesktopEngineHost? = nil
+    public internal(set) var host: DesktopEngineHost? = nil
     /// The hosted engine's lease on the data root, held for the process's life.
     var lease: EngineHostLease? = nil
 

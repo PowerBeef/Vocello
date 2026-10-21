@@ -672,6 +672,8 @@
         "list",
         "show",
         "enroll",
+        "replace",
+        "save-take",
         "banks",
         "delete"
       ],
@@ -755,8 +757,63 @@
           "valueOptional": false
         },
         {
+          "name": "audio-only",
+          "summary": "save no transcript: the voice conditions on the audio alone",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "name": "transcribe",
+          "placeholder": "when",
+          "summary": "recognize the clip on this Mac without a transcript: auto (default, only if Speech is allowed) | always | never",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "language",
+          "placeholder": "language",
+          "summary": "the reference's language (default: detected from the transcript)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "keep",
+            "discard",
+            "fail"
+          ],
+          "name": "on-warnings",
+          "placeholder": "policy",
+          "summary": "a reference with quality warnings: keep it | discard it | fail (default)",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
           "name": "confirm-consent",
           "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
@@ -765,10 +822,216 @@
       "path": "voices.enroll",
       "refusedOptions": [],
       "subcommands": [],
-      "summary": "Save a clone voice from a reference clip",
+      "summary": "Save a clone voice from a reference clip, as the app does",
       "usage": [
-        "vocello voices enroll --name <name> --audio <wav> [--transcript \"…\"] --confirm-consent"
+        "vocello voices enroll --name <name> --audio <wav> [--transcript \"…\" | --audio-only] --confirm-consent"
       ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "replace",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the saved voice id (see `vocello voices list`)",
+          "type": "string"
+        }
+      ],
+      "options": [
+        {
+          "name": "audio",
+          "placeholder": "wav",
+          "summary": "the new reference clip",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "name",
+          "placeholder": "name",
+          "summary": "a new name (default: the voice's own)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "transcript",
+          "placeholder": "text",
+          "summary": "the clip's words",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "audio-only",
+          "summary": "save no transcript: the voice conditions on the audio alone",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "name": "transcribe",
+          "placeholder": "when",
+          "summary": "recognize the clip on this Mac without a transcript: auto (default, only if Speech is allowed) | always | never",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "language",
+          "placeholder": "language",
+          "summary": "the reference's language (default: detected from the transcript)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "keep",
+            "discard",
+            "fail"
+          ],
+          "name": "on-warnings",
+          "placeholder": "policy",
+          "summary": "a reference with quality warnings: keep it | discard it | fail (default)",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "voices.replace",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Give a saved voice a new reference clip",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "save-take",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the History id (see `vocello history list`)",
+          "type": "string"
+        }
+      ],
+      "options": [
+        {
+          "name": "name",
+          "placeholder": "name",
+          "summary": "the voice's name (default: as the app suggests it)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "transcript",
+          "placeholder": "text",
+          "summary": "the clip's words",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "audio-only",
+          "summary": "save no transcript: the voice conditions on the audio alone",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "name": "transcribe",
+          "placeholder": "when",
+          "summary": "recognize the clip on this Mac without a transcript: auto (default, only if Speech is allowed) | always | never",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "language",
+          "placeholder": "language",
+          "summary": "the reference's language (default: detected from the transcript)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "keep",
+            "discard",
+            "fail"
+          ],
+          "name": "on-warnings",
+          "placeholder": "policy",
+          "summary": "a reference with quality warnings: keep it | discard it | fail (default)",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "voices.save-take",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Save a Design or Clone take from History as a voice",
+      "usage": []
     },
     {
       "aliases": [],
@@ -803,6 +1066,20 @@
         {
           "name": "confirm-consent",
           "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
           "takesValue": false,
           "type": "flag",
           "valueOptional": false

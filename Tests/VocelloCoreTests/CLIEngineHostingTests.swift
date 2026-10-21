@@ -260,6 +260,151 @@ final class DesktopLongFormDriverTests: XCTestCase {
     }
 }
 
+/// RF-28: saving a clone voice as the app's voice sheet does, over the real
+/// engine and its saved-voice store in a temporary data folder.
+final class DesktopVoiceEnrollmentTests: XCTestCase {
+    private static let contract = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+    private static let words = "The lighthouse keeper climbed the stairs again, counting each step aloud."
+
+    @MainActor
+    private func host() async throws -> (host: DesktopEngineHost, engine: MLXTTSEngine, root: URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DesktopVoiceEnrollment-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let registry = try ContractBackedModelRegistry(manifestURL: Self.contract)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let components = try NativeRuntimeFactory.make(
+            registry: registry, paths: .rooted(at: root), storeVersionSeed: "rf28-enrollment-fixture"
+        )
+        let host = DesktopEngineHost(
+            engine: components.engine, consent: VoiceCloningConsentPolicy(isConsentRecorded: true), deviceClass: .mid16GBMac
+        )
+        try await host.initialize(appSupportDirectory: root)
+        return (host, components.engine, root)
+    }
+
+    /// A 220 Hz tone, `seconds` long.
+    private func clip(_ seconds: Int, in root: URL) throws -> String {
+        let url = root.appendingPathComponent("reference-\(seconds)s.wav")
+        let samples: [Int16] = (0 ..< seconds * 24_000).map { frame in
+            Int16((sin(2 * Double.pi * 220 * Double(frame) / 24_000) * 8_000).rounded())
+        }
+        // A 16-bit mono PCM WAV at 24 kHz.
+        var data = Data()
+        func append<T: FixedWidthInteger>(_ value: T) {
+            for shift in stride(from: 0, to: T.bitWidth, by: 8) { data.append(UInt8(truncatingIfNeeded: value >> shift)) }
+        }
+        data.append(contentsOf: Array("RIFF".utf8)); append(UInt32(36 + samples.count * 2))
+        data.append(contentsOf: Array("WAVEfmt ".utf8)); append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
+        append(UInt32(24_000)); append(UInt32(48_000)); append(UInt16(2)); append(UInt16(16))
+        data.append(contentsOf: Array("data".utf8)); append(UInt32(samples.count * 2))
+        samples.forEach { append($0) }
+        try data.write(to: url)
+        return url.path
+    }
+
+    private func request(
+        _ path: String, name: String? = nil, transcript: String? = nil, audioOnly: Bool = false,
+        onWarnings: DesktopVoiceEnrollment.OnWarnings = .fail, replacing: String? = nil,
+        source: DesktopVoiceEnrollment.Source = .clip
+    ) -> DesktopVoiceEnrollment.Request {
+        DesktopVoiceEnrollment.Request(
+            name: name, audioPath: path, transcript: transcript, audioOnly: audioOnly, transcription: .never,
+            language: nil, onWarnings: onWarnings, replacingVoiceID: replacing, source: source
+        )
+    }
+
+    @MainActor
+    private func failure(
+        _ host: DesktopEngineHost, _ request: DesktopVoiceEnrollment.Request
+    ) async -> DesktopVoiceEnrollment.Failure? {
+        do {
+            _ = try await host.enrollVoice(request)
+            return nil
+        } catch {
+            return error as? DesktopVoiceEnrollment.Failure
+        }
+    }
+
+    @MainActor
+    func testAClipIsSavedReplacedAndDeletedAsTheAppDoes() async throws {
+        let (host, engine, root) = try await host()
+        defer { engine.stop() }
+        let clip = try clip(10, in: root)
+
+        let needsTranscript = await failure(host, request(clip, name: "Keeper"))
+        XCTAssertEqual(needsTranscript, .transcriptNeeded(reason: "transcription is off"))
+        let saved = try await host.enrollVoice(request(clip, name: "Keeper", transcript: Self.words))
+        XCTAssertEqual(saved.outcome, .saved)
+        XCTAssertEqual(saved.transcriptSource, "manual")
+        XCTAssertEqual(saved.referenceLanguage, "english", "detected from the transcript")
+        let voice = try XCTUnwrap(saved.voice)
+        XCTAssertTrue(voice.hasTranscript)
+        XCTAssertEqual(voice.enrollmentMetadata?.transcriptSource, .manual)
+
+        let duplicate = await failure(host, request(clip, name: "keeper", transcript: Self.words))
+        XCTAssertEqual(duplicate, .nameExists("keeper"), "the store's own case-insensitive naming, as the app names it")
+        let unknown = await failure(host, request(clip, transcript: Self.words, replacing: "Nobody"))
+        XCTAssertEqual(unknown, .voiceNotFound("Nobody"))
+        let numbers = await failure(host, request(clip, name: "Digits", transcript: "1234 5678"))
+        XCTAssertEqual(numbers, .languageNeeded, "a transcript needs a known language")
+
+        let replaced = try await host.enrollVoice(request(clip, audioOnly: true, replacing: voice.id))
+        XCTAssertEqual(replaced.name, voice.name, "a replaced voice keeps its name")
+        XCTAssertEqual(replaced.transcriptSource, "audio_only")
+        let afterReplace = try await host.listVoices()
+        XCTAssertEqual(afterReplace.map(\.id), [voice.id])
+        XCTAssertEqual(afterReplace.first?.hasTranscript, false)
+
+        try await host.deleteVoice(id: voice.id, sleep: { _ in XCTFail("no retry without a busy store") })
+        let afterDelete = try await host.listVoices()
+        XCTAssertEqual(afterDelete, [])
+    }
+
+    @MainActor
+    func testQualityWarningsFollowThePolicy() async throws {
+        let (host, engine, root) = try await host()
+        defer { engine.stop() }
+        let short = try clip(3, in: root)
+        let refused = await failure(host, request(short, name: "Short", transcript: Self.words))
+        XCTAssertEqual(refused, .qualityRefused(warnings: ["reference_duration_short"], hardBlocking: false))
+        let discarded = try await host.enrollVoice(request(short, name: "Short", transcript: Self.words, onWarnings: .discard))
+        XCTAssertEqual(discarded.outcome, .discarded)
+        XCTAssertNil(discarded.voice)
+        let left = try await host.listVoices()
+        XCTAssertEqual(left, [], "a refused or discarded candidate leaves nothing")
+        let kept = try await host.enrollVoice(request(short, name: "Short", transcript: Self.words, onWarnings: .keep))
+        XCTAssertEqual(kept.voice?.qualityWarnings, ["reference_duration_short"])
+    }
+
+    /// History takes become voices as the app's History offers them: a Clone
+    /// take's text is its transcript; a Design take's is intent, so it needs one.
+    @MainActor
+    func testHistoryTakesBecomeVoicesAsTheAppSavesThem() async throws {
+        let (host, engine, root) = try await host()
+        defer { engine.stop() }
+        let clip = try clip(10, in: root)
+
+        let cloned = try await host.enrollVoice(
+            request(clip, source: .cloneTake(text: Self.words, suggestedName: "Nora"))
+        )
+        XCTAssertEqual(cloned.name, "Nora", "the voice it was spoken in")
+        XCTAssertEqual(cloned.transcriptSource, "unknown", "a supplied transcript with no new recognition")
+        XCTAssertEqual(cloned.voice?.hasTranscript, true)
+
+        let brief = "A warm, slow narrator with a gentle rasp"
+        let design = DesktopVoiceEnrollment.Source.designTake(text: Self.words, voiceDescription: brief)
+        let needsWords = await failure(host, request(clip, source: design))
+        XCTAssertEqual(needsWords, .transcriptNeeded(reason: "transcription is off"), "the script is intent, not evidence")
+        let designed = try await host.enrollVoice(request(clip, transcript: Self.words, source: design))
+        XCTAssertEqual(designed.name, DesktopVoiceEnrollment.suggestedName(forVoiceDescription: brief))
+        XCTAssertEqual(designed.voice?.enrollmentMetadata?.generatedSourceMode, GenerationMode.design.rawValue)
+    }
+}
+
 /// RF-27: publishing a project's joined output (review of fc1c4e05, item 4).
 final class LongFormPublishTests: XCTestCase {
     private func project() throws -> (outcome: CLILongFormProject.Outcome, root: URL) {

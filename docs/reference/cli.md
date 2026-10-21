@@ -433,11 +433,35 @@ speech language (default English), with the 500-character description limit.
 vocello voices list [--json]
 vocello voices show <name|id> [--json]   # reference, transcript, enrollment record
 vocello voices banks [--json]            # Clone delivery banks: <Name> and <Name> (<Preset>)
-vocello voices enroll --name <name> --audio <wav> [--transcript "…"] --confirm-consent
+vocello voices enroll --name <name> --audio <wav> [--transcript "…" | --audio-only] --confirm-consent
+vocello voices replace <id> --audio <wav> [--transcript "…" | --audio-only] --confirm-consent
+vocello voices save-take <history id> [--name <name>] [--transcript "…" | --audio-only] --confirm-consent
 vocello voices delete --id <id>
 ```
 
-`enroll` requires `--confirm-consent`; `list` and `delete` do not.
+`enroll`, `replace` and `save-take` require `--confirm-consent`; `list`, `show`, `banks` and `delete`
+do not. They save a voice as the app's voice sheet does (`DesktopVoiceEnrollment`), through the hosted
+engine:
+
+- **Transcript.** `--transcript` is the clip's words; `--audio-only` saves none (the voice conditions on
+  the audio alone). With neither, `--transcribe auto` (the default) recognizes the clip on this Mac only
+  when Speech recognition is already allowed for the terminal, so it never prompts; `always` asks for
+  it (macOS may prompt; Speech needs Siri on); `never` refuses. A transcript needs its reference
+  language: detected from the words, or `--language`.
+- **Quality.** A reference with quality warnings (too short, too long, unreadable) is refused
+  (`qc_rejected`, the warnings in `detail`) unless `--on-warnings keep` saves it anyway or `discard`
+  reports it discarded; an excessively long reference is always refused.
+- **Names.** The app's rules: a name needs a letter, digit or underscore and must not match another
+  saved voice, case-insensitively. `replace` keeps the voice's name unless `--name` gives a new one.
+- **`save-take`** takes a Design or Clone take from History (which is read only while the app is
+  closed). A Clone take's text is its transcript and its voice its suggested name; a Design take's text
+  is only what was asked for, so it needs `--transcript`, recognition or `--audio-only`, and its name
+  defaults to the one the app suggests from the brief. The record notes it came from Design.
+- **`delete`** retries for a few seconds while another Vocello process holds the saved-voice store.
+
+Each change tells a running app (`com.qwenvoice.shared.savedVoicesDidChange`). The result of `enroll`,
+`replace` and `save-take` is `{outcome, voice, name, qualityWarnings, transcriptSource,
+referenceLanguage, automaticTranscription}`.
 
 ### Voice-cloning consent
 

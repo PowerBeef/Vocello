@@ -297,8 +297,10 @@
           "rm"
         ],
         "options": {
+          "allow-concurrent-engine": false,
           "confirm-consent": false,
-          "id": true
+          "id": true,
+          "wait-for-engine": false
         }
       },
       "voices.enroll": {
@@ -306,10 +308,16 @@
           "add"
         ],
         "options": {
+          "allow-concurrent-engine": false,
           "audio": true,
+          "audio-only": false,
           "confirm-consent": false,
+          "language": true,
           "name": true,
-          "transcript": true
+          "on-warnings": true,
+          "transcribe": true,
+          "transcript": true,
+          "wait-for-engine": false
         }
       },
       "voices.list": {
@@ -318,6 +326,35 @@
         ],
         "options": {
           "confirm-consent": false
+        }
+      },
+      "voices.replace": {
+        "aliases": [],
+        "options": {
+          "allow-concurrent-engine": false,
+          "audio": true,
+          "audio-only": false,
+          "confirm-consent": false,
+          "language": true,
+          "name": true,
+          "on-warnings": true,
+          "transcribe": true,
+          "transcript": true,
+          "wait-for-engine": false
+        }
+      },
+      "voices.save-take": {
+        "aliases": [],
+        "options": {
+          "allow-concurrent-engine": false,
+          "audio-only": false,
+          "confirm-consent": false,
+          "language": true,
+          "name": true,
+          "on-warnings": true,
+          "transcribe": true,
+          "transcript": true,
+          "wait-for-engine": false
         }
       },
       "voices.show": {

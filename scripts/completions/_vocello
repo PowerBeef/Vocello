@@ -5,7 +5,7 @@
 _vocello() {
   local word previous key command sub i
   local -a candidates options
-  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --long-form --out-dir --client-request-id --file --request --requests --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
+  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --long-form --out-dir --client-request-id --file --request --requests --order --limit --name --audio --transcribe --on-warnings --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
 
   # Find the command and subcommand typed so far, skipping options and their values.
   i=2
@@ -110,6 +110,8 @@ _vocello() {
         list|ls) key=voices_list ;;
         show) key=voices_show ;;
         enroll|add) key=voices_enroll ;;
+        replace) key=voices_replace ;;
+        save-take) key=voices_save-take ;;
         banks) key=voices_banks ;;
         delete|rm) key=voices_delete ;;
         '') ;;
@@ -120,8 +122,10 @@ _vocello() {
           'list:List saved voices'
           'ls:List saved voices'
           'show:Show one saved voice\: its reference, transcript and enrollment record'
-          'enroll:Save a clone voice from a reference clip'
-          'add:Save a clone voice from a reference clip'
+          'enroll:Save a clone voice from a reference clip, as the app does'
+          'add:Save a clone voice from a reference clip, as the app does'
+          'replace:Give a saved voice a new reference clip'
+          'save-take:Save a Design or Clone take from History as a voice'
           'banks:List saved voices grouped into Clone delivery banks (<Name> and <Name> (<Preset>))'
           'delete:Delete a saved voice'
           'rm:Delete a saved voice'
@@ -296,6 +300,8 @@ _vocello() {
     --limit) :; return ;;
     --name) :; return ;;
     --audio) _files; return ;;
+    --transcribe) _values 'transcribe' auto always never; return ;;
+    --on-warnings) _values 'on-warnings' keep discard fail; return ;;
     --id) :; return ;;
     --modes) _values -s , 'modes' custom design clone; return ;;
     --variants) _values -s , 'variants' speed quality; return ;;
@@ -490,7 +496,56 @@ _vocello() {
         '--name:the voice'\''s name'
         '--audio:the reference clip'
         '--transcript:the clip'\''s words'
+        '--audio-only:save no transcript\: the voice conditions on the audio alone'
+        '--transcribe:recognize the clip on this Mac without a transcript\: auto (default, only if Speech is allowed) | always | never'
+        '--language:the reference'\''s language (default\: detected from the transcript)'
+        '--on-warnings:a reference with quality warnings\: keep it | discard it | fail (default)'
         '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--allow-concurrent-engine:run beside another Vocello engine (an 8 GB Mac refuses a second one without it)'
+        '--wait-for-engine:wait for another Vocello engine on this Mac to exit instead of refusing'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_replace)
+      options=(
+        '--audio:the new reference clip'
+        '--name:a new name (default\: the voice'\''s own)'
+        '--transcript:the clip'\''s words'
+        '--audio-only:save no transcript\: the voice conditions on the audio alone'
+        '--transcribe:recognize the clip on this Mac without a transcript\: auto (default, only if Speech is allowed) | always | never'
+        '--language:the reference'\''s language (default\: detected from the transcript)'
+        '--on-warnings:a reference with quality warnings\: keep it | discard it | fail (default)'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--allow-concurrent-engine:run beside another Vocello engine (an 8 GB Mac refuses a second one without it)'
+        '--wait-for-engine:wait for another Vocello engine on this Mac to exit instead of refusing'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_save-take)
+      options=(
+        '--name:the voice'\''s name (default\: as the app suggests it)'
+        '--transcript:the clip'\''s words'
+        '--audio-only:save no transcript\: the voice conditions on the audio alone'
+        '--transcribe:recognize the clip on this Mac without a transcript\: auto (default, only if Speech is allowed) | always | never'
+        '--language:the reference'\''s language (default\: detected from the transcript)'
+        '--on-warnings:a reference with quality warnings\: keep it | discard it | fail (default)'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--allow-concurrent-engine:run beside another Vocello engine (an 8 GB Mac refuses a second one without it)'
+        '--wait-for-engine:wait for another Vocello engine on this Mac to exit instead of refusing'
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'
@@ -517,6 +572,8 @@ _vocello() {
       options=(
         '--id:the saved voice id (see `vocello voices list`)'
         '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--allow-concurrent-engine:run beside another Vocello engine (an 8 GB Mac refuses a second one without it)'
+        '--wait-for-engine:wait for another Vocello engine on this Mac to exit instead of refusing'
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'
@@ -848,6 +905,8 @@ _vocello() {
     history_show) return ;;
     history_export) return ;;
     voices_show) return ;;
+    voices_replace) return ;;
+    voices_save-take) return ;;
     models_list) return ;;
     models_status) return ;;
     models_verify) return ;;

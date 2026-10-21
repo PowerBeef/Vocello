@@ -233,6 +233,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--seed` | deterministic sampling seed — the same request + seed reproduces the same take bit-for-bit |
 | `--variation` | `expressive` (official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability; without it, the app's Variation setting |
 | `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
+| `--long-form` | `auto` (default): a script longer than one take (900 characters, East Asian characters counting three) runs as a long-form project, as the apps route it · `always`: any script does · `never`: such a script is refused (`text_too_long`) |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
@@ -260,8 +261,20 @@ without `--mode` defaults to `custom` (no prompt). `vocello modes` lists the mod
 Prints the output WAV path on stdout (or, with `--json`, the envelope whose `result` carries `audioPath`, `durationSeconds`, `wallSeconds`,
 `realtimeFactor` (standard RTF: `wallSeconds ÷ durationSeconds`, lower is faster, below 1.0 is faster than
 real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, `seed` (the
-effective seed as a decimal string: pass it back as `--seed` to reproduce the take), and — when `--stream` —
-`firstChunkMS` and `chunks`).
+effective seed as a decimal string: pass it back as `--seed`, with the same variant and variation, to
+reproduce the take), and — when `--stream` — `firstChunkMS` and `chunks`).
+
+**Long-form projects.** A script past one take is planned, before any model work, by the apps'
+long-form planner (at most 100 segments; `--plan` reports `longForm` and `segments`), run one streaming
+take per segment at the app's cadence (each with the seed derived from the base seed `--seed`, or a
+random one), and joined by the apps' bounded assembler. Segment takes stay in `<output stem>_segments/`
+beside the output; the joined file replaces `--out` only once the project is complete. The result adds
+`longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`, `longFormSegments` (each
+segment's index, boundary, pause, seed, generation id, path, duration and finish reason) and
+`longFormAssembly`; `finishReason` is `max_tokens` when any segment was truncated. A stopped project
+keeps its completed segments and says where (warning `long_form_segments_kept`). Only the engine's Fast
+QC runs, per segment: the apps' joined-output gate, manifest and History acceptance are not part of it
+yet. `--no-stream` does not apply to a project and is refused with one.
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
 never share a file. An explicit `--out` that names an existing file is replaced atomically only by a

@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import QwenVoiceCore
 import Synchronization
+import System
 import VocelloDesktopCore
 
 /// `vocello generate` — synthesize one clip headlessly via the in-process engine.
@@ -53,6 +54,14 @@ public enum GenerateCommand {
         let audioQC: AudioQCReport?
         let firstChunkMS: Double?
         let chunks: Int?
+        /// A long-form project (a script past one take, or `--long-form always`):
+        /// `seed` is then its base seed, `generationID` names the project, and the
+        /// segments carry their own takes. The single-take receipt fields are null.
+        var longForm = false
+        var longFormBaseSeed: String?
+        var longFormPlanDigest: String?
+        var longFormSegments: [CLILongFormProject.Segment]?
+        var longFormAssembly: LongFormAssemblyEvidence?
     }
 
     /// What a `--stream` run observes off `engine.events`.
@@ -173,6 +182,9 @@ public enum GenerateCommand {
         let characters: Int
         let streaming: Bool
         let outputPath: String
+        let longForm: Bool
+        /// The planned segments of a long-form project.
+        let segments: Int?
     }
 
     /// One take, validated and resolved before any engine work: everything
@@ -195,6 +207,8 @@ public enum GenerateCommand {
         public let manifestOverride: URL?
         let registry: ContractBackedModelRegistry
         let modelsDirectory: URL
+        /// Set when the take runs as a long-form project.
+        let longFormPlan: LongFormPlan?
 
         var quality: Bool { variant.quality }
     }
@@ -209,7 +223,13 @@ public enum GenerateCommand {
         // Resolve text first so a missing-text run fails fast (before any prompt).
         // A request an agent sent never takes unnamed stdin.
         let text = try resolveText(args, implicitStdin: interactive)
-        try validateSingleTakeText(text)
+        let routesToLongForm = try routesToLongForm(text, route: try parseLongForm(args))
+        if routesToLongForm, !streaming {
+            throw CLIError(
+                .invalidInput, "--no-stream does not apply to a long-form project: its segments stream at the app's cadence",
+                hint: "omit --no-stream, or pass --long-form never for a script that fits one take"
+            )
+        }
 
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
         // default to custom (keeps scripted/piped runs unchanged).
@@ -220,6 +240,8 @@ public enum GenerateCommand {
         // Every option is checked before boot, so a bad value never costs a model load.
         let language = try parseLanguage(args)
         let seed = try parseSeed(args)
+        // Planned before boot, so a script the apps would refuse never costs a model load.
+        let longFormPlan = routesToLongForm ? try CLILongFormProject.plan(text, seed: seed) : nil
         let settings = DesktopAppSettings()
         let variation = try parseVariation(args) ?? appVariation(settings)
         let appDelivery = try parseAppDelivery(args)
@@ -244,7 +266,7 @@ public enum GenerateCommand {
             variation: variation, appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
             variant: variant, generationID: generationID, output: output, streaming: streaming,
             dataDirectory: dataDir, manifestOverride: manifestOverride, registry: registryContext.registry,
-            modelsDirectory: registryContext.modelsDirectory
+            modelsDirectory: registryContext.modelsDirectory, longFormPlan: longFormPlan
         )
     }
 
@@ -264,7 +286,7 @@ public enum GenerateCommand {
         let args = take.args
         let normalized: Set<String> = [
             "text", "text-file", "mode", "variant", "seed", "variation", "language", "stream", "no-stream", "out",
-            "reference", "manifest", "data-dir",
+            "reference", "manifest", "data-dir", "long-form",
         ]
         guard case .object(var fields) = args.canonicalForm(excluding: identityExclusions.union(normalized)) else {
             throw CLIError(.internalError, "the request has no canonical form")
@@ -281,6 +303,7 @@ public enum GenerateCommand {
             "variation": try parseVariation(args).map { .string($0.rawValue) } ?? .null,
             "language": take.language.flatMap { $0 == .auto ? nil : CLIJSONValue.string($0.rawValue) } ?? .null,
             "stream": .bool(take.streaming),
+            "longForm": .bool(take.longFormPlan != nil),
             "out": absolutePath("out"),
             "reference": absolutePath("reference"),
             "manifest": absolutePath("manifest"),
@@ -304,7 +327,7 @@ public enum GenerateCommand {
                 .map { DesktopModelInventory.isComplete($0, modelsDirectory: take.modelsDirectory) } ?? false,
             language: (take.language ?? .auto).rawValue, seed: take.seed.map { String($0) },
             variation: (take.variation ?? .expressive).rawValue, characters: take.text.count, streaming: take.streaming,
-            outputPath: take.output.path
+            outputPath: take.output.path, longForm: take.longFormPlan != nil, segments: take.longFormPlan?.segments.count
         )
     }
 
@@ -316,8 +339,9 @@ public enum GenerateCommand {
             if CLIPresenter.isMachine {
                 CLIPresenter.succeed(plan)
             } else {
+                let longForm = plan.segments.map { " · long-form, \($0) segments" } ?? ""
                 print("\(plan.mode) · \(plan.modelID) (\(plan.variantSource)) · \(plan.language) · \(plan.variation)"
-                    + " · \(plan.characters) characters\(plan.modelInstalled ? "" : " · model not installed")")
+                    + " · \(plan.characters) characters\(longForm)\(plan.modelInstalled ? "" : " · model not installed")")
                 print(plan.outputPath)
             }
             return
@@ -400,6 +424,9 @@ public enum GenerateCommand {
         CLIPresenter.event(.modelLoading, data: ["modelID": .string(modelID)])
         try await runtime.loadModel(id: modelID)
         CLIPresenter.event(.modelLoaded, data: ["modelID": .string(modelID)])
+        if let plan = take.longFormPlan {
+            return try await executeLongForm(take, plan: plan, runtime: runtime, modelID: modelID, payload: payload)
+        }
 
         let request = GenerationRequest(
             mode: mode, modelID: modelID, text: text, outputPath: output.path,
@@ -520,6 +547,90 @@ public enum GenerateCommand {
             note(unsafe "✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
             return report
         }
+    }
+
+    /// One long-form project (the apps' runner, `CLILongFormProject`): segment
+    /// takes in `<output stem>_segments/`, joined beside them and moved onto the
+    /// output only once complete, so a failed project never touches an existing
+    /// `--out`. A stopped project keeps its completed segments and says where.
+    @MainActor
+    private static func executeLongForm(
+        _ take: PreparedTake, plan: LongFormPlan, runtime: CLIRuntime, modelID: String,
+        payload: GenerationRequest.Payload
+    ) async throws -> GenerateJSON {
+        let output = URL(fileURLWithPath: take.output.path)
+        let segmentsFolder = output.deletingLastPathComponent().appendingPathComponent(
+            output.deletingPathExtension().lastPathComponent + "_segments", isDirectory: true
+        )
+        do {
+            try FileManager.default.createDirectory(at: segmentsFolder, withIntermediateDirectories: true)
+        } catch {
+            throw CLIError(.outputUnavailable, "could not create \(segmentsFolder.path): \(error.localizedDescription)")
+        }
+        let joined = segmentsFolder.appendingPathComponent("joined.wav")
+        note("generating a long-form project: \(plan.segments.count) segments (\(take.text.count) chars)…")
+        let started = ContinuousClock.now
+        let outcome = await CLILongFormProject.run(
+            plan, mode: take.mode, modelID: modelID, runtime: runtime, payload: payload,
+            deliveryInstructionCellID: take.deliveryInstructionCellID, variation: take.variation,
+            joinedURL: joined,
+            segmentURL: { segmentsFolder.appendingPathComponent(unsafe "segment_\(String(format: "%03d", $0)).wav") }
+        )
+        if let stop = outcome.stop {
+            if !outcome.segments.isEmpty {
+                CLIPresenter.warn(
+                    "long_form_segments_kept",
+                    "the project stopped after \(outcome.segments.count) of \(plan.segments.count) segments; "
+                        + "their takes are kept in \(segmentsFolder.path)",
+                    detail: [
+                        "completedSegments": .integer(outcome.segments.count),
+                        "plannedSegments": .integer(plan.segments.count),
+                        "segmentsFolder": .string(segmentsFolder.path),
+                    ]
+                )
+            } else {
+                try? FileManager.default.removeItem(at: segmentsFolder)
+            }
+            switch stop {
+            case .failed(let error, _, _): throw error
+            case .cancelled: throw CancellationError()
+            case .engine(let engineStop): throw engineStop
+            }
+        }
+        guard let duration = outcome.durationSeconds, let assembly = outcome.assembly else {
+            throw CLIError(.internalError, "a completed long-form project has no joined output")
+        }
+        // Same folder, so the rename is atomic: an existing --out is replaced whole or not at all.
+        guard unsafe rename(joined.path, output.path) == 0 else {
+            let failure = Errno(rawValue: errno)
+            try? FileManager.default.removeItem(at: joined)
+            throw CLIError(.outputUnavailable, "could not write \(output.path): \(failure)")
+        }
+        let wall = started.elapsedSeconds
+        // Each segment had its own started and completed events; the project publishes once.
+        CLIPresenter.event(.outputPublished, generationID: take.generationID, data: ["audioPath": .string(output.path)])
+        let deliveryInstruction = (payload.deliveryInstructionText?.trimmingCharacters(in: .whitespacesAndNewlines))
+            .flatMap { $0.isEmpty ? nil : $0 }
+        note(unsafe "✓ \(String(format: "%.2f", duration))s audio from \(outcome.segments.count) segments in \(String(format: "%.1f", wall))s · finish=\(outcome.finishReason ?? "?")")
+        return GenerateJSON(
+            generationID: take.generationID.uuidString.lowercased(),
+            audioPath: output.path, durationSeconds: duration, wallSeconds: wall,
+            realtimeFactor: duration > 0 ? wall / duration : 0, realtimeSpeedup: wall > 0 ? duration / wall : 0,
+            finishReason: outcome.finishReason, mode: take.mode.rawValue, variant: take.quality ? "quality" : "speed",
+            modelID: modelID, variantSource: take.variant.source, seed: String(outcome.baseSeed),
+            deliveryInstructionChars: deliveryInstruction?.count,
+            deliveryInstructionDigest: deliveryInstruction.map { sha256(Data($0.utf8)) },
+            deliveryInstructionLanguage: nil, modelFacingInstructionLanguage: nil,
+            deliveryInstructionCellID: take.deliveryInstructionCellID, requestReceiptSchemaVersion: nil,
+            storedLanguageSelection: nil, detectedTargetLanguage: nil, referenceTranscriptLanguage: nil,
+            finalModelLanguage: nil, languageTokenMode: nil, conditioningMode: nil,
+            targetTextDigest: sha256(Data(take.text.utf8)), targetTextCharacters: take.text.count,
+            referenceTranscriptDigest: nil, referenceTranscriptCharacters: nil, referenceAudioDigest: nil,
+            modelArtifactVersion: nil, modelIntegrityManifestDigest: nil, speechTokenizerDigest: nil,
+            completionReceipt: nil, audioQC: nil, firstChunkMS: nil, chunks: nil,
+            longForm: true, longFormBaseSeed: String(outcome.baseSeed), longFormPlanDigest: outcome.planDigest,
+            longFormSegments: outcome.segments, longFormAssembly: assembly
+        )
     }
 
     private static func sha256(_ data: Data) -> String {
@@ -811,30 +922,57 @@ public enum GenerateCommand {
     /// ends before any audio, U29), or past the apps' single-take limit (CJK
     /// characters count three, `SingleTakeScriptBudget`), which would spend
     /// minutes on a take that runs out of tokens (P15-03).
-    static func validateSingleTakeText(_ text: String) throws {
+    /// `--long-form auto|always|never` (default auto).
+    public enum LongFormRoute: String, Sendable {
+        case auto, always, never
+    }
+
+    static func parseLongForm(_ args: Args) throws -> LongFormRoute {
+        // The parser refuses any other value.
+        args.string("long-form").flatMap(LongFormRoute.init(rawValue:)) ?? .auto
+    }
+
+    /// Whether the take runs as a long-form project: a script past one take does
+    /// unless `never`, as the apps route it (`LongTextGenerationRouter`), and
+    /// `always` runs any script as one. Empty or unspeakable text is refused.
+    static func routesToLongForm(_ text: String, route: LongFormRoute) throws -> Bool {
+        guard route != .never else {
+            try validateSingleTakeText(text, longFormHint: "drop --long-form never to run it as a long-form project")
+            return false
+        }
+        try validateSpeakableText(text)
+        return route == .always || SingleTakeScriptBudget.measure(text).exceedsSingleTake
+    }
+
+    private static func validateSpeakableText(_ text: String) throws {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CLIError(.invalidInput, "empty text — pass --text \"…\", --text-file <path>, or --text - to read stdin")
         }
-        let measure = SingleTakeScriptBudget.measure(text)
-        guard measure.hasSpeakableContent else {
+        guard SingleTakeScriptBudget.measure(text).hasSpeakableContent else {
             throw CLIError(.invalidInput, "nothing to speak — the text has no letters or digits")
         }
+    }
+
+    static func validateSingleTakeText(
+        _ text: String,
+        longFormHint: String = "run it as a long-form project with vocello batch --long-form --file <path>, which reads each line as one project"
+    ) throws {
+        try validateSpeakableText(text)
+        let measure = SingleTakeScriptBudget.measure(text)
         guard !measure.exceedsSingleTake else {
             throw CLIError(
                 .textTooLong,
                 "text is too long for one take (\(measure.characters) characters; one take holds "
                     + "\(SingleTakeScriptBudget.characterLimit), or about "
                     + "\(SingleTakeScriptBudget.characterLimit / SingleTakeScriptBudget.eastAsianCharacterWeight) "
-                    + "Chinese, Japanese or Korean characters) — run it as a long-form project with "
-                    + "vocello batch --long-form --file <path>, which reads each line as one project"
+                    + "Chinese, Japanese or Korean characters) — \(longFormHint)"
             )
         }
     }
 
-    /// Resolve script text from --text, --text-file, or piped stdin (`-` forces stdin;
-    /// unnamed stdin is read only in text mode without --no-input).
     /// The take's text: `--text`, `--text-file`, or `-` for stdin; unnamed piped
-    /// stdin only when `implicitStdin` (never for a request an agent sent).
+    /// stdin only in text mode without --no-input, and only when `implicitStdin`
+    /// (never for a request an agent sent).
     static func resolveText(_ args: Args, implicitStdin: Bool = true) throws -> String {
         if let t = args.string("text") {
             return t == "-" ? (readStdinText() ?? "") : t

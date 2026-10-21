@@ -158,6 +158,19 @@
           "valueOptional": false
         },
         {
+          "choices": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "name": "long-form",
+          "placeholder": "when",
+          "summary": "run the script as a long-form project: auto (default, past one take, as the apps route it) | always | never",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
           "name": "stream",
           "summary": "streaming synthesis at the app's cadence (the default)",
           "takesValue": false,

@@ -37,19 +37,7 @@ enum BatchCommand {
     // MARK: - Long-form projects (`--long-form`)
 
     /// One planned segment of a long-form project and the engine's take of it.
-    /// No text: the project's line is the item's. `index` counts from 0.
-    struct LongFormSegmentJSON: Encodable, Sendable {
-        let index: Int
-        let segmentID: String
-        let boundary: String
-        let intendedPauseMilliseconds: Int
-        /// A decimal string, as every 64-bit value in the machine contract.
-        let effectiveSeed: String
-        let generationID: String
-        let audioPath: String
-        let durationSeconds: Double
-        let finishReason: String?
-    }
+    typealias LongFormSegmentJSON = CLILongFormProject.Segment
     struct LongFormItemJSON: Encodable, Sendable {
         let index: Int
         let text: String
@@ -255,9 +243,6 @@ enum BatchCommand {
         if let machineResult { CLIPresenter.succeed(machineResult) }
     }
 
-    /// The apps refuse a long-form plan of more segments (`IOSLongFormCoordinator.maxSegments`).
-    static let longFormMaximumSegments = CLILimits.longFormMaximumSegments
-
     /// A batch row's terminal event (ndjson only).
     static func reportRow(_ row: CLIBatchExecution.Row, generationID: UUID?) {
         switch row.status {
@@ -301,28 +286,14 @@ enum BatchCommand {
     ) async throws {
         var plans: [LongFormPlan] = []
         for (lineIndex, line) in lines.enumerated() {
-            let plan: LongFormPlan
             do {
-                let spokenPlan = try SpokenTextPlanner.plan(originalText: line)
-                plan = try LongFormPlanner.plan(
-                    spokenTextPlan: spokenPlan,
-                    configuration: LongFormPlanningConfiguration(
-                        runtimeTokenLimit: LongFormPlanningConfiguration.shippingRuntimeTokenLimit,
-                        baseSeed: seed ?? UInt64.random(in: UInt64.min ... UInt64.max)
-                    )
-                )
-            } catch {
+                plans.append(try CLILongFormProject.plan(line, seed: seed))
+            } catch let refusal as CLIError {
                 // The planner's errors carry no text, so the line number says which project failed.
-                throw CLIError(.invalidInput, "line \(lineIndex + 1): the long-form planner refused the project (\(error))")
-            }
-            guard plan.segments.count <= longFormMaximumSegments else {
                 throw CLIError(
-                    .textTooLong,
-                    "line \(lineIndex + 1): the project plans \(plan.segments.count) segments, "
-                        + "more than the \(longFormMaximumSegments) the apps accept"
+                    refusal.code, "line \(lineIndex + 1): \(refusal.description)", hint: refusal.hint, detail: refusal.detail
                 )
             }
-            plans.append(plan)
         }
         let segmentCount = plans.reduce(0) { $0 + $1.segments.count }
         note("loading \(modelID)…")
@@ -335,123 +306,55 @@ enum BatchCommand {
         let started = ContinuousClock.now
         projects: for (index, plan) in plans.enumerated() {
             let name = unsafe "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
-            let joinedURL = outDir.appendingPathComponent("\(name).wav")
-            rows[index].longFormBaseSeed = String(plan.configuration.baseSeed)
-            rows[index].longFormPlanDigest = plan.evidence.planDigest
-            var segments: [LongFormSegmentJSON] = []
-            var sources: [LongFormAssemblySegmentSource] = []
-            // The planner numbers its segments from 1 (`evidence.index`); the JSON counts from 0.
-            for (position, segment) in plan.segments.enumerated() {
-                let generationID = UUID()
-                let request = CLIBatchExecution.makeLongFormSegmentRequest(
-                    mode: mode, modelID: modelID, text: segment.spokenTextForGeneration,
-                    outputPath: outDir.appendingPathComponent(
-                        unsafe "\(name)_segment_\(String(format: "%03d", position)).wav"
-                    ).path,
-                    payload: payload, generationID: generationID, subseed: segment.evidence.effectiveSubseed,
-                    variation: variation, deliveryInstructionCellID: deliveryInstructionCellID
-                )
-                do {
-                    try Task.checkCancellation()
-                    // Named once submitted: a project cancelled first names no take the engine never saw.
-                    rows[index].generationID = generationID
-                    noteVerbose("project \(index + 1)/\(plans.count), segment \(position + 1)/\(plan.segments.count)")
-                    CLIPresenter.event(.generationStarted, generationID: generationID, data: [
-                        "index": .integer(index), "segment": .integer(position),
-                        "segments": .integer(plan.segments.count), "mode": .string(mode.rawValue),
-                        "modelID": .string(modelID),
-                    ])
-                    let (result, _, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
-                    guard FileManager.default.fileExists(atPath: result.audioPath) else {
-                        rows[index].status = .failed
-                        rows[index].errorCode = VocelloErrorCode.outputMissing.rawValue
-                        if Task.isCancelled { rows[index].cancellationRequested = true }
-                        stopped = true
-                        break projects
-                    }
-                    segments.append(LongFormSegmentJSON(
-                        index: position, segmentID: segment.segmentID,
-                        boundary: segment.evidence.boundary.rawValue,
-                        intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds,
-                        effectiveSeed: String(segment.evidence.effectiveSubseed),
-                        generationID: generationID.uuidString, audioPath: result.audioPath,
-                        durationSeconds: result.durationSeconds, finishReason: result.finishReason?.rawValue
-                    ))
-                    // A stopped project keeps the segment takes it completed.
-                    rows[index].longFormSegments = segments
-                    CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
-                        "index": .integer(index), "segment": .integer(position),
-                        "durationSeconds": .number(result.durationSeconds),
-                    ])
-                    sources.append(LongFormAssemblySegmentSource(
-                        segmentID: segment.segmentID, lineage: segment.evidence.lineage,
-                        audioURL: URL(fileURLWithPath: result.audioPath), boundary: segment.evidence.boundary,
-                        intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds
-                    ))
-                } catch let engineStop as CLIEngineCancellation {
-                    // The engine stopped the segment on its own (P15-02): a failure, not an interrupt.
-                    rows[index].status = .failed
-                    rows[index].errorCode = engineStop.errorCode
-                    engineCancellation = engineStop
-                    stopped = true
-                    break projects
-                } catch is CancellationError {
-                    rows[index].status = .cancelled
-                    rows[index].errorCode = "cancelled"
-                    cancelled = true
-                    stopped = true
-                    break projects
-                } catch {
-                    // Typed: a genuine failure that coincides with a signal stays failed.
-                    rows[index].status = .failed
-                    rows[index].errorCode = CLIFailure.rowCode(for: error).rawValue
-                    if Task.isCancelled { rows[index].cancellationRequested = true }
-                    stopped = true
-                    break projects
-                }
-            }
-            let assembly: LongFormAssemblyEvidence
-            do {
-                assembly = try await BoundedLongFormAssembler.assemble(
-                    segments: sources,
-                    outputURL: joinedURL,
-                    provenanceModelID: modelID,
-                    provenanceMode: mode.rawValue
-                )
-            } catch is CancellationError {
-                // The segments were generated: the stop is the join's, not a generation's.
-                try? FileManager.default.removeItem(at: joinedURL)
-                rows[index].generationID = nil
+            let outcome = await CLILongFormProject.run(
+                plan, mode: mode, modelID: modelID, runtime: runtime, payload: payload,
+                deliveryInstructionCellID: deliveryInstructionCellID, variation: variation,
+                joinedURL: outDir.appendingPathComponent("\(name).wav"),
+                segmentURL: { outDir.appendingPathComponent(unsafe "\(name)_segment_\(String(format: "%03d", $0)).wav") },
+                projectIndex: index, projectCount: plans.count
+            )
+            rows[index].longFormBaseSeed = String(outcome.baseSeed)
+            rows[index].longFormPlanDigest = outcome.planDigest
+            rows[index].generationID = outcome.generationID
+            // A stopped project keeps the segment takes it completed.
+            if !outcome.segments.isEmpty { rows[index].longFormSegments = outcome.segments }
+            switch outcome.stop {
+            case .failed(_, let code, let cancellationRequested)?:
+                rows[index].status = .failed
+                rows[index].errorCode = code.rawValue
+                if cancellationRequested { rows[index].cancellationRequested = true }
+                stopped = true
+                break projects
+            case .cancelled?:
                 rows[index].status = .cancelled
                 rows[index].errorCode = "cancelled"
                 cancelled = true
                 stopped = true
                 break projects
-            } catch {
-                // The assembler can publish and then fail its read-back; the apps remove that file too.
-                try? FileManager.default.removeItem(at: joinedURL)
-                rows[index].generationID = nil
+            case .engine(let engineStop)?:
+                // The engine stopped the segment on its own (P15-02): a failure, not an interrupt.
                 rows[index].status = .failed
-                rows[index].errorCode = VocelloErrorCode.assemblyFailed.rawValue
-                if Task.isCancelled { rows[index].cancellationRequested = true }
+                rows[index].errorCode = engineStop.errorCode
+                engineCancellation = engineStop
                 stopped = true
                 break projects
+            case nil:
+                break
             }
-            let joinedPath = joinedURL.path
-            let duration = Double(assembly.outputFrameCount) / Double(assembly.sampleRate)
-            // A truncated middle segment is the project's finish reason, never hidden behind the last one's eos.
-            let truncated = segments.contains { $0.finishReason == GenerationFinishReason.maxTokens.rawValue }
-            let finishReason = truncated ? GenerationFinishReason.maxTokens.rawValue : segments.last?.finishReason
+            guard let joinedPath = outcome.audioPath, let duration = outcome.durationSeconds,
+                  let assembly = outcome.assembly else {
+                throw CLIError(.internalError, "a completed long-form project has no joined output")
+            }
             rows[index].status = .completed
             CLIPresenter.event(.outputPublished, data: ["index": .integer(index), "audioPath": .string(joinedPath)])
             rows[index].audioPath = joinedPath
             rows[index].durationSeconds = duration
-            rows[index].finishReason = finishReason
+            rows[index].finishReason = outcome.finishReason
             rows[index].longFormAssembly = assembly
             items.append(LongFormItemJSON(
                 index: index, text: lines[index], audioPath: joinedPath, durationSeconds: duration,
-                finishReason: finishReason, longFormBaseSeed: String(plan.configuration.baseSeed),
-                longFormPlanDigest: plan.evidence.planDigest, longFormSegments: segments,
+                finishReason: outcome.finishReason, longFormBaseSeed: String(outcome.baseSeed),
+                longFormPlanDigest: outcome.planDigest, longFormSegments: outcome.segments,
                 longFormAssembly: assembly
             ))
         }

@@ -34,6 +34,7 @@ public enum CLIGenerateRequest {
         "seed": ("seed", .unsignedInteger),
         "variation": ("variation", .text),
         "out": ("out", .text),
+        "longForm": ("long-form", .text),
         "confirmConsent": ("confirm-consent", .flag),
         "appDelivery": ("app-delivery", .flag),
         "stream": ("no-stream", .negatedFlag),

@@ -39,8 +39,10 @@ public enum VocelloCommandTree {
         ],
         discussion: """
         Prints the WAV path (text) or the take's result (--json). Without --mode at a terminal, \
-        a picker asks for one; elsewhere the mode is custom. Exits 75 when the engine stopped the \
-        take under memory pressure, 130 on Ctrl-C.
+        a picker asks for one; elsewhere the mode is custom. A script longer than one take runs as \
+        a long-form project, as the apps route it: planned into segments, each a streaming take, \
+        joined into the one output. Exits 75 when the engine stopped the take under memory \
+        pressure, 130 on Ctrl-C.
         """,
         options: [
             .value("text", .text, "text", "the script (\"-\" reads stdin)"),
@@ -49,6 +51,8 @@ public enum VocelloCommandTree {
             .value("language", .text, "language",
                    "auto, a Qwen3 language name or a code such as en, fr or ja-JP; omitted is Auto"),
             .value("out", .file, "wav", "write the take to this .wav file (replaced only by a successful take)"),
+            .value("long-form", .choice(["auto", "always", "never"]), "when",
+                   "run the script as a long-form project: auto (default, past one take, as the apps route it) | always | never"),
             .flag("stream", "streaming synthesis at the app's cadence (the default)"),
             .flag("no-stream", "accumulate the whole take before decoding"),
             .flag("play", "play the take when done"),

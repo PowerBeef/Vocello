@@ -85,6 +85,14 @@
       "type": "string",
       "description": "The .wav file to write."
     },
+    "longForm": {
+      "enum": [
+        "auto",
+        "always",
+        "never"
+      ],
+      "description": "auto (default): a script past one take runs as a long-form project, as the apps route it; always: any script does; never: one past a take is refused."
+    },
     "confirmConsent": {
       "type": "boolean",
       "description": "Required true to clone: you own or have permission to clone this voice."

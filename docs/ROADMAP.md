@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 18/42 (43%) |
+| `release-first-3-0-2026-09` | active | release-qa | 18/43 (42%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -62,11 +62,12 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21` |
+| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21`, `RF-22` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
+| `RF-22` | in-flight | The iPhone export unlock sheet matches the app's design | — |
 
 ### Open items in detail
 
@@ -147,6 +148,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
+
+- **`RF-22`** (in-flight, due 2026-10-23) — The iPhone export unlock sheet matches the app's design.
+  gate: Maintainer request 2026-10-20: the Design & Clone Export sheet was a plain text page that did not match the app. Done when the sheet uses the app's own language (the onboarding hero, benefit rows and the shared primary CTA over the mode backdrop) with no change to its strings, identifiers or purchase behavior; the generic iOS compile and the routed check pass; the Swift review finds no blocker; and scripts/ui_test.sh ios purchase passes on the paired iPhone in an announced window, its screenshots showing the locked, purchased and restored states.
 
 ## Engine remediation programme (2026-10-16 audit)
 

@@ -309,7 +309,9 @@ private struct IOSOnboardingReadyPage: View {
 
 // MARK: - Reusable rows
 
-private struct IOSOnboardingIcon: View {
+/// The gradient hero tile. The export unlock sheet (`IOSExportPurchaseSheet`)
+/// opens with it too, so the app's one purchase reads like its welcome.
+struct IOSOnboardingIcon: View {
     let symbol: String
     let colors: [Color]
 
@@ -332,7 +334,8 @@ private struct IOSOnboardingIcon: View {
     }
 }
 
-private struct IOSOnboardingBenefitRow: View {
+/// A benefit line under a hero; shared with the export unlock sheet.
+struct IOSOnboardingBenefitRow: View {
     let symbol: String
     let title: String
     let detail: String?

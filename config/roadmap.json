@@ -238,25 +238,10 @@
       "due": "2026-11-06"
     },
     {
-      "id": "RF-27",
-      "plan": "release-first-3-0-2026-09",
-      "title": "CLI generation on the app's pipeline",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.",
-      "sourceOfTruth": [
-        "Sources/VocelloCLI/GenerateCommand.swift",
-        "docs/audits/2026-10-21-cli-overhaul-plan.md"
-      ],
-      "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 (docs/audits/2026-10-21-cli-overhaul-plan.md). Done: takes default to the app's package and variation, and generate --plan (d2eee3c5); run --request(s) with idempotent client ids whose identity is the resolved take (44c169f4, 711f4b16, abc3d300); generate, batch and run host the engine through TTSEngineStore as the Mac app does, with a hosted take per mode passing (bf4544fa; a store refusal no longer strands the stream drain, abc3d300); long-form: generate routes a script past one take to a project (01f9206f), and projects run on the apps' own IOSLongFormProjectRunner headless, with segment and joined QC, one script language and the manifest v4, each attempt owning its folder and a clone never replacing its reference (c6725d84), verified on the Mac. Each step reviewed by vocello-swift-review; findings fixed (c6725d84's review running). Left: the line batch on the app's plan, the interim opt-in History writes, the engine lease and NDJSON progress polish.",
-      "due": "2026-11-06"
-    },
-    {
       "id": "RF-28",
       "plan": "release-first-3-0-2026-09",
       "title": "CLI saved voices, models and settings writes",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.",
       "sourceOfTruth": [
@@ -294,7 +279,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission.",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission. From RF-27 (2026-10-21): CLI single takes adopt the shared IOSSingleTakeGenerationExecutor with headless History hooks when History writes land here; until then the CLI writes no History (no opt-in interim).",
       "unparkWhen": "The iOS 3.0 submission is done."
     },
     {

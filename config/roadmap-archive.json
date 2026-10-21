@@ -5315,6 +5315,31 @@
         "commit:5876d990",
         "commit:87c01ec0"
       ]
+    },
+    {
+      "id": "RF-27",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI generation on the app's pipeline",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/GenerateCommand.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 (docs/audits/2026-10-21-cli-overhaul-plan.md). Done: the app's package and variation are the defaults, generate --plan, run --request(s) with idempotent client ids; generate, batch and run host the engine through TTSEngineStore as the Mac app does (a hosted take per mode passed); long-form runs on the apps' IOSLongFormProjectRunner headless (segment and joined QC, one script language, manifest v4), verified on the Mac; generate --line-by-line runs the Mac line batch plan; NDJSON progress; per-Mac engine leases (8 GB: one engine). Deviations, decided 2026-10-21 as lead: batch keeps its own semantics because the QC lanes resume it from any item (the app plan is --line-by-line); no CLI History writes until RF-30's lock instead of an opt-in interim; the shared single-take executor moves to RF-30 with History (its hooks are History writes). Every step reviewed by vocello-swift-review; findings fixed.",
+      "due": "2026-11-06",
+      "evidence": [
+        "commit:d2eee3c5",
+        "commit:44c169f4",
+        "commit:bf4544fa",
+        "commit:c6725d84",
+        "commit:eef934b5",
+        "commit:fc1c4e05",
+        "commit:f537427a",
+        "doc:docs/reference/cli.md"
+      ]
     }
   ]
 }

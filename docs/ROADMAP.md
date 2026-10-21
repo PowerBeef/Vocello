@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 22/53 (42%) |
+| `release-first-3-0-2026-09` | active | release-qa | 23/53 (43%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -71,8 +71,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
-| `RF-27` | in-flight | CLI generation on the app's pipeline | — |
-| `RF-28` | planned | CLI saved voices, models and settings writes | — |
+| `RF-28` | in-flight | CLI saved voices, models and settings writes | — |
 | `RF-29` | planned | vocello mcp server | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
@@ -164,10 +163,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-23`** (planned, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.
 
-- **`RF-27`** (in-flight, due 2026-11-06) — CLI generation on the app's pipeline.
-  gate: Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.
-
-- **`RF-28`** (planned, due 2026-11-10) — CLI saved voices, models and settings writes.
+- **`RF-28`** (in-flight, due 2026-11-10) — CLI saved voices, models and settings writes.
   gate: voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.
 
 - **`RF-29`** (planned, due 2026-11-13) — vocello mcp server.

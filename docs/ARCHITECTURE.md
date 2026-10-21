@@ -1358,9 +1358,9 @@ environment and publishes only a draft whose assets are exactly the evidence's, 
 `release.yml` attestations for that tag and commit, and whose evidence names the checked-out source.
 Release candidates produce SPDX and
 CycloneDX SBOMs, checksums, provenance/attestation, the Sparkle `appcast.xml` (the stapled DMG's
-EdDSA signature, verified against the app's `SUPublicEDKey` before the feed is written; the code
-nested in Sparkle.framework is re-signed inside-out and its XPC services removed, see
-`docs/reference/macos-release-qa.md`), and a validated
+EdDSA signature and the feed's own embedded signature, both verified against the app's
+`SUPublicEDKey` before the feed is written; the code nested in Sparkle.framework is re-signed
+inside-out and its XPC services removed, see `docs/reference/macos-release-qa.md`), and a validated
 `config/release-evidence-contract.json` evidence set before a draft Release is created. The emitted
 schema-v2 `release-evidence.json` binds the clean tracked-and-untracked source identity, required
 input digests, and a hashed `release-verification.json` bundle. Every required-step manifest must
@@ -1374,6 +1374,10 @@ root privacy-manifest identity, App Group and increased-memory entitlements, loc
 profile-authorized signing, and team/App ID prefix consistency. Only the exported IPA must carry an App Store profile,
 Apple Distribution signature, and no `get-task-allow`; valid two-phase development-signed archives
 remain accepted.
+The macOS candidate runs in three jobs: `package` builds third-party code with a read-only token and
+the Apple signing secrets, `sparkle-feed` holds the Sparkle key on a fresh runner that builds nothing,
+and `draft-release`, the only job with `contents: write`, holds no secret; each later job checks the
+DMG against the digest `package` recorded.
 Draft assets are downloaded and digest-verified before publication, which remains the final transaction. See
 [`SECURITY.md`](../SECURITY.md), `.github/workflows/security.yml`, and
 [`reference/macos-release-qa.md`](reference/macos-release-qa.md).

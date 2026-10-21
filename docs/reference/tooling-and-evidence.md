@@ -80,7 +80,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
   artifacts (gh, swiftlint, ruff, periphery and Sparkle's `sign_update` on demand, the last only
-  in the macOS release and rehearsal jobs; the Linux contracts job installs the
+  in the `sparkle-feed` jobs of the release and rehearsal workflows; the Linux contracts job installs the
   `-linux-x86_64` shellcheck, ruff and swiftlint entries); numpy, pytest and pytest-xdist pip-pin to
   the manifest and Pyright npm-pins to its `npmPins` entry; the website's Node and npm pin only their major version (24 / 11). Dependabot proposes, the manifest and comment change together:
   on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the
@@ -89,7 +89,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   the checked-out commit, containment in `origin/main` and a successful latest `CI required` run of a
   push to main; the release workflow runs Security on that commit first, and every later job builds
   that authorized commit, never the tag ref again. Promotion runs from the tag under the `release`
-  environment and verifies each DMG's build attestation from `release.yml`. Lightweight tags, cross-SHA checks and incomplete
+  environment and verifies each DMG's build attestation from `release.yml`. Release-path jobs restore no Actions
+  cache (`native-toolchain` with `pip-cache: "false"`); the Sparkle key lives only in `sparkle-feed`, a fresh
+  runner that builds nothing, and only `draft-release`, which holds no secret, has `contents: write`.
+  Lightweight tags, cross-SHA checks and incomplete
   check-run pagination fail closed. Every release step matches its `config/orchestration-contract.json`
   template; schema-v2 release evidence accepts only a clean full-tree identity and same-invocation step
   manifests. Never restore a `release.published` trigger; `--generate-notes` is banned and

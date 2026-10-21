@@ -129,15 +129,18 @@ release-readiness and artifact checks.
    `git tag -s vX.Y.Z <commit>`), push the tag, or dispatch the tag's own workflow with
    `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` (the `release-trigger` job refuses a
    dispatch from any other ref, because a dispatch runs the workflow file of the ref it came from).
-   The signing jobs use the tag-restricted `release` environment. GitHub must report the annotated tag object's signature as verified with reason `valid`;
+   The `package` and `sparkle-feed` jobs use the tag-restricted `release` environment (with a
+   required reviewer, each asks for approval). GitHub must report the annotated tag object's signature as verified with reason `valid`;
    a lightweight, unsigned, invalid, or differently targeted tag cannot build a candidate. The
    source-authority job also proves that the tag commit is contained in `origin/main` and that both
-   required checks belong to that exact SHA before any platform job starts. CI then verifies
-   tag/source/version identity, builds, signs, notarizes, staples,
-   verifies (`verify_packaged_dmg.sh … --include-cli`), signs the DMG for Sparkle and writes
-   `appcast.xml` (see [Sparkle updates](#sparkle-updates-rf-23)), emits SPDX and CycloneDX
-   inventories, writes `SHA256SUMS` plus `release-evidence.json` (the appcast is one of its
-   artifacts), and attests both DMGs. The CLI report is a required,
+   required checks belong to that exact SHA before any platform job starts. The `package` job then
+   verifies tag/source/version identity and that the build number grew, builds, signs, notarizes,
+   staples and verifies (`verify_packaged_dmg.sh … --include-cli`) with a read-only token, and hands
+   the DMG on with its SHA-256. The `sparkle-feed` job signs that DMG and `appcast.xml` on a fresh
+   runner (see [Sparkle updates](#sparkle-updates-rf-23)). The `draft-release` job, the only one
+   with `contents: write` and holding no secret, checks both digests, re-verifies the feed, emits
+   SPDX and CycloneDX inventories, writes `SHA256SUMS` plus `release-evidence.json` (the appcast is
+   one of its artifacts), and attests both DMGs. The CLI report is a required,
    hashed output of the managed artifact-verification step and binds the exact CLI DMG and
    source/version/build. Only then does it create or reuse
    a draft GitHub Release, upload the candidate, download every asset, and verify the digests.
@@ -189,26 +192,49 @@ prerelease offers nothing.
   helper, plug-in or library elsewhere in the bundle) for the release Team ID, the hardened runtime
   and an empty entitlement set (`entitlement_contract.py verify-bundle --role macos-framework`);
   the app's executable is held to the app allowlist (`--role macos-app`).
-- **The feed.** After the DMG is notarized, stapled and verified, `release.yml` installs
+- **Where the key lives.** Only `release.yml`'s `sparkle-feed` job receives
+  `SPARKLE_ED_PRIVATE_KEY`, and only in its signing step. That job runs on a fresh runner after
+  `package`, with a read-only token: it downloads the DMG `package` uploaded, refuses it unless
+  its SHA-256 matches the one `package` recorded after verification, and installs nothing but
   `sign_update` from the SHA-pinned `Sparkle-2.10.0.tar.xz` (`config/toolchain.json`
-  `artifactPins.sparkle`; it moves with the Sparkle package pin, and
-  `scripts/supply_chain_contract.py` fails when the two versions differ) and runs
-  `scripts/sparkle_appcast.py create`. The key reaches `sign_update` only on standard input, and
-  the tool's output is withheld on failure because it echoes a key it cannot decode. The helper
-  verifies the signature against the app's own `SUPublicEDKey` (RFC 8032 Ed25519), so a secret
-  that is not the app's pair fails the run, then writes a one-item RSS feed: `sparkle:version`
-  (CFBundleVersion), `sparkle:shortVersionString`, `sparkle:minimumSystemVersion`
-  (LSMinimumSystemVersion, 26.0), the enclosure URL
+  `artifactPins.sparkle`, digest checked before extraction; it moves with the Sparkle package
+  pin, and `scripts/supply_chain_contract.py` fails when the two versions differ). It builds,
+  tests and pip-installs nothing and restores no cache, so no third-party code from the build can
+  share a runner with the key. The job that writes the draft (`draft-release`) holds no secret.
+- **The feed.** `python3 -I -S scripts/sparkle_appcast.py create` (standard library only) reads
+  the feed's values from the app users install: it attaches the DMG read-only (`hdiutil attach
+  -readonly -nobrowse -noautoopen`), reads `CFBundleVersion`, `CFBundleShortVersionString`,
+  `LSMinimumSystemVersion`, `SUPublicEDKey` and `SUFeedURL` from the one app at its top level, and
+  detaches. It calls `sign_update` by absolute path with only `PATH=/usr/bin:/bin` in its
+  environment and an empty working directory; the key reaches it only on standard input, and the
+  tool's output is withheld on failure because it echoes a key it cannot decode. The DMG's
+  signature must verify against the app's own `SUPublicEDKey` (RFC 8032 Ed25519), so a secret
+  that is not the app's pair fails the run. The helper then renders a one-item RSS feed:
+  `sparkle:version` (CFBundleVersion), `sparkle:shortVersionString`,
+  `sparkle:minimumSystemVersion` (LSMinimumSystemVersion, 26.0), the enclosure URL
   `…/releases/download/<tag>/<dmg>`, its length and `sparkle:edSignature`, a `pubDate` from the
-  tagged commit's time (`SOURCE_DATE_EPOCH`), and the Releases page as the item link and
-  `sparkle:fullReleaseNotesLink`. No inline release notes are published.
-  `appcast.xml` is a release-evidence artifact, so `SHA256SUMS` covers it, the draft carries it
-  beside the DMG, and promotion's exact-asset check accepts it.
-- **Rehearsal.** `release-rehearsal.yml` runs the same command with an ephemeral key and verifies
-  against that key's public half (`create --public-key`); it still requires the app's
-  `SUPublicEDKey` and an `SUFeedURL` that names `appcast.xml`.
+  tagged commit's time, and the Releases page as the item link and `sparkle:fullReleaseNotesLink`.
+  No inline release notes are published.
+- **The signed feed.** The app requires a signed feed (`SURequireSignedFeed`, with
+  `SUVerifyUpdateBeforeExtraction`), so the helper has `sign_update --ed-key-file -
+  --disable-signing-warning` sign `appcast.xml` too. Sparkle 2.9 and later embed that signature
+  as a trailing `<!-- sparkle-signatures: edSignature … length … -->` comment over the bytes
+  before it, which installed copies verify against `SUPublicEDKey` before they read the feed (the
+  signing warning is disabled because adding it makes `sign_update` reserialize the XML). The
+  helper writes `appcast.xml` only after that signature verifies against the same key and covers
+  exactly the feed it rendered. Any later change to the file, even whitespace, needs a new
+  signature, so never edit a published `appcast.xml` by hand.
+- **The draft.** `draft-release` checks the DMG and `appcast.xml` against the digests the earlier
+  jobs recorded, re-runs the secret-free `sparkle_appcast.py verify` (feed signature, versions
+  against the DMG's app, enclosure URL, length and signature over the DMG's bytes), then writes the
+  evidence. `appcast.xml` is a release-evidence artifact, so `SHA256SUMS` covers it, the draft
+  carries it beside the DMG, and promotion's exact-asset check accepts it.
+- **Rehearsal.** `release-rehearsal.yml` mirrors the three jobs (`macos-package`, `sparkle-feed`,
+  `evidence`) with an ephemeral key and verifies against that key's public half (`--public-key`);
+  it still requires the app's `SUPublicEDKey` and an `SUFeedURL` that names `appcast.xml`.
 - **Order matters.** The signature covers the stapled DMG's bytes, so nothing may modify the DMG
-  after the Sparkle step; the evidence then binds both files.
+  after `package` records its digest; the later jobs check that digest and the evidence then binds
+  both files.
 
 ## Attended walk of the converged screens (per candidate, ten minutes)
 

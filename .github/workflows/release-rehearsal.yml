@@ -4,15 +4,17 @@ name: Release rehearsal
 # The v2.4.0 tag (August 1) was the last run of release.yml; three separate
 # toolchain pins broke it afterwards without anything noticing.
 #
-# The macOS job runs the same ledgered commands release.yml's package job runs
-# (release.sh with its release-readiness gate, then the packaged-DMG and CLI
-# verification) with ad-hoc signing and no notarization, signs the DMG for
-# Sparkle and writes its appcast with an ephemeral key (release.yml uses the
-# `release` environment's key and verifies against the app's SUPublicEDKey),
-# then builds and validates the release evidence locally. Nothing is uploaded
-# except logs on failure. Keychain import, notarization, stapling, attestation
-# and the draft Release steps stay covered by ReleaseCredentialHygieneTests and
-# the next tag.
+# The macOS jobs mirror release.yml's three. macos-package runs the same
+# ledgered commands release.yml's package job runs (release.sh with its
+# release-readiness gate, then the packaged-DMG and CLI verification) with
+# ad-hoc signing and no notarization, and hands the DMG on with its digest.
+# sparkle-feed, a fresh runner with only the pinned sign_update, signs the DMG
+# and the feed with an ephemeral key (release.yml uses the `release`
+# environment's key and verifies against the app's SUPublicEDKey). evidence
+# re-verifies the feed and builds and validates the release evidence. Only
+# workflow artifacts between those jobs and logs on failure are uploaded.
+# Keychain import, notarization, stapling, attestation and the draft Release
+# steps stay covered by ReleaseCredentialHygieneTests and the next tag.
 on:
   schedule:
     - cron: '17 6 * * 3'
@@ -59,6 +61,9 @@ jobs:
     name: Rehearse macOS package (ad-hoc, not notarized)
     runs-on: macos-26
     timeout-minutes: 150
+    outputs:
+      tag: ${{ steps.bind.outputs.tag }}
+      dmg_sha256: ${{ steps.digest.outputs.dmg_sha256 }}
     env:
       QWENVOICE_SIGNING_MODE: ad-hoc
       QWENVOICE_NOTARIZE: "0"
@@ -76,10 +81,11 @@ jobs:
         uses: ./.github/actions/native-toolchain
         with:
           metal: "true"
-          release-tools: "true"
+          release-tools: "false"
           pip-cache: "false"
 
       - name: Bind rehearsal source and initialize required steps
+        id: bind
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
@@ -99,9 +105,7 @@ jobs:
             --workflow release-macos-candidate \
             --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY"
-          echo "REHEARSAL_TAG=v$version" >> "$GITHUB_ENV"
-          echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
-          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$commit")" >> "$GITHUB_ENV"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - name: Run scripts/release.sh (ad-hoc rehearsal)
         run: |
@@ -118,49 +122,35 @@ jobs:
               build/dist/macos/Vocello-macos26.dmg \
               build/dist/macos/release-metadata.txt --include-cli
 
-      - name: Install the pinned Sparkle signing tool
-        run: ./scripts/install_pinned_tools.sh sparkle
-
-      # The same command release.yml runs, except that the key is ephemeral and the
-      # signature is verified against its public half; the app must still carry a
-      # well-formed SUPublicEDKey and an SUFeedURL that names appcast.xml.
-      - name: Rehearse the Sparkle signature and appcast (ephemeral key)
+      - name: Record the verified DMG's digest
+        id: digest
         run: |
           set -euo pipefail
-          SPARKLE_ED_PRIVATE_KEY="$(python3 -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
-          export SPARKLE_ED_PRIVATE_KEY
-          public_key="$(python3 scripts/sparkle_appcast.py public-key)"
-          wrapper="$(awk -F= '$1 == "app_wrapper_name" { print $2; exit }' build/dist/macos/release-metadata.txt)"
-          [ -n "$wrapper" ] || { echo "::error::release metadata names no app wrapper"; exit 1; }
-          releases="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
-          python3 scripts/sparkle_appcast.py create \
-            --app "build/dist/macos/$wrapper" \
-            --dmg build/dist/macos/Vocello-macos26.dmg \
-            --url "$releases/download/$REHEARSAL_TAG/Vocello-macos26.dmg" \
-            --link "$releases" \
-            --pub-date-epoch "$SOURCE_DATE_EPOCH" \
-            --public-key "$public_key" \
-            --output build/dist/macos/appcast.xml
+          sha="$(shasum -a 256 build/dist/macos/Vocello-macos26.dmg | cut -d' ' -f1)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::could not digest the DMG"; exit 1; }
+          echo "dmg_sha256=$sha" >> "$GITHUB_OUTPUT"
 
-      - name: Build and validate release evidence (not published)
-        run: |
-          set -euo pipefail
-          python3 scripts/required_step_ledger.py finalize --ledger "$RELEASE_STEP_LEDGER"
-          python3 scripts/release_evidence.py create \
-            --allow-missing-tag-ref \
-            --tag "$REHEARSAL_TAG" \
-            --commit "$RELEASE_COMMIT" \
-            --platform macos \
-            --source-date-epoch "$SOURCE_DATE_EPOCH" \
-            --output-dir build/dist/macos \
-            --artifact build/dist/macos/Vocello-macos26.dmg \
-            --artifact build/dist/macos/Vocello-macos26-cli.dmg \
-            --artifact build/dist/macos/cli-package-verification.json \
-            --artifact build/dist/macos/appcast.xml \
-            --metadata build/dist/macos/release-metadata.txt \
-            --source-identity "$RELEASE_SOURCE_IDENTITY" \
-            --step-ledger "$RELEASE_STEP_LEDGER"
-          python3 scripts/release_evidence.py validate --output-dir build/dist/macos
+      - name: Upload the verified DMG for the Sparkle and evidence jobs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rehearsal-dmg
+          path: build/dist/macos/Vocello-macos26.dmg
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload the package outputs and step ledger for the evidence job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rehearsal-package
+          path: |
+            build/dist/macos/Vocello-macos26-cli.dmg
+            build/dist/macos/cli-package-verification.json
+            build/dist/macos/release-metadata.txt
+            ${{ env.RELEASE_SOURCE_IDENTITY }}
+            ${{ env.RELEASE_STEP_LEDGER }}
+            build/artifacts/macos/release/steps/
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Upload rehearsal logs on failure
         if: failure()
@@ -171,6 +161,189 @@ jobs:
             build/artifacts/macos/release/
             build/artifacts/macos/release-readiness/
             build/artifacts/macos/tests/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # release.yml's sparkle-feed job with an ephemeral key: a fresh runner, the DMG checked
+  # against macos-package's digest, only the pinned sign_update installed, and the same
+  # standard-library command. The app must still carry a well-formed SUPublicEDKey and an
+  # SUFeedURL that names appcast.xml.
+  sparkle-feed:
+    name: Rehearse the Sparkle signatures (ephemeral key)
+    needs: macos-package
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      appcast_sha256: ${{ steps.sign.outputs.appcast_sha256 }}
+      public_key: ${{ steps.sign.outputs.public_key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the verified DMG
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rehearsal-dmg
+          path: ${{ runner.temp }}/candidate
+
+      - name: Check the DMG against the package job's digest
+        id: candidate
+        env:
+          EXPECTED_SHA256: ${{ needs.macos-package.outputs.dmg_sha256 }}
+        run: |
+          set -euo pipefail
+          dmg="$RUNNER_TEMP/candidate/Vocello-macos26.dmg"
+          [ -f "$dmg" ] && [ ! -L "$dmg" ] || { echo "::error::the downloaded DMG is missing"; exit 1; }
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::the package job recorded no DMG digest"; exit 1; }
+          [ "$(shasum -a 256 "$dmg" | cut -d' ' -f1)" = "$EXPECTED_SHA256" ] \
+            || { echo "::error::the downloaded DMG is not the one the package job verified"; exit 1; }
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+          echo "pub_date_epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned Sparkle signing tool
+        id: sparkle
+        run: |
+          set -euo pipefail
+          prefix="$RUNNER_TEMP/sparkle-tool"
+          ./scripts/install_pinned_tools.sh --prefix "$prefix/bin" sparkle
+          version="$(python3 -I -S -c 'import json, sys; print(json.load(open(sys.argv[1]))["artifactPins"]["sparkle"]["version"])' config/toolchain.json)"
+          tool="$prefix/share/sparkle-$version/bin/sign_update"
+          [ -f "$tool" ] && [ -x "$tool" ] || { echo "::error::sign_update is not where the installer puts it"; exit 1; }
+          echo "sign_update=$tool" >> "$GITHUB_OUTPUT"
+
+      - name: Rehearse the Sparkle signatures and appcast (ephemeral key)
+        id: sign
+        env:
+          DMG: ${{ steps.candidate.outputs.dmg }}
+          PUB_DATE_EPOCH: ${{ steps.candidate.outputs.pub_date_epoch }}
+          SIGN_UPDATE: ${{ steps.sparkle.outputs.sign_update }}
+          REHEARSAL_TAG: ${{ needs.macos-package.outputs.tag }}
+        run: |
+          set -euo pipefail
+          SPARKLE_ED_PRIVATE_KEY="$(python3 -I -S -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+          export SPARKLE_ED_PRIVATE_KEY
+          public_key="$(python3 -I -S scripts/sparkle_appcast.py public-key)"
+          releases="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+          appcast="$RUNNER_TEMP/sparkle-feed/appcast.xml"
+          python3 -I -S scripts/sparkle_appcast.py create \
+            --dmg "$DMG" \
+            --url "$releases/download/$REHEARSAL_TAG/$(basename "$DMG")" \
+            --link "$releases" \
+            --pub-date-epoch "$PUB_DATE_EPOCH" \
+            --sign-update "$SIGN_UPDATE" \
+            --public-key "$public_key" \
+            --output "$appcast"
+          echo "public_key=$public_key" >> "$GITHUB_OUTPUT"
+          echo "appcast_sha256=$(shasum -a 256 "$appcast" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the signed appcast for the evidence job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rehearsal-appcast
+          path: ${{ runner.temp }}/sparkle-feed/appcast.xml
+          if-no-files-found: error
+          retention-days: 3
+
+  # release.yml's draft-release job up to the evidence: the digests, a secret-free
+  # re-check of the feed, and the release evidence built and validated, not published.
+  evidence:
+    name: Rehearse the release evidence (not published)
+    needs: [macos-package, sparkle-feed]
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      RELEASE_SOURCE_IDENTITY: build/artifacts/macos/release/source-identity.json
+      RELEASE_STEP_LEDGER: build/artifacts/macos/release/required-steps.json
+      REHEARSAL_TAG: ${{ needs.macos-package.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Roadmap and evidence validation read history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Unused here, but release.yml's draft-release job installs it the same way, so a
+      # broken gh pin fails the rehearsal rather than the next tag.
+      - name: Install the pinned release tool gh
+        run: |
+          set -euo pipefail
+          ./scripts/install_pinned_tools.sh gh
+          PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH" python3 scripts/supply_chain_contract.py --installed release
+
+      - name: Download the package outputs and step ledger
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rehearsal-package
+          path: build
+
+      - name: Download the verified DMG
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rehearsal-dmg
+          path: build/dist/macos
+
+      - name: Download the signed appcast
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rehearsal-appcast
+          path: build/dist/macos
+
+      - name: Check the DMG and appcast digests and re-verify the feed
+        env:
+          DMG_SHA256: ${{ needs.macos-package.outputs.dmg_sha256 }}
+          APPCAST_SHA256: ${{ needs.sparkle-feed.outputs.appcast_sha256 }}
+          PUBLIC_KEY: ${{ needs.sparkle-feed.outputs.public_key }}
+        run: |
+          set -euo pipefail
+          dmg=build/dist/macos/Vocello-macos26.dmg
+          appcast=build/dist/macos/appcast.xml
+          [[ "$DMG_SHA256" =~ ^[0-9a-f]{64}$ && "$APPCAST_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || { echo "::error::an earlier job recorded no digest"; exit 1; }
+          [ "$(shasum -a 256 "$dmg" | cut -d' ' -f1)" = "$DMG_SHA256" ] \
+            || { echo "::error::the DMG is not the one the package job verified"; exit 1; }
+          [ "$(shasum -a 256 "$appcast" | cut -d' ' -f1)" = "$APPCAST_SHA256" ] \
+            || { echo "::error::appcast.xml is not the one the Sparkle job signed"; exit 1; }
+          releases="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+          python3 -I -S scripts/sparkle_appcast.py verify \
+            --dmg "$dmg" \
+            --appcast "$appcast" \
+            --url "$releases/download/$REHEARSAL_TAG/Vocello-macos26.dmg" \
+            --public-key "$PUBLIC_KEY"
+
+      - name: Build and validate release evidence (not published)
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          python3 scripts/required_step_ledger.py finalize --ledger "$RELEASE_STEP_LEDGER"
+          python3 scripts/release_evidence.py create \
+            --allow-missing-tag-ref \
+            --tag "$REHEARSAL_TAG" \
+            --commit "$commit" \
+            --platform macos \
+            --source-date-epoch "$(git show -s --format=%ct "$commit")" \
+            --output-dir build/dist/macos \
+            --artifact build/dist/macos/Vocello-macos26.dmg \
+            --artifact build/dist/macos/Vocello-macos26-cli.dmg \
+            --artifact build/dist/macos/cli-package-verification.json \
+            --artifact build/dist/macos/appcast.xml \
+            --metadata build/dist/macos/release-metadata.txt \
+            --source-identity "$RELEASE_SOURCE_IDENTITY" \
+            --step-ledger "$RELEASE_STEP_LEDGER"
+          python3 scripts/release_evidence.py validate --output-dir build/dist/macos
+
+      - name: Upload rehearsal evidence logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-rehearsal-evidence-logs
+          path: build/artifacts/macos/release/
           if-no-files-found: warn
           retention-days: 7
 
@@ -230,7 +403,7 @@ jobs:
 
   report:
     name: Open or refresh the rehearsal issue
-    needs: [macos-package, ios-release-prerequisites]
+    needs: [macos-package, sparkle-feed, evidence, ios-release-prerequisites]
     if: failure()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

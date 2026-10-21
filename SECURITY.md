@@ -39,7 +39,9 @@ authority, and both must pass before any packaging step.
 A dispatched release must run from the tag's own ref, so a branch's edited copy of the workflow never
 receives signing secrets; the signing jobs use a tag-restricted `release` environment, grant only
 `codesign` access to the temporary keychain, restore no Actions cache and delete the signing material
-right after the signing step. The secrets-free release rehearsal (`release-rehearsal.yml`, weekly, on
+right after the signing step. The job that builds third-party code holds a read-only token; the
+Sparkle update key reaches only a separate job on a fresh runner that builds and installs nothing but
+the SHA-pinned `sign_update`, and the job that writes the draft Release holds no secret. The secrets-free release rehearsal (`release-rehearsal.yml`, weekly, on
 dispatch and on the release-path pushes above) exercises the same toolchain and packaging path
 between tags with ad-hoc signing and no notarization. Candidate creation and later public promotion
 both re-evaluate this authority and fail closed on lightweight or unsigned tags, missing checks,

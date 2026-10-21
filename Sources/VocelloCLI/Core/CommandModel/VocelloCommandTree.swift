@@ -85,6 +85,10 @@ public enum VocelloCommandTree {
         subcommands: [
             CLICommandSpec(name: "list", aliases: ["ls"], summary: "List saved voices", options: [consent]),
             CLICommandSpec(
+                name: "show", summary: "Show one saved voice: its reference, transcript and enrollment record",
+                positionals: [CLIPositionalSpec("voice", "the saved voice's name or id", required: true)]
+            ),
+            CLICommandSpec(
                 name: "enroll", aliases: ["add"], summary: "Save a clone voice from a reference clip",
                 usage: ["vocello voices enroll --name <name> --audio <wav> [--transcript \"…\"] --confirm-consent"],
                 options: [

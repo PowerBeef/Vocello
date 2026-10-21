@@ -16,6 +16,17 @@ enum VoicesCommand {
         let voices: [VoiceJSON]
     }
 
+    struct Shown: Encodable, Sendable {
+        let voice: VoiceJSON
+        /// The words the reference says, as saved (nil when it has none).
+        let transcript: String?
+        /// The reference language recorded at enrollment (nil: Auto or unrecorded).
+        let referenceLanguage: String?
+        let transcriptSource: String?
+        let generatedSourceMode: String?
+        let enrollmentRecordUnreadable: Bool
+    }
+
     struct Enrolled: Encodable, Sendable {
         let voice: VoiceJSON
     }
@@ -56,6 +67,36 @@ enum VoicesCommand {
             for v in voices {
                 let warn = v.qualityWarnings.isEmpty ? "" : "  ⚠ \(v.qualityWarnings.joined(separator: ","))"
                 print("\(v.name)\t[\(v.id)]\ttranscript=\(v.hasTranscript)\(warn)")
+            }
+        case "show":
+            let wanted = args.positionals.first ?? ""
+            let voices = try await runtime.engine.listPreparedVoices()
+            guard let voice = voices.first(where: { $0.id == wanted || $0.name == wanted }) else {
+                throw CLIError(
+                    .voiceNotFound, "no saved voice '\(wanted)'", hint: "see `vocello voices list` for the names and ids"
+                )
+            }
+            let transcriptURL = URL(fileURLWithPath: voice.audioPath).deletingPathExtension().appendingPathExtension("txt")
+            let transcript = voice.hasTranscript
+                ? (try? String(contentsOf: transcriptURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+                : nil
+            let metadata = voice.enrollmentMetadata
+            let shown = Shown(
+                voice: json(voice), transcript: transcript,
+                referenceLanguage: metadata?.referenceLanguage?.rawValue,
+                transcriptSource: metadata?.transcriptSource.rawValue,
+                generatedSourceMode: metadata?.generatedSourceMode,
+                enrollmentRecordUnreadable: voice.enrollmentMetadataUnreadable
+            )
+            if CLIPresenter.isMachine {
+                CLIPresenter.succeed(shown)
+            } else {
+                print("\(voice.name)\t[\(voice.id)]")
+                print("reference: \(voice.audioPath)")
+                if let language = shown.referenceLanguage { print("language: \(language)") }
+                if let source = shown.transcriptSource { print("transcript source: \(source)") }
+                if !voice.qualityWarnings.isEmpty { print("warnings: \(voice.qualityWarnings.joined(separator: ", "))") }
+                print("transcript: \(transcript ?? "(none: audio-only conditioning)")")
             }
         case "enroll":
             let name = try args.require("name", "a name for the voice")

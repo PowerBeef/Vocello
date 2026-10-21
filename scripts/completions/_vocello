@@ -78,6 +78,7 @@ _vocello() {
     voices)
       case $sub in
         list|ls) key=voices_list ;;
+        show) key=voices_show ;;
         enroll|add) key=voices_enroll ;;
         delete|rm) key=voices_delete ;;
         '') ;;
@@ -87,6 +88,7 @@ _vocello() {
         candidates=(
           'list:List saved voices'
           'ls:List saved voices'
+          'show:Show one saved voice\: its reference, transcript and enrollment record'
           'enroll:Save a clone voice from a reference clip'
           'add:Save a clone voice from a reference clip'
           'delete:Delete a saved voice'
@@ -296,6 +298,18 @@ _vocello() {
     voices_list)
       options=(
         '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_show)
+      options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'
@@ -543,6 +557,7 @@ _vocello() {
     return
   fi
   case $key in
+    voices_show) return ;;
     models_list) return ;;
     models_status) return ;;
     models_verify) return ;;

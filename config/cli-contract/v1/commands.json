@@ -368,6 +368,7 @@
       "refusedOptions": [],
       "subcommands": [
         "list",
+        "show",
         "enroll",
         "delete"
       ],
@@ -395,6 +396,26 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "List saved voices",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "show",
+      "operands": [
+        {
+          "name": "voice",
+          "required": true,
+          "summary": "the saved voice's name or id",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "voices.show",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Show one saved voice: its reference, transcript and enrollment record",
       "usage": []
     },
     {

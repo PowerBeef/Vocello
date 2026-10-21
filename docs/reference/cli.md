@@ -304,6 +304,7 @@ codec-trace v1 and records its digest in the take's engine row; sampling and out
 
 ```sh
 vocello voices list [--json]
+vocello voices show <name|id> [--json]   # reference, transcript, enrollment record
 vocello voices enroll --name <name> --audio <wav> [--transcript "…"] --confirm-consent
 vocello voices delete --id <id>
 ```

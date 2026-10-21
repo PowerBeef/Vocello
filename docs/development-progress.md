@@ -17,7 +17,42 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 21, evening — RF-26 closes; RF-27 hosts takes like the app and routes long scripts (resume here)
+### October 21, late — RF-27 closes; RF-28 paused mid-way at the maintainer's request (resume here)
+
+Work is paused cleanly: everything is committed, nothing runs, and no agent is open. The maintainer
+asked whether the CLI is over-engineered and chose to continue the approved plan.
+
+- **RF-27 done** (closed with its deviations recorded in its notes):
+  - generate, batch and run host the engine through `TTSEngineStore`;
+  - long-form runs the apps' own `IOSLongFormProjectRunner` headless, with segment and joined QC, one
+    script language and the manifest v4;
+  - `generate --line-by-line` runs the Mac line batch plan;
+  - `run --request(s)` takes idempotent client ids;
+  - NDJSON progress;
+  - per-Mac engine leases: an 8 GB Mac runs one engine.
+
+  Deviations, decided as lead: `batch` keeps its semantics for the QC lanes; the CLI writes no History
+  until RF-30's lock; the single-take executor moves to RF-30.
+- **RF-28 in flight, paused:**
+  - `settings set`, `models use` and `models prefer-lower-memory` (`d364f073`);
+  - `models install-recommended` and `models remove` (`d985a430`);
+  - `voices enroll`, `replace`, `save-take` and `delete`, as the app's voice sheet saves voices
+    (`a3ebb9e2`).
+
+  **Resume with:**
+  1. a `vocello-swift-review` of those three commits, and its fixes;
+  2. the app observing the `com.qwenvoice.shared.*DidChange` notices (a Mac-only edit, or with RF-30);
+  3. tests for `models remove` and `install-recommended`;
+  4. a real `save-take` once History has a take.
+
+  Then close RF-28 and start RF-29 (the MCP server).
+- **RF-08 in flight:** the maintainer still needs the Developer ID Installer certificate, its two
+  `release` secrets and the first rehearsal.
+- **Release items waiting:** RF-09's freeze checks are due 2026-10-23.
+- **Not pushed:** local commits are unpushed; the iPhone candidate stays at `0919e998`, awaiting the
+  maintainer's tag.
+
+### October 21, evening — RF-26 closes; RF-27 hosts takes like the app and routes long scripts
 
 - **RF-26 done:** `VocelloDesktopCore` (the app's store, History records, settings keys and
   model selection, compiled by path plus `Sources/DesktopShared`) gives the CLI read-only parity:
@@ -107,60 +142,3 @@ holds the release: no tag yet.
   - RF-23: Sparkle updates for the Mac app (maintainer choices: Sparkle, after the freeze, ask on
     the second launch). The EdDSA key, its GitHub secret and the appcast publication are the
     maintainer's steps.
-
-### October 20 — BG-01, RF-18 and CONV-21 close; full text up front adopted
-
-`main` is pushed through `8c0cadf9`, and push CI is green on it (run 39516326220, ThreadSanitizer
-included). PR #110's zsh completion landed earlier in the day; #110 and #87 are closed.
-
-- **iPhone window (iPhone 17 Pro, iOS 27.0.1, the adopted engine and the MLX refresh):**
-  - **RF-18 closed:** `smoke --scenario long-form` passed (`ios-xcui-smoke-20261020-160313-80e6aba4`).
-    The first attempt finished the project, then failed at History search when notifications
-    interrupted the phone (`…153705-0a3bf3f5`, kept).
-  - **BG-01 closed:** `background-warmup` passed with a clean crash delta (`…161737-a54444f8`).
-  - **CONV-21, iPhone half done:**
-    - The full iPhone smoke passed (`…162655-207aa53e`), the first full pass in 30 days.
-    - The memory qualification passed: 60 MB maximum retained growth, 0.5% of RAM
-      (`ios-memory-qualification-20261020-175216-613bb02a`, record `bf9d0da2`).
-    - The first take after launch reached audio 0.61 s after load, so no gemv compile stall
-      (`ios-engine-20261020-175501-9d08fde9`, record `3bff8143`).
-  - These lanes ran the app with the Observation migration and the strictness settings in place.
-- **Defects the window found, all fixed and tested:**
-  - Saved-voice Clone failed on the iPhone once a voice's artifact identity changed, as the MLX
-    refresh does (`6a2a29f6`, reviewed). Publication compared `standardizedFileURL` spellings,
-    which drop `/private` only from existing paths, and iOS spells the App Group `/private/var`.
-    A refused publication now skips the cache instead of failing the take.
-  - The device-diagnostics build failed under strict memory safety (`c368d7df`).
-  - Device lanes read another run's engine rows from the pulled mirror (`bd494cb7`) and counted
-    Xcode 27's simulated iPhone (`f1698bd8`); the doctor's "multiple devices" error is gone.
-  - `scripts/ui_test.sh ios take-variation` restores Take variation through Settings, and session
-    cleanup closes a History search keyboard first (`d549d45c`). The phone is back on Consistent.
-- **Auto language verified on the Mac (maintainer request):** `scripts/ui_test.sh macos auto-language`
-  (`4a4c31df`, `3f134082`) passed all 17 takes (`macos-xcui-auto-language-20261020-193808-e91827da`).
-  With Studio on Auto the request carries `auto`, the engine resolves the detected language and sends
-  its language token, and the chip agrees, in all ten languages and in Design and Clone. Dutch, which
-  Qwen3 does not speak, shows Auto: Built-in then sends English (D6, ER-05), Design sends no token.
-  BKL-21 parks the receipt-validator gap the checker works around. An iPhone run waits for a window.
-  Manual selection followed (`aa0adfdd`, `64fbbbc9`): 22 of 22 takes pass
-  (`macos-xcui-auto-language-20261020-204002-f86c7a46`). A pinned language reaches the engine even
-  when the text is in another language, and returning to Auto follows detection again.
-- **Full text up front (D1) adopted for single streamed takes (RF-21; RF-20 declined first).** The
-  lane's French take that whispered for 35 s had streamed its whole script during an opening sigh
-  (A-01). RF-20's screen favored D1 (5 gross failures against 10 of 251 takes per arm), but its rule
-  also required the Mac language bench, where D1 garbled one Japanese take
-  (`mac-lang-bench-20261020-215933-4b3c7b82` against `…220248-067bb65c`), so RF-20 closed declined.
-  At the maintainer's request both ASR families then scored the 496 saved screen takes under a rule
-  written first: wrong-content takes fell from 31 to 16, and the maintainer adopted D1. Long-form
-  segments keep trailing text (`GenerationRequest.longFormSegment`). Landed in `9cd075bd` and
-  verified there: the French take replays clean, a long-form segment matches forced trailing text
-  byte for byte, the auto-language lane passes 22 of 22 (`…231517-484006e1`) and the Mac memory
-  qualification passes with unchanged MLX peaks (`mac-memory-qualification-20261020-233325-d9f14b0a`).
-  RF-21 is done; the iPhone proof is RF-15's. BKL-22 and BKL-23 park two language-bench tooling gaps.
-- **CONV-21 closed:** the full Mac smoke passed 15 of 15, attended, on clean `8c0cadf9` with no new
-  crash reports (`macos-xcui-smoke-20261020-234442-98d62058`). test01's 25 minutes is its usual
-  length (1,514 s on 2026-10-10): about 1,500 existence checks, no step over 2 s.
-- **Next:**
-  - RF-09's freeze checks run on the freeze commit (due 2026-10-23); no release-plan blocker is left
-    open before them.
-  - RF-15 and the items behind it run on the processed TestFlight candidate after the freeze.
-  - DW-02 and P1-15's `ios_device.sh` shared library stay deferred until after the submission.

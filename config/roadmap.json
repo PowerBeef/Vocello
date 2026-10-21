@@ -249,7 +249,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "notes": "Started 2026-10-21 after RF-27 closed; paused 2026-10-21 at the maintainer's request. Done: settings set, models use and models prefer-lower-memory write the app's preferences (d364f073); models install-recommended (--plan) and models remove (d985a430); voices enroll, replace, save-take and delete save voices as the app's voice sheet does, with --transcribe auto|always|never, --audio-only, --language and --on-warnings keep|discard|fail (a3ebb9e2). Every write posts com.qwenvoice.shared.*DidChange. Verified on the Mac (no-op settings writes; remove and every enrollment path in a scratch data folder; real settings, models and voices untouched). Left: a vocello-swift-review of d364f073, d985a430 and a3ebb9e2 and its fixes; the app observing the change notices (a Mac-only edit, or with RF-30); unit coverage for models remove and install-recommended (in the executable target); a real save-take once History has a take.",
       "due": "2026-11-10"
     },
     {

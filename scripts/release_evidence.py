@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import cli_package
 import release_sbom
 import required_step_ledger
 from lib import jsonio  # noqa: E402
@@ -28,7 +29,16 @@ ORCHESTRATION_RELATIVE = Path("config/orchestration-contract.json")
 VERIFICATION_DIR = Path("release-verification")
 VERIFICATION_BUNDLE_NAME = "release-verification.json"
 IOS_ARTIFACT_VERIFICATION_NAME = "ios-release-artifact-verification.json"
+# The macOS CLI ships one sealed payload twice: in `<output-name>-cli.dmg`, smoke-checked into
+# the first report, and in `<output-name>-cli.pkg`, checked by `cli_package.py pkg-verify` into
+# the second.
+CLI_VERIFICATION_NAME = "cli-package-verification.json"
+CLI_PKG_VERIFICATION_NAME = "cli-pkg-verification.json"
+CLI_DMG_SUFFIX = "-cli.dmg"
+CLI_PKG_SUFFIX = "-cli.pkg"
 DIGEST = re.compile(r"[0-9a-f]{64}")
+# An Apple Team ID: ten uppercase letters and digits, at least one a letter.
+TEAM_IDENTIFIER = re.compile(r"(?<![A-Za-z0-9])(?=[0-9]*[A-Z])[A-Z0-9]{10}(?![A-Za-z0-9])")
 
 
 digest_file = jsonio.sha256_file
@@ -542,6 +552,7 @@ def create(
     source_identity_path: Path | None = None,
     step_ledger_path: Path | None = None,
     require_tag_ref: bool = True,
+    rehearsal: bool = False,
 ) -> tuple[Path, Path]:
     if source_identity_path is None or step_ledger_path is None:
         raise ValueError("release evidence requires source identity and managed required-step ledger manifests")
@@ -635,7 +646,13 @@ def create(
     ] + [evidence_path]
     checksum_lines = [f"{digest_file(path)}  {path.relative_to(output_dir).as_posix()}" for path in checksum_paths]
     atomic_write(checksum_path, ("\n".join(sorted(checksum_lines)) + "\n").encode("utf-8"))
-    validate(output_dir)
+    try:
+        validate(output_dir, rehearsal=rehearsal)
+    except Exception:
+        # Evidence that fails its own validation is never left looking publishable.
+        for path in (evidence_path, checksum_path, verification_bundle_path):
+            path.unlink(missing_ok=True)
+        raise
     return evidence_path, checksum_path
 
 
@@ -773,7 +790,7 @@ def validate_cli_artifact_verification(payload: dict[str, Any], release: dict[st
     if not isinstance(artifact, dict) or set(artifact) != {"name", "bytes", "sha256"}:
         raise ValueError("CLI artifact verification has malformed DMG identity")
     matches = [entry for entry in artifacts if entry.get("name") == artifact.get("name")]
-    if (len(matches) != 1 or not str(artifact.get("name", "")).endswith("-cli.dmg")
+    if (len(matches) != 1 or not str(artifact.get("name", "")).endswith(CLI_DMG_SUFFIX)
             or any(matches[0].get(key) != artifact.get(key) for key in ("sha256", "bytes"))):
         raise ValueError("CLI artifact verification DMG binding mismatch")
     required = {"content-integrity", "arm64", "system-linkage", "embedded-version", "embedded-build",
@@ -786,10 +803,143 @@ def validate_cli_artifact_verification(payload: dict[str, Any], release: dict[st
         raise ValueError("CLI artifact smoke must not claim generation qualification")
 
 
+# Exactly what `cli_package.py pkg-verify` writes; anything else fails closed.
+CLI_PKG_REPORT_FIELDS = frozenset({
+    "schemaVersion", "status", "release", "manifestSHA256", "fileCount", "package", "signature",
+    "notarization", "installTest", "checks", "generationQualification", "artifact",
+})
+CLI_PKG_PACKAGE_FIELDS = frozenset({
+    "identifier", "version", "installLocation", "hostArchitectures", "minimumOS", "relocatableBundles",
+    "scriptDigests",
+})
+
+
+def _strings(value: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], str]]:
+    """Every string in a JSON value, keys included, with the key path that holds it."""
+    if isinstance(value, str):
+        return [(path, value)]
+    if isinstance(value, dict):
+        found: list[tuple[tuple[str, ...], str]] = []
+        for key, item in value.items():
+            found.append(((*path, "<key>"), str(key)))
+            found.extend(_strings(item, (*path, str(key))))
+        return found
+    if isinstance(value, list):
+        return [found for item in value for found in _strings(item, path)]
+    return []
+
+
+def validate_cli_installer_verification(
+    payload: dict[str, Any],
+    release: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    dmg_report: dict[str, Any],
+    *,
+    rehearsal: bool = False,
+) -> None:
+    """Bind the `pkg-verify` report to its exact `-cli.pkg`, the release and the CLI DMG's payload.
+
+    The package carries the payload the CLI DMG carries, so its manifest digest and file count must
+    equal the ones the DMG's smoke report recorded. Release evidence needs a Developer ID Installer
+    signature with a stapled ticket; only rehearsal evidence, which is never published, may carry an
+    unsigned, unnotarized package.
+    """
+    if not isinstance(payload, dict) or set(payload) != CLI_PKG_REPORT_FIELDS:
+        raise ValueError("CLI installer verification contains unexpected or missing fields")
+    expected_release = {key: release.get(key) for key in ("marketingVersion", "buildNumber", "commitSHA")}
+    if (type(payload.get("schemaVersion")) is not int or payload["schemaVersion"] != 1
+            or payload.get("status") != "passed" or payload.get("release") != expected_release):
+        raise ValueError("CLI installer verification source/status mismatch")
+
+    for path, text in _strings(payload):
+        if path == ("package", "installLocation"):
+            continue
+        if "/" in text or text.startswith("~") or TEAM_IDENTIFIER.search(text):
+            raise ValueError("CLI installer verification must not carry a Team ID or an absolute path")
+
+    artifact = payload.get("artifact")
+    if not isinstance(artifact, dict) or set(artifact) != {"name", "bytes", "sha256"}:
+        raise ValueError("CLI installer verification has malformed package identity")
+    packages = [entry for entry in artifacts if str(entry.get("name", "")).endswith(CLI_PKG_SUFFIX)]
+    dmg = dmg_report.get("artifact") if isinstance(dmg_report, dict) else None
+    dmg_name = str(dmg.get("name", "")) if isinstance(dmg, dict) else ""
+    if (len(packages) != 1 or packages[0].get("kind") != "artifact"
+            or not dmg_name.endswith(CLI_DMG_SUFFIX)
+            or packages[0].get("name") != dmg_name.removesuffix(CLI_DMG_SUFFIX) + CLI_PKG_SUFFIX
+            or type(artifact.get("bytes")) is not int
+            or any(packages[0].get(key) != artifact.get(key) for key in ("name", "bytes", "sha256"))):
+        raise ValueError("CLI installer verification package binding mismatch")
+
+    if (not isinstance(payload.get("manifestSHA256"), str) or not DIGEST.fullmatch(payload["manifestSHA256"])
+            or payload["manifestSHA256"] != dmg_report.get("manifestSHA256")
+            or type(payload.get("fileCount")) is not int or payload["fileCount"] <= 0
+            or payload["fileCount"] != dmg_report.get("fileCount")):
+        raise ValueError("CLI installer payload differs from the CLI DMG's sealed payload")
+
+    package = payload.get("package")
+    if not isinstance(package, dict) or set(package) != CLI_PKG_PACKAGE_FIELDS:
+        raise ValueError("CLI installer verification has malformed package facts")
+    scripts = package.get("scriptDigests")
+    if (package.get("identifier") != cli_package.PKG_IDENTIFIER
+            or package.get("version") != release.get("marketingVersion")
+            or package.get("installLocation") != cli_package.INSTALL_LOCATION
+            or package.get("hostArchitectures") != ["arm64"]
+            or not isinstance(package.get("minimumOS"), str)
+            or not cli_package.MACOS_VERSION.fullmatch(package["minimumOS"])
+            or type(package.get("relocatableBundles")) is not int or package["relocatableBundles"] != 0
+            or not isinstance(scripts, dict) or set(scripts) != set(cli_package.PKG_SCRIPT_SOURCES)
+            or any(not isinstance(value, str) or not DIGEST.fullmatch(value) for value in scripts.values())):
+        raise ValueError("CLI installer identity, location, architecture or relocation differs from the contract")
+
+    signature, notarization = payload.get("signature"), payload.get("notarization")
+    if (signature not in cli_package.PKG_SIGNATURES or notarization not in cli_package.PKG_NOTARIZATIONS
+            or (notarization == "stapled" and signature != "developer-id-installer")):
+        raise ValueError("CLI installer signature/notarization claim is invalid")
+    if not rehearsal and (signature, notarization) != ("developer-id-installer", "stapled"):
+        raise ValueError("release evidence needs a Developer ID Installer signed, stapled CLI installer")
+
+    if payload.get("checks") not in (list(cli_package.PKG_CHECKS),
+                                     [*cli_package.PKG_CHECKS, *cli_package.PKG_INSTALL_CHECKS]):
+        raise ValueError("CLI installer verification checks differ from what pkg-verify proves")
+    if payload.get("installTest") != "not-performed" or payload.get("generationQualification") != "not-performed":
+        raise ValueError("CLI installer verification must not claim an install test or generation qualification")
+
+
+def _validate_macos_cli(
+    output_dir: Path, release: dict[str, Any], artifacts: list[dict[str, Any]], *, rehearsal: bool
+) -> None:
+    """The CLI DMG, its smoke report, the installer package and its report travel together."""
+    names = [str(item.get("name", "")) for item in artifacts if isinstance(item, dict)]
+    has_dmg = any(name.endswith(CLI_DMG_SUFFIX) for name in names)
+    has_dmg_report = CLI_VERIFICATION_NAME in names
+    has_pkg = any(name.endswith(CLI_PKG_SUFFIX) for name in names)
+    has_pkg_report = CLI_PKG_VERIFICATION_NAME in names
+    if has_dmg and not has_dmg_report:
+        raise ValueError("CLI DMG requires its managed verification report")
+    if (has_pkg or has_pkg_report) and not (has_dmg and has_dmg_report):
+        raise ValueError("CLI installer package requires the CLI DMG that carries the same payload")
+    if has_dmg and not has_pkg:
+        raise ValueError("CLI DMG requires its installer package")
+    if has_dmg and not has_pkg_report:
+        raise ValueError("CLI installer package requires its verification report")
+    if not has_dmg_report:
+        return  # App-only evidence carries no CLI.
+    dmg_report = load_json(output_dir / CLI_VERIFICATION_NAME)
+    validate_cli_artifact_verification(dmg_report, release, artifacts)
+    reports = [item for item in artifacts if item.get("name") == CLI_PKG_VERIFICATION_NAME]
+    if len(reports) != 1 or reports[0].get("kind") != "artifact":
+        raise ValueError("CLI installer verification report must be one release artifact")
+    validate_cli_installer_verification(
+        load_json(output_dir / CLI_PKG_VERIFICATION_NAME), release, artifacts, dmg_report, rehearsal=rehearsal
+    )
+
+
 def validate(
     output_dir: Path,
     source_root: Path | None = None,
     exact_extra: list[str] | None = None,
+    *,
+    rehearsal: bool = False,
 ) -> dict[str, Any]:
     """Validate release evidence against itself; with `source_root`, also against that checkout.
 
@@ -797,8 +947,12 @@ def validate(
     promotion that has the tagged source checked out passes `source_root`: the evidence must
     name that commit, and the bundled contracts must equal the checkout's, byte for byte. With
     `exact_extra`, the directory must hold exactly the files the evidence names, SHA256SUMS and
-    those extra names, so nothing it did not check is published beside them.
+    those extra names, so nothing it did not check is published beside them. `rehearsal` marks
+    evidence that is never published, whose CLI installer may be unsigned and unnotarized; a
+    promotion (`source_root`) is never a rehearsal.
     """
+    if rehearsal and source_root is not None:
+        raise ValueError("rehearsal evidence is never promoted")
     output_dir = output_dir.resolve()
     evidence_path = output_dir / EVIDENCE_NAME
     checksum_path = output_dir / CHECKSUM_NAME
@@ -823,13 +977,7 @@ def validate(
         summary = load_json(output_dir / IOS_ARTIFACT_VERIFICATION_NAME)
         validate_ios_release_artifact_verification(summary, release, evidence.get("artifacts", []))
     if platform == "macos":
-        artifacts = evidence.get("artifacts", [])
-        has_cli = any(str(item.get("name", "")).endswith("-cli.dmg") for item in artifacts)
-        has_cli_report = any(item.get("name") == "cli-package-verification.json" for item in artifacts)
-        if has_cli and not has_cli_report:
-            raise ValueError("CLI DMG requires its managed verification report")
-        if has_cli_report:
-            validate_cli_artifact_verification(load_json(output_dir / "cli-package-verification.json"), release, artifacts)
+        _validate_macos_cli(output_dir, release, evidence.get("artifacts", []), rehearsal=rehearsal)
 
     bundle_path = output_dir / VERIFICATION_BUNDLE_NAME
     bundle = load_json(bundle_path)
@@ -959,6 +1107,10 @@ def match_assets(listing: dict[str, Any], output_dir: Path) -> list[str]:
     return present
 
 
+REHEARSAL_HELP = ("rehearsal evidence, never published: the CLI installer package may be unsigned "
+                  "and not notarized (release evidence requires Developer ID Installer and a stapled ticket)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -982,10 +1134,12 @@ def main() -> int:
     create_parser.add_argument("--step-ledger", type=Path, required=True)
     create_parser.add_argument("--source-date-epoch", type=int, required=True)
     create_parser.add_argument("--allow-missing-tag-ref", action="store_true", help=argparse.SUPPRESS)
+    create_parser.add_argument("--rehearsal", action="store_true", help=REHEARSAL_HELP)
     validate_parser = sub.add_parser("validate")
     validate_parser.add_argument("--output-dir", type=Path, required=True)
     validate_parser.add_argument("--source-root", type=Path,
                                  help="also require the evidence to match this checkout (commit and contracts)")
+    validate_parser.add_argument("--rehearsal", action="store_true", help=REHEARSAL_HELP)
     validate_parser.add_argument("--exact-assets", nargs="*", metavar="EXTRA",
                                  help="require exactly the evidence's files, SHA256SUMS and these extra names")
     match_parser = sub.add_parser("match-assets")
@@ -1004,14 +1158,14 @@ def main() -> int:
             args.root.resolve(), args.output_dir.resolve(), args.tag, args.commit, args.platform,
             args.artifact, args.metadata, args.source_date_epoch,
             args.source_identity.resolve(), args.step_ledger.resolve(),
-            require_tag_ref=not args.allow_missing_tag_ref,
+            require_tag_ref=not args.allow_missing_tag_ref, rehearsal=args.rehearsal,
         )
         print(json.dumps({"evidence": str(evidence), "checksums": str(checksums)}, sort_keys=True))
     elif args.command == "match-assets":
         names = match_assets(load_json(args.listing), args.output_dir.resolve())
         print(json.dumps({"status": "matched", "assets": len(names)}, sort_keys=True))
     else:
-        evidence = validate(args.output_dir, args.source_root, args.exact_assets)
+        evidence = validate(args.output_dir, args.source_root, args.exact_assets, rehearsal=args.rehearsal)
         print(json.dumps({"status": "passed", "tag": evidence["release"]["tag"]}, sort_keys=True))
     return 0
 

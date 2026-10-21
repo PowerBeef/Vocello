@@ -158,6 +158,244 @@ class ReleaseEvidenceTests(unittest.TestCase):
             text=True, capture_output=True, check=False,
         )
 
+    # The CLI ships one sealed payload twice: a DMG smoke-checked by `cli_package.py smoke` and an
+    # installer package checked by `cli_package.py pkg-verify`; both reports travel as artifacts.
+    MANIFEST_SHA256 = "4" * 64
+
+    def cli_release(self) -> dict[str, str]:
+        return {"marketingVersion": "2.1.0", "buildNumber": "18", "commitSHA": self.commit}
+
+    def write_cli_fixture(self, *, signature: str = "developer-id-installer",
+                          notarization: str = "stapled") -> list[Path]:
+        """The CLI DMG, the installer package and both reports, as the release step leaves them."""
+        cli_dmg = self.output / "Vocello-macos26-cli.dmg"
+        cli_pkg = self.output / "Vocello-macos26-cli.pkg"
+        cli_dmg.write_bytes(b"cli dmg fixture")
+        cli_pkg.write_bytes(b"xar! cli installer fixture")
+        dmg_report = {
+            "schemaVersion": 1, "status": "passed", "release": self.cli_release(),
+            "manifestSHA256": self.MANIFEST_SHA256, "fileCount": 20,
+            "checks": ["content-integrity", "arm64", "system-linkage", "embedded-version", "embedded-build",
+                       "json-modes", "bundled-speakers", "usage-exit-status", "checkout-independent-cwd"],
+            "generationQualification": "not-performed",
+            "artifact": {"name": cli_dmg.name, "bytes": cli_dmg.stat().st_size,
+                         "sha256": release_evidence.digest_file(cli_dmg)},
+        }
+        dmg_report_path = self.output / release_evidence.CLI_VERIFICATION_NAME
+        dmg_report_path.write_text(json.dumps(dmg_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.write_pkg_report(self.pkg_report(signature=signature, notarization=notarization))
+        return [cli_dmg, dmg_report_path, cli_pkg, self.output / release_evidence.CLI_PKG_VERIFICATION_NAME]
+
+    def pkg_report(self, *, signature: str = "developer-id-installer", notarization: str = "stapled",
+                   install_checks: bool = False) -> dict:
+        """What `cli_package.py pkg-verify` writes for the fixture package."""
+        package = release_evidence.cli_package
+        cli_pkg = self.output / "Vocello-macos26-cli.pkg"
+        checks = [*package.PKG_CHECKS, *(package.PKG_INSTALL_CHECKS if install_checks else ())]
+        return {
+            "schemaVersion": 1, "status": "passed", "release": self.cli_release(),
+            "manifestSHA256": self.MANIFEST_SHA256, "fileCount": 20,
+            "package": {"identifier": "com.qwenvoice.cli", "version": "2.1.0",
+                        "installLocation": "/usr/local/lib/vocello", "hostArchitectures": ["arm64"],
+                        "minimumOS": "26.0", "relocatableBundles": 0,
+                        "scriptDigests": {name: "5" * 64 for name in package.PKG_SCRIPT_SOURCES}},
+            "signature": signature, "notarization": notarization, "installTest": "not-performed",
+            "checks": checks, "generationQualification": "not-performed",
+            "artifact": {"name": cli_pkg.name, "bytes": cli_pkg.stat().st_size,
+                         "sha256": release_evidence.digest_file(cli_pkg)},
+        }
+
+    def write_pkg_report(self, report: dict) -> None:
+        path = self.output / release_evidence.CLI_PKG_VERIFICATION_NAME
+        path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    def create_with(self, artifacts: list[Path], *, rehearsal: bool = False) -> None:
+        release_evidence.create(
+            self.root, self.output, "v2.1.0", self.commit, "macos", [self.dmg, self.step_summary, *artifacts],
+            self.metadata, 1_700_000_000, self.source_identity, self.ledger, require_tag_ref=False,
+            rehearsal=rehearsal,
+        )
+
+    def assert_refused(self, artifacts: list[Path], message: str, *, rehearsal: bool = False) -> None:
+        with self.assertRaisesRegex(ValueError, message):
+            self.create_with(artifacts, rehearsal=rehearsal)
+        for name in (release_evidence.EVIDENCE_NAME, release_evidence.CHECKSUM_NAME,
+                     release_evidence.VERIFICATION_BUNDLE_NAME):
+            self.assertFalse((self.output / name).exists(), name)
+
+    def installer_case(self) -> tuple[dict, dict, list[dict], dict]:
+        """A passing installer report with the evidence rows and DMG report it is checked against."""
+        cli = self.write_cli_fixture()
+        artifacts = [{"name": path.name, "kind": "artifact", "bytes": path.stat().st_size,
+                      "sha256": release_evidence.digest_file(path)} for path in cli]
+        dmg_report = json.loads(cli[1].read_text(encoding="utf-8"))
+        return self.pkg_report(), {**self.cli_release(), "tag": "v2.1.0"}, artifacts, dmg_report
+
+    def test_cli_installer_package_and_report_bind_into_release_evidence(self) -> None:
+        self.create()
+        sboms = {name: (self.output / name).read_bytes()
+                 for name in ("vocello-macos.spdx.json", "vocello-macos.cdx.json")}
+        cli = self.write_cli_fixture()
+        self.create_with(cli)
+        evidence = release_evidence.validate(self.output, source_root=self.root)
+        # The release's one dependency inventory covers the installer as it covers both DMGs.
+        self.assertEqual({name: (self.output / name).read_bytes() for name in sboms}, sboms)
+        self.assertEqual({item["name"] for item in evidence["sboms"]}, set(sboms))
+        named = {item["name"]: item for item in evidence["artifacts"]}
+        for path in cli:
+            self.assertEqual(named[path.name]["kind"], "artifact")
+            self.assertEqual(named[path.name]["sha256"], release_evidence.digest_file(path))
+        sums = (self.output / release_evidence.CHECKSUM_NAME).read_text(encoding="utf-8")
+        self.assertIn("  Vocello-macos26-cli.pkg\n", sums)
+        self.assertIn("  cli-pkg-verification.json\n", sums)
+        # The report may also carry the root-free install checks.
+        self.write_pkg_report(self.pkg_report(install_checks=True))
+        self.create_with(cli)
+        release_evidence.validate(self.output)
+
+    def test_cli_dmg_without_its_installer_package_or_report_cannot_publish(self) -> None:
+        cli_dmg, dmg_report, cli_pkg, pkg_report = self.write_cli_fixture()
+        self.assert_refused([cli_dmg, dmg_report, pkg_report], "requires its installer package")
+        self.assert_refused([cli_dmg, dmg_report, cli_pkg], "requires its verification report")
+        self.assert_refused([cli_pkg, pkg_report], "requires the CLI DMG")
+        self.assert_refused([cli_dmg, cli_pkg, pkg_report], "requires its managed verification report")
+        # App-only evidence still carries no CLI at all.
+        self.create()
+        release_evidence.validate(self.output)
+
+    def test_cli_installer_report_for_another_package_cannot_publish(self) -> None:
+        cli = self.write_cli_fixture()
+        cli[2].write_bytes(b"xar! a rebuilt installer the report never checked")
+        self.assert_refused(cli, "package binding mismatch")
+        # Renamed away from the CLI DMG it shares a payload with.
+        cli = self.write_cli_fixture()
+        report = self.pkg_report()
+        other = self.output / "Other-cli.pkg"
+        cli[2].rename(other)
+        report["artifact"] = {"name": other.name, "bytes": other.stat().st_size,
+                              "sha256": release_evidence.digest_file(other)}
+        self.write_pkg_report(report)
+        self.assert_refused([cli[0], cli[1], other, cli[3]], "package binding mismatch")
+
+    def test_unsigned_cli_installer_is_rehearsal_only(self) -> None:
+        cli = self.write_cli_fixture(signature="unsigned", notarization="not-performed")
+        self.assert_refused(cli, "Developer ID Installer signed, stapled")
+        self.create_with(cli, rehearsal=True)
+        release_evidence.validate(self.output, rehearsal=True)
+        with self.assertRaisesRegex(ValueError, "Developer ID Installer signed, stapled"):
+            release_evidence.validate(self.output)
+        with self.assertRaisesRegex(ValueError, "never promoted"):
+            release_evidence.validate(self.output, source_root=self.root, rehearsal=True)
+        # Signed but not notarized is still not a release candidate.
+        self.write_cli_fixture(signature="developer-id-installer", notarization="not-performed")
+        self.assert_refused(cli, "Developer ID Installer signed, stapled")
+        self.create_with(cli, rehearsal=True)
+        # A stapled ticket on an unsigned package is no valid claim, rehearsal or not.
+        self.write_cli_fixture(signature="unsigned", notarization="stapled")
+        self.assert_refused(cli, "claim is invalid", rehearsal=True)
+
+    def test_command_line_rehearsal_flag_reaches_create_and_validate(self) -> None:
+        cli = self.write_cli_fixture(signature="unsigned", notarization="not-performed")
+        command = [
+            "python3", str(SCRIPTS / "release_evidence.py"), "create",
+            "--root", str(self.root), "--tag", "v2.1.0", "--commit", self.commit,
+            "--platform", "macos", "--source-date-epoch", "1700000000", "--output-dir", str(self.output),
+            "--artifact", str(self.dmg), "--artifact", str(self.step_summary),
+            *[argument for path in cli for argument in ("--artifact", str(path))],
+            "--metadata", str(self.metadata), "--source-identity", str(self.source_identity),
+            "--step-ledger", str(self.ledger), "--allow-missing-tag-ref",
+        ]
+        refused = subprocess.run(command, text=True, capture_output=True, check=False)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("Developer ID Installer", refused.stderr)
+        self.assertFalse((self.output / release_evidence.CHECKSUM_NAME).exists())
+        created = subprocess.run([*command, "--rehearsal"], text=True, capture_output=True, check=False)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        validate = ["python3", str(SCRIPTS / "release_evidence.py"), "validate", "--output-dir", str(self.output)]
+        self.assertNotEqual(subprocess.run(validate, capture_output=True, check=False).returncode, 0)
+        rehearsal = subprocess.run([*validate, "--rehearsal"], text=True, capture_output=True, check=False)
+        self.assertEqual(rehearsal.returncode, 0, rehearsal.stderr)
+
+    def test_sha256sums_and_listed_assets_must_name_the_installer(self) -> None:
+        cli = self.write_cli_fixture()
+        self.create_with(cli)
+        sums = self.output / release_evidence.CHECKSUM_NAME
+        original = sums.read_text(encoding="utf-8")
+        for name in ("Vocello-macos26-cli.pkg", release_evidence.CLI_PKG_VERIFICATION_NAME):
+            with self.subTest(name=name):
+                sums.write_text("".join(line + "\n" for line in original.splitlines()
+                                        if not line.endswith("  " + name)), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "SHA256SUMS does not exactly match"):
+                    release_evidence.validate(self.output)
+        sums.write_text(original, encoding="utf-8")
+        listing = {"assets": [
+            {"name": entry.name, "digest": "sha256:" + release_evidence.digest_file(entry)}
+            for entry in sorted(self.output.iterdir()) if entry.name != "Vocello-macos26-cli.pkg"
+        ]}
+        with self.assertRaisesRegex(ValueError, "differ from the checked files"):
+            release_evidence.match_assets(listing, self.output)
+        # A missing installer file fails the evidence before any CLI rule.
+        cli[2].unlink()
+        with self.assertRaisesRegex(ValueError, "release evidence mismatch: Vocello-macos26-cli.pkg"):
+            release_evidence.validate(self.output)
+
+    def test_cli_installer_report_is_structurally_release_bound(self) -> None:
+        payload, release, artifacts, dmg_report = self.installer_case()
+        release_evidence.validate_cli_installer_verification(payload, release, artifacts, dmg_report)
+
+        def drop(key: str):
+            return lambda value: value.pop(key)
+
+        team = "Vocello-A1B2C3D4E5-cli.pkg"
+        for label, mutation, message in (
+            ("unknown field", lambda value: value.update(teamIdentifier="unknown"), "unexpected or missing"),
+            ("missing field", drop("installTest"), "unexpected or missing"),
+            ("unknown package field", lambda value: value["package"].update(teamID="x"), "malformed package facts"),
+            ("unknown artifact field", lambda value: value["artifact"].update(path="x"), "malformed package identity"),
+            ("schema", lambda value: value.update(schemaVersion=2), "source/status"),
+            ("status", lambda value: value.update(status="failed"), "source/status"),
+            ("build", lambda value: value["release"].update(buildNumber="19"), "source/status"),
+            ("commit", lambda value: value["release"].update(commitSHA="0" * 40), "source/status"),
+            ("package size", lambda value: value["artifact"].update(bytes=1), "binding mismatch"),
+            ("package digest", lambda value: value["artifact"].update(sha256="0" * 64), "binding mismatch"),
+            ("manifest", lambda value: value.update(manifestSHA256="6" * 64), "CLI DMG's sealed payload"),
+            ("file count", lambda value: value.update(fileCount=19), "CLI DMG's sealed payload"),
+            ("identifier", lambda value: value["package"].update(identifier="com.qwenvoice.app"), "identity"),
+            ("version", lambda value: value["package"].update(version="2.0.0"), "identity"),
+            ("location", lambda value: value["package"].update(installLocation="/usr/local/vocello"), "identity"),
+            ("architectures", lambda value: value["package"].update(hostArchitectures=["arm64", "x86_64"]),
+             "architecture"),
+            ("minimum", lambda value: value["package"].update(minimumOS="latest"), "identity"),
+            ("relocatable", lambda value: value["package"].update(relocatableBundles=1), "relocation"),
+            ("relocatable bool", lambda value: value["package"].update(relocatableBundles=False), "relocation"),
+            ("scripts", lambda value: value["package"]["scriptDigests"].update(uninstall="5" * 64), "identity"),
+            ("checks reordered", lambda value: value["checks"].reverse(), "checks differ"),
+            ("checks partial", lambda value: value["checks"].pop(), "checks differ"),
+            ("install test", lambda value: value.update(installTest="passed"), "install test"),
+            ("generation", lambda value: value.update(generationQualification="passed"), "generation"),
+            ("unknown signature", lambda value: value.update(signature="ad-hoc"), "claim is invalid"),
+            ("absolute path", lambda value: value["artifact"].update(name="/Users/example/Vocello-macos26-cli.pkg"),
+             "absolute path"),
+            ("home path", lambda value: value["package"].update(minimumOS="~/fixture"), "absolute path"),
+            ("team id", lambda value: value["artifact"].update(name=team), "Team ID"),
+        ):
+            with self.subTest(label=label):
+                tampered = copy.deepcopy(payload)
+                mutation(tampered)
+                with self.assertRaisesRegex(ValueError, message):
+                    release_evidence.validate_cli_installer_verification(tampered, release, artifacts, dmg_report)
+
+        # The DMG's report is the authority on the payload both forms carry.
+        other_payload = dict(dmg_report, manifestSHA256="6" * 64)
+        with self.assertRaisesRegex(ValueError, "CLI DMG's sealed payload"):
+            release_evidence.validate_cli_installer_verification(payload, release, artifacts, other_payload)
+        # Exactly one installer package, published as an artifact.
+        package_row = next(row for row in artifacts if row["name"].endswith("-cli.pkg"))
+        for rows in ([*artifacts, dict(package_row, name="Second-cli.pkg")],
+                     [dict(row, kind="metadata") if row is package_row else row for row in artifacts]):
+            with self.assertRaisesRegex(ValueError, "binding mismatch"):
+                release_evidence.validate_cli_installer_verification(payload, release, rows, dmg_report)
+
     def test_create_is_deterministic_relative_and_ledger_derived(self) -> None:
         self.create()
         first = (self.output / release_evidence.EVIDENCE_NAME).read_bytes()

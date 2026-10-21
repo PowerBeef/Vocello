@@ -4,6 +4,7 @@
       "batch": {
         "aliases": [],
         "options": {
+          "allow-concurrent-engine": false,
           "app-delivery": false,
           "confirm-consent": false,
           "delivery": true,
@@ -20,7 +21,8 @@
           "variant": true,
           "variation": true,
           "voice": true,
-          "voice-brief": true
+          "voice-brief": true,
+          "wait-for-engine": false
         }
       },
       "bench": {
@@ -103,6 +105,7 @@
           "gen"
         ],
         "options": {
+          "allow-concurrent-engine": false,
           "app-delivery": false,
           "client-request-id": true,
           "confirm-consent": false,
@@ -127,7 +130,8 @@
           "variant": true,
           "variation": true,
           "voice": true,
-          "voice-brief": true
+          "voice-brief": true,
+          "wait-for-engine": false
         }
       },
       "help": {
@@ -220,8 +224,10 @@
       "run": {
         "aliases": [],
         "options": {
+          "allow-concurrent-engine": false,
           "request": true,
-          "requests": true
+          "requests": true,
+          "wait-for-engine": false
         }
       },
       "settings": {

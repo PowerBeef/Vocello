@@ -82,7 +82,8 @@ public enum RunCommand {
                 CLIPresenter.event(.engineBooting)
                 runtime = try await CLIRuntime.bootstrap(
                     dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride,
-                    voiceCloningConsent: take.consent, hostedLikeTheApp: true
+                    voiceCloningConsent: take.consent, hostedLikeTheApp: true,
+                    concurrency: CLIEngineConcurrency(args)
                 )
                 CLIPresenter.event(.engineReady)
             }

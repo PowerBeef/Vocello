@@ -148,7 +148,7 @@ enum BatchCommand {
         CLIPresenter.event(.engineBooting)
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent,
-            hostedLikeTheApp: true)
+            hostedLikeTheApp: true, concurrency: CLIEngineConcurrency(args))
         CLIPresenter.event(.engineReady)
         let settings = DesktopAppSettings()
         let quality = GenerateCommand.resolveVariant(

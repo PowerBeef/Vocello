@@ -29,15 +29,21 @@ public struct CLIRuntime {
     /// RF-27: product commands (generate, batch, run) host the engine as the Mac
     /// app does, through the shared store; bench drives the raw engine (nil).
     var host: DesktopEngineHost? = nil
+    /// The hosted engine's lease on the data root, held for the process's life.
+    var lease: EngineHostLease? = nil
 
     public static func bootstrap(
         dataDirectory: URL,
         manifestOverride: URL?,
         voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed,
-        hostedLikeTheApp: Bool = false
+        hostedLikeTheApp: Bool = false,
+        concurrency: CLIEngineConcurrency = CLIEngineConcurrency()
     ) async throws -> CLIRuntime {
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
+        let lease = hostedLikeTheApp
+            ? try await admitEngineHost(dataDirectory: dataDirectory, deviceClass: deviceClass, concurrency: concurrency)
+            : nil
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
             .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
         let runtime = try NativeRuntimeFactory.make(
@@ -60,9 +66,57 @@ public struct CLIRuntime {
             registry: registry,
             dataDirectory: dataDirectory,
             voiceCloningConsent: voiceCloningConsent,
-            host: host
+            host: host,
+            lease: lease
         )
     }
+
+    /// Admits this process as an engine host on `dataDirectory` beside the others
+    /// (`EngineHostAdmission`) and returns its lease. The lease is taken before
+    /// the others are read, so two processes starting together see each other;
+    /// a waiting one gives its lease back between tries. A lease that cannot be
+    /// written only warns: it is advisory.
+    static func admitEngineHost(
+        dataDirectory: URL, deviceClass: NativeDeviceMemoryClass, concurrency: CLIEngineConcurrency
+    ) async throws -> EngineHostLease? {
+        var announcedWait = false
+        while true {
+            let lease: EngineHostLease?
+            do {
+                lease = try EngineHostLease.acquire(dataDirectory: dataDirectory, kind: "cli")
+            } catch {
+                CLIPresenter.warn("engine_lease_unavailable", "could not record this engine on the data folder: \(error)")
+                lease = nil
+            }
+            let decision = EngineHostAdmission.decide(
+                otherHosts: EngineHostLease.liveHosts(dataDirectory: dataDirectory, excluding: lease),
+                appRunning: DesktopAppPresence.isAppRunning() && DesktopAppPresence.isAppDataRoot(dataDirectory),
+                deviceClass: deviceClass, allowConcurrent: concurrency.allow
+            )
+            switch decision {
+            case .proceed:
+                return lease
+            case .warn(let message):
+                CLIPresenter.warn("concurrent_engine", message)
+                return lease
+            case .refuse(let message):
+                lease?.release()
+                guard concurrency.wait else {
+                    throw CLIError(
+                        .engineBusy, message,
+                        hint: "retry when it finishes, pass --wait-for-engine to wait, or --allow-concurrent-engine to run anyway"
+                    )
+                }
+                if !announcedWait {
+                    note("waiting: \(message)")
+                    announcedWait = true
+                }
+                // Jitter, so two waiters never keep seeing each other.
+                try await Task.sleep(for: .milliseconds(Int.random(in: 1500 ... 3000)))
+            }
+        }
+    }
+
 
     /// Same tiered prewarm policy as the macOS app: defer the dedicated custom
     /// prewarm on the 8 GB floor tier (the work folds into the first generation).
@@ -255,5 +309,22 @@ public struct CLIRuntime {
         let marketing = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? vocelloCLIVersion
         let build = bundle.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "0"
         return "\(id)|\(marketing)|\(build)"
+    }
+}
+
+
+/// `--allow-concurrent-engine` and `--wait-for-engine`: what a product command
+/// does when another engine already runs on its data root.
+public struct CLIEngineConcurrency: Sendable, Equatable {
+    public let allow: Bool
+    public let wait: Bool
+
+    public init(allow: Bool = false, wait: Bool = false) {
+        self.allow = allow
+        self.wait = wait
+    }
+
+    public init(_ args: Args) {
+        self.init(allow: args.flag("allow-concurrent-engine"), wait: args.flag("wait-for-engine"))
     }
 }

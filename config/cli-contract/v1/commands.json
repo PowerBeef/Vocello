@@ -220,6 +220,20 @@
           "takesValue": true,
           "type": "string",
           "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
         }
       ],
       "path": "generate",
@@ -383,6 +397,20 @@
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
         }
       ],
       "path": "batch",
@@ -418,6 +446,20 @@
           "summary": "JSONL: one request per line (- reads stdin)",
           "takesValue": true,
           "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
           "valueOptional": false
         }
       ],

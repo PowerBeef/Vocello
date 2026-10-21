@@ -341,6 +341,7 @@ public enum GenerateCommand {
     /// What a request's identity leaves out: how it reports, not what it asks for.
     static let identityExclusions: Set<String> = [
         "client-request-id", "json", "ndjson", "output-format", "quiet", "verbose", "no-input", "play", "plan",
+        "allow-concurrent-engine", "wait-for-engine",
     ]
 
     /// What idempotency compares (`--client-request-id`, a request's
@@ -457,7 +458,8 @@ public enum GenerateCommand {
             note("booting engine (data: \(take.dataDirectory.path))")
             CLIPresenter.event(.engineBooting)
             let runtime = try await CLIRuntime.bootstrap(
-                dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent, hostedLikeTheApp: true)
+                dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent, hostedLikeTheApp: true,
+                concurrency: CLIEngineConcurrency(args))
             CLIPresenter.event(.engineReady)
             report = take.lineBatch != nil
                 ? try CLIJSONValue(encoding: try await executeLines(take, runtime: runtime))

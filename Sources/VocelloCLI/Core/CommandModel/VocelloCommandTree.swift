@@ -13,6 +13,12 @@ public enum VocelloCommandTree {
     )
 
     /// The voice and delivery options `generate` and `batch` share.
+    /// What a product command does when another engine already runs on its data root.
+    static let engineOptions: [CLIOptionSpec] = [
+        .flag("allow-concurrent-engine", "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)"),
+        .flag("wait-for-engine", "wait for another Vocello engine on this Mac to exit instead of refusing"),
+    ]
+
     static let voiceOptions: [CLIOptionSpec] = [
         .value("mode", .choice(modes), "mode", "custom (default) | design | clone"),
         .value("variant", .choice(variants), "variant", "speed | quality (default: the package the app uses for the mode)"),
@@ -61,7 +67,7 @@ public enum VocelloCommandTree {
             .flag("plan", "resolve the take (model, variant, language, output) and report it without loading a model"),
             .value("client-request-id", .text, "id",
                    "idempotency: a repeated id with the same request replays its result instead of running again"),
-        ]
+        ] + engineOptions
     )
 
     static let run = CLICommandSpec(
@@ -79,7 +85,7 @@ public enum VocelloCommandTree {
         options: [
             .value("request", .file, "path|-", "one request object (- reads stdin)"),
             .value("requests", .file, "path|-", "JSONL: one request per line (- reads stdin)"),
-        ]
+        ] + engineOptions
     )
 
     static let batch = CLICommandSpec(
@@ -97,7 +103,7 @@ public enum VocelloCommandTree {
             .flag("long-form", "each line is one long-form project: planned into segments and joined"),
             .flag("capture-codec-trace", "internal diagnostics: keep each take's codec trace", hidden: true),
             .flag("play", "play each result when done"),
-        ],
+        ] + engineOptions,
         refusedOptions: [
             "language": "--language is not supported by batch; use generate or omit it. Batch uses per-text Auto language and non-streaming output.",
             "stream": "--stream is not supported by batch; use generate or omit it. Batch uses per-text Auto language and non-streaming output.",

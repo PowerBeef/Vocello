@@ -146,6 +146,53 @@ final class CLIEngineHostingTests: XCTestCase {
     }
 }
 
+/// RF-27: engines on one data root say so with a lease, and a second engine is
+/// refused only where two cannot fit.
+final class EngineHostLeaseTests: XCTestCase {
+    private func makeRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EngineHostLease-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return root
+    }
+
+    func testALeaseIsLiveWhileHeldAndStaleOnceNobodyHoldsIt() throws {
+        let root = try makeRoot()
+        let lease = try EngineHostLease.acquire(dataDirectory: root, kind: "cli")
+        XCTAssertEqual(lease.host.pid, getpid())
+        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [lease.host], "a held lease is live to any reader")
+        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root, excluding: lease), [])
+        let folder = root.appendingPathComponent("engine-hosts")
+        let mode = try FileManager.default.attributesOfItem(atPath: folder.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o700)
+        lease.release()
+        lease.release()
+        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [], "a released lease is gone")
+
+        // A lease whose process died is a file nobody holds: stale, and removed.
+        let stale = folder.appendingPathComponent("99999-stale.lease")
+        try JSONEncoder().encode(EngineHostLease.Host(pid: 99999, kind: "cli", startedAt: "2026-10-21T00:00:00Z"))
+            .write(to: stale)
+        XCTAssertEqual(EngineHostLease.liveHosts(dataDirectory: root), [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path))
+    }
+
+    func testASecondEngineIsRefusedOnlyWhereTwoCannotFit() {
+        let other = EngineHostLease.Host(pid: 42, kind: "cli", startedAt: "2026-10-21T00:00:00Z")
+        func decide(_ hosts: [EngineHostLease.Host], app: Bool = false, _ device: NativeDeviceMemoryClass,
+                    allow: Bool = false) -> EngineHostAdmission {
+            EngineHostAdmission.decide(otherHosts: hosts, appRunning: app, deviceClass: device, allowConcurrent: allow)
+        }
+        XCTAssertEqual(decide([], .floor8GBMac), .proceed)
+        guard case .refuse(let message) = decide([other], .floor8GBMac) else { return XCTFail("8 GB refuses") }
+        XCTAssertTrue(message.contains("pid 42"), message)
+        guard case .refuse = decide([], app: true, .floor8GBMac) else { return XCTFail("the running app counts") }
+        guard case .warn = decide([other], .floor8GBMac, allow: true) else { return XCTFail("insisting runs, warned") }
+        guard case .warn = decide([other], .mid16GBMac) else { return XCTFail("16 GB warns") }
+    }
+}
+
 @MainActor
 private final class EventLog {
     var lines: [String] = []

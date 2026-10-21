@@ -112,6 +112,7 @@ Maintained macOS subtrees and preferences:
   only through ordinary user-directed History deletion; no background garbage collector removes
   audio that might still be playing or exporting.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
+- Software updates (RF-23): Sparkle keeps its own preferences in the app's defaults (`SUEnableAutomaticChecks`, set by its permission prompt on the second launch or by Settings > Updates, and its last-check time) and stages an update it downloads under `~/Library/Caches/com.qwenvoice.app/org.sparkle-project.Sparkle/` until the install finishes. A check requests the signed `appcast.xml` from the latest GitHub release over HTTPS, at most once a day with automatic checks on, and sends no system profile; an update is offered in Sparkle's window, never installed silently (`SUAllowsAutomaticUpdates` off).
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
 subtree above. Use the model manager for an individual model so shared components still referenced

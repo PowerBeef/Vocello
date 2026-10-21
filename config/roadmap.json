@@ -249,7 +249,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "notes": "Opened 2026-10-21 (docs/audits/2026-10-21-cli-overhaul-plan.md). Done: takes default to the app's package and variation, and generate --plan (d2eee3c5); run --request(s) with idempotent client ids (44c169f4; ledger hardened, identity is the resolved take, 711f4b16, abc3d300); generate, batch and run host the engine through TTSEngineStore as the Mac app does (bf4544fa; a store refusal no longer strands the stream drain, abc3d300); generate routes a script past one take to a long-form project through the shared CLILongFormProject runner (01f9206f), verified on the Mac (2 segments, 60 s, SIGINT keeps the done segment). Each step reviewed by vocello-swift-review with fixes landed. Left: long-form through IOSLongFormCoordinator with its joined-output QC, the line batch on the app's plan, the interim History write policy (opt-in until RF-30), the engine lease, NDJSON progress polish, and a hosted take per mode.",
       "due": "2026-11-06"
     },
     {

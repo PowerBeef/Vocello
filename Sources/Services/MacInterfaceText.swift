@@ -943,6 +943,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.menu.checkForUpdates", defaultValue: "Check for Updates…",
                comment: "macOS interface: Vocello menu item and Settings button that look for a newer version of the app now (Sparkle, RF-23). Presentation only.")
     }
+    static var settingsUpdates: String {
+        localization.string(localized: "vocello.mac.settings.updates", defaultValue: "Updates",
+               comment: "macOS interface: Settings category for checking for and installing newer versions of the app (Sparkle, RF-23). Presentation only.")
+    }
     static var settingsAutomaticUpdates: String {
         localization.string(localized: "vocello.mac.settings.automaticUpdates", defaultValue: "Check for updates automatically",
                comment: "macOS interface: Settings toggle for the app's daily check for a newer version (Sparkle, RF-23). Presentation only.")

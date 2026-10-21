@@ -21,7 +21,7 @@ struct MacSettingsScreen: View {
     private var generationVariation = GenerationVariationPreference.defaultValue
 
     private enum Category: String {
-        case audio, appLanguage, modelsFiles, cloning
+        case audio, appLanguage, modelsFiles, cloning, updates
     }
 
     @State private var selectedCategory: Category?
@@ -65,6 +65,8 @@ struct MacSettingsScreen: View {
                             storageSection
                         case .cloning:
                             cloningSection
+                        case .updates:
+                            updatesSection
                         }
                     } else {
                         overview
@@ -139,9 +141,16 @@ struct MacSettingsScreen: View {
             }
             MacSettingsSection {
                 categoryButton(.cloning, symbol: "waveform.badge.mic", subtitle: MacInterfaceText.settingsCloneConsentDetail)
+                MacSettingsDivider()
+                categoryButton(.updates, symbol: "arrow.triangle.2.circlepath", subtitle: versionTitle)
             }
-            updatesSection
         }
+    }
+
+    /// The app's name and version, the Updates row's subtitle and the version
+    /// an update check compares against.
+    private var versionTitle: String {
+        [VocelloTheme.Branding.productName, appVersion].joined(separator: " ")
     }
 
     /// RF-23: Sparkle's automatic check and a check on demand, beside the
@@ -160,10 +169,7 @@ struct MacSettingsScreen: View {
                 )
             )
             MacSettingsDivider()
-            MacSettingsRow(
-                symbol: "info.circle",
-                title: [VocelloTheme.Branding.productName, appVersion].joined(separator: " ")
-            ) {
+            MacSettingsRow(symbol: "info.circle", title: versionTitle) {
                 EmptyView()
             } trailing: {
                 Button(MacInterfaceText.checkForUpdates) {
@@ -187,6 +193,7 @@ struct MacSettingsScreen: View {
         case .appLanguage: MacInterfaceText.settingsAppLanguage
         case .modelsFiles: settingsText.settingsModelsFiles
         case .cloning: MacInterfaceText.settingsVoiceCloning
+        case .updates: MacInterfaceText.settingsUpdates
         }
     }
 

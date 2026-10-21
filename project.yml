@@ -69,9 +69,10 @@ packages:
   MLXSwift:
     url: https://github.com/ml-explore/mlx-swift.git
     exactVersion: "0.32.3"
-  # RF-23: the macOS app's updater, a signed binary framework. The app is not
-  # sandboxed, so scripts/release.sh drops Sparkle's XPC services and re-signs
-  # its helpers inside-out; only the macOS app links it.
+  # RF-23: the macOS app's updater, a signed binary framework; only the macOS
+  # app links it. The app is not sandboxed: the target's post-build phase
+  # drops Sparkle's XPC services and thins it to arm64, and scripts/release.sh
+  # re-signs its nested helpers inside-out.
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: "2.10.0"
@@ -270,6 +271,8 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # RF-23: the Sparkle phase writes inside the embedded framework.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: QW_UI_LIQUID

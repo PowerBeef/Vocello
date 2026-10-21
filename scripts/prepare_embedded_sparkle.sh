@@ -7,12 +7,18 @@
 # Downloader service holds sandbox entitlements, and the app must stay the only
 # entitled Mach-O). So the framework's Mach-O files are thinned to arm64, the XPC
 # services are removed, and the nested code is re-signed inside-out with the
-# build's identity. scripts/release.sh re-signs everything with the release
-# identity, and scripts/verify_release_bundle.sh checks the result.
+# build's identity. scripts/release.sh re-signs the nested code inside-out with
+# the release identity (scripts/lib/release_signing.sh), and
+# scripts/verify_release_bundle.sh checks every nested Mach-O.
 set -euo pipefail
 
 framework="${TARGET_BUILD_DIR:?}/${FRAMEWORKS_FOLDER_PATH:?}/Sparkle.framework"
-[[ -d "$framework" ]] || exit 0
+# The app always links Sparkle, so a missing framework means this phase ran
+# before Xcode embedded it; fail rather than ship it unprepared.
+[[ -d "$framework" ]] || {
+    echo "error: $framework is not embedded yet; the phase's input no longer orders it after Xcode's CodeSign task" >&2
+    exit 1
+}
 
 rm -rf "$framework/XPCServices"
 find "$framework/Versions" -mindepth 2 -maxdepth 2 -type d -name XPCServices -exec rm -rf {} +

@@ -56,17 +56,20 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows.containing(.button, identifier: "settings_category_audio").firstMatch
         XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20), "Cmd+, must open the Settings scene")
-        for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
+        for category in ["audio", "appLanguage", "modelsFiles", "cloning", "updates"] {
             XCTAssertTrue(button("settings_category_\(category)", in: settings).isHittable)
         }
+        VocelloUIScreenshot.attach(settings, named: "mac-settings-command-comma")
         // RF-23: the updater's controls. The session launches with Sparkle's own
         // SUEnableAutomaticChecks off, so no prompt or check runs and nothing
         // here reaches the network.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_category_updates", in: settings), timeout: 10))
         let automaticChecks = element("settings_automaticUpdateChecks")
         XCTAssertTrue(VocelloUIWait.exists(automaticChecks, timeout: 10), "Settings must offer automatic update checks")
         XCTAssertEqual(VocelloUIToggle.state(of: automaticChecks), false)
         XCTAssertTrue(button("settings_checkForUpdates", in: settings).isEnabled)
-        VocelloUIScreenshot.attach(settings, named: "mac-settings-command-comma")
+        VocelloUIScreenshot.attach(settings, named: "mac-settings-updates")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_backButton", in: settings), timeout: 10))
         app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(VocelloUIWait.condition("Settings window to close", timeout: 10) { !settings.exists })
         XCTAssertTrue(element("screen_voiceCloning").exists, "Closing Settings must preserve Studio")

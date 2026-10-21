@@ -15,7 +15,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 17/42 (40%) |
+| `release-first-3-0-2026-09` | active | release-qa | 18/42 (43%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -55,7 +55,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
-| `CONV-21` | in-flight | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
 | `DW-03` | in-flight | Development workflow: product-side quality (audit Phase 2) | — |
@@ -109,9 +108,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`AUD-09`** (planned, due 2026-10-30) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
-
-- **`CONV-21`** (in-flight, due 2026-10-22) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
-  gate: Authorized by the maintainer on 2026-10-16 before the freeze: mlx-swift 0.32.3 (never 0.32.2), mlx-swift-lm 3.32.3, swift-transformers 1.3.5 and swift-huggingface 1.0.0 move together, after BG-01's error scopes, readback failure probes (F-03), a golden seeded-sampling canary recorded on the old pin (F-20), the MLX version in the clone-artifact identity (F-06) and the Tokenizers-only product (F-11). The seed change is accepted with a release-note line (F-02) and prewarm covers the runtime-compiled gemv shapes (F-04, F-05). config/toolchain.json pins a CI toolchain GitHub's runners provide; the deployment targets stay at 26; the move is reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline, re-pooled from three seeded runs) and a clean unit lane; scripts/dev.sh ci is green; Mac memory qualification and a qc-takes screen pass. The iPhone smoke, background-warmup and memory benchmark run in the next announced iPhone window.
 
 - **`DA-04`** (planned, due 2026-10-30) — Engine edge inputs.
   gate: One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).

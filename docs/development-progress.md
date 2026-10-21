@@ -17,10 +17,10 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 20 — iPhone window: BG-01 and RF-18 close; CONV-21's iPhone half passes (resume here)
+### October 20 — BG-01, RF-18 and CONV-21 close; full text up front adopted (resume here)
 
-`main` is pushed through `5c0b5203` (PR #110's zsh completion with its missing flags and a drift
-test; #110 and #87 closed). The window's commits after it wait for the maintainer's push request.
+`main` is pushed through `8c0cadf9`, and push CI is green on it (run 39516326220, ThreadSanitizer
+included). PR #110's zsh completion landed earlier in the day; #110 and #87 are closed.
 
 - **iPhone window (iPhone 17 Pro, iOS 27.0.1, the adopted engine and the MLX refresh):**
   - **RF-18 closed:** `smoke --scenario long-form` passed (`ios-xcui-smoke-20261020-160313-80e6aba4`).
@@ -65,9 +65,12 @@ test; #110 and #87 closed). The window's commits after it wait for the maintaine
   byte for byte, the auto-language lane passes 22 of 22 (`…231517-484006e1`) and the Mac memory
   qualification passes with unchanged MLX peaks (`mac-memory-qualification-20261020-233325-d9f14b0a`).
   RF-21 is done; the iPhone proof is RF-15's. BKL-22 and BKL-23 park two language-bench tooling gaps.
+- **CONV-21 closed:** the full Mac smoke passed 15 of 15, attended, on clean `8c0cadf9` with no new
+  crash reports (`macos-xcui-smoke-20261020-234442-98d62058`). test01's 25 minutes is its usual
+  length (1,514 s on 2026-10-10): about 1,500 existence checks, no step over 2 s.
 - **Next:**
-  - RF-09's freeze now waits only on CONV-21's full Mac smoke, which needs someone at the Mac
-    (BKL-19's Speech Recognition prompt).
+  - RF-09's freeze checks run on the freeze commit (due 2026-10-23); no release-plan blocker is left
+    open before them.
   - RF-15 and the items behind it run on the processed TestFlight candidate after the freeze.
   - DW-02 and P1-15's `ios_device.sh` shared library stay deferred until after the submission.
 

@@ -3,9 +3,12 @@
   "primaryPlan": "release-first-3-0-2026-09",
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
-    "decided": "2026-10-18",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items.",
-    "maxInFlight": 8
+    "decided": "2026-10-20",
+    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23).",
+    "maxInFlight": 2,
+    "freeze": {
+      "commit": "029427c99a897bd677ae3513bcb1daeff5a7e28d"
+    }
   },
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
@@ -248,8 +251,8 @@
         "scripts/release_evidence.py",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-10-16",
-      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. RF-13, RF-14 and ASR-08 are closed. 2026-10-16: the maintainer added RF-18, RF-19, BG-01 and CONV-21 before the freeze (engine audit); the engine-remediation programme pauses at the freeze until the submission. The iPhone proofs of BG-01, CONV-21 and RF-18 stay before the freeze (maintainer, 2026-10-16). (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
+      "updated": "2026-10-20",
+      "notes": "Re-gated 2026-09-13 (the September 7 verification is void; promotion inputs are config/quality-promotion-contract.json and scripts/quality_promotion.py). Earlier history: git log -p -- config/roadmap.json. 2026-10-20: every blocker is closed (BG-01, CONV-21, RF-18 to RF-22 included) and the freeze checks pass on 029427c9: regen clean; the full contract gate with 2,589 Python tests; macOS 1,522 core and 199 runtime tests and 1,522 under TSan; the Mac app (3.0.0/24), CLI, generic iOS and UI-test builds; lints. The website check matches CI run 39385512938 on the identical website/ tree (the local browser smoke lacks Playwright 1.64.1 Chromium). One full-gate attempt failed on three signal-timing tests that pass alone (BKL-26). App Store Connect, read-only: builds 21-23 only, build 24 unused. focusLock.freeze records 029427c9. Left: the maintainer pushes the annotated v3.0.0 tag on 029427c9, proved by scripts/release_source_authority.py. Exact-SHA push CI on 029427c9: run 39531352634, CI required green.",
       "blockedBy": [
         "ASR-08",
         "BG-01",
@@ -262,6 +265,23 @@
         "RF-21",
         "RF-22"
       ]
+    },
+    {
+      "id": "RF-23",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The Mac app offers new versions and installs them through Sparkle",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-30",
+      "gate": "Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT), with the supply-chain, attribution and license inventories updated. The Mac app owns one SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings toggle; Sparkle's own permission prompt on the second launch (no SUEnableAutomaticChecks) and no system profile. SUFeedURL points at an appcast on the website; SUPublicEDKey comes from an EdDSA key the maintainer generates and keeps as a GitHub secret, never in Git. The release workflow signs the notarized DMG and adds its appcast entry; the privacy page names the check. Deterministic tests cover the wiring, a Mac UI lane covers the menu item and the toggle, and one local end-to-end update between two local builds proves download, verification, install and relaunch.",
+      "sourceOfTruth": [
+        "project.yml",
+        "Sources/QwenVoiceApp.swift",
+        "scripts/release.sh",
+        ".github/workflows/release.yml"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Opened 2026-10-20. Maintainer choices: Sparkle over a notify-only GitHub check; build after the iPhone freeze; ask on the second launch. Users on 2.4.0 have no updater, so Mac 3.0 is the first version that checks and prompts start with the release after it. Maintainer-only steps: generating the EdDSA key pair, storing the private key as a GitHub secret, publishing the appcast and the privacy-page line (website deploys from Git)."
     },
     {
       "id": "RF-10",
@@ -1800,6 +1820,21 @@
       "notes": "Found 2026-10-20 in RF-22: the routed check passed on the export sheet redesign, and only the full gate (scripts/dev.sh ci, RF-09's freeze checks) caught the drifted interactive count. Parked without investigation under the focus lock."
     },
     {
+      "id": "BKL-26",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The UI-finalization signal tests fail under the parallel full Python suite",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_ui_failure_finalization.py passes reliably inside the full parallel suite (check_project_inputs.sh, pytest -n auto), shown by repeated full runs, without weakening what the signal cases prove.",
+      "sourceOfTruth": [
+        "scripts/tests/test_ui_failure_finalization.py",
+        "scripts/lib/ui_finalization.sh"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 in RF-09's freeze checks on 029427c9: three SIGINT cases failed in the full parallel run (a 10 s subprocess deadline, exit 0 or 1 for 130, and record_lane_ledger not found on one signal path), then passed 15/15 three times alone and in the next full run. Parked without investigation under the focus lock."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",
@@ -2044,7 +2079,7 @@
       "id": "DW-03",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: product-side quality (audit Phase 2)",
-      "status": "in-flight",
+      "status": "parked",
       "blockedBy": [],
       "gate": "Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.",
       "sourceOfTruth": [
@@ -2053,8 +2088,8 @@
         "Packages/VocelloQwen3Core/Package.swift",
         "Tests/VocelloCoreTests"
       ],
-      "updated": "2026-10-19",
-      "due": "2026-10-22",
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.",
       "notes": "Maintainer 2026-10-18: runs now; P2-5, then P2-3. Landed: P2-1 owned-target optimization variables (a2147383). P2-6 MemberImportVisibility and project Swift 6 (a2147383), no first-party @preconcurrency imports (42b15022), SwiftLint gate (1a4aaf6e), nightly migrate-mode report (8f9bdbeb, e32fb52f). P2-4 Swift Testing in the owned package (c406eea2, 54842e39). P2-7 signposts, Logger, macOS MetricKit (adb556a2, 25192b69, 82c921a7, dcfdcf07). P2-5 (2026-10-19): allocator seam keeping core tests off MLX (e124f375); load-coordinator and runtime seam suites, fakes failing inside warm and prime bodies (7fe58fa2; mutation-checked; B-02 and BKL-20 strict expected failures); nightly shipped-configuration run (dfb51453). P2-3 step 1 (2026-10-19): VocelloCLICore, the CLI's tested files compiled once and imported @testable (cd4843eb). Step 2 waits for the submission: the Mac-only files need shared code the Mac app compiles by path from the iOS folders, so the shared set moves first, and that changes the iOS app. Declined: P2-2 dwarf test builds and the compilation cache. Open: P2-3 steps 2-4; package warnings-as-errors waits on the MLXArray Sendable warnings."
     },
     {

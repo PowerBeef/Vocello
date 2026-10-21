@@ -8,14 +8,16 @@
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-18): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items.
-Only this plan may hold planned or in-flight work, at most 8 items in flight.
+**Focus lock** (decided 2026-10-20): The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23).
+Only this plan may hold planned or in-flight work, at most 2 items in flight.
+
+**Frozen** at `029427c99a897bd677ae3513bcb1daeff5a7e28d`: every later commit names an item of this plan in its subject.
 
 ## Plans
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 19/43 (44%) |
+| `release-first-3-0-2026-09` | active | release-qa | 19/44 (43%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -27,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/28 (46%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/29 (45%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -57,7 +59,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
-| `DW-03` | in-flight | Development workflow: product-side quality (audit Phase 2) | — |
+| `DW-03` | parked | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | in-flight | Development workflow: longer-term modernization (audit Phase 3) | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
@@ -67,6 +69,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
+| `RF-23` | in-flight | The Mac app offers new versions and installs them through Sparkle | — |
 
 ### Open items in detail
 
@@ -116,8 +119,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.
   unparkWhen: The next announced iPhone window: P1-2's iPhone readiness preflight and P1-15's ios_device.sh half run there.
 
-- **`DW-03`** (in-flight, due 2026-10-22) — Development workflow: product-side quality (audit Phase 2).
+- **`DW-03`** (parked) — Development workflow: product-side quality (audit Phase 2).
   gate: Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.
+  unparkWhen: The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.
 
 - **`DW-04`** (in-flight, due 2026-10-30) — Development workflow: longer-term modernization (audit Phase 3).
   gate: Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.
@@ -147,6 +151,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
+
+- **`RF-23`** (in-flight, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
+  gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT), with the supply-chain, attribution and license inventories updated. The Mac app owns one SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings toggle; Sparkle's own permission prompt on the second launch (no SUEnableAutomaticChecks) and no system profile. SUFeedURL points at an appcast on the website; SUPublicEDKey comes from an EdDSA key the maintainer generates and keeps as a GitHub secret, never in Git. The release workflow signs the notarized DMG and adds its appcast entry; the privacy page names the check. Deterministic tests cover the wiring, a Mac UI lane covers the menu item and the toggle, and one local end-to-end update between two local builds proves download, verification, install and relaunch.
 
 ## Engine remediation programme (2026-10-16 audit)
 
@@ -543,6 +550,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
 | `BKL-24` | parked | The iOS control audit does not count trailing-closure buttons | — |
 | `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
+| `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -595,6 +603,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-25`** (parked) — The routed check does not select the iOS control-audit tests for an iOS source edit.
   gate: scripts/dev.sh check selects scripts/tests/test_ios_control_audit.py when a Sources/iOS or Sources/SharedSupport/Views Swift file changes, with a selection test pinning it.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-26`** (parked) — The UI-finalization signal tests fail under the parallel full Python suite.
+  gate: scripts/tests/test_ui_failure_finalization.py passes reliably inside the full parallel suite (check_project_inputs.sh, pytest -n auto), shown by repeated full runs, without weakening what the signal cases prove.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

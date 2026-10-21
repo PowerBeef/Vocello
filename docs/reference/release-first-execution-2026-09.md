@@ -82,6 +82,13 @@ Between September 4 and October 12 the release did not move:
 
   Consistent's remaining long-form failures stay the 3.0 known limitation.
 
+  Later that day:
+  - Full text up front (D1) was adopted for single streamed takes (RF-21).
+  - The redesigned export unlock sheet was approved (RF-22).
+  - The iPhone candidate was frozen at `029427c9`, with `maxInFlight` at 2 and DW-03 parked until the
+    submission. Mac-only user requests follow as items of this plan without changing the iPhone
+    candidate, starting with Sparkle updates for the Mac app (RF-23).
+
 ## The path
 
 Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.
@@ -91,7 +98,7 @@ Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scr
 | 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | On hold since Oct 13 |
 | 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default (done); the blockers' code fixes with deterministic tests; the engine-audit items, with the iPhone proofs of BG-01, CONV-21 and RF-18 in an announced window (RF-19 done) | Claude; the phone in an announced window | Oct 21–23 |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Done Oct 16 |
-| 4 — freeze | ASR-08, RF-09 | Build 24 unused; exact-SHA CI green; `focusLock.freeze` recorded; the v3.0.0 tag | Maintainer pushes the tag | Oct 23 |
+| 4 — freeze | ASR-08, RF-09 | Build 24 unused; exact-SHA CI green; `focusLock.freeze` recorded; the v3.0.0 tag | Maintainer pushes the tag | Frozen Oct 20; tag pending |
 | 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | Release workflow dispatch with `archive_ios`, verifier, internal TestFlight | Maintainer dispatches and approves | Oct 26–27 |
 | 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | Oct 29 |
 | 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | Oct 30 |

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-18
+reviewed: 2026-10-20
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,34 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 20 — BG-01, RF-18 and CONV-21 close; full text up front adopted (resume here)
+### October 20, night — the iPhone 3.0.0 candidate is frozen at `029427c9` (resume here)
+
+`main` is pushed through `029427c9`, the freeze commit, and its push CI is green (run 39531352634); the freeze record follows it.
+
+- **RF-22 (maintainer request): the export unlock sheet matches the app.** It opens like onboarding's
+  welcome: the warm mode backdrop, a hero of a Design and a Clone waveform card with a gold export
+  badge (the maintainer rejected a first pastel tile), benefit rows, the shared glass CTA, Restore,
+  and a quiet footer. Strings, identifiers and purchase behavior are unchanged; the Swift review
+  found no blocker and its tap-area and VoiceOver points landed (`9d6c60b1`). The iPhone purchase lane
+  passed on clean `9d6c60b1` (`ios-xcui-purchase-20261021-014956-fcc2d6ac`), and the maintainer
+  approved the sheet.
+- **RF-09's freeze checks pass on `029427c9`:** regen clean; the full contract gate with 2,589 Python
+  tests; macOS 1,522 core and 199 runtime tests and 1,522 under TSan; the Mac app (3.0.0/24), CLI,
+  generic iOS and UI-test builds; lints. The website check rests on CI run 39385512938 over the
+  identical `website/` tree (the local browser smoke lacks Playwright 1.64.1's Chromium). Build 24
+  is unused in App Store Connect (read-only). The first attempt caught the control audit's drifted
+  count (`029427c9`); a second failed on three signal-timing tests that pass alone (BKL-26). BKL-24
+  and BKL-25 park the audit scanner and check-routing gaps.
+- **The freeze:** `focusLock.freeze` records `029427c9`, `maxInFlight` is 2, DW-03 is parked until the
+  submission, and every later commit names an item of this plan.
+- **Next:**
+  - The maintainer pushes the annotated `v3.0.0` tag on `029427c9`; then ASR-10's signed archive
+    and the TestFlight path (RF-12, RF-15), each on the maintainer's go.
+  - RF-23: Sparkle updates for the Mac app (maintainer choices: Sparkle, after the freeze, ask on
+    the second launch). The EdDSA key, its GitHub secret and the appcast publication are the
+    maintainer's steps.
+
+### October 20 — BG-01, RF-18 and CONV-21 close; full text up front adopted
 
 `main` is pushed through `8c0cadf9`, and push CI is green on it (run 39516326220, ThreadSanitizer
 included). PR #110's zsh completion landed earlier in the day; #110 and #87 are closed.
@@ -191,44 +218,3 @@ included). PR #110's zsh completion landed earlier in the day; #110 and #87 are 
   `check` regenerates the project, and the first native build is cold, so it is never a measurement.
 - **RF-18 E4:** the resume script finds no CLI with the screen's digest. It rebuilds
   `cli-optimized` at HEAD and records the new digest in its driver log; note that in the E4 result.
-
-### October 17, early morning — the freeze waits for an iPhone window; backlog work without the iPhone
-
-On local `main`, not pushed (pushes wait for the maintainer's request).
-
-- **Maintainer decisions (2026-10-16, in `focusLock`):** the iPhone proofs of BG-01, CONV-21 and RF-18
-  stay before the freeze, so the October 23 freeze needs an iPhone window the maintainer announces;
-  the backlog items that need no iPhone may be fixed now, each closed in the change that fixes it.
-- **Closed:** BKL-17 (the QC v2 lanes run under the selected Python and fail before generating
-  without numpy; RF-15's language bench needed it), BKL-13 (Mac Saved Voices Delete waits for a
-  take, a Studio Clone take still priming, a line batch or a long-form project, and releases the
-  retained project that reads a deleted voice) and BKL-15 (Saved Voices' empty and error states stay
-  inside the window; new `ui_test.sh macos smoke --scenario saved-voices-states`).
-- **In part:** BKL-09 (new takes are named `<stamp>_Vocello.wav`, History uses SQLite secure delete,
-  the app ships no developer README; the iPhone share of older takes, SEC-3, SEC-7 and
-  `get-task-allow` remain) and BKL-12 (the DMG's intermediate image is sized from its payload; it
-  closes after the rehearsal passes on three consecutive pushes). New parked line: BKL-18.
-- **ER-13:** the v0.1.5 upstream review point, a banner on the historical iPhone memory figures and
-  the artifact provenance in `model-delivery.md`. Pass 2 follows the RF-18 follow-up screen.
-- **RF-18 follow-up screen** (pre-registered in the engine audit, A2), paused at the E2/E4 boundary
-  with six of seven arms done (failed long-form projects of 56): C0 9, C1 2, C2 15, C4 7, E0 0, E2 0.
-  The control reproduced; C1 (subtalker at the reference 0.9/50/1.0) passes its rule, C2 (budget 200)
-  fails it, and D2 waits on E4. Resume: `ARMS=E4
-  build/private/qc/rf18-followup/tools/rf18_followup_resume.sh` (about 27 minutes; it skips finished
-  projects and reuses the screen's CLI binary when its digest still matches), then `python3
-  build/private/qc/rf18-followup/tools/rf18_followup_analyze.py`. Then adopt per the rules: C1 changes
-  the subtalker defaults for Balanced and Consistent (`UnsafeSpeechGenerationModel`), D2 flips
-  `filtersEOS`; if both pass, a combined Consistent arm must fail at most one project more than C1
-  before the combination ships; record the result in the audit (A2), RF-18, ER-05 and the release notes.
-- **Owed after the screen:** CONV-21's Mac smoke lanes (`scripts/ui_test.sh macos smoke`,
-  `--scenario long-form`, `--scenario long-form-recovery`).
-- **Next iPhone window, in order:**
-  1. `scripts/ios_device.sh preflight`
-  2. `scripts/ui_test.sh ios smoke`: CONV-21's iPhone smoke on the new MLX, and the long-form
-     journey pinned to Expressive (RF-18's iPhone scenario); it also exercises the new take names.
-  3. `scripts/ui_test.sh ios smoke --scenario background-warmup` (BG-01).
-  4. `scripts/ios_device.sh memory --voice-id <benchmark clone voice>` (CONV-21's memory benchmark).
-  5. `scripts/dev.sh triage <smoke run dir> --json` for the first take after the update (the
-     one-time Metal compile, F-05).
-- **Freeze day:** a Security run on the exact freeze commit (the weekly run is on Tuesdays, so a
-  dispatch on request), ASR-08's manual build-24 check, the push, and `focusLock.freeze`.

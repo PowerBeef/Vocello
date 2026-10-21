@@ -138,27 +138,28 @@ if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
         python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$framework_path" \
             || fail "Nested framework $(basename "$framework_path") carries unexpected entitlements"
     done < <(find "$FRAMEWORKS_DIR" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
-    # So must every Mach-O anywhere under Contents/Frameworks: each framework's own binary
-    # and the code nested inside it (Sparkle's Autoupdate, and Updater.app through its main
-    # executable, which codesign reads as the bundle). Each needs the release team, the
-    # hardened runtime and no entitlements. The listing is a file so a find failure stops
+    # So must every other Mach-O anywhere under Contents: each framework's own binary, the
+    # code nested inside it (Sparkle's Autoupdate, and Updater.app through its main
+    # executable, which codesign reads as the bundle) and any helper, plug-in or library
+    # outside Contents/Frameworks. Each needs the release team, the hardened runtime and no
+    # entitlements; only the app's own executable carries the app's allowlisted
+    # entitlements, checked above. The listing is a file so a find failure stops
     # verification instead of skipping code.
-    if [ -d "$FRAMEWORKS_DIR" ]; then
-        TMP_NESTED_CODE="$(mktemp)"
-        find "$FRAMEWORKS_DIR" -type f -print0 > "$TMP_NESTED_CODE" \
-            || fail "Could not list the code under Contents/Frameworks"
-        while IFS= read -r -d '' nested_path; do
-            release_is_macho "$nested_path" || continue
-            nested_label="${nested_path#"$FRAMEWORKS_DIR"/}"
-            NESTED_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$nested_path" || true)"
-            [ "$NESTED_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] \
-                || fail "Nested code $nested_label signature Team ID mismatch: expected $APP_TEAM_ID, got ${NESTED_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
-            codesign_has_runtime_metadata "$nested_path" \
-                || fail "Nested code $nested_label is missing the hardened runtime"
-            python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$nested_path" \
-                || fail "Nested code $nested_label carries unexpected entitlements"
-        done < "$TMP_NESTED_CODE"
-    fi
+    TMP_NESTED_CODE="$(mktemp)"
+    find "$APP_PATH/Contents" -type f -print0 > "$TMP_NESTED_CODE" \
+        || fail "Could not list the code under Contents"
+    while IFS= read -r -d '' nested_path; do
+        [ "$nested_path" != "$APP_BINARY" ] || continue
+        release_is_macho "$nested_path" || continue
+        nested_label="${nested_path#"$APP_PATH/Contents"/}"
+        NESTED_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$nested_path" || true)"
+        [ "$NESTED_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] \
+            || fail "Nested code $nested_label signature Team ID mismatch: expected $APP_TEAM_ID, got ${NESTED_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
+        codesign_has_runtime_metadata "$nested_path" \
+            || fail "Nested code $nested_label is missing the hardened runtime"
+        python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$nested_path" \
+            || fail "Nested code $nested_label carries unexpected entitlements"
+    done < "$TMP_NESTED_CODE"
     echo "[2/4] Signed release checks OK"
 else
     echo "[2/4] Signature checks skipped (set QWENVOICE_EXPECT_SIGNED_RELEASE=1 for release verification)"

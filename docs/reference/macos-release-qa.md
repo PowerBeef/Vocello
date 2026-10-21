@@ -178,10 +178,11 @@ prerelease offers nothing.
   `SUEnableInstallerLauncherService` or `SUEnableDownloaderService`. Any other Mach-O nested in a
   framework is signed the same way, never left ad hoc.
 - **Verifying the bundle.** `verify_release_bundle.sh` fails when `Sparkle.framework` still holds
-  `XPCServices`, and in signed mode checks every Mach-O under `Contents/Frameworks` (each
-  framework's binary, `Autoupdate`, `Updater.app` through its executable) for the release Team ID,
-  the hardened runtime and an empty entitlement set (`entitlement_contract.py verify-bundle
-  --role macos-framework`).
+  `XPCServices`, and in signed mode checks every Mach-O under `Contents` except the app's own
+  executable (each framework's binary, `Autoupdate`, `Updater.app` through its executable, and any
+  helper, plug-in or library elsewhere in the bundle) for the release Team ID, the hardened runtime
+  and an empty entitlement set (`entitlement_contract.py verify-bundle --role macos-framework`);
+  the app's executable is held to the app allowlist (`--role macos-app`).
 - **The feed.** After the DMG is notarized, stapled and verified, `release.yml` installs
   `sign_update` from the SHA-pinned `Sparkle-2.10.0.tar.xz` (`config/toolchain.json`
   `artifactPins.sparkle`; it moves with the Sparkle package pin) and runs

@@ -62,7 +62,8 @@ downloaded artifact cannot become installed until its catalog identity, path, si
 8. `config/macos-entitlement-policy.json` is the exact per-role allowlist. The app receives the
    five documented app capabilities (the two MLX runtime exceptions among them, since the engine
    runs in the app); nested frameworks and the code inside them (Sparkle's `Autoupdate` and
-   `Updater.app`; its XPC services are removed because the app is not sandboxed) receive none.
+   `Updater.app`; its XPC services are removed because the app is not sandboxed), like any other
+   Mach-O in the bundle besides the app's executable, receive none.
    `scripts/entitlement_contract.py` checks source routing and
    rejects owned arbitrary-code loading APIs on every deterministic change, while packaged release
    verification compares the actual signed entitlements against the same allowlist.

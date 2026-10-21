@@ -4,7 +4,9 @@
 over fabricated framework trees whose code files carry a Mach-O header, with a recording
 `run_codesign` in place of the release identity, so the tests see what is signed, in which
 order, and what is removed. scripts/verify_release_bundle.sh runs from a sandbox
-(scripts/tests/shell_stubs.py) whose `codesign` answers from a table of fabricated signatures.
+(scripts/tests/shell_stubs.py) whose `codesign` answers from a table of fabricated signatures;
+in signed mode it holds every Mach-O under Contents except the app's own executable to the
+release team, the hardened runtime and no entitlements.
 """
 
 from __future__ import annotations
@@ -259,22 +261,70 @@ class VerifyReleaseBundleNestedCodeTests(unittest.TestCase):
         del self.signatures[self.sparkle / "Versions/B/Autoupdate"]
         completed = self.verify()
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("Nested code Sparkle.framework/Versions/B/Autoupdate signature Team ID mismatch", completed.stderr)
+        self.assertIn("Nested code Frameworks/Sparkle.framework/Versions/B/Autoupdate signature Team ID mismatch",
+                      completed.stderr)
         self.assertIn("got not set", completed.stderr)
 
     def test_nested_code_without_the_hardened_runtime_fails(self) -> None:
         self.signatures[self.sparkle / "Versions/B/Updater.app/Contents/MacOS/Updater"] = (TEAM, False)
         completed = self.verify()
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater is missing the hardened runtime",
-                      completed.stderr)
+        self.assertIn("Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater is missing the hardened "
+                      "runtime", completed.stderr)
 
     def test_entitled_nested_code_fails(self) -> None:
         (self.sandbox.path / "entitled").write_text(f"{self.sparkle / 'Versions/B/Autoupdate'}\n", encoding="utf-8")
         completed = self.verify()
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("Nested code Sparkle.framework/Versions/B/Autoupdate carries unexpected entitlements",
+        self.assertIn("Nested code Frameworks/Sparkle.framework/Versions/B/Autoupdate carries unexpected entitlements",
                       completed.stderr)
+
+    def framework_role_checks(self) -> list[Path]:
+        return [Path(arguments[-1]) for arguments in self.sandbox.calls_to(
+            "scripts/entitlement_contract.py", "verify-bundle", "--role", "macos-framework")]
+
+    def test_mach_o_outside_frameworks_is_held_to_the_same_rules(self) -> None:
+        contents = self.app / "Contents"
+        helper = contents / "MacOS/vocello-helper"
+        plugin = contents / "PlugIns/Importer.bundle/Contents/MacOS/Importer"
+        library = contents / "Resources/libextra.dylib"
+        for path in (helper, plugin, library):
+            macho(path)
+            self.signatures[path] = (TEAM, True)
+        completed = self.verify()
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        checked = self.framework_role_checks()
+        self.assertLessEqual({helper, plugin, library}, set(checked))
+        # The app's own executable keeps the app role and its allowlisted entitlements.
+        self.assertNotIn(contents / "MacOS/Vocello", checked)
+        self.assertEqual(len(self.sandbox.calls_to(
+            "scripts/entitlement_contract.py", "verify-bundle", "--role", "macos-app")), 1)
+
+    def test_ad_hoc_code_outside_frameworks_fails(self) -> None:
+        macho(self.app / "Contents/Resources/tool")
+        completed = self.verify()
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("Nested code Resources/tool signature Team ID mismatch", completed.stderr)
+        self.assertIn("got not set", completed.stderr)
+
+    def test_code_outside_frameworks_without_the_hardened_runtime_or_with_entitlements_fails(self) -> None:
+        helper = self.app / "Contents/MacOS/vocello-helper"
+        macho(helper)
+        self.signatures[helper] = (TEAM, False)
+        completed = self.verify()
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("Nested code MacOS/vocello-helper is missing the hardened runtime", completed.stderr)
+        self.signatures[helper] = (TEAM, True)
+        (self.sandbox.path / "entitled").write_text(f"{helper}\n", encoding="utf-8")
+        completed = self.verify()
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("Nested code MacOS/vocello-helper carries unexpected entitlements", completed.stderr)
+
+    def test_unsigned_mode_does_not_check_signatures(self) -> None:
+        macho(self.app / "Contents/Resources/tool")
+        completed = self.verify(signed=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(self.framework_role_checks(), [])
 
     def test_sparkle_xpc_services_fail_even_unsigned(self) -> None:
         macho(self.sparkle / "Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader")

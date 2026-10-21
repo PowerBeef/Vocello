@@ -1,27 +1,105 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import os
+from contextlib import redirect_stdout
 from pathlib import Path
 import plistlib
+import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 import wave
 from unittest import mock
+import xml.etree.ElementTree as ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import cli_package as package
 import release_evidence
+
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def plist_dump(info: dict) -> str:
     data = plistlib.dumps(info)
     data += b"\0" * (-len(data) % 4)
     return "\n".join(f"{index:016x}\t{int.from_bytes(data[index:index+4], 'little'):08x}" for index in range(0, len(data), 4))
+
+
+# What pkgbuild writes for this package (recorded with Xcode 27.1's pkgbuild, InstallCmds-883).
+PACKAGE_INFO = """<?xml version="1.0" encoding="utf-8"?>
+<pkg-info overwrite-permissions="true" relocatable="false" identifier="com.qwenvoice.cli" postinstall-action="none" version="{version}" format-version="2" generator-version="InstallCmds-883 (26A434)" install-location="{location}" auth="root">
+    <payload numberOfFiles="20" installKBytes="1"/>
+{bundles}
+    <bundle-version/>
+    <upgrade-bundle>
+{identifiers}
+    </upgrade-bundle>
+    <update-bundle/>
+    <atomic-update-bundle/>
+    <strict-identifier>
+{identifiers}
+    </strict-identifier>
+    <relocate{relocate}
+    <scripts>
+        <preinstall file="./preinstall" timeout="600"/>
+{postinstall}
+    </scripts>
+</pkg-info>
+"""
+
+# The Distribution productbuild writes into the product from distribution_xml().
+PRODUCT_DISTRIBUTION = """<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Vocello CLI</title>
+    <readme file="README.txt"/>
+    <license file="LICENSE.txt"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="26.0"/>
+        </allowed-os-versions>
+    </volume-check>
+    <choices-outline>
+        <line choice="com.qwenvoice.cli"/>
+    </choices-outline>
+    <choice id="com.qwenvoice.cli" visible="false" title="Vocello CLI">
+        <pkg-ref id="com.qwenvoice.cli"/>
+    </choice>
+    <pkg-ref id="com.qwenvoice.cli" version="3.0.0" onConclusion="none" installKBytes="3" updateKBytes="0">#vocello-cli.pkg</pkg-ref>
+    <pkg-ref id="com.qwenvoice.cli">
+        <bundle-version>
+            <bundle id="fixture.GRDB_GRDB.resources" path="GRDB_GRDB.bundle"/>
+        </bundle-version>
+    </pkg-ref>
+</installer-gui-script>
+"""
+
+SAMPLE_LOAD_COMMANDS = """vocello:
+Load command 10
+      cmd LC_UUID
+  cmdsize 24
+    uuid 1AD9BA78-7CAE-34DD-8444-2D2F930F9271
+Load command 11
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform 1
+    minos 26.0
+      sdk 27.0
+   ntools 1
+     tool 3
+  version 27037.1
+Load command 12
+      cmd LC_SOURCE_VERSION
+  cmdsize 16
+  version 0.0
+"""
 
 
 class CLIPackageTests(unittest.TestCase):
@@ -68,6 +146,14 @@ class CLIPackageTests(unittest.TestCase):
             directory = self.products / bundle / "Contents/Resources"
             directory.mkdir(parents=True)
             (directory / "default.metallib").write_bytes(b"resource")
+            # Like Xcode's SwiftPM resource bundles; pkgbuild accepts only real bundles.
+            (directory.parent / "Info.plist").write_bytes(plistlib.dumps(
+                {"CFBundleIdentifier": f"fixture.{bundle.removesuffix('.bundle')}.resources",
+                 "CFBundlePackageType": "BNDL"}))
+        # The package carries the repository's own completion and uninstaller.
+        for relative in (package.COMPLETION_SOURCE, package.UNINSTALLER_SOURCE):
+            (self.source / relative).parent.mkdir(parents=True, exist_ok=True)
+            (self.source / relative).write_bytes((REPOSITORY / relative).read_bytes())
         package.stage(self.products, self.output, self.source)
         package.seal(self.output, self.release)
 
@@ -507,6 +593,463 @@ class CLIPackageTests(unittest.TestCase):
         current = next(item for item in variants if item["argv"][-1] == "--include-cli")
         self.assertEqual(current["outputs"], ["build/dist/macos/cli-package-verification.json"])
         self.assertIn("macos-artifact-verification-v1", {item["id"] for item in variants})
+
+    def test_stage_adds_completion_and_uninstaller_as_plain_data(self):
+        manifest = package.verify(self.output, self.release)
+        rows = {row["name"]: row for row in manifest["files"]}
+        for name, source in ((package.COMPLETION, package.COMPLETION_SOURCE),
+                             (package.UNINSTALLER, package.UNINSTALLER_SOURCE)):
+            with self.subTest(name=name):
+                self.assertEqual((self.output / name).read_bytes(), (REPOSITORY / source).read_bytes())
+                self.assertEqual(stat.S_IMODE((self.output / name).stat().st_mode), 0o644)
+                self.assertFalse(rows[name]["executable"])
+        self.assertEqual([name for name, row in rows.items() if row["executable"]], ["vocello"])
+        readme = (self.output / "README.txt").read_text()
+        for route in ("sudo sh /usr/local/lib/vocello/uninstall.sh", "/usr/local/bin/vocello mcp",
+                      '"/your/chosen/Vocello CLI/vocello" --version'):
+            self.assertIn(route, readme)
+        # The uninstaller runs through `sh`; an executable copy would be a second entry point.
+        (self.output / package.UNINSTALLER).chmod(0o755)
+        with self.assertRaisesRegex(ValueError, "executable"):
+            package.seal(self.output, self.release)
+        (self.output / package.UNINSTALLER).chmod(0o644)
+        (self.output / package.COMPLETION).unlink()
+        with self.assertRaisesRegex(ValueError, "missing required files"):
+            package.seal(self.output, self.release)
+
+    def test_smoke_runs_the_cli_through_a_launcher_link(self):
+        links = self.root / "bin with spaces"
+        links.mkdir()
+        launcher = links / "vocello"
+        launcher.symlink_to(os.path.relpath(self.output / "vocello", links))
+        seen = []
+
+        def record(argv, cwd, environment, expected=0):
+            seen.append(list(argv))
+            return self.fake_command(argv, cwd, environment, expected)
+
+        with mock.patch.object(package, "command", side_effect=record):
+            package.smoke(self.output, self.release, launcher=launcher)
+        executable = str((self.output / "vocello").resolve())
+        inspected = [argv for argv in seen if argv[0] in ("/usr/bin/lipo", "/usr/bin/otool")]
+        self.assertEqual(len(inspected), 3)
+        self.assertTrue(all(argv[-1] == executable for argv in inspected))
+        self.assertEqual({argv[0] for argv in seen if argv not in inspected}, {str(launcher)})
+
+        copy_launcher = links / "copied vocello"
+        shutil.copyfile(self.output / "vocello", copy_launcher)
+        elsewhere = links / "other"
+        elsewhere.symlink_to(self.output / "README.txt")
+        for bad in (Path("bin with spaces/vocello"), copy_launcher, elsewhere):
+            with self.subTest(launcher=bad.name), mock.patch.object(package, "command", side_effect=record):
+                with self.assertRaisesRegex(ValueError, "launcher"):
+                    package.smoke(self.output, self.release, launcher=bad)
+
+    def test_qualification_runs_the_cli_through_a_launcher_link(self):
+        model_store = self.root / "model store"
+        model_store.mkdir()
+        reference = self.root / "reference.wav"
+        reference.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture audio" * 8)
+        launcher = self.root / "vocello link"
+        launcher.symlink_to(self.output / "vocello")
+        launched = []
+
+        def generate(argv, _cwd, _environment, _timeout):
+            launched.append(argv[0])
+            if argv[1] == "batch":
+                return self.batch_result(argv)
+            output = Path(argv[argv.index("--out") + 1])
+            output.write_bytes(b"RIFF" + b"\0" * 4 + b"WAVE" + b"generated audio" * 8)
+            mode = argv[argv.index("--mode") + 1]
+            return {"audioPath": str(output), "audioQC": {"verdict": "pass"}, "durationSeconds": 1.0,
+                    "finalModelLanguage": argv[argv.index("--language") + 1], "finishReason": "eos",
+                    "mode": mode, "modelID": f"pro_{mode}_speed", "variant": "speed"}
+
+        def cancel(argv, _cwd, _environment, _timeout):
+            launched.append(argv[0])
+            return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
+
+        def failure(argv, *_args, **_kwargs):
+            launched.append(argv[0])
+            return ""
+
+        with mock.patch.object(package, "command", side_effect=failure):
+            package.qualify(self.output, self.release, model_store, reference, generation_runner=generate,
+                            cancellation_runner=cancel, launcher=launcher)
+        self.assertEqual(len(launched), 7)
+        self.assertEqual(set(launched), {str(launcher)})
+
+
+class CLIInstallerPackageTests(unittest.TestCase):
+    """`pkg` and `pkg-verify` over the same sealed fixture folder."""
+
+    # Set by the shared setUp.
+    root: Path
+    output: Path
+    release: dict
+    setUp = CLIPackageTests.setUp
+    tearDown = CLIPackageTests.tearDown
+    fake_command = CLIPackageTests.fake_command
+
+    def identifiers(self) -> dict[str, str]:
+        return {bundle: f"fixture.{bundle.removesuffix('.bundle')}.resources" for bundle in package.BUNDLES}
+
+    def package_info(self, *, version="3.0.0", location=package.INSTALL_LOCATION, relocate="/>",
+                     postinstall='        <postinstall file="./postinstall" timeout="600"/>') -> str:
+        identifiers = self.identifiers()
+        return PACKAGE_INFO.format(
+            version=version, location=location, relocate=relocate, postinstall=postinstall,
+            bundles="\n".join(f'    <bundle id="{name}" path="./{bundle}"/>' for bundle, name in identifiers.items()),
+            identifiers="\n".join(f'        <bundle id="{name}"/>' for name in identifiers.values()))
+
+    def expand_fixture(self, name: str, *, distribution: bytes | None = None,
+                       package_info: str | None = None) -> tuple[Path, Path]:
+        """A tree shaped like `pkgutil --expand-full` of the product, built without pkgbuild."""
+        expanded = self.root / name
+        component = expanded / package.COMPONENT
+        component.mkdir(parents=True)
+        payload = component / "Payload"
+        package._copy_payload(self.output, payload)
+        (expanded / "Distribution").write_bytes(distribution or PRODUCT_DISTRIBUTION.encode())
+        (expanded / "Resources").mkdir()
+        shutil.copyfile(payload / "README.txt", expanded / "Resources/README.txt")
+        shutil.copyfile(payload / "LICENSE", expanded / "Resources/LICENSE.txt")
+        (component / "Scripts").mkdir()
+        for script, source in package.PKG_SCRIPT_SOURCES.items():
+            shutil.copyfile(REPOSITORY / source, component / "Scripts" / script)
+            (component / "Scripts" / script).chmod(0o755)
+        (component / "PackageInfo").write_text(package_info or self.package_info(), encoding="utf-8")
+        (component / "Bom").write_bytes(b"BOMStore fixture")
+        artifact = expanded.parent / f"{name}-Vocello-macos26-cli.pkg"
+        artifact.write_bytes(b"xar! fixture product")
+        return expanded, artifact
+
+    @staticmethod
+    def bom_rows(payload: Path) -> list[list]:
+        rows: list[list] = [[".", 0, 0, 0o40755]]
+        for path in sorted(payload.rglob("*")):
+            relative = "./" + path.relative_to(payload).as_posix()
+            rows.append([relative, 0, 0, 0o40755 if path.is_dir() else 0o100755 if relative == "./vocello" else 0o100644])
+        return rows
+
+    def tools(self, payload: Path, *, rows=None, signature="no signature", calls=None):
+        """Stand-ins for lsbom, pkgutil --check-signature and stapler."""
+        def run(argv, cwd, environment, expected=0, timeout=60):
+            if calls is not None:
+                calls.append(list(argv))
+            if argv[0] == "/usr/bin/lsbom":
+                self.assertEqual(argv[1:3], ["-p", "fugm"])
+                return "".join(f"{path}\t{uid}\t{gid}\t{mode:o}\n"
+                               for path, uid, gid, mode in (rows or self.bom_rows(payload)))
+            if argv[:2] == ["/usr/sbin/pkgutil", "--check-signature"]:
+                signed = signature != "no signature"
+                if expected != (0 if signed else 1):
+                    raise ValueError("CLI package subprocess returned an unexpected exit status")
+                chain = "   Certificate Chain:\n    1. Developer ID Installer: Fixture (FIXTURE123)\n" if signed else ""
+                return f'Package "fixture.pkg":\n   Status: {signature}\n{chain}'
+            if argv[:3] == ["/usr/bin/xcrun", "stapler", "validate"]:
+                return "The validate action worked!\n"
+            raise AssertionError(f"unexpected tool {argv[0]}")
+        return run
+
+    def verify_fixture(self, expanded: Path, artifact: Path, *, manifest=None, rows=None,
+                       signature="unsigned", notarization="not-performed", status="no signature", calls=None):
+        report = expanded.parent / f"{expanded.name}-verification.json"
+        tools = self.tools(expanded / package.COMPONENT / "Payload", rows=rows, signature=status, calls=calls)
+        with mock.patch.object(package, "binary_minimum_os", return_value="26.0"), \
+             mock.patch.object(package, "command", side_effect=tools):
+            return package.pkg_verify(
+                expanded, artifact, self.release, manifest or package.digest(self.output / package.MANIFEST),
+                signature=signature, notarization=notarization, report=report)
+
+    def test_component_plist_keeps_every_bundle_in_place(self):
+        rows = plistlib.loads(package.component_plist(self.output))
+        self.assertEqual(sorted(row["RootRelativeBundlePath"] for row in rows), sorted(package.BUNDLES))
+        for row in rows:
+            self.assertEqual({key: value for key, value in row.items() if key != "RootRelativeBundlePath"},
+                             {"BundleIsRelocatable": False, "BundleIsVersionChecked": False,
+                              "BundleHasStrictIdentifier": True, "BundleOverwriteAction": "upgrade"})
+        shutil.rmtree(self.output / package.BUNDLES[0])
+        with self.assertRaisesRegex(ValueError, "bundle"):
+            package.component_plist(self.output)
+
+    def test_distribution_renders_and_parses_before_and_after_productbuild(self):
+        rendered = package.distribution_xml("3.0.0", "26.0")
+        self.assertEqual(package.check_distribution(rendered, "3.0.0"), "26.0")
+        self.assertEqual(package.check_distribution(PRODUCT_DISTRIBUTION.encode(), "3.0.0"), "26.0")
+        script = ElementTree.fromstring(rendered)
+        self.assertEqual([node.get("hostArchitectures") for node in script.iter("options")], ["arm64"])
+        self.assertEqual([node.attrib for node in script.iter("os-version")], [{"min": "26.0"}])
+        self.assertEqual([node.attrib["id"] for node in script.iter("pkg-ref")], [package.PKG_IDENTIFIER] * 2)
+        self.assertEqual([node.text for node in script.findall("pkg-ref")], [package.COMPONENT])
+        product = PRODUCT_DISTRIBUTION
+        faults = {
+            "x86_64": (product.replace('hostArchitectures="arm64"', 'hostArchitectures="arm64,x86_64"'), "arm64"),
+            "home-domain": (product.replace('enable_currentUserHome="false"', 'enable_currentUserHome="true"'),
+                            "startup disk"),
+            "any-volume": (product.replace('enable_anywhere="false"', 'enable_anywhere="true"'), "startup disk"),
+            "script-element": (product.replace("</installer-gui-script>", "<script>x()</script></installer-gui-script>"),
+                               "script-free"),
+            "installation-check": (product.replace("<title>", '<installation-check script="x()"/><title>'),
+                                   "script-free"),
+            "choice-expression": (product.replace('visible="false"', 'visible="false" selected="x()"'),
+                                  "hidden, fixed choice"),
+            "visible-choice": (product.replace('visible="false"', 'visible="true"'), "hidden, fixed choice"),
+            "customizable": (product.replace('customize="never"', 'customize="allow"'), "hidden, fixed choice"),
+            "second-package": (product.replace('<pkg-ref id="com.qwenvoice.cli">\n        <bundle-version>',
+                                               '<pkg-ref id="com.example.other">\n        <bundle-version>'),
+                               "one package"),
+            "wrong-version": (product.replace('version="3.0.0"', 'version="2.9.0"'), "release version"),
+            "no-minimum": (product.replace('<os-version min="26.0"/>', ""), "minimum macOS"),
+            "upper-bound": (product.replace('min="26.0"', 'min="26.0" before="27.0"'), "minimum macOS"),
+            "entity": ('<!DOCTYPE x [<!ENTITY a "b">]>' + product.split("?>", 1)[1], "entities"),
+        }
+        for fault, (text, message) in faults.items():
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, message):
+                package.check_distribution(text.encode(), "3.0.0")
+
+    def test_minimum_os_comes_from_the_one_build_version_command(self):
+        self.assertEqual(package.parse_minimum_os(SAMPLE_LOAD_COMMANDS), "26.0")
+        fat = SAMPLE_LOAD_COMMANDS + SAMPLE_LOAD_COMMANDS.split("Load command 11", 1)[1]
+        for text in (fat, SAMPLE_LOAD_COMMANDS.replace(" platform 1", " platform 2"),
+                     SAMPLE_LOAD_COMMANDS.replace("LC_BUILD_VERSION", "LC_VERSION_MIN_MACOSX")):
+            with self.assertRaisesRegex(ValueError, "minimum version"):
+                package.parse_minimum_os(text)
+
+    def test_pkg_builds_the_sealed_folder_with_root_modes_and_scripts(self):
+        output = self.root / "dist" / "Vocello-macos26-cli.pkg"
+        work = self.root / "pkg work"
+        calls = []
+
+        def tools(argv, cwd, environment, expected=0, timeout=60):
+            calls.append(list(argv))
+            self.assertEqual(environment["PATH"], "/usr/bin:/bin:/usr/sbin:/sbin")
+            Path(argv[-1]).write_bytes(b"xar! " + Path(argv[0]).name.encode())
+            return ""
+
+        (self.output / "README.txt").chmod(0o600)  # a restrictive umask at stage time
+        package.seal(self.output, self.release)
+        with mock.patch.object(package, "binary_minimum_os", return_value="26.0"), \
+             mock.patch.object(package, "command", side_effect=tools):
+            result = package.pkg(self.output, self.release, output, work=work)
+        self.assertEqual(output.read_bytes(), b"xar! productbuild")
+        self.assertEqual(result["artifact"]["sha256"], package.digest(output))
+        pkgbuild, productbuild = calls
+        self.assertEqual(pkgbuild[:5], ["/usr/bin/pkgbuild", "--root", str(work.resolve() / "root"),
+                                        "--install-location", "/usr/local/lib/vocello"])
+        for flag, value in (("--identifier", "com.qwenvoice.cli"), ("--version", "3.0.0"),
+                            ("--ownership", "recommended"), ("--scripts", str(work.resolve() / "scripts"))):
+            self.assertEqual(pkgbuild[pkgbuild.index(flag) + 1], value)
+        self.assertEqual(pkgbuild[-1], str(work.resolve() / package.COMPONENT))
+        self.assertEqual(productbuild[productbuild.index("--package-path") + 1], str(work.resolve()))
+        self.assertEqual(Path(productbuild[-1]).name, output.name)
+
+        staged = work / "root"
+        package.verify(staged, self.release)
+        for path in [staged, *staged.rglob("*")]:
+            mode = stat.S_IMODE(path.stat().st_mode)
+            self.assertEqual(mode, 0o755 if path.is_dir() or path.name == "vocello" else 0o644, path.name)
+        self.assertEqual(plistlib.loads((work / "component.plist").read_bytes()),
+                         plistlib.loads(package.component_plist(staged)))
+        self.assertEqual(sorted(path.name for path in (work / "scripts").iterdir()), ["postinstall", "preinstall"])
+        for name, source in package.PKG_SCRIPT_SOURCES.items():
+            self.assertEqual((work / "scripts" / name).read_bytes(), (REPOSITORY / source).read_bytes())
+            self.assertEqual(stat.S_IMODE((work / "scripts" / name).stat().st_mode), 0o755)
+        self.assertEqual(package.check_distribution((work / "Distribution.xml").read_bytes(), "3.0.0"), "26.0")
+        self.assertEqual((work / "resources/LICENSE.txt").read_bytes(), (self.output / "LICENSE").read_bytes())
+        self.assertFalse(list(output.parent.glob(".cli-pkg-*")))
+
+        with mock.patch.object(package, "binary_minimum_os", return_value="26.0"), \
+             mock.patch.object(package, "command", side_effect=tools):
+            with self.assertRaisesRegex(ValueError, "overwrite"):
+                package.pkg(self.output, self.release, output)
+            with self.assertRaisesRegex(ValueError, "work folder"):
+                package.pkg(self.output, self.release, self.root / "other.pkg", work=work)
+        with mock.patch.object(package, "binary_minimum_os", return_value="27.0"), \
+             mock.patch.object(package, "command", side_effect=tools):
+            with self.assertRaisesRegex(ValueError, "minimum macOS"):
+                package.pkg(self.output, self.release, self.root / "other.pkg")
+        self.assertFalse((self.root / "other.pkg").exists())
+
+    def test_pkg_verify_accepts_the_expanded_product_and_reports_it(self):
+        expanded, artifact = self.expand_fixture("expanded")
+        report = self.verify_fixture(expanded, artifact)
+        self.assertEqual(set(report), {"schemaVersion", "status", "release", "manifestSHA256", "fileCount",
+                                       "package", "signature", "notarization", "installTest", "checks",
+                                       "generationQualification", "artifact"})
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["release"], self.release)
+        self.assertEqual(report["checks"], list(package.PKG_CHECKS))
+        self.assertEqual(report["installTest"], "not-performed")
+        self.assertEqual(report["generationQualification"], "not-performed")
+        self.assertEqual(report["package"]["relocatableBundles"], 0)
+        self.assertEqual(report["package"]["hostArchitectures"], ["arm64"])
+        self.assertEqual(report["package"]["installLocation"], "/usr/local/lib/vocello")
+        self.assertEqual(report["package"]["scriptDigests"],
+                         {name: package.digest(REPOSITORY / source)
+                          for name, source in package.PKG_SCRIPT_SOURCES.items()})
+        self.assertEqual(report["artifact"], {"name": artifact.name, "bytes": artifact.stat().st_size,
+                                              "sha256": package.digest(artifact)})
+        saved = (expanded.parent / "expanded-verification.json").read_text()
+        self.assertEqual(json.loads(saved), report)
+        self.assertNotIn(str(self.root), saved)
+        with self.assertRaisesRegex(ValueError, "overwrite"):
+            self.verify_fixture(expanded, artifact)
+
+    def test_pkg_verify_confirms_the_signature_it_records(self):
+        signed = "signed by a developer certificate issued by Apple for distribution"
+        expanded, artifact = self.expand_fixture("signed")
+        # A stapled product may expand with a plain file beside its own entries.
+        (expanded / "ticket").write_bytes(b"fixture ticket")
+        calls: list = []
+        report = self.verify_fixture(expanded, artifact, signature="developer-id-installer",
+                                     notarization="stapled", status=signed, calls=calls)
+        self.assertEqual((report["signature"], report["notarization"]), ("developer-id-installer", "stapled"))
+        self.assertIn(["/usr/bin/xcrun", "stapler", "validate", str(artifact)], calls)
+        self.assertNotIn("FIXTURE123", json.dumps(report))
+        cases = {
+            "claims-unsigned": dict(status=signed),
+            "claims-signed": dict(signature="developer-id-installer"),
+            "stapled-unsigned": dict(notarization="stapled"),
+            "unknown-claim": dict(signature="ad-hoc"),
+            "unstapled-extra-entry": dict(signature="developer-id-installer", status=signed),
+        }
+        for case, arguments in cases.items():
+            expanded, artifact = self.expand_fixture(case)
+            if case == "unstapled-extra-entry":
+                (expanded / "ticket").write_bytes(b"fixture ticket")
+            with self.subTest(case=case), self.assertRaises(ValueError):
+                self.verify_fixture(expanded, artifact, **arguments)
+            self.assertFalse((expanded.parent / f"{case}-verification.json").exists())
+        expanded, artifact = self.expand_fixture("stapled-extra-folder")
+        (expanded / "other.pkg").mkdir()
+        with self.assertRaisesRegex(ValueError, "layout"):
+            self.verify_fixture(expanded, artifact, signature="developer-id-installer",
+                                notarization="stapled", status=signed)
+
+    def test_pkg_verify_rejects_package_faults(self):
+        relocating = '>\n        <bundle id="fixture.GRDB_GRDB.resources"/>\n    </relocate>'
+
+        def edit(path: str, old: str, new: str):
+            def change(expanded: Path):
+                target = expanded / path
+                target.write_text(target.read_text().replace(old, new))
+            return change
+
+        def payload(change):
+            def mutate(expanded: Path):
+                folder = expanded / package.COMPONENT / "Payload"
+                change(folder)
+            return mutate
+
+        def bom(mutate):
+            def change(rows):
+                mutate(rows)
+                return rows
+            return change
+
+        component = package.COMPONENT
+        faults = {
+            "relocate": (dict(package_info=self.package_info(relocate=relocating)), None, None, "relocates bundles"),
+            "relocatable": (dict(package_info=self.package_info().replace('relocatable="false"', 'relocatable="true"')),
+                            None, None, "relocates bundles"),
+            "install-location": (dict(package_info=self.package_info(location="/Applications/vocello")),
+                                 None, None, "identity mismatch"),
+            "package-version": (dict(package_info=self.package_info(version="2.9.0")), None, None, "identity mismatch"),
+            "no-postinstall": (dict(package_info=self.package_info(postinstall="")), None, None,
+                               "preinstall and postinstall"),
+            "x86_64": (dict(distribution=PRODUCT_DISTRIBUTION.replace('"arm64"', '"arm64,x86_64"').encode()),
+                       None, None, "arm64"),
+            "home-domain": (dict(distribution=PRODUCT_DISTRIBUTION.replace(
+                'enable_currentUserHome="false"', 'enable_currentUserHome="true"').encode()), None, None, "startup disk"),
+            "older-minimum": (dict(distribution=PRODUCT_DISTRIBUTION.replace('min="26.0"', 'min="15.0"').encode()),
+                              None, None, "minimum macOS differs"),
+            "extra-file": ({}, payload(lambda folder: (folder / "extra.txt").write_text("extra")), None, "payload"),
+            "script-drift": ({}, edit(f"{component}/Scripts/preinstall", "set -eu", "set -u"), None,
+                             "scripts differ"),
+            "extra-script": ({}, lambda expanded: (expanded / component / "Scripts/postflight").write_text("x"),
+                             None, "layout"),
+            "readme-drift": ({}, edit("Resources/README.txt", "Vocello", "Other"), None, "readme or license"),
+            "bom-extra": ({}, None, bom(lambda rows: rows.append(["./extra", 0, 0, 0o100644])), "differs from the payload"),
+            "bom-missing": ({}, None, bom(lambda rows: rows.pop()), "differs from the payload"),
+            "bom-setuid": ({}, None, bom(lambda rows: [row.__setitem__(3, 0o104755) for row in rows
+                                                      if row[0] == "./vocello"]), "setuid"),
+            "bom-non-root": ({}, None, bom(lambda rows: rows[1].__setitem__(1, 501)), "root:wheel"),
+            "bom-writable": ({}, None, bom(lambda rows: rows[1].__setitem__(3, 0o40775)), "modes"),
+            "bom-executable-resource": ({}, None, bom(lambda rows: [row.__setitem__(3, 0o100755) for row in rows
+                                                                   if row[0] == "./README.txt"]), "modes"),
+        }
+        for fault, (layout, mutate, change_rows, message) in faults.items():
+            expanded, artifact = self.expand_fixture(fault, **layout)
+            if mutate:
+                mutate(expanded)
+            rows = change_rows(self.bom_rows(expanded / component / "Payload")) if change_rows else None
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, message):
+                self.verify_fixture(expanded, artifact, rows=rows)
+
+        expanded, artifact = self.expand_fixture("manifest")
+        with self.assertRaisesRegex(ValueError, "manifest differs"):
+            self.verify_fixture(expanded, artifact, manifest="0" * 64)
+        # A payload resealed around a different uninstaller still differs from the source.
+        expanded, artifact = self.expand_fixture("helper-drift")
+        folder = expanded / component / "Payload"
+        (folder / package.UNINSTALLER).write_text("#!/bin/sh\nrm -rf /usr/local\n")
+        package.seal(folder, self.release)
+        with self.assertRaisesRegex(ValueError, "helpers differ"):
+            self.verify_fixture(expanded, artifact, manifest=package.digest(folder / package.MANIFEST))
+
+    def test_command_line_routes_pkg_verify_without_a_directory(self):
+        arguments = ["cli_package.py", "pkg-verify", "--version", "3.0.0", "--build", "24", "--commit", "a" * 40]
+        with mock.patch.object(sys, "argv", arguments), redirect_stdout(io.StringIO()) as printed:
+            self.assertEqual(package.main(), 1)
+        self.assertIn("pkg-verify: FAIL", printed.getvalue())
+        with mock.patch.object(sys, "argv", ["cli_package.py", "pkg", "--version", "3.0.0"]), \
+             redirect_stdout(io.StringIO()), mock.patch("sys.stderr", io.StringIO()):
+            with self.assertRaises(SystemExit) as exit_status:
+                package.main()
+        self.assertEqual(exit_status.exception.code, 2)
+
+    @unittest.skipUnless(sys.platform == "darwin" and all(
+        Path(tool).exists() for tool in ("/usr/bin/pkgbuild", "/usr/bin/productbuild", "/usr/sbin/pkgutil",
+                                         "/usr/bin/lsbom", "/usr/bin/ditto")), "needs the macOS packaging tools")
+    def test_real_package_round_trip_installs_upgrades_and_refuses_without_root(self):
+        output = self.root / "dist" / "Vocello-macos26-cli.pkg"
+        with mock.patch.object(package, "binary_minimum_os", return_value="26.0"):
+            package.pkg(self.output, self.release, output)
+        expanded = self.root / "expanded product"
+        subprocess.run(["/usr/sbin/pkgutil", "--expand-full", str(output), str(expanded)],
+                       check=True, capture_output=True)
+        info = ElementTree.fromstring((expanded / package.COMPONENT / "PackageInfo").read_bytes())
+        self.assertFalse([bundle for node in info.iter("relocate") for bundle in node])
+        self.assertEqual({bundle.attrib["id"] for node in info.iter("strict-identifier") for bundle in node},
+                         set(self.identifiers().values()))
+
+        real_command = package.command
+        cli_runs = []
+
+        def tools(argv, cwd, environment, expected=0, timeout=60):
+            # Only the fixture executable is faked; Installer's scripts, ditto and lsbom run for real.
+            if argv[0].endswith("/vocello") or argv[0] == "/usr/bin/lipo" or argv[:2] in (
+                    ["/usr/bin/otool", "-L"], ["/usr/bin/otool", "-X"]):
+                cli_runs.append(list(argv))
+                return self.fake_command(argv, cwd, environment, expected)
+            return real_command(argv, cwd, environment, expected, timeout)
+
+        report_path = self.root / "cli-pkg-verification.json"
+        with mock.patch.object(package, "binary_minimum_os", return_value="26.0"), \
+             mock.patch.object(package, "command", side_effect=tools):
+            report = package.pkg_verify(
+                expanded, output, self.release, package.digest(self.output / package.MANIFEST),
+                signature="unsigned", notarization="not-performed", report=report_path, root_free_install=True)
+        self.assertEqual(report["checks"], [*package.PKG_CHECKS, *package.PKG_INSTALL_CHECKS])
+        self.assertEqual(report["installTest"], "not-performed")
+        launched = {argv[0] for argv in cli_runs if argv[0].endswith("/vocello")}
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(launched.pop().endswith("/root with spaces/usr/local/bin/vocello"))
+        inspected = [argv[-1] for argv in cli_runs if not argv[0].endswith("/vocello")]
+        self.assertTrue(inspected)
+        self.assertTrue(all(path.endswith("/root with spaces/usr/local/lib/vocello/vocello") for path in inspected))
+        self.assertNotIn(str(self.root), report_path.read_text())
 
 
 if __name__ == "__main__":

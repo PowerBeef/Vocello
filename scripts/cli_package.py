@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Stage/seal and smoke-check the CLI payload used by the existing macOS release lane.
 
+The same sealed folder ships twice: as the DMG folder and, through `pkg`, as an
+installer package that puts it at /usr/local/lib/vocello; `pkg-verify` checks an
+expanded package against the sealed manifest. Signing the package is release.sh's job.
 Model generation runs only through the opt-in qualify command. No model installation,
 publication, or shell-profile modification. The manifest is an integrity inventory,
 not independent signing or quality-promotion authority.
@@ -24,16 +27,47 @@ import subprocess
 import tempfile
 import time
 import wave
-from typing import Callable
+from typing import Callable, Iterator
+import xml.etree.ElementTree as ElementTree
 from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLES = ("mlx-swift_Cmlx.bundle", "swift-transformers_Hub.bundle",
            "swift-crypto_Crypto.bundle", "GRDB_GRDB.bundle")
 CATALOGS = ("qwenvoice_contract.json", "qwenvoice_production_model_catalog.json")
+COMPLETION = "_vocello"
+UNINSTALLER = "uninstall.sh"
 FILES = ("vocello", *CATALOGS, "third_party_attributions.json", "LICENSE",
-         "THIRD-PARTY-NOTICES.txt", "README.txt")
+         "THIRD-PARTY-NOTICES.txt", "README.txt", COMPLETION, UNINSTALLER)
 MANIFEST = "package-manifest.json"
+# Repository sources of the files the package carries beside the built products.
+COMPLETION_SOURCE = "scripts/completions/_vocello"
+PKG_SCRIPT_SOURCES = {"preinstall": "scripts/cli_pkg/preinstall.sh",
+                      "postinstall": "scripts/cli_pkg/postinstall.sh"}
+UNINSTALLER_SOURCE = "scripts/cli_pkg/uninstall.sh"
+PKG_IDENTIFIER = "com.qwenvoice.cli"
+INSTALL_LOCATION = "/usr/local/lib/vocello"
+COMPONENT = "vocello-cli.pkg"
+PKG_TITLE = "Vocello CLI"
+# The shared /usr/local directories stay out of the payload; postinstall links into them.
+PKG_LINKS = {"usr/local/bin/vocello": "../lib/vocello/vocello",
+             "usr/local/share/zsh/site-functions/_vocello": "../../../lib/vocello/_vocello"}
+PKG_SIGNATURES = ("developer-id-installer", "unsigned")
+PKG_NOTARIZATIONS = ("stapled", "not-performed")
+# What `pkg-verify` proves, in report order; the install checks join only with --root-free-install.
+PKG_CHECKS = (
+    "distribution-script-free", "distribution-arm64-only", "distribution-minimum-os",
+    "distribution-boot-volume-only", "distribution-single-hidden-package", "installer-resources",
+    "package-identity", "non-relocatable-bundles", "package-scripts-match-source",
+    "payload-content-integrity", "payload-manifest-digest", "payload-helpers-match-source",
+    "bom-matches-payload", "bom-root-ownership", "bom-modes", "bom-no-setid",
+    "signature-state", "notarization-state",
+)
+PKG_INSTALL_CHECKS = (
+    "root-free-install", "relative-links", "smoke-through-link", "upgrade-removes-stale-payload",
+    "refuses-symlinked-install-folder", "refuses-foreign-install-folder",
+)
+PKG_TOOL_TIMEOUT = 600
 MACHO = {bytes.fromhex(value) for value in ("cffaedfe", "cefaedfe", "feedface",
                                           "feedfacf", "cafebabe", "bebafeca", "cafebabf")}
 
@@ -105,6 +139,41 @@ def notices(document: dict) -> str:
     return "\n\n".join(parts) + "\n"
 
 
+README = (
+    'Vocello CLI for Apple Silicon / macOS 26+\n\n'
+    'The same files ship two ways.\n\n'
+    'Installer package (Vocello-macos26-cli.pkg)\n'
+    '  Open the package and follow Installer; it asks for an administrator password. It puts\n'
+    '  this folder at /usr/local/lib/vocello, links /usr/local/bin/vocello to it and adds\n'
+    '  zsh completion in /usr/local/share/zsh/site-functions. Your shell profile is not changed.\n'
+    '  From a new Terminal window:\n'
+    '    vocello --version\n'
+    '    vocello generate --help\n'
+    '  Agents and other tools that do not read your PATH use the absolute path, for example:\n'
+    '    /usr/local/bin/vocello mcp\n'
+    '  To upgrade, install a newer package; it replaces the previous files.\n'
+    '  To remove it:\n'
+    '    sudo sh /usr/local/lib/vocello/uninstall.sh\n\n'
+    'Folder copy (Vocello-macos26-cli.dmg)\n'
+    '  Copy this entire "Vocello CLI" folder to a location you control. Keep vocello and\n'
+    '  all adjacent resources together. No installer, administrator access, or shell change is needed.\n'
+    '  From Terminal, use the quoted absolute path to the executable, for example:\n'
+    '    "/your/chosen/Vocello CLI/vocello" --version\n'
+    '    "/your/chosen/Vocello CLI/vocello" modes --json\n'
+    '    "/your/chosen/Vocello CLI/vocello" generate --help\n'
+    '  To remove it, delete the folder. Its uninstall.sh is only for the installer package.\n\n'
+    'No models, Python, or repository checkout are included or required. Install a model\n'
+    'explicitly through Vocello or `vocello models install <id>` before generation.\n'
+    'The default data store (~/Library/Application Support/QwenVoice) is shared with the\n'
+    'desktop app; removing the CLI either way never removes it. Use --data-dir <folder>\n'
+    'to select a separate store. Downloads require network; inference is local.\n'
+    'Ctrl-C cancels a command. Exit status: 0 success, 1 error, 2 usage, 75 the engine\n'
+    'stopped a take under memory pressure (retry later), 130 interrupted.\n'
+    'See LICENSE, THIRD-PARTY-NOTICES.txt and third_party_attributions.json for notices.\n'
+    'The signed package or DMG and the release SHA256SUMS bind this folder; package-manifest.json\n'
+    'is a content inventory, not independent release or audio-quality approval.\n')
+
+
 def stage(products: Path, output: Path, root: Path = ROOT) -> None:
     if output.exists() or output.is_symlink():
         raise ValueError("refusing to overwrite an existing CLI payload")
@@ -128,23 +197,12 @@ def stage(products: Path, output: Path, root: Path = ROOT) -> None:
         attribution = root / "Sources/Resources/third_party_attributions.json"
         shutil.copy2(attribution, target / attribution.name)
         (target / "THIRD-PARTY-NOTICES.txt").write_text(notices(json.loads(attribution.read_text())), encoding="utf-8")
-        (target / "README.txt").write_text(
-            'Vocello CLI for Apple Silicon / macOS 26+\n\n'
-            'Copy this entire "Vocello CLI" folder to a location you control. Keep vocello and\n'
-            'all adjacent resources together. No installer, administrator access, or shell change is needed.\n'
-            'From Terminal, use the quoted absolute path to the executable, for example:\n'
-            '  "/your/chosen/Vocello CLI/vocello" --version\n'
-            '  "/your/chosen/Vocello CLI/vocello" modes --json\n'
-            '  "/your/chosen/Vocello CLI/vocello" generate --help\n\n'
-            'No models, Python, or repository checkout are included or required. Install a model\n'
-            'explicitly through Vocello or `vocello models install <id>` before generation.\n'
-            'The default data store is shared with the desktop app. Use --data-dir <folder>\n'
-            'to select a separate store. Downloads require network; inference is local.\n'
-            'Ctrl-C cancels a command. Exit status: 0 success, 1 error, 2 usage, 75 the engine\n'
-            'stopped a take under memory pressure (retry later), 130 interrupted.\n'
-            'See LICENSE, THIRD-PARTY-NOTICES.txt and third_party_attributions.json for notices.\n'
-            'The signed DMG and release SHA256SUMS bind this package; package-manifest.json\n'
-            'is a content inventory, not independent release or audio-quality approval.\n', encoding="utf-8")
+        # Plain data in both routes: zsh reads the completion, `sudo sh` runs the uninstaller,
+        # so `vocello` stays the payload's only executable.
+        for name, source in ((COMPLETION, COMPLETION_SOURCE), (UNINSTALLER, UNINSTALLER_SOURCE)):
+            shutil.copyfile(root / source, target / name)
+            (target / name).chmod(0o644)
+        (target / "README.txt").write_text(README, encoding="utf-8")
         inventory(target)
         os.replace(target, output)
 
@@ -172,9 +230,9 @@ def verify(directory: Path, expected: dict | None = None) -> dict:
     return payload
 
 
-def command(argv: list[str], cwd: Path, environment: dict, expected: int = 0) -> str:
+def command(argv: list[str], cwd: Path, environment: dict, expected: int = 0, timeout: int = 60) -> str:
     result = subprocess.run(argv, cwd=cwd, env=environment, stdin=subprocess.DEVNULL,
-                            capture_output=True, text=True, timeout=60, check=False)
+                            capture_output=True, text=True, timeout=timeout, check=False)
     if result.returncode != expected:
         # Raw output may contain operator paths; do not include it in a report/error.
         raise ValueError("CLI package subprocess returned an unexpected exit status")
@@ -189,21 +247,33 @@ def embedded_info(hex_dump: str) -> dict:
     return plistlib.loads(b"".join(int(word, 16).to_bytes(4, "little") for word in words).rstrip(b"\0"))
 
 
-def smoke(directory: Path, expected: dict) -> dict:
+def _launcher(directory: Path, launcher: Path | None) -> str:
+    """The path commands run through: the payload's executable, or an installed link to it."""
+    executable = (directory / "vocello").resolve()
+    if launcher is None:
+        return str(executable)
+    if not launcher.is_absolute() or not launcher.is_symlink() or launcher.resolve() != executable:
+        raise ValueError("CLI launcher must be an absolute link to the payload executable")
+    return str(launcher)
+
+
+def smoke(directory: Path, expected: dict, *, launcher: Path | None = None) -> dict:
     payload = verify(directory, expected)
-    binary = str((directory / "vocello").resolve())
+    # lipo and otool read the real file; every command runs through the launcher.
+    executable = str((directory / "vocello").resolve())
+    binary = _launcher(directory, launcher)
     with tempfile.TemporaryDirectory(prefix="vocello-cli-smoke-") as temporary:
         work = Path(temporary) / "unrelated working folder"
         work.mkdir()
         # Drop caller overrides, DYLD injection and checkout-derived resource paths.
         environment = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", **{key: os.environ[key] for key in ("HOME",) if key in os.environ},
                        "TMPDIR": temporary, "LANG": "en_US.UTF-8"}
-        if command(["/usr/bin/lipo", "-archs", binary], work, environment).strip() != "arm64":
+        if command(["/usr/bin/lipo", "-archs", executable], work, environment).strip() != "arm64":
             raise ValueError("CLI package must contain only arm64")
-        linked = command(["/usr/bin/otool", "-L", binary], work, environment).splitlines()[1:]
+        linked = command(["/usr/bin/otool", "-L", executable], work, environment).splitlines()[1:]
         if not linked or any(not line.strip().startswith(("/System/Library/", "/usr/lib/")) for line in linked):
             raise ValueError("CLI has an unbundled/non-system dynamic dependency")
-        info = embedded_info(command(["/usr/bin/otool", "-X", "-s", "__TEXT", "__info_plist", binary], work, environment))
+        info = embedded_info(command(["/usr/bin/otool", "-X", "-s", "__TEXT", "__info_plist", executable], work, environment))
         if info.get("CFBundleShortVersionString") != expected["marketingVersion"] or info.get("CFBundleVersion") != expected["buildNumber"]:
             raise ValueError("CLI embedded build/version mismatch")
         for alias in (["--version"], ["version"], ["-v"]):
@@ -416,11 +486,13 @@ def qualify(
     report: Path | None = None,
     generation_runner: Callable[[list[str], Path, dict[str, str], int], dict] = _run_qualification_generation,
     cancellation_runner: Callable[[list[str], Path, dict[str, str], int], dict] = _run_qualification_cancellation,
+    launcher: Path | None = None,
 ) -> dict:
     """Run opt-in serial real-generation checks against a copied CLI payload.
 
     This is operator QA for an already-produced package. It is deliberately not
     called by deterministic packaging, CI, signing, notarization, or publication.
+    `launcher` runs every command through an installed link (/usr/local/bin/vocello).
     """
 
     payload = verify(directory, expected)
@@ -441,7 +513,7 @@ def qualify(
             raise ValueError("CLI qualification transcript is empty")
         clone_arguments += ["--transcript", transcript]
 
-    binary = str((directory / "vocello").resolve())
+    binary = _launcher(directory, launcher)
     fixed_runs = (
         {
             "mode": "custom", "language": "english", "seed": "30000001",
@@ -594,10 +666,456 @@ def qualify(
     return result
 
 
+# Installer package ---------------------------------------------------------------------
+
+# Every element a Distribution may hold, as written here or as productbuild rewrites it.
+DISTRIBUTION_ELEMENTS = frozenset({
+    "installer-gui-script", "title", "readme", "license", "options", "domains", "volume-check",
+    "allowed-os-versions", "os-version", "choices-outline", "line", "choice", "pkg-ref",
+    "bundle-version", "bundle",
+})
+MACOS_VERSION = re.compile(r"\d+\.\d+(?:\.\d+)?")
+
+
+def parse_minimum_os(load_commands: str) -> str:
+    """The macOS minimum in `otool -l` output: exactly one LC_BUILD_VERSION, for macOS."""
+    found: list[dict[str, str]] = []
+    lines = load_commands.splitlines()
+    for index, line in enumerate(lines):
+        if line.split() != ["cmd", "LC_BUILD_VERSION"]:
+            continue
+        fields: dict[str, str] = {}
+        for row in lines[index + 1:]:
+            parts = row.split()
+            if not parts or parts[0] in {"Load", "cmd"}:
+                break
+            if len(parts) == 2:
+                fields.setdefault(parts[0], parts[1])
+        found.append(fields)
+    if (len(found) != 1 or found[0].get("platform") not in {"1", "MACOS", "macos"}
+            or not MACOS_VERSION.fullmatch(found[0].get("minos", ""))):
+        raise ValueError("CLI executable lacks exactly one macOS minimum version")
+    return found[0]["minos"]
+
+
+def binary_minimum_os(binary: Path) -> str:
+    with tempfile.TemporaryDirectory(prefix="vocello-cli-minos-") as temporary:
+        return parse_minimum_os(command(["/usr/bin/otool", "-l", str(binary)], Path(temporary),
+                                        _qualification_environment(temporary)))
+
+
+def _bundles(payload: Path) -> list[str]:
+    return sorted(path.relative_to(payload).as_posix() for path in payload.rglob("*.bundle")
+                  if path.is_dir() and not path.is_symlink())
+
+
+def _bundle_identifiers(payload: Path) -> dict[str, str]:
+    identifiers = {}
+    for name in _bundles(payload):
+        info = payload / name / "Contents/Info.plist"
+        if info.is_symlink() or not info.is_file() or info.stat().st_size > 1024**2:
+            raise ValueError("CLI resource bundle lacks a bounded Info.plist")
+        identifier = plistlib.loads(info.read_bytes()).get("CFBundleIdentifier")
+        if not isinstance(identifier, str) or not identifier:
+            raise ValueError("CLI resource bundle lacks an identifier")
+        identifiers[name] = identifier
+    return identifiers
+
+
+def component_plist(payload: Path) -> bytes:
+    """pkgbuild's component list: every bundle stays where it is and replaces only itself.
+
+    The Mac app ships bundles with the same identifiers; a relocatable bundle would let
+    Installer find one of those and "upgrade" it in place instead of installing here.
+    """
+    bundles = _bundles(payload)
+    if not set(BUNDLES) <= set(bundles):
+        raise ValueError("CLI resource bundle is missing")
+    return plistlib.dumps([{"RootRelativeBundlePath": name, "BundleIsRelocatable": False,
+                            "BundleIsVersionChecked": False, "BundleHasStrictIdentifier": True,
+                            "BundleOverwriteAction": "upgrade"} for name in bundles], sort_keys=True)
+
+
+def distribution_xml(version: str, minimum_os: str) -> bytes:
+    """The product's Distribution: no JavaScript, arm64 only, the startup disk, one hidden package."""
+    script = ElementTree.Element("installer-gui-script", {"minSpecVersion": "2"})
+    ElementTree.SubElement(script, "title").text = PKG_TITLE
+    ElementTree.SubElement(script, "readme", {"file": "README.txt"})
+    ElementTree.SubElement(script, "license", {"file": "LICENSE.txt"})
+    ElementTree.SubElement(script, "options", {"customize": "never", "require-scripts": "false",
+                                               "hostArchitectures": "arm64"})
+    ElementTree.SubElement(script, "domains", {"enable_anywhere": "false", "enable_currentUserHome": "false",
+                                               "enable_localSystem": "true"})
+    versions = ElementTree.SubElement(ElementTree.SubElement(script, "volume-check"), "allowed-os-versions")
+    ElementTree.SubElement(versions, "os-version", {"min": minimum_os})
+    ElementTree.SubElement(ElementTree.SubElement(script, "choices-outline"), "line", {"choice": PKG_IDENTIFIER})
+    choice = ElementTree.SubElement(script, "choice", {"id": PKG_IDENTIFIER, "visible": "false", "title": PKG_TITLE})
+    ElementTree.SubElement(choice, "pkg-ref", {"id": PKG_IDENTIFIER})
+    reference = ElementTree.SubElement(script, "pkg-ref", {"id": PKG_IDENTIFIER, "version": version,
+                                                          "onConclusion": "none"})
+    reference.text = COMPONENT
+    ElementTree.indent(script)
+    return ElementTree.tostring(script, encoding="utf-8", xml_declaration=True) + b"\n"
+
+
+def _xml(data: bytes, tag: str) -> ElementTree.Element:
+    if len(data) > 1024**2 or b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+        raise ValueError("CLI installer XML is oversized or declares entities")
+    try:
+        element = ElementTree.fromstring(data)
+    except ElementTree.ParseError as error:
+        raise ValueError("CLI installer XML is malformed") from error
+    if element.tag != tag:
+        raise ValueError("CLI installer XML has an unexpected root element")
+    return element
+
+
+def check_distribution(data: bytes, version: str) -> str:
+    """Check a Distribution as written or as productbuild rewrote it; return its minimum macOS."""
+    script = _xml(data, "installer-gui-script")
+    nodes = list(script.iter())
+    if any(node.tag == "script" or "script" in node.attrib or node.tag not in DISTRIBUTION_ELEMENTS
+           for node in nodes):
+        raise ValueError("CLI installer Distribution must be script-free")
+    options = script.findall("options")
+    if len(options) != 1 or options[0].get("hostArchitectures") != "arm64":
+        raise ValueError("CLI installer Distribution must allow only arm64 hosts")
+    domains = script.findall("domains")
+    if len(domains) != 1 or domains[0].attrib != {"enable_anywhere": "false", "enable_currentUserHome": "false",
+                                                  "enable_localSystem": "true"}:
+        raise ValueError("CLI installer Distribution must install only on the startup disk")
+    checks = script.findall("volume-check")
+    allowed = list(checks[0]) if len(checks) == 1 else []
+    versions = list(allowed[0]) if len(allowed) == 1 and allowed[0].tag == "allowed-os-versions" else []
+    if (len(versions) != 1 or versions[0].tag != "os-version" or set(versions[0].attrib) != {"min"}
+            or not MACOS_VERSION.fullmatch(versions[0].get("min", ""))):
+        raise ValueError("CLI installer Distribution lacks exactly one minimum macOS")
+    outline = script.findall("choices-outline")
+    lines = list(outline[0]) if len(outline) == 1 else []
+    choices = script.findall("choice")
+    if (options[0].attrib != {"customize": "never", "require-scripts": "false", "hostArchitectures": "arm64"}
+            or len(lines) != 1 or len(choices) != 1 or lines[0].tag != "line" or list(lines[0])
+            or lines[0].attrib != {"choice": choices[0].get("id")} or choices[0].get("visible") != "false"
+            or not set(choices[0].attrib) <= {"id", "visible", "title", "description"}
+            or [(child.tag, child.attrib) for child in choices[0]] != [("pkg-ref", {"id": PKG_IDENTIFIER})]):
+        raise ValueError("CLI installer Distribution must offer exactly one hidden, fixed choice")
+    references = script.findall("pkg-ref")
+    carriers = [node for node in references if (node.text or "").strip()]
+    if (any(node.get("id") != PKG_IDENTIFIER for node in script.iter("pkg-ref")) or len(carriers) != 1
+            or (carriers[0].text or "").strip() not in {COMPONENT, "#" + COMPONENT}
+            or carriers[0].get("version") != version or carriers[0].get("onConclusion") != "none"
+            or any(node is not carriers[0] and ("version" in node.attrib
+                                                or any(child.tag != "bundle-version" for child in node))
+                   for node in references)):
+        raise ValueError("CLI installer Distribution must reference one package at the release version")
+    titles = script.findall("title")
+    if (len(titles) != 1 or titles[0].text != PKG_TITLE
+            or [node.attrib for node in script.findall("readme")] != [{"file": "README.txt"}]
+            or [node.attrib for node in script.findall("license")] != [{"file": "LICENSE.txt"}]):
+        raise ValueError("CLI installer Distribution lacks its title, readme or license")
+    return versions[0].attrib["min"]
+
+
+def check_package_info(data: bytes, version: str, bundles: dict[str, str]) -> None:
+    """The component's identity, its non-relocatable bundles and its two scripts."""
+    info = _xml(data, "pkg-info")
+    if (info.get("identifier") != PKG_IDENTIFIER or info.get("version") != version
+            or info.get("install-location") != INSTALL_LOCATION or info.get("auth") != "root"):
+        raise ValueError("CLI installer package identity mismatch")
+    # pkgbuild always writes <relocate/>; a bundle inside it is what Installer would relocate.
+    if info.get("relocatable", "false") != "false" or any(len(node) for node in info.iter("relocate")):
+        raise ValueError("CLI installer package relocates bundles")
+    declared = {node.get("path"): node.get("id") for node in info.findall("bundle")}
+    if len(info.findall("bundle")) != len(bundles) or declared != {"./" + path: name for path, name in bundles.items()}:
+        raise ValueError("CLI installer package bundles differ from the payload")
+    identifiers = set(bundles.values())
+    for tag in ("strict-identifier", "upgrade-bundle"):
+        nodes = info.findall(tag)
+        if (len(nodes) != 1 or any(child.tag != "bundle" for child in nodes[0])
+                or {child.get("id") for child in nodes[0]} != identifiers):
+            raise ValueError("CLI installer package bundle policy mismatch")
+    if any(len(node) for tag in ("bundle-version", "update-bundle", "atomic-update-bundle")
+           for node in info.findall(tag)):
+        raise ValueError("CLI installer package bundle policy mismatch")
+    scripts = info.findall("scripts")
+    if len(scripts) != 1 or sorted((child.tag, child.get("file")) for child in scripts[0]) != [
+            ("postinstall", "./postinstall"), ("preinstall", "./preinstall")]:
+        raise ValueError("CLI installer package must run exactly its preinstall and postinstall")
+
+
+def bom_entries(bom: Path, cwd: Path, environment: dict[str, str]) -> dict[str, tuple[int, int, int]]:
+    """`lsbom -p fugm`: path, owner, group and mode of everything the package installs."""
+    entries: dict[str, tuple[int, int, int]] = {}
+    for line in command(["/usr/bin/lsbom", "-p", "fugm", str(bom)], cwd, environment).splitlines():
+        fields = line.split("\t")
+        if (len(fields) != 4 or not fields[0] or fields[0] in entries
+                or not all(re.fullmatch(r"\d{1,10}", value) for value in fields[1:3])
+                or not re.fullmatch(r"[0-7]{1,7}", fields[3])):
+            raise ValueError("CLI installer Bom listing is malformed")
+        entries[fields[0]] = (int(fields[1]), int(fields[2]), int(fields[3], 8))
+        if len(entries) > 6000:
+            raise ValueError("CLI installer Bom exceeds bounds")
+    return entries
+
+
+def check_bom(entries: dict[str, tuple[int, int, int]], payload: Path) -> None:
+    expected = {".": True, **{"./" + path.relative_to(payload).as_posix(): path.is_dir()
+                             for path in payload.rglob("*")}}
+    if set(entries) != set(expected):
+        raise ValueError("CLI installer Bom differs from the payload")
+    if any(uid != 0 or gid != 0 for uid, gid, _ in entries.values()):
+        raise ValueError("CLI installer Bom must install everything as root:wheel")
+    if any(mode & 0o7000 for _, _, mode in entries.values()):
+        raise ValueError("CLI installer Bom must not set setuid, setgid or sticky bits")
+    for path, (_, _, mode) in entries.items():
+        wanted = 0o40755 if expected[path] else 0o100755 if path == "./vocello" else 0o100644
+        if mode != wanted:
+            raise ValueError("CLI installer Bom modes must be 0755 folders, 0644 files and one 0755 vocello")
+
+
+def check_signature(artifact: Path, signature: str, notarization: str, cwd: Path,
+                    environment: dict[str, str]) -> None:
+    """Confirm the claimed signature and stapled ticket; never record the signing team."""
+    if signature == "unsigned":
+        listing = command(["/usr/sbin/pkgutil", "--check-signature", str(artifact)], cwd, environment, expected=1)
+        if "Status: no signature" not in [line.strip() for line in listing.splitlines()]:
+            raise ValueError("CLI installer package claimed unsigned but carries a signature")
+    else:
+        listing = command(["/usr/sbin/pkgutil", "--check-signature", str(artifact)], cwd, environment)
+        lines = [line.strip() for line in listing.splitlines()]
+        if ("Status: signed by a developer certificate issued by Apple for distribution" not in lines
+                or not any(line.startswith("1. Developer ID Installer: ") for line in lines)):
+            raise ValueError("CLI installer package lacks a Developer ID Installer signature")
+    if notarization == "stapled":
+        command(["/usr/bin/xcrun", "stapler", "validate", str(artifact)], cwd, environment)
+
+
+def _copy_payload(source: Path, target: Path) -> None:
+    """Copy a sealed folder with install modes: folders 0755, files 0644, vocello 0755."""
+    target.mkdir()
+    target.chmod(0o755)
+    for path in sorted(source.rglob("*")):
+        relative = path.relative_to(source)
+        destination = target / relative
+        info = path.lstat()
+        if stat.S_ISDIR(info.st_mode):
+            destination.mkdir()
+            destination.chmod(0o755)
+        elif stat.S_ISREG(info.st_mode):
+            shutil.copyfile(path, destination)
+            destination.chmod(0o755 if relative.as_posix() == "vocello" else 0o644)
+        else:
+            raise ValueError("CLI payload contains a link or special file")
+
+
+@contextmanager
+def _pkg_workspace(work: Path | None, output: Path) -> Iterator[Path]:
+    if work is not None:
+        work.mkdir(parents=True)
+        work.chmod(0o755)
+        yield work.resolve()
+        return
+    with tempfile.TemporaryDirectory(prefix=".cli-pkg-work-", dir=output.parent) as temporary:
+        yield Path(temporary).resolve()
+
+
+def pkg(directory: Path, release: dict, output: Path, *, work: Path | None = None,
+        minimum_os: str = "26.0", root: Path = ROOT) -> dict:
+    """Build the unsigned product archive that installs the sealed folder at INSTALL_LOCATION.
+
+    The payload is the sealed folder byte for byte; /usr/local/bin and the zsh directory
+    stay out of it (postinstall links into them). release.sh signs the result.
+    """
+    if output.exists() or output.is_symlink():
+        raise ValueError("refusing to overwrite an existing CLI installer package")
+    if output.suffix != ".pkg" or not MACOS_VERSION.fullmatch(minimum_os):
+        raise ValueError("CLI installer package needs a .pkg output and a minimum macOS version")
+    if work is not None and (work.exists() or work.is_symlink()):
+        raise ValueError("refusing to reuse an existing CLI installer work folder")
+    payload = verify(directory, release)
+    if binary_minimum_os(directory / "vocello") != minimum_os:
+        raise ValueError("CLI executable minimum macOS differs from the package's")
+    version = release["marketingVersion"]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with _pkg_workspace(work, output) as base:
+        staged = base / "root"
+        _copy_payload(directory, staged)
+        verify(staged, release)
+        (base / "component.plist").write_bytes(component_plist(staged))
+        scripts = base / "scripts"
+        scripts.mkdir()
+        for name, source in PKG_SCRIPT_SOURCES.items():
+            shutil.copyfile(root / source, scripts / name)
+            (scripts / name).chmod(0o755)
+        resources = base / "resources"
+        resources.mkdir()
+        shutil.copyfile(staged / "README.txt", resources / "README.txt")
+        shutil.copyfile(staged / "LICENSE", resources / "LICENSE.txt")
+        (base / "Distribution.xml").write_bytes(distribution_xml(version, minimum_os))
+        temporary = base / "tmp"
+        temporary.mkdir()
+        environment = _qualification_environment(str(temporary))
+        command(["/usr/bin/pkgbuild", "--root", str(staged), "--install-location", INSTALL_LOCATION,
+                 "--identifier", PKG_IDENTIFIER, "--version", version, "--ownership", "recommended",
+                 "--scripts", str(scripts), "--component-plist", str(base / "component.plist"),
+                 str(base / COMPONENT)], base, environment, timeout=PKG_TOOL_TIMEOUT)
+        with tempfile.TemporaryDirectory(prefix=".cli-pkg-", dir=output.parent) as partial:
+            product = Path(partial) / output.name
+            command(["/usr/bin/productbuild", "--distribution", str(base / "Distribution.xml"),
+                     "--resources", str(resources), "--package-path", str(base), str(product)],
+                    base, environment, timeout=PKG_TOOL_TIMEOUT)
+            if product.is_symlink() or not product.is_file():
+                raise ValueError("productbuild did not write the CLI installer package")
+            os.replace(product, output)
+    return {"schemaVersion": 1, "release": payload["release"], "manifestSHA256": digest(directory / MANIFEST),
+            "package": {"identifier": PKG_IDENTIFIER, "version": version,
+                        "installLocation": INSTALL_LOCATION, "minimumOS": minimum_os},
+            "artifact": {"name": output.name, "bytes": output.stat().st_size, "sha256": digest(output)}}
+
+
+def _read_small(path: Path, limit: int = 1024**2) -> bytes:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > limit:
+        raise ValueError("CLI installer package file is missing, linked or oversized")
+    return path.read_bytes()
+
+
+def _exact_children(directory: Path, files: set[str], folders: set[str] | None = None, *,
+                    extra_files: bool = False) -> None:
+    """`directory` holds exactly these real files and folders (plus plain files, if allowed)."""
+    folders = folders or set()
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("CLI installer package folder is missing or linked")
+    children = {path.name: path for path in directory.iterdir()}
+    if not files | folders <= set(children) or (not extra_files and set(children) != files | folders) or any(
+            path.is_symlink() or not (path.is_dir() if name in folders else path.is_file())
+            for name, path in children.items()):
+        raise ValueError("CLI installer package layout is unexpected")
+
+
+def _root_free_install(payload: Path, scripts: Path, artifact: Path, release: dict) -> None:
+    """Install, upgrade and refuse under a temporary root, the way Installer runs the scripts."""
+    with tempfile.TemporaryDirectory(prefix="vocello-cli-pkg-install-") as temporary:
+        base = Path(temporary).resolve()
+        environment = _qualification_environment(str(base))
+        work = base / "unrelated working folder"
+        work.mkdir()
+        volume = base / "root with spaces"
+        volume.mkdir()
+        lib = volume / INSTALL_LOCATION.lstrip("/")
+
+        def run(name: str, target: Path, expected: int = 0) -> None:
+            # Installer's arguments: package, install location, target volume, startup disk.
+            command([str(scripts / name), str(artifact), str(target / INSTALL_LOCATION.lstrip("/")),
+                     str(target), "/"], work, environment, expected)
+
+        def install() -> None:
+            run("preinstall", volume)
+            lib.parent.mkdir(parents=True, exist_ok=True)
+            command(["/usr/bin/ditto", str(payload), str(lib)], work, environment, timeout=PKG_TOOL_TIMEOUT)
+            run("postinstall", volume)
+
+        def check_installed() -> None:
+            verify(lib, release)
+            for link, target in PKG_LINKS.items():
+                path = volume / link
+                if (not path.is_symlink() or os.readlink(path) != target
+                        or path.resolve() != (lib / Path(target).name).resolve()):
+                    raise ValueError("CLI installer links are not relative links into the installed folder")
+
+        install()
+        check_installed()
+        smoke(lib, release, launcher=volume / "usr/local/bin/vocello")
+        stale = lib / "stale-file-from-an-older-version.txt"
+        stale.write_text("stale\n", encoding="utf-8")
+        install()
+        if stale.exists() or stale.is_symlink():
+            raise ValueError("CLI installer upgrade kept a stale payload file")
+        check_installed()
+
+        decoy = base / "decoy folder with a manifest"
+        decoy.mkdir()
+        (decoy / MANIFEST).write_text("{}\n", encoding="utf-8")
+        linked = base / "volume with a linked folder"
+        (linked / "usr/local/lib").mkdir(parents=True)
+        (linked / INSTALL_LOCATION.lstrip("/")).symlink_to(decoy, target_is_directory=True)
+        run("preinstall", linked, expected=1)
+        if not (decoy / MANIFEST).is_file() or not (linked / INSTALL_LOCATION.lstrip("/")).is_symlink():
+            raise ValueError("CLI installer followed a linked install folder")
+        foreign = base / "volume with a foreign folder"
+        (foreign / INSTALL_LOCATION.lstrip("/")).mkdir(parents=True)
+        kept = foreign / INSTALL_LOCATION.lstrip("/") / "notes.txt"
+        kept.write_text("not the CLI\n", encoding="utf-8")
+        run("preinstall", foreign, expected=1)
+        if not kept.is_file():
+            raise ValueError("CLI installer removed a folder it did not install")
+
+
+def pkg_verify(expanded: Path, artifact: Path, release: dict, manifest_sha256: str, *, signature: str,
+               notarization: str, report: Path, root_free_install: bool = False, root: Path = ROOT) -> dict:
+    """Check a `pkgutil --expand-full` tree of the product archive and write its report."""
+    if report.exists() or report.is_symlink():
+        raise ValueError("refusing to overwrite a CLI installer verification report")
+    if (signature not in PKG_SIGNATURES or notarization not in PKG_NOTARIZATIONS
+            or (notarization == "stapled" and signature != "developer-id-installer")):
+        raise ValueError("CLI installer signature/notarization claim is invalid")
+    if not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256):
+        raise ValueError("invalid CLI manifest digest")
+    if artifact.is_symlink() or not artifact.is_file() or not artifact.name.endswith("-cli.pkg"):
+        raise ValueError("CLI installer artifact must be a real -cli.pkg file")
+    # A stapled ticket may surface as a plain file beside the product's own entries; the
+    # Distribution checked below references nothing but README, LICENSE and the component.
+    _exact_children(expanded, {"Distribution"}, {"Resources", COMPONENT}, extra_files=notarization == "stapled")
+    component = expanded / COMPONENT
+    _exact_children(component, {"Bom", "PackageInfo"}, {"Payload", "Scripts"})
+    _exact_children(expanded / "Resources", {"README.txt", "LICENSE.txt"})
+    _exact_children(component / "Scripts", set(PKG_SCRIPT_SOURCES))
+    version = release["marketingVersion"]
+
+    minimum_os = check_distribution(_read_small(expanded / "Distribution"), version)
+    payload_folder = component / "Payload"
+    payload = verify(payload_folder, release)
+    if digest(payload_folder / MANIFEST) != manifest_sha256:
+        raise ValueError("CLI installer payload manifest differs from the sealed folder's")
+    if binary_minimum_os(payload_folder / "vocello") != minimum_os:
+        raise ValueError("CLI installer minimum macOS differs from the executable's")
+    if (_read_small(expanded / "Resources/README.txt") != (payload_folder / "README.txt").read_bytes()
+            or _read_small(expanded / "Resources/LICENSE.txt") != (payload_folder / "LICENSE").read_bytes()):
+        raise ValueError("CLI installer readme or license differs from the payload")
+    check_package_info(_read_small(component / "PackageInfo"), version, _bundle_identifiers(payload_folder))
+    for name, source in PKG_SCRIPT_SOURCES.items():
+        script = component / "Scripts" / name
+        if _read_small(script) != (root / source).read_bytes() or not os.access(script, os.X_OK):
+            raise ValueError("CLI installer scripts differ from the repository source")
+    for name, source in ((UNINSTALLER, UNINSTALLER_SOURCE), (COMPLETION, COMPLETION_SOURCE)):
+        if (payload_folder / name).read_bytes() != (root / source).read_bytes():
+            raise ValueError("CLI payload helpers differ from the repository source")
+    with tempfile.TemporaryDirectory(prefix="vocello-cli-pkg-verify-") as temporary:
+        environment = _qualification_environment(temporary)
+        check_bom(bom_entries(component / "Bom", Path(temporary), environment), payload_folder)
+        check_signature(artifact, signature, notarization, Path(temporary), environment)
+    checks: list[str] = list(PKG_CHECKS)
+    if root_free_install:
+        _root_free_install(payload_folder, component / "Scripts", artifact, release)
+        checks.extend(PKG_INSTALL_CHECKS)
+    result = {
+        "schemaVersion": 1, "status": "passed", "release": payload["release"],
+        "manifestSHA256": manifest_sha256, "fileCount": len(payload["files"]),
+        "package": {"identifier": PKG_IDENTIFIER, "version": version, "installLocation": INSTALL_LOCATION,
+                    "hostArchitectures": ["arm64"], "minimumOS": minimum_os, "relocatableBundles": 0,
+                    "scriptDigests": {name: digest(component / "Scripts" / name) for name in PKG_SCRIPT_SOURCES}},
+        "signature": signature, "notarization": notarization, "installTest": "not-performed",
+        "checks": checks, "generationQualification": "not-performed",
+        "artifact": {"name": artifact.name, "bytes": artifact.stat().st_size, "sha256": digest(artifact)},
+    }
+    report.parent.mkdir(parents=True, exist_ok=True)
+    atomic_json(report, result)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("stage", "seal", "verify", "smoke", "qualify"))
-    parser.add_argument("--directory", required=True, type=Path)
+    parser.add_argument("command", choices=("stage", "seal", "verify", "smoke", "qualify", "pkg", "pkg-verify"))
+    parser.add_argument("--directory", type=Path, help="the sealed CLI folder (every command but pkg-verify)")
     parser.add_argument("--products", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--build")
@@ -607,7 +1125,20 @@ def main() -> int:
     parser.add_argument("--model-store", type=Path)
     parser.add_argument("--clone-reference", type=Path)
     parser.add_argument("--clone-transcript-file", type=Path)
+    parser.add_argument("--launcher", type=Path,
+                        help="smoke/qualify: run every command through this absolute link to the folder's vocello")
+    parser.add_argument("--output", type=Path, help="pkg: the product archive to write (never overwritten)")
+    parser.add_argument("--work", type=Path, help="pkg: a new folder to build in, kept afterwards")
+    parser.add_argument("--minimum-os", default="26.0", help="pkg: must equal the executable's LC_BUILD_VERSION minos")
+    parser.add_argument("--expanded", type=Path, help="pkg-verify: the `pkgutil --expand-full` tree of --artifact")
+    parser.add_argument("--manifest-sha256", help="pkg-verify: SHA-256 of the sealed folder's package-manifest.json")
+    parser.add_argument("--signature", choices=PKG_SIGNATURES)
+    parser.add_argument("--notarization", choices=PKG_NOTARIZATIONS)
+    parser.add_argument("--root-free-install", action="store_true",
+                        help="pkg-verify: also install, upgrade and smoke under a temporary root")
     args = parser.parse_args()
+    if args.command != "pkg-verify" and args.directory is None:
+        parser.error("the following arguments are required: --directory")
     try:
         if args.command == "stage":
             if args.products is None:
@@ -625,14 +1156,27 @@ def main() -> int:
                     args.model_store, args.clone_reference,
                     clone_transcript=args.clone_transcript_file,
                     report=args.report,
+                    launcher=args.launcher,
                 )
+            elif args.command == "pkg":
+                if args.output is None:
+                    raise ValueError("pkg requires an output")
+                pkg(args.directory, release, args.output, work=args.work, minimum_os=args.minimum_os)
+            elif args.command == "pkg-verify":
+                if not all((args.expanded, args.artifact, args.manifest_sha256, args.signature,
+                            args.notarization, args.report)):
+                    raise ValueError("pkg-verify requires expanded, artifact, manifest digest, claims and report")
+                pkg_verify(args.expanded, args.artifact, release, args.manifest_sha256,
+                           signature=args.signature, notarization=args.notarization, report=args.report,
+                           root_free_install=args.root_free_install)
             else:
-                action = {"seal": seal, "verify": verify, "smoke": smoke}[args.command]
-                result = action(args.directory, release)
-            if args.report and args.command != "qualify":
-                if args.command != "smoke" or not args.artifact or not args.artifact.is_file():
-                    raise ValueError("report requires a smoke check and its DMG artifact")
+                if args.command == "smoke":
+                    result = smoke(args.directory, release, launcher=args.launcher)
                 else:
+                    result = {"seal": seal, "verify": verify}[args.command](args.directory, release)
+                if args.report:
+                    if args.command != "smoke" or not args.artifact or not args.artifact.is_file():
+                        raise ValueError("report requires a smoke check and its DMG artifact")
                     result["artifact"] = {"name": args.artifact.name, "bytes": args.artifact.stat().st_size,
                                           "sha256": digest(args.artifact)}
                     atomic_json(args.report, result)
@@ -641,7 +1185,6 @@ def main() -> int:
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError):
         print("CLI package " + args.command + ": FAIL (invalid payload, identity, resources, or subprocess)")
         return 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

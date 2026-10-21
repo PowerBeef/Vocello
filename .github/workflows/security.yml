@@ -72,6 +72,8 @@ jobs:
         uses: ./.github/actions/native-toolchain
         with:
           metal: "true"
+          # release.yml calls this workflow on the tag: a tag run restores no cache.
+          pip-cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
       - name: Prepare Swift CodeQL build inputs
         if: matrix.language == 'swift'

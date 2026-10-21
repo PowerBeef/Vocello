@@ -275,6 +275,7 @@ jobs:
         with:
           metal: "true"
           release-tools: "true"
+          pip-cache: "false"
 
       - name: Verify release tag and source identity
         run: |
@@ -398,9 +399,10 @@ jobs:
           head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" \
             || { echo "::error::APPLE_NOTARY_PRIVATE_KEY_P8 does not look like a PKCS#8 private key (first line is not 'BEGIN PRIVATE KEY')" >&2; exit 1; }
 
-      # No Actions cache is restored in this job: a prefix-keyed cache written
-      # by another ref must not feed sources into a Developer ID-signed build.
-      # release.sh resolves packages cold from Package.resolved.
+      # No Actions cache is restored in this job (the toolchain step's pip cache
+      # is off, pip-cache "false"): a prefix-keyed cache written by another ref
+      # must not feed sources into a Developer ID-signed build. release.sh
+      # resolves packages cold from Package.resolved.
       - name: Run scripts/release.sh (Developer ID + notarized DMG)
         # QWENVOICE_SIGNING_MODE / NOTARIZE / EXPECT_SIGNED_RELEASE /
         # EXPECT_NOTARIZED_DMG come from job-level env, SIGNING_IDENTITY and
@@ -697,6 +699,7 @@ jobs:
         uses: ./.github/actions/native-toolchain
         with:
           metal: "true"
+          pip-cache: "false"
 
       - name: Compute SwiftPM cache prefix
         id: spm_key
@@ -779,6 +782,7 @@ jobs:
         with:
           metal: "true"
           release-tools: "false"
+          pip-cache: "false"
 
       - name: Bind iOS release source and initialize required steps
         run: |

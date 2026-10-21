@@ -76,6 +76,7 @@ jobs:
         with:
           metal: "true"
           release-tools: "true"
+          pip-cache: "false"
 
       - name: Bind rehearsal source and initialize required steps
         run: |
@@ -187,6 +188,7 @@ jobs:
         with:
           metal: "true"
           release-tools: "false"
+          pip-cache: "false"
 
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh

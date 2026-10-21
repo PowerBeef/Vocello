@@ -3,7 +3,8 @@ description: >-
   Select the pinned Xcode, install the SHA-pinned xcodegen/ripgrep/xcbeautify/shellcheck
   release artifacts and the pinned numpy, pytest and pytest-xdist (optionally the pinned
   release tool gh), put them on PATH and verify every version against
-  config/toolchain.json.
+  config/toolchain.json. Release jobs pass pip-cache "false" so a tag run restores no
+  Actions cache.
 inputs:
   metal:
     description: Install Xcode's optional Metal toolchain when it is absent (CodeQL, TSan, release builds)
@@ -13,6 +14,12 @@ inputs:
     description: Also install the pinned release tool gh and verify the release group
     required: false
     default: "false"
+  pip-cache:
+    description: >-
+      Restore and save the pip wheel cache. Release and rehearsal jobs pass "false": a cache
+      another ref wrote must never reach a job that signs or packages a release.
+    required: false
+    default: "true"
 runs:
   using: composite
   steps:
@@ -20,6 +27,7 @@ runs:
     # and pytest-xdist on some macOS runner images (audit P1-11); the wheels it caches are
     # keyed on the manifest that pins them, and the pip install below still checks versions.
     - name: Cache the pinned Python wheels
+      if: ${{ inputs.pip-cache == 'true' }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/Library/Caches/pip

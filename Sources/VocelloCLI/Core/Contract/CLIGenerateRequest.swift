@@ -44,12 +44,12 @@ public enum CLIGenerateRequest {
     /// Every field a request may carry.
     public static var fieldNames: Set<String> { Set(fields.keys).union([clientRequestIDField]) }
 
+    /// What idempotency compares is the prepared take (`GenerateCommand.identity`),
+    /// so a request and the same `generate` command line are one request.
     public struct Parsed: Sendable, Equatable {
         /// `generate` arguments (options only; the caller adds global ones).
         public let argv: [String]
         public let clientRequestID: String?
-        /// The request without its id: what idempotency compares.
-        public let identity: CLIJSONValue
     }
 
     public static func parse(_ value: CLIJSONValue) throws -> Parsed {
@@ -61,12 +61,16 @@ public enum CLIGenerateRequest {
         for key in object.keys.sorted() {
             let field = object[key] ?? .null
             if key == clientRequestIDField {
-                guard case .string(let id) = field else {
+                switch field {
+                case .null:
+                    continue
+                case .string(let id):
+                    try CLIRequestLedger.validate(id: id)
+                    clientRequestID = id
+                    continue
+                default:
                     throw CLIError(.invalidInput, "\(key) must be a string")
                 }
-                try CLIRequestLedger.validate(id: id)
-                clientRequestID = id
-                continue
             }
             guard let (option, kind) = fields[key] else {
                 let suggestion = CLISuggestion.closest(to: key, in: Array(fieldNames))
@@ -103,8 +107,6 @@ public enum CLIGenerateRequest {
                 throw CLIError(.invalidInput, "\(key) must be \(expected)")
             }
         }
-        var identity = object
-        identity.removeValue(forKey: clientRequestIDField)
-        return Parsed(argv: argv, clientRequestID: clientRequestID, identity: .object(identity))
+        return Parsed(argv: argv, clientRequestID: clientRequestID)
     }
 }

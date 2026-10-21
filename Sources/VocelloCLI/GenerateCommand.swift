@@ -25,8 +25,9 @@ public enum GenerateCommand {
         /// Mac app would use for the mode).
         let variantSource: String
         /// The take's effective seed as a decimal string; passing it back as
-        /// --seed reproduces the take. `completionReceipt` is the engine's own
-        /// receipt and keeps its numeric fields.
+        /// --seed, with the same `variant` and variation
+        /// (`completionReceipt.request.variation`), reproduces the take.
+        /// `completionReceipt` is the engine's own receipt and keeps its numeric fields.
         let seed: String?
         let deliveryInstructionChars: Int?
         let deliveryInstructionDigest: String?
@@ -206,7 +207,8 @@ public enum GenerateCommand {
         let streaming = !args.flag("no-stream")
 
         // Resolve text first so a missing-text run fails fast (before any prompt).
-        let text = try resolveText(args)
+        // A request an agent sent never takes unnamed stdin.
+        let text = try resolveText(args, implicitStdin: interactive)
         try validateSingleTakeText(text)
 
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
@@ -251,6 +253,47 @@ public enum GenerateCommand {
         "client-request-id", "json", "ndjson", "output-format", "quiet", "verbose", "no-input", "play", "plan",
     ]
 
+    /// What idempotency compares (`--client-request-id`, a request's
+    /// `clientRequestID`): the take as the caller asked for it, not how it was
+    /// spelled. The text counts by its digest wherever it came from (an argument,
+    /// a file or stdin), paths are absolute, parsed options take their canonical
+    /// form, and defaults (the app's settings, Auto language, streaming) count as
+    /// what they mean, so a `generate` command line and the same `run` request are
+    /// one request. The data folder is not part of it: the ledger lives there.
+    static func identity(of take: PreparedTake) throws -> CLIJSONValue {
+        let args = take.args
+        let normalized: Set<String> = [
+            "text", "text-file", "mode", "variant", "seed", "variation", "language", "stream", "no-stream", "out",
+            "reference", "manifest", "data-dir",
+        ]
+        guard case .object(var fields) = args.canonicalForm(excluding: identityExclusions.union(normalized)) else {
+            throw CLIError(.internalError, "the request has no canonical form")
+        }
+        func absolutePath(_ option: String) -> CLIJSONValue {
+            guard let raw = args.string(option) else { return .null }
+            return .string(URL(fileURLWithPath: (raw as NSString).expandingTildeInPath).standardizedFileURL.path)
+        }
+        fields["take"] = .object([
+            "mode": .string(take.mode.rawValue),
+            "textDigest": .string(sha256(Data(take.text.utf8))),
+            "variant": try parseVariantFlag(args).map { .string($0 ? "quality" : "speed") } ?? .null,
+            "seed": take.seed.map { .string(String($0)) } ?? .null,
+            "variation": try parseVariation(args).map { .string($0.rawValue) } ?? .null,
+            "language": take.language.flatMap { $0 == .auto ? nil : CLIJSONValue.string($0.rawValue) } ?? .null,
+            "stream": .bool(take.streaming),
+            "out": absolutePath("out"),
+            "reference": absolutePath("reference"),
+            "manifest": absolutePath("manifest"),
+        ])
+        return .object(fields)
+    }
+
+    /// The `audioPath` a stored or encoded result names.
+    static func audioPath(of result: CLIJSONValue?) -> String? {
+        guard case .object(let fields)? = result, case .string(let path)? = fields["audioPath"] else { return nil }
+        return path
+    }
+
     /// What `--plan` reports for a prepared take.
     static func plan(_ take: PreparedTake) throws -> GeneratePlan {
         let modelID = try CLIRuntime.modelID(registry: take.registry, mode: take.mode, quality: take.quality)
@@ -280,33 +323,32 @@ public enum GenerateCommand {
             return
         }
 
+        // The folder is checked before boot, so a path that cannot hold the take
+        // never costs an engine start (P15-09).
+        try prepareOutputFolder(of: take.output.path)
+
         // Idempotency: a repeated client request id replays its stored result.
         var reservation: CLIRequestLedger.Reservation?
         let ledger = CLIRequestLedger(dataDirectory: take.dataDirectory)
         if let id = args.string("client-request-id") {
-            let identity = args.canonicalForm(excluding: Self.identityExclusions)
-            switch try ledger.claim(id: id, request: identity) {
+            switch try ledger.start(id: id, request: try identity(of: take)) {
             case .replay(let stored):
                 CLIPresenter.markReplayed()
-                if CLIPresenter.isMachine {
-                    CLIPresenter.succeed(stored)
-                } else if case .object(let fields) = stored, case .string(let path)? = fields["audioPath"] {
-                    print(path)
+                let path = audioPath(of: stored)
+                if !CLIPresenter.isMachine {
+                    note("client request id '\(id)' already ran: replaying its take")
+                    if let path { print(path) }
                 }
+                if args.flag("play"), let path { try await CLIPlayback.play([path]) }
+                if CLIPresenter.isMachine { CLIPresenter.succeed(stored) }
                 return
-            case .conflict:
-                throw CLIError(
-                    .idempotencyConflict, "client request id '\(id)' was used for a different request",
-                    hint: "use a new id for a new request"
-                )
-            case .inProgress:
-                throw CLIError(.requestInProgress, "client request id '\(id)' is running in another process")
-            case .fresh(let held):
+            case .run(let held):
                 reservation = held
             }
         }
 
         let result: GenerateJSON
+        let report: CLIJSONValue
         do {
             note("booting engine (data: \(take.dataDirectory.path))")
             CLIPresenter.event(.engineBooting)
@@ -314,11 +356,17 @@ public enum GenerateCommand {
                 dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent, hostedLikeTheApp: true)
             CLIPresenter.event(.engineReady)
             result = try await execute(take, runtime: runtime)
+            report = try CLIJSONValue(encoding: result)
         } catch {
             if let reservation { ledger.abandon(reservation) }
             throw error
         }
-        if let reservation { ledger.complete(reservation, result: try CLIJSONValue(encoding: result)) }
+        if let reservation, !ledger.complete(reservation, result: report) {
+            CLIPresenter.warn(
+                "idempotency_not_recorded",
+                "the take succeeded but its result could not be kept: a retry with this client request id runs again"
+            )
+        }
         if !CLIPresenter.isMachine {
             // stdout = machine-readable (the path). stderr = human notes.
             print(result.audioPath)
@@ -785,7 +833,9 @@ public enum GenerateCommand {
 
     /// Resolve script text from --text, --text-file, or piped stdin (`-` forces stdin;
     /// unnamed stdin is read only in text mode without --no-input).
-    static func resolveText(_ args: Args) throws -> String {
+    /// The take's text: `--text`, `--text-file`, or `-` for stdin; unnamed piped
+    /// stdin only when `implicitStdin` (never for a request an agent sent).
+    static func resolveText(_ args: Args, implicitStdin: Bool = true) throws -> String {
         if let t = args.string("text") {
             return t == "-" ? (readStdinText() ?? "") : t
         }
@@ -798,7 +848,7 @@ public enum GenerateCommand {
                 throw CLIError(code, "could not read --text-file \(path): \(error.localizedDescription)")
             }
         }
-        if let piped = readImplicitStdinText() { return piped }
+        if implicitStdin, let piped = readImplicitStdinText() { return piped }
         throw CLIError(
             .usageError, "missing text — pass --text \"…\", --text-file <path>, or --text - to read stdin"
         )

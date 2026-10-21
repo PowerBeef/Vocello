@@ -316,6 +316,7 @@ targets:
           - CLIRuntime.swift
           - GenerateCommand.swift
           - ModesCommand.swift
+          - RunCommand.swift
       # Bundle the contract beside the binary so the CLI resolves it via the
       # Bundle sweep in CLIRuntime.locateManifestURL — no longer dependent on
       # being run from the repo root. Uses the explicit resources buildPhase
@@ -414,6 +415,7 @@ targets:
       - path: Sources/VocelloCLI/CLIRuntime.swift
       - path: Sources/VocelloCLI/GenerateCommand.swift
       - path: Sources/VocelloCLI/ModesCommand.swift
+      - path: Sources/VocelloCLI/RunCommand.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.cli.core

@@ -321,16 +321,23 @@ A request is a JSON object of `generate`'s options in camelCase (`mode`, `text`,
 `appDelivery`, `language`, `seed`, `variation`, `variant`, `out`, `stream`), described by
 `config/cli-contract/v1/generate-request.schema.json`. It becomes `generate` arguments and goes through
 the same strict parser, so an unknown field, a wrong type or `text: "-"` is refused. With `--requests`
-each line runs on the same engine; a failed request does not stop the others, and the result lists
-every one (`{requests, succeeded, failed, results[]}`, each `{index, clientRequestID, ok, replayed,
-result, error}`), ending `batch_incomplete` when any failed.
+each line (lines end at `\n`) runs on the same engine; a failed request does not stop the others, and the
+result lists every one (`{requests, succeeded, failed, results[]}`, each `{index, clientRequestID, ok,
+replayed, result, error}`), ending `batch_incomplete` when any failed. A signal stops the run and keeps
+every planned row: the request it interrupted and those it never reached are `cancelled`. A request
+never reads unnamed stdin, so one without `text` or `textFile` is a usage error.
 
 **Idempotency:** a request's `clientRequestID` (or `generate --client-request-id <id>`, which also becomes
 the envelope's `requestID`) is kept with its result under `<data>/cli/requests` for seven days, named by
 the id's digest and private to the user. The same id with the same request replays the stored result
 (`meta.replayed: true`) instead of running again; the same id with a different request is
 `idempotency_conflict` (2); the same id while another process runs it is `request_in_progress` (75). A
-failed request keeps nothing, so a retry runs again.
+failed request keeps nothing, so a retry runs again. "The same request" means the same take: the text
+counts by its content wherever it came from (`--text`, a file or stdin), paths count as absolute paths,
+option spellings and defaults count as what they mean (`--variant fast` is `speed`), and how a command
+reports does not count, so a `generate` command line and the same `run` request are one request. A
+replay whose take no longer exists fails with `output_missing` (use a new id), and a success whose
+result could not be kept carries the warning `idempotency_not_recorded`.
 
 ### `history` — read the app's History
 

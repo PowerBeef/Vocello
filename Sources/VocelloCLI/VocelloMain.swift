@@ -32,21 +32,22 @@ enum VocelloMain {
             return failure.exitCode
         }
         CLIOutput.configure(invocation)
-        // A client request id names the envelope (and every event) of its request.
+        // A valid client request id names the envelope (and every event) of its
+        // request; an invalid one never reaches them, and fails.
         let clientRequestID = invocation.args.string("client-request-id")
+        var invalidID: (any Error)?
+        if let clientRequestID {
+            do { try CLIRequestLedger.validate(id: clientRequestID) } catch { invalidID = error }
+        }
         CLIPresenter.begin(
             format: invocation.format, command: invocation.commandName,
-            requestID: clientRequestID ?? UUID().uuidString.lowercased(),
+            requestID: (invalidID == nil ? clientRequestID : nil) ?? UUID().uuidString.lowercased(),
             onBrokenOutput: CLIProcessSupervisor.outputBroken
         )
-        if let clientRequestID {
-            do {
-                try CLIRequestLedger.validate(id: clientRequestID)
-            } catch {
-                let failure = CLIFailure.classify(error)
-                CLIPresenter.fail(failure)
-                return failure.exitCode
-            }
+        if let invalidID {
+            let failure = CLIFailure.classify(invalidID)
+            CLIPresenter.fail(failure)
+            return failure.exitCode
         }
         do {
             try await dispatch(invocation)

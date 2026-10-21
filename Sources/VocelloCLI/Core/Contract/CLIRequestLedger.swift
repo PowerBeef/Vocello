@@ -9,13 +9,20 @@ import System
 /// conflict; the same id while another process runs it is in progress. A
 /// failed request keeps nothing, so a retry runs again. Entries live under
 /// `<data>/cli/requests`, named by the id's digest, each with a lock file held
-/// (flock) for as long as its request runs.
+/// (flock) for as long as its request runs. A ledger-wide lock serializes
+/// claims and pruning, so a prune never removes what a claim is about to use.
 public struct CLIRequestLedger: Sendable {
     public enum Claim: Sendable {
         case fresh(Reservation)
         case replay(CLIJSONValue)
         case conflict
         case inProgress
+    }
+
+    /// A claim as a command acts on it.
+    public enum Start: Sendable {
+        case replay(CLIJSONValue)
+        case run(Reservation)
     }
 
     /// A request this process is running: its lock is held until `complete` or `abandon`.
@@ -63,12 +70,42 @@ public struct CLIRequestLedger: Sendable {
     /// The digest that identifies a request: its canonical JSON (sorted keys).
     public static func digest(of request: CLIJSONValue) -> String {
         let data = (try? CLIJSONEncoding.encoder().encode(request)) ?? Data()
-        return SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
+        return hex(SHA256.hash(data: data))
     }
 
-    public func claim(id: String, request: CLIJSONValue) throws -> Claim {
+    private static func hex(_ digest: SHA256.Digest) -> String {
+        digest.map { unsafe String(format: "%02x", $0) }.joined()
+    }
+
+    /// `claim` as a command acts on it: a conflict or a request running elsewhere
+    /// fails, and a stored take whose file is gone fails rather than claim a path
+    /// with nothing behind it (CM-7).
+    public func start(id: String, request: CLIJSONValue) throws -> Start {
+        switch try claim(id: id, request: request) {
+        case .fresh(let reservation):
+            return .run(reservation)
+        case .conflict:
+            throw CLIError(
+                .idempotencyConflict, "client request id '\(id)' was used for a different request",
+                hint: "use a new id for a new request"
+            )
+        case .inProgress:
+            throw CLIError(.requestInProgress, "client request id '\(id)' is running in another process")
+        case .replay(let stored):
+            if case .object(let fields) = stored, case .string(let path)? = fields["audioPath"],
+               !FileManager.default.fileExists(atPath: path) {
+                throw CLIError(
+                    .outputMissing, "the take kept for client request id '\(id)' no longer exists at \(path)",
+                    hint: "use a new id to generate it again"
+                )
+            }
+            return .replay(stored)
+        }
+    }
+
+    public func claim(id: String, request: CLIJSONValue, now: Date = Date()) throws -> Claim {
         try Self.validate(id: id)
-        let key = SHA256.hash(data: Data(id.utf8)).map { unsafe String(format: "%02x", $0) }.joined()
+        let key = Self.hex(SHA256.hash(data: Data(id.utf8)))
         let requestDigest = Self.digest(of: request)
         do {
             try FileManager.default.createDirectory(
@@ -77,42 +114,49 @@ public struct CLIRequestLedger: Sendable {
         } catch {
             throw CLIError(.ioError, "could not create the request ledger: \(error.localizedDescription)")
         }
-        let lock: FileDescriptor
-        do {
-            lock = try FileDescriptor.open(
-                FilePath(directory.appendingPathComponent("\(key).lock").path), .readWrite,
-                options: [.create, .closeOnExec], permissions: [.ownerReadWrite]
-            )
-        } catch {
-            throw CLIError(.ioError, "could not open the request ledger: \(error)")
+        return try withLedgerLock {
+            let lock = try openLock(key: key)
+            guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
+                let failure = Errno(rawValue: errno)
+                try? lock.close()
+                // Only a lock another process holds means in progress; anything else
+                // (a filesystem without locks) would otherwise retry forever.
+                if failure == .wouldBlock { return .inProgress }
+                throw CLIError(.ioError, "could not lock the request ledger entry: \(failure)")
+            }
+            let entry: Entry?
+            do {
+                entry = try readEntry(key: key)
+            } catch {
+                release(lock)
+                throw error
+            }
+            if let entry, !isExpired(entry, now: now) {
+                release(lock)
+                return entry.requestDigest == requestDigest ? .replay(entry.result) : .conflict
+            }
+            return .fresh(Reservation(key: key, requestDigest: requestDigest, lock: lock))
         }
-        guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
-            try? lock.close()
-            return .inProgress
-        }
-        let entryURL = directory.appendingPathComponent("\(key).json")
-        if let data = try? Data(contentsOf: entryURL),
-           let entry = try? JSONDecoder().decode(Entry.self, from: data) {
-            release(lock)
-            return entry.requestDigest == requestDigest ? .replay(entry.result) : .conflict
-        }
-        return .fresh(Reservation(key: key, requestDigest: requestDigest, lock: lock))
     }
 
-    /// Keeps a successful request's result and releases its lock.
-    public func complete(_ reservation: Reservation, result: CLIJSONValue, now: Date = Date()) {
+    /// Keeps a successful request's result and releases its lock. False when the
+    /// result could not be kept, so a retry would run the request again.
+    @discardableResult
+    public func complete(_ reservation: Reservation, result: CLIJSONValue, now: Date = Date()) -> Bool {
         defer { release(reservation.lock) }
-        let formatter = ISO8601DateFormatter()
         let entry = Entry(
-            schemaVersion: 1, requestDigest: reservation.requestDigest, completedAt: formatter.string(from: now),
-            result: result
+            schemaVersion: 1, requestDigest: reservation.requestDigest,
+            completedAt: ISO8601DateFormatter().string(from: now), result: result
         )
-        guard let data = try? CLIJSONEncoding.encoder().encode(entry) else { return }
-        // Private like its 0700 folder: a result names the take's output path.
-        let url = directory.appendingPathComponent("\(reservation.key).json")
-        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        let kept: Bool
+        do {
+            try writePrivately(try CLIJSONEncoding.encoder().encode(entry), to: entryURL(key: reservation.key))
+            kept = true
+        } catch {
+            kept = false
+        }
         prune(now: now)
+        return kept
     }
 
     /// Releases a failed request's lock and keeps nothing, so a retry runs again.
@@ -120,22 +164,115 @@ public struct CLIRequestLedger: Sendable {
         release(reservation.lock)
     }
 
+    /// Removes entries completed before the retention window, with their lock
+    /// files, skipping any id a process holds.
+    func prune(now: Date) {
+        _ = try? withLedgerLock {
+            let urls = (try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+            )) ?? []
+            for url in urls {
+                if url.pathExtension == "tmp" {
+                    // A write that never reached its rename.
+                    let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                        .contentModificationDate ?? now
+                    if now.timeIntervalSince(modified) > 3600 { try? FileManager.default.removeItem(at: url) }
+                    continue
+                }
+                guard url.pathExtension == "json" else { continue }
+                let key = url.deletingPathExtension().lastPathComponent
+                guard let entry = try? readEntry(key: key), isExpired(entry, now: now) else { continue }
+                // Claims open lock files only under the ledger lock, held here, so an
+                // id nobody holds can lose its lock file without racing a claim.
+                guard let lock = try? openLock(key: key) else { continue }
+                guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
+                    try? lock.close()
+                    continue
+                }
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.removeItem(at: lockURL(key: key))
+                release(lock)
+            }
+        }
+    }
+
+    // MARK: - Files
+
+    private func entryURL(key: String) -> URL { directory.appendingPathComponent("\(key).json") }
+    private func lockURL(key: String) -> URL { directory.appendingPathComponent("\(key).lock") }
+
+    private func openLock(key: String) throws -> FileDescriptor {
+        try openLockFile(at: lockURL(key: key))
+    }
+
+    private func openLockFile(at url: URL) throws -> FileDescriptor {
+        do {
+            return try FileDescriptor.open(
+                FilePath(url.path), .readWrite, options: [.create, .closeOnExec], permissions: [.ownerReadWrite]
+            )
+        } catch {
+            throw CLIError(.ioError, "could not open the request ledger: \(error)")
+        }
+    }
+
+    /// Runs `body` holding the ledger-wide lock.
+    private func withLedgerLock<T>(_ body: () throws -> T) throws -> T {
+        let lock = try openLockFile(at: directory.appendingPathComponent("ledger.lock"))
+        defer { release(lock) }
+        while flock(lock.rawValue, LOCK_EX) != 0 {
+            let failure = Errno(rawValue: errno)
+            guard failure == .interrupted else {
+                throw CLIError(.ioError, "could not lock the request ledger: \(failure)")
+            }
+        }
+        return try body()
+    }
+
     private func release(_ lock: FileDescriptor) {
         _ = flock(lock.rawValue, LOCK_UN)
         try? lock.close()
     }
 
-    /// Removes entries completed before the retention window.
-    func prune(now: Date) {
-        let formatter = ISO8601DateFormatter()
-        let entries = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-        for url in entries where url.pathExtension == "json" {
-            guard let data = try? Data(contentsOf: url),
-                  let entry = try? JSONDecoder().decode(Entry.self, from: data),
-                  let completed = formatter.date(from: entry.completedAt),
-                  now.timeIntervalSince(completed) > Self.retention else { continue }
-            // The lock file stays: another process may be about to claim the same id.
-            try? FileManager.default.removeItem(at: url)
+    /// The entry for `key`, nil when there is none. An entry that exists but
+    /// cannot be read fails, rather than run a completed request again.
+    private func readEntry(key: String) throws -> Entry? {
+        let url = entryURL(key: key)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw CLIError(.ioError, "could not read the request ledger entry: \(error.localizedDescription)")
+        }
+        do {
+            return try JSONDecoder().decode(Entry.self, from: data)
+        } catch {
+            throw CLIError(.ioError, "a request ledger entry is damaged", hint: "use a new client request id")
+        }
+    }
+
+    private func isExpired(_ entry: Entry, now: Date) -> Bool {
+        guard let completed = ISO8601DateFormatter().date(from: entry.completedAt) else { return false }
+        return now.timeIntervalSince(completed) > Self.retention
+    }
+
+    /// Private from its creation, like its 0700 folder (a result names the take's
+    /// output path), and published whole by a rename.
+    private func writePrivately(_ data: Data, to url: URL) throws {
+        let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        do {
+            let descriptor = try FileDescriptor.open(
+                FilePath(temporary.path), .writeOnly,
+                options: [.create, .exclusiveCreate, .closeOnExec], permissions: [.ownerReadWrite]
+            )
+            try descriptor.closeAfter {
+                _ = try descriptor.writeAll(data)
+                guard fsync(descriptor.rawValue) == 0 else { throw Errno(rawValue: errno) }
+            }
+            guard unsafe rename(temporary.path, url.path) == 0 else { throw Errno(rawValue: errno) }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
         }
     }
 }

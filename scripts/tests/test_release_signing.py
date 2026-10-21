@@ -215,6 +215,9 @@ class VerifyReleaseBundleNestedCodeTests(unittest.TestCase):
             '    runtime="$(printf "%s" "$row" | cut -f3)"\n'
             '    echo "Executable=$target" >&2\n'
             '    echo "TeamIdentifier=${team:-not set}" >&2\n'
+            # Real codesign keeps writing after the line the verifier wants.
+            '    [ -z "${CODESIGN_PAUSE:-}" ] || sleep "$CODESIGN_PAUSE"\n'
+            '    echo "Sealed Resources version=2 rules=13 files=4" >&2\n'
             '    [ "$runtime" != 1 ] || echo "Runtime Version=26.0.0" >&2\n'
             "    exit 0 ;;\n"
             "esac\n"
@@ -239,10 +242,10 @@ class VerifyReleaseBundleNestedCodeTests(unittest.TestCase):
         return [path for path in self.frameworks.rglob("*") if path.is_file() and not path.is_symlink()
                 and path.read_bytes()[:4] == MACHO[:4]]
 
-    def verify(self, *, signed: bool = True) -> subprocess.CompletedProcess[str]:
+    def verify(self, *, signed: bool = True, **extra: str) -> subprocess.CompletedProcess[str]:
         rows = "".join(f"{path}\t{team}\t{int(runtime)}\n" for path, (team, runtime) in self.signatures.items())
         (self.sandbox.path / "signatures.tsv").write_text(rows, encoding="utf-8")
-        environment = {"QWENVOICE_SKIP_LAUNCH_SMOKE": "1", "CI": "false", "QWENVOICE_EXPECT_TEAM_ID": TEAM}
+        environment = {"QWENVOICE_SKIP_LAUNCH_SMOKE": "1", "CI": "false", "QWENVOICE_EXPECT_TEAM_ID": TEAM, **extra}
         if signed:
             environment["QWENVOICE_EXPECT_SIGNED_RELEASE"] = "1"
         return self.sandbox.run_script(str(self.app), env=environment)
@@ -278,6 +281,13 @@ class VerifyReleaseBundleNestedCodeTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertIn("Nested code Frameworks/Sparkle.framework/Versions/B/Autoupdate carries unexpected entitlements",
                       completed.stderr)
+
+    def test_codesign_output_after_the_team_line_does_not_break_the_pipe(self) -> None:
+        # The team lookup reads codesign's whole output; stopping at the first match left
+        # codesign writing into a closed pipe, and pipefail turned its SIGPIPE into exit 141.
+        completed = self.verify(CODESIGN_PAUSE="0.2")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("[2/4] Signed release checks OK", completed.stdout)
 
     def framework_role_checks(self) -> list[Path]:
         return [Path(arguments[-1]) for arguments in self.sandbox.calls_to(

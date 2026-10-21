@@ -29,8 +29,10 @@ codesign_has_runtime_metadata() {
 
 codesign_team_identifier() {
     local target="$1"
+    # awk reads to the end: exiting at the first match would leave codesign writing into a
+    # closed pipe, and under pipefail its SIGPIPE (exit 141) would abort verification.
     codesign -dv --verbose=4 "$target" 2>&1 \
-        | awk -F= '/^TeamIdentifier=/ { print $2; exit }'
+        | awk -F= '/^TeamIdentifier=/ && !found { print $2; found = 1 }'
 }
 
 if [ $# -ne 1 ]; then

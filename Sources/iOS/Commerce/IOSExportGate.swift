@@ -216,6 +216,8 @@ struct IOSExportPurchaseSheet: View {
                     IOSHaptics.impact(.medium)
                     Task { await store.purchase() }
                 }
+                // The lock glyph is decoration; VoiceOver hears only the title and price.
+                .accessibilityLabel(text.exportBuy(product.displayPrice))
                 .accessibilityIdentifier("exportPurchase_buy")
             } else {
                 unavailable
@@ -233,7 +235,9 @@ struct IOSExportPurchaseSheet: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("exportPurchase_progress")
             }
-            if let notice = store.notice {
+            // The unavailable branch already says this sentence; say it once.
+            if let notice = store.notice,
+               !(notice == .unavailable && store.access != .unlocked && store.product == nil) {
                 Text(text.exportPurchaseNotice(notice, access: store.access))
                     .font(.subheadline)
                     .foregroundStyle(Theme.Text.secondary)
@@ -341,19 +345,25 @@ struct IOSExportPurchaseSheet: View {
     }
 
     private var privacyLink: some View {
-        Link(text.exportPrivacy, destination: Self.privacyURL)
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(Theme.Text.secondary)
-            .frame(minHeight: Theme.HitTarget.minimum)
+        footerLink(text.exportPrivacy, destination: Self.privacyURL)
             .accessibilityIdentifier("exportPurchase_privacy")
     }
 
     private var supportLink: some View {
-        Link(text.exportSupport, destination: Self.supportURL)
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(Theme.Text.secondary)
-            .frame(minHeight: Theme.HitTarget.minimum)
+        footerLink(text.exportSupport, destination: Self.supportURL)
             .accessibilityIdentifier("exportPurchase_support")
+    }
+
+    /// The 44 pt frame and content shape live inside the label, so the whole
+    /// target opens the link, not only the footnote's words.
+    private func footerLink(_ title: String, destination: URL) -> some View {
+        Link(destination: destination) {
+            Text(title)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.Text.secondary)
+                .frame(minHeight: Theme.HitTarget.minimum)
+                .contentShape(Rectangle())
+        }
     }
 }
 

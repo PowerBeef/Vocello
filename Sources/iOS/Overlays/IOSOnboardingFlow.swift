@@ -348,6 +348,8 @@ struct IOSOnboardingBenefitRow: View {
                     .foregroundStyle(Theme.Brand.gold)
             }
             .frame(width: 38, height: 38)
+            // Decoration: VoiceOver reads the benefit, not "checkmark" before it.
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 // D7: benefit titles carry the row (every current row is

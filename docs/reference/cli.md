@@ -505,9 +505,18 @@ vocello models status [<id>] [--json]      # adds missing-file detail
 vocello models verify [<id>] [--json]      # every installed file's size and SHA-256
 vocello models active [--json]             # the package each mode uses, as the app resolves it
 vocello models install <id> [--verbose]    # headless download into the shared models dir
+vocello models install-recommended [--plan] # the package each mode uses (`models active`); --plan downloads nothing
+vocello models remove <id>                  # an installed model, its staging and the shared files only it used
 vocello models use <mode> speed|quality|automatic   # the app's per-mode package choice
 vocello models prefer-lower-memory on|off           # the app's "Prefer lower-memory models"
 ```
+
+`install-recommended` installs, for each mode, the package `models active` names (the app's explicit
+choice, the lower-memory preference, then this Mac's recommendation); its result lists each with
+`planned`, `already_installed`, `installed` or `updated`. `remove` deletes as the app's model manager
+does and is refused (`engine_busy`) while the Vocello app or another vocello engine runs, since either
+may have the model loaded. Installs and removals tell a running app
+(`com.qwenvoice.shared.modelsDidChange`).
 
 `use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and
 `settings set prefer-lower-memory`; `models active` shows what each mode then resolves to.

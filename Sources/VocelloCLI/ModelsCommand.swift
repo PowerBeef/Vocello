@@ -3,10 +3,10 @@ import QwenVoiceCore
 import VocelloCLICore
 import VocelloDesktopCore
 
-/// `vocello models` — read-only inventory of the contract's models: install state,
-/// on-disk size, and (for `status`) any missing required files. No download
-/// machinery — honors the no-bundled-weights framing. Uses the lightweight
-/// registry bootstrap (no engine boot).
+/// `vocello models` — the contract's models: inventory (install state, on-disk
+/// size, missing or stale files), verification, installs (one, or the packages
+/// the app would use: `install-recommended`), removal and the app's package
+/// choices. Uses the lightweight registry bootstrap (no engine boot).
 enum ModelsCommand {
     struct ModelJSON: Encodable, Sendable {
         let id: String
@@ -52,6 +52,27 @@ enum ModelsCommand {
         let installedBytes: Int64
     }
 
+    /// `install-recommended`: the package each mode uses, as `models active`
+    /// resolves it, and what became of it.
+    struct Recommended: Encodable, Sendable {
+        let mode: String
+        let modelID: String
+        /// planned, already_installed, installed or updated.
+        let status: String
+        let estimatedDownloadBytes: Int64?
+        let installedBytes: Int64?
+    }
+
+    struct RecommendedRows: Encodable, Sendable {
+        let plan: Bool
+        let models: [Recommended]
+    }
+
+    struct Removed: Encodable, Sendable {
+        let removed: String
+        let freedBytes: Int64
+    }
+
     struct VerifiedModel: Encodable, Sendable {
         let id: String
         let installed: Bool
@@ -72,6 +93,14 @@ enum ModelsCommand {
     /// `action` is the canonical subcommand the parser resolved.
     @MainActor
     static func run(action: String, _ args: Args) async throws {
+        if action == "install-recommended" {
+            try await runInstallRecommended(args)
+            return
+        }
+        if action == "remove" {
+            try runRemove(args)
+            return
+        }
         if action == "use" {
             // The app's per-mode package choice (Settings > Models): `models active` shows what it resolves to.
             let mode = args.positionals.first ?? ""
@@ -287,7 +316,18 @@ enum ModelsCommand {
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+        let installed = try await install(modelID, ctx: ctx)
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(installed)
+        } else if installed.status != "already_installed" {
+            print("✓ \(installed.status == "updated" ? "Updated" : "Installed") \(modelID) (\(humanBytes(installed.installedBytes)))")
+        }
+    }
 
+    /// Installs (or repairs) one model; reports nothing on stdout. Tells a running
+    /// app once its files changed.
+    @MainActor
+    static func install(_ modelID: String, ctx: CLIRegistryContext) async throws -> Installed {
         guard let descriptor = ctx.registry.model(id: modelID) else {
             throw CLIError(.modelUnknown, "unknown model id '\(modelID)' (run `vocello models list` for valid ids)")
         }
@@ -310,12 +350,7 @@ enum ModelsCommand {
             let stale = catalog.installedFileSizeMismatches(for: artifact, modelsRoot: ctx.modelsDirectory)
             if stale.isEmpty {
                 note("Already installed: \(modelID)")
-                if CLIPresenter.isMachine {
-                    CLIPresenter.succeed(Installed(
-                        modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir)
-                    ))
-                }
-                return
+                return Installed(modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir))
             }
             repairingStaleInstall = true
             note("Updating \(modelID): \(stale.count) file(s) no longer match the pinned catalog identity")
@@ -401,13 +436,95 @@ enum ModelsCommand {
             throw error
         }
 
-        let installedBytes = directorySize(targetDir)
-        if CLIPresenter.isMachine {
-            CLIPresenter.succeed(Installed(
-                modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: installedBytes
+        DesktopChangeNotice.models.post()
+        return Installed(
+            modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: directorySize(targetDir)
+        )
+    }
+
+    /// `vocello models install-recommended [--plan]`: installs the package each
+    /// mode uses, as the app resolves it (`models active`: the explicit choice,
+    /// the lower-memory preference, then this Mac's recommendation). `--plan`
+    /// lists them, with their download sizes, and downloads nothing.
+    @MainActor
+    static func runInstallRecommended(_ args: Args) async throws {
+        let ctx = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+        let settings = DesktopAppSettings()
+        let isInstalled: (String) -> Bool = { id in
+            ctx.registry.model(id: id).map { DesktopModelInventory.isComplete($0, modelsDirectory: ctx.modelsDirectory) } ?? false
+        }
+        let choices = DesktopModelSelection.resolve(
+            registry: ctx.registry, explicitVariantID: { settings.explicitVariantID(for: $0) },
+            prefersLowerMemory: settings.prefersLowerMemory, deviceClass: NativeMemoryPolicyResolver.deviceClass(),
+            isInstalled: isInstalled
+        )
+        let planOnly = args.flag("plan")
+        var rows: [Recommended] = []
+        for choice in choices {
+            guard let modelID = choice.activeModelID else { continue }
+            let estimate = ctx.registry.model(id: modelID)?.estimatedDownloadBytes
+            if planOnly {
+                rows.append(Recommended(
+                    mode: choice.mode, modelID: modelID, status: isInstalled(modelID) ? "already_installed" : "planned",
+                    estimatedDownloadBytes: estimate, installedBytes: nil
+                ))
+                continue
+            }
+            let installed = try await install(modelID, ctx: ctx)
+            rows.append(Recommended(
+                mode: choice.mode, modelID: modelID, status: installed.status, estimatedDownloadBytes: estimate,
+                installedBytes: installed.installedBytes
             ))
+        }
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(RecommendedRows(plan: planOnly, models: rows))
+            return
+        }
+        for row in rows {
+            let size = row.status == "planned" ? row.estimatedDownloadBytes.map { " (\(humanBytes($0)))" } ?? "" : ""
+            print("\(row.mode)\t\(row.modelID)\t\(row.status)\(size)")
+        }
+    }
+
+    /// `vocello models remove <id>`: removes one installed model, its staging
+    /// and the shared components no other model uses, as the app's model
+    /// manager does. Refused while the Vocello app or another vocello engine
+    /// runs, since either may have the model loaded.
+    @MainActor
+    static func runRemove(_ args: Args) throws {
+        let modelID = args.positionals.first?.lowercased() ?? ""
+        let ctx = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+        guard let descriptor = ctx.registry.model(id: modelID) else {
+            throw CLIError(.modelUnknown, "unknown model id '\(modelID)'", hint: "see `vocello models list`")
+        }
+        let modelDirectory = descriptor.installDirectory(in: ctx.modelsDirectory)
+        guard FileManager.default.fileExists(atPath: modelDirectory.path) else {
+            throw CLIError(.modelNotInstalled, "\(modelID) is not installed")
+        }
+        if DesktopAppPresence.isAppRunning() || !EngineHostLease.liveHosts().isEmpty {
+            throw CLIError(
+                .engineBusy, "a Vocello engine is running (the app or another vocello) and may have \(modelID) loaded",
+                hint: "quit the Vocello app and wait for other vocello commands, then retry"
+            )
+        }
+        let freed = directorySize(modelDirectory)
+        HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDirectory)
+        do {
+            try SharedModelComponentStore(modelsRoot: ctx.modelsDirectory).deleteModel(
+                modelFolder: modelDirectory.lastPathComponent, reclamation: .immediate
+            )
+        } catch {
+            throw CLIError(.ioError, "could not remove \(modelID): \(error.localizedDescription)")
+        }
+        DesktopChangeNotice.models.post()
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Removed(removed: modelID, freedBytes: freed))
         } else {
-            print("✓ \(repairingStaleInstall ? "Updated" : "Installed") \(modelID) (\(humanBytes(installedBytes)))")
+            print("removed \(modelID) (\(humanBytes(freed)))")
         }
     }
 }

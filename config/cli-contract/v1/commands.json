@@ -1010,6 +1010,8 @@
         "active",
         "verify",
         "install",
+        "install-recommended",
+        "remove",
         "use",
         "prefer-lower-memory"
       ],
@@ -1109,6 +1111,47 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "Download and verify a model into the shared store",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "install-recommended",
+      "operands": [],
+      "options": [
+        {
+          "name": "plan",
+          "summary": "list them and their download sizes; download nothing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "models.install-recommended",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Install the package each mode uses, as the app resolves it (see `models active`)",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "remove",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the installed model id (see `vocello models list`)",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.remove",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Remove an installed model and the shared files only it used",
       "usage": []
     },
     {

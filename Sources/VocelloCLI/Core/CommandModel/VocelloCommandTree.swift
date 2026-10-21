@@ -204,6 +204,16 @@ public enum VocelloCommandTree {
                 positionals: [CLIPositionalSpec("id", "the model id to install (see `vocello models list`)", required: true)]
             ),
             CLICommandSpec(
+                name: "install-recommended",
+                summary: "Install the package each mode uses, as the app resolves it (see `models active`)",
+                options: [.flag("plan", "list them and their download sizes; download nothing")]
+            ),
+            CLICommandSpec(
+                name: "remove", summary: "Remove an installed model and the shared files only it used",
+                discussion: "Refused while the Vocello app or another vocello engine runs, since either may have it loaded.",
+                positionals: [CLIPositionalSpec("id", "the installed model id (see `vocello models list`)", required: true)]
+            ),
+            CLICommandSpec(
                 name: "use", summary: "Choose the package a mode uses, as the app's Settings do",
                 positionals: [
                     CLIPositionalSpec("mode", "custom | design | clone", required: true),

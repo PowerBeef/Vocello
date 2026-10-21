@@ -197,6 +197,12 @@
         "aliases": [],
         "options": {}
       },
+      "models.install-recommended": {
+        "aliases": [],
+        "options": {
+          "plan": false
+        }
+      },
       "models.list": {
         "aliases": [
           "ls"
@@ -204,6 +210,10 @@
         "options": {}
       },
       "models.prefer-lower-memory": {
+        "aliases": [],
+        "options": {}
+      },
+      "models.remove": {
         "aliases": [],
         "options": {}
       },

@@ -284,6 +284,9 @@ jobs:
           # The commit source-authority approved, and the tag still names it.
           [ "$commit" = "$AUTHORIZED_COMMIT" ] || { echo "::error::checkout is not the authorized commit"; exit 1; }
           python3 scripts/release_evidence.py verify-source --tag "$RELEASE_TAG" --commit "$commit"
+          # Sparkle offers an update only when CFBundleVersion grows, so a build number
+          # that did not move past the previous v* tag's fails here, before any signing.
+          python3 scripts/release_build_number.py check --tag "$RELEASE_TAG"
           python3 scripts/release_evidence.py capture-source-identity \
             --commit "$commit" --output "$RELEASE_SOURCE_IDENTITY"
           python3 scripts/required_step_ledger.py init \

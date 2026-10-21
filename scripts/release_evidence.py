@@ -66,7 +66,11 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def project_version(root: Path) -> tuple[str, str]:
-    text = (root / "project.yml").read_text(encoding="utf-8")
+    return project_version_from_text((root / "project.yml").read_text(encoding="utf-8"))
+
+
+def project_version_from_text(text: str) -> tuple[str, str]:
+    """The one MARKETING_VERSION and CURRENT_PROJECT_VERSION a project.yml declares."""
     versions = set(re.findall(r'MARKETING_VERSION:\s*["\']?([^"\'\s]+)', text))
     builds = set(re.findall(r'CURRENT_PROJECT_VERSION:\s*["\']?([^"\'\s]+)', text))
     if len(versions) != 1 or len(builds) != 1:

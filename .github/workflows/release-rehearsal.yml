@@ -33,6 +33,7 @@ on:
       - scripts/sparkle_appcast.py
       - scripts/cli_package.py
       - scripts/release_evidence.py
+      - scripts/release_build_number.py
       - scripts/release_sbom.py
       - scripts/required_step_ledger.py
       - scripts/install_pinned_*.sh
@@ -90,6 +91,7 @@ jobs:
           print(release_evidence.project_version(Path("."))[0])
           PY
           )"
+          python3 scripts/release_build_number.py check --tag "v$version"
           python3 scripts/release_evidence.py capture-source-identity \
             --commit "$commit" --output "$RELEASE_SOURCE_IDENTITY"
           python3 scripts/required_step_ledger.py init \

@@ -7,6 +7,7 @@ sourceOfTruth:
   - scripts/release.sh
   - scripts/lib/release_signing.sh
   - scripts/sparkle_appcast.py
+  - scripts/release_build_number.py
   - docs/reference/macos-app-guide.md
   - .github/workflows/release.yml
   - scripts/macos_test.sh
@@ -102,6 +103,11 @@ release-readiness and artifact checks.
    and security/privacy. Scope findings to changed surfaces; fix or explicitly defer them.
 5. **Version bump**: `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml`'s project-level
    `settings.base` (shared by every generated target) → `./scripts/regenerate_project.sh`.
+   `CURRENT_PROJECT_VERSION` (the app's CFBundleVersion, Sparkle's `sparkle:version`) must be greater
+   than at the previous `v*` tag in version order, or installed copies are never offered the update;
+   `release.yml` checks it before signing (`scripts/release_build_number.py check --tag <tag>`). The
+   rule does not depend on Sparkle: v2.4.0 shipped build 23 without it, and 3.0.0 is build 24. With no
+   earlier `v*` tag the check passes; an earlier tag whose `project.yml` cannot be read fails it.
 6. **Local package verification**:
    ```sh
    ./scripts/release.sh --preflight full --signing-mode developer-id --signing-identity "<Developer ID Application: …>"

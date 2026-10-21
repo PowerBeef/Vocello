@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 import VocelloCLICore
 
 /// `vocello` — headless Vocello TTS over the in-process MLX engine.
@@ -96,7 +97,7 @@ enum VocelloMain {
         case "bench":
             try await BenchCommand.run(args)
         case "capabilities":
-            try CapabilitiesCommand.run()
+            try CapabilitiesCommand.run(args)
         case "completions":
             try CompletionsCommand.run(args)
         case "version":
@@ -123,8 +124,30 @@ enum VocelloMain {
 
 /// `vocello capabilities`: the static description agents read first.
 enum CapabilitiesCommand {
-    static func run() throws {
-        let document = CLICapabilitiesDocument()
+    @MainActor
+    static func run(_ args: Args) throws {
+        var runtime: CLICapabilitiesDocument.Runtime?
+        let dataDirectory = CLIPaths.dataDirectory(override: args.string("data-dir"))
+        if let context = try? CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: dataDirectory,
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        ) {
+            runtime = CLICapabilitiesDocument.Runtime(
+                dataDirectory: dataDirectory.path,
+                memoryClass: NativeMemoryPolicyResolver.deviceClass().rawValue,
+                defaultSpeaker: context.registry.defaultSpeaker.id,
+                speakers: context.registry.allSpeakers.map(\.id),
+                installedModels: context.registry.models.compactMap { model in
+                    if case .available = context.registry.availability(forModelID: model.id, in: context.modelsDirectory) {
+                        return model.id
+                    }
+                    return nil
+                }
+            )
+        } else {
+            CLIPresenter.warn("contract_unavailable", "runtime facts are missing: the model contract could not be read")
+        }
+        let document = CLICapabilitiesDocument(runtime: runtime)
         if CLIPresenter.isMachine {
             CLIPresenter.succeed(document)
             return

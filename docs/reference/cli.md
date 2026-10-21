@@ -182,7 +182,8 @@ compatibility policy in `config/cli-contract/v1/README.md` (validated by
 - 64-bit values the CLI reports, such as `seed`, `effectiveSeed` and `longFormBaseSeed`, are decimal
   strings; an embedded engine receipt (`completionReceipt`) keeps its own numeric fields.
 - `vocello capabilities --json` describes every command, option, error code, exit code, event type,
-  mode, language, delivery cell and limit with no engine boot.
+  mode, language, delivery cell and limit, plus runtime facts (data folder, memory tier, speakers,
+  installed models), with no engine boot.
 - `bench` is an internal tool with its own output; it refuses `--json`/`--ndjson`.
 
 | Exit | Category | Meaning |

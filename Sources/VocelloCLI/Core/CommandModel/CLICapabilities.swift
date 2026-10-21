@@ -146,6 +146,23 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
         let available: Bool
     }
 
+    /// Facts about this Mac and its shared store, read without an engine boot.
+    public struct Runtime: Encodable, Sendable {
+        let dataDirectory: String
+        let memoryClass: String
+        let defaultSpeaker: String
+        let speakers: [String]
+        let installedModels: [String]
+
+        public init(dataDirectory: String, memoryClass: String, defaultSpeaker: String, speakers: [String], installedModels: [String]) {
+            self.dataDirectory = dataDirectory
+            self.memoryClass = memoryClass
+            self.defaultSpeaker = defaultSpeaker
+            self.speakers = speakers
+            self.installedModels = installedModels
+        }
+    }
+
     let vocelloVersion: String
     let build: String
     let schemaVersion: Int
@@ -157,8 +174,11 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
     let eventTypes: [String]
     let generation: Generation
     let mcp: MCP
+    /// Nil when the contract cannot be read (`vocello doctor` says why).
+    let runtime: Runtime?
 
-    public init() {
+    public init(runtime: Runtime? = nil) {
+        self.runtime = runtime
         vocelloVersion = vocelloCLIVersion
         build = vocelloCLIBuild
         schemaVersion = CLIContract.schemaVersion

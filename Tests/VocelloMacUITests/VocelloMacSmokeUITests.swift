@@ -64,12 +64,16 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // SUEnableAutomaticChecks off, so no prompt or check runs and nothing
         // here reaches the network.
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_category_updates", in: settings), timeout: 10))
+        // The detail page replaces the overview, so the window is found by the
+        // screen itself rather than by the overview's Audio row.
+        let settingsWindow = app.windows.containing(.any, identifier: "screen_settings").firstMatch
         let automaticChecks = element("settings_automaticUpdateChecks")
         XCTAssertTrue(VocelloUIWait.exists(automaticChecks, timeout: 10), "Settings must offer automatic update checks")
         XCTAssertEqual(VocelloUIToggle.state(of: automaticChecks), false)
-        XCTAssertTrue(button("settings_checkForUpdates", in: settings).isEnabled)
-        VocelloUIScreenshot.attach(settings, named: "mac-settings-updates")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_backButton", in: settings), timeout: 10))
+        XCTAssertTrue(button("settings_checkForUpdates", in: settingsWindow).isEnabled)
+        VocelloUIScreenshot.attach(settingsWindow, named: "mac-settings-updates")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_backButton", in: settingsWindow), timeout: 10))
+        XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 10), "Back must return to the Settings overview")
         app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(VocelloUIWait.condition("Settings window to close", timeout: 10) { !settings.exists })
         XCTAssertTrue(element("screen_voiceCloning").exists, "Closing Settings must preserve Studio")

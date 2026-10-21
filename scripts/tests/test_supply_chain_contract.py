@@ -115,6 +115,53 @@ class SupplyChainContractTests(unittest.TestCase):
         finally:
             module._tool_output = original
 
+    def write_sparkle(self, artifact_version: str | None, package_version: str | None, url: str | None = None) -> None:
+        manifest = json.loads((self.root / "config/toolchain.json").read_text())
+        if artifact_version is not None:
+            manifest["artifactPins"] = {"sparkle": {
+                "version": artifact_version,
+                "url": url or ("https://github.com/sparkle-project/Sparkle/releases/download/"
+                               f"{artifact_version}/Sparkle-{artifact_version}.tar.xz"),
+                "sha256": "0" * 64, "archivePath": "bin/sign_update",
+            }}
+        (self.root / "config/toolchain.json").write_text(json.dumps(manifest), encoding="utf-8")
+        pins = [{"identity": "swift-argument-parser", "kind": "remoteSourceControl",
+                 "state": {"revision": "f" * 40, "version": "1.6.1"}}]
+        if package_version is not None:
+            pins.append({"identity": "sparkle", "kind": "remoteSourceControl",
+                         "location": "https://github.com/sparkle-project/Sparkle",
+                         "state": {"revision": "e" * 40, "version": package_version}})
+        resolved = self.root / module.PACKAGE_RESOLVED
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(json.dumps({"pins": pins, "version": 3}), encoding="utf-8")
+
+    def test_sign_update_moves_with_the_sparkle_package_pin(self) -> None:
+        self.write_sparkle("2.10.0", "2.10.0")
+        self.assertEqual(module.validate(self.root), [])
+        self.write_sparkle("2.10.0", "2.10.1")
+        self.assertTrue(any("artifactPins.sparkle is 2.10.0" in e and "pins sparkle 2.10.1" in e
+                            for e in module.validate(self.root)))
+
+    def test_the_sparkle_artifact_url_names_its_version(self) -> None:
+        self.write_sparkle("2.10.1", "2.10.1",
+                           url="https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz")
+        self.assertTrue(any("does not name the Sparkle-2.10.1 tarball" in e for e in module.validate(self.root)))
+
+    def test_either_sparkle_pin_alone_fails(self) -> None:
+        self.write_sparkle(None, "2.10.0")
+        self.assertTrue(any("no artifactPins.sparkle" in e for e in module.validate(self.root)))
+        self.write_sparkle("2.10.0", None)
+        self.assertTrue(any("has no sparkle pin" in e for e in module.validate(self.root)))
+
+    def test_without_sparkle_there_is_nothing_to_match(self) -> None:
+        self.write_sparkle(None, None)
+        self.assertEqual(module.validate(self.root), [])
+
+    def test_the_repository_sparkle_pins_agree(self) -> None:
+        root = SCRIPT.parent.parent
+        manifest = json.loads((root / "config/toolchain.json").read_text(encoding="utf-8"))
+        self.assertEqual(module.sparkle_pin_errors(root, manifest), [])
+
     def bump_checkout(self, sha: str, version: str) -> None:
         """What a Dependabot action bump does: the workflow SHA and comment move, the manifest does not."""
         path = self.root / ".github/workflows/ci.yml"

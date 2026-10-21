@@ -182,7 +182,9 @@ VALIDATORS: tuple[Validator, ...] = (
     # Release evidence, supply chain and benchmark history.
     _reads(PYTHON, "scripts/supply_chain_contract.py", inputs=(
         "scripts/supply_chain_contract.py", "config/toolchain.json", ".github/workflows/",
-        ".github/dependabot.yml", "website/package.json")),
+        ".github/dependabot.yml", "website/package.json",
+        # artifactPins.sparkle moves with the app's sparkle package pin.
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")),
     _reads(PYTHON, "scripts/required_step_ledger.py", "validate-contract", inputs=(
         "scripts/required_step_ledger.py", *JSONIO, "config/orchestration-contract.json",
         # The contract's workflow producers must exist.

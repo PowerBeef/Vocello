@@ -185,7 +185,8 @@ prerelease offers nothing.
   the app's executable is held to the app allowlist (`--role macos-app`).
 - **The feed.** After the DMG is notarized, stapled and verified, `release.yml` installs
   `sign_update` from the SHA-pinned `Sparkle-2.10.0.tar.xz` (`config/toolchain.json`
-  `artifactPins.sparkle`; it moves with the Sparkle package pin) and runs
+  `artifactPins.sparkle`; it moves with the Sparkle package pin, and
+  `scripts/supply_chain_contract.py` fails when the two versions differ) and runs
   `scripts/sparkle_appcast.py create`. The key reaches `sign_update` only on standard input, and
   the tool's output is withheld on failure because it echoes a key it cannot decode. The helper
   verifies the signature against the app's own `SUPublicEDKey` (RFC 8032 Ed25519), so a secret

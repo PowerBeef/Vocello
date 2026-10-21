@@ -7,6 +7,10 @@ consumes; the website keeps its deterministic npm scripts; and `--installed <gro
 checks that the tools on this host report the pinned version components: `2.46.0` is
 exact, while a major-only pin such as the website's Node `24` accepts any 24.x.
 
+Sparkle's `sign_update` (`artifactPins.sparkle`) signs what the app's Sparkle framework
+verifies, so it moves with the `sparkle` package pin in the app's Package.resolved: the two
+versions must match, and the artifact URL must name that release's tarball.
+
 `--sync-actions` copies the workflows' action SHAs and their `# vX.Y.Z` comments into
 `config/toolchain.json`. A Dependabot action bump changes only the workflows, so the
 contract fails on its pull request until the manifest moves in the same PR: run this on
@@ -29,6 +33,7 @@ ACTION = re.compile(
 )
 # The same references with their trailing version comment (`@<sha> # v7.0.1`).
 ACTION_WITH_VERSION = re.compile(ACTION.pattern + r"(?:[ \t]+#[ \t]*(\S+))?", re.MULTILINE)
+PACKAGE_RESOLVED = Path("QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
 SYNC_HINT = (
     "run `python3 scripts/supply_chain_contract.py --sync-actions` and commit "
     "config/toolchain.json in the same change"
@@ -40,6 +45,54 @@ def _tool_output(command: list[str]) -> str:
         return subprocess.check_output(command, stderr=subprocess.STDOUT, text=True)
     except (OSError, subprocess.CalledProcessError) as error:
         raise ValueError(f"could not execute {' '.join(command)}: {error}") from error
+
+
+def _resolved_package_version(root: Path, identity: str) -> tuple[str | None, str | None]:
+    """The exact version Package.resolved pins for `identity`, or (None, error)."""
+    path = root / PACKAGE_RESOLVED
+    if not path.is_file():
+        return None, None
+    try:
+        resolved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return None, f"{PACKAGE_RESOLVED}: {error}"
+    pins = resolved.get("pins") if isinstance(resolved, dict) else None
+    if not isinstance(pins, list):
+        return None, f"{PACKAGE_RESOLVED}: no pins array"
+    for pin in pins:
+        if isinstance(pin, dict) and pin.get("identity") == identity:
+            state = pin.get("state")
+            version = state.get("version") if isinstance(state, dict) else None
+            if not isinstance(version, str) or not version:
+                return None, f"{PACKAGE_RESOLVED}: the {identity} pin has no exact version"
+            return version, None
+    return None, None
+
+
+def sparkle_pin_errors(root: Path, manifest: dict) -> list[str]:
+    """`artifactPins.sparkle` (sign_update) and the app's `sparkle` package pin move together."""
+    artifact = manifest.get("artifactPins", {}).get("sparkle")
+    package_version, error = _resolved_package_version(root, "sparkle")
+    if error:
+        return [error]
+    if artifact is None and package_version is None:
+        return []
+    if artifact is None:
+        return [f"{PACKAGE_RESOLVED} pins sparkle {package_version} but config/toolchain.json has no "
+                "artifactPins.sparkle to sign its updates"]
+    version = artifact.get("version")
+    if package_version is None:
+        return [f"config/toolchain.json artifactPins.sparkle ({version}) has no sparkle pin in {PACKAGE_RESOLVED}"]
+    errors = []
+    if version != package_version:
+        errors.append(
+            f"config/toolchain.json artifactPins.sparkle is {version} but {PACKAGE_RESOLVED} pins sparkle "
+            f"{package_version}; sign_update moves with the framework that verifies its signatures"
+        )
+    url = artifact.get("url")
+    if not isinstance(url, str) or not url.endswith(f"/{version}/Sparkle-{version}.tar.xz"):
+        errors.append(f"config/toolchain.json artifactPins.sparkle url does not name the Sparkle-{version} tarball")
+    return errors
 
 
 def validate(root: Path, installed: str | None = None) -> list[str]:
@@ -77,6 +130,7 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
                 )
     for repository in sorted(set(configured_actions) - used_actions):
         errors.append(f"config/toolchain.json: configured action is unused: {repository}")
+    errors.extend(sparkle_pin_errors(root, manifest))
 
     dependabot_path = root / ".github/dependabot.yml"
     dependabot = dependabot_path.read_text(encoding="utf-8") if dependabot_path.is_file() else ""

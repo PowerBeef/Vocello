@@ -166,13 +166,9 @@ struct IOSExportPurchaseSheet: View {
 
     private var hero: some View {
         VStack(spacing: 0) {
-            // Design's lavender into Clone's terracotta: the two modes this unlocks.
-            IOSOnboardingIcon(
-                symbol: store.access == .unlocked ? "checkmark" : "square.and.arrow.up",
-                colors: [Theme.Brand.modeDesign, Theme.Brand.modeClone]
-            )
-            .accessibilityHidden(true)
-            .padding(.bottom, 28)
+            IOSExportEmblem(isUnlocked: store.access == .unlocked)
+                .accessibilityHidden(true)
+                .padding(.bottom, Theme.Spacing.xxl)
 
             Text(text.exportUnlockTitle)
                 .iosScaledFont(size: 30, weight: .bold, relativeTo: .largeTitle)
@@ -358,6 +354,69 @@ struct IOSExportPurchaseSheet: View {
             .foregroundStyle(Theme.Text.secondary)
             .frame(minHeight: Theme.HitTarget.minimum)
             .accessibilityIdentifier("exportPurchase_support")
+    }
+}
+
+/// The sheet's hero: a Design take and a Clone take drawn the way the app draws
+/// audio (waveform cards in each mode's color, as on onboarding's ready page and
+/// in History), fanned, with the export itself as a gold badge in the CTA's
+/// color. The badge turns to a check once exports are unlocked.
+private struct IOSExportEmblem: View {
+    let isUnlocked: Bool
+
+    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            take(tint: Theme.Brand.modeDesign, seed: 7)
+                .rotationEffect(.degrees(-8))
+                .offset(x: -28, y: 6)
+            take(tint: Theme.Brand.modeClone, seed: 11)
+                .rotationEffect(.degrees(6))
+                .offset(x: 28, y: -4)
+            badge
+                .offset(x: 72, y: -40)
+        }
+        .frame(width: 210, height: 128)
+    }
+
+    private func take(tint: Color, seed: Int) -> some View {
+        IOSWaveformBars(seed: seed, barCount: 16, tint: tint, style: .player)
+            .frame(width: 76, height: 44)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, 15)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(Theme.Surface.stage)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                            .fill(Theme.accentSurface(tint))
+                    }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .stroke(Theme.accentStroke(tint), lineWidth: Theme.Stroke.standard)
+            }
+            .shadow(color: reduceTransparency ? .clear : Theme.Elevation.glowColor(tint), radius: 14)
+            .shadow(color: Theme.Elevation.ctaDropColor, radius: Theme.Elevation.ctaDropRadius,
+                    y: Theme.Elevation.ctaDropY)
+    }
+
+    private var badge: some View {
+        Image(systemName: isUnlocked ? "checkmark" : "arrow.up")
+            .font(.system(size: 17, weight: .bold))
+            .foregroundStyle(Theme.Text.onAccent)
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 40, height: 40)
+            .background {
+                Circle().fill(Theme.accentGradient(Theme.Brand.gold))
+            }
+            // A canvas ring lifts the badge off the card it sits on.
+            .overlay {
+                Circle().stroke(Theme.Surface.canvas, lineWidth: 3)
+            }
+            .shadow(color: reduceTransparency ? .clear : Theme.Elevation.ctaGlowColor(Theme.Brand.gold),
+                    radius: Theme.Elevation.ctaGlowRadius, y: Theme.Elevation.ctaGlowY)
     }
 }
 #endif

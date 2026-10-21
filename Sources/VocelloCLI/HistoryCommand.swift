@@ -41,6 +41,13 @@ enum HistoryCommand {
                 throw CLIError(.configError, error.errorDescription ?? "", hint: "open Vocello once, then retry")
             case .busy:
                 throw CLIError(.storeBusy, error.errorDescription ?? "", hint: "the app is writing History; retry")
+            case .appRunning:
+                throw CLIError(
+                    .storeBusy, error.errorDescription ?? "",
+                    hint: "quit Vocello and retry; a shared History lock (RF-30) will lift this"
+                )
+            case .damaged:
+                throw CLIError(.ioError, error.errorDescription ?? "", hint: "open Vocello, which recovers History")
             }
         }
     }
@@ -84,12 +91,17 @@ enum HistoryCommand {
             print(reader.exists ? "(no matching History)" : "(no History yet)")
             return
         }
+        let localTime = DateFormatter()
+        localTime.dateFormat = "yyyy-MM-dd HH:mm"
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         for item in page.items {
+            let when = parser.date(from: item.createdAt).map(localTime.string(from:)) ?? item.createdAt
             let duration = item.durationSeconds.map { unsafe String(format: "%.1fs", $0) } ?? "-"
             let indent = item.longFormRole == "segment" ? "  " : ""
             let preview = item.text.count > 60 ? String(item.text.prefix(60)) + "…" : item.text
             let missing = item.audioExists ? "" : "  (audio missing)"
-            print("\(indent)\(item.id)\t\(item.createdAt.prefix(19))\t\(item.mode)\t\(duration)\t\(preview)\(missing)")
+            print("\(indent)\(item.id)\t\(when)\t\(item.mode)\t\(duration)\t\(preview)\(missing)")
         }
         if page.hasMore {
             note("more rows: raise --limit (at most 500) or narrow with --mode or a search")
@@ -123,17 +135,24 @@ enum HistoryCommand {
             throw CLIError(.inputFileNotFound, "History item \(id)'s audio file is gone")
         }
         let out = try args.require("out", "a .wav file path to copy the take to")
-        let destination = URL(fileURLWithPath: (out as NSString).expandingTildeInPath)
-        guard destination.pathExtension.lowercased() == "wav" else {
-            throw CLIError(.invalidInput, "--out must name a .wav file (got \(out))")
-        }
-        var isDirectory: ObjCBool = false
-        let parent = destination.deletingLastPathComponent()
-        guard unsafe FileManager.default.fileExists(atPath: parent.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            throw CLIError(.outputUnavailable, "the folder \(parent.path) does not exist")
-        }
-        if FileManager.default.fileExists(atPath: destination.path), !args.flag("replace") {
-            throw CLIError(.outputUnavailable, "\(destination.path) exists", hint: "pass --replace to overwrite it")
+        let destination = URL(fileURLWithPath: (out as NSString).expandingTildeInPath).standardizedFileURL
+        do {
+            try DesktopHistoryExport.check(
+                destination: destination, source: source, replace: args.flag("replace"), isTakeAudio: reader.isTakeAudio
+            )
+        } catch let refusal as DesktopHistoryExport.Refusal {
+            switch refusal {
+            case .notWAV:
+                throw CLIError(.invalidInput, "--out must name a .wav file (got \(out))")
+            case .missingFolder:
+                throw CLIError(.outputUnavailable, "the folder \(destination.deletingLastPathComponent().path) does not exist")
+            case .isFolder:
+                throw CLIError(.outputUnavailable, "\(destination.path) is a folder; pass a .wav file path inside it")
+            case .exists:
+                throw CLIError(.outputUnavailable, "\(destination.path) exists", hint: "pass --replace to overwrite it")
+            case .anotherTake:
+                throw CLIError(.outputUnavailable, "\(destination.path) is another take in History and is never overwritten")
+            }
         }
         let outcome = try DesktopHistoryExport.copy(from: source, to: destination)
         let bytes = ((try? FileManager.default.attributesOfItem(atPath: destination.path))?[.size] as? NSNumber)?.int64Value ?? 0

@@ -43,7 +43,7 @@ final class DesktopHistoryReaderTests: XCTestCase {
 
     func testAMissingStoreReadsAsEmptyAndCreatesNothing() throws {
         let root = try makeRoot()
-        let reader = DesktopHistoryReader(root: root)
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
         let page = try reader.page()
         XCTAssertEqual(page.items, [])
         XCTAssertEqual(page.totalCount, 0)
@@ -63,7 +63,7 @@ final class DesktopHistoryReaderTests: XCTestCase {
             row("Segment one", at: 4, audioPath: root.appendingPathComponent("s1.wav").path, projectID: "p1", role: "segment"),
             row("Segment two", at: 5, audioPath: root.appendingPathComponent("s2.wav").path, projectID: "p1", role: "segment"),
         ])
-        let reader = DesktopHistoryReader(root: root)
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
         let before = try digest(reader.databaseURL)
 
         let page = try reader.page()
@@ -95,7 +95,7 @@ final class DesktopHistoryReaderTests: XCTestCase {
     func testAStoreFromANewerVocelloIsRefused() throws {
         let root = try makeRoot()
         try seed(root, [row("Take", at: 1, audioPath: root.appendingPathComponent("a.wav").path)])
-        let reader = DesktopHistoryReader(root: root)
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
         let queue = try DatabaseQueue(path: reader.databaseURL.path)
         try queue.write { db in
             try db.execute(sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v99_from_the_future')")
@@ -113,12 +113,101 @@ final class DesktopHistoryReaderTests: XCTestCase {
         ])
         let journal = root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
         try FileManager.default.createDirectory(at: journal, withIntermediateDirectories: true)
-        let reader = DesktopHistoryReader(root: root)
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
         XCTAssertFalse(reader.longFormRecoveryPending, "an empty journal is not pending")
         try Data("{}".utf8).write(to: journal.appendingPathComponent("entry.json"))
         let page = try reader.page()
         XCTAssertTrue(page.longFormRecoveryPending)
         XCTAssertEqual(page.items.map(\.text), ["Single"])
+    }
+
+    func testReadsAreRefusedWhileTheAppUsesTheStore() throws {
+        let root = try makeRoot()
+        try seed(root, [row("Take", at: 1, audioPath: root.appendingPathComponent("a.wav").path)])
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in true })
+        XCTAssertThrowsError(try reader.page()) { XCTAssertEqual($0 as? DesktopHistoryError, .appRunning) }
+        XCTAssertThrowsError(try reader.detail(id: 1)) { XCTAssertEqual($0 as? DesktopHistoryError, .appRunning) }
+        XCTAssertFalse(DesktopAppPresence.isAppDataRoot(root), "a scratch root is never the app's")
+        let support = try XCTUnwrap(FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first)
+        XCTAssertTrue(DesktopAppPresence.isAppDataRoot(support.appendingPathComponent("QwenVoice", isDirectory: true)))
+        XCTAssertTrue(DesktopAppPresence.isAppDataRoot(support.appendingPathComponent("QwenVoice-Debug/", isDirectory: true)))
+    }
+
+    func testAnOlderStoreIsRefusedAndAHotJournalNeverShowsATornWrite() throws {
+        let root = try makeRoot()
+        try seed(root, [row("Take", at: 1, audioPath: root.appendingPathComponent("a.wav").path)])
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
+
+        // A hot journal: a write that spilled pages to disk, copied mid-transaction.
+        let copy = try makeRoot()
+        let queue = try DatabaseQueue(path: reader.databaseURL.path)
+        try queue.inDatabase { db in
+            try db.execute(sql: "PRAGMA cache_size = 1")
+            try db.execute(sql: "BEGIN IMMEDIATE")
+            for index in 0 ..< 400 {
+                try db.execute(
+                    sql: "UPDATE generations SET text = ? WHERE id = 1",
+                    arguments: [String(repeating: "x", count: 4096) + String(index)]
+                )
+                try db.execute(sql: "INSERT INTO generations (text, mode, modelTier, audioPath, createdAt) VALUES (?, 'custom', 'speed', ?, ?)",
+                               arguments: [String(repeating: "y", count: 2048), "/x/\(index).wav", Date()])
+            }
+            for name in ["history.sqlite", "history.sqlite-journal"] {
+                try FileManager.default.copyItem(at: root.appendingPathComponent(name), to: copy.appendingPathComponent(name))
+            }
+            try db.execute(sql: "ROLLBACK")
+        }
+        // SQLite recovers the hot journal before the read: only the committed state is seen, never a torn write.
+        let recovered = try DesktopHistoryReader(root: copy, appIsUsingRoot: { _ in false }).page()
+        XCTAssertEqual(recovered.items.map(\.text), ["Take"])
+        XCTAssertEqual(recovered.totalCount, 1)
+
+        try queue.write { db in
+            try db.execute(sql: "DELETE FROM grdb_migrations WHERE identifier = (SELECT MAX(identifier) FROM grdb_migrations)")
+        }
+        XCTAssertThrowsError(try reader.page()) { XCTAssertEqual($0 as? DesktopHistoryError, .schemaOlder) }
+    }
+
+    func testRecoveryIsPendingAsTheAppDecides() throws {
+        let root = try makeRoot()
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
+        let journal = root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        try FileManager.default.createDirectory(at: journal, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: journal.appendingPathComponent("abc.1234.unreadable"))
+        XCTAssertFalse(reader.longFormRecoveryPending, "a discarded journal is not pending")
+        try Data("{}".utf8).write(to: journal.appendingPathComponent("abc.json"))
+        XCTAssertTrue(reader.longFormRecoveryPending)
+        try FileManager.default.removeItem(at: journal)
+        try Data().write(to: journal)
+        XCTAssertTrue(reader.longFormRecoveryPending, "a journal folder that cannot be read fails closed")
+    }
+
+    func testExportRefusesWhatSaveAsWouldNot() throws {
+        let root = try makeRoot()
+        let source = root.appendingPathComponent("take.wav")
+        try Data("RIFF".utf8).write(to: source)
+        let existing = root.appendingPathComponent("existing.wav")
+        try Data("old".utf8).write(to: existing)
+        let folder = root.appendingPathComponent("folder.wav", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let other = root.appendingPathComponent("other-take.wav")
+        try Data("other".utf8).write(to: other)
+        func check(_ destination: URL, replace: Bool = false) -> DesktopHistoryExport.Refusal? {
+            do {
+                try DesktopHistoryExport.check(destination: destination, source: source, replace: replace) { $0 == other }
+                return nil
+            } catch {
+                return error as? DesktopHistoryExport.Refusal
+            }
+        }
+        XCTAssertNil(check(root.appendingPathComponent("new.wav")))
+        XCTAssertEqual(check(root.appendingPathComponent("new.aiff")), .notWAV)
+        XCTAssertEqual(check(root.appendingPathComponent("missing/new.wav")), .missingFolder)
+        XCTAssertEqual(check(existing), .exists)
+        XCTAssertNil(check(existing, replace: true))
+        XCTAssertEqual(check(folder, replace: true), .isFolder)
+        XCTAssertEqual(check(other, replace: true), .anotherTake, "never another History take")
+        XCTAssertNil(check(source), "the take's own file is a no-op")
     }
 
     func testExportCopiesTheTakeAndTreatsItsOwnFileAsDone() throws {
@@ -135,9 +224,13 @@ final class DesktopHistoryReaderTests: XCTestCase {
     func testSettingsReadTheAppsKeysWithItsDefaults() {
         let values: [String: any Sendable] = [
             "autoPlay": false, "generationVariation": "consistent", "outputDirectory": "  ",
-            "QwenVoice.MacModelVariantPreference.clone": "quality", "QwenVoice.MacModelVariantPreference.design": "turbo",
+            "QwenVoice.MacModelVariantPreference.clone": " quality ", "QwenVoice.MacModelVariantPreference.design": "turbo",
+            "QwenVoice.PreferSpeedEverywhere": "YES",
         ]
-        let settings = DesktopAppSettings(domain: DesktopAppSettings.releaseDomain) { values[$0] }
+        let release: [String: any Sendable] = ["vocello.ios.interfaceLanguage": "fr"]
+        let settings = DesktopAppSettings(
+            domain: DesktopAppSettings.debugDomain, read: { values[$0] }, readRelease: { release[$0] }
+        )
         let entries = Dictionary(uniqueKeysWithValues: settings.all().map { ($0.name, $0) })
         XCTAssertEqual(Set(entries.keys), Set(DesktopAppSettings.names))
         XCTAssertEqual(entries["autoplay"]?.value, "false")
@@ -146,8 +239,14 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(entries["output-folder"]?.value, "default", "a blank folder is the default")
         XCTAssertEqual(entries["variant.clone"]?.value, "quality")
         XCTAssertEqual(entries["variant.design"]?.value, "automatic", "an unknown variant reads as automatic")
-        XCTAssertEqual(entries["prefer-lower-memory"]?.value, "false")
         XCTAssertEqual(entries["interface-language"]?.settable, false)
+        XCTAssertEqual(entries["interface-language"]?.value, "fr", "the app keeps it in the release domain")
+        XCTAssertEqual(entries["prefer-lower-memory"]?.value, "true", "a string Boolean reads as UserDefaults reads it")
+        XCTAssertTrue(settings.prefersLowerMemory)
+        XCTAssertEqual(settings.variation, .consistent)
+        XCTAssertEqual(settings.explicitVariantID(for: .clone), "quality")
+        XCTAssertEqual(settings.explicitVariantID(for: .design), "turbo", "any stored id counts; the resolution skips it")
+        XCTAssertNil(settings.explicitVariantID(for: .custom))
         XCTAssertNil(settings.entry("consent"), "consent is never a CLI setting")
         XCTAssertEqual(DesktopAppSettings(debug: false).domain, "com.qwenvoice.app")
     }

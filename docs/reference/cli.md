@@ -315,7 +315,10 @@ read-only transaction per command: it never migrates, reconciles or writes the s
 exactly as the app does (newest first; a long-form project's segments follow its joined row unless a
 search lists matches flat; the Mac search is case-insensitive over text and voice). A store written by a
 newer Vocello is refused with `history_schema_newer` (78); a busy store is `store_busy` (75). While the
-app has a long-form recovery pending, project rows are withheld with a warning. `export` copies the take
+app has a long-form recovery pending, project rows are withheld with a warning. The app writes History
+without waiting for other readers, so until the cross-process History lock lands (RF-30) every
+`history` command refuses with `store_busy` while the Vocello app is running on the same data folder;
+quit the app, or point `--data-dir` elsewhere. `export` copies the take
 the way the app's Save As does (complete before it replaces anything; `--replace` to overwrite).
 Deleting, clearing and recovery come with the cross-process History lock (RF-30).
 

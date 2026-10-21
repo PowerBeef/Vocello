@@ -25,6 +25,8 @@ enum VoicesCommand {
         let voice: VoiceJSON
         /// The words the reference says, as saved (nil when it has none).
         let transcript: String?
+        /// The voice has a transcript file that could not be read.
+        let transcriptUnreadable: Bool
         /// The reference language recorded at enrollment (nil: Auto or unrecorded).
         let referenceLanguage: String?
         let transcriptSource: String?
@@ -97,9 +99,10 @@ enum VoicesCommand {
             let transcript = voice.hasTranscript
                 ? (try? String(contentsOf: transcriptURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
                 : nil
+            let transcriptUnreadable = voice.hasTranscript && transcript == nil
             let metadata = voice.enrollmentMetadata
             let shown = Shown(
-                voice: json(voice), transcript: transcript,
+                voice: json(voice), transcript: transcript, transcriptUnreadable: transcriptUnreadable,
                 referenceLanguage: metadata?.referenceLanguage?.rawValue,
                 transcriptSource: metadata?.transcriptSource.rawValue,
                 generatedSourceMode: metadata?.generatedSourceMode,
@@ -113,7 +116,7 @@ enum VoicesCommand {
                 if let language = shown.referenceLanguage { print("language: \(language)") }
                 if let source = shown.transcriptSource { print("transcript source: \(source)") }
                 if !voice.qualityWarnings.isEmpty { print("warnings: \(voice.qualityWarnings.joined(separator: ", "))") }
-                print("transcript: \(transcript ?? "(none: audio-only conditioning)")")
+                print("transcript: \(transcript ?? (transcriptUnreadable ? "(unreadable)" : "(none: audio-only conditioning)"))")
             }
         case "enroll":
             let name = try args.require("name", "a name for the voice")

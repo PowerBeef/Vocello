@@ -321,8 +321,11 @@ ticket and Gatekeeper's install assessment; that its payload holds the sealed ma
 `/usr/local/lib/vocello` and the installed manifest, smokes the CLI through `/usr/local/bin/vocello`,
 installs again over a planted stale file that must disappear, runs `sudo sh
 /usr/local/lib/vocello/uninstall.sh`, and requires the receipt, folder and links gone and
-`~/Library/Application Support/QwenVoice` unchanged. It runs only with `CI=true` and passwordless
-`sudo` (an ephemeral GitHub runner); anywhere else it refuses with exit 2 before invoking `sudo`. The
+`~/Library/Application Support/QwenVoice` unchanged. It runs only on an ephemeral GitHub-hosted runner
+(`CI=true`, `GITHUB_ACTIONS=true`, `RUNNER_ENVIRONMENT=github-hosted` and passwordless `sudo`); anywhere
+else it refuses with exit 2 before invoking `sudo`. The package scripts refuse a `/usr/local` or
+`/usr/local/lib` that anyone but root can change, so the first rehearsal also confirms the runner's
+`/usr/local` ownership. The
 rehearsal installs the unsigned package. The install test is recorded by the step's ledger and
 command template, not by `cli-pkg-verification.json`, whose `installTest` stays `not-performed`.
 

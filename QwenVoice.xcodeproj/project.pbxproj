@@ -612,6 +612,7 @@
 		B4AEDD4319ED3C1D8756ADB9 /* VocelloUIInteractionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1004511291434DD40D335C94 /* VocelloUIInteractionPolicy.swift */; };
 		B53B221346CB22217396B9B2 /* WaveformService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902038E2BAE3E5AC81612EFD /* WaveformService.swift */; };
 		B68B37574C6ADFF037C1A154 /* VocelloIconButtonChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCCDB1DC4E34FD938411CCC /* VocelloIconButtonChrome.swift */; };
+		B6C8D92787F98A2B463ED61B /* DesktopAppPresence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01DBD4EF994D1DE016AA75A5 /* DesktopAppPresence.swift */; };
 		B6CB0C31F51CB8911AA30A07 /* GenerationTelemetryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDAA8C5ADE95EC61570A219 /* GenerationTelemetryRecord.swift */; };
 		B6E404A585D6460A8CCDDD41 /* MacChipRowBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698F6E2CBD6354BB457BF6CD /* MacChipRowBudget.swift */; };
 		B77160EF7A41E7A32791C29C /* QwenVoiceCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1CD42CBFA3E0E68EDA48DEA /* QwenVoiceCore.framework */; };
@@ -702,6 +703,7 @@
 		D2AB592D98D920F7BF960EC4 /* VocelloCLICore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0CAC94D19442E36EA28436C /* VocelloCLICore.framework */; };
 		D32597F9BAA358AC7FD05D7F /* LanguageSelectionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE98ABA2A416060FE667DD45 /* LanguageSelectionPresentation.swift */; };
 		D325F6D71EB0ED1979D7DA49 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = D4787185F6668A7FAF173B12 /* GRDB */; };
+		D32B58EEA87B0080DE67FEC9 /* DesktopModelInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F72D268AA45601ABC0EF50C /* DesktopModelInventory.swift */; };
 		D3BBFC311AF428545AD5CB7C /* IOSRecordVoiceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2290D85D02EF277B2AC164A /* IOSRecordVoiceSheet.swift */; };
 		D4008E9B424CE5E4D9D76879 /* VocelloMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3548C32EC85AB76ABEAEA6A8 /* VocelloMain.swift */; };
 		D45A1753FBA6D932E5DB46C0 /* ModelDownloadLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3906B4F64C4DEF21F1AFEF77 /* ModelDownloadLifecycleTests.swift */; };
@@ -1014,6 +1016,7 @@
 		0150C20587FC9E858573E18A /* FileStreamIOTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileStreamIOTests.swift; sourceTree = "<group>"; };
 		017F5C3702FC8CF9C4A88E43 /* DesktopCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopCatalog.swift; sourceTree = "<group>"; };
 		01B42F5235213E8CA15A0803 /* SpokenTextPlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenTextPlanningTests.swift; sourceTree = "<group>"; };
+		01DBD4EF994D1DE016AA75A5 /* DesktopAppPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAppPresence.swift; sourceTree = "<group>"; };
 		02505AB2D0BCC95916512E6A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		02675FED92DFFB3ED1508C5B /* ModelsCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsCommand.swift; sourceTree = "<group>"; };
 		02BAFB56C161430BB372F49D /* MacStudioCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStudioCanvas.swift; sourceTree = "<group>"; };
@@ -1282,6 +1285,7 @@
 		6F08AE4621401967EBE2D55E /* MacLineBatchRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLineBatchRunnerTests.swift; sourceTree = "<group>"; };
 		6F3D06E2FF511C7FBE4BFE41 /* IOSSavedOutputsDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSSavedOutputsDestinationTests.swift; sourceTree = "<group>"; };
 		6F60B4BA56B3455CB8B52EDD /* IOSModelProgressPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSModelProgressPresentation.swift; sourceTree = "<group>"; };
+		6F72D268AA45601ABC0EF50C /* DesktopModelInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopModelInventory.swift; sourceTree = "<group>"; };
 		6FF06A4116BBDB359ADECFF4 /* MacListPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacListPrimitives.swift; sourceTree = "<group>"; };
 		70AFBD4170BB7B0B3EA29928 /* VocelloPlaybackCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloPlaybackCaptureSession.swift; sourceTree = "<group>"; };
 		71761C4FD04CF031A72524C2 /* SavedVoicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedVoicesViewModel.swift; sourceTree = "<group>"; };
@@ -2523,9 +2527,11 @@
 		AC6F854627D7101752EF9821 /* VocelloDesktopCore */ = {
 			isa = PBXGroup;
 			children = (
+				01DBD4EF994D1DE016AA75A5 /* DesktopAppPresence.swift */,
 				7FA57D3528F1087263226BF3 /* DesktopAppSettings.swift */,
 				017F5C3702FC8CF9C4A88E43 /* DesktopCatalog.swift */,
 				E3D359451E1486C0325EE249 /* DesktopHistoryReader.swift */,
+				6F72D268AA45601ABC0EF50C /* DesktopModelInventory.swift */,
 				ACD98AC8D386F3400EB58A06 /* DesktopModelSelection.swift */,
 			);
 			name = VocelloDesktopCore;
@@ -3665,9 +3671,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B6C8D92787F98A2B463ED61B /* DesktopAppPresence.swift in Sources */,
 				57C084B166AEB94A078E1B41 /* DesktopAppSettings.swift in Sources */,
 				40ECCC4505EA0720FE407FA2 /* DesktopCatalog.swift in Sources */,
 				C1CDF938DDBEBFB087FFEA4D /* DesktopHistoryReader.swift in Sources */,
+				D32B58EEA87B0080DE67FEC9 /* DesktopModelInventory.swift in Sources */,
 				F1498AA8EE9A80E8DA2E05D4 /* DesktopModelSelection.swift in Sources */,
 				E41D2645ED3C1FD751E74A61 /* Generation.swift in Sources */,
 				F7FA7337D12CAF8485DF159B /* GenerationHistoryPage.swift in Sources */,

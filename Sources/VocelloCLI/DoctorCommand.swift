@@ -71,10 +71,11 @@ enum DoctorCommand {
             checks.append(Check(name: "contract", status: "fail", message: CLIFailure.classify(error).message))
         }
 
-        let catalogFound = (try? CLIRuntime.locateProductionCatalogURL()) != nil
+        let catalogFound = (try? CLIRuntime.locateProductionCatalogURL())
+            .flatMap { try? ProductionModelCatalog(contentsOf: $0) } != nil
         checks.append(Check(
             name: "catalog", status: catalogFound ? "ok" : "fail",
-            message: catalogFound ? "the authenticated model catalog is present" : "the authenticated model catalog is missing"
+            message: catalogFound ? "the authenticated model catalog loads" : "the authenticated model catalog is missing or invalid"
         ))
 
         let memoryClass = NativeMemoryPolicyResolver.deviceClass()

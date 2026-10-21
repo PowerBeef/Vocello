@@ -1,5 +1,7 @@
+import CryptoKit
 import Foundation
 import QwenVoiceCore
+import Synchronization
 import XCTest
 import VocelloDesktopCore
 
@@ -65,5 +67,89 @@ final class DesktopModelSelectionTests: XCTestCase {
         XCTAssertEqual(choices["custom"]?.generationVariant, "speed")
         XCTAssertEqual(choices["custom"]?.generationModelID, "pro_custom_speed")
         XCTAssertNil(choices["design"]?.generationVariant, "nothing installed for Design")
+    }
+}
+
+/// RF-26: `models verify` hashes every installed file against the catalog's
+/// size and digest, cancellably; `isComplete` judges an install as the app does.
+final class DesktopModelInventoryTests: XCTestCase {
+    private func makeRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DesktopModelInventory-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return root
+    }
+
+    private func expected(_ name: String, _ data: Data) -> DesktopModelInventory.ExpectedFile {
+        let digest = SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
+        return DesktopModelInventory.ExpectedFile(relativePath: name, sizeBytes: Int64(data.count), sha256: digest)
+    }
+
+    func testVerifySortsEveryFileIntoItsOutcome() async throws {
+        let folder = try makeRoot()
+        let good = Data("weights".utf8)
+        try good.write(to: folder.appendingPathComponent("good.bin"))
+        try Data("weigh".utf8).write(to: folder.appendingPathComponent("truncated.bin"))
+        try FileManager.default.linkItem(
+            at: folder.appendingPathComponent("good.bin"), to: folder.appendingPathComponent("hardlink.bin")
+        )
+        try FileManager.default.createSymbolicLink(
+            at: folder.appendingPathComponent("symlink.bin"), withDestinationURL: folder.appendingPathComponent("good.bin")
+        )
+        let checked = Mutex(0)
+        let result = try await DesktopModelInventory.verify(
+            [expected("good.bin", good), expected("truncated.bin", good), expected("missing.bin", good),
+             expected("hardlink.bin", good), expected("symlink.bin", good)],
+            in: folder
+        ) { count in checked.withLock { $0 = count } }
+        XCTAssertEqual(result.missingPaths, ["missing.bin"])
+        XCTAssertEqual(result.mismatchedPaths, ["symlink.bin", "truncated.bin"], "a link is not the installed file")
+        XCTAssertEqual(result.unreadablePaths, [])
+        XCTAssertEqual(result.verifiedBytes, Int64(good.count * 2), "a hard link is the same verified file")
+        XCTAssertFalse(result.passed)
+        XCTAssertEqual(checked.withLock { $0 }, 5)
+    }
+
+    func testVerifyStopsWhenCancelled() async throws {
+        let folder = try makeRoot()
+        let data = Data("x".utf8)
+        try data.write(to: folder.appendingPathComponent("a.bin"))
+        let file = expected("a.bin", data)
+        let task = Task { () async throws -> DesktopModelInventory.Verification in
+            unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
+            return try await DesktopModelInventory.verify([file], in: folder)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled verification must not finish")
+        } catch is CancellationError {}
+    }
+
+    func testAnInstallIsCompleteOnlyWithEveryRequiredFile() throws {
+        let manifest = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let registry = try ContractBackedModelRegistry(manifestURL: manifest)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let descriptor = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
+        let models = try makeRoot()
+        XCTAssertFalse(DesktopModelInventory.isComplete(descriptor, modelsDirectory: models))
+        let folder = descriptor.installDirectory(in: models)
+        for path in descriptor.requiredRelativePaths.dropLast() {
+            let url = folder.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: url)
+        }
+        XCTAssertFalse(DesktopModelInventory.isComplete(descriptor, modelsDirectory: models), "one required file is missing")
+        let last = try XCTUnwrap(descriptor.requiredRelativePaths.last)
+        try FileManager.default.createDirectory(
+            at: folder.appendingPathComponent(last).deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try Data().write(to: folder.appendingPathComponent(last))
+        XCTAssertTrue(
+            DesktopModelInventory.isComplete(descriptor, modelsDirectory: models),
+            "every file present and no integrity manifest to contradict them, as the app decides"
+        )
     }
 }

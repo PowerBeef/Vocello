@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "batch",
+  "requestID": "nightly-batch-2026-10-21.3",
+  "result": {
+    "schemaVersion": 2,
+    "mode": "custom",
+    "variant": "quality",
+    "modelID": "pro_custom_quality",
+    "plannedCount": 3,
+    "completedCount": 1,
+    "wallSeconds": 9.6,
+    "items": [
+      {
+        "index": 0,
+        "generationID": "8E2C4A10-6B3D-4F59-A7C1-0D9E5B3F2A84",
+        "status": "completed",
+        "audioPath": "/Users/example/Library/Application Support/QwenVoice/outputs/cli/batch/20261021_102000_custom_000.wav",
+        "durationSeconds": 3.2,
+        "finishReason": "eos"
+      },
+      {
+        "index": 1,
+        "generationID": "1F7A9C3E-2D4B-4E61-8B05-C6A3D9E1F720",
+        "status": "failed",
+        "errorCode": "memory_pressure"
+      },
+      {
+        "index": 2,
+        "generationID": "5C8B1E4D-7A2F-4093-9D6E-3B1A0F8C2D57",
+        "status": "not_attempted"
+      }
+    ]
+  },
+  "error": {
+    "code": "memory_pressure",
+    "category": "transient",
+    "exitCode": 75,
+    "message": "The engine stopped item 1 under critical memory pressure, so no audio was written for it.",
+    "retryable": true,
+    "retryAfterMs": null,
+    "hint": "Free memory (quit other apps) or use --variant speed, then rerun the items not attempted.",
+    "detail": {
+      "stoppedAt": 1
+    }
+  },
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.0.0",
+    "build": "24",
+    "contractRevision": 1,
+    "durationMs": 10240,
+    "replayed": false
+  }
+}

@@ -1,0 +1,13 @@
+{"schemaVersion":1,"seq":0,"t":0.0,"requestID":"agent-run-42","type":"started","data":{"command":"generate"}}
+{"schemaVersion":1,"seq":1,"t":0.002,"requestID":"agent-run-42","type":"plan","data":{"mode":"design","variant":"speed","modelID":"pro_design_speed","seed":"18446744073709551557","items":1}}
+{"schemaVersion":1,"seq":2,"t":0.004,"requestID":"agent-run-42","type":"engine_booting","data":{}}
+{"schemaVersion":1,"seq":3,"t":0.31,"requestID":"agent-run-42","type":"engine_ready","data":{}}
+{"schemaVersion":1,"seq":4,"t":0.311,"requestID":"agent-run-42","type":"model_loading","data":{"modelID":"pro_design_speed"}}
+{"schemaVersion":1,"seq":5,"t":1.94,"requestID":"agent-run-42","type":"model_loaded","data":{"modelID":"pro_design_speed","loadMs":1629}}
+{"schemaVersion":1,"seq":6,"t":1.95,"requestID":"agent-run-42","type":"generation_started","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"index":0}}
+{"schemaVersion":1,"seq":7,"t":2.36,"requestID":"agent-run-42","type":"chunk","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"chunk":0,"audioSeconds":0.32}}
+{"schemaVersion":1,"seq":8,"t":3.1,"requestID":"agent-run-42","type":"progress","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"chunks":9,"audioSeconds":2.88}}
+{"schemaVersion":1,"seq":9,"t":4.02,"requestID":"agent-run-42","type":"qc","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"passed":true,"flags":[]}}
+{"schemaVersion":1,"seq":10,"t":4.03,"requestID":"agent-run-42","type":"output_published","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"audioPath":"/Users/example/Library/Application Support/QwenVoice/outputs/cli/20261021_110000_design_9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273.wav"}}
+{"schemaVersion":1,"seq":11,"t":4.031,"requestID":"agent-run-42","type":"generation_completed","generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","data":{"durationSeconds":3.84,"finishReason":"eos"}}
+{"schemaVersion":1,"seq":12,"t":4.04,"requestID":"agent-run-42","type":"result","data":{"schemaVersion":1,"ok":true,"command":"generate","requestID":"agent-run-42","result":{"generationID":"9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273","audioPath":"/Users/example/Library/Application Support/QwenVoice/outputs/cli/20261021_110000_design_9a1c5e7f-3b2d-4f80-a6c4-e1d0b9f8a273.wav","durationSeconds":3.84,"wallSeconds":4.04,"realtimeFactor":1.05,"realtimeSpeedup":0.95,"finishReason":"eos","mode":"design","variant":"speed","modelID":"pro_design_speed","firstChunkMS":410.0,"chunks":12},"error":null,"warnings":[],"meta":{"vocelloVersion":"3.0.0","build":"24","contractRevision":1,"durationMs":4040,"replayed":false}}}

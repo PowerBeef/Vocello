@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vocello:cli:v1:error",
+  "title": "Vocello CLI error",
+  "description": "Why a command failed. code is the stable identifier; category and exitCode classify it as error-codes.json and exit-codes.json do; retryable is true exactly for the transient category.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "enum": [
+        "assembly_failed",
+        "batch_incomplete",
+        "cancelled",
+        "config_error",
+        "consent_required",
+        "download_failed",
+        "engine_busy",
+        "generation_failed",
+        "history_item_not_found",
+        "history_schema_newer",
+        "idempotency_conflict",
+        "input_file_not_found",
+        "insufficient_memory",
+        "integrity_failed",
+        "internal_error",
+        "invalid_input",
+        "io_error",
+        "memory_pressure",
+        "model_not_installed",
+        "model_unknown",
+        "network_unavailable",
+        "output_missing",
+        "output_unavailable",
+        "path_not_allowed",
+        "qc_rejected",
+        "request_in_progress",
+        "speaker_not_found",
+        "speech_unavailable",
+        "storage_full",
+        "store_busy",
+        "text_too_long",
+        "unsupported_contract_version",
+        "usage_error",
+        "voice_not_found"
+      ],
+      "description": "The stable error code (error-codes.json). A consumer meeting a code it does not know falls back on category and exitCode."
+    },
+    "category": {
+      "enum": [
+        "cancelled",
+        "config",
+        "failure",
+        "io",
+        "not_found",
+        "output",
+        "permission",
+        "precondition",
+        "transient",
+        "usage"
+      ],
+      "description": "The exit class of the code (exit-codes.json)."
+    },
+    "exitCode": {
+      "enum": [
+        1,
+        2,
+        66,
+        69,
+        73,
+        74,
+        75,
+        77,
+        78,
+        130,
+        143
+      ],
+      "description": "The process exit status the CLI ends with; 143 replaces 130 for SIGTERM."
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "A human-readable English sentence; never parsed, and never text, transcripts or private paths."
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "True exactly when category is transient: the same request may succeed later."
+    },
+    "retryAfterMs": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "A suggested wait before retrying, or null; set only when retryable."
+    },
+    "hint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000,
+      "description": "What the caller can do next, or null."
+    },
+    "detail": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Code-specific structured facts, or null; cancelled carries signal (SIGINT or SIGTERM)."
+    }
+  },
+  "required": [
+    "code",
+    "category",
+    "exitCode",
+    "message",
+    "retryable",
+    "retryAfterMs",
+    "hint",
+    "detail"
+  ],
+  "additionalProperties": false
+}

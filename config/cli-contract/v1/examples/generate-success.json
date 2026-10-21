@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "generate",
+  "requestID": "7f9c2ba4-e88f-4b51-9a3e-2b8d1f0c5a61",
+  "result": {
+    "generationID": "3b0e6f1c-5d2a-4c8e-9f17-2a6b8c4d0e93",
+    "audioPath": "/Users/example/Library/Application Support/QwenVoice/outputs/cli/20261021_101500_custom_3b0e6f1c-5d2a-4c8e-9f17-2a6b8c4d0e93.wav",
+    "durationSeconds": 4.48,
+    "wallSeconds": 2.91,
+    "realtimeFactor": 0.65,
+    "realtimeSpeedup": 1.54,
+    "finishReason": "eos",
+    "mode": "custom",
+    "variant": "speed",
+    "modelID": "pro_custom_speed",
+    "requestReceiptSchemaVersion": 3,
+    "storedLanguageSelection": "auto",
+    "detectedTargetLanguage": "english",
+    "finalModelLanguage": "english",
+    "firstChunkMS": 412.0,
+    "chunks": 14
+  },
+  "error": null,
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.0.0",
+    "build": "24",
+    "contractRevision": 1,
+    "durationMs": 3120,
+    "replayed": false
+  }
+}

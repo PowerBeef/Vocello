@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "speakers.list",
+  "requestID": "e2a9b7c1-4d3f-4a8e-b6c5-1f0d9e8a7b26",
+  "result": {
+    "speakers": [
+      {
+        "id": "ryan",
+        "group": "English",
+        "displayName": "Ryan",
+        "language": "english",
+        "description": "A warm, steady male voice.",
+        "isDefault": false
+      },
+      {
+        "id": "vivian",
+        "group": "Chinese",
+        "displayName": "Vivian",
+        "language": "chinese",
+        "description": null,
+        "isDefault": true
+      }
+    ]
+  },
+  "error": null,
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.0.0",
+    "build": "24",
+    "contractRevision": 1,
+    "durationMs": 12,
+    "replayed": false
+  }
+}

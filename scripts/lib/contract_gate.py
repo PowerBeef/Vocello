@@ -119,6 +119,11 @@ VALIDATORS: tuple[Validator, ...] = (
         "Sources/SharedSupport/Services/HantHansFoldTable.swift")),
     _reads(PYTHON, "scripts/cli_version_contract.py", "validate", inputs=(
         "scripts/cli_version_contract.py", "project.yml", "Sources/VocelloCLI/")),
+    # The CLI machine contract (RF-25): tables, schemas, examples, the additive-only baseline and the
+    # reference docs' exit-code table.
+    _reads(PYTHON, "scripts/cli_contract.py", "validate", inputs=(
+        "scripts/cli_contract.py", "scripts/lib/cli_contract_schema.py", *JSONIO, "config/cli-contract/",
+        "docs/reference/cli.md")),
     _reads(PYTHON, "scripts/localization_contract.py", "validate", inputs=(
         "scripts/localization_contract.py", "project.yml", "Sources/", "Tests/VocelloiOSUITests/",
         "Tests/VocelloMacUITests/", "config/localization-unlocalized-baseline.json")),

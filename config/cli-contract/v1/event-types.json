@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "contract": "urn:vocello:cli:v1",
+  "eventTypes": [
+    {
+      "type": "started",
+      "summary": "The command accepted its request; the first record of every stream."
+    },
+    {
+      "type": "plan",
+      "summary": "The resolved request: mode, model, variant, seed (a decimal string) and the planned item or segment count."
+    },
+    {
+      "type": "engine_booting",
+      "summary": "The in-process engine is starting."
+    },
+    {
+      "type": "engine_ready",
+      "summary": "The engine is ready to accept work."
+    },
+    {
+      "type": "model_loading",
+      "summary": "A model is loading."
+    },
+    {
+      "type": "model_loaded",
+      "summary": "The model finished loading."
+    },
+    {
+      "type": "queued",
+      "summary": "The request waits behind another for the engine."
+    },
+    {
+      "type": "generation_started",
+      "summary": "A take started; the record carries its generationID."
+    },
+    {
+      "type": "chunk",
+      "summary": "A streamed audio chunk was produced (counts and timings only, never PCM)."
+    },
+    {
+      "type": "progress",
+      "summary": "Coalesced progress of the current take, batch or project."
+    },
+    {
+      "type": "download_progress",
+      "summary": "Coalesced progress of a model download."
+    },
+    {
+      "type": "qc",
+      "summary": "The take's Fast QC verdict and flags."
+    },
+    {
+      "type": "output_published",
+      "summary": "A take's output file was published atomically."
+    },
+    {
+      "type": "generation_completed",
+      "summary": "A take completed."
+    },
+    {
+      "type": "generation_failed",
+      "summary": "A take failed; data carries the error object."
+    },
+    {
+      "type": "generation_cancelled",
+      "summary": "A take was cancelled."
+    },
+    {
+      "type": "warning",
+      "summary": "A warning, with the same code and message as the envelope's warnings."
+    },
+    {
+      "type": "log",
+      "summary": "A diagnostic line under --verbose; never text, transcripts or private paths."
+    },
+    {
+      "type": "result",
+      "summary": "The final record of every stream; data is the command's envelope."
+    }
+  ]
+}

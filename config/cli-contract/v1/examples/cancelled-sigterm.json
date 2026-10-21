@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "generate",
+  "requestID": "0d6e3f8a-91b2-4c7d-a5e4-f2b3c1d0e9a8",
+  "result": null,
+  "error": {
+    "code": "cancelled",
+    "category": "cancelled",
+    "exitCode": 143,
+    "message": "Cancelled by SIGTERM; the take's staging output was discarded.",
+    "retryable": false,
+    "retryAfterMs": null,
+    "hint": null,
+    "detail": {
+      "signal": "SIGTERM"
+    }
+  },
+  "warnings": [
+    {
+      "code": "output_not_published",
+      "message": "No output was published for this request."
+    }
+  ],
+  "meta": {
+    "vocelloVersion": "3.0.0",
+    "build": "24",
+    "contractRevision": 1,
+    "durationMs": 1830,
+    "replayed": false
+  }
+}

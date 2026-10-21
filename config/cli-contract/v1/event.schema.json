@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vocello:cli:v1:event",
+  "title": "Vocello CLI NDJSON record",
+  "description": "One NDJSON record of --output-format ndjson. A stream holds records of one requestID with seq counting from 0 and t never decreasing, and ends with exactly one result record whose data is the envelope. Consumers ignore record types they do not know.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "The record's schema version: 1 for every v1 revision."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The record's position in the stream, from 0."
+    },
+    "t": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Seconds since the command started."
+    },
+    "requestID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128,
+      "description": "The request's ID: the caller's --client-request-id when given, else one the CLI generated. Letters, digits and . _ : - only, starting with a letter or digit."
+    },
+    "type": {
+      "enum": [
+        "started",
+        "plan",
+        "engine_booting",
+        "engine_ready",
+        "model_loading",
+        "model_loaded",
+        "queued",
+        "generation_started",
+        "chunk",
+        "progress",
+        "download_progress",
+        "qc",
+        "output_published",
+        "generation_completed",
+        "generation_failed",
+        "generation_cancelled",
+        "warning",
+        "log",
+        "result"
+      ],
+      "description": "The record type (event-types.json)."
+    },
+    "generationID": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "description": "The take the record concerns, when it concerns one."
+    },
+    "data": {
+      "type": "object",
+      "description": "Type-specific facts; never text, transcripts, PCM or private paths. 64-bit values such as seeds are decimal strings."
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "seq",
+    "t",
+    "requestID",
+    "type",
+    "data"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "description": "The final record: data is the command's envelope.",
+      "properties": {
+        "type": {
+          "const": "result"
+        },
+        "data": {
+          "$ref": "#/$defs/envelope"
+        }
+      }
+    },
+    {
+      "description": "Any other record.",
+      "properties": {
+        "type": {
+          "enum": [
+            "started",
+            "plan",
+            "engine_booting",
+            "engine_ready",
+            "model_loading",
+            "model_loaded",
+            "queued",
+            "generation_started",
+            "chunk",
+            "progress",
+            "download_progress",
+            "qc",
+            "output_published",
+            "generation_completed",
+            "generation_failed",
+            "generation_cancelled",
+            "warning",
+            "log"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "envelope": {
+      "description": "What every vocello command prints in --output-format json, and the data of the final result record in ndjson. A success has an object result and a null error; a failure has an error and, for a stopped batch, the partial result (every planned row).",
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1,
+          "description": "The envelope's schema version: 1 for every v1 revision."
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "True when the command succeeded (exit 0)."
+        },
+        "command": {
+          "type": "string",
+          "pattern": "^([a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*)?$",
+          "maxLength": 128,
+          "description": "The dotted canonical command path (generate, voices.list, models.install); empty when the invocation failed before any command resolved."
+        },
+        "requestID": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "maxLength": 128,
+          "description": "The request's ID: the caller's --client-request-id when given, else one the CLI generated. Letters, digits and . _ : - only, starting with a letter or digit."
+        },
+        "result": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "The command's result object; null on a failure without a partial result."
+        },
+        "error": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/error"
+            }
+          ],
+          "description": "Null on success, the error object on failure."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/warning"
+          },
+          "description": "Conditions that did not stop the command, in the order they arose."
+        },
+        "meta": {
+          "$ref": "#/$defs/meta"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "ok",
+        "command",
+        "requestID",
+        "result",
+        "error",
+        "warnings",
+        "meta"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "description": "Success: an object result and no error.",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "type": "object"
+            },
+            "error": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "description": "Failure: an error, and a result only when the command reports a partial outcome.",
+          "properties": {
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "description": "Why a command failed. code is the stable identifier; category and exitCode classify it as error-codes.json and exit-codes.json do; retryable is true exactly for the transient category.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "assembly_failed",
+            "batch_incomplete",
+            "cancelled",
+            "config_error",
+            "consent_required",
+            "download_failed",
+            "engine_busy",
+            "generation_failed",
+            "history_item_not_found",
+            "history_schema_newer",
+            "idempotency_conflict",
+            "input_file_not_found",
+            "insufficient_memory",
+            "integrity_failed",
+            "internal_error",
+            "invalid_input",
+            "io_error",
+            "memory_pressure",
+            "model_not_installed",
+            "model_unknown",
+            "network_unavailable",
+            "output_missing",
+            "output_unavailable",
+            "path_not_allowed",
+            "qc_rejected",
+            "request_in_progress",
+            "speaker_not_found",
+            "speech_unavailable",
+            "storage_full",
+            "store_busy",
+            "text_too_long",
+            "unsupported_contract_version",
+            "usage_error",
+            "voice_not_found"
+          ],
+          "description": "The stable error code (error-codes.json). A consumer meeting a code it does not know falls back on category and exitCode."
+        },
+        "category": {
+          "enum": [
+            "cancelled",
+            "config",
+            "failure",
+            "io",
+            "not_found",
+            "output",
+            "permission",
+            "precondition",
+            "transient",
+            "usage"
+          ],
+          "description": "The exit class of the code (exit-codes.json)."
+        },
+        "exitCode": {
+          "enum": [
+            1,
+            2,
+            66,
+            69,
+            73,
+            74,
+            75,
+            77,
+            78,
+            130,
+            143
+          ],
+          "description": "The process exit status the CLI ends with; 143 replaces 130 for SIGTERM."
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "A human-readable English sentence; never parsed, and never text, transcripts or private paths."
+        },
+        "retryable": {
+          "type": "boolean",
+          "description": "True exactly when category is transient: the same request may succeed later."
+        },
+        "retryAfterMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "A suggested wait before retrying, or null; set only when retryable."
+        },
+        "hint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000,
+          "description": "What the caller can do next, or null."
+        },
+        "detail": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Code-specific structured facts, or null; cancelled carries signal (SIGINT or SIGTERM)."
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "exitCode",
+        "message",
+        "retryable",
+        "retryAfterMs",
+        "hint",
+        "detail"
+      ],
+      "additionalProperties": false
+    },
+    "meta": {
+      "description": "Facts about the run that produced the envelope.",
+      "type": "object",
+      "properties": {
+        "vocelloVersion": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "The CLI's marketing version (CFBundleShortVersionString), or unknown."
+        },
+        "build": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "The CLI's build number (CFBundleVersion)."
+        },
+        "contractRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The v1 contract revision the CLI implements (baseline.json)."
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wall-clock milliseconds from the command's start to the envelope."
+        },
+        "replayed": {
+          "type": "boolean",
+          "description": "True when the envelope is a stored result replayed for a repeated --client-request-id."
+        }
+      },
+      "required": [
+        "vocelloVersion",
+        "build",
+        "contractRevision",
+        "durationMs",
+        "replayed"
+      ],
+      "additionalProperties": false
+    },
+    "warning": {
+      "description": "A condition that did not stop the command.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 64,
+          "description": "A stable snake_case warning code."
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "A human-readable English sentence."
+        },
+        "detail": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Code-specific structured facts, or null."
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

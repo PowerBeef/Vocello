@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "generate",
+  "requestID": "c41d7e2a-0b6f-4f3a-8d95-61e0a7b2c3f4",
+  "result": null,
+  "error": {
+    "code": "invalid_input",
+    "category": "usage",
+    "exitCode": 2,
+    "message": "--mode must be custom, design or clone.",
+    "retryable": false,
+    "retryAfterMs": null,
+    "hint": "Run vocello modes to list the modes and what each needs.",
+    "detail": {
+      "flag": "--mode",
+      "allowed": ["custom", "design", "clone"]
+    }
+  },
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.0.0",
+    "build": "24",
+    "contractRevision": 1,
+    "durationMs": 4,
+    "replayed": false
+  }
+}

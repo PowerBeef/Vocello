@@ -1,0 +1,434 @@
+{
+  "contract": "urn:vocello:cli:v1",
+  "contractRevision": 1,
+  "errorClasses": {
+    "assembly_failed": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "batch_incomplete": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "cancelled": {
+      "category": "cancelled",
+      "exitCode": 130,
+      "retryable": false
+    },
+    "config_error": {
+      "category": "config",
+      "exitCode": 78,
+      "retryable": false
+    },
+    "consent_required": {
+      "category": "permission",
+      "exitCode": 77,
+      "retryable": false
+    },
+    "download_failed": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "engine_busy": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "generation_failed": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "history_item_not_found": {
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false
+    },
+    "history_schema_newer": {
+      "category": "config",
+      "exitCode": 78,
+      "retryable": false
+    },
+    "idempotency_conflict": {
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false
+    },
+    "input_file_not_found": {
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false
+    },
+    "insufficient_memory": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "integrity_failed": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "internal_error": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "invalid_input": {
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false
+    },
+    "io_error": {
+      "category": "io",
+      "exitCode": 74,
+      "retryable": false
+    },
+    "memory_pressure": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "model_not_installed": {
+      "category": "precondition",
+      "exitCode": 69,
+      "retryable": false
+    },
+    "model_unknown": {
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false
+    },
+    "network_unavailable": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "output_missing": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "output_unavailable": {
+      "category": "output",
+      "exitCode": 73,
+      "retryable": false
+    },
+    "path_not_allowed": {
+      "category": "permission",
+      "exitCode": 77,
+      "retryable": false
+    },
+    "qc_rejected": {
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false
+    },
+    "request_in_progress": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "speaker_not_found": {
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false
+    },
+    "speech_unavailable": {
+      "category": "precondition",
+      "exitCode": 69,
+      "retryable": false
+    },
+    "storage_full": {
+      "category": "io",
+      "exitCode": 74,
+      "retryable": false
+    },
+    "store_busy": {
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true
+    },
+    "text_too_long": {
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false
+    },
+    "unsupported_contract_version": {
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false
+    },
+    "usage_error": {
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false
+    },
+    "voice_not_found": {
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false
+    }
+  },
+  "errorCodes": [
+    "assembly_failed",
+    "batch_incomplete",
+    "cancelled",
+    "config_error",
+    "consent_required",
+    "download_failed",
+    "engine_busy",
+    "generation_failed",
+    "history_item_not_found",
+    "history_schema_newer",
+    "idempotency_conflict",
+    "input_file_not_found",
+    "insufficient_memory",
+    "integrity_failed",
+    "internal_error",
+    "invalid_input",
+    "io_error",
+    "memory_pressure",
+    "model_not_installed",
+    "model_unknown",
+    "network_unavailable",
+    "output_missing",
+    "output_unavailable",
+    "path_not_allowed",
+    "qc_rejected",
+    "request_in_progress",
+    "speaker_not_found",
+    "speech_unavailable",
+    "storage_full",
+    "store_busy",
+    "text_too_long",
+    "unsupported_contract_version",
+    "usage_error",
+    "voice_not_found"
+  ],
+  "eventTypes": [
+    "chunk",
+    "download_progress",
+    "engine_booting",
+    "engine_ready",
+    "generation_cancelled",
+    "generation_completed",
+    "generation_failed",
+    "generation_started",
+    "log",
+    "model_loaded",
+    "model_loading",
+    "output_published",
+    "plan",
+    "progress",
+    "qc",
+    "queued",
+    "result",
+    "started",
+    "warning"
+  ],
+  "exitCodes": [
+    {
+      "category": "ok",
+      "exit": 0
+    },
+    {
+      "category": "failure",
+      "exit": 1
+    },
+    {
+      "category": "usage",
+      "exit": 2
+    },
+    {
+      "category": "not_found",
+      "exit": 66
+    },
+    {
+      "category": "precondition",
+      "exit": 69
+    },
+    {
+      "category": "output",
+      "exit": 73
+    },
+    {
+      "category": "io",
+      "exit": 74
+    },
+    {
+      "category": "transient",
+      "exit": 75
+    },
+    {
+      "category": "permission",
+      "exit": 77
+    },
+    {
+      "category": "config",
+      "exit": 78
+    },
+    {
+      "category": "cancelled",
+      "exit": 130
+    },
+    {
+      "category": "cancelled",
+      "exit": 143
+    }
+  ],
+  "revisions": [
+    {
+      "change": "The initial v1 machine contract: envelope, error and NDJSON record schemas, exit codes, error codes and event types (RF-25).",
+      "date": "2026-10-21",
+      "revision": 1
+    }
+  ],
+  "schemaProperties": {
+    "envelope": {
+      "properties": [
+        "command",
+        "error",
+        "error.category",
+        "error.code",
+        "error.detail",
+        "error.exitCode",
+        "error.hint",
+        "error.message",
+        "error.retryAfterMs",
+        "error.retryable",
+        "meta",
+        "meta.build",
+        "meta.contractRevision",
+        "meta.durationMs",
+        "meta.replayed",
+        "meta.vocelloVersion",
+        "ok",
+        "requestID",
+        "result",
+        "schemaVersion",
+        "warnings",
+        "warnings[].code",
+        "warnings[].detail",
+        "warnings[].message"
+      ],
+      "required": [
+        "command",
+        "error",
+        "error.category",
+        "error.code",
+        "error.detail",
+        "error.exitCode",
+        "error.hint",
+        "error.message",
+        "error.retryAfterMs",
+        "error.retryable",
+        "meta",
+        "meta.build",
+        "meta.contractRevision",
+        "meta.durationMs",
+        "meta.replayed",
+        "meta.vocelloVersion",
+        "ok",
+        "requestID",
+        "result",
+        "schemaVersion",
+        "warnings",
+        "warnings[].code",
+        "warnings[].message"
+      ]
+    },
+    "error": {
+      "properties": [
+        "category",
+        "code",
+        "detail",
+        "exitCode",
+        "hint",
+        "message",
+        "retryAfterMs",
+        "retryable"
+      ],
+      "required": [
+        "category",
+        "code",
+        "detail",
+        "exitCode",
+        "hint",
+        "message",
+        "retryAfterMs",
+        "retryable"
+      ]
+    },
+    "event": {
+      "properties": [
+        "data",
+        "data.command",
+        "data.error",
+        "data.error.category",
+        "data.error.code",
+        "data.error.detail",
+        "data.error.exitCode",
+        "data.error.hint",
+        "data.error.message",
+        "data.error.retryAfterMs",
+        "data.error.retryable",
+        "data.meta",
+        "data.meta.build",
+        "data.meta.contractRevision",
+        "data.meta.durationMs",
+        "data.meta.replayed",
+        "data.meta.vocelloVersion",
+        "data.ok",
+        "data.requestID",
+        "data.result",
+        "data.schemaVersion",
+        "data.warnings",
+        "data.warnings[].code",
+        "data.warnings[].detail",
+        "data.warnings[].message",
+        "generationID",
+        "requestID",
+        "schemaVersion",
+        "seq",
+        "t",
+        "type"
+      ],
+      "required": [
+        "data",
+        "data.command",
+        "data.error",
+        "data.error.category",
+        "data.error.code",
+        "data.error.detail",
+        "data.error.exitCode",
+        "data.error.hint",
+        "data.error.message",
+        "data.error.retryAfterMs",
+        "data.error.retryable",
+        "data.meta",
+        "data.meta.build",
+        "data.meta.contractRevision",
+        "data.meta.durationMs",
+        "data.meta.replayed",
+        "data.meta.vocelloVersion",
+        "data.ok",
+        "data.requestID",
+        "data.result",
+        "data.schemaVersion",
+        "data.warnings",
+        "data.warnings[].code",
+        "data.warnings[].message",
+        "requestID",
+        "schemaVersion",
+        "seq",
+        "t",
+        "type"
+      ]
+    }
+  },
+  "schemaVersion": 1
+}

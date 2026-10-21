@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "contract": "urn:vocello:cli:v1",
+  "errorCodes": [
+    {
+      "code": "generation_failed",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "The engine failed to generate the take."
+    },
+    {
+      "code": "qc_rejected",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "The take failed the mandatory Fast QC and was discarded."
+    },
+    {
+      "code": "output_missing",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "The take reported success but its published output is missing (the batch row code published_output_missing before v1)."
+    },
+    {
+      "code": "assembly_failed",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "A long-form project's segment takes could not be joined."
+    },
+    {
+      "code": "batch_incomplete",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "A batch stopped before every item completed; result carries every planned row."
+    },
+    {
+      "code": "download_failed",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "A model download failed."
+    },
+    {
+      "code": "integrity_failed",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "A downloaded or installed artifact failed its size or SHA-256 verification."
+    },
+    {
+      "code": "internal_error",
+      "category": "failure",
+      "exitCode": 1,
+      "retryable": false,
+      "summary": "An unexpected internal failure."
+    },
+    {
+      "code": "usage_error",
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false,
+      "summary": "An unknown command or flag, or a missing or malformed value."
+    },
+    {
+      "code": "invalid_input",
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false,
+      "summary": "A well-formed value the command does not accept, such as an unknown mode or language or a refused output path."
+    },
+    {
+      "code": "text_too_long",
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false,
+      "summary": "The text exceeds the generation limit."
+    },
+    {
+      "code": "idempotency_conflict",
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false,
+      "summary": "A client request ID was reused with a different request."
+    },
+    {
+      "code": "unsupported_contract_version",
+      "category": "usage",
+      "exitCode": 2,
+      "retryable": false,
+      "summary": "The requested machine contract version is not supported by this CLI."
+    },
+    {
+      "code": "voice_not_found",
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false,
+      "summary": "No saved voice has the given name or ID."
+    },
+    {
+      "code": "speaker_not_found",
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false,
+      "summary": "No built-in speaker has the given ID."
+    },
+    {
+      "code": "model_unknown",
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false,
+      "summary": "No model in the contract has the given ID."
+    },
+    {
+      "code": "history_item_not_found",
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false,
+      "summary": "No History item has the given ID."
+    },
+    {
+      "code": "input_file_not_found",
+      "category": "not_found",
+      "exitCode": 66,
+      "retryable": false,
+      "summary": "A named input file (text, line file or reference audio) does not exist."
+    },
+    {
+      "code": "model_not_installed",
+      "category": "precondition",
+      "exitCode": 69,
+      "retryable": false,
+      "summary": "The model the request needs is not installed."
+    },
+    {
+      "code": "speech_unavailable",
+      "category": "precondition",
+      "exitCode": 69,
+      "retryable": false,
+      "summary": "Speech recognition is unavailable or not authorized for transcription."
+    },
+    {
+      "code": "output_unavailable",
+      "category": "output",
+      "exitCode": 73,
+      "retryable": false,
+      "summary": "The output destination cannot be created or written."
+    },
+    {
+      "code": "storage_full",
+      "category": "io",
+      "exitCode": 74,
+      "retryable": false,
+      "summary": "The volume has too little free space."
+    },
+    {
+      "code": "io_error",
+      "category": "io",
+      "exitCode": 74,
+      "retryable": false,
+      "summary": "A file read or write failed."
+    },
+    {
+      "code": "engine_busy",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "The engine is serving another request or another engine host holds the memory."
+    },
+    {
+      "code": "store_busy",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "A shared store (History, saved voices, models) is locked by another process."
+    },
+    {
+      "code": "memory_pressure",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "The engine stopped the take on its own under critical memory pressure."
+    },
+    {
+      "code": "insufficient_memory",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "Admission refused the request because too little memory is available now."
+    },
+    {
+      "code": "request_in_progress",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "A request with the same client request ID is still running."
+    },
+    {
+      "code": "network_unavailable",
+      "category": "transient",
+      "exitCode": 75,
+      "retryable": true,
+      "summary": "The network needed for a download is unavailable."
+    },
+    {
+      "code": "consent_required",
+      "category": "permission",
+      "exitCode": 77,
+      "retryable": false,
+      "summary": "Voice cloning or enrollment needs the invocation's explicit consent confirmation."
+    },
+    {
+      "code": "path_not_allowed",
+      "category": "permission",
+      "exitCode": 77,
+      "retryable": false,
+      "summary": "A path lies outside the roots the command may read or write."
+    },
+    {
+      "code": "config_error",
+      "category": "config",
+      "exitCode": 78,
+      "retryable": false,
+      "summary": "Configuration, settings or a data store is invalid."
+    },
+    {
+      "code": "history_schema_newer",
+      "category": "config",
+      "exitCode": 78,
+      "retryable": false,
+      "summary": "History was written by a newer schema than this CLI reads."
+    },
+    {
+      "code": "cancelled",
+      "category": "cancelled",
+      "exitCode": 130,
+      "retryable": false,
+      "summary": "A signal cancelled the command after its owned cleanup; detail.signal names it, and SIGTERM exits 143 instead of 130."
+    }
+  ]
+}

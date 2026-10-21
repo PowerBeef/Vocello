@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "contract": "urn:vocello:cli:v1",
+  "exitCodes": [
+    {
+      "exit": 0,
+      "category": "ok",
+      "meaning": "The command succeeded."
+    },
+    {
+      "exit": 1,
+      "category": "failure",
+      "meaning": "The command ran and failed: generation, QC, publication, assembly, a stopped batch, a download, an integrity check or an internal error."
+    },
+    {
+      "exit": 2,
+      "category": "usage",
+      "meaning": "The invocation was refused before any work: an unknown command or flag, a missing or invalid value, text over the limit, a reused request ID or an unsupported contract version."
+    },
+    {
+      "exit": 66,
+      "category": "not_found",
+      "meaning": "A named voice, speaker, model, History item or input file does not exist (sysexits EX_NOINPUT)."
+    },
+    {
+      "exit": 69,
+      "category": "precondition",
+      "meaning": "A required model is not installed or speech recognition is unavailable (EX_UNAVAILABLE)."
+    },
+    {
+      "exit": 73,
+      "category": "output",
+      "meaning": "The output destination cannot be created or written (EX_CANTCREAT)."
+    },
+    {
+      "exit": 74,
+      "category": "io",
+      "meaning": "Storage is full or a read or write failed (EX_IOERR)."
+    },
+    {
+      "exit": 75,
+      "category": "transient",
+      "meaning": "A temporary condition: the engine or a store is busy, memory is short, the same request is in progress or the network is unavailable; a later retry may succeed (EX_TEMPFAIL)."
+    },
+    {
+      "exit": 77,
+      "category": "permission",
+      "meaning": "Voice-cloning consent was not confirmed or a path lies outside the allowed roots (EX_NOPERM)."
+    },
+    {
+      "exit": 78,
+      "category": "config",
+      "meaning": "Configuration or a data store is invalid, or History has a newer schema than this CLI reads (EX_CONFIG)."
+    },
+    {
+      "exit": 130,
+      "category": "cancelled",
+      "meaning": "Cancelled by SIGINT (Ctrl-C) after the command's owned cleanup."
+    },
+    {
+      "exit": 143,
+      "category": "cancelled",
+      "meaning": "Cancelled by SIGTERM after the command's owned cleanup."
+    }
+  ]
+}

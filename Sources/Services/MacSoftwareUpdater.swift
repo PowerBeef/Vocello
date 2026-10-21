@@ -8,7 +8,11 @@ import SwiftUI
 /// app checks nothing until the user agrees. The feed and the EdDSA public key
 /// are `SUFeedURL` and `SUPublicEDKey` in `Sources/Info.plist`; Sparkle sends no
 /// system profile, and `SUAllowsAutomaticUpdates` is off, so a new version is
-/// always offered in Sparkle's window rather than installed silently. Settings mirrors the automatic-check preference, which Sparkle
+/// always offered in Sparkle's window rather than installed silently. The feed
+/// must carry the release key's signature (`SURequireSignedFeed`), and an
+/// update's signature is checked before its disk image is mounted
+/// (`SUVerifyUpdateBeforeExtraction`); both ship in the first version with
+/// Sparkle because only an installed copy's own settings protect it. Settings mirrors the automatic-check preference, which Sparkle
 /// keeps in the app's defaults, and Vocello > Check for Updates… follows
 /// `canCheckForUpdates`, which is false while a check runs.
 @MainActor

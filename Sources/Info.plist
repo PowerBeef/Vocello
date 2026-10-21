@@ -42,5 +42,9 @@
     <string>https://github.com/PowerBeef/Vocello/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>0Lowc/RlE87KDi4CMQ+0KTU99cYD0PvXejaZU4FqD/0=</string>
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
 </dict>
 </plist>

@@ -108,8 +108,8 @@
       "path": "Sources/iOS/IOSGenerationModeViews.swift",
       "screen": "Studio generation modes",
       "scenario": "stateful",
-      "reason": "Mode-specific warnings, Voice Design enrollment, and Clone transcript review/audio-only decisions are governed by visible controls.",
-      "interactiveOccurrenceCount": 7
+      "reason": "Mode-specific warnings and Voice Design enrollment are governed by visible controls; Clone's transcript review/audio-only decisions moved to the Reference panel (RF-24).",
+      "interactiveOccurrenceCount": 4
     },
     {
       "path": "Sources/iOS/IOSGenerationSetupCards.swift",
@@ -171,8 +171,8 @@
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
       "screen": "Studio selector sheets",
       "scenario": "inventory",
-      "reason": "All speaker, delivery, language, reference, and model selector options, and the reference picker's Saved Voices load-failure Retry, use stable families.",
-      "interactiveOccurrenceCount": 3
+      "reason": "All speaker, delivery, language, reference, and model selector options, the reference picker's Saved Voices load-failure Retry, and the Reference panel's Clone transcript review and audio-only decisions (RF-24), use stable families.",
+      "interactiveOccurrenceCount": 6
     },
     {
       "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift",

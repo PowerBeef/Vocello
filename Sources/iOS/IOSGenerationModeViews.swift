@@ -1464,7 +1464,6 @@ struct IOSVoiceCloningView: View {
     /// undone by priming the same reference again (U18).
     @State private var clonePrimingIntent = CloneProactivePrimingIntent()
     @State private var transcriptionTask: Task<Void, Never>?
-    @State private var isTranscriptExpanded = false
     @State private var isScriptFocused = false
 
     // Generation lifecycle moved to AppModel.cloneCoordinator (Phase 3b).
@@ -1718,7 +1717,6 @@ struct IOSVoiceCloningView: View {
     var body: some View {
         pageContent
             .task(id: draft.referenceAudioPath) {
-                isTranscriptExpanded = !draft.isReferenceReady
                 autoTranscribeReferenceIfNeeded()
             }
             .onDisappear {
@@ -1813,40 +1811,8 @@ struct IOSVoiceCloningView: View {
                 onPlayerExpand: expandInlinePlayer,
                 onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
             )
-            if draft.referenceAudioPath != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(draft.referenceReview.status.message)
-                        .font(.caption)
-                        .accessibilityIdentifier("voiceCloning_referenceReviewStatus")
-                    DisclosureGroup(IOSInterfaceText.transcript, isExpanded: $isTranscriptExpanded) {
-                        TextField(IOSInterfaceText.transcriptPlaceholder, text: Binding(
-                            get: { draft.referenceTranscript }, set: {
-                                transcriptionTask?.cancel()
-                                transcriptionTask = nil
-                                draft.referenceTranscript = $0
-                            }
-                        ), axis: .vertical)
-                            .accessibilityIdentifier("voiceCloning_transcriptInput")
-                    }
-                    .accessibilityIdentifier("voiceCloning_transcriptDisclosure")
-                    if !draft.isReferenceReady {
-                        if draft.trimmedReferenceTranscript != nil {
-                            Button(VocelloPresentationText.reviewReferenceTranscript) {
-                                transcriptionTask?.cancel()
-                                draft.reviewReferenceTranscript()
-                            }
-                            .accessibilityIdentifier("voiceCloning_reviewTranscriptButton")
-                        }
-                        Button(VocelloPresentationText.useAudioOnly) {
-                            transcriptionTask?.cancel()
-                            transcriptionTask = nil
-                            draft.confirmAudioOnly()
-                        }
-                        .accessibilityIdentifier("voiceCloning_useAudioOnlyButton")
-                    }
-                }
-                .padding(.horizontal)
-            }
+            // The reference's transcript review lives in the Reference panel
+            // (RF-24): stacked here it pushed Generate up and squeezed the script.
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -1991,7 +1957,14 @@ struct IOSVoiceCloningView: View {
                     savedVoicesLoadError: savedVoicesLoadError,
                     onRetrySavedVoices: {
                         Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
-                    }
+                    },
+                    transcriptReview: draft.referenceAudioPath == nil ? nil : IOSReferenceTranscriptReviewSection(
+                        draft: $draft,
+                        cancelTranscription: {
+                            transcriptionTask?.cancel()
+                            transcriptionTask = nil
+                        }
+                    )
                 )
             }
         }
@@ -2161,6 +2134,10 @@ struct IOSVoiceCloningView: View {
         ensureSelectedSavedVoiceHydratedIfNeeded()
         guard draft.isReferenceReady, transcriptLoadError == nil else {
             coordinator.rejectStart(draft.referenceReview.status.message)
+            // The review that unblocks the take is in the Reference panel.
+            if draft.referenceAudioPath != nil, !draft.isReferenceReady {
+                presentReferencePicker()
+            }
             return
         }
         let currentDraft = draft

@@ -45,6 +45,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario startup-retry
   scripts/ui_test.sh ios smoke --scenario background-warmup
   scripts/ui_test.sh ios smoke --scenario record-then-play
+  scripts/ui_test.sh ios smoke --scenario studio-layout
   scripts/ui_test.sh ios smoke --scenario long-form
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
@@ -84,6 +85,9 @@ interrupted takes are discarded, never saved.
 `smoke --scenario record-then-play` (AUD-02) records a clip from Clone's reference and plays it to its end in the
 save sheet's review, then closes without saving; full smoke runs it too. A first run waits for the
 human-answered microphone and speech prompts.
+`smoke --scenario studio-layout` (RF-24) selects each Studio mode with its benchmark setup and checks that an idle
+Generate sits just above the tab dock in all three, that Clone's canvas carries no reference transcript and that
+the Reference panel reviews it; a few minutes, nothing generated or saved.
 `smoke --scenario long-form` (RF-18) runs the long-form project journey alone (about 15 minutes; full
 smoke runs it too). It pins Take variation to Expressive through Settings and restores the original
 afterwards, so a persisted Consistent setting no longer decides the outcome.
@@ -251,9 +255,9 @@ elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
         || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \
         || "$scenario_argument" == "background-warmup" || "$scenario_argument" == "record-then-play" \
-        || "$scenario_argument" == "long-form" ) \
+        || "$scenario_argument" == "long-form" || "$scenario_argument" == "studio-layout" ) \
       && -z "$candidate_evidence" ]] \
-    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models, startup-retry, background-warmup, record-then-play or long-form"
+    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit, update-models, startup-retry, background-warmup, record-then-play, long-form or studio-layout"
   [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
@@ -419,6 +423,7 @@ step_workflow="ui-$platform-$lane"
 [[ "$scenario_argument" != "startup-retry" ]] || step_workflow="ui-ios-startup-retry"
 [[ "$scenario_argument" != "background-warmup" ]] || step_workflow="ui-ios-background-warmup"
 [[ "$scenario_argument" != "record-then-play" ]] || step_workflow="ui-ios-record-then-play"
+[[ "$scenario_argument" != "studio-layout" ]] || step_workflow="ui-ios-studio-layout"
 [[ "$platform" != "ios" || "$scenario_argument" != "long-form" ]] || step_workflow="ui-ios-long-form"
 [[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
@@ -1635,6 +1640,9 @@ else
     elif [[ "$scenario_argument" == "record-then-play" ]]; then
       # AUD-02: a recorded clip plays to its end in the save sheet's review.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testRecordThenPlayReviewsTheClip"
+    elif [[ "$scenario_argument" == "studio-layout" ]]; then
+      # RF-24: every Studio mode keeps its setup dock against the tab dock.
+      only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testStudioModesKeepTheirDockLayout"
     elif [[ "$scenario_argument" == "long-form" ]]; then
       # RF-18: the long-form project journey alone, with Take variation pinned to Expressive.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney"
@@ -1942,13 +1950,15 @@ PY
   # Collect failed smoke evidence before the aggregate exit. A passing diagnostic
   # subset never converts a failed XCTest into a successful run.
   smoke_diagnostics_status=0
-  # Model maintenance, the startup Retry proof, the background warm-up check and
-  # record-then-play generate nothing, so they have no smoke diagnostics to gate.
+  # Model maintenance, the startup Retry proof, the background warm-up check,
+  # record-then-play and studio-layout generate nothing, so they have no smoke
+  # diagnostics to gate.
   # The long-form journey generates but never forces the full smoke's critical
   # memory event, so the memory-pressure gate does not apply to it either.
   if [[ "$lane" == "smoke" && "$scenario_argument" != "update-models" \
       && "$scenario_argument" != "startup-retry" && "$scenario_argument" != "background-warmup" \
-      && "$scenario_argument" != "record-then-play" && "$scenario_argument" != "long-form" ]]; then
+      && "$scenario_argument" != "record-then-play" && "$scenario_argument" != "long-form" \
+      && "$scenario_argument" != "studio-layout" ]]; then
     if ! required_step_run "$step_ledger" smoke-diagnostics validate_ios_smoke; then
       smoke_diagnostics_status=1
       warn "iOS smoke memory-pressure diagnostics gate failed"

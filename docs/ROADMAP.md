@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 19/44 (43%) |
+| `release-first-3-0-2026-09` | active | release-qa | 19/45 (42%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -60,16 +60,17 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `DA-04` | planned | Engine edge inputs | `RF-15` |
 | `DW-02` | parked | Development workflow: structural tooling (audit Phase 1) | — |
 | `DW-03` | parked | Development workflow: product-side quality (audit Phase 2) | — |
-| `DW-04` | in-flight | Development workflow: longer-term modernization (audit Phase 3) | — |
+| `DW-04` | planned | Development workflow: longer-term modernization (audit Phase 3) | — |
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21`, `RF-22` |
+| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21`, `RF-22`, `RF-24` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | in-flight | The Mac app offers new versions and installs them through Sparkle | — |
+| `RF-24` | in-flight | The iPhone Clone Studio keeps the layout of the other two modes | — |
 
 ### Open items in detail
 
@@ -123,7 +124,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.
   unparkWhen: The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.
 
-- **`DW-04`** (in-flight, due 2026-10-30) — Development workflow: longer-term modernization (audit Phase 3).
+- **`DW-04`** (planned, due 2026-10-30) — Development workflow: longer-term modernization (audit Phase 3).
   gate: Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.
 
 - **`F-01`** (planned, due 2026-10-30) — High — make saved-voice review transactional and add iOS deletion.
@@ -154,6 +155,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-23`** (in-flight, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT), with the supply-chain, attribution and license inventories updated. The Mac app owns one SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings toggle; Sparkle's own permission prompt on the second launch (no SUEnableAutomaticChecks) and no system profile. SUFeedURL points at an appcast on the website; SUPublicEDKey comes from an EdDSA key the maintainer generates and keeps as a GitHub secret, never in Git. The release workflow signs the notarized DMG and adds its appcast entry; the privacy page names the check. Deterministic tests cover the wiring, a Mac UI lane covers the menu item and the toggle, and one local end-to-end update between two local builds proves download, verification, install and relaunch.
+
+- **`RF-24`** (in-flight, due 2026-10-23) — The iPhone Clone Studio keeps the layout of the other two modes.
+  gate: Maintainer report 2026-10-20 (release blocker): with a reference selected, Clone stacked its reference transcript review (status, Transcript disclosure, Review / Use Audio Only) under the Studio canvas, so Generate rose, the script editor shrank above the keyboard and the section slid under the tab dock. Done when the review lives in the Reference panel with unchanged behaviour (status, editable transcript, the two decisions, a refused Generate opening the panel), the generic iOS compile and the routed check pass, the Swift review finds no blocker, and scripts/ui_test.sh ios smoke --scenario studio-layout passes on the paired iPhone in an announced window. The iPhone freeze moves to the commit that carries it.
 
 ## Engine remediation programme (2026-10-16 audit)
 

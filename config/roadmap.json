@@ -238,6 +238,22 @@
       ]
     },
     {
+      "id": "RF-24",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The iPhone Clone Studio keeps the layout of the other two modes",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-23",
+      "gate": "Maintainer report 2026-10-20 (release blocker): with a reference selected, Clone stacked its reference transcript review (status, Transcript disclosure, Review / Use Audio Only) under the Studio canvas, so Generate rose, the script editor shrank above the keyboard and the section slid under the tab dock. Done when the review lives in the Reference panel with unchanged behaviour (status, editable transcript, the two decisions, a refused Generate opening the panel), the generic iOS compile and the routed check pass, the Swift review finds no blocker, and scripts/ui_test.sh ios smoke --scenario studio-layout passes on the paired iPhone in an announced window. The iPhone freeze moves to the commit that carries it.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
+      ],
+      "updated": "2026-10-20",
+      "notes": "Opened 2026-10-20 after the freeze at 029427c9, from the maintainer's Clone screenshots. The section came from 46504a11 (2026-10-10, Clone conditioning as an explicit reviewed decision); no lane asserted Studio layout, so the full smoke passed with it. The new studio-layout scenario checks that an idle Generate sits within 48 pt above the tab dock in every mode and that the Reference panel carries the review. The iPhone proof waits for the maintainer's next window."
+    },
+    {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",
@@ -252,7 +268,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-10-20",
-      "notes": "Re-gated 2026-09-13 (the September 7 verification is void; promotion inputs are config/quality-promotion-contract.json and scripts/quality_promotion.py). Earlier history: git log -p -- config/roadmap.json. 2026-10-20: every blocker is closed (BG-01, CONV-21, RF-18 to RF-22 included) and the freeze checks pass on 029427c9: regen clean; the full contract gate with 2,589 Python tests; macOS 1,522 core and 199 runtime tests and 1,522 under TSan; the Mac app (3.0.0/24), CLI, generic iOS and UI-test builds; lints. The website check matches CI run 39385512938 on the identical website/ tree (the local browser smoke lacks Playwright 1.64.1 Chromium). One full-gate attempt failed on three signal-timing tests that pass alone (BKL-26). App Store Connect, read-only: builds 21-23 only, build 24 unused. focusLock.freeze records 029427c9. Left: the maintainer pushes the annotated v3.0.0 tag on 029427c9, proved by scripts/release_source_authority.py. Exact-SHA push CI on 029427c9: run 39531352634, CI required green.",
+      "notes": "Re-gated 2026-09-13 (the September 7 verification is void; promotion inputs are config/quality-promotion-contract.json and scripts/quality_promotion.py). Earlier history: git log -p -- config/roadmap.json. 2026-10-20: every blocker is closed (BG-01, CONV-21, RF-18 to RF-22 included) and the freeze checks pass on 029427c9: regen clean; the full contract gate with 2,589 Python tests; macOS 1,522 core and 199 runtime tests and 1,522 under TSan; the Mac app (3.0.0/24), CLI, generic iOS and UI-test builds; lints. The website check matches CI run 39385512938 on the identical website/ tree (the local browser smoke lacks Playwright 1.64.1 Chromium). One full-gate attempt failed on three signal-timing tests that pass alone (BKL-26). App Store Connect, read-only: builds 21-23 only, build 24 unused. focusLock.freeze records 029427c9. Left: the maintainer pushes the annotated v3.0.0 tag on 029427c9, proved by scripts/release_source_authority.py. Exact-SHA push CI on 029427c9: run 39531352634, CI required green. 2026-10-20: RF-24 (Clone Studio layout, release blocker) changes the iPhone app after the freeze; the freeze moves to the commit carrying it, with the checks rerun there.",
       "blockedBy": [
         "ASR-08",
         "BG-01",
@@ -263,7 +279,8 @@
         "RF-19",
         "RF-20",
         "RF-21",
-        "RF-22"
+        "RF-22",
+        "RF-24"
       ]
     },
     {
@@ -2096,7 +2113,7 @@
       "id": "DW-04",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: longer-term modernization (audit Phase 3)",
-      "status": "in-flight",
+      "status": "planned",
       "blockedBy": [],
       "gate": "Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.",
       "sourceOfTruth": [
@@ -2104,7 +2121,7 @@
         "config/toolchain.json",
         "Sources/"
       ],
-      "updated": "2026-10-19",
+      "updated": "2026-10-20",
       "due": "2026-10-30",
       "notes": "Maintainer 2026-10-18: now, one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10, vDSP declined after measurement; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600), Enhanced Security CLI trial (49702a2c); P3-5 tested lane modules (349ddc34, da0200b1) and core-test --repeat (68c796d9). 2026-10-20 documentation audit (maintainer: fix all, then consolidate): about 40 stale or contradictory statements fixed (455e8391, f1024c02, d6a06f47); the agent guard now refuses subagent shell writes to the roadmap, dev.sh ci runs CI's lint gates and check --paths scopes its gate (2ad5a79d); docs/reference cut from 49 to 32 files by deleting, moving dated reports to docs/audits and merging overlaps (902b6dff to 358c5361). Open: the iOS-only lane snippets and ios_device.sh in an iPhone window; CI on Xcode 27 when runners offer it."
     }

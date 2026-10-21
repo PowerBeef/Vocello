@@ -1163,6 +1163,72 @@ struct IOSSavedVoicesObservingHost<Content: View>: View {
 }
 
 /// Sources for a clone reference clip: record on-device or pick a saved voice.
+/// The Studio reference's transcript review (Clone conditioning is an explicit
+/// reviewed decision): its status, the editable transcript, and Review or Use
+/// Audio Only while a decision is pending. It lives in the Reference panel the
+/// reference chip opens (RF-24), so the Clone canvas keeps the layout of the
+/// other two modes instead of a section stacked under it. It reads the draft
+/// through its binding, so the panel follows the review as it changes.
+struct IOSReferenceTranscriptReviewSection: View {
+    @Binding var draft: VoiceCloningDraft
+    /// Stops an automatic transcription still running for this reference.
+    let cancelTranscription: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(draft.referenceReview.status.message)
+                .font(.caption)
+                .foregroundStyle(Theme.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("voiceCloning_referenceReviewStatus")
+            TextField(IOSInterfaceText.transcriptPlaceholder, text: Binding(
+                get: { draft.referenceTranscript },
+                set: {
+                    cancelTranscription()
+                    draft.referenceTranscript = $0
+                }
+            ), axis: .vertical)
+                .font(.subheadline)
+                .foregroundStyle(Theme.Text.primary)
+                .lineLimit(2...6)
+                .padding(12)
+                .background {
+                    RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
+                        .fill(Theme.Surface.field)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
+                        .stroke(Theme.Surface.fieldStroke, lineWidth: Theme.Stroke.hairline)
+                }
+                .accessibilityIdentifier("voiceCloning_transcriptInput")
+            if !draft.isReferenceReady {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { decisionButtons }
+                    VStack(alignment: .leading, spacing: 10) { decisionButtons }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var decisionButtons: some View {
+        if draft.trimmedReferenceTranscript != nil {
+            Button(VocelloPresentationText.reviewReferenceTranscript) {
+                cancelTranscription()
+                draft.reviewReferenceTranscript()
+            }
+            .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.modeClone)
+            .accessibilityIdentifier("voiceCloning_reviewTranscriptButton")
+        }
+        Button(VocelloPresentationText.useAudioOnly) {
+            cancelTranscription()
+            draft.confirmAudioOnly()
+        }
+        .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.modeClone)
+        .accessibilityIdentifier("voiceCloning_useAudioOnlyButton")
+    }
+}
+
 struct IOSReferenceClipSheet: View {
     let savedVoices: [IOSVoicePickerOption]
     @Binding var selectedSavedVoiceID: String?
@@ -1174,6 +1240,8 @@ struct IOSReferenceClipSheet: View {
     /// (PA-30; the Voices tab does the same since PA-21).
     var savedVoicesLoadError: String? = nil
     var onRetrySavedVoices: (() -> Void)? = nil
+    /// The current reference's transcript review, above the sources (RF-24).
+    var transcriptReview: IOSReferenceTranscriptReviewSection? = nil
 
     var body: some View {
         IOSBottomSheetSurface(
@@ -1184,6 +1252,11 @@ struct IOSReferenceClipSheet: View {
         ) {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 14) {
+                    if let transcriptReview {
+                        savedVoicesHeader(IOSInterfaceText.transcript)
+                        transcriptReview
+                    }
+
                     sourcePicker
 
                     if savedVoices.isEmpty, let savedVoicesLoadError {

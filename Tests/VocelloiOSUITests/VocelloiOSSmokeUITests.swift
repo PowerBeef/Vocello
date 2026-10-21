@@ -739,6 +739,48 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     /// that anyone heard it. Microphone and speech prompts stay human-answered:
     /// the recorder asks as it opens and the review as it appears, so those two
     /// taps wait long enough for a first run's answer. Nothing is saved.
+    /// RF-24: every Studio mode keeps its setup dock against the tab dock. Clone
+    /// once stacked its reference transcript review under the canvas, which
+    /// pushed Generate up, squeezed the script and slid under the tab dock; the
+    /// review now lives in the Reference panel. Each mode is prepared with its
+    /// benchmark setup (Clone with the benchmark voice, so the reference is set);
+    /// an idle Generate must sit just above the tab dock. Nothing is generated
+    /// or saved.
+    func testStudioModesKeepTheirDockLayout() {
+        beginSession()
+        defer { endSession() }
+
+        for mode in VocelloUIBenchMatrix.Mode.allCases {
+            prepare(mode: mode)
+            let generate = element("textInput_generateButton")
+            let tabDock = element("rootTabDock")
+            XCTAssertTrue(VocelloUIWait.exists(generate, timeout: 20), "\(mode.rawValue) must offer Generate")
+            XCTAssertTrue(VocelloUIWait.exists(tabDock, timeout: 20))
+            let gap = tabDock.frame.minY - generate.frame.maxY
+            XCTAssertTrue(
+                (0...48).contains(gap),
+                "\(mode.rawValue): Generate must sit just above the tab dock; the gap is \(gap) pt"
+            )
+            VocelloUIScreenshot.attach(app, named: "ios-studio-layout-\(mode.rawValue)")
+        }
+
+        // Clone's canvas carries no transcript; the Reference panel reviews it.
+        XCTAssertFalse(element("voiceCloning_transcriptInput").exists, "The Clone canvas must not carry the transcript")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_reference"), timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.exists(element("voiceCloning_transcriptInput"), timeout: 20),
+            "The Reference panel must review the selected reference's transcript"
+        )
+        XCTAssertTrue(element("voiceCloning_referenceReviewStatus").exists)
+        VocelloUIScreenshot.attach(app, named: "ios-studio-layout-clone-reference-panel")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.condition("the Reference panel to close", timeout: 20) {
+                !self.element("voiceCloning_transcriptInput").exists
+            }
+        )
+    }
+
     func testRecordThenPlayReviewsTheClip() {
         beginSession()
         defer { endSession() }

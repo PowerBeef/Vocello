@@ -10,19 +10,36 @@ fail() {
     exit 1
 }
 
-if [ $# -lt 2 ] || [ $# -gt 3 ] || { [ $# -eq 3 ] && [ "$3" != "--include-cli" ]; }; then
-    fail "Usage: $0 /path/to/Vocello-macos26.dmg /path/to/release-metadata.txt [--include-cli]"
-fi
+usage() {
+    fail "Usage: $0 /path/to/Vocello-macos26.dmg /path/to/release-metadata.txt [--include-cli [--include-pkg /path/to/Vocello-macos26-cli.pkg]]"
+}
 
+# --include-cli verifies the CLI DMG folder (scripts/verify_packaged_cli.sh); --include-pkg, only
+# after it, also verifies the CLI installer package and installs, upgrades and uninstalls it,
+# which that script allows only on a CI runner (exit 2 elsewhere).
+[ $# -eq 2 ] || [ $# -eq 3 ] || [ $# -eq 5 ] || usage
 DMG_PATH="$1"
 METADATA_PATH="$2"
-INCLUDE_CLI="${3:-}"
+INCLUDE_CLI=""
+CLI_PKG_PATH=""
+if [ $# -ge 3 ]; then
+    [ "$3" = "--include-cli" ] || usage
+    INCLUDE_CLI="--include-cli"
+fi
+if [ $# -eq 5 ]; then
+    [ "$4" = "--include-pkg" ] && [ -n "$5" ] || usage
+    CLI_PKG_PATH="$5"
+fi
 
 [ -f "$DMG_PATH" ] || fail "DMG not found: $DMG_PATH"
 [ -f "$METADATA_PATH" ] || fail "Metadata file not found: $METADATA_PATH"
+[ -z "$CLI_PKG_PATH" ] || [ -f "$CLI_PKG_PATH" ] || fail "CLI installer package not found: $CLI_PKG_PATH"
 
 DMG_PATH="$(cd "$(dirname "$DMG_PATH")" && pwd)/$(basename "$DMG_PATH")"
 METADATA_PATH="$(cd "$(dirname "$METADATA_PATH")" && pwd)/$(basename "$METADATA_PATH")"
+if [ -n "$CLI_PKG_PATH" ]; then
+    CLI_PKG_PATH="$(cd "$(dirname "$CLI_PKG_PATH")" && pwd)/$(basename "$CLI_PKG_PATH")"
+fi
 
 EXPECTED_DMG_NAME="$(grep -E '^dmg_name=' "$METADATA_PATH" | head -n1 | cut -d= -f2-)"
 if [ -z "$EXPECTED_DMG_NAME" ]; then
@@ -154,7 +171,11 @@ echo ""
 echo "[4/5] Validating packaged bundle contents..."
 "$SCRIPT_DIR/verify_release_bundle.sh" "$COPIED_APP"
 if [ "$INCLUDE_CLI" = "--include-cli" ]; then
-    bash "$SCRIPT_DIR/verify_packaged_cli.sh" "$METADATA_PATH"
+    cli_arguments=("$METADATA_PATH")
+    if [ -n "$CLI_PKG_PATH" ]; then
+        cli_arguments+=(--include-pkg "$CLI_PKG_PATH")
+    fi
+    bash "$SCRIPT_DIR/verify_packaged_cli.sh" "${cli_arguments[@]}"
 fi
 echo "[4/5] Packaged bundle validation passed"
 echo ""

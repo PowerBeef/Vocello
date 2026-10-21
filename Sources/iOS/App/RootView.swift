@@ -90,9 +90,11 @@ struct RootView: View {
         // This is safe app-wide: every text editor that must sit above the keyboard
         // lives in an isolated `.sheet` / `.fullScreenCover` (the design-brief, batch,
         // and recorder editors) — those are separate presentations unaffected by
-        // this modifier. The bottom-panel overlays reachable from here are pickers
-        // (delivery/voice/language/install — no keyboard), and the only inline
-        // editor below this is the Studio composer, which we intend to overlay.
+        // this modifier. The bottom-panel overlays reachable from here are mostly
+        // pickers; the two with a text field (the delivery custom tone and the
+        // Reference panel's transcript, RF-24) keep it near the panel's top, above
+        // the keyboard. The only inline editor below this is the Studio composer,
+        // which we intend to overlay.
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .tint(Theme.Brand.gold)

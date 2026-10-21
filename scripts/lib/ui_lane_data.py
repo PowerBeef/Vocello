@@ -119,7 +119,7 @@ def run_metadata(values: dict[str, str], directory: Path) -> dict[str, Any]:
         if scenario == "foreground-exit":
             payload["scenario"] = scenario
             payload["evidenceClass"] = "focused-smoke"
-        elif scenario in ("startup-retry", "record-then-play"):
+        elif scenario in ("startup-retry", "record-then-play", "studio-layout"):
             _focus(payload, scenario, "focused-smoke", [])
         elif scenario == "background-warmup":
             _focus(payload, scenario, "focused-smoke", ["clone", "custom"])

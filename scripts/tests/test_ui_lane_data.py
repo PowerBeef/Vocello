@@ -94,6 +94,7 @@ class RunMetadataTests(LaneDataCase):
             ("ios", "background-warmup", "focused-smoke", ["clone", "custom"]),
             ("ios", "long-form", "focused-smoke", ["custom"]),
             ("ios", "record-then-play", "focused-smoke", []),
+            ("ios", "studio-layout", "focused-smoke", []),
             ("ios", "update-models", "device-maintenance", []),
         ]
         for platform, scenario, evidence, modes in cases:

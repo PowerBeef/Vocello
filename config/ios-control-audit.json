@@ -171,7 +171,7 @@
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
       "screen": "Studio selector sheets",
       "scenario": "inventory",
-      "reason": "All speaker, delivery, language, reference, and model selector options, the reference picker's Saved Voices load-failure Retry, and the Reference panel's Clone transcript review and audio-only decisions (RF-24), use stable families.",
+      "reason": "All speaker, delivery, language, reference, and model selector options, and the reference picker's Saved Voices load-failure Retry use stable families; the Reference panel also carries Clone's transcript review and audio-only decisions (RF-24), identified voiceCloning_* and checked by ios smoke --scenario studio-layout.",
       "interactiveOccurrenceCount": 6
     },
     {

@@ -1162,7 +1162,6 @@ struct IOSSavedVoicesObservingHost<Content: View>: View {
     }
 }
 
-/// Sources for a clone reference clip: record on-device or pick a saved voice.
 /// The Studio reference's transcript review (Clone conditioning is an explicit
 /// reviewed decision): its status, the editable transcript, and Review or Use
 /// Audio Only while a decision is pending. It lives in the Reference panel the
@@ -1173,6 +1172,7 @@ struct IOSReferenceTranscriptReviewSection: View {
     @Binding var draft: VoiceCloningDraft
     /// Stops an automatic transcription still running for this reference.
     let cancelTranscription: () -> Void
+    @FocusState private var isTranscriptFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1191,15 +1191,9 @@ struct IOSReferenceTranscriptReviewSection: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.Text.primary)
                 .lineLimit(2...6)
-                .padding(12)
-                .background {
-                    RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
-                        .fill(Theme.Surface.field)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
-                        .stroke(Theme.Surface.fieldStroke, lineWidth: Theme.Stroke.hairline)
-                }
+                .focused($isTranscriptFocused)
+                // The enrollment sheet's field chrome, in Clone's tint.
+                .iosSelectionFieldChrome(tint: Theme.Brand.modeClone, isFocused: isTranscriptFocused)
                 .accessibilityIdentifier("voiceCloning_transcriptInput")
             if !draft.isReferenceReady {
                 ViewThatFits(in: .horizontal) {
@@ -1229,6 +1223,7 @@ struct IOSReferenceTranscriptReviewSection: View {
     }
 }
 
+/// Sources for a clone reference clip: record on-device or pick a saved voice.
 struct IOSReferenceClipSheet: View {
     let savedVoices: [IOSVoicePickerOption]
     @Binding var selectedSavedVoiceID: String?

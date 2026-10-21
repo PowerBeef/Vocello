@@ -87,7 +87,7 @@ save sheet's review, then closes without saving; full smoke runs it too. A first
 human-answered microphone and speech prompts.
 `smoke --scenario studio-layout` (RF-24) selects each Studio mode with its benchmark setup and checks that an idle
 Generate sits just above the tab dock in all three, that Clone's canvas carries no reference transcript and that
-the Reference panel reviews it; a few minutes, nothing generated or saved.
+the Reference panel reviews it; a few minutes, nothing generated or saved. Full smoke runs it too.
 `smoke --scenario long-form` (RF-18) runs the long-form project journey alone (about 15 minutes; full
 smoke runs it too). It pins Take variation to Expressive through Settings and restores the original
 afterwards, so a persisted Consistent setting no longer decides the outcome.
@@ -1730,6 +1730,7 @@ else
   test_selection_args=("-only-testing:$only_test")
   if [[ "$lane" == "smoke" && -z "$scenario_argument" ]]; then
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testRecordThenPlayReviewsTheClip")
+    test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testStudioModesKeepTheirDockLayout")
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney")
   fi
   if [[ "$lane" == "smoke" && "$scenario_argument" == "background-warmup" ]]; then

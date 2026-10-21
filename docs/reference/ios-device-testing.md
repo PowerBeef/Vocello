@@ -115,6 +115,15 @@ microphone and speech prompts:
 scripts/ui_test.sh ios smoke --scenario record-then-play
 ```
 
+The Studio layout check (RF-24) also runs alone, in a few minutes, and generates nothing. With the
+default text size pinned, each mode is prepared with its benchmark setup and an idle Generate must
+sit within 48 pt above the tab dock; Clone's canvas must carry no reference transcript, and its
+Reference panel must review it and follow an edit:
+
+```sh
+scripts/ui_test.sh ios smoke --scenario studio-layout
+```
+
 The long-form project journey (RF-18) also runs alone, in about 15 minutes. It pins Take
 variation to Expressive through Settings and restores the original afterwards, so a persisted
 Consistent setting no longer decides the outcome (Consistent's long-form stalls are a 3.0 known

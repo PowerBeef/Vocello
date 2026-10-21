@@ -731,23 +731,17 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX)
     }
 
-    /// AUD-02: record a clip from Clone's reference, then play it in the review the save sheet shows,
-    /// in one journey. The session moves from recording to playback through its
-    /// one owner; the review's play control changes while the clip plays and
-    /// changes back only when the player reaches the clip's end, so a player
-    /// that could not play never passes. It proves playback to the end, not
-    /// that anyone heard it. Microphone and speech prompts stay human-answered:
-    /// the recorder asks as it opens and the review as it appears, so those two
-    /// taps wait long enough for a first run's answer. Nothing is saved.
     /// RF-24: every Studio mode keeps its setup dock against the tab dock. Clone
     /// once stacked its reference transcript review under the canvas, which
     /// pushed Generate up, squeezed the script and slid under the tab dock; the
     /// review now lives in the Reference panel. Each mode is prepared with its
     /// benchmark setup (Clone with the benchmark voice, so the reference is set);
-    /// an idle Generate must sit just above the tab dock. Nothing is generated
-    /// or saved.
+    /// an idle Generate must sit just above the tab dock. The text size is
+    /// pinned to the default, since accessibility sizes reserve a taller dock.
+    /// Nothing is generated or saved; the transcript edit stays in the draft,
+    /// which keeps only the saved voice and reloads its transcript.
     func testStudioModesKeepTheirDockLayout() {
-        beginSession()
+        beginSession(additionalArguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"])
         defer { endSession() }
 
         for mode in VocelloUIBenchMatrix.Mode.allCases {
@@ -757,6 +751,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             XCTAssertTrue(VocelloUIWait.exists(generate, timeout: 20), "\(mode.rawValue) must offer Generate")
             XCTAssertTrue(VocelloUIWait.exists(tabDock, timeout: 20))
             let gap = tabDock.frame.minY - generate.frame.maxY
+            let measurement = XCTAttachment(string: "\(mode.rawValue): Generate to tab dock gap \(gap) pt")
+            measurement.name = "ios-studio-layout-gap-\(mode.rawValue)"
+            measurement.lifetime = .keepAlways
+            add(measurement)
             XCTAssertTrue(
                 (0...48).contains(gap),
                 "\(mode.rawValue): Generate must sit just above the tab dock; the gap is \(gap) pt"
@@ -773,6 +771,17 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         )
         XCTAssertTrue(element("voiceCloning_referenceReviewStatus").exists)
         VocelloUIScreenshot.attach(app, named: "ios-studio-layout-clone-reference-panel")
+        // The panel is built once in a stored closure; an edit must reach the
+        // draft and come back, or the field would freeze as a closure-bound
+        // picker once did.
+        let transcript = element("voiceCloning_transcriptInput")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: transcript, timeout: 20))
+        transcript.typeText(" layoutcheck")
+        XCTAssertTrue(
+            VocelloUIWait.condition("the panel's transcript to follow the edit", timeout: 10) {
+                ((transcript.value as? String) ?? "").contains("layoutcheck")
+            }
+        )
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
         XCTAssertTrue(
             VocelloUIWait.condition("the Reference panel to close", timeout: 20) {
@@ -781,6 +790,14 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         )
     }
 
+    /// AUD-02: record a clip from Clone's reference, then play it in the review the save sheet shows,
+    /// in one journey. The session moves from recording to playback through its
+    /// one owner; the review's play control changes while the clip plays and
+    /// changes back only when the player reaches the clip's end, so a player
+    /// that could not play never passes. It proves playback to the end, not
+    /// that anyone heard it. Microphone and speech prompts stay human-answered:
+    /// the recorder asks as it opens and the review as it appears, so those two
+    /// taps wait long enough for a first run's answer. Nothing is saved.
     func testRecordThenPlayReviewsTheClip() {
         beginSession()
         defer { endSession() }

@@ -235,22 +235,6 @@
       ]
     },
     {
-      "id": "RF-22",
-      "plan": "release-first-3-0-2026-09",
-      "title": "The iPhone export unlock sheet matches the app's design",
-      "status": "in-flight",
-      "blockedBy": [],
-      "due": "2026-10-23",
-      "gate": "Maintainer request 2026-10-20: the Design & Clone Export sheet was a plain text page that did not match the app. Done when the sheet uses the app's own language (the onboarding hero, benefit rows and the shared primary CTA over the mode backdrop) with no change to its strings, identifiers or purchase behavior; the generic iOS compile and the routed check pass; the Swift review finds no blocker; and scripts/ui_test.sh ios purchase passes on the paired iPhone in an announced window, its screenshots showing the locked, purchased and restored states.",
-      "sourceOfTruth": [
-        "Sources/iOS/Commerce/IOSExportGate.swift",
-        "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
-        "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift"
-      ],
-      "updated": "2026-10-20",
-      "notes": "Opened 2026-10-20 at the maintainer's request, after the freeze checks passed on e51b8d8e and before the freeze was recorded; the freeze moves to the commit after this item. The redesign reuses onboarding's IOSOnboardingIcon (a Design-lavender to Clone-terracotta tile) and IOSOnboardingBenefitRow, the shared IOSPrimaryCTAButton for Buy, a gated-glass Try Again and an xmark close button; actions pin to the bottom except at accessibility text sizes."
-    },
-    {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",

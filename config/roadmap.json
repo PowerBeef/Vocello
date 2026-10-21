@@ -281,7 +281,7 @@
         ".github/workflows/release.yml"
       ],
       "updated": "2026-10-20",
-      "notes": "Opened 2026-10-20. Maintainer choices: Sparkle over a notify-only GitHub check; build after the iPhone freeze; ask on the second launch. Users on 2.4.0 have no updater, so Mac 3.0 is the first version that checks and prompts start with the release after it. Maintainer-only steps: generating the EdDSA key pair, storing the private key as a GitHub secret, publishing the appcast and the privacy-page line (website deploys from Git)."
+      "notes": "Opened 2026-10-20. Maintainer choices: Sparkle over a notify-only GitHub check; build after the iPhone freeze; ask on the second launch. Users on 2.4.0 have no updater, so Mac 3.0 is the first version that checks and prompts start with the release after it. Maintainer-only steps: generating the EdDSA key pair, storing the private key as a GitHub secret, publishing the appcast and the privacy-page line (website deploys from Git). 2026-10-20: the maintainer's Sparkle EdDSA key pair was generated with Sparkle 2.10.0's generate_keys (release tarball, SHA-256 checked against GitHub's digest) into the login keychain, account vocello; SUPublicEDKey 0Lowc/RlE87KDi4CMQ+0KTU99cYD0PvXejaZU4FqD/0=. The private key goes to the release environment's SPARKLE_ED_PRIVATE_KEY secret."
     },
     {
       "id": "RF-10",

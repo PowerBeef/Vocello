@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "Every shipped macOS code target has an exact entitlement allowlist. Any added, removed, or changed entitlement fails deterministic and packaged-release verification until this policy and its security review are updated together. Since 2026-09-15 the app hosts the engine in-process; the XPC service role was retired with it.",
+  "policy": "Every shipped macOS code target has an exact entitlement allowlist. Any added, removed, or changed entitlement fails deterministic and packaged-release verification until this policy and its security review are updated together. Since 2026-09-15 the app hosts the engine in-process; the XPC service role was retired with it. Since 2026-10-21 the CLI executable has its own role, macos-cli, new and empty: vocello is signed with the hardened runtime and no entitlements, the same Mach-O in the CLI DMG folder and the installer package payload.",
   "targets": [
     {
       "id": "macos-app",
@@ -17,6 +17,12 @@
     {
       "id": "macos-framework",
       "projectTarget": null,
+      "source": null,
+      "allowed": {}
+    },
+    {
+      "id": "macos-cli",
+      "projectTarget": "VocelloCLI",
       "source": null,
       "allowed": {}
     }

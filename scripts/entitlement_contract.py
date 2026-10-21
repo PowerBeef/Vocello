@@ -18,6 +18,12 @@ ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = Path("config/macos-entitlement-policy.json")
 LOCK_PATH = Path("QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
 SAFE_ID = re.compile(r"^[a-z0-9-]+$")
+ROLES = ("macos-app", "macos-framework", "macos-cli")
+# Roles whose signed code is one Mach-O file, not a bundle folder: the CLI's `vocello`, in the
+# sealed folder and as the copy in an expanded installer package's Payload.
+MACH_O_ROLES = frozenset({"macos-cli"})
+MACH_O_MAGIC = frozenset(bytes.fromhex(value) for value in (
+    "cffaedfe", "cefaedfe", "feedface", "feedfacf", "cafebabe", "bebafeca", "cafebabf"))
 
 
 class EntitlementError(ValueError):
@@ -60,6 +66,11 @@ def _target_blocks(project: str) -> dict[str, str]:
         match.group(1): text[match.start():(matches[index + 1].start() if index + 1 < len(matches) else len(text))]
         for index, match in enumerate(matches)
     }
+
+
+def _is_macos_tool(block: str) -> bool:
+    return bool(re.search(r"(?m)^\s+platform:\s*macOS\s*$", block)
+                and re.search(r"(?m)^\s+type:\s*tool\s*$", block))
 
 
 def _declared_entitlements(project: str) -> dict[str, str]:
@@ -131,8 +142,8 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
         if policy.get("schemaVersion") != 1:
             errors.append("macOS entitlement policy has an unsupported schemaVersion")
         targets = policy.get("targets")
-        if not isinstance(targets, list) or len(targets) != 2:
-            raise EntitlementError("macOS entitlement policy must define the app and framework roles")
+        if not isinstance(targets, list) or len(targets) != len(ROLES):
+            raise EntitlementError("macOS entitlement policy must define the app, framework and CLI roles")
         by_id: dict[str, dict[str, Any]] = {}
         for row in targets:
             if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not SAFE_ID.fullmatch(row["id"]):
@@ -140,7 +151,7 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
             if row["id"] in by_id or not isinstance(row.get("allowed"), dict):
                 raise EntitlementError("macOS entitlement policy target is duplicate or lacks an allowlist")
             by_id[row["id"]] = row
-        if set(by_id) != {"macos-app", "macos-framework"}:
+        if set(by_id) != set(ROLES):
             errors.append("macOS entitlement policy target roles are incomplete")
 
         project = (root / "project.yml").read_text(encoding="utf-8")
@@ -162,6 +173,14 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
         framework = by_id.get("macos-framework", {})
         if framework.get("projectTarget") is not None or framework.get("source") is not None or framework.get("allowed") != {}:
             errors.append("macos-framework must have an empty entitlement allowlist and no source plist")
+        # The CLI tool is signed with the hardened runtime and no entitlements; its target declares
+        # no entitlement file, which the routing comparison below enforces.
+        cli = by_id.get("macos-cli", {})
+        if cli.get("source") is not None or cli.get("allowed") != {}:
+            errors.append("macos-cli must have an empty entitlement allowlist and no source plist")
+        cli_target = cli.get("projectTarget")
+        if not isinstance(cli_target, str) or not _is_macos_tool(_target_blocks(project).get(cli_target, "")):
+            errors.append("macos-cli must name the project's macOS command-line tool target")
         if declared != expected_declared:
             errors.append(
                 "project.yml macOS entitlement routing differs from policy: "
@@ -229,12 +248,26 @@ def _signed_entitlements(bundle: Path) -> dict[str, Any]:
     return value
 
 
+def _require_mach_o(path: Path) -> None:
+    if path.is_symlink() or not path.is_file():
+        raise EntitlementError(f"{path.name} must be a regular Mach-O file")
+    try:
+        with path.open("rb") as stream:
+            magic = stream.read(4)
+    except OSError as error:
+        raise EntitlementError(f"could not read {path.name}: {error}") from error
+    if magic not in MACH_O_MAGIC:
+        raise EntitlementError(f"{path.name} is not a Mach-O file")
+
+
 def verify_bundle(root: Path, role: str, bundle: Path) -> None:
     policy = _read_json(root / POLICY_PATH)
     rows = policy.get("targets")
     row = next((item for item in rows if isinstance(item, dict) and item.get("id") == role), None) if isinstance(rows, list) else None
     if not row or not isinstance(row.get("allowed"), dict):
         raise EntitlementError(f"unknown entitlement role: {role}")
+    if role in MACH_O_ROLES:
+        _require_mach_o(bundle)
     actual = _signed_entitlements(bundle)
     if actual != row["allowed"]:
         added = sorted(set(actual) - set(row["allowed"]))

@@ -59,6 +59,12 @@ targets:
   Library:
     type: framework
     platform: macOS
+  VocelloCLI:
+    type: tool
+    platform: macOS
+    settings:
+      base:
+        PRODUCT_NAME: vocello
 """
         )
         (self.root / "scripts/release.sh").write_text(RELEASE_SIGNING)
@@ -86,6 +92,7 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framewo
                     "allowed": self.app_allowed,
                 },
                 {"id": "macos-framework", "projectTarget": None, "source": None, "allowed": {}},
+                {"id": "macos-cli", "projectTarget": "VocelloCLI", "source": None, "allowed": {}},
             ],
             "forbiddenDynamicLoadingAPIs": [
                 "dlopen",
@@ -171,6 +178,92 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framewo
         with mock.patch.object(module, "_signed_entitlements", return_value=actual):
             with self.assertRaisesRegex(module.EntitlementError, "added"):
                 module.verify_bundle(self.root, "macos-app", bundle)
+
+    def write_policy(self, change) -> None:
+        policy = json.loads(json.dumps(self.policy))
+        change(policy)
+        self.policy_path.write_text(json.dumps(policy))
+
+    def cli_role(self, policy: dict) -> dict:
+        return next(row for row in policy["targets"] if row["id"] == "macos-cli")
+
+    def test_cli_role_is_empty_and_names_the_cli_tool(self) -> None:
+        for label, change, message in (
+            ("entitled", lambda policy: self.cli_role(policy)["allowed"].update(
+                {"com.apple.security.cs.disable-library-validation": True}), "macos-cli must have an empty"),
+            ("source plist", lambda policy: self.cli_role(policy).update(source="Sources/QwenVoice.entitlements"),
+             "macos-cli must have an empty"),
+            ("unknown target", lambda policy: self.cli_role(policy).update(projectTarget="Missing"),
+             "command-line tool target"),
+            ("not a tool", lambda policy: self.cli_role(policy).update(projectTarget="Library"),
+             "command-line tool target"),
+            ("no target", lambda policy: self.cli_role(policy).update(projectTarget=None), "command-line tool target"),
+            ("role missing", lambda policy: policy["targets"].pop(), "app, framework and CLI roles"),
+            ("role renamed", lambda policy: self.cli_role(policy).update(id="macos-helper"), "roles are incomplete"),
+        ):
+            with self.subTest(label=label):
+                self.write_policy(change)
+                self.assertTrue(any(message in error for error in module.validate(self.root)),
+                                module.validate(self.root))
+        self.policy_path.write_text(json.dumps(self.policy))
+        self.assertEqual(module.validate(self.root), [])
+
+    def test_cli_target_declaring_an_entitlement_file_is_rejected(self) -> None:
+        path = self.root / "project.yml"
+        path.write_text(path.read_text() + "        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoice.entitlements\n")
+        self.assertTrue(any("routing differs" in error for error in module.validate(self.root)))
+
+    def write_mach_o(self, relative: str) -> Path:
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(bytes.fromhex("cffaedfe") + b"\x0c\x00\x00\x01 fixture arm64 executable")
+        path.chmod(0o755)
+        return path
+
+    def test_cli_mach_o_with_no_entitlements_passes_in_folder_and_package_payload(self) -> None:
+        for relative in ("dist/Vocello CLI/vocello", "expanded product/vocello-cli.pkg/Payload/vocello"):
+            with self.subTest(relative=relative):
+                binary = self.write_mach_o(relative)
+                calls: list[list[str]] = []
+
+                def codesign(argv, **_kwargs):
+                    calls.append(list(argv))
+                    return b""  # codesign prints nothing for a signature without entitlements
+
+                with mock.patch.object(module.subprocess, "check_output", side_effect=codesign):
+                    module.verify_bundle(self.root, "macos-cli", binary)
+                self.assertEqual(calls, [["codesign", "--display", "--entitlements", ":-", str(binary)]])
+
+    def test_cli_mach_o_with_any_entitlement_is_rejected(self) -> None:
+        binary = self.write_mach_o("dist/Vocello CLI/vocello")
+        for key, value in (("com.apple.security.cs.disable-library-validation", True),
+                           ("com.apple.security.cs.allow-unsigned-executable-memory", True),
+                           ("com.apple.security.get-task-allow", True),
+                           ("com.apple.security.app-sandbox", False)):
+            with self.subTest(key=key):
+                signed = plistlib.dumps({key: value})
+                with mock.patch.object(module.subprocess, "check_output", return_value=signed):
+                    with self.assertRaisesRegex(module.EntitlementError, f"added=\\['{key}'\\]"):
+                        module.verify_bundle(self.root, "macos-cli", binary)
+
+    def test_cli_role_needs_a_signed_mach_o_file(self) -> None:
+        unsigned = self.write_mach_o("dist/Vocello CLI/vocello")
+        failure = module.subprocess.CalledProcessError(1, ["codesign"])
+        with mock.patch.object(module.subprocess, "check_output", side_effect=failure):
+            with self.assertRaisesRegex(module.EntitlementError, "could not read signed entitlements"):
+                module.verify_bundle(self.root, "macos-cli", unsigned)
+        folder = self.root / "dist/Vocello CLI"
+        script = self.root / "dist/vocello.sh"
+        script.write_text("#!/bin/sh\n")
+        link = self.root / "dist/linked-vocello"
+        link.symlink_to(unsigned)
+        for path, message in ((folder, "regular Mach-O"), (script, "not a Mach-O"), (link, "regular Mach-O"),
+                              (self.root / "dist/missing", "regular Mach-O")):
+            with self.subTest(path=path.name), mock.patch.object(module.subprocess, "check_output",
+                                                                 return_value=b"") as codesign:
+                with self.assertRaisesRegex(module.EntitlementError, message):
+                    module.verify_bundle(self.root, "macos-cli", path)
+                codesign.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -203,7 +203,15 @@
         ],
         "options": {}
       },
+      "models.prefer-lower-memory": {
+        "aliases": [],
+        "options": {}
+      },
       "models.status": {
+        "aliases": [],
+        "options": {}
+      },
+      "models.use": {
         "aliases": [],
         "options": {}
       },
@@ -242,6 +250,10 @@
         "aliases": [
           "ls"
         ],
+        "options": {}
+      },
+      "settings.set": {
+        "aliases": [],
         "options": {}
       },
       "speakers": {

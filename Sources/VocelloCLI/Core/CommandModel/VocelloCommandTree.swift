@@ -203,6 +203,17 @@ public enum VocelloCommandTree {
                 name: "install", summary: "Download and verify a model into the shared store",
                 positionals: [CLIPositionalSpec("id", "the model id to install (see `vocello models list`)", required: true)]
             ),
+            CLICommandSpec(
+                name: "use", summary: "Choose the package a mode uses, as the app's Settings do",
+                positionals: [
+                    CLIPositionalSpec("mode", "custom | design | clone", required: true),
+                    CLIPositionalSpec("variant", "speed | quality | automatic", required: true),
+                ]
+            ),
+            CLICommandSpec(
+                name: "prefer-lower-memory", summary: "Turn the app's \"Prefer lower-memory models\" on or off",
+                positionals: [CLIPositionalSpec("state", "on | off", required: true)]
+            ),
         ],
         defaultSubcommand: "list"
     )
@@ -288,11 +299,23 @@ public enum VocelloCommandTree {
 
     static let settings = CLICommandSpec(
         name: "settings",
-        summary: "Read the Mac app's settings",
+        summary: "Read and change the Mac app's settings",
         subcommands: [
             CLICommandSpec(name: "list", aliases: ["ls"], summary: "List every setting with its value"),
             CLICommandSpec(name: "get", summary: "Print one setting's value",
                            positionals: [CLIPositionalSpec("name", "a setting name from `vocello settings list`", required: true)]),
+            CLICommandSpec(
+                name: "set", summary: "Change one setting, as the app's Settings do",
+                discussion: """
+                autoplay and prefer-lower-memory take true or false; variation expressive, balanced or consistent; \
+                output-folder an existing folder or default; variant.custom, variant.design and variant.clone \
+                speed, quality or automatic. Consent and the interface language belong to the app.
+                """,
+                positionals: [
+                    CLIPositionalSpec("name", "a setting name from `vocello settings list`", required: true),
+                    CLIPositionalSpec("value", "its new value", required: true),
+                ]
+            ),
         ],
         defaultSubcommand: "list"
     )

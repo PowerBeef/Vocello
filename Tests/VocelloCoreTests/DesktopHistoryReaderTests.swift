@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import GRDB
 import QwenVoiceCore
+import Synchronization
 import XCTest
 import VocelloDesktopCore
 
@@ -249,6 +250,68 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertNil(settings.explicitVariantID(for: .custom))
         XCTAssertNil(settings.entry("consent"), "consent is never a CLI setting")
         XCTAssertEqual(DesktopAppSettings(debug: false).domain, "com.qwenvoice.app")
+    }
+
+    /// RF-28: the CLI sets what the app's Settings set, stored as the app stores it.
+    func testSettingsAreSetAsTheAppStoresThem() throws {
+        let store = Mutex<[String: any Sendable]>(["generationVariation": "balanced"])
+        let settings = DesktopAppSettings(
+            domain: DesktopAppSettings.debugDomain,
+            read: { key -> Any? in store.withLock { stored -> (any Sendable)? in stored[key] } },
+            write: { key, value in
+                store.withLock { stored in
+                    switch value {
+                    case let flag as Bool: stored[key] = flag
+                    case let text as String: stored[key] = text
+                    default: stored[key] = nil
+                    }
+                }
+                return true
+            }
+        )
+        func stored(_ key: String) -> (any Sendable)? { store.withLock { $0[key] } }
+        func code(_ name: String, _ value: String) -> DesktopAppSettings.SetError? {
+            do {
+                _ = try settings.set(name, to: value)
+                return nil
+            } catch {
+                return error as? DesktopAppSettings.SetError
+            }
+        }
+
+        XCTAssertEqual(try settings.set("autoplay", to: "off").value, "false")
+        XCTAssertEqual(stored("autoPlay") as? Bool, false, "a Boolean, as UserDefaults stores it")
+        XCTAssertEqual(try settings.set("prefer-lower-memory", to: "YES").value, "true")
+        XCTAssertEqual(stored("QwenVoice.PreferSpeedEverywhere") as? Bool, true)
+        XCTAssertEqual(try settings.set("variation", to: " Consistent ").value, "consistent")
+        XCTAssertEqual(stored("generationVariation") as? String, "consistent")
+        XCTAssertEqual(try settings.set("variant.design", to: "hq").value, "quality")
+        XCTAssertEqual(stored("QwenVoice.MacModelVariantPreference.design") as? String, "quality")
+        let automatic = try settings.set("variant.design", to: "automatic")
+        XCTAssertEqual(automatic.value, "automatic")
+        XCTAssertTrue(automatic.isDefault)
+        XCTAssertNil(stored("QwenVoice.MacModelVariantPreference.design"), "automatic removes the choice")
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("settings-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        XCTAssertEqual(try settings.set("output-folder", to: folder.path + "/").value, folder.standardizedFileURL.path)
+        XCTAssertEqual(try settings.set("output-folder", to: "default").value, "default")
+        XCTAssertNil(stored("outputDirectory"))
+
+        XCTAssertEqual(code("output-folder", folder.appendingPathComponent("missing").path),
+                       .invalidValue(name: "output-folder", value: folder.appendingPathComponent("missing").path,
+                                     accepted: "an existing folder | default"))
+        XCTAssertEqual(code("autoplay", "maybe"), .invalidValue(name: "autoplay", value: "maybe", accepted: "true | false"))
+        XCTAssertEqual(code("interface-language", "fr"), .notSettable("interface-language"))
+        XCTAssertEqual(code("consent", "true"), .unknownSetting("consent"), "consent is never a CLI setting")
+
+        let readOnly = DesktopAppSettings(domain: DesktopAppSettings.debugDomain, read: { _ in nil })
+        XCTAssertThrowsError(try readOnly.set("autoplay", to: "true")) {
+            XCTAssertEqual($0 as? DesktopAppSettings.SetError, .writeFailed("autoplay"))
+        }
+        XCTAssertEqual(Set(DesktopChangeNotice.allCases.map(\.rawValue)).count, 4)
+        XCTAssertTrue(DesktopChangeNotice.allCases.allSatisfy { $0.rawValue.hasPrefix("com.qwenvoice.shared.") })
     }
 
     @MainActor

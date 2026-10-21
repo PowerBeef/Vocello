@@ -1009,7 +1009,9 @@
         "status",
         "active",
         "verify",
-        "install"
+        "install",
+        "use",
+        "prefer-lower-memory"
       ],
       "summary": "Inventory and install models",
       "usage": []
@@ -1111,6 +1113,52 @@
     },
     {
       "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "use",
+      "operands": [
+        {
+          "name": "mode",
+          "required": true,
+          "summary": "custom | design | clone",
+          "type": "string"
+        },
+        {
+          "name": "variant",
+          "required": true,
+          "summary": "speed | quality | automatic",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.use",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Choose the package a mode uses, as the app's Settings do",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "prefer-lower-memory",
+      "operands": [
+        {
+          "name": "state",
+          "required": true,
+          "summary": "on | off",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.prefer-lower-memory",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Turn the app's \"Prefer lower-memory models\" on or off",
+      "usage": []
+    },
+    {
+      "aliases": [],
       "defaultSubcommand": "list",
       "internalTool": false,
       "machineContract": true,
@@ -1121,9 +1169,10 @@
       "refusedOptions": [],
       "subcommands": [
         "list",
-        "get"
+        "get",
+        "set"
       ],
-      "summary": "Read the Mac app's settings",
+      "summary": "Read and change the Mac app's settings",
       "usage": []
     },
     {
@@ -1159,6 +1208,32 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "Print one setting's value",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "set",
+      "operands": [
+        {
+          "name": "name",
+          "required": true,
+          "summary": "a setting name from `vocello settings list`",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "required": true,
+          "summary": "its new value",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "settings.set",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Change one setting, as the app's Settings do",
       "usage": []
     },
     {

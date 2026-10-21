@@ -65,6 +65,7 @@
 		0AF4FC23C9138278AEF0A609 /* GenerationFailureDiagnosticLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF8577E65C258F1081F57A2 /* GenerationFailureDiagnosticLoggerTests.swift */; };
 		0B6A4C86670EDDDA579B5F43 /* MacStudioSingleTakeRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D08413C58F59EF9D86B616F /* MacStudioSingleTakeRunnerTests.swift */; };
 		0B760CE34312C13A16AFFC53 /* VocelloMacSmokeUITests+Acceptance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E46E146FB2F7F8207789B2B /* VocelloMacSmokeUITests+Acceptance.swift */; };
+		0B915FE4315BA6EF223638F8 /* DesktopChangeNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72157D2C516EC7EB119AA421 /* DesktopChangeNotice.swift */; };
 		0C503ECF7A070EEDC6131CF6 /* MacRecordVoiceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5B333484B86C0E30314380 /* MacRecordVoiceSheet.swift */; };
 		0C72DB8DD7E6FCDFDF6B5660 /* AudioQualityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C299927320A1CBCE655FCE7F /* AudioQualityGate.swift */; };
 		0C938FCAEB2BB9E2356C4326 /* ModelManagerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A367AAE25201E301F646DCA /* ModelManagerViewModel.swift */; };
@@ -1342,6 +1343,7 @@
 		71761C4FD04CF031A72524C2 /* SavedVoicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedVoicesViewModel.swift; sourceTree = "<group>"; };
 		71BF891DDCD76290F1E6DCA2 /* MacVoiceCloningReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVoiceCloningReadiness.swift; sourceTree = "<group>"; };
 		71FBA7C29EB94E1A7001A623 /* SharedModelComponentStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedModelComponentStoreTests.swift; sourceTree = "<group>"; };
+		72157D2C516EC7EB119AA421 /* DesktopChangeNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopChangeNotice.swift; sourceTree = "<group>"; };
 		72B703DF8A07FC4F83D3202F /* ModelInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInfo.swift; sourceTree = "<group>"; };
 		731806AD2E661F625043EC13 /* ModelDeletionSequence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDeletionSequence.swift; sourceTree = "<group>"; };
 		733FEEF76D4DE00AB9BA201F /* CLIGenerateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIGenerateRequest.swift; sourceTree = "<group>"; };
@@ -2596,6 +2598,7 @@
 				01DBD4EF994D1DE016AA75A5 /* DesktopAppPresence.swift */,
 				7FA57D3528F1087263226BF3 /* DesktopAppSettings.swift */,
 				017F5C3702FC8CF9C4A88E43 /* DesktopCatalog.swift */,
+				72157D2C516EC7EB119AA421 /* DesktopChangeNotice.swift */,
 				36C9E646BCB36E61C32A47DA /* DesktopEngineHost.swift */,
 				E3D359451E1486C0325EE249 /* DesktopHistoryReader.swift */,
 				12C2760EFFDB72BE37D2E80E /* DesktopLineBatch.swift */,
@@ -3764,6 +3767,7 @@
 				B6C8D92787F98A2B463ED61B /* DesktopAppPresence.swift in Sources */,
 				57C084B166AEB94A078E1B41 /* DesktopAppSettings.swift in Sources */,
 				40ECCC4505EA0720FE407FA2 /* DesktopCatalog.swift in Sources */,
+				0B915FE4315BA6EF223638F8 /* DesktopChangeNotice.swift in Sources */,
 				F0BBB197A07DC99A2E85EE32 /* DesktopEngineHost.swift in Sources */,
 				C1CDF938DDBEBFB087FFEA4D /* DesktopHistoryReader.swift in Sources */,
 				F14A20AB03AECC89116A7354 /* DesktopLineBatch.swift in Sources */,

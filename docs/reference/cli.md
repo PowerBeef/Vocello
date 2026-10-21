@@ -408,12 +408,19 @@ quit the app, or point `--data-dir` elsewhere. `export` copies the take
 the way the app's Save As does (complete before it replaces anything; `--replace` to overwrite).
 Deleting, clearing and recovery come with the cross-process History lock (RF-30).
 
-### `settings` — read the app's settings
+### `settings` — read and change the app's settings
 
 `vocello settings [list|get <name>] [--json]` reads the Mac app's preferences (`com.qwenvoice.app`):
 `autoplay`, `output-folder`, `variation`, `prefer-lower-memory`, `variant.custom|design|clone`
 (`automatic` when unset) and `interface-language` (read-only). Each row says whether it is the app's
 default. Voice-cloning consent is never a CLI setting.
+
+`vocello settings set <name> <value>` changes one as the app's Settings do and reports its new row:
+`autoplay` and `prefer-lower-memory` take `true` or `false` (`on`/`off`, `yes`/`no` too); `variation`
+`expressive`, `balanced` or `consistent`; `output-folder` an existing folder or `default`;
+`variant.<mode>` `speed`, `quality` or `automatic` (`automatic` and `default` remove the choice). A bad
+value or name is `invalid_input`; `interface-language` stays the app's. The app reads each value when
+it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidChange`).
 
 ### `briefs` — Voice Design's starting briefs
 
@@ -498,7 +505,12 @@ vocello models status [<id>] [--json]      # adds missing-file detail
 vocello models verify [<id>] [--json]      # every installed file's size and SHA-256
 vocello models active [--json]             # the package each mode uses, as the app resolves it
 vocello models install <id> [--verbose]    # headless download into the shared models dir
+vocello models use <mode> speed|quality|automatic   # the app's per-mode package choice
+vocello models prefer-lower-memory on|off           # the app's "Prefer lower-memory models"
 ```
+
+`use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and
+`settings set prefer-lower-memory`; `models active` shows what each mode then resolves to.
 
 `verify` reads every byte of each installed model and compares it with the authenticated catalog's
 exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any difference exits 1 with

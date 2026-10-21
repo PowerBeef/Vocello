@@ -69,9 +69,22 @@ enum ModelsCommand {
         let models: [VerifiedModel]
     }
 
-    /// `action` is the canonical subcommand the parser resolved: list, status, verify or install.
+    /// `action` is the canonical subcommand the parser resolved.
     @MainActor
     static func run(action: String, _ args: Args) async throws {
+        if action == "use" {
+            // The app's per-mode package choice (Settings > Models): `models active` shows what it resolves to.
+            let mode = args.positionals.first ?? ""
+            guard GenerationMode(rawValue: mode) != nil else {
+                throw CLIError(.invalidInput, "unknown mode '\(mode)'", hint: "use custom, design or clone")
+            }
+            SettingsCommand.report(try SettingsCommand.set("variant.\(mode)", to: args.positionals.dropFirst().first ?? ""))
+            return
+        }
+        if action == "prefer-lower-memory" {
+            SettingsCommand.report(try SettingsCommand.set("prefer-lower-memory", to: args.positionals.first ?? ""))
+            return
+        }
         if action == "install" {
             try await runInstall(args)
             return

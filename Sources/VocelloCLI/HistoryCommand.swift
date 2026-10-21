@@ -164,7 +164,8 @@ enum HistoryCommand {
     }
 }
 
-/// `vocello settings`: the Mac app's settings, read-only here (RF-26).
+/// `vocello settings`: the Mac app's settings (RF-26), changed as its
+/// Settings change them (RF-28).
 enum SettingsCommand {
     struct Rows: Encodable, Sendable {
         let domain: String
@@ -175,10 +176,47 @@ enum SettingsCommand {
         let setting: DesktopAppSettings.Entry
     }
 
+    /// Sets `name` and tells a running app; the new entry.
+    static func set(_ name: String, to value: String, in settings: DesktopAppSettings = DesktopAppSettings()) throws
+        -> DesktopAppSettings.Entry {
+        let entry: DesktopAppSettings.Entry
+        do {
+            entry = try settings.set(name, to: value)
+        } catch let error as DesktopAppSettings.SetError {
+            switch error {
+            case .unknownSetting(let name):
+                throw CLIError(
+                    .invalidInput, "unknown setting '\(name)'",
+                    hint: "one of: \(DesktopAppSettings.names.joined(separator: ", "))"
+                )
+            case .notSettable(let name):
+                throw CLIError(.invalidInput, "\(name) is not settable from the CLI", hint: "change it in the Vocello app")
+            case .invalidValue(let name, let value, let accepted):
+                throw CLIError(.invalidInput, "invalid value '\(value)' for \(name)", hint: "use \(accepted)")
+            case .writeFailed(let name):
+                throw CLIError(.ioError, "could not store \(name) in the app's preferences (\(settings.domain))")
+            }
+        }
+        DesktopChangeNotice.settings.post()
+        return entry
+    }
+
+    static func report(_ entry: DesktopAppSettings.Entry) {
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(One(setting: entry))
+        } else {
+            print("\(entry.name)\t\(entry.value)")
+        }
+    }
+
     @MainActor
     static func run(action: String, _ args: Args) async throws {
         let settings = DesktopAppSettings()
         switch action {
+        case "set":
+            let name = args.positionals.first ?? ""
+            let value = args.positionals.dropFirst().first ?? ""
+            report(try set(name, to: value, in: settings))
         case "get":
             let name = args.positionals.first ?? ""
             guard let entry = settings.entry(name) else {

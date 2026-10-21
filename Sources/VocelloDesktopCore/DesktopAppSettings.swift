@@ -5,8 +5,10 @@ import QwenVoiceCore
 /// The Mac app's settings as the CLI reads them: the `com.qwenvoice.app`
 /// preferences domain (`com.qwenvoice.app.debug` in a debug session), read
 /// through CFPreferences because `UserDefaults.standard` in the CLI is the
-/// CLI's own domain. Read-only here; consent and the interface language are
-/// reported but never settable from the CLI.
+/// CLI's own domain. `set` writes what the app's Settings write (RF-28); the
+/// app reads each value when it needs it, and preferences stay coherent across
+/// processes. Consent and the interface language are reported but never
+/// settable from the CLI.
 public struct DesktopAppSettings: Sendable {
     /// One setting: its CLI name, the app's preference key and its value.
     public struct Entry: Encodable, Sendable, Equatable {
@@ -22,8 +24,18 @@ public struct DesktopAppSettings: Sendable {
     public static let interfaceLanguageKey = "vocello.ios.interfaceLanguage"
     public static let debugDomain = "com.qwenvoice.app.debug"
 
+    /// Why a setting was not set.
+    public enum SetError: Error, Equatable, Sendable {
+        case unknownSetting(String)
+        case notSettable(String)
+        case invalidValue(name: String, value: String, accepted: String)
+        case writeFailed(String)
+    }
+
     public let domain: String
     private let read: @Sendable (String) -> Any?
+    /// Stores a value (nil removes the key) and makes it visible to other processes.
+    private let write: @Sendable (String, Any?) -> Bool
     /// The release domain, where the app keeps the interface language even in
     /// a debug session (`IOSAppLanguage` writes `UserDefaults.standard`).
     private let readRelease: @Sendable (String) -> Any?
@@ -34,18 +46,90 @@ public struct DesktopAppSettings: Sendable {
         self.init(
             domain: domain,
             read: { CFPreferencesCopyAppValue($0 as CFString, domain as CFString) as Any? },
-            readRelease: { CFPreferencesCopyAppValue($0 as CFString, release as CFString) as Any? }
+            readRelease: { CFPreferencesCopyAppValue($0 as CFString, release as CFString) as Any? },
+            write: { key, value in
+                let stored: CFPropertyList? = value.map { $0 as AnyObject }
+                CFPreferencesSetAppValue(key as CFString, stored, domain as CFString)
+                return CFPreferencesAppSynchronize(domain as CFString)
+            }
         )
     }
 
-    /// A reader over any key-value source (tests); `readRelease` defaults to `read`.
+    /// A store over any key-value source (tests); `readRelease` defaults to `read`,
+    /// and without `write` nothing is settable.
     public init(
         domain: String, read: @escaping @Sendable (String) -> Any?,
-        readRelease: (@Sendable (String) -> Any?)? = nil
+        readRelease: (@Sendable (String) -> Any?)? = nil,
+        write: (@Sendable (String, Any?) -> Bool)? = nil
     ) {
         self.domain = domain
         self.read = read
         self.readRelease = readRelease ?? read
+        self.write = write ?? { _, _ in false }
+    }
+
+    /// Sets the setting `name` from its CLI spelling, as the app's Settings store
+    /// it, and returns its new entry. `output-folder` takes an existing folder or
+    /// `default`; `variant.<mode>` takes `speed`, `quality` or `automatic`.
+    public func set(_ name: String, to raw: String) throws -> Entry {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stored: Any?
+        switch name {
+        case "autoplay", "prefer-lower-memory":
+            guard let flag = Self.flag(value) else {
+                throw SetError.invalidValue(name: name, value: raw, accepted: "true | false")
+            }
+            stored = flag
+        case "output-folder":
+            if value.lowercased() == "default" {
+                stored = nil
+            } else {
+                let folder = URL(fileURLWithPath: (value as NSString).expandingTildeInPath).standardizedFileURL
+                var isDirectory: ObjCBool = false
+                guard !value.isEmpty, unsafe FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
+                      isDirectory.boolValue else {
+                    throw SetError.invalidValue(name: name, value: raw, accepted: "an existing folder | default")
+                }
+                stored = folder.path
+            }
+        case "variation":
+            guard let variation = Qwen3SamplingVariation(rawValue: value.lowercased()) else {
+                throw SetError.invalidValue(name: name, value: raw, accepted: "expressive | balanced | consistent")
+            }
+            stored = variation.rawValue
+        case "variant.custom", "variant.design", "variant.clone":
+            switch value.lowercased() {
+            case "automatic", "auto": stored = nil
+            case "speed", "fast": stored = ModelVariantKind.speed.rawValue
+            case "quality", "hq": stored = ModelVariantKind.quality.rawValue
+            default: throw SetError.invalidValue(name: name, value: raw, accepted: "speed | quality | automatic")
+            }
+        case "interface-language":
+            throw SetError.notSettable(name)
+        default:
+            throw SetError.unknownSetting(name)
+        }
+        guard write(Self.key(for: name), stored) else { throw SetError.writeFailed(name) }
+        guard let entry = entry(name) else { throw SetError.unknownSetting(name) }
+        return entry
+    }
+
+    private static func key(for name: String) -> String {
+        switch name {
+        case "autoplay": MacAppSettingsKeys.autoPlay
+        case "output-folder": MacAppSettingsKeys.outputDirectory
+        case "variation": MacAppSettingsKeys.generationVariation
+        case "prefer-lower-memory": MacAppSettingsKeys.preferSpeedEverywhere
+        default: MacAppSettingsKeys.variantPreference(for: GenerationMode(rawValue: String(name.dropFirst("variant.".count))) ?? .custom)
+        }
+    }
+
+    private static func flag(_ value: String) -> Bool? {
+        switch value.lowercased() {
+        case "true", "on", "yes", "1": true
+        case "false", "off", "no", "0": false
+        default: nil
+        }
     }
 
     /// The CLI names, in display order.

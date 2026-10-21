@@ -218,6 +218,9 @@ security() {
       [ "$FAIL_STAGE" != cleanup ] || return 57
       command rm -f "${@: -1}"; return ;;
     import)
+      # Which file each import read and whether its private key stays non-extractable (-x).
+      case " $* " in *" -x "*) extractable=non-extractable ;; *) extractable=extractable ;; esac
+      printf '%s %s\n' "${2##*/}" "$extractable" >> "$CREDENTIAL_TEST_ROOT/security-imports.log"
       if [ "$FAIL_STAGE" = terminate ]; then kill -TERM "$$"; fi
       if [ "$FAIL_STAGE" = installer-import ] && [[ " $* " == *installer-cert.p12* ]]; then return 41; fi ;;
     find-identity)
@@ -342,6 +345,15 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
         self.assertEqual(self.run_block("Cleanup iOS signing material").returncode, 0)
         self.assertFalse(self.credentials())
         self.assertEqual(self.run_block("Cleanup iOS signing material").returncode, 0)
+
+    def test_macos_signing_keys_are_imported_non_extractable(self):
+        r = self.run_block(self.SETUP_MAC)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # The Developer ID Application and Installer identities, each with a non-extractable key.
+        self.assertEqual((self.root / "security-imports.log").read_text().splitlines(),
+                         ["cert.p12 non-extractable", "installer-cert.p12 non-extractable"])
+        self.assertEqual(self.run_block("Cleanup signing material").returncode, 0)
+        self.assertFalse(self.credentials())
 
     def test_early_failures_and_termination_remove_partial_material(self):
         cases = [(self.SETUP_MAC, x) for x in ("decode", "create-keychain", "import", "installer-import",

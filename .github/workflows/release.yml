@@ -374,7 +374,7 @@ jobs:
           security unlock-keychain  -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           security import "$RUNNER_TEMP/cert.p12" \
-            -P "$CERT_PASSWORD" \
+            -P "$CERT_PASSWORD" -x \
             -T /usr/bin/codesign -t cert -f pkcs12 \
             -k "$KEYCHAIN_PATH"
           rm "$RUNNER_TEMP/cert.p12"
@@ -383,7 +383,7 @@ jobs:
           # installer package, goes into the same keychain the same way.
           echo "$INSTALLER_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/installer-cert.p12"
           security import "$RUNNER_TEMP/installer-cert.p12" \
-            -P "$INSTALLER_CERT_PASSWORD" \
+            -P "$INSTALLER_CERT_PASSWORD" -x \
             -T /usr/bin/productsign -t cert -f pkcs12 \
             -k "$KEYCHAIN_PATH"
           rm "$RUNNER_TEMP/installer-cert.p12"

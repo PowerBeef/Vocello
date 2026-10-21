@@ -48,6 +48,11 @@ for (const viewport of VIEWPORTS) {
     const before = await progress.evaluate((element) => getComputedStyle(element).transform);
     await page.evaluate(() => window.scrollTo(0, Math.max(900, document.body.scrollHeight / 2)));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    // The bar eases over an 80 ms transform transition, so a read taken at once
+    // can still see its starting value on a fast machine; wait for it to move.
+    await expect
+      .poll(() => progress.evaluate((element) => getComputedStyle(element).transform))
+      .not.toBe(before);
     const after = await progress.evaluate((element) => getComputedStyle(element).transform);
     validateHydrationProbe({ before, after, scrollTop: await page.evaluate(() => window.scrollY) });
 

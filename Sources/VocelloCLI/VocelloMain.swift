@@ -32,10 +32,22 @@ enum VocelloMain {
             return failure.exitCode
         }
         CLIOutput.configure(invocation)
+        // A client request id names the envelope (and every event) of its request.
+        let clientRequestID = invocation.args.string("client-request-id")
         CLIPresenter.begin(
             format: invocation.format, command: invocation.commandName,
+            requestID: clientRequestID ?? UUID().uuidString.lowercased(),
             onBrokenOutput: CLIProcessSupervisor.outputBroken
         )
+        if let clientRequestID {
+            do {
+                try CLIRequestLedger.validate(id: clientRequestID)
+            } catch {
+                let failure = CLIFailure.classify(error)
+                CLIPresenter.fail(failure)
+                return failure.exitCode
+            }
+        }
         do {
             try await dispatch(invocation)
             CLIPresenter.finishSuccessIfUnreported()
@@ -74,6 +86,8 @@ enum VocelloMain {
             try await GenerateCommand.run(args)
         case "batch":
             try await BatchCommand.run(args)
+        case "run":
+            try await RunCommand.run(args)
         case "voices":
             try await VoicesCommand.run(action: action, args)
         case "speakers":

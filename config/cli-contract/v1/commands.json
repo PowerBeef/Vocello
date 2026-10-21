@@ -184,6 +184,14 @@
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
+        },
+        {
+          "name": "client-request-id",
+          "placeholder": "id",
+          "summary": "idempotency: a repeated id with the same request replays its result instead of running again",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
         }
       ],
       "path": "generate",
@@ -359,6 +367,39 @@
       "summary": "Synthesize many clips with one model load",
       "usage": [
         "vocello batch --file <path|-> --mode custom|design|clone [options]"
+      ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "run",
+      "operands": [],
+      "options": [
+        {
+          "name": "request",
+          "placeholder": "path|-",
+          "summary": "one request object (- reads stdin)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "requests",
+          "placeholder": "path|-",
+          "summary": "JSONL: one request per line (- reads stdin)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        }
+      ],
+      "path": "run",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Run JSON generation requests on one warm engine (for agents)",
+      "usage": [
+        "vocello run --request <file|-> [--json|--ndjson]",
+        "vocello run --requests <file|-> [--json|--ndjson]"
       ]
     },
     {

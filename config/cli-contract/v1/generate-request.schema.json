@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vocello:cli:v1:generate-request",
+  "title": "Vocello generation request",
+  "description": "One take as an agent asks for it (vocello run --request, one line of --requests, and the MCP server's generate_speech input). Each field is the generate option of the same name; the CLI parses the result as strictly as its command line.",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "enum": [
+        "custom",
+        "design",
+        "clone"
+      ],
+      "description": "custom (default), design or clone."
+    },
+    "variant": {
+      "enum": [
+        "speed",
+        "quality"
+      ],
+      "description": "The model package; absent, the one the Mac app uses for the mode."
+    },
+    "text": {
+      "type": "string",
+      "description": "The script; never \"-\" (stdin carries the requests)."
+    },
+    "textFile": {
+      "type": "string",
+      "description": "A file holding the script."
+    },
+    "speaker": {
+      "type": "string",
+      "description": "custom: a Built-in Voice speaker id."
+    },
+    "voiceBrief": {
+      "type": "string",
+      "description": "design: the voice description."
+    },
+    "voice": {
+      "type": "string",
+      "description": "clone: a saved voice name or id."
+    },
+    "reference": {
+      "type": "string",
+      "description": "clone: a reference clip instead of a saved voice."
+    },
+    "transcript": {
+      "type": "string",
+      "description": "clone: the reference clip's words."
+    },
+    "delivery": {
+      "type": "string",
+      "description": "A delivery instruction (custom and design)."
+    },
+    "deliveryCell": {
+      "type": "string",
+      "description": "custom: a preset cell such as calm.normal."
+    },
+    "language": {
+      "type": "string",
+      "description": "auto, a language name or a code such as fr."
+    },
+    "seed": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,20}$"
+        },
+        {
+          "type": "integer",
+          "minimum": 0
+        }
+      ],
+      "description": "A deterministic sampling seed, preferably as a decimal string."
+    },
+    "variation": {
+      "enum": [
+        "expressive",
+        "balanced",
+        "consistent"
+      ],
+      "description": "Absent, the app's Variation setting."
+    },
+    "out": {
+      "type": "string",
+      "description": "The .wav file to write."
+    },
+    "confirmConsent": {
+      "type": "boolean",
+      "description": "Required true to clone: you own or have permission to clone this voice."
+    },
+    "appDelivery": {
+      "type": "boolean",
+      "description": "With no delivery given, send the app's default delivery."
+    },
+    "stream": {
+      "type": "boolean",
+      "description": "Streaming synthesis (default true)."
+    },
+    "clientRequestID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "maxLength": 128,
+      "description": "Idempotency: the same id and request replays the stored result."
+    }
+  },
+  "additionalProperties": false
+}

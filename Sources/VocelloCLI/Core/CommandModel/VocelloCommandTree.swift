@@ -53,6 +53,26 @@ public enum VocelloCommandTree {
             .flag("no-stream", "accumulate the whole take before decoding"),
             .flag("play", "play the take when done"),
             .flag("plan", "resolve the take (model, variant, language, output) and report it without loading a model"),
+            .value("client-request-id", .text, "id",
+                   "idempotency: a repeated id with the same request replays its result instead of running again"),
+        ]
+    )
+
+    static let run = CLICommandSpec(
+        name: "run",
+        summary: "Run JSON generation requests on one warm engine (for agents)",
+        usage: [
+            "vocello run --request <file|-> [--json|--ndjson]",
+            "vocello run --requests <file|-> [--json|--ndjson]",
+        ],
+        discussion: """
+        A request is a JSON object of generate's options (config/cli-contract/v1/generate-request.schema.json), \
+        with an optional clientRequestID for idempotency. --requests reads JSONL, one request per line, and runs \
+        each on the same engine; a failed request does not stop the others, and the result lists every one.
+        """,
+        options: [
+            .value("request", .file, "path|-", "one request object (- reads stdin)"),
+            .value("requests", .file, "path|-", "JSONL: one request per line (- reads stdin)"),
         ]
     )
 
@@ -294,7 +314,7 @@ public enum VocelloCommandTree {
     )
 
     public static let commands: [CLICommandSpec] = [
-        generate, batch, history, voices, speakers, modesCommand, languages, deliveries, briefs, models, settings,
+        generate, batch, run, history, voices, speakers, modesCommand, languages, deliveries, briefs, models, settings,
         doctor, capabilities, completions,
         bench, help, version,
     ]

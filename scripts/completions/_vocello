@@ -5,7 +5,7 @@
 _vocello() {
   local word previous key command sub i
   local -a candidates options
-  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --file --out-dir --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
+  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --client-request-id --file --out-dir --request --requests --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
 
   # Find the command and subcommand typed so far, skipping options and their values.
   i=2
@@ -25,6 +25,7 @@ _vocello() {
   case $command in
     generate|gen) command=generate ;;
     batch) command=batch ;;
+    run) command=run ;;
     history) command=history ;;
     voices|voice) command=voices ;;
     speakers|speaker) command=speakers ;;
@@ -50,6 +51,7 @@ _vocello() {
       'generate:Synthesize one clip'
       'gen:Synthesize one clip'
       'batch:Synthesize many clips with one model load'
+      'run:Run JSON generation requests on one warm engine (for agents)'
       'history:Read the app'\''s History (read-only)'
       'voices:Manage saved clone voices'
       'voice:Manage saved clone voices'
@@ -274,8 +276,11 @@ _vocello() {
     --variation) _values 'variation' expressive balanced consistent; return ;;
     --language) :; return ;;
     --out) _files; return ;;
+    --client-request-id) :; return ;;
     --file) _files; return ;;
     --out-dir) _files -/; return ;;
+    --request) _files; return ;;
+    --requests) _files; return ;;
     --order) _values 'order' newest oldest longest shortest mode; return ;;
     --limit) :; return ;;
     --name) :; return ;;
@@ -325,6 +330,7 @@ _vocello() {
         '--no-stream:accumulate the whole take before decoding'
         '--play:play the take when done'
         '--plan:resolve the take (model, variant, language, output) and report it without loading a model'
+        '--client-request-id:idempotency\: a repeated id with the same request replays its result instead of running again'
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'
@@ -354,6 +360,20 @@ _vocello() {
         '--out-dir:output folder (default <data>/outputs/cli/batch)'
         '--long-form:each line is one long-form project\: planned into segments and joined'
         '--play:play each result when done'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    run)
+      options=(
+        '--request:one request object (- reads stdin)'
+        '--requests:JSONL\: one request per line (- reads stdin)'
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'

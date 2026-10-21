@@ -7,7 +7,7 @@ import VocelloDesktopCore
 /// `vocello generate` — synthesize one clip headlessly via the in-process engine.
 public enum GenerateCommand {
     /// Machine-readable result emitted under `--json`.
-    struct GenerateJSON: Encodable {
+    public struct GenerateJSON: Encodable, Sendable {
         let generationID: String
         let audioPath: String
         let durationSeconds: Double
@@ -174,8 +174,34 @@ public enum GenerateCommand {
         let outputPath: String
     }
 
+    /// One take, validated and resolved before any engine work: everything
+    /// `--plan` reports and `execute` needs.
+    public struct PreparedTake: Sendable {
+        let args: Args
+        let text: String
+        let mode: GenerationMode
+        public let consent: VoiceCloningConsentPolicy
+        let language: Qwen3SupportedLanguage?
+        let seed: UInt64?
+        let variation: Qwen3SamplingVariation?
+        let appDelivery: Bool
+        let deliveryInstructionCellID: String?
+        let variant: VariantChoice
+        let generationID: UUID
+        let output: OutputDestination
+        let streaming: Bool
+        public let dataDirectory: URL
+        public let manifestOverride: URL?
+        let registry: ContractBackedModelRegistry
+        let modelsDirectory: URL
+
+        var quality: Bool { variant.quality }
+    }
+
+    /// Validates `args` and resolves the take without an engine. `interactive`
+    /// allows the mode picker (never for a request an agent sent).
     @MainActor
-    public static func run(_ args: Args) async throws {
+    public static func prepare(_ args: Args, interactive: Bool) async throws -> PreparedTake {
         let explicitQuality = try parseVariantFlag(args)
         let streaming = !args.flag("no-stream")
 
@@ -185,7 +211,7 @@ public enum GenerateCommand {
 
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
         // default to custom (keeps scripted/piped runs unchanged).
-        let mode = try await resolveModeInteractive(args)
+        let mode = interactive ? try await resolveModeInteractive(args) : try resolveMode(args)
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
@@ -207,22 +233,43 @@ public enum GenerateCommand {
             explicitQuality: explicitQuality, mode: mode, registry: registryContext.registry,
             modelsDirectory: registryContext.modelsDirectory, settings: settings
         )
-        let quality = variant.quality
         // The take's identity names its default output, so the path and the
         // JSON `generationID` agree and no two runs share a file (U28).
         let generationID = UUID()
         let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        return PreparedTake(
+            args: args, text: text, mode: mode, consent: consent, language: language, seed: seed,
+            variation: variation, appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
+            variant: variant, generationID: generationID, output: output, streaming: streaming,
+            dataDirectory: dataDir, manifestOverride: manifestOverride, registry: registryContext.registry,
+            modelsDirectory: registryContext.modelsDirectory
+        )
+    }
+
+    /// What a request's identity leaves out: how it reports, not what it asks for.
+    static let identityExclusions: Set<String> = [
+        "client-request-id", "json", "ndjson", "output-format", "quiet", "verbose", "no-input", "play", "plan",
+    ]
+
+    /// What `--plan` reports for a prepared take.
+    static func plan(_ take: PreparedTake) throws -> GeneratePlan {
+        let modelID = try CLIRuntime.modelID(registry: take.registry, mode: take.mode, quality: take.quality)
+        return GeneratePlan(
+            mode: take.mode.rawValue, variant: take.quality ? "quality" : "speed", variantSource: take.variant.source,
+            modelID: modelID,
+            modelInstalled: take.registry.model(id: modelID)
+                .map { DesktopModelInventory.isComplete($0, modelsDirectory: take.modelsDirectory) } ?? false,
+            language: (take.language ?? .auto).rawValue, seed: take.seed.map { String($0) },
+            variation: (take.variation ?? .expressive).rawValue, characters: take.text.count, streaming: take.streaming,
+            outputPath: take.output.path
+        )
+    }
+
+    @MainActor
+    public static func run(_ args: Args) async throws {
+        let take = try await prepare(args, interactive: true)
         if args.flag("plan") {
-            let modelID = try CLIRuntime.modelID(registry: registryContext.registry, mode: mode, quality: quality)
-            let plan = GeneratePlan(
-                mode: mode.rawValue, variant: quality ? "quality" : "speed", variantSource: variant.source,
-                modelID: modelID,
-                modelInstalled: registryContext.registry.model(id: modelID)
-                    .map { DesktopModelInventory.isComplete($0, modelsDirectory: registryContext.modelsDirectory) } ?? false,
-                language: (language ?? .auto).rawValue, seed: seed.map { String($0) },
-                variation: (variation ?? .expressive).rawValue, characters: text.count, streaming: streaming,
-                outputPath: output.path
-            )
+            let plan = try plan(take)
             if CLIPresenter.isMachine {
                 CLIPresenter.succeed(plan)
             } else {
@@ -232,19 +279,74 @@ public enum GenerateCommand {
             }
             return
         }
+
+        // Idempotency: a repeated client request id replays its stored result.
+        var reservation: CLIRequestLedger.Reservation?
+        let ledger = CLIRequestLedger(dataDirectory: take.dataDirectory)
+        if let id = args.string("client-request-id") {
+            let identity = args.canonicalForm(excluding: Self.identityExclusions)
+            switch try ledger.claim(id: id, request: identity) {
+            case .replay(let stored):
+                CLIPresenter.markReplayed()
+                if CLIPresenter.isMachine {
+                    CLIPresenter.succeed(stored)
+                } else if case .object(let fields) = stored, case .string(let path)? = fields["audioPath"] {
+                    print(path)
+                }
+                return
+            case .conflict:
+                throw CLIError(
+                    .idempotencyConflict, "client request id '\(id)' was used for a different request",
+                    hint: "use a new id for a new request"
+                )
+            case .inProgress:
+                throw CLIError(.requestInProgress, "client request id '\(id)' is running in another process")
+            case .fresh(let held):
+                reservation = held
+            }
+        }
+
+        let result: GenerateJSON
+        do {
+            note("booting engine (data: \(take.dataDirectory.path))")
+            CLIPresenter.event(.engineBooting)
+            let runtime = try await CLIRuntime.bootstrap(
+                dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent)
+            CLIPresenter.event(.engineReady)
+            result = try await execute(take, runtime: runtime)
+        } catch {
+            if let reservation { ledger.abandon(reservation) }
+            throw error
+        }
+        if let reservation { ledger.complete(reservation, result: try CLIJSONValue(encoding: result)) }
+        if !CLIPresenter.isMachine {
+            // stdout = machine-readable (the path). stderr = human notes.
+            print(result.audioPath)
+        }
+        if args.flag("play") { try await CLIPlayback.play([result.audioPath]) }
+        // Reported after any playback, so an interrupted --play never follows a success.
+        if CLIPresenter.isMachine { CLIPresenter.succeed(result) }
+    }
+
+    /// Runs one prepared take on `runtime`: payload, model load, generation, the
+    /// CM-7 publication check and its events. Prints nothing on stdout.
+    @MainActor
+    public static func execute(_ take: PreparedTake, runtime: CLIRuntime) async throws -> GenerateJSON {
+        let args = take.args
+        let mode = take.mode
+        let quality = take.quality
+        let text = take.text
+        let streaming = take.streaming
+        let generationID = take.generationID
+        let output = take.output
         try prepareOutputFolder(of: output.path)
         if output.replacesExistingFile {
             note("--out names an existing file: a successful take replaces it")
         }
-
-        note("booting engine (data: \(dataDir.path))")
-        CLIPresenter.event(.engineBooting)
-        let runtime = try await CLIRuntime.bootstrap(
-            dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
-        CLIPresenter.event(.engineReady)
+        let runtime = runtime.withConsent(take.consent)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         let built = try await buildPayload(args, mode: mode, runtime: runtime)
-        let payload = appDelivery ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
+        let payload = take.appDelivery ? CLIBatchExecution.applyingAppDefaultDelivery(to: built) : built
 
         note("loading \(modelID)…")
         CLIPresenter.event(.modelLoading, data: ["modelID": .string(modelID)])
@@ -257,12 +359,11 @@ public enum GenerateCommand {
             // Match the app's interactive streaming cadence so --stream exercises
             // the same engine chunk path the UI uses (CustomVoiceCoordinator et al.).
             streamingInterval: streaming ? GenerationSemantics.appStreamingInterval : nil,
-            languageHint: language?.rawValue,
+            languageHint: take.language?.rawValue,
             payload: payload, generationID: generationID,
-            seed: seed,
-            variation: variation,
-            deliveryInstructionCellID: deliveryInstructionCellID)
-
+            seed: take.seed,
+            variation: take.variation,
+            deliveryInstructionCellID: take.deliveryInstructionCellID)
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
         CLIPresenter.event(.generationStarted, generationID: generationID, data: [
             "mode": .string(mode.rawValue), "modelID": .string(modelID), "characters": .integer(text.count),
@@ -288,9 +389,7 @@ public enum GenerateCommand {
 
         let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
         let speedup = wall > 0 ? result.durationSeconds / wall : 0
-        // Reported after any playback, so an interrupted --play never follows a success.
-        var machineResult: GenerateJSON?
-        if CLIPresenter.isMachine {
+        do {
             let deliveryInstruction = payload.deliveryInstructionText?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let deliveryInstructionChars = deliveryInstruction.flatMap { $0.isEmpty ? nil : $0.count }
@@ -300,14 +399,14 @@ public enum GenerateCommand {
             let deliveryInstructionDigest = result.diagnosticStringFlags[
                 "delivery_instruction_digest"
             ] ?? fallbackDigest
-            machineResult = GenerateJSON(
+            let report = GenerateJSON(
                 generationID: generationID.uuidString.lowercased(),
                 audioPath: result.audioPath, durationSeconds: result.durationSeconds,
                 wallSeconds: wall, realtimeFactor: rtf, realtimeSpeedup: speedup,
                 finishReason: result.finishReason?.rawValue,
                 mode: mode.rawValue, variant: quality ? "quality" : "speed",
                 modelID: modelID,
-                variantSource: variant.source,
+                variantSource: take.variant.source,
                 seed: result.completionReceipt.map { String($0.request.seed) },
                 deliveryInstructionChars: deliveryInstructionChars,
                 deliveryInstructionDigest: deliveryInstructionDigest,
@@ -368,16 +467,11 @@ public enum GenerateCommand {
                 completionReceipt: result.completionReceipt,
                 audioQC: result.audioQC,
                 firstChunkMS: firstChunkMS, chunks: chunkCount)
-        } else {
-            // stdout = machine-readable (the path). stderr = human notes.
-            print(result.audioPath)
+            let ttfc = firstChunkMS.map { unsafe " · ttfc=\(String(format: "%.0f", $0))ms" } ?? ""
+            let chunks = chunkCount.map { " · chunks=\($0)" } ?? ""
+            note(unsafe "✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
+            return report
         }
-        let ttfc = firstChunkMS.map { unsafe " · ttfc=\(String(format: "%.0f", $0))ms" } ?? ""
-        let chunks = chunkCount.map { " · chunks=\($0)" } ?? ""
-        note(unsafe "✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
-
-        if args.flag("play") { try await CLIPlayback.play([result.audioPath]) }
-        if let machineResult { CLIPresenter.succeed(machineResult) }
     }
 
     private static func sha256(_ data: Data) -> String {
@@ -711,7 +805,7 @@ public enum GenerateCommand {
     }
 
     /// Where `generate` writes its take.
-    struct OutputDestination: Equatable {
+    struct OutputDestination: Equatable, Sendable {
         let path: String
         /// An explicit `--out` names an existing file, which a successful take
         /// replaces atomically (a failed one leaves it as it was).

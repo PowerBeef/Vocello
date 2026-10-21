@@ -104,6 +104,7 @@
         ],
         "options": {
           "app-delivery": false,
+          "client-request-id": true,
           "confirm-consent": false,
           "delivery": true,
           "delivery-cell": true,
@@ -212,6 +213,13 @@
           "ls"
         ],
         "options": {}
+      },
+      "run": {
+        "aliases": [],
+        "options": {
+          "request": true,
+          "requests": true
+        }
       },
       "settings": {
         "aliases": [],
@@ -586,7 +594,7 @@
   ],
   "revisions": [
     {
-      "change": "The initial v1 machine contract: envelope, error and NDJSON record schemas, exit codes, error codes, event types and the command surface of commands.json (RF-25).",
+      "change": "The initial v1 machine contract: envelope, error, NDJSON record and generation-request schemas, exit codes, error codes, event types and the command surface of commands.json (RF-25, RF-27).",
       "date": "2026-10-21",
       "revision": 1
     }
@@ -732,6 +740,30 @@
         "t",
         "type"
       ]
+    },
+    "generate-request": {
+      "properties": [
+        "appDelivery",
+        "clientRequestID",
+        "confirmConsent",
+        "delivery",
+        "deliveryCell",
+        "language",
+        "mode",
+        "out",
+        "reference",
+        "seed",
+        "speaker",
+        "stream",
+        "text",
+        "textFile",
+        "transcript",
+        "variant",
+        "variation",
+        "voice",
+        "voiceBrief"
+      ],
+      "required": []
     }
   },
   "schemaVersion": 1

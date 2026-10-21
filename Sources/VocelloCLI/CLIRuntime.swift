@@ -55,6 +55,12 @@ public struct CLIRuntime {
         deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager
     }
 
+    /// This runtime's engine under another request's recorded consent (one warm
+    /// engine serves many requests, each with its own `confirmConsent`).
+    public func withConsent(_ consent: VoiceCloningConsentPolicy) -> CLIRuntime {
+        CLIRuntime(engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent)
+    }
+
     /// Every CLI generation: clone requests are refused without recorded consent,
     /// and a take the engine cancelled while no signal reached the command throws
     /// `CLIEngineCancellation` instead of the operator's `CancellationError` (P15-02).

@@ -49,6 +49,13 @@ public enum CLIJSONValue: Codable, Sendable, Equatable {
     }
 }
 
+extension CLIJSONValue {
+    /// Any encodable value as a JSON value (64-bit integers kept exact).
+    public init(encoding value: some Encodable) throws {
+        self = try JSONDecoder().decode(CLIJSONValue.self, from: CLIJSONEncoding.encoder().encode(value))
+    }
+}
+
 extension CLIJSONValue: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByBooleanLiteral {
     public init(stringLiteral value: String) { self = .string(value) }
     public init(integerLiteral value: Int) { self = .integer(value) }

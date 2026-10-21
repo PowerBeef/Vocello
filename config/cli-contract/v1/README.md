@@ -13,6 +13,8 @@ These files are the canonical data: the Swift side is golden-tested against them
 | `envelope.schema.json` | The one object json mode prints, and the `data` of ndjson's final `result` record. |
 | `error.schema.json` | The envelope's `error` object (embedded in the envelope's `$defs`). |
 | `event.schema.json` | One NDJSON record (it embeds the envelope and its definitions). |
+| `generate-request.schema.json` | One generation request (`vocello run`, the MCP server's `generate_speech` input). |
+| `commands.json` | The command tree the Swift parser runs on (rendered from it; additive-only like the rest). |
 | `baseline.json` | The frozen v1 surface at `contractRevision`, and the history of revisions. |
 | `examples/` | Envelopes (`.json`) and an NDJSON stream (`.jsonl`) that validate. |
 

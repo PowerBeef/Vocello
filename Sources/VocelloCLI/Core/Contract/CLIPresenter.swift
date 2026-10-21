@@ -15,6 +15,7 @@ public enum CLIPresenter {
         var warnings: [CLIWarning] = []
         var reported = false
         var unencodable = false
+        var replayed = false
         var partialResult: (any Encodable & Sendable)?
         var events: CLIEventStream?
         var stdoutSink: @Sendable (Data) -> Bool = CLIStandardOutput.write
@@ -78,6 +79,12 @@ public enum CLIPresenter {
         report(ok: true, result: result, error: nil)
     }
 
+    /// The result about to be reported is a stored one replayed for a repeated
+    /// client request id (`meta.replayed`).
+    public static func markReplayed() {
+        state.withLock { $0.replayed = true }
+    }
+
     /// The rows a failing command keeps (a partial batch), reported with its error.
     public static func recordPartialResult(_ result: some Encodable & Sendable) {
         state.withLock { $0.partialResult = result }
@@ -125,7 +132,7 @@ public enum CLIPresenter {
                     vocelloVersion: vocelloCLIVersion, build: vocelloCLIBuild,
                     contractRevision: CLIContract.revision,
                     durationMs: Int((snapshot.started.duration(to: .now) / .milliseconds(1)).rounded()),
-                    replayed: false
+                    replayed: snapshot.replayed
                 )
             )
             let encodes = (try? CLIJSONEncoding.encoder().encode(envelope)) != nil

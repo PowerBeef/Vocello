@@ -236,6 +236,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
+| `--client-request-id` | idempotency: a repeated id with the same request replays its stored result (see `run`) |
 | `--plan` | resolve the take (mode, model and its source, whether it is installed, language, seed, variation, output path) and report it without loading a model |
 | `--json` / `--ndjson` | the v1 envelope (result: the take) instead of the bare path, or events ending in it |
 
@@ -301,6 +302,29 @@ telemetry on, short-form batches only) asks the engine for each take's codec tra
 registered run id (`QVOICE_MAC_BENCH_RUN_ID`) the engine keeps it beside its diagnostics as
 codec-trace v1 and records its digest in the take's engine row; sampling and output are unchanged.
 `scripts/macos_test.sh qc-takes` passes it.
+
+### `run` — JSON generation requests (for agents)
+
+```sh
+vocello run --request <file|-> [--json|--ndjson]     # one request, reported as generate reports it
+vocello run --requests <file|-> [--json|--ndjson]    # JSONL: one request per line, one warm engine
+```
+
+A request is a JSON object of `generate`'s options in camelCase (`mode`, `text`, `textFile`, `speaker`,
+`voiceBrief`, `voice`, `reference`, `transcript`, `confirmConsent`, `delivery`, `deliveryCell`,
+`appDelivery`, `language`, `seed`, `variation`, `variant`, `out`, `stream`), described by
+`config/cli-contract/v1/generate-request.schema.json`. It becomes `generate` arguments and goes through
+the same strict parser, so an unknown field, a wrong type or `text: "-"` is refused. With `--requests`
+each line runs on the same engine; a failed request does not stop the others, and the result lists
+every one (`{requests, succeeded, failed, results[]}`, each `{index, clientRequestID, ok, replayed,
+result, error}`), ending `batch_incomplete` when any failed.
+
+**Idempotency:** a request's `clientRequestID` (or `generate --client-request-id <id>`, which also becomes
+the envelope's `requestID`) is kept with its result under `<data>/cli/requests` for seven days, named by
+the id's digest and private to the user. The same id with the same request replays the stored result
+(`meta.replayed: true`) instead of running again; the same id with a different request is
+`idempotency_conflict` (2); the same id while another process runs it is `request_in_progress` (75). A
+failed request keeps nothing, so a retry runs again.
 
 ### `history` — read the app's History
 

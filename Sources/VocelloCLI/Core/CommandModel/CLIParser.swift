@@ -24,6 +24,16 @@ public struct Args: Sendable, Equatable {
         return value
     }
 
+    /// The options and operands as data, for a request digest: values, flags and
+    /// operands, leaving out `excluded` names (output format, verbosity, the id itself).
+    public func canonicalForm(excluding excluded: Set<String>) -> CLIJSONValue {
+        .object([
+            "values": .object(values.filter { !excluded.contains($0.key) }.mapValues { .string($0) }),
+            "flags": .array(flags.subtracting(excluded).sorted().map { .string($0) }),
+            "operands": .array(positionals.map { .string($0) }),
+        ])
+    }
+
     mutating func set(_ key: String, _ value: String) { values[key] = value }
     mutating func set(flag key: String) { flags.insert(key) }
     mutating func append(positional: String) { positionals.append(positional) }

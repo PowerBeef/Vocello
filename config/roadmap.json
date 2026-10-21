@@ -238,22 +238,6 @@
       ]
     },
     {
-      "id": "RF-24",
-      "plan": "release-first-3-0-2026-09",
-      "title": "The iPhone Clone Studio keeps the layout of the other two modes",
-      "status": "in-flight",
-      "blockedBy": [],
-      "due": "2026-10-23",
-      "gate": "Maintainer report 2026-10-20 (release blocker): with a reference selected, Clone stacked its reference transcript review (status, Transcript disclosure, Review / Use Audio Only) under the Studio canvas, so Generate rose, the script editor shrank above the keyboard and the section slid under the tab dock. Done when the review lives in the Reference panel with unchanged behaviour (status, editable transcript, the two decisions, a refused Generate opening the panel), the generic iOS compile and the routed check pass, the Swift review finds no blocker, and scripts/ui_test.sh ios smoke --scenario studio-layout passes on the paired iPhone in an announced window. The iPhone freeze moves to the commit that carries it.",
-      "sourceOfTruth": [
-        "Sources/iOS/IOSGenerationModeViews.swift",
-        "Sources/iOS/Sheets/IOSBottomSheets.swift",
-        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
-      ],
-      "updated": "2026-10-20",
-      "notes": "Opened 2026-10-20 after the freeze at 029427c9, from the maintainer's Clone screenshots. The section came from 46504a11 (2026-10-10, Clone conditioning as an explicit reviewed decision); no lane asserted Studio layout, so the full smoke passed with it. The new studio-layout scenario checks that an idle Generate sits within 48 pt above the tab dock in every mode and that the Reference panel carries the review. The iPhone proof waits for the maintainer's next window. macOS is unaffected (checked 2026-10-21 at the maintainer's request): since 46504a11 the Mac keeps the transcript review in the reference chip's popover and its Clone body holds only the shared canvas; the layout lane's Clone screenshots with a selected reference at default and minimum window sizes show the setup and Generate against the bottom (macos-xcui-smoke-20261021-033712-87e8ba53)."
-    },
-    {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",

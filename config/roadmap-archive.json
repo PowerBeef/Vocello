@@ -5249,6 +5249,27 @@
         "commit:f75fe3f8",
         "commit:9d6c60b1"
       ]
+    },
+    {
+      "id": "RF-24",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The iPhone Clone Studio keeps the layout of the other two modes",
+      "status": "done",
+      "blockedBy": [],
+      "due": "2026-10-23",
+      "gate": "Maintainer report 2026-10-20 (release blocker): with a reference selected, Clone stacked its reference transcript review (status, Transcript disclosure, Review / Use Audio Only) under the Studio canvas, so Generate rose, the script editor shrank above the keyboard and the section slid under the tab dock. Done when the review lives in the Reference panel with unchanged behaviour (status, editable transcript, the two decisions, a refused Generate opening the panel), the generic iOS compile and the routed check pass, the Swift review finds no blocker, and scripts/ui_test.sh ios smoke --scenario studio-layout passes on the paired iPhone in an announced window. The iPhone freeze moves to the commit that carries it.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-20 after the freeze at 029427c9, from the maintainer's Clone screenshots. The section came from 46504a11 (2026-10-10); no lane asserted Studio layout, so smoke passed with it. The review moved to the Reference panel (50761bcc), with the Swift review's fixes (08372fdd). macOS is unaffected: its review has lived in the reference popover since 46504a11 (macos-xcui-smoke-20261021-033712-87e8ba53). 2026-10-21: ios smoke --scenario studio-layout passed on the paired iPhone on clean 4246d177 (ios-xcui-smoke-20261021-050240-000ce5bc): Generate sits 8.6 pt above the tab dock in all three modes (about 107 pt in the screenshot before), the Reference panel carries the review and followed an edit, the crash delta is clean. Full smoke now runs the check too.",
+      "evidence": [
+        "run:ios-xcui-smoke-20261021-050240-000ce5bc",
+        "commit:50761bcc",
+        "commit:08372fdd"
+      ]
     }
   ]
 }

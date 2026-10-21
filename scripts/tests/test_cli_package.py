@@ -822,8 +822,19 @@ class CLIInstallerPackageTests(unittest.TestCase):
                                "script-free"),
             "installation-check": (product.replace("<title>", '<installation-check script="x()"/><title>'),
                                    "script-free"),
+            # Installer evaluates these attributes as JavaScript.
             "choice-expression": (product.replace('visible="false"', 'visible="false" selected="x()"'),
-                                  "hidden, fixed choice"),
+                                  "script-free"),
+            "choice-enabled": (product.replace('visible="false"', 'visible="false" enabled="x()"'), "script-free"),
+            "package-active": (product.replace('onConclusion="none"', 'onConclusion="none" active="x()"'),
+                               "script-free"),
+            "inner-package-active": (product.replace('<pkg-ref id="com.qwenvoice.cli"/>',
+                                                     '<pkg-ref id="com.qwenvoice.cli" active="x()"/>'), "script-free"),
+            "volume-check-script": (product.replace("<volume-check>", '<volume-check script="x()">'), "script-free"),
+            "root-attribute": (product.replace('minSpecVersion="2"', 'minSpecVersion="2" other="x()"'),
+                               "script-free"),
+            "bundle-attribute": (product.replace('path="GRDB_GRDB.bundle"', 'path="GRDB_GRDB.bundle" active="x()"'),
+                                 "script-free"),
             "visible-choice": (product.replace('visible="false"', 'visible="true"'), "hidden, fixed choice"),
             "customizable": (product.replace('customize="never"', 'customize="allow"'), "hidden, fixed choice"),
             "second-package": (product.replace('<pkg-ref id="com.qwenvoice.cli">\n        <bundle-version>',
@@ -837,6 +848,30 @@ class CLIInstallerPackageTests(unittest.TestCase):
         for fault, (text, message) in faults.items():
             with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, message):
                 package.check_distribution(text.encode(), "3.0.0")
+
+        # productbuild records a versioned bundle's versions beside its id and path.
+        versioned = product.replace('<bundle id=', '<bundle CFBundleShortVersionString="1.2" CFBundleVersion="7" id=')
+        self.assertEqual(package.check_distribution(versioned.encode(), "3.0.0"), "26.0")
+        # Only plain UTF-8, so the text checked for declarations is the text the parser reads.
+        encoded = product.encode()
+        for fault, data in {
+            "byte-order-mark": b"\xef\xbb\xbf" + encoded,
+            "nul": encoded.replace(b"<title>", b"<title>\0"),
+            "invalid-utf-8": encoded.replace(b"Vocello CLI</title>", b"Vocello \xe9 CLI</title>"),
+            "utf-16": product.encode("utf-16"),
+            "utf-16-declared": product.replace('encoding="utf-8"', 'encoding="utf-16"').encode("utf-16-le"),
+        }.items():
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, "plain UTF-8"):
+                package.check_distribution(data, "3.0.0")
+
+    def test_installer_xml_parser_refuses_any_document_type(self):
+        self.assertEqual(package.parse_xml('<?xml version="1.0"?><a b="c">d</a>').attrib, {"b": "c"})
+        for text in ("<!DOCTYPE a><a/>", '<!DOCTYPE a SYSTEM "file:///etc/passwd"><a/>',
+                     '<!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>', '<!DOCTYPE a [<!ENTITY % p "x">]><a/>'):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, "declares entities"):
+                package.parse_xml(text)
+        with self.assertRaisesRegex(ValueError, "malformed"):
+            package.parse_xml("<a><b></a>")
 
     def test_minimum_os_comes_from_the_one_build_version_command(self):
         self.assertEqual(package.parse_minimum_os(SAMPLE_LOAD_COMMANDS), "26.0")
@@ -988,6 +1023,10 @@ class CLIInstallerPackageTests(unittest.TestCase):
             "package-version": (dict(package_info=self.package_info(version="2.9.0")), None, None, "identity mismatch"),
             "no-postinstall": (dict(package_info=self.package_info(postinstall="")), None, None,
                                "preinstall and postinstall"),
+            "package-info-byte-order-mark": (dict(package_info="﻿" + self.package_info()), None, None,
+                                             "plain UTF-8"),
+            "package-info-entity": (dict(package_info=self.package_info().replace(
+                "<pkg-info", '<!DOCTYPE pkg-info [<!ENTITY v "3.0.0">]>\n<pkg-info', 1)), None, None, "entities"),
             "x86_64": (dict(distribution=PRODUCT_DISTRIBUTION.replace('"arm64"', '"arm64,x86_64"').encode()),
                        None, None, "arm64"),
             "home-domain": (dict(distribution=PRODUCT_DISTRIBUTION.replace(

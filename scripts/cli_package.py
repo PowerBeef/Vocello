@@ -11,6 +11,7 @@ not independent signing or quality-promotion authority.
 from __future__ import annotations
 
 import argparse
+import codecs
 from contextlib import contextmanager
 import hashlib
 import json
@@ -28,8 +29,9 @@ import sys
 import tempfile
 import time
 import wave
-from typing import Callable, Iterator
+from typing import Callable, Iterator, NoReturn
 import xml.etree.ElementTree as ElementTree
+from xml.parsers import expat
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -687,12 +689,28 @@ def qualify(
 
 # Installer package ---------------------------------------------------------------------
 
-# Every element a Distribution may hold, as written here or as productbuild rewrites it.
-DISTRIBUTION_ELEMENTS = frozenset({
-    "installer-gui-script", "title", "readme", "license", "options", "domains", "volume-check",
-    "allowed-os-versions", "os-version", "choices-outline", "line", "choice", "pkg-ref",
-    "bundle-version", "bundle",
-})
+# Every element a Distribution may hold, as written here or as productbuild rewrites it, with
+# the attributes each may carry. Installer evaluates some attributes as JavaScript (`active` on
+# a pkg-ref, `selected` or `enabled` on a choice, `script` on a check), so none of those is here.
+DISTRIBUTION_ATTRIBUTES: dict[str, frozenset[str]] = {
+    "installer-gui-script": frozenset({"minSpecVersion", "authoringTool", "authoringToolVersion",
+                                       "authoringToolBuild"}),
+    "title": frozenset(),
+    "readme": frozenset({"file"}),
+    "license": frozenset({"file"}),
+    "options": frozenset({"customize", "require-scripts", "hostArchitectures"}),
+    "domains": frozenset({"enable_anywhere", "enable_currentUserHome", "enable_localSystem"}),
+    "volume-check": frozenset(),
+    "allowed-os-versions": frozenset(),
+    "os-version": frozenset({"min", "before"}),  # check_distribution then allows exactly `min`
+    "choices-outline": frozenset(),
+    "line": frozenset({"choice"}),
+    "choice": frozenset({"id", "visible", "title", "description"}),
+    "pkg-ref": frozenset({"id", "version", "onConclusion", "installKBytes", "updateKBytes", "auth",
+                          "packageIdentifier"}),
+    "bundle-version": frozenset(),
+    "bundle": frozenset({"id", "path", "CFBundleShortVersionString", "CFBundleVersion", "SourceVersion"}),
+}
 MACOS_VERSION = re.compile(r"\d+\.\d+(?:\.\d+)?")
 
 
@@ -777,13 +795,45 @@ def distribution_xml(version: str, minimum_os: str) -> bytes:
     return ElementTree.tostring(script, encoding="utf-8", xml_declaration=True) + b"\n"
 
 
-def _xml(data: bytes, tag: str) -> ElementTree.Element:
-    if len(data) > 1024**2 or b"<!DOCTYPE" in data or b"<!ENTITY" in data:
-        raise ValueError("CLI installer XML is oversized or declares entities")
+def _refuse_document_type(*_: object) -> NoReturn:
+    raise ValueError("CLI installer XML is oversized or declares entities")
+
+
+def parse_xml(text: str) -> ElementTree.Element:
+    """Parse a document with an expat parser that refuses any document type or entity declaration."""
+    builder = ElementTree.TreeBuilder()
+    parser = expat.ParserCreate()
+    parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    parser.StartDoctypeDeclHandler = _refuse_document_type
+    parser.EntityDeclHandler = _refuse_document_type
+    parser.UnparsedEntityDeclHandler = _refuse_document_type
+    parser.ExternalEntityRefHandler = _refuse_document_type
+    parser.StartElementHandler = builder.start
+    parser.EndElementHandler = builder.end
+    parser.CharacterDataHandler = builder.data
+    parser.buffer_text = True
     try:
-        element = ElementTree.fromstring(data)
-    except ElementTree.ParseError as error:
+        # A str is parsed as UTF-8 whatever encoding its declaration names.
+        parser.Parse(text, True)
+    except expat.ExpatError as error:
         raise ValueError("CLI installer XML is malformed") from error
+    return builder.close()
+
+
+def _xml(data: bytes, tag: str) -> ElementTree.Element:
+    if len(data) > 1024**2:
+        raise ValueError("CLI installer XML is oversized or declares entities")
+    # Plain UTF-8, as pkgbuild and productbuild write it: no byte-order mark, no NUL, no other
+    # encoding, so the text checked below is the text the parser reads.
+    if data.startswith(codecs.BOM_UTF8) or b"\0" in data:
+        raise ValueError("CLI installer XML is not plain UTF-8")
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise ValueError("CLI installer XML is not plain UTF-8") from error
+    if "<!DOCTYPE" in text or "<!ENTITY" in text:
+        raise ValueError("CLI installer XML is oversized or declares entities")
+    element = parse_xml(text)
     if element.tag != tag:
         raise ValueError("CLI installer XML has an unexpected root element")
     return element
@@ -793,8 +843,8 @@ def check_distribution(data: bytes, version: str) -> str:
     """Check a Distribution as written or as productbuild rewrote it; return its minimum macOS."""
     script = _xml(data, "installer-gui-script")
     nodes = list(script.iter())
-    if any(node.tag == "script" or "script" in node.attrib or node.tag not in DISTRIBUTION_ELEMENTS
-           for node in nodes):
+    if any(node.tag == "script" or "script" in node.attrib or node.tag not in DISTRIBUTION_ATTRIBUTES
+           or not set(node.attrib) <= DISTRIBUTION_ATTRIBUTES[node.tag] for node in nodes):
         raise ValueError("CLI installer Distribution must be script-free")
     options = script.findall("options")
     if len(options) != 1 or options[0].get("hostArchitectures") != "arm64":

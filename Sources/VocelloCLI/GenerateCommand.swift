@@ -364,7 +364,7 @@ public enum GenerateCommand {
     /// Chinese), or `auto`. Anything else is refused before boot, because the
     /// engine would read it as Auto and pick a language from the script. `nil`
     /// when omitted (Auto); otherwise the canonical name the apps send.
-    static func parseLanguage(_ args: Args) throws -> Qwen3SupportedLanguage? {
+    public static func parseLanguage(_ args: Args) throws -> Qwen3SupportedLanguage? {
         // The parser refuses a bare --language before this runs.
         guard let raw = args.string("language") else { return nil }
         guard let language = Self.language(named: raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
@@ -427,7 +427,7 @@ public enum GenerateCommand {
     }
 
     /// Validate a mode string into a `GenerationMode`.
-    static func parseModeString(_ s: String) throws -> GenerationMode {
+    public static func parseModeString(_ s: String) throws -> GenerationMode {
         guard let mode = GenerationMode(rawValue: s.lowercased()) else {
             throw CLIError(.invalidInput, "invalid --mode '\(s)' (use custom | design | clone)")
         }

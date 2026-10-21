@@ -5,7 +5,7 @@
 _vocello() {
   local word previous key command sub i
   local -a candidates options
-  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --file --out-dir --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
+  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --file --out-dir --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
 
   # Find the command and subcommand typed so far, skipping options and their values.
   i=2
@@ -25,12 +25,15 @@ _vocello() {
   case $command in
     generate|gen) command=generate ;;
     batch) command=batch ;;
+    history) command=history ;;
     voices|voice) command=voices ;;
     speakers|speaker) command=speakers ;;
     modes) command=modes ;;
     languages|language) command=languages ;;
     deliveries|delivery) command=deliveries ;;
+    briefs) command=briefs ;;
     models|model) command=models ;;
+    settings) command=settings ;;
     doctor) command=doctor ;;
     capabilities) command=capabilities ;;
     completions) command=completions ;;
@@ -47,6 +50,7 @@ _vocello() {
       'generate:Synthesize one clip'
       'gen:Synthesize one clip'
       'batch:Synthesize many clips with one model load'
+      'history:Read the app'\''s History (read-only)'
       'voices:Manage saved clone voices'
       'voice:Manage saved clone voices'
       'speakers:List Built-in Voice speakers'
@@ -56,8 +60,10 @@ _vocello() {
       'language:List the generation languages and their codes'
       'deliveries:List delivery presets and their instructions'
       'delivery:List delivery presets and their instructions'
+      'briefs:List Voice Design'\''s starting briefs'
       'models:Inventory and install models'
       'model:Inventory and install models'
+      'settings:Read the Mac app'\''s settings'
       'doctor:Check the data folder, contract, catalog, models, memory and disk (no engine boot)'
       'capabilities:Describe commands, options, codes and limits for agents'
       'completions:Print a shell completion script'
@@ -75,11 +81,34 @@ _vocello() {
 
   key=$command
   case $command in
+    history)
+      case $sub in
+        list|ls) key=history_list ;;
+        search) key=history_search ;;
+        show) key=history_show ;;
+        export) key=history_export ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List takes, newest first'
+          'ls:List takes, newest first'
+          'search:List takes whose text or voice contains the query'
+          'show:Show one take with its completion receipt'
+          'export:Copy one take'\''s audio to a .wav file'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=history_list
+      ;;
     voices)
       case $sub in
         list|ls) key=voices_list ;;
         show) key=voices_show ;;
         enroll|add) key=voices_enroll ;;
+        banks) key=voices_banks ;;
         delete|rm) key=voices_delete ;;
         '') ;;
         *) return ;;
@@ -91,6 +120,7 @@ _vocello() {
           'show:Show one saved voice\: its reference, transcript and enrollment record'
           'enroll:Save a clone voice from a reference clip'
           'add:Save a clone voice from a reference clip'
+          'banks:List saved voices grouped into Clone delivery banks (<Name> and <Name> (<Preset>))'
           'delete:Delete a saved voice'
           'rm:Delete a saved voice'
         )
@@ -163,6 +193,22 @@ _vocello() {
       fi
       [[ -z $sub ]] && key=deliveries_list
       ;;
+    briefs)
+      case $sub in
+        list|ls) key=briefs_list ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List the starting briefs by position'
+          'ls:List the starting briefs by position'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=briefs_list
+      ;;
     models)
       case $sub in
         list|ls) key=models_list ;;
@@ -184,6 +230,24 @@ _vocello() {
         return
       fi
       [[ -z $sub ]] && key=models_list
+      ;;
+    settings)
+      case $sub in
+        list|ls) key=settings_list ;;
+        get) key=settings_get ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List every setting with its value'
+          'ls:List every setting with its value'
+          'get:Print one setting'\''s value'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=settings_list
       ;;
   esac
 
@@ -210,6 +274,8 @@ _vocello() {
     --out) _files; return ;;
     --file) _files; return ;;
     --out-dir) _files -/; return ;;
+    --order) _values 'order' newest oldest longest shortest mode; return ;;
+    --limit) :; return ;;
     --name) :; return ;;
     --audio) _files; return ;;
     --id) :; return ;;
@@ -295,6 +361,62 @@ _vocello() {
         '--manifest:override the bundled qwenvoice_contract.json'
         '--help:show help for the command'
       ) ;;
+    history_list)
+      options=(
+        '--mode:only takes of this mode'
+        '--order:newest (default) | oldest | longest | shortest | mode'
+        '--limit:rows to return, 1 to 500 (default 50)'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    history_search)
+      options=(
+        '--mode:only takes of this mode'
+        '--order:newest (default) | oldest | longest | shortest | mode'
+        '--limit:rows to return, 1 to 500 (default 50)'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    history_show)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    history_export)
+      options=(
+        '--out:the .wav file to write'
+        '--replace:overwrite an existing file (only once the copy is complete)'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
     voices_list)
       options=(
         '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
@@ -326,6 +448,18 @@ _vocello() {
         '--audio:the reference clip'
         '--transcript:the clip'\''s words'
         '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_banks)
+      options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
         '--ndjson:same as --output-format ndjson'
@@ -399,6 +533,19 @@ _vocello() {
         '--manifest:override the bundled qwenvoice_contract.json'
         '--help:show help for the command'
       ) ;;
+    briefs_list)
+      options=(
+        '--language:the speech language to show them in (default english)'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
     models_list)
       options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
@@ -436,6 +583,30 @@ _vocello() {
         '--help:show help for the command'
       ) ;;
     models_install)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    settings_list)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    settings_get)
       options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'
@@ -557,11 +728,15 @@ _vocello() {
     return
   fi
   case $key in
+    history_search) return ;;
+    history_show) return ;;
+    history_export) return ;;
     voices_show) return ;;
     models_list) return ;;
     models_status) return ;;
     models_verify) return ;;
     models_install) return ;;
+    settings_get) return ;;
     completions) _values 'shell' zsh bash fish; return ;;
     help) return ;;
   esac

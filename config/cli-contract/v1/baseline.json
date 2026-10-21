@@ -60,6 +60,18 @@
           "warm": true
         }
       },
+      "briefs": {
+        "aliases": [],
+        "options": {}
+      },
+      "briefs.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {
+          "language": true
+        }
+      },
       "capabilities": {
         "aliases": [],
         "options": {}
@@ -117,6 +129,39 @@
         "aliases": [],
         "options": {}
       },
+      "history": {
+        "aliases": [],
+        "options": {}
+      },
+      "history.export": {
+        "aliases": [],
+        "options": {
+          "out": true,
+          "replace": false
+        }
+      },
+      "history.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {
+          "limit": true,
+          "mode": true,
+          "order": true
+        }
+      },
+      "history.search": {
+        "aliases": [],
+        "options": {
+          "limit": true,
+          "mode": true,
+          "order": true
+        }
+      },
+      "history.show": {
+        "aliases": [],
+        "options": {}
+      },
       "languages": {
         "aliases": [
           "language"
@@ -163,6 +208,20 @@
         ],
         "options": {}
       },
+      "settings": {
+        "aliases": [],
+        "options": {}
+      },
+      "settings.get": {
+        "aliases": [],
+        "options": {}
+      },
+      "settings.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {}
+      },
       "speakers": {
         "aliases": [
           "speaker"
@@ -183,6 +242,10 @@
         "aliases": [
           "voice"
         ],
+        "options": {}
+      },
+      "voices.banks": {
+        "aliases": [],
         "options": {}
       },
       "voices.delete": {

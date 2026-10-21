@@ -99,6 +99,9 @@ public enum VocelloCommandTree {
                 ]
             ),
             CLICommandSpec(
+                name: "banks", summary: "List saved voices grouped into Clone delivery banks (<Name> and <Name> (<Preset>))"
+            ),
+            CLICommandSpec(
                 name: "delete", aliases: ["rm"], summary: "Delete a saved voice",
                 options: [.value("id", .text, "id", "the saved voice id (see `vocello voices list`)"), consent]
             ),
@@ -219,6 +222,55 @@ public enum VocelloCommandTree {
 
     static let version = CLICommandSpec(name: "version", summary: "Print the version")
 
+    static let historyListOptions: [CLIOptionSpec] = [
+        .value("mode", .choice(modes), "mode", "only takes of this mode"),
+        .value("order", .choice(["newest", "oldest", "longest", "shortest", "mode"]), "order", "newest (default) | oldest | longest | shortest | mode"),
+        .value("limit", .integer, "n", "rows to return, 1 to 500 (default 50)"),
+    ]
+
+    static let history = CLICommandSpec(
+        name: "history",
+        summary: "Read the app's History (read-only)",
+        discussion: "Reads the History the Mac app owns in one short read-only transaction per command; it never migrates or writes it, and refuses a store from a newer Vocello (exit 78).",
+        subcommands: [
+            CLICommandSpec(name: "list", aliases: ["ls"], summary: "List takes, newest first; long-form segments follow their project",
+                           options: historyListOptions),
+            CLICommandSpec(name: "search", summary: "List takes whose text or voice contains the query",
+                           options: historyListOptions,
+                           positionals: [CLIPositionalSpec("query", "words to find in the text or voice", required: true)]),
+            CLICommandSpec(name: "show", summary: "Show one take with its completion receipt",
+                           positionals: [CLIPositionalSpec("id", "the take's History id", required: true)]),
+            CLICommandSpec(name: "export", summary: "Copy one take's audio to a .wav file",
+                           options: [
+                               .value("out", .file, "wav", "the .wav file to write"),
+                               .flag("replace", "overwrite an existing file (only once the copy is complete)"),
+                           ],
+                           positionals: [CLIPositionalSpec("id", "the take's History id", required: true)]),
+        ],
+        defaultSubcommand: "list"
+    )
+
+    static let settings = CLICommandSpec(
+        name: "settings",
+        summary: "Read the Mac app's settings",
+        subcommands: [
+            CLICommandSpec(name: "list", aliases: ["ls"], summary: "List every setting with its value"),
+            CLICommandSpec(name: "get", summary: "Print one setting's value",
+                           positionals: [CLIPositionalSpec("name", "a setting name from `vocello settings list`", required: true)]),
+        ],
+        defaultSubcommand: "list"
+    )
+
+    static let briefs = CLICommandSpec(
+        name: "briefs",
+        summary: "List Voice Design's starting briefs",
+        subcommands: [
+            CLICommandSpec(name: "list", aliases: ["ls"], summary: "List the starting briefs by position",
+                           options: [.value("language", .text, "language", "the speech language to show them in (default english)")]),
+        ],
+        defaultSubcommand: "list"
+    )
+
     static let doctor = CLICommandSpec(
         name: "doctor",
         summary: "Check the data folder, contract, catalog, models, memory and disk (no engine boot)"
@@ -238,7 +290,8 @@ public enum VocelloCommandTree {
     )
 
     public static let commands: [CLICommandSpec] = [
-        generate, batch, voices, speakers, modesCommand, languages, deliveries, models, doctor, capabilities, completions,
+        generate, batch, history, voices, speakers, modesCommand, languages, deliveries, briefs, models, settings,
+        doctor, capabilities, completions,
         bench, help, version,
     ]
 

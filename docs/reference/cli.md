@@ -300,11 +300,42 @@ registered run id (`QVOICE_MAC_BENCH_RUN_ID`) the engine keeps it beside its dia
 codec-trace v1 and records its digest in the take's engine row; sampling and output are unchanged.
 `scripts/macos_test.sh qc-takes` passes it.
 
+### `history` — read the app's History
+
+```sh
+vocello history [list] [--mode custom|design|clone] [--order newest|oldest|longest|shortest|mode] [--limit 1-500] [--json]
+vocello history search <words> [--mode …] [--order …] [--limit …] [--json]
+vocello history show <id> [--json]          # adds the engine's completion receipt
+vocello history export <id> --out <file.wav> [--replace]
+```
+
+Reads the History the Mac app owns (`<data>/history.sqlite`) through `VocelloDesktopCore`, in one short
+read-only transaction per command: it never migrates, reconciles or writes the store, and it lists takes
+exactly as the app does (newest first; a long-form project's segments follow its joined row unless a
+search lists matches flat; the Mac search is case-insensitive over text and voice). A store written by a
+newer Vocello is refused with `history_schema_newer` (78); a busy store is `store_busy` (75). While the
+app has a long-form recovery pending, project rows are withheld with a warning. `export` copies the take
+the way the app's Save As does (complete before it replaces anything; `--replace` to overwrite).
+Deleting, clearing and recovery come with the cross-process History lock (RF-30).
+
+### `settings` — read the app's settings
+
+`vocello settings [list|get <name>] [--json]` reads the Mac app's preferences (`com.qwenvoice.app`):
+`autoplay`, `output-folder`, `variation`, `prefer-lower-memory`, `variant.custom|design|clone`
+(`automatic` when unset) and `interface-language` (read-only). Each row says whether it is the app's
+default. Voice-cloning consent is never a CLI setting.
+
+### `briefs` — Voice Design's starting briefs
+
+`vocello briefs [--language <l>] [--json]` lists the app's eight starting briefs by position in a
+speech language (default English), with the 500-character description limit.
+
 ### `voices` — manage saved clone voices
 
 ```sh
 vocello voices list [--json]
 vocello voices show <name|id> [--json]   # reference, transcript, enrollment record
+vocello voices banks [--json]            # Clone delivery banks: <Name> and <Name> (<Preset>)
 vocello voices enroll --name <name> --audio <wav> [--transcript "…"] --confirm-consent
 vocello voices delete --id <id>
 ```

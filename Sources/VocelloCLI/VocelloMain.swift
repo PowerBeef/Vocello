@@ -83,6 +83,12 @@ enum VocelloMain {
             try await DeliveriesCommand.run(args)
         case "languages":
             try await LanguagesCommand.run(args)
+        case "briefs":
+            try await BriefsCommand.run(args)
+        case "history":
+            try await HistoryCommand.run(action: action, args)
+        case "settings":
+            try await SettingsCommand.run(action: action, args)
         case "models":
             try await ModelsCommand.run(action: action, args)
         case "doctor":

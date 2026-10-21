@@ -196,6 +196,8 @@ targets:
           - "iOSSupport/**"
           - "VocelloCLI"
           - "VocelloCLI/**"
+          - "VocelloDesktopCore"
+          - "VocelloDesktopCore/**"
           - "Resources/ffmpeg"
           - "Resources/ffmpeg/**"
           - "Resources/vendor"
@@ -342,11 +344,46 @@ targets:
         CODE_SIGN_IDENTITY: "-"
     dependencies:
       - target: VocelloCLICore
+      - target: VocelloDesktopCore
       - target: QwenVoiceCore
       - package: MLXAudio
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
+
+  # The UI-free app logic the CLI shares with the Mac app (RF-26): History,
+  # settings and catalogs. It compiles the app's own files by path, read-only
+  # where the app's store owns writes, so both read one store the same way.
+  # Never GenerationPersistence, AudioPlayerViewModel, MacInterfaceText, either
+  # AppPaths or either TTSModel.
+  VocelloDesktopCore:
+    type: framework.static
+    platform: macOS
+    sources:
+      - path: Sources/VocelloDesktopCore
+      - path: Sources/iOSSupport/Models/Generation.swift
+      - path: Sources/SharedSupport/Services/VocelloLocalization.swift
+      - path: Sources/SharedSupport/Database/GenerationHistoryPage.swift
+      - path: Sources/SharedSupport/Database/GenerationMigrations.swift
+      - path: Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
+      - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
+      - path: Sources/SharedSupport/Services/GenerationOutputFileName.swift
+      - path: Sources/Services/MacFileSaveCopy.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.desktop.core
+        PRODUCT_NAME: VocelloDesktopCore
+        PRODUCT_MODULE_NAME: VocelloDesktopCore
+        SWIFT_VERSION: "6"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: QwenVoiceCore
+      - package: MLXAudio
+        product: VocelloQwen3Core
+      - package: MLXSwift
+        product: MLX
+      - package: GRDB
 
   # The CLI's runtime, argument parsing, consent and batch execution (workflow audit P2-3):
   # one module the vocello executable links and VocelloCoreTests imports @testable, instead
@@ -658,6 +695,8 @@ targets:
       # The CLI's tested files (PA-17's consent refusal, TEST-13's generate options, the
       # runtime wrappers) come from their module, imported @testable.
       - target: VocelloCLICore
+      # RF-26: the CLI's read-only History, settings and catalogs, through their public API.
+      - target: VocelloDesktopCore
       - package: GRDB
     settings:
       base:

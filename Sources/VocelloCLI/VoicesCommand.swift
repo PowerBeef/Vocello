@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import VocelloCLICore
+import VocelloDesktopCore
 
 /// `vocello voices` — manage saved (enrolled) clone voices.
 enum VoicesCommand {
@@ -14,6 +15,10 @@ enum VoicesCommand {
 
     struct Rows: Encodable, Sendable {
         let voices: [VoiceJSON]
+    }
+
+    struct Banks: Encodable, Sendable {
+        let banks: [DesktopVoiceBanks.Bank]
     }
 
     struct Shown: Encodable, Sendable {
@@ -67,6 +72,18 @@ enum VoicesCommand {
             for v in voices {
                 let warn = v.qualityWarnings.isEmpty ? "" : "  ⚠ \(v.qualityWarnings.joined(separator: ","))"
                 print("\(v.name)\t[\(v.id)]\ttranscript=\(v.hasTranscript)\(warn)")
+            }
+        case "banks":
+            let voices = try await runtime.engine.listPreparedVoices()
+            let banks = DesktopVoiceBanks.banks(voices: voices.map { (id: $0.id, name: $0.name) })
+            if CLIPresenter.isMachine {
+                CLIPresenter.succeed(Banks(banks: banks))
+                return
+            }
+            if banks.isEmpty { print("(no delivery banks: save voices named <Name> and <Name> (<Preset>))") }
+            for bank in banks {
+                print("\(bank.name)\t[\(bank.baseVoiceID)]")
+                for member in bank.members { print("  \(member.preset)\t\(member.voiceID)") }
             }
         case "show":
             let wanted = args.positionals.first ?? ""

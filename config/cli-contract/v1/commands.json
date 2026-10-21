@@ -355,6 +355,190 @@
       ]
     },
     {
+      "aliases": [],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "history",
+      "operands": [],
+      "options": [],
+      "path": "history",
+      "refusedOptions": [],
+      "subcommands": [
+        "list",
+        "search",
+        "show",
+        "export"
+      ],
+      "summary": "Read the app's History (read-only)",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [
+        {
+          "choices": [
+            "custom",
+            "design",
+            "clone"
+          ],
+          "name": "mode",
+          "placeholder": "mode",
+          "summary": "only takes of this mode",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "newest",
+            "oldest",
+            "longest",
+            "shortest",
+            "mode"
+          ],
+          "name": "order",
+          "placeholder": "order",
+          "summary": "newest (default) | oldest | longest | shortest | mode",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "limit",
+          "placeholder": "n",
+          "summary": "rows to return, 1 to 500 (default 50)",
+          "takesValue": true,
+          "type": "integer",
+          "valueOptional": false
+        }
+      ],
+      "path": "history.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List takes, newest first; long-form segments follow their project",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "search",
+      "operands": [
+        {
+          "name": "query",
+          "required": true,
+          "summary": "words to find in the text or voice",
+          "type": "string"
+        }
+      ],
+      "options": [
+        {
+          "choices": [
+            "custom",
+            "design",
+            "clone"
+          ],
+          "name": "mode",
+          "placeholder": "mode",
+          "summary": "only takes of this mode",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "newest",
+            "oldest",
+            "longest",
+            "shortest",
+            "mode"
+          ],
+          "name": "order",
+          "placeholder": "order",
+          "summary": "newest (default) | oldest | longest | shortest | mode",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "limit",
+          "placeholder": "n",
+          "summary": "rows to return, 1 to 500 (default 50)",
+          "takesValue": true,
+          "type": "integer",
+          "valueOptional": false
+        }
+      ],
+      "path": "history.search",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List takes whose text or voice contains the query",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "show",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the take's History id",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "history.show",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Show one take with its completion receipt",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "export",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the take's History id",
+          "type": "string"
+        }
+      ],
+      "options": [
+        {
+          "name": "out",
+          "placeholder": "wav",
+          "summary": "the .wav file to write",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "replace",
+          "summary": "overwrite an existing file (only once the copy is complete)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "history.export",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Copy one take's audio to a .wav file",
+      "usage": []
+    },
+    {
       "aliases": [
         "voice"
       ],
@@ -370,6 +554,7 @@
         "list",
         "show",
         "enroll",
+        "banks",
         "delete"
       ],
       "summary": "Manage saved clone voices",
@@ -466,6 +651,19 @@
       "usage": [
         "vocello voices enroll --name <name> --audio <wav> [--transcript \"…\"] --confirm-consent"
       ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "banks",
+      "operands": [],
+      "options": [],
+      "path": "voices.banks",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List saved voices grouped into Clone delivery banks (<Name> and <Name> (<Preset>))",
+      "usage": []
     },
     {
       "aliases": [
@@ -637,6 +835,46 @@
       "usage": []
     },
     {
+      "aliases": [],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "briefs",
+      "operands": [],
+      "options": [],
+      "path": "briefs",
+      "refusedOptions": [],
+      "subcommands": [
+        "list"
+      ],
+      "summary": "List Voice Design's starting briefs",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [
+        {
+          "name": "language",
+          "placeholder": "language",
+          "summary": "the speech language to show them in (default english)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        }
+      ],
+      "path": "briefs.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List the starting briefs by position",
+      "usage": []
+    },
+    {
       "aliases": [
         "model"
       ],
@@ -737,6 +975,58 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "Download and verify a model into the shared store",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "settings",
+      "operands": [],
+      "options": [],
+      "path": "settings",
+      "refusedOptions": [],
+      "subcommands": [
+        "list",
+        "get"
+      ],
+      "summary": "Read the Mac app's settings",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [],
+      "path": "settings.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List every setting with its value",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "get",
+      "operands": [
+        {
+          "name": "name",
+          "required": true,
+          "summary": "a setting name from `vocello settings list`",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "settings.get",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Print one setting's value",
       "usage": []
     },
     {

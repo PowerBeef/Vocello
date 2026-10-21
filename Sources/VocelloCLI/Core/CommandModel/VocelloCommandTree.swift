@@ -53,6 +53,8 @@ public enum VocelloCommandTree {
             .value("out", .file, "wav", "write the take to this .wav file (replaced only by a successful take)"),
             .value("long-form", .choice(["auto", "always", "never"]), "when",
                    "run the script as a long-form project: auto (default, past one take, as the apps route it) | always | never"),
+            .flag("line-by-line", "one take per line, as the Mac app's line batch runs them (one batch seed, one script language)"),
+            .value("out-dir", .file, "folder", "with --line-by-line: the folder for the takes (default <data>/outputs/cli)"),
             .flag("stream", "streaming synthesis at the app's cadence (the default)"),
             .flag("no-stream", "accumulate the whole take before decoding"),
             .flag("play", "play the take when done"),

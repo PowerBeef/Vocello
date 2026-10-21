@@ -206,6 +206,9 @@ public enum GenerateCommand {
         let longForm: Bool
         /// The planned segments of a long-form project.
         let segments: Int?
+        let lineByLine: Bool
+        /// The takes of a `--line-by-line` batch (`outputPath` is then their folder).
+        let lines: Int?
     }
 
     /// One take, validated and resolved before any engine work: everything
@@ -230,6 +233,9 @@ public enum GenerateCommand {
         let modelsDirectory: URL
         /// Set when the take runs as a long-form project.
         let longFormPlan: LongFormPlan?
+        /// Set for `--line-by-line`: the lines, one take each, and their folder.
+        let lineBatch: [String]?
+        let lineOutputDirectory: URL?
 
         var quality: Bool { variant.quality }
     }
@@ -244,11 +250,17 @@ public enum GenerateCommand {
         // Resolve text first so a missing-text run fails fast (before any prompt).
         // A request an agent sent never takes unnamed stdin.
         let text = try resolveText(args, implicitStdin: interactive)
-        let routesToLongForm = try routesToLongForm(text, route: try parseLongForm(args))
-        if routesToLongForm, !streaming {
+        // One take per line takes precedence over long-form routing, as in the app.
+        let lineBatch = args.flag("line-by-line") ? try lineBatchLines(text, args: args) : nil
+        if lineBatch == nil, args.string("out-dir") != nil {
+            throw CLIError(.usageError, "--out-dir applies to --line-by-line; pass --out for one take")
+        }
+        let routesToLongForm = try lineBatch == nil && routesToLongForm(text, route: try parseLongForm(args))
+        if routesToLongForm || lineBatch != nil, !streaming {
             throw CLIError(
-                .invalidInput, "--no-stream does not apply to a long-form project: its segments stream at the app's cadence",
-                hint: "omit --no-stream, or pass --long-form never for a script that fits one take"
+                .invalidInput,
+                "--no-stream does not apply to a long-form project or a line batch: their takes stream at the app's cadence",
+                hint: "omit --no-stream"
             )
         }
 
@@ -282,6 +294,10 @@ public enum GenerateCommand {
         // JSON `generationID` agree and no two runs share a file (U28).
         let generationID = UUID()
         let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        let lineOutputDirectory = lineBatch.map { _ in
+            args.string("out-dir").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }
+                ?? dataDir.appendingPathComponent("outputs/cli", isDirectory: true)
+        }
         if longFormPlan != nil, let reference = args.string("reference") {
             // Refused before boot when the path is known; a saved voice's is checked once resolved.
             let path = URL(fileURLWithPath: (reference as NSString).expandingTildeInPath).path
@@ -295,8 +311,31 @@ public enum GenerateCommand {
             variation: variation, appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
             variant: variant, generationID: generationID, output: output, streaming: streaming,
             dataDirectory: dataDir, manifestOverride: manifestOverride, registry: registryContext.registry,
-            modelsDirectory: registryContext.modelsDirectory, longFormPlan: longFormPlan
+            modelsDirectory: registryContext.modelsDirectory, longFormPlan: longFormPlan, lineBatch: lineBatch,
+            lineOutputDirectory: lineOutputDirectory
         )
+    }
+
+    /// `--line-by-line`: the script's lines as the app's line batch splits them,
+    /// each one take, refused before boot when one cannot be.
+    static func lineBatchLines(_ text: String, args: Args) throws -> [String] {
+        if args.string("out") != nil {
+            throw CLIError(.usageError, "--line-by-line writes one take per line: pass --out-dir <folder>, not --out")
+        }
+        if let route = args.string("long-form"), route != LongFormRoute.auto.rawValue {
+            throw CLIError(.usageError, "--long-form does not apply to --line-by-line: every line is one take")
+        }
+        let lines = DesktopLineBatch.lines(from: text)
+        guard !lines.isEmpty else {
+            throw CLIError(.invalidInput, "nothing to speak — no line has letters or digits")
+        }
+        guard lines.count <= DesktopLineBatch.maxLines else {
+            throw CLIError(
+                .textTooLong, "the script has \(lines.count) lines, more than the \(DesktopLineBatch.maxLines) the app runs as one batch"
+            )
+        }
+        try CLIBatchExecution.validateShortFormLines(lines)
+        return lines
     }
 
     /// What a request's identity leaves out: how it reports, not what it asks for.
@@ -317,7 +356,7 @@ public enum GenerateCommand {
         let args = take.args
         let normalized: Set<String> = [
             "text", "text-file", "mode", "variant", "seed", "variation", "language", "stream", "no-stream", "out",
-            "reference", "manifest", "data-dir", "long-form", "speaker",
+            "reference", "manifest", "data-dir", "long-form", "speaker", "out-dir",
             // Required for clone and ignored elsewhere, so it never tells two takes apart.
             "confirm-consent",
         ]
@@ -340,6 +379,7 @@ public enum GenerateCommand {
             "stream": .bool(take.streaming),
             "longForm": .bool(take.longFormPlan != nil),
             "out": absolutePath("out"),
+            "outDir": absolutePath("out-dir"),
             "reference": absolutePath("reference"),
             "manifest": absolutePath("manifest"),
         ])
@@ -362,7 +402,8 @@ public enum GenerateCommand {
                 .map { DesktopModelInventory.isComplete($0, modelsDirectory: take.modelsDirectory) } ?? false,
             language: (take.language ?? .auto).rawValue, seed: take.seed.map { String($0) },
             variation: (take.variation ?? .expressive).rawValue, characters: take.text.count, streaming: take.streaming,
-            outputPath: take.output.path, longForm: take.longFormPlan != nil, segments: take.longFormPlan?.segments.count
+            outputPath: take.lineOutputDirectory?.path ?? take.output.path, longForm: take.longFormPlan != nil,
+            segments: take.longFormPlan?.segments.count, lineByLine: take.lineBatch != nil, lines: take.lineBatch?.count
         )
     }
 
@@ -374,7 +415,8 @@ public enum GenerateCommand {
             if CLIPresenter.isMachine {
                 CLIPresenter.succeed(plan)
             } else {
-                let longForm = plan.segments.map { " · long-form, \($0) segments" } ?? ""
+                let longForm = plan.segments.map { " · long-form, \($0) segments" }
+                    ?? plan.lines.map { " · line by line, \($0) takes" } ?? ""
                 print("\(plan.mode) · \(plan.modelID) (\(plan.variantSource)) · \(plan.language) · \(plan.variation)"
                     + " · \(plan.characters) characters\(longForm)\(plan.modelInstalled ? "" : " · model not installed")")
                 print(plan.outputPath)
@@ -384,7 +426,11 @@ public enum GenerateCommand {
 
         // The folder is checked before boot, so a path that cannot hold the take
         // never costs an engine start (P15-09).
-        try prepareOutputFolder(of: take.output.path)
+        if let directory = take.lineOutputDirectory {
+            try prepareOutputFolder(of: directory.appendingPathComponent("take.wav").path)
+        } else {
+            try prepareOutputFolder(of: take.output.path)
+        }
 
         // Idempotency: a repeated client request id replays its stored result.
         var reservation: CLIRequestLedger.Reservation?
@@ -393,12 +439,12 @@ public enum GenerateCommand {
             switch try ledger.start(id: id, request: try identity(of: take)) {
             case .replay(let stored):
                 CLIPresenter.markReplayed()
-                let path = audioPath(of: stored)
+                let paths = CLIRequestLedger.audioPaths(of: stored)
                 if !CLIPresenter.isMachine {
-                    note("client request id '\(id)' already ran: replaying its take")
-                    if let path { print(path) }
+                    note("client request id '\(id)' already ran: replaying its result")
+                    paths.forEach { print($0) }
                 }
-                if args.flag("play"), let path { try await CLIPlayback.play([path]) }
+                if args.flag("play"), !paths.isEmpty { try await CLIPlayback.play(paths) }
                 if CLIPresenter.isMachine { CLIPresenter.succeed(stored) }
                 return
             case .run(let held):
@@ -406,7 +452,6 @@ public enum GenerateCommand {
             }
         }
 
-        let result: GenerateJSON
         let report: CLIJSONValue
         do {
             note("booting engine (data: \(take.dataDirectory.path))")
@@ -414,8 +459,9 @@ public enum GenerateCommand {
             let runtime = try await CLIRuntime.bootstrap(
                 dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent, hostedLikeTheApp: true)
             CLIPresenter.event(.engineReady)
-            result = try await execute(take, runtime: runtime)
-            report = try CLIJSONValue(encoding: result)
+            report = take.lineBatch != nil
+                ? try CLIJSONValue(encoding: try await executeLines(take, runtime: runtime))
+                : try CLIJSONValue(encoding: try await execute(take, runtime: runtime))
         } catch {
             if let reservation { ledger.abandon(reservation) }
             throw error
@@ -426,19 +472,23 @@ public enum GenerateCommand {
                 "the take succeeded but its result could not be kept: a retry with this client request id runs again"
             )
         }
+        let paths = CLIRequestLedger.audioPaths(of: report)
         if !CLIPresenter.isMachine {
-            // stdout = machine-readable (the path). stderr = human notes.
-            print(result.audioPath)
+            // stdout = machine-readable (the paths). stderr = human notes.
+            paths.forEach { print($0) }
         }
-        if args.flag("play") { try await CLIPlayback.play([result.audioPath]) }
+        if args.flag("play") { try await CLIPlayback.play(paths) }
         // Reported after any playback, so an interrupted --play never follows a success.
-        if CLIPresenter.isMachine { CLIPresenter.succeed(result) }
+        if CLIPresenter.isMachine { CLIPresenter.succeed(report) }
     }
 
     /// Runs one prepared take on `runtime`: payload, model load, generation, the
     /// CM-7 publication check and its events. Prints nothing on stdout.
     @MainActor
     public static func execute(_ take: PreparedTake, runtime: CLIRuntime) async throws -> GenerateJSON {
+        guard take.lineBatch == nil else {
+            throw CLIError(.internalError, "a line batch runs through executeLines")
+        }
         let args = take.args
         let mode = take.mode
         let quality = take.quality
@@ -582,6 +632,134 @@ public enum GenerateCommand {
             note(unsafe "✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
             return report
         }
+    }
+
+    /// One take of a `--line-by-line` batch.
+    public struct LineTakeJSON: Encodable, Sendable {
+        let index: Int
+        let text: String
+        let audioPath: String
+        let durationSeconds: Double
+        let finishReason: String?
+        /// A decimal string: the batch seed, or the one a repeated line derives from it.
+        let seed: String
+        let generationID: String
+    }
+
+    /// The result of `generate --line-by-line`.
+    public struct LineBatchJSON: Encodable, Sendable {
+        var lineByLine = true
+        let mode: String
+        let variant: String
+        let variantSource: String
+        let modelID: String
+        /// The language every line carried: the selection, or Auto resolved over the script.
+        let language: String
+        let batchSeed: String
+        let count: Int
+        let wallSeconds: Double
+        let items: [LineTakeJSON]
+    }
+
+    /// A stopped `--line-by-line` batch: every planned row (`schemaVersion` 2, as `batch`).
+    struct FailedLineBatchJSON: Encodable, Sendable {
+        var schemaVersion = 2
+        var lineByLine = true
+        let mode: String
+        let variant: String
+        let modelID: String
+        let language: String
+        let batchSeed: String
+        let plannedCount: Int
+        let completedCount: Int
+        let wallSeconds: Double
+        let items: [CLIBatchExecution.Row]
+    }
+
+    /// `--line-by-line`: one take per line, each request built by the Mac app's
+    /// line batch plan (`DesktopLineBatch`): streaming at the app cadence, one
+    /// batch seed, one script language, the Neutral delivery when none is given.
+    /// Runs on one model load and stops at the first failed line, keeping every
+    /// planned row, as `batch` does.
+    @MainActor
+    static func executeLines(_ take: PreparedTake, runtime: CLIRuntime) async throws -> LineBatchJSON {
+        guard let lines = take.lineBatch, let directory = take.lineOutputDirectory else {
+            throw CLIError(.internalError, "a line batch has no lines")
+        }
+        let runtime = runtime.withConsent(take.consent)
+        let modelID = try runtime.modelID(mode: take.mode, quality: take.quality)
+        guard let model = runtime.registry.model(id: modelID) else {
+            throw CLIError(.modelUnknown, "no model '\(modelID)' in the contract")
+        }
+        let payload = try await buildPayload(take.args, mode: take.mode, runtime: runtime)
+        let batch = DesktopLineBatch(
+            mode: take.mode, model: model, lines: lines, payload: payload,
+            deliveryInstructionCellID: take.deliveryInstructionCellID, language: take.language,
+            variation: take.variation, batchSeed: take.seed
+        )
+        let prefix = "\(defaultOutputStamp(Date()))_\(take.mode.rawValue)_\(take.generationID.uuidString.lowercased().prefix(8))"
+        var requests: [GenerationRequest] = []
+        for index in lines.indices {
+            let path = directory.appendingPathComponent(unsafe "\(prefix)_\(String(format: "%03d", index)).wav").path
+            guard let request = batch.request(forLineAt: index, outputPath: path, generationID: UUID()) else {
+                throw CLIError(.invalidInput, "line \(index + 1) has no voice to speak it")
+            }
+            requests.append(request)
+        }
+
+        note("loading \(modelID)…")
+        CLIPresenter.event(.modelLoading, data: ["modelID": .string(modelID)])
+        try await runtime.loadModel(id: modelID)
+        CLIPresenter.event(.modelLoaded, data: ["modelID": .string(modelID)])
+        note("generating \(lines.count) line(s), one take each…")
+        let started = ContinuousClock.now
+        let outcome = await CLIBatchExecution.run(requests, progress: { index, total in
+            noteVerbose("line \(index + 1)/\(total)")
+            CLIPresenter.event(.generationStarted, generationID: requests[index].generationID, data: [
+                "index": .integer(index), "total": .integer(total), "mode": .string(take.mode.rawValue),
+                "modelID": .string(modelID),
+            ])
+        }, finished: { index, row in
+            CLIBatchExecution.reportRow(row, generationID: requests[index].generationID)
+        }) { request in
+            try await runtime.generate(request)
+        }
+        let wall = started.elapsedSeconds
+        let variant = take.quality ? "quality" : "speed"
+        guard outcome.passed else {
+            CLIPresenter.recordPartialResult(FailedLineBatchJSON(
+                mode: take.mode.rawValue, variant: variant, modelID: modelID, language: batch.language.rawValue,
+                batchSeed: String(batch.batchSeed), plannedCount: lines.count, completedCount: outcome.results.count,
+                wallSeconds: wall, items: outcome.rows
+            ))
+            if !CLIPresenter.isMachine {
+                outcome.results.forEach { print($0.audioPath) }
+                for row in outcome.rows where row.status != .completed {
+                    let code = row.status == .failed ? row.errorCode.map { " (\($0))" } ?? "" : ""
+                    note("line \(row.index + 1): \(row.status.rawValue)\(code)")
+                }
+            }
+            if outcome.cancelled { throw CancellationError() }
+            if let engineCancellation = outcome.engineCancellation { throw engineCancellation }
+            throw CLIError(
+                .batchIncomplete, "the line batch stopped; completed takes retained, remaining lines not attempted",
+                detail: ["completedCount": .integer(outcome.results.count), "plannedCount": .integer(lines.count)]
+            )
+        }
+        let items = outcome.results.enumerated().map { index, result in
+            LineTakeJSON(
+                index: index, text: lines[index], audioPath: result.audioPath, durationSeconds: result.durationSeconds,
+                finishReason: result.finishReason?.rawValue, seed: String(batch.seed(forLineAt: index)),
+                generationID: (requests[index].generationID ?? UUID()).uuidString.lowercased()
+            )
+        }
+        let totalAudio = items.reduce(0.0) { $0 + $1.durationSeconds }
+        note(unsafe "✓ \(items.count) line(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
+        return LineBatchJSON(
+            mode: take.mode.rawValue, variant: variant, variantSource: take.variant.source, modelID: modelID,
+            language: batch.language.rawValue, batchSeed: String(batch.batchSeed), count: items.count,
+            wallSeconds: wall, items: items
+        )
     }
 
     /// One long-form project (the apps' runner, `CLILongFormProject`): segment

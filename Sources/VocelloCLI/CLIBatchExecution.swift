@@ -76,6 +76,28 @@ public enum CLIBatchExecution {
         }
     }
 
+    /// A batch row's terminal event (ndjson only).
+    public static func reportRow(_ row: CLIBatchExecution.Row, generationID: UUID?) {
+        switch row.status {
+        case .completed:
+            if let path = row.audioPath {
+                CLIPresenter.event(.outputPublished, generationID: generationID, data: ["audioPath": .string(path)])
+            }
+            CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
+                "index": .integer(row.index),
+                "durationSeconds": row.durationSeconds.map { .number($0) } ?? .null,
+            ])
+        case .failed:
+            CLIPresenter.event(.generationFailed, generationID: generationID, data: [
+                "index": .integer(row.index), "code": row.errorCode.map { .string($0) } ?? .null,
+            ])
+        case .cancelled:
+            CLIPresenter.event(.generationCancelled, generationID: generationID, data: ["index": .integer(row.index)])
+        case .notAttempted:
+            break
+        }
+    }
+
     public enum Status: String, Codable, Sendable { case completed, failed, cancelled, notAttempted = "not_attempted" }
     public struct Row: Encodable, Sendable {
         public let index: Int

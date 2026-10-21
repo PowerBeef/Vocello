@@ -171,6 +171,21 @@
           "valueOptional": false
         },
         {
+          "name": "line-by-line",
+          "summary": "one take per line, as the Mac app's line batch runs them (one batch seed, one script language)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "out-dir",
+          "placeholder": "folder",
+          "summary": "with --line-by-line: the folder for the takes (default <data>/outputs/cli)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
           "name": "stream",
           "summary": "streaming synthesis at the app's cadence (the default)",
           "takesValue": false,

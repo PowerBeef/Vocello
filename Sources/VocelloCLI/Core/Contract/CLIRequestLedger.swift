@@ -100,14 +100,24 @@ public struct CLIRequestLedger: Sendable {
         case .inProgress:
             throw CLIError(.requestInProgress, "client request id '\(id)' is running in another process")
         case .replay(let stored):
-            if case .object(let fields) = stored, case .string(let path)? = fields["audioPath"],
-               !FileManager.default.fileExists(atPath: path) {
+            if let path = Self.audioPaths(of: stored).first(where: { !FileManager.default.fileExists(atPath: $0) }) {
                 throw CLIError(
                     .outputMissing, "the take kept for client request id '\(id)' no longer exists at \(path)",
                     hint: "use a new id to generate it again"
                 )
             }
             return .replay(stored)
+        }
+    }
+
+    /// The audio a result names: its `audioPath`, or each of its `items`' (a line batch).
+    public static func audioPaths(of result: CLIJSONValue) -> [String] {
+        guard case .object(let fields) = result else { return [] }
+        if case .string(let path)? = fields["audioPath"] { return [path] }
+        guard case .array(let items)? = fields["items"] else { return [] }
+        return items.compactMap { item in
+            guard case .object(let itemFields) = item, case .string(let path)? = itemFields["audioPath"] else { return nil }
+            return path
         }
     }
 

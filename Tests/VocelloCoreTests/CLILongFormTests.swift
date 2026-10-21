@@ -233,4 +233,84 @@ final class CLILongFormTests: XCTestCase {
             output: reference.path, payload: .custom(speakerID: "ryan", deliveryStyle: nil)
         ), "only a clone has a reference to protect")
     }
+
+    // MARK: - Line by line
+
+    /// RF-27: `--line-by-line` splits the script as the app's line batch does and
+    /// refuses, before boot, what that batch would refuse.
+    @MainActor
+    func testLineByLineFollowsTheAppsLineBatch() async throws {
+        let script = "Hello there.\n  Hello there.  \n***\n\nGoodbye for now.\n"
+        let take = try await prepare(["--text", script, "--line-by-line", "--seed", "5"])
+        XCTAssertEqual(take.lineBatch, ["Hello there.", "Hello there.", "Goodbye for now."],
+                       "trimmed; blank and unspeakable lines skipped")
+        XCTAssertNil(take.longFormPlan, "one take per line wins over long-form routing")
+        let report = try GenerateCommand.plan(take)
+        XCTAssertTrue(report.lineByLine)
+        XCTAssertEqual(report.lines, 3)
+        XCTAssertEqual(report.outputPath, take.lineOutputDirectory?.path)
+
+        let longScript = Array(repeating: "The lighthouse keeper climbed the stairs again.", count: 30)
+            .joined(separator: "\n")
+        XCTAssertTrue(SingleTakeScriptBudget.measure(longScript).exceedsSingleTake)
+        let longLines = try await prepare(["--text", longScript, "--line-by-line"])
+        XCTAssertNotNil(longLines.lineBatch, "a long script whose lines each fit one take")
+        let tooMany = (0 ... DesktopLineBatch.maxLines).map { "Line \($0)." }.joined(separator: "\n")
+        for (argv, expected) in [
+            (["--text", "Hi.", "--line-by-line", "--out", "/tmp/x.wav"], VocelloErrorCode.usageError),
+            (["--text", "Hi.", "--line-by-line", "--long-form", "always"], .usageError),
+            (["--text", "Hi.", "--out-dir", "/tmp/takes"], .usageError),
+            (["--text", "Hi.", "--line-by-line", "--no-stream"], .invalidInput),
+            (["--text", "***\n---", "--line-by-line"], .invalidInput),
+            (["--text", tooMany, "--line-by-line"], .textTooLong),
+            (["--text", Self.story, "--line-by-line"], .textTooLong),
+        ] {
+            do {
+                _ = try await prepare(argv)
+                XCTFail("\(argv.dropFirst(2)) is refused before boot")
+            } catch {
+                XCTAssertEqual((error as? CLIError)?.code, expected, "\(argv.dropFirst(2))")
+            }
+        }
+    }
+
+    /// The requests come from the app's plan: streaming, one batch seed (a repeated
+    /// line derives its own), one script language, the Neutral delivery by default.
+    func testLineRequestsAreTheAppsRequests() throws {
+        let registry = try ContractBackedModelRegistry(manifestURL: Self.contract)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let custom = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
+        let lines = [
+            "The lighthouse keeper climbed the stairs again.", "The lighthouse keeper climbed the stairs again.",
+            "Far below, the harbour lights flickered one by one.",
+        ]
+        let batch = DesktopLineBatch(
+            mode: .custom, model: custom, lines: lines, payload: .custom(speakerID: "ryan", deliveryStyle: nil),
+            deliveryInstructionCellID: nil, language: nil, variation: .balanced, batchSeed: 5
+        )
+        XCTAssertEqual(batch.language, .english, "Auto resolves once over the script")
+        XCTAssertEqual(batch.seed(forLineAt: 0), 5)
+        XCTAssertNotEqual(batch.seed(forLineAt: 1), 5, "a repeated line derives its own seed")
+        XCTAssertEqual(batch.seed(forLineAt: 2), 5)
+        let request = try XCTUnwrap(batch.request(forLineAt: 1, outputPath: "/tmp/1.wav", generationID: UUID()))
+        XCTAssertTrue(request.shouldStream)
+        XCTAssertEqual(request.seed, batch.seed(forLineAt: 1))
+        XCTAssertEqual(request.variation, .balanced)
+        XCTAssertEqual(Qwen3SupportedLanguage.normalized(request.languageHint), .english)
+        if custom.supportsInstructionControl {
+            XCTAssertEqual(request.payload.deliveryInstructionText, EmotionPreset.neutralPresetInstruction,
+                           "the app sends the Neutral delivery when none is given")
+        }
+        XCTAssertNil(batch.request(forLineAt: 3, outputPath: "/tmp/3.wav", generationID: UUID()))
+
+        let styled = DesktopLineBatch(
+            mode: .custom, model: custom, lines: lines, payload: .custom(speakerID: "ryan", deliveryStyle: "Whisper."),
+            deliveryInstructionCellID: nil, language: .french, variation: nil, batchSeed: nil
+        )
+        XCTAssertEqual(styled.language, .french, "an explicit language is kept")
+        let styledRequest = try XCTUnwrap(styled.request(forLineAt: 0, outputPath: "/tmp/0.wav", generationID: UUID()))
+        if custom.supportsInstructionControl {
+            XCTAssertEqual(styledRequest.payload.deliveryInstructionText, "Whisper.")
+        }
+    }
 }

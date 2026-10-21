@@ -234,6 +234,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--variation` | `expressive` (official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability; without it, the app's Variation setting |
 | `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
 | `--long-form` | `auto` (default): a script longer than one take (900 characters, East Asian characters counting three) runs as a long-form project, as the apps route it · `always`: any script does · `never`: such a script is refused (`text_too_long`) |
+| `--line-by-line` | one take per line, as the Mac app's line batch runs them (see below); `--out-dir <folder>` names their folder (default `<data>/outputs/cli`) |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
@@ -279,6 +280,19 @@ pause, seed, generation id, path, duration, finish reason and QC warnings) and `
 `qc_rejected` (`detail.segment` names the segment); a stopped project keeps its completed segments and
 says where (warning `long_form_segments_kept`). Projects write no History rows until the History lock
 lands (RF-30). `--no-stream` does not apply to a project and is refused with one.
+
+**Line by line.** `--line-by-line` runs the script as the Mac app's line batch does (`DesktopLineBatch`
+over `MacLineBatchRequest`): one take per trimmed line that has something to speak (blank lines and
+separators such as `***` are skipped), at most 100 lines, each refused before boot if it does not fit
+one take; one batch seed for every line (`--seed`, or one drawn), a repeated line deriving its own;
+Auto resolved once over the whole script; the Neutral delivery when none is given (Design, and Custom on
+a package with instruction control); every line streamed at the app's cadence, on one model load. The
+takes are `<stamp>_<mode>_<id>_<NNN>.wav` in `--out-dir`. The result is `{lineByLine: true, mode,
+variant, variantSource, modelID, language, batchSeed, count, wallSeconds, items[]}`, each item `{index,
+text, audioPath, durationSeconds, finishReason, seed, generationID}`. It stops at the first failed line
+and then keeps every planned row, as `batch` does. `--out`, `--long-form` and `--no-stream` are
+refused with it. Unlike `batch`, whose items sample on their seed and text alone (the QC lanes resume a
+batch from any item on that property), these takes follow the app.
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
 never share a file. An explicit `--out` that names an existing file is replaced atomically only by a

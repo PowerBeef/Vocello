@@ -203,7 +203,7 @@ enum BatchCommand {
                 "modelID": .string(modelID),
             ])
         }, finished: { index, row in
-            Self.reportRow(row, generationID: requests[index].generationID)
+            CLIBatchExecution.reportRow(row, generationID: requests[index].generationID)
         }) { request in
             return try await runtime.generate(request)
         }
@@ -247,28 +247,6 @@ enum BatchCommand {
 
         if args.flag("play") { try await CLIPlayback.play(results.map(\.audioPath)) }
         if let machineResult { CLIPresenter.succeed(machineResult) }
-    }
-
-    /// A batch row's terminal event (ndjson only).
-    static func reportRow(_ row: CLIBatchExecution.Row, generationID: UUID?) {
-        switch row.status {
-        case .completed:
-            if let path = row.audioPath {
-                CLIPresenter.event(.outputPublished, generationID: generationID, data: ["audioPath": .string(path)])
-            }
-            CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
-                "index": .integer(row.index),
-                "durationSeconds": row.durationSeconds.map { .number($0) } ?? .null,
-            ])
-        case .failed:
-            CLIPresenter.event(.generationFailed, generationID: generationID, data: [
-                "index": .integer(row.index), "code": row.errorCode.map { .string($0) } ?? .null,
-            ])
-        case .cancelled:
-            CLIPresenter.event(.generationCancelled, generationID: generationID, data: ["index": .integer(row.index)])
-        case .notAttempted:
-            break
-        }
     }
 
     /// `--long-form`: each line is one long-form project, run by the apps' own

@@ -269,6 +269,26 @@ final class CLIRequestTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: entry.path), "a damaged entry ages out by its file date")
     }
 
+    func testAReplayChecksEveryTakeItNames() throws {
+        let root = try makeRoot()
+        let ledger = CLIRequestLedger(dataDirectory: root)
+        let request = try json(#"{"text":"Lines"}"#)
+        let first = root.appendingPathComponent("0.wav")
+        let second = root.appendingPathComponent("1.wav")
+        try Data([1]).write(to: first)
+        try Data([1]).write(to: second)
+        let lines: CLIJSONValue = .object(["items": .array([
+            .object(["audioPath": .string(first.path)]), .object(["audioPath": .string(second.path)]),
+        ])])
+        XCTAssertEqual(CLIRequestLedger.audioPaths(of: lines), [first.path, second.path])
+        guard case .run(let held) = try ledger.start(id: "lines-1", request: request) else { return XCTFail() }
+        XCTAssertTrue(ledger.complete(held, result: lines))
+        guard case .replay = try ledger.start(id: "lines-1", request: request) else { return XCTFail("replays") }
+        try FileManager.default.removeItem(at: second)
+        XCTAssertEqual(code { try ledger.start(id: "lines-1", request: request) }, .outputMissing,
+                       "a line batch replays only while every take exists")
+    }
+
     private func code(_ body: () throws -> CLIRequestLedger.Start) -> VocelloErrorCode? {
         do {
             _ = try body()

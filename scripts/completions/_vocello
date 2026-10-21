@@ -5,7 +5,7 @@
 _vocello() {
   local word previous key command sub i
   local -a candidates options
-  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --long-form --client-request-id --file --out-dir --request --requests --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
+  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --long-form --out-dir --client-request-id --file --request --requests --order --limit --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
 
   # Find the command and subcommand typed so far, skipping options and their values.
   i=2
@@ -277,9 +277,9 @@ _vocello() {
     --language) :; return ;;
     --out) _files; return ;;
     --long-form) _values 'long-form' auto always never; return ;;
+    --out-dir) _files; return ;;
     --client-request-id) :; return ;;
     --file) _files; return ;;
-    --out-dir) _files -/; return ;;
     --request) _files; return ;;
     --requests) _files; return ;;
     --order) _values 'order' newest oldest longest shortest mode; return ;;
@@ -328,6 +328,8 @@ _vocello() {
         '--language:auto, a Qwen3 language name or a code such as en, fr or ja-JP'
         '--out:write the take to this .wav file (replaced only by a successful take)'
         '--long-form:run the script as a long-form project\: auto (default, past one take, as the apps route it) | always | never'
+        '--line-by-line:one take per line, as the Mac app'\''s line batch runs them (one batch seed, one script language)'
+        '--out-dir:with --line-by-line\: the folder for the takes (default <data>/outputs/cli)'
         '--stream:streaming synthesis at the app'\''s cadence (the default)'
         '--no-stream:accumulate the whole take before decoding'
         '--play:play the take when done'

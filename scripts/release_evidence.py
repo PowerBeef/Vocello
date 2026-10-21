@@ -36,6 +36,12 @@ CLI_VERIFICATION_NAME = "cli-package-verification.json"
 CLI_PKG_VERIFICATION_NAME = "cli-pkg-verification.json"
 CLI_DMG_SUFFIX = "-cli.dmg"
 CLI_PKG_SUFFIX = "-cli.pkg"
+# The macOS artifact-verification command templates that verify each CLI form on the release
+# runner. Only the one that passes the package with --include-pkg checks its signature and ticket
+# and installs, upgrades and removes it; the CLI DMG is verified by that one or by --include-cli.
+CLI_PKG_VERIFICATION_TEMPLATES = frozenset({"macos-artifact-verification-with-cli-pkg-v3"})
+CLI_DMG_VERIFICATION_TEMPLATES = frozenset({"macos-artifact-verification-with-cli-v2",
+                                            *CLI_PKG_VERIFICATION_TEMPLATES})
 DIGEST = re.compile(r"[0-9a-f]{64}")
 # An Apple Team ID: ten uppercase letters and digits, at least one a letter.
 TEAM_IDENTIFIER = re.compile(r"(?<![A-Za-z0-9])(?=[0-9]*[A-Z])[A-Z0-9]{10}(?![A-Za-z0-9])")
@@ -379,6 +385,17 @@ def _bound_output_entries(
     return result
 
 
+def required_command_templates(platform: str, artifact_names: list[str]) -> frozenset[str]:
+    """The command templates, one of which a managed step must have run, for these artifacts."""
+    if platform != "macos":
+        return frozenset()
+    if any(name.endswith(CLI_PKG_SUFFIX) for name in artifact_names):
+        return CLI_PKG_VERIFICATION_TEMPLATES
+    if any(name.endswith(CLI_DMG_SUFFIX) for name in artifact_names):
+        return CLI_DMG_VERIFICATION_TEMPLATES
+    return frozenset()
+
+
 def validate_step_ledger(
     ledger_path: Path,
     source_identity: dict[str, Any],
@@ -389,7 +406,10 @@ def validate_step_ledger(
     *,
     enforce_freshness: bool,
     manifest_payloads: dict[str, dict[str, Any]] | None = None,
+    required_templates: frozenset[str] = frozenset(),
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """Validate the ledger and its step manifests; with `required_templates`, one managed step
+    must have run one of those command templates (`required_command_templates`)."""
     ledger = load_json(ledger_path)
     definition = contract["platformVerification"][platform]
     required_steps = definition["requiredSteps"]
@@ -517,6 +537,15 @@ def validate_step_ledger(
         if result.get("completedAt") != manifest.get("completedAt"):
             raise ValueError(f"required-step result timestamp does not match its manifest: {step}")
         manifests[step] = manifest
+    # A CLI artifact counts as verified only by the managed command that verifies that form: the
+    # installer package by the artifact verification that checks and installs it.
+    if required_templates and not any(
+        manifest["commandTemplateID"] in required_templates for manifest in manifests.values()
+    ):
+        raise ValueError(
+            "no managed step ran the artifact verification the CLI artifacts require: one of "
+            + ", ".join(sorted(required_templates))
+        )
     return ledger, manifests
 
 
@@ -574,7 +603,8 @@ def create(
     validate_source_identity(source_identity, contract, root=root, expected_commit=commit)
     ledger, manifests = validate_step_ledger(
         step_ledger_path, source_identity, contract, platform, orchestration_contract, output_dir,
-        enforce_freshness=True
+        enforce_freshness=True,
+        required_templates=required_command_templates(platform, [path.name for path in artifacts]),
     )
 
     verification_bundle = {
@@ -841,8 +871,8 @@ def validate_cli_installer_verification(
 
     The package carries the payload the CLI DMG carries, so its manifest digest and file count must
     equal the ones the DMG's smoke report recorded. Release evidence needs a Developer ID Installer
-    signature with a stapled ticket; only rehearsal evidence, which is never published, may carry an
-    unsigned, unnotarized package.
+    signature with a stapled ticket and the root-free install checks; only rehearsal evidence, which
+    is never published, may carry an unsigned, unnotarized package or the package checks alone.
     """
     if not isinstance(payload, dict) or set(payload) != CLI_PKG_REPORT_FIELDS:
         raise ValueError("CLI installer verification contains unexpected or missing fields")
@@ -898,9 +928,12 @@ def validate_cli_installer_verification(
     if not rehearsal and (signature, notarization) != ("developer-id-installer", "stapled"):
         raise ValueError("release evidence needs a Developer ID Installer signed, stapled CLI installer")
 
-    if payload.get("checks") not in (list(cli_package.PKG_CHECKS),
-                                     [*cli_package.PKG_CHECKS, *cli_package.PKG_INSTALL_CHECKS]):
-        raise ValueError("CLI installer verification checks differ from what pkg-verify proves")
+    # Release evidence needs the root-free install, upgrade and refusal checks (release.sh runs
+    # pkg-verify --root-free-install); a rehearsal may carry the package checks alone.
+    with_install = [*cli_package.PKG_CHECKS, *cli_package.PKG_INSTALL_CHECKS]
+    if payload.get("checks") not in ((with_install, list(cli_package.PKG_CHECKS)) if rehearsal else (with_install,)):
+        raise ValueError("CLI installer verification checks differ from what pkg-verify proves"
+                         + ("" if rehearsal else " with its root-free install"))
     if payload.get("installTest") != "not-performed" or payload.get("generationQualification") != "not-performed":
         raise ValueError("CLI installer verification must not claim an install test or generation qualification")
 
@@ -1024,6 +1057,9 @@ def validate(
         _, validated_manifests = validate_step_ledger(
             synthetic_ledger, source_identity, contract, platform, orchestration_contract, output_dir,
             enforce_freshness=False, manifest_payloads=manifests,
+            required_templates=required_command_templates(
+                platform, [str(item.get("name", "")) for item in evidence.get("artifacts", [])
+                           if isinstance(item, dict)]),
         )
     missing_bound_outputs = set(_bound_output_entries(validated_manifests, platform)) - {
         _safe_name(item.get("name")) for item in evidence.get("artifacts", [])

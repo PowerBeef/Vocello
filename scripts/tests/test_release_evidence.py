@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -28,6 +29,12 @@ IDENTITY_DIGESTS = [
 
 
 class ReleaseEvidenceTests(unittest.TestCase):
+    VERIFY_TEMPLATES = {
+        "fixture-verify-v1": ["/usr/bin/true"],
+        "macos-artifact-verification-with-cli-v2": ["/usr/bin/true", "--include-cli"],
+        "macos-artifact-verification-with-cli-pkg-v3": ["/usr/bin/true", "--include-cli", "--include-pkg"],
+    }
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -77,11 +84,13 @@ class ReleaseEvidenceTests(unittest.TestCase):
                     "requiredSteps": ["build", "verify"],
                     "commandTemplates": {
                         "build": [{"id": "fixture-build-v1", "argv": ["/usr/bin/true"]}],
+                        # The release contract's artifact-verification template identities: the
+                        # app only, the CLI DMG folder, and the CLI DMG with its installer package.
                         "verify": [{
-                            "id": "fixture-verify-v1",
-                            "argv": ["/usr/bin/true"],
+                            "id": template_id,
+                            "argv": argv,
                             "outputs": ["build/dist/macos/verification-summary.json"],
-                        }],
+                        } for template_id, argv in self.VERIFY_TEMPLATES.items()],
                     },
                 },
                 "release-ios-fixture": {
@@ -126,17 +135,21 @@ class ReleaseEvidenceTests(unittest.TestCase):
             self.fail(completed.stdout + completed.stderr)
         return completed
 
-    def create_managed_ledger(self) -> None:
+    def create_managed_ledger(self, ledger: Path | None = None,
+                              verify_template: str = "macos-artifact-verification-with-cli-pkg-v3") -> Path:
+        """A managed run whose verify step ran `verify_template` (by default, as release.yml does)."""
+        ledger = ledger or self.ledger
         self.ledger_tool(
-            "init", "--ledger", str(self.ledger), "--workflow", "release-macos-fixture",
+            "init", "--ledger", str(ledger), "--workflow", "release-macos-fixture",
             "--run-id", "fixture", "--source-identity", str(self.source_identity),
         )
-        for step in ("build", "verify"):
+        for step, argv in (("build", ["/usr/bin/true"]), ("verify", self.VERIFY_TEMPLATES[verify_template])):
             self.ledger_tool(
-                "run", "--ledger", str(self.ledger), "--step", step,
-                "--timeout-seconds", "5", "--cwd", str(self.root), "--", "/usr/bin/true",
+                "run", "--ledger", str(ledger), "--step", step,
+                "--timeout-seconds", "5", "--cwd", str(self.root), "--", *argv,
             )
-        self.ledger_tool("finalize", "--ledger", str(self.ledger))
+        self.ledger_tool("finalize", "--ledger", str(ledger))
+        return ledger
 
     def create(self) -> None:
         release_evidence.create(
@@ -187,7 +200,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         return [cli_dmg, dmg_report_path, cli_pkg, self.output / release_evidence.CLI_PKG_VERIFICATION_NAME]
 
     def pkg_report(self, *, signature: str = "developer-id-installer", notarization: str = "stapled",
-                   install_checks: bool = False) -> dict:
+                   install_checks: bool = True) -> dict:
         """What `cli_package.py pkg-verify` writes for the fixture package."""
         package = release_evidence.cli_package
         cli_pkg = self.output / "Vocello-macos26-cli.pkg"
@@ -209,16 +222,17 @@ class ReleaseEvidenceTests(unittest.TestCase):
         path = self.output / release_evidence.CLI_PKG_VERIFICATION_NAME
         path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    def create_with(self, artifacts: list[Path], *, rehearsal: bool = False) -> None:
+    def create_with(self, artifacts: list[Path], *, rehearsal: bool = False, ledger: Path | None = None) -> None:
         release_evidence.create(
             self.root, self.output, "v2.1.0", self.commit, "macos", [self.dmg, self.step_summary, *artifacts],
-            self.metadata, 1_700_000_000, self.source_identity, self.ledger, require_tag_ref=False,
+            self.metadata, 1_700_000_000, self.source_identity, ledger or self.ledger, require_tag_ref=False,
             rehearsal=rehearsal,
         )
 
-    def assert_refused(self, artifacts: list[Path], message: str, *, rehearsal: bool = False) -> None:
+    def assert_refused(self, artifacts: list[Path], message: str, *, rehearsal: bool = False,
+                       ledger: Path | None = None) -> None:
         with self.assertRaisesRegex(ValueError, message):
-            self.create_with(artifacts, rehearsal=rehearsal)
+            self.create_with(artifacts, rehearsal=rehearsal, ledger=ledger)
         for name in (release_evidence.EVIDENCE_NAME, release_evidence.CHECKSUM_NAME,
                      release_evidence.VERIFICATION_BUNDLE_NAME):
             self.assertFalse((self.output / name).exists(), name)
@@ -248,10 +262,39 @@ class ReleaseEvidenceTests(unittest.TestCase):
         sums = (self.output / release_evidence.CHECKSUM_NAME).read_text(encoding="utf-8")
         self.assertIn("  Vocello-macos26-cli.pkg\n", sums)
         self.assertIn("  cli-pkg-verification.json\n", sums)
-        # The report may also carry the root-free install checks.
-        self.write_pkg_report(self.pkg_report(install_checks=True))
-        self.create_with(cli)
-        release_evidence.validate(self.output)
+        # Release evidence needs the root-free install checks; a rehearsal may go without them.
+        self.write_pkg_report(self.pkg_report(install_checks=False))
+        self.assert_refused(cli, "with its root-free install")
+        self.create_with(cli, rehearsal=True)
+        release_evidence.validate(self.output, rehearsal=True)
+        with self.assertRaisesRegex(ValueError, "with its root-free install"):
+            release_evidence.validate(self.output)
+
+    def test_cli_evidence_needs_the_verification_that_installs_the_package(self) -> None:
+        cli = self.write_cli_fixture()
+        # The ledger's verify step ran without --include-pkg (or without the CLI at all).
+        for template in ("fixture-verify-v1", "macos-artifact-verification-with-cli-v2"):
+            with self.subTest(template=template):
+                ledger = self.create_managed_ledger(
+                    self.root / f"build/artifacts/{template}/required-steps.json", template)
+                self.assert_refused(cli, "macos-artifact-verification-with-cli-pkg-v3", ledger=ledger)
+                self.assert_refused(cli, "macos-artifact-verification-with-cli-pkg-v3", ledger=ledger,
+                                    rehearsal=True)
+                # App-only evidence needs neither.
+                release_evidence.create(
+                    self.root, self.output, "v2.1.0", self.commit, "macos", [self.dmg, self.step_summary],
+                    self.metadata, 1_700_000_000, self.source_identity, ledger, require_tag_ref=False)
+                release_evidence.validate(self.output)
+        # Evidence that skipped the binding when it was created still fails validation.
+        ledger = self.root / "build/artifacts/fixture-verify-v1/required-steps.json"
+        with mock.patch.object(release_evidence, "required_command_templates", return_value=frozenset()):
+            self.create_with(cli, ledger=ledger)
+        with self.assertRaisesRegex(ValueError, "macos-artifact-verification-with-cli-pkg-v3"):
+            release_evidence.validate(self.output)
+        # A CLI DMG is verified at least by the CLI DMG template.
+        self.assertEqual(release_evidence.required_command_templates("macos", ["Vocello-macos26-cli.dmg"]),
+                         {"macos-artifact-verification-with-cli-v2", "macos-artifact-verification-with-cli-pkg-v3"})
+        self.assertEqual(release_evidence.required_command_templates("ios", ["Vocello-macos26-cli.pkg"]), set())
 
     def test_cli_dmg_without_its_installer_package_or_report_cannot_publish(self) -> None:
         cli_dmg, dmg_report, cli_pkg, pkg_report = self.write_cli_fixture()
@@ -371,6 +414,8 @@ class ReleaseEvidenceTests(unittest.TestCase):
             ("scripts", lambda value: value["package"]["scriptDigests"].update(uninstall="5" * 64), "identity"),
             ("checks reordered", lambda value: value["checks"].reverse(), "checks differ"),
             ("checks partial", lambda value: value["checks"].pop(), "checks differ"),
+            ("no root-free install", lambda value: value.update(checks=list(release_evidence.cli_package.PKG_CHECKS)),
+             "with its root-free install"),
             ("install test", lambda value: value.update(installTest="passed"), "install test"),
             ("generation", lambda value: value.update(generationQualification="passed"), "generation"),
             ("unknown signature", lambda value: value.update(signature="ad-hoc"), "claim is invalid"),
@@ -384,6 +429,15 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 mutation(tampered)
                 with self.assertRaisesRegex(ValueError, message):
                     release_evidence.validate_cli_installer_verification(tampered, release, artifacts, dmg_report)
+
+        # A rehearsal may carry the package checks alone, but not a partial or reordered list.
+        package_checks = list(release_evidence.cli_package.PKG_CHECKS)
+        release_evidence.validate_cli_installer_verification(
+            dict(payload, checks=package_checks), release, artifacts, dmg_report, rehearsal=True)
+        for checks in (package_checks[:-1], list(reversed(payload["checks"]))):
+            with self.assertRaisesRegex(ValueError, "checks differ"):
+                release_evidence.validate_cli_installer_verification(
+                    dict(payload, checks=checks), release, artifacts, dmg_report, rehearsal=True)
 
         # The DMG's report is the authority on the payload both forms carry.
         other_payload = dict(dmg_report, manifestSHA256="6" * 64)

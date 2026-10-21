@@ -1,0 +1,1103 @@
+{
+  "commands": [
+    {
+      "aliases": [
+        "gen"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "generate",
+      "operands": [],
+      "options": [
+        {
+          "name": "text",
+          "placeholder": "text",
+          "summary": "the script (\"-\" reads stdin)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "text-file",
+          "placeholder": "path",
+          "summary": "read the script from a file (\"-\" reads stdin)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "custom",
+            "design",
+            "clone"
+          ],
+          "name": "mode",
+          "placeholder": "mode",
+          "summary": "custom (default) | design | clone",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "speed",
+            "quality"
+          ],
+          "name": "variant",
+          "placeholder": "variant",
+          "summary": "speed (default) | quality",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "speaker",
+          "placeholder": "id",
+          "summary": "(custom) Built-in Voice speaker id; default the contract's (see `vocello speakers list`)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "voice-brief",
+          "placeholder": "text",
+          "summary": "(design) the voice description",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "voice",
+          "placeholder": "name|id",
+          "summary": "(clone) a saved voice",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "reference",
+          "placeholder": "wav",
+          "summary": "(clone) a reference clip instead of a saved voice",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "transcript",
+          "placeholder": "text",
+          "summary": "(clone) the reference clip's words; with --voice, replaces the saved transcript",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "delivery",
+          "placeholder": "text",
+          "summary": "delivery instruction (custom and design; refused in clone)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "delivery-cell",
+          "placeholder": "preset.intensity",
+          "summary": "(custom) a preset cell such as calm.normal (see `vocello deliveries`)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "app-delivery",
+          "summary": "with no delivery given, send the apps' default (Neutral) delivery, as a new Studio draft does",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "seed",
+          "placeholder": "n",
+          "summary": "deterministic sampling seed: the same request and seed reproduce the take",
+          "takesValue": true,
+          "type": "uint64",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "expressive",
+            "balanced",
+            "consistent"
+          ],
+          "name": "variation",
+          "placeholder": "variation",
+          "summary": "expressive (default) | balanced | consistent",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "language",
+          "placeholder": "language",
+          "summary": "auto, a Qwen3 language name or a code such as en, fr or ja-JP; omitted is Auto",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "out",
+          "placeholder": "wav",
+          "summary": "write the take to this .wav file (replaced only by a successful take)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "stream",
+          "summary": "streaming synthesis at the app's cadence (the default)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "no-stream",
+          "summary": "accumulate the whole take before decoding",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "play",
+          "summary": "play the take when done",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "generate",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Synthesize one clip",
+      "usage": [
+        "vocello generate --mode custom|design|clone (--text \"…\" | --text-file <path> | --text -) [options]",
+        "vocello custom|design|clone [options]"
+      ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "batch",
+      "operands": [],
+      "options": [
+        {
+          "name": "file",
+          "placeholder": "path",
+          "summary": "input lines, one clip per line (\"-\" reads stdin)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "custom",
+            "design",
+            "clone"
+          ],
+          "name": "mode",
+          "placeholder": "mode",
+          "summary": "custom (default) | design | clone",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "speed",
+            "quality"
+          ],
+          "name": "variant",
+          "placeholder": "variant",
+          "summary": "speed (default) | quality",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "speaker",
+          "placeholder": "id",
+          "summary": "(custom) Built-in Voice speaker id; default the contract's (see `vocello speakers list`)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "voice-brief",
+          "placeholder": "text",
+          "summary": "(design) the voice description",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "voice",
+          "placeholder": "name|id",
+          "summary": "(clone) a saved voice",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "reference",
+          "placeholder": "wav",
+          "summary": "(clone) a reference clip instead of a saved voice",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "transcript",
+          "placeholder": "text",
+          "summary": "(clone) the reference clip's words; with --voice, replaces the saved transcript",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "delivery",
+          "placeholder": "text",
+          "summary": "delivery instruction (custom and design; refused in clone)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "delivery-cell",
+          "placeholder": "preset.intensity",
+          "summary": "(custom) a preset cell such as calm.normal (see `vocello deliveries`)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "app-delivery",
+          "summary": "with no delivery given, send the apps' default (Neutral) delivery, as a new Studio draft does",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "seed",
+          "placeholder": "n",
+          "summary": "deterministic sampling seed: the same request and seed reproduce the take",
+          "takesValue": true,
+          "type": "uint64",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "expressive",
+            "balanced",
+            "consistent"
+          ],
+          "name": "variation",
+          "placeholder": "variation",
+          "summary": "expressive (default) | balanced | consistent",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "out-dir",
+          "placeholder": "dir",
+          "summary": "output folder (default <data>/outputs/cli/batch)",
+          "takesValue": true,
+          "type": "directory",
+          "valueOptional": false
+        },
+        {
+          "name": "long-form",
+          "summary": "each line is one long-form project: planned into segments and joined",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "play",
+          "summary": "play each result when done",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "batch",
+      "refusedOptions": [
+        "language",
+        "out",
+        "stream"
+      ],
+      "subcommands": [],
+      "summary": "Synthesize many clips with one model load",
+      "usage": [
+        "vocello batch --file <path|-> --mode custom|design|clone [options]"
+      ]
+    },
+    {
+      "aliases": [
+        "voice"
+      ],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "voices",
+      "operands": [],
+      "options": [],
+      "path": "voices",
+      "refusedOptions": [],
+      "subcommands": [
+        "list",
+        "enroll",
+        "delete"
+      ],
+      "summary": "Manage saved clone voices",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "voices.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List saved voices",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "add"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "enroll",
+      "operands": [],
+      "options": [
+        {
+          "name": "name",
+          "placeholder": "name",
+          "summary": "the voice's name",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "audio",
+          "placeholder": "wav",
+          "summary": "the reference clip",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "transcript",
+          "placeholder": "text",
+          "summary": "the clip's words",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "voices.enroll",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Save a clone voice from a reference clip",
+      "usage": [
+        "vocello voices enroll --name <name> --audio <wav> [--transcript \"…\"] --confirm-consent"
+      ]
+    },
+    {
+      "aliases": [
+        "rm"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "delete",
+      "operands": [],
+      "options": [
+        {
+          "name": "id",
+          "placeholder": "id",
+          "summary": "the saved voice id (see `vocello voices list`)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "voices.delete",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Delete a saved voice",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "speaker"
+      ],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "speakers",
+      "operands": [],
+      "options": [],
+      "path": "speakers",
+      "refusedOptions": [],
+      "subcommands": [
+        "list"
+      ],
+      "summary": "List Built-in Voice speakers",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [],
+      "path": "speakers.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List Built-in Voice speakers",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "modes",
+      "operands": [],
+      "options": [],
+      "path": "modes",
+      "refusedOptions": [],
+      "subcommands": [
+        "list"
+      ],
+      "summary": "List the generation modes",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [],
+      "path": "modes.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List the generation modes and what each needs",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "delivery"
+      ],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "deliveries",
+      "operands": [],
+      "options": [],
+      "path": "deliveries",
+      "refusedOptions": [],
+      "subcommands": [
+        "list"
+      ],
+      "summary": "List delivery presets and their instructions",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [
+        {
+          "name": "shipped-only",
+          "summary": "one row per product preset, Neutral included, at its shipped tier",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "deliveries.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List delivery preset cells and the instruction each sends",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "model"
+      ],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "models",
+      "operands": [],
+      "options": [],
+      "path": "models",
+      "refusedOptions": [],
+      "subcommands": [
+        "list",
+        "status",
+        "install"
+      ],
+      "summary": "Inventory and install models",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [
+        {
+          "name": "id",
+          "required": false,
+          "summary": "show only this model",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List the contract's models and their install state",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "status",
+      "operands": [
+        {
+          "name": "id",
+          "required": false,
+          "summary": "show only this model",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.status",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List models with missing or stale files",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "install",
+      "operands": [
+        {
+          "name": "id",
+          "required": true,
+          "summary": "the model id to install (see `vocello models list`)",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.install",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Download and verify a model into the shared store",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "capabilities",
+      "operands": [],
+      "options": [],
+      "path": "capabilities",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Describe commands, options, codes and limits for agents",
+      "usage": [
+        "vocello capabilities --json"
+      ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "completions",
+      "operands": [
+        {
+          "choices": [
+            "zsh",
+            "bash",
+            "fish"
+          ],
+          "name": "shell",
+          "required": true,
+          "summary": "zsh, bash or fish",
+          "type": "choice"
+        }
+      ],
+      "options": [],
+      "path": "completions",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Print a shell completion script",
+      "usage": [
+        "vocello completions zsh|bash|fish"
+      ]
+    },
+    {
+      "aliases": [
+        "benchmark"
+      ],
+      "internalTool": true,
+      "machineContract": false,
+      "name": "bench",
+      "operands": [],
+      "options": [
+        {
+          "choices": [
+            "custom",
+            "design",
+            "clone"
+          ],
+          "name": "modes",
+          "placeholder": "list",
+          "summary": "strict comma list of modes (default all)",
+          "takesValue": true,
+          "type": "list",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "speed",
+            "quality"
+          ],
+          "name": "variants",
+          "placeholder": "list",
+          "summary": "strict comma list of variants (default both)",
+          "takesValue": true,
+          "type": "list",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "short",
+            "medium",
+            "long"
+          ],
+          "name": "lengths",
+          "placeholder": "list",
+          "summary": "strict comma list of lengths (default all)",
+          "takesValue": true,
+          "type": "list",
+          "valueOptional": false
+        },
+        {
+          "name": "warm",
+          "placeholder": "n",
+          "summary": "warm repetitions per cell and length (default 3)",
+          "takesValue": true,
+          "type": "integer",
+          "valueOptional": false
+        },
+        {
+          "name": "no-cold",
+          "summary": "with --delivery, skip the Custom/Design cold take",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "voice",
+          "placeholder": "name",
+          "summary": "(clone) saved voice name",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "confirm-consent",
+          "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "speaker",
+          "placeholder": "id",
+          "summary": "(custom) exact Built-in Voice speaker id",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "voice-brief",
+          "placeholder": "text",
+          "summary": "(design) voice brief",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "delivery",
+          "placeholder": "list",
+          "summary": "add instruct-bearing cells; alone runs the default set",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": true
+        },
+        {
+          "name": "prosody-profile",
+          "placeholder": "path",
+          "summary": "a calibrated prosody profile for the delivery analysis",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "continue-delivery-failures",
+          "summary": "with --delivery and --no-summary, keep typed failures and continue",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "label",
+          "placeholder": "id",
+          "summary": "opaque 1-96 character run label",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "8gb",
+            "16gb",
+            "high",
+            "iphone"
+          ],
+          "name": "force-class",
+          "placeholder": "tier",
+          "summary": "run a constrained memory tier",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "off",
+            "lightweight",
+            "verbose"
+          ],
+          "name": "telemetry",
+          "placeholder": "level",
+          "summary": "telemetry level (default verbose)",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "retained-memory-v1"
+          ],
+          "name": "memory-qualification",
+          "placeholder": "protocol",
+          "summary": "require the retained-memory protocol",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "seed",
+          "placeholder": "n",
+          "summary": "deterministic sampling seed applied to every take",
+          "takesValue": true,
+          "type": "uint64",
+          "valueOptional": false
+        },
+        {
+          "name": "no-stream",
+          "summary": "accumulate each result before decoding",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "ttfc",
+          "summary": "add an engine first-chunk-latency probe per cell",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "keep",
+          "summary": "append to existing diagnostics (default: clear first)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "force",
+          "summary": "allow clearing even the real (non-debug) app data folder",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "no-summary",
+          "summary": "skip the aggregator and registry",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "codec-replay",
+          "placeholder": "take.json",
+          "summary": "internal diagnostics: replay collected codes",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "take-sha256",
+          "placeholder": "digest",
+          "summary": "the original take digest (--codec-replay)",
+          "takesValue": true,
+          "type": "string",
+          "valueOptional": false
+        },
+        {
+          "name": "codec-trace",
+          "placeholder": "trace.bin",
+          "summary": "the collected binary trace (--codec-replay)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "output-dir",
+          "placeholder": "dir",
+          "summary": "new untracked diagnostic output folder",
+          "takesValue": true,
+          "type": "directory",
+          "valueOptional": false
+        },
+        {
+          "name": "script-file",
+          "placeholder": "path",
+          "summary": "the original model-facing script (--codec-replay)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "reference-wav",
+          "placeholder": "wav",
+          "summary": "the canonical reference clip (--codec-replay)",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "codec-roundtrip",
+          "placeholder": "job.json",
+          "summary": "internal diagnostics: resynthesize reference clips",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        },
+        {
+          "name": "codec-loop",
+          "placeholder": "job.json",
+          "summary": "internal diagnostics: decode repeated codec spans",
+          "takesValue": true,
+          "type": "file",
+          "valueOptional": false
+        }
+      ],
+      "path": "bench",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Drive the performance and quality matrix (internal)",
+      "usage": [
+        "vocello bench [--modes custom,design,clone] [--variants speed,quality] [--lengths short,medium,long] [--warm 3] [options]"
+      ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "help",
+      "operands": [
+        {
+          "name": "command",
+          "required": false,
+          "summary": "the command to describe",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "help",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Show help for a command",
+      "usage": [
+        "vocello help [<command> [<subcommand>]]"
+      ]
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "version",
+      "operands": [],
+      "options": [],
+      "path": "version",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Print the version",
+      "usage": []
+    }
+  ],
+  "contractRevision": 1,
+  "globalOptions": [
+    {
+      "choices": [
+        "text",
+        "json",
+        "ndjson"
+      ],
+      "name": "output-format",
+      "placeholder": "format",
+      "summary": "text (default), json (one envelope on stdout) or ndjson (events, then the envelope)",
+      "takesValue": true,
+      "type": "choice",
+      "valueOptional": false
+    },
+    {
+      "name": "json",
+      "summary": "same as --output-format json",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    },
+    {
+      "name": "ndjson",
+      "summary": "same as --output-format ndjson",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    },
+    {
+      "name": "quiet",
+      "summary": "suppress progress notes on stderr",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    },
+    {
+      "name": "verbose",
+      "summary": "more progress notes on stderr (also in the json formats)",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    },
+    {
+      "name": "no-input",
+      "summary": "never prompt and never read stdin unless a flag names it (-)",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    },
+    {
+      "name": "data-dir",
+      "placeholder": "dir",
+      "summary": "runtime data directory (default ~/Library/Application Support/QwenVoice)",
+      "takesValue": true,
+      "type": "directory",
+      "valueOptional": false
+    },
+    {
+      "name": "manifest",
+      "placeholder": "path",
+      "summary": "override the bundled qwenvoice_contract.json",
+      "takesValue": true,
+      "type": "file",
+      "valueOptional": false
+    },
+    {
+      "name": "help",
+      "summary": "show help for the command",
+      "takesValue": false,
+      "type": "flag",
+      "valueOptional": false
+    }
+  ],
+  "modeShortcuts": [
+    "custom",
+    "design",
+    "clone"
+  ],
+  "schemaVersion": 1
+}

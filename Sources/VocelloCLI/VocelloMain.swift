@@ -7,89 +7,144 @@ import VocelloCLICore
 @MainActor
 enum VocelloMain {
     static func main() async {
+        // A closed stdout must fail its writes (EPIPE), never end the process
+        // before the command's owned cleanup runs.
+        signal(SIGPIPE, SIG_IGN)
         let code = await CLIProcessSupervisor.run { await execute() }
         if code != 0 { exit(code) }
     }
 
     private static func execute() async -> Int32 {
-        let route = CLICommandRoute(Array(CommandLine.arguments.dropFirst()))
-
+        let argv = Array(CommandLine.arguments.dropFirst())
+        let invocation: CLIInvocation
         do {
-            switch route {
-            case .generate(let argv):
-                try await GenerateCommand.run(argv)
-            case .batch(let argv):
-                try await BatchCommand.run(argv)
-            case .modes(let argv):
-                try await ModesCommand.run(argv)
-            case .deliveries(let argv):
-                try await DeliveriesCommand.run(argv)
-            case .voices(let argv):
-                try await VoicesCommand.run(argv)
-            case .speakers(let argv):
-                try await SpeakersCommand.run(argv)
-            case .models(let argv):
-                try await ModelsCommand.run(argv)
-            case .bench(let argv):
-                try await BenchCommand.run(argv)
-            case .help:
-                printUsage()
-            case .version:
-                print("vocello \(vocelloCLIVersion)")
-            case .unknown(let command):
-                FileHandle.standardError.write(Data("unknown command: \(command)\n\n".utf8))
-                printUsage()
-                exit(2)
-            case .missingCommand:
-                printUsage()
-                exit(2)
-            }
-        } catch is CancellationError {
+            invocation = try CLIParser.parse(argv)
+        } catch {
+            // Reported in the format the caller asked for, even unparsed.
+            // No command resolved, so the envelope names none.
+            CLIPresenter.begin(
+                format: CLIParser.requestedFormat(argv), command: "",
+                onBrokenOutput: CLIProcessSupervisor.outputBroken
+            )
+            let failure = CLIFailure.classify(error)
+            CLIPresenter.fail(failure)
+            return failure.exitCode
+        }
+        CLIOutput.configure(invocation)
+        CLIPresenter.begin(
+            format: invocation.format, command: invocation.commandName,
+            onBrokenOutput: CLIProcessSupervisor.outputBroken
+        )
+        do {
+            try await dispatch(invocation)
+            CLIPresenter.finishSuccessIfUnreported()
+            return CLIPresenter.resultWasUnencodable ? VocelloErrorCode.internalError.exitCode : 0
+        } catch {
             // A forced exit's reap of a `--play` child also unwinds the
             // command; the forced path reports that exit, not this one.
-            if !CLIChildProcesses.shared.forcedExitBegan {
-                FileHandle.standardError.write(Data("Cancelled; command cleanup completed.\n".utf8))
-            }
-            return 130
-        } catch let engineStop as CLIEngineCancellation {
-            // P15-02: the engine stopped a take on its own (memory pressure);
-            // a wrapper must never read it as an operator interrupt.
-            FileHandle.standardError.write(Data("error: \(engineStop.errorDescription ?? engineStop.errorCode)\n".utf8))
-            return CLIEngineCancellation.exitStatus
-        } catch {
-            // A typed error prints its own path-free description (SEC-11); the
-            // raw value would print every associated value, staged paths and an
-            // underlying error's userInfo included.
-            let message = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-            FileHandle.standardError.write(Data("error: \(message)\n".utf8))
-            return 1
+            if error is CancellationError, CLIChildProcesses.shared.forcedExitBegan { return 130 }
+            // A signalled run exits 128 + the signal whatever else failed, and says so.
+            let failure = CLIFailure.classify(error, signal: CLIProcessSupervisor.receivedSignal)
+                .signalled(by: CLIProcessSupervisor.receivedSignal)
+            CLIPresenter.fail(failure)
+            return failure.exitCode
         }
-        return 0
     }
 
-    static func printUsage() {
-        print("""
-        vocello — headless Vocello TTS (Qwen3-TTS via MLX)
+    private static func dispatch(_ invocation: CLIInvocation) async throws {
+        let args = invocation.args
+        if invocation.action == .help {
+            if invocation.path == ["bench"], !CLIPresenter.isMachine {
+                BenchCommand.printHelp()
+                return
+            }
+            let text = CLIHelpRenderer.render(path: invocation.path)
+            if CLIPresenter.isMachine {
+                CLIPresenter.succeed(HelpResult(path: invocation.path.joined(separator: "."), text: text))
+            } else {
+                print(text)
+            }
+            return
+        }
+        let path = invocation.path
+        let action = path.count > 1 ? path[1] : ""
+        switch path.first ?? "" {
+        case "generate":
+            try await GenerateCommand.run(args)
+        case "batch":
+            try await BatchCommand.run(args)
+        case "voices":
+            try await VoicesCommand.run(action: action, args)
+        case "speakers":
+            try await SpeakersCommand.run(args)
+        case "modes":
+            try await ModesCommand.run(args)
+        case "deliveries":
+            try await DeliveriesCommand.run(args)
+        case "models":
+            try await ModelsCommand.run(action: action, args)
+        case "bench":
+            try await BenchCommand.run(args)
+        case "capabilities":
+            try CapabilitiesCommand.run()
+        case "completions":
+            try CompletionsCommand.run(args)
+        case "version":
+            if CLIPresenter.isMachine {
+                CLIPresenter.succeed(VersionResult(version: vocelloCLIVersion, build: vocelloCLIBuild))
+            } else {
+                print("vocello \(vocelloCLIVersion)")
+            }
+        default:
+            throw CLIError(.internalError, "no handler for \(invocation.commandName)")
+        }
+    }
 
-        Commands:
-          generate            synthesize a clip            (vocello generate --help)
-          custom|design|clone synthesize in that mode (shortcut for generate --mode)
-          batch               synthesize many clips, one model load (vocello batch --help)
-          voices              manage saved clone voices    (vocello voices help)
-          speakers            list Built-in Voice speakers (vocello speakers help)
-          modes               list the generation modes    (vocello modes --help)
-          deliveries          list delivery presets + instruction text (vocello deliveries --help)
-          models              inventory installed models   (vocello models help)
-          bench               drive the perf/quality matrix (vocello bench --help)
-          help                show this message
-          version             print version
+    struct HelpResult: Encodable, Sendable {
+        let path: String
+        let text: String
+    }
 
-        Global: --json (machine-readable stdout), --quiet / --verbose (stderr notes).
-        Voice cloning (clone generation, `voices enroll`, clone bench cells) requires
-        --confirm-consent: only clone voices you own or have permission to use.
+    struct VersionResult: Encodable, Sendable {
+        let version: String
+        let build: String
+    }
+}
 
-        Exit status: 0 success · 1 error · 2 usage · 75 the engine stopped a take
-        under memory pressure (retry later) · 130 / 143 interrupted (SIGINT / SIGTERM).
-        """)
+/// `vocello capabilities`: the static description agents read first.
+enum CapabilitiesCommand {
+    static func run() throws {
+        let document = CLICapabilitiesDocument()
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(document)
+            return
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes, .prettyPrinted]
+        print(String(decoding: try encoder.encode(document), as: UTF8.self))
+    }
+}
+
+/// `vocello completions zsh|bash|fish`: the completion script for the shell.
+enum CompletionsCommand {
+    struct Result: Encodable, Sendable {
+        let shell: String
+        let script: String
+    }
+
+    static func run(_ args: Args) throws {
+        guard let name = args.positionals.first, let shell = CLICompletionShell(rawValue: name) else {
+            throw CLIError(
+                .usageError,
+                "unknown shell '\(args.positionals.first ?? "")'",
+                hint: "use \(CLICompletionShell.allCases.map(\.rawValue).joined(separator: " | "))"
+            )
+        }
+        let script = CLICompletionGenerator.script(for: shell)
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Result(shell: shell.rawValue, script: script))
+        } else {
+            print(script, terminator: "")
+        }
     }
 }

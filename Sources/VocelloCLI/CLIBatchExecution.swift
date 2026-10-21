@@ -12,7 +12,7 @@ public enum CLIBatchExecution {
             do {
                 try GenerateCommand.validateSingleTakeText(line)
             } catch let error as CLIError {
-                throw CLIError("line \(index + 1): \(error.description)")
+                throw CLIError(error.code, "line \(index + 1): \(error.description)", hint: error.hint)
             }
         }
     }
@@ -81,8 +81,8 @@ public enum CLIBatchExecution {
         public let index: Int
         let generationID: UUID?
         public internal(set) var status: Status = .notAttempted
-        var audioPath: String?
-        var durationSeconds: Double?
+        public internal(set) var audioPath: String?
+        public internal(set) var durationSeconds: Double?
         var finishReason: String?
         public internal(set) var errorCode: String?
         /// Set only on a `failed` row whose failure coincided with a
@@ -103,6 +103,7 @@ public enum CLIBatchExecution {
     public static func run(
         _ requests: [GenerationRequest],
         progress: (Int, Int) -> Void = { _, _ in },
+        finished: (Int, Row) -> Void = { _, _ in },
         generate: @concurrent (GenerationRequest) async throws -> GenerationResult
     ) async -> Outcome {
         var rows = requests.enumerated().map { Row(index: $0.offset, generationID: $0.element.generationID) }
@@ -116,7 +117,7 @@ public enum CLIBatchExecution {
                 // Publication is an irreversible commit. Preserve a returned
                 // successful result even if a signal arrived immediately after.
                 guard FileManager.default.fileExists(atPath: result.audioPath) else {
-                    rows[index].fail("published_output_missing")
+                    rows[index].fail(VocelloErrorCode.outputMissing.rawValue)
                     break
                 }
                 rows[index].status = .completed
@@ -124,6 +125,7 @@ public enum CLIBatchExecution {
                 rows[index].durationSeconds = result.durationSeconds
                 rows[index].finishReason = result.finishReason?.rawValue
                 results.append(result)
+                finished(index, rows[index])
             } catch let stopped as CLIEngineCancellation {
                 // The engine stopped the take on its own (memory pressure): a
                 // failure with its reason, not the operator's interrupt.
@@ -137,10 +139,13 @@ public enum CLIBatchExecution {
             } catch {
                 // Typed: the engine reports cancellation only as
                 // CancellationError, so a genuine failure that coincides with
-                // a signal stays failed.
-                rows[index].fail("generation_failed")
+                // a signal stays failed, with its contract code.
+                rows[index].fail(CLIFailure.rowCode(for: error).rawValue)
                 break
             }
+        }
+        if let stopped = rows.first(where: { $0.status == .failed || $0.status == .cancelled }) {
+            finished(stopped.index, stopped)
         }
         return Outcome(rows: rows, results: results, engineCancellation: engineCancellation)
     }

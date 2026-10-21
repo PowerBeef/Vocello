@@ -21,125 +21,170 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertNil(GenerateCommand.savedVoiceCloneReference(voice, transcriptOverride: nil).transcript)
     }
 
-    // MARK: - Args
+    // MARK: - Parser
 
-    func testArgsParsesValuesFlagsAndPositionals() {
-        let args = Args([
-            "list", "--mode", "clone", "--seed=42", "--json", "--text", "hello world", "extra", "--quiet",
-        ])
-        XCTAssertEqual(args.positionals, ["list", "extra"])
+    private func parse(_ argv: [String]) throws -> CLIInvocation { try CLIParser.parse(argv) }
+    private func generate(_ argv: [String]) throws -> Args { try CLIParser.args(argv, for: "generate") }
+
+    private func usageMessage(_ argv: [String], file: StaticString = #filePath, line: UInt = #line) -> String {
+        do {
+            _ = try CLIParser.parse(argv)
+            XCTFail("\(argv) must be refused", file: file, line: line)
+            return ""
+        } catch let error as CLIError {
+            XCTAssertEqual(error.code, .usageError, file: file, line: line)
+            return error.description + " | " + (error.hint ?? "")
+        } catch {
+            XCTFail("unexpected \(error)", file: file, line: line)
+            return ""
+        }
+    }
+
+    func testParserReadsDeclaredValuesFlagsAndOperands() throws {
+        let args = try generate(["--mode", "clone", "--seed=42", "--text", "hello world", "--quiet", "--play"])
         XCTAssertEqual(args.string("mode"), "clone")
         XCTAssertEqual(args.string("seed"), "42")
         XCTAssertEqual(args.string("text"), "hello world")
-        XCTAssertTrue(args.flag("json"))
         XCTAssertTrue(args.flag("quiet"))
-        XCTAssertNil(args.string("json"), "a bare flag carries no value")
+        XCTAssertTrue(args.flag("play"))
+        XCTAssertNil(args.string("play"), "a bare flag carries no value")
         XCTAssertFalse(args.flag("mode"), "a flag with a value is not a bare flag")
-        XCTAssertEqual(Args(["--seed", "1", "--seed", "2"]).string("seed"), "2", "the last value wins")
-    }
-
-    func testDoubleDashEndsFlagsAndTheEqualsFormCarriesDashedValues() throws {
-        let args = Args(["--delivery=--calm", "--", "--not-a-flag", "-"])
-        XCTAssertEqual(args.string("delivery"), "--calm")
-        XCTAssertEqual(args.positionals, ["--not-a-flag", "-"])
-        XCTAssertFalse(args.flag("not-a-flag"))
-
-        // Without `=`, a value that starts with `--` reads as the next flag.
-        let ambiguous = Args(["--delivery", "--calm"])
-        XCTAssertNil(ambiguous.string("delivery"))
-        XCTAssertTrue(ambiguous.flag("delivery"))
-        XCTAssertTrue(ambiguous.flag("calm"))
+        XCTAssertEqual(try generate(["--seed", "1", "--seed", "2"]).string("seed"), "2", "the last value wins")
+        XCTAssertEqual(try generate(["--delivery=--calm"]).string("delivery"), "--calm", "= carries a dashed value")
+        XCTAssertEqual(try generate(["--text", "-"]).string("text"), "-", "a lone dash is a value")
+        XCTAssertEqual(try parse(["models", "status", "pro_custom_speed"]).args.positionals, ["pro_custom_speed"])
+        XCTAssertEqual(try parse(["models", "list", "--", "--odd-id"]).args.positionals, ["--odd-id"])
 
         // An empty `--key=` value is recorded, but `require` refuses it.
-        let empty = Args(["--voice="])
+        let empty = try generate(["--voice="])
         XCTAssertEqual(empty.string("voice"), "")
         XCTAssertThrowsError(try empty.require("voice", "a saved voice")) { error in
             XCTAssertEqual((error as? CLIError)?.description, "missing required --voice (a saved voice)")
         }
-        XCTAssertThrowsError(try Args([]).require("voice", "a saved voice"))
-        XCTAssertEqual(try Args(["--voice", "Ava"]).require("voice", "a saved voice"), "Ava")
+        XCTAssertEqual(try generate(["--voice", "Ava"]).require("voice", "a saved voice"), "Ava")
     }
 
-    // MARK: - Dispatch
+    func testParserRefusesWhatTheCommandDoesNotDeclare() {
+        XCTAssertTrue(usageMessage(["generate", "--vioce", "Ava"]).contains("did you mean --voice?"))
+        XCTAssertTrue(usageMessage(["generat"]).contains("did you mean 'generate'?"))
+        XCTAssertTrue(usageMessage(["models", "instal", "x"]).contains("did you mean 'install'?"))
+        XCTAssertTrue(usageMessage(["generate", "--delivery", "--calm"]).hasPrefix("--delivery needs a value"))
+        XCTAssertTrue(usageMessage(["generate", "--speaker"]).hasPrefix("--speaker needs a value"))
+        XCTAssertTrue(usageMessage(["generate", "--play=yes"]).contains("--play takes no value"))
+        XCTAssertTrue(usageMessage(["speakers", "list", "extra"]).hasPrefix("unexpected argument 'extra'"))
+        XCTAssertTrue(usageMessage(["models", "install"]).hasPrefix("missing <id>"))
+        XCTAssertTrue(usageMessage(["batch", "--language", "en"]).hasPrefix("--language is not supported by batch"))
+        XCTAssertTrue(usageMessage(["--json", "--ndjson", "version"]).contains("conflicts"))
+        XCTAssertTrue(usageMessage(["--output-format", "yaml", "version"]).hasPrefix("invalid --output-format"))
+        XCTAssertTrue(usageMessage(["bench", "--json"]).contains("writes its own output"))
+        XCTAssertTrue(usageMessage([]).hasPrefix("missing command"))
+        XCTAssertTrue(usageMessage(["Generate"]).hasPrefix("unknown command"), "commands are case-sensitive")
+        XCTAssertTrue(usageMessage(["-x"]).hasPrefix("unknown option -x"))
+    }
 
-    func testCommandRoutingForwardsArgumentsAndModeShortcuts() {
-        XCTAssertEqual(CLICommandRoute([]), .missingCommand)
-        XCTAssertEqual(CLICommandRoute(["generate"]), .generate([]))
-        XCTAssertEqual(CLICommandRoute(["gen", "--text", "hi"]), .generate(["--text", "hi"]))
-        XCTAssertEqual(
-            CLICommandRoute(["clone", "--voice", "Ava"]),
-            .generate(["--mode", "clone", "--voice", "Ava"])
-        )
-        XCTAssertEqual(
-            CLICommandRoute(["design", "--file", "lines.txt"]),
-            .batch(["--mode", "design", "--file", "lines.txt"])
-        )
-        XCTAssertEqual(
-            CLICommandRoute(["custom", "--file=lines.txt"]),
-            .batch(["--mode", "custom", "--file=lines.txt"])
-        )
-        XCTAssertEqual(
-            CLICommandRoute(["custom", "--text", "--file"]),
-            .batch(["--mode", "custom", "--text", "--file"]),
-            "the shortcut routes on the bare token, as the batch command reads it"
-        )
-        XCTAssertEqual(CLICommandRoute(["batch", "--file", "x"]), .batch(["--file", "x"]))
-        XCTAssertEqual(CLICommandRoute(["modes", "--json"]), .modes(["--json"]))
-        XCTAssertEqual(CLICommandRoute(["delivery"]), .deliveries([]))
-        XCTAssertEqual(CLICommandRoute(["voice", "list"]), .voices(["list"]))
-        XCTAssertEqual(CLICommandRoute(["speaker", "list"]), .speakers(["list"]))
-        XCTAssertEqual(CLICommandRoute(["model"]), .models([]))
-        XCTAssertEqual(CLICommandRoute(["benchmark", "--cells", "a"]), .bench(["--cells", "a"]))
-        for help in ["help", "-h", "--help"] {
-            XCTAssertEqual(CLICommandRoute([help, "extra"]), .help, help)
+    func testCommandPathsAliasesShortcutsAndDefaults() throws {
+        XCTAssertEqual(try parse(["gen", "--text", "hi"]).path, ["generate"])
+        let clone = try parse(["clone", "--voice", "Ava"])
+        XCTAssertEqual(clone.path, ["generate"])
+        XCTAssertEqual(clone.args.string("mode"), "clone")
+        XCTAssertEqual(try parse(["design", "--file", "lines.txt"]).path, ["batch"])
+        XCTAssertEqual(try parse(["custom", "--file=lines.txt"]).args.string("mode"), "custom")
+        XCTAssertEqual(CLIParser.expandingShortcut(["custom", "--", "--file"]).first, "generate",
+                       "an operand after -- never routes to batch")
+        XCTAssertEqual(try parse(["voice", "ls"]).path, ["voices", "list"])
+        XCTAssertEqual(try parse(["voices"]).path, ["voices", "list"], "the default subcommand")
+        XCTAssertEqual(try parse(["delivery", "--shipped-only"]).path, ["deliveries", "list"])
+        XCTAssertEqual(try parse(["model"]).path, ["models", "list"])
+        XCTAssertEqual(try parse(["benchmark", "--modes", "custom"]).path, ["bench"])
+        for version in [["version"], ["--version"], ["-v"]] {
+            XCTAssertEqual(try parse(version).path, ["version"], "\(version)")
         }
-        for version in ["version", "--version", "-v"] {
-            XCTAssertEqual(CLICommandRoute([version]), .version, version)
+        XCTAssertEqual(try parse(["models", "install", "pro_custom_speed"]).commandName, "models.install")
+    }
+
+    func testOptionalValuesSubcommandsAfterOptionsAndHelpPastAMistake() throws {
+        let bare = try parse(["bench", "--delivery", "--modes", "custom"])
+        XCTAssertTrue(bare.args.flag("delivery"), "a value-optional option alone is a flag")
+        XCTAssertEqual(bare.args.string("modes"), "custom")
+        XCTAssertEqual(try parse(["bench", "--delivery", "happy.strong"]).args.string("delivery"), "happy.strong")
+        XCTAssertEqual(try parse(["bench", "--delivery=calm"]).args.string("delivery"), "calm")
+        XCTAssertEqual(try parse(["bench", "--delivery", "-h"]).action, .help, "-h is never an optional value")
+
+        let enroll = try parse(["voices", "--confirm-consent", "enroll", "--name", "Ava", "--audio", "a.wav"])
+        XCTAssertEqual(enroll.path, ["voices", "enroll"], "an option before the subcommand belongs to it")
+        XCTAssertTrue(enroll.args.flag("confirm-consent"))
+        XCTAssertEqual(enroll.args.string("name"), "Ava")
+
+        let help = try parse(["generate", "--vioce", "x", "-h"])
+        XCTAssertEqual(help.action, .help, "help wins over a mistake on the same line")
+        XCTAssertEqual(help.path, ["generate"])
+        XCTAssertTrue(usageMessage(["help", "models", "nope"]).contains("unknown command 'nope'"))
+    }
+
+    func testHelpAnywhereAndGlobalOptionsAnywhereBeforeTheEnd() throws {
+        for argv in [["--help"], ["-h"], ["help"]] {
+            let invocation = try parse(argv)
+            XCTAssertEqual(invocation.action, .help, "\(argv)")
+            XCTAssertEqual(invocation.path, [], "\(argv)")
         }
-        XCTAssertEqual(CLICommandRoute(["synthesize"]), .unknown("synthesize"))
-        XCTAssertEqual(CLICommandRoute(["Generate"]), .unknown("Generate"), "commands are case-sensitive")
+        XCTAssertEqual(try parse(["generate", "--text", "hi", "-h"]).path, ["generate"])
+        XCTAssertEqual(try parse(["generate", "--text", "hi", "-h"]).action, .help)
+        XCTAssertEqual(try parse(["help", "models", "install"]).path, ["models", "install"])
+        XCTAssertEqual(try parse(["models", "help"]).path, ["models"])
+        XCTAssertEqual(try parse(["models", "help"]).action, .help)
+
+        let machine = try parse(["--json", "models", "--verbose", "status", "--data-dir", "/tmp/x"])
+        XCTAssertEqual(machine.path, ["models", "status"])
+        XCTAssertEqual(machine.format, .json)
+        XCTAssertEqual(machine.verbosity, .verbose)
+        XCTAssertEqual(machine.args.string("data-dir"), "/tmp/x")
+        XCTAssertEqual(try parse(["version", "--output-format=ndjson"]).format, .ndjson)
+        XCTAssertEqual(try parse(["version", "--json", "--output-format", "json"]).format, .json)
+        XCTAssertTrue(try parse(["generate", "--no-input"]).noInput)
+        XCTAssertEqual(CLIParser.requestedFormat(["generat", "--json"]), .json, "a refused line keeps its format")
+        XCTAssertEqual(CLIParser.requestedFormat(["--", "--json"]), .text)
     }
 
     // MARK: - generate options
 
     func testGenerateOptionParsingAcceptsDocumentedValuesAndRejectsTheRest() throws {
-        XCTAssertNil(try GenerateCommand.parseSeed(Args([])))
-        XCTAssertEqual(try GenerateCommand.parseSeed(Args(["--seed", "18446744073709551615"])), UInt64.max)
-        XCTAssertThrowsError(try GenerateCommand.parseSeed(Args(["--seed=-1"])))
-        XCTAssertThrowsError(try GenerateCommand.parseSeed(Args(["--seed", "1.5"])))
+        XCTAssertNil(try GenerateCommand.parseSeed(generate([])))
+        XCTAssertEqual(try GenerateCommand.parseSeed(generate(["--seed", "18446744073709551615"])), UInt64.max)
+        XCTAssertThrowsError(try GenerateCommand.parseSeed(generate(["--seed=-1"])))
+        XCTAssertThrowsError(try GenerateCommand.parseSeed(generate(["--seed", "1.5"])))
 
-        XCTAssertNil(try GenerateCommand.parseVariation(Args([])))
-        XCTAssertEqual(try GenerateCommand.parseVariation(Args(["--variation", "Balanced"])), .balanced)
-        XCTAssertThrowsError(try GenerateCommand.parseVariation(Args(["--variation", "wild"])))
+        XCTAssertNil(try GenerateCommand.parseVariation(generate([])))
+        XCTAssertEqual(try GenerateCommand.parseVariation(generate(["--variation", "Balanced"])), .balanced)
+        XCTAssertThrowsError(try GenerateCommand.parseVariation(generate(["--variation", "wild"])))
 
-        XCTAssertEqual(try GenerateCommand.resolveMode(Args([])), .custom)
-        XCTAssertEqual(try GenerateCommand.resolveMode(Args(["--mode", "CLONE"])), .clone)
-        XCTAssertThrowsError(try GenerateCommand.resolveMode(Args(["--mode", "sing"]))) { error in
+        XCTAssertEqual(try GenerateCommand.resolveMode(generate([])), .custom)
+        XCTAssertEqual(try GenerateCommand.resolveMode(generate(["--mode", "CLONE"])), .clone)
+        XCTAssertThrowsError(try GenerateCommand.resolveMode(generate(["--mode", "sing"]))) { error in
             XCTAssertEqual(
                 (error as? CLIError)?.description,
                 "invalid --mode 'sing' (use custom | design | clone)"
             )
         }
 
-        XCTAssertFalse(try GenerateCommand.resolveQuality(Args([])))
-        XCTAssertFalse(try GenerateCommand.resolveQuality(Args(["--variant", "fast"])))
-        XCTAssertTrue(try GenerateCommand.resolveQuality(Args(["--variant", "HQ"])))
-        XCTAssertThrowsError(try GenerateCommand.resolveQuality(Args(["--variant", "turbo"])))
+        XCTAssertFalse(try GenerateCommand.resolveQuality(generate([])))
+        XCTAssertFalse(try GenerateCommand.resolveQuality(generate(["--variant", "fast"])))
+        XCTAssertTrue(try GenerateCommand.resolveQuality(generate(["--variant", "HQ"])))
+        XCTAssertThrowsError(try GenerateCommand.resolveQuality(generate(["--variant", "turbo"])))
 
-        XCTAssertNil(try GenerateCommand.resolveDeliveryInstructionCellID(Args([]), mode: .design))
+        XCTAssertNil(try GenerateCommand.resolveDeliveryInstructionCellID(generate([]), mode: .design))
         XCTAssertEqual(
             try GenerateCommand.resolveDeliveryInstructionCellID(
-                Args(["--delivery-cell", "angry.normal"]),
+                generate(["--delivery-cell", "angry.normal"]),
                 mode: .custom
             ),
             "angry.normal"
         )
         XCTAssertThrowsError(try GenerateCommand.resolveDeliveryInstructionCellID(
-            Args(["--delivery-cell", "angry.normal"]),
+            generate(["--delivery-cell", "angry.normal"]),
             mode: .design
         ))
         XCTAssertThrowsError(try GenerateCommand.resolveDeliveryInstructionCellID(
-            Args(["--delivery-cell", "angry"]),
+            generate(["--delivery-cell", "angry"]),
             mode: .custom
         ))
     }
@@ -149,9 +194,9 @@ final class CLIArgumentsTests: XCTestCase {
     /// the canonical language the apps send.
     func testLanguageResolvesNamesAndCodesAndRefusesTheRest() throws {
         func parse(_ value: String) throws -> Qwen3SupportedLanguage? {
-            try GenerateCommand.parseLanguage(Args(["--language", value]))
+            try GenerateCommand.parseLanguage(generate(["--language", value]))
         }
-        XCTAssertNil(try GenerateCommand.parseLanguage(Args([])), "omitted stays Auto with no hint")
+        XCTAssertNil(try GenerateCommand.parseLanguage(generate([])), "omitted stays Auto with no hint")
         XCTAssertEqual(try parse("auto"), .auto)
         XCTAssertEqual(try parse("Automatic"), .auto)
         XCTAssertEqual(try parse("French"), .french)
@@ -169,34 +214,35 @@ final class CLIArgumentsTests: XCTestCase {
                 XCTAssertTrue(message.contains("auto | chinese | english"), "the refusal lists the accepted values")
             }
         }
-        XCTAssertThrowsError(try GenerateCommand.parseLanguage(Args(["--language"])), "a bare flag has no language")
+        XCTAssertThrowsError(try GenerateCommand.parseLanguage(generate(["--language"])), "a bare flag has no language")
     }
 
     /// P15-08 / P05-05: an empty speaker (an unset shell variable) is refused,
     /// never sent as a take with no speaker conditioning; P02-09: Clone refuses
     /// a delivery it would drop unseen; P15-06: `--app-delivery` is a bare flag.
     func testPayloadOptionsRefuseAnEmptySpeakerAndACloneDelivery() throws {
-        XCTAssertNil(try GenerateCommand.explicitSpeaker(Args([])), "omitted takes the contract default")
-        XCTAssertEqual(try GenerateCommand.explicitSpeaker(Args(["--speaker", " ryan "])), "ryan")
-        for argv in [["--speaker", ""], ["--speaker=   "], ["--speaker=", "--json"], ["--speaker", "--json"]] {
-            XCTAssertThrowsError(try GenerateCommand.explicitSpeaker(Args(argv)), "\(argv)") { error in
+        XCTAssertNil(try GenerateCommand.explicitSpeaker(generate([])), "omitted takes the contract default")
+        XCTAssertEqual(try GenerateCommand.explicitSpeaker(generate(["--speaker", " ryan "])), "ryan")
+        XCTAssertThrowsError(try generate(["--speaker", "--json"]), "a missing value is a usage error")
+        for argv in [["--speaker", ""], ["--speaker=   "], ["--speaker=", "--json"]] {
+            XCTAssertThrowsError(try GenerateCommand.explicitSpeaker(generate(argv)), "\(argv)") { error in
                 XCTAssertTrue((error as? CLIError)?.description.hasPrefix("empty --speaker") == true)
             }
-            XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(Args(argv), mode: .custom))
+            XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(generate(argv), mode: .custom))
             XCTAssertNoThrow(
-                try GenerateCommand.validatePayloadOptions(Args(argv), mode: .design),
+                try GenerateCommand.validatePayloadOptions(generate(argv), mode: .design),
                 "only Built-in Voice reads --speaker"
             )
         }
 
-        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .custom))
-        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .design))
-        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(Args(["--app-delivery"]), mode: .clone))
-        XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(Args(["--delivery", "Calm."]), mode: .clone))
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(generate(["--delivery", "Calm."]), mode: .custom))
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(generate(["--delivery", "Calm."]), mode: .design))
+        XCTAssertNoThrow(try GenerateCommand.validatePayloadOptions(generate(["--app-delivery"]), mode: .clone))
+        XCTAssertThrowsError(try GenerateCommand.validatePayloadOptions(generate(["--delivery", "Calm."]), mode: .clone))
 
-        XCTAssertFalse(try GenerateCommand.parseAppDelivery(Args([])))
-        XCTAssertTrue(try GenerateCommand.parseAppDelivery(Args(["--app-delivery"])))
-        XCTAssertThrowsError(try GenerateCommand.parseAppDelivery(Args(["--app-delivery=yes"])))
+        XCTAssertFalse(try GenerateCommand.parseAppDelivery(generate([])))
+        XCTAssertTrue(try GenerateCommand.parseAppDelivery(generate(["--app-delivery"])))
+        XCTAssertThrowsError(try GenerateCommand.parseAppDelivery(generate(["--app-delivery=yes"])))
     }
 
     /// U28: two runs that resolve their default output in the same second and
@@ -207,9 +253,9 @@ final class CLIArgumentsTests: XCTestCase {
         let first = UUID()
         let second = UUID()
         let a = try GenerateCommand.resolveOutputDestination(
-            Args([]), dataDir: dataDir, mode: .custom, generationID: first, now: now)
+            generate([]), dataDir: dataDir, mode: .custom, generationID: first, now: now)
         let b = try GenerateCommand.resolveOutputDestination(
-            Args([]), dataDir: dataDir, mode: .custom, generationID: second, now: now)
+            generate([]), dataDir: dataDir, mode: .custom, generationID: second, now: now)
         XCTAssertNotEqual(a.path, b.path)
         XCTAssertEqual(
             a.path,
@@ -233,7 +279,7 @@ final class CLIArgumentsTests: XCTestCase {
 
         func resolve(_ out: String) throws -> GenerateCommand.OutputDestination {
             try GenerateCommand.resolveOutputDestination(
-                Args(["--out", out]), dataDir: root, mode: .design, generationID: UUID())
+                generate(["--out", out]), dataDir: root, mode: .design, generationID: UUID())
         }
         let fresh = try resolve(root.appendingPathComponent("take.wav").path)
         XCTAssertEqual(fresh.path, root.appendingPathComponent("take.wav").path)
@@ -257,7 +303,7 @@ final class CLIArgumentsTests: XCTestCase {
             }
         }
         XCTAssertThrowsError(try GenerateCommand.resolveOutputDestination(
-            Args(["--out"]), dataDir: root, mode: .custom, generationID: UUID()))
+            generate(["--out"]), dataDir: root, mode: .custom, generationID: UUID()))
 
         // The folder is created when missing, and a file in its place is refused.
         let nested = root.appendingPathComponent("a/b/take.wav").path
@@ -289,7 +335,7 @@ final class CLIArgumentsTests: XCTestCase {
             CLIEngineCancellation(reason: .memoryPressure),
             "the engine's `user` default never relabels an engine stop"
         )
-        let other = CLIError("fixture")
+        let other = CLIError(.internalError, "fixture")
         XCTAssertEqual((CLIEngineCancellation.classify(other, commandCancelled: false) as? CLIError)?.description, "fixture")
         XCTAssertEqual(CLIEngineCancellation.exitStatus, 75)
         XCTAssertNotEqual(CLIEngineCancellation.exitStatus, 130)
@@ -297,14 +343,14 @@ final class CLIArgumentsTests: XCTestCase {
     }
 
     func testScriptTextComesFromTheFlagOrAFile() throws {
-        XCTAssertEqual(try GenerateCommand.resolveText(Args(["--text", "Hello there."])), "Hello there.")
+        XCTAssertEqual(try GenerateCommand.resolveText(generate(["--text", "Hello there."])), "Hello there.")
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cli-text-\(UUID().uuidString).txt")
         try "From a file.".write(to: url, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(at: url) }
-        XCTAssertEqual(try GenerateCommand.resolveText(Args(["--text-file", url.path])), "From a file.")
+        XCTAssertEqual(try GenerateCommand.resolveText(generate(["--text-file", url.path])), "From a file.")
         XCTAssertThrowsError(
-            try GenerateCommand.resolveText(Args(["--text-file", url.path + ".missing"]))
+            try GenerateCommand.resolveText(generate(["--text-file", url.path + ".missing"]))
         ) { error in
             XCTAssertTrue((error as? CLIError)?.description.hasPrefix("could not read --text-file") == true)
         }

@@ -233,6 +233,11 @@ def _count(value: Any, *, positive: bool = False) -> bool:
     return not isinstance(value, bool) and isinstance(value, int) and (value > 0 if positive else value >= 0)
 
 
+def _decimal_seed(value: Any) -> Any:
+    """A seed as vocello reports it: a decimal string in the v1 envelope, a number before it."""
+    return int(value) if isinstance(value, str) and value.isascii() and value.isdigit() else value
+
+
 def _positive_number(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value) and value > 0
 
@@ -1609,7 +1614,7 @@ def _long_form_segments(evidence: Mapping[str, Any], wav_root: Path, take_id: st
                 digest = jsonio.sha256_file(source)
         reduced.append({"index": segment.get("index"), "boundary": segment.get("boundary"),
                         "intendedPauseMilliseconds": segment.get("intendedPauseMilliseconds"),
-                        "effectiveSeed": segment.get("effectiveSeed"),
+                        "effectiveSeed": _decimal_seed(segment.get("effectiveSeed")),
                         "durationSeconds": _number(segment.get("durationSeconds")),
                         "finishReason": segment.get("finishReason") if isinstance(segment.get("finishReason"), str)
                         else None, "wavSHA256": digest, "engineIntrospection": None})

@@ -1,182 +1,496 @@
 #compdef vocello
 
-# Keep these lists in step with the command table (CLICommandRoute in
-# Sources/VocelloCLI/Support.swift) and each command's printHelp() in
-# Sources/VocelloCLI/*Command.swift; scripts/tests/test_zsh_completion.py fails when they drift.
+# Generated from the vocello command model by `vocello completions zsh`; do not edit.
+# CLICommandModelGoldenTests keeps this file equal to the generator's output.
 _vocello() {
-  local command action previous option value
-  local -a commands actions options common runtime generate batch bench
+  local word previous key command sub i
+  local -a candidates options
+  local -a value_options=( --output-format --data-dir --manifest --text --text-file --mode --variant --speaker --voice-brief --voice --reference --transcript --delivery --delivery-cell --seed --variation --language --out --file --out-dir --name --audio --id --modes --variants --lengths --warm --prosody-profile --label --force-class --telemetry --memory-qualification --run-id --codec-replay --take-sha256 --codec-trace --output-dir --script-file --reference-wav --codec-roundtrip --codec-loop )
 
-  commands=(
-    'generate:Synthesize one clip' 'gen:Synthesize one clip'
-    'custom:Synthesize with a built-in speaker'
-    'design:Synthesize from a voice description'
-    'clone:Synthesize from a reference voice'
-    'batch:Synthesize multiple clips'
-    'voices:Manage saved clone voices' 'voice:Manage saved clone voices'
-    'speakers:List built-in speakers' 'speaker:List built-in speakers'
-    'modes:List generation modes' 'deliveries:List delivery presets'
-    'delivery:List delivery presets' 'models:Manage models'
-    'model:Manage models' 'bench:Run benchmarks'
-    'benchmark:Run benchmarks' 'help:Show help' 'version:Show version'
-    '--help:Show help' '-h:Show help'
-    '--version:Show version' '-v:Show version'
-  )
+  # Find the command and subcommand typed so far, skipping options and their values.
+  i=2
+  while (( i < CURRENT )); do
+    word=${words[i]}
+    if [[ $word == -- ]]; then break; fi
+    if [[ $word == -* ]]; then
+      if [[ $word != *=* ]] && (( ${value_options[(Ie)$word]} )); then (( i++ )); fi
+    elif [[ -z $command ]]; then
+      command=$word
+    elif [[ -z $sub ]]; then
+      sub=$word
+    fi
+    (( i++ ))
+  done
 
-  if (( CURRENT == 2 )); then
-    _describe -t commands 'vocello command' commands
+  case $command in
+    generate|gen) command=generate ;;
+    batch) command=batch ;;
+    voices|voice) command=voices ;;
+    speakers|speaker) command=speakers ;;
+    modes) command=modes ;;
+    deliveries|delivery) command=deliveries ;;
+    models|model) command=models ;;
+    capabilities) command=capabilities ;;
+    completions) command=completions ;;
+    bench|benchmark) command=bench ;;
+    help) command=help ;;
+    version) command=version ;;
+    custom|design|clone)
+      if (( ${words[(I)--file]} || ${words[(I)--file=*]} )); then command=batch; else command=generate; fi
+      sub= ;;
+  esac
+
+  if [[ -z $command ]]; then
+    candidates=(
+      'generate:Synthesize one clip'
+      'gen:Synthesize one clip'
+      'batch:Synthesize many clips with one model load'
+      'voices:Manage saved clone voices'
+      'voice:Manage saved clone voices'
+      'speakers:List Built-in Voice speakers'
+      'speaker:List Built-in Voice speakers'
+      'modes:List the generation modes'
+      'deliveries:List delivery presets and their instructions'
+      'delivery:List delivery presets and their instructions'
+      'models:Inventory and install models'
+      'model:Inventory and install models'
+      'capabilities:Describe commands, options, codes and limits for agents'
+      'completions:Print a shell completion script'
+      'bench:Drive the performance and quality matrix (internal)'
+      'benchmark:Drive the performance and quality matrix (internal)'
+      'help:Show help for a command'
+      'version:Print the version'
+      'custom:Synthesize in custom mode'
+      'design:Synthesize in design mode'
+      'clone:Synthesize in clone mode'
+    )
+    _describe -t commands 'vocello command' candidates
     return
   fi
 
-  command=${words[2]}
-  previous=${words[CURRENT-1]}
-
-  # Complete the value of a split --option value pair before offering flags.
-  case $previous in
-    --mode) _values 'mode' custom design clone; return ;;
-    --modes) _values -s , 'modes' custom design clone; return ;;
-    --variant) _values 'variant' speed quality; return ;;
-    --variants) _values -s , 'variants' speed quality; return ;;
-    --lengths) _values -s , 'lengths' short medium long; return ;;
-    --variation) _values 'variation' expressive balanced consistent; return ;;
-    --telemetry) _values 'telemetry' off lightweight verbose; return ;;
-    --force-class) _values 'memory class' 8gb 16gb high iphone; return ;;
-    --memory-qualification) _values 'qualification' retained-memory-v1; return ;;
-    --file|--text-file|--reference|--audio|--manifest|--prosody-profile|--codec-replay|--codec-trace|--script-file|--codec-roundtrip|--codec-loop|--reference-wav)
-      _files; return ;;
-    --out) _files; return ;;
-    --take-sha256) return ;;
-    --data-dir|--out-dir|--output-dir) _files -/; return ;;
+  key=$command
+  case $command in
+    voices)
+      case $sub in
+        list|ls) key=voices_list ;;
+        enroll|add) key=voices_enroll ;;
+        delete|rm) key=voices_delete ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List saved voices'
+          'ls:List saved voices'
+          'enroll:Save a clone voice from a reference clip'
+          'add:Save a clone voice from a reference clip'
+          'delete:Delete a saved voice'
+          'rm:Delete a saved voice'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=voices_list
+      ;;
+    speakers)
+      case $sub in
+        list|ls) key=speakers_list ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List Built-in Voice speakers'
+          'ls:List Built-in Voice speakers'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=speakers_list
+      ;;
+    modes)
+      case $sub in
+        list|ls) key=modes_list ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List the generation modes and what each needs'
+          'ls:List the generation modes and what each needs'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=modes_list
+      ;;
+    deliveries)
+      case $sub in
+        list|ls) key=deliveries_list ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List delivery preset cells and the instruction each sends'
+          'ls:List delivery preset cells and the instruction each sends'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=deliveries_list
+      ;;
+    models)
+      case $sub in
+        list|ls) key=models_list ;;
+        status) key=models_status ;;
+        install) key=models_install ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List the contract'\''s models and their install state'
+          'ls:List the contract'\''s models and their install state'
+          'status:List models with missing or stale files'
+          'install:Download and verify a model into the shared store'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=models_list
+      ;;
   esac
 
-  runtime=(
-    '--data-dir:Use a runtime data directory'
-    '--manifest:Use a model contract file'
-    '--quiet:Suppress progress notes'
-    '--verbose:Show detailed progress notes'
-  )
-  common=( '--help:Show command help' )
-  generate=(
-    '--mode:Select generation mode' '--variant:Select model quality'
-    '--text:Use inline text' '--text-file:Read text from a file'
-    '--speaker:Select a built-in speaker' '--voice-brief:Describe a voice'
-    '--voice:Select a saved voice' '--reference:Use a reference WAV'
-    '--transcript:Supply a reference transcript'
-    '--confirm-consent:Confirm permission to clone the voice'
-    '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
-    '--app-delivery:Use the delivery a new app draft uses'
-    '--language:Select a language hint' '--seed:Use a deterministic seed'
-    '--variation:Select sampling variation' '--out:Write a WAV file'
-    '--stream:Use streaming synthesis' '--no-stream:Disable streaming synthesis'
-    '--play:Play the result' '--json:Write JSON output'
-    $runtime $common
-  )
-  batch=(
-    '--file:Read input lines from a file' '--mode:Select generation mode'
-    '--variant:Select model quality' '--speaker:Select a built-in speaker'
-    '--voice-brief:Describe a voice' '--voice:Select a saved voice'
-    '--reference:Use a reference WAV' '--transcript:Supply a reference transcript'
-    '--confirm-consent:Confirm permission to clone the voice'
-    '--delivery:Select a delivery style' '--delivery-cell:Select a preset delivery cell'
-    '--app-delivery:Use the delivery a new app draft uses'
-    '--out-dir:Write WAV files to a directory' '--seed:Use a deterministic seed'
-    '--variation:Select sampling variation'
-    '--long-form:Run each line as a long-form project'
-    '--capture-codec-trace:Keep codec traces (internal diagnostics)'
-    '--play:Play the results' '--json:Write JSON output' $runtime $common
-  )
-  bench=(
-    '--modes:Select benchmark modes' '--variants:Select model qualities'
-    '--lengths:Select text lengths' '--warm:Set warm repetitions'
-    '--no-cold:Skip cold takes in a delivery sweep'
-    '--voice:Select a saved clone voice' '--speaker:Select a built-in speaker'
-    '--voice-brief:Describe a voice'
-    '--confirm-consent:Confirm permission to clone the voice'
-    '--delivery:Add delivery cells' '--prosody-profile:Use a prosody profile'
-    '--continue-delivery-failures:Retain diagnostic failures'
-    '--label:Label the run'
-    '--force-class:Force a memory tier' '--telemetry:Select telemetry level'
-    '--memory-qualification:Select a memory qualification protocol'
-    '--seed:Use a deterministic seed' '--no-stream:Disable streaming'
-    '--ttfc:Measure first chunk latency' '--keep:Append to diagnostics'
-    '--force:Allow clearing the app data directory'
-    '--no-summary:Skip summary and registry publication'
-    '--codec-replay:Replay collected codec data'
-    '--take-sha256:Specify a take digest' '--codec-trace:Specify a codec trace'
-    '--output-dir:Write diagnostic output to a directory'
-    '--script-file:Supply the original script file'
-    '--reference-wav:Supply the canonical reference WAV'
-    '--codec-roundtrip:Resynthesize reference WAVs (internal diagnostics)'
-    '--codec-loop:Decode repeated codec spans (internal diagnostics)'
-    $runtime $common
-  )
+  # The value of a split --option value pair.
+  previous=${words[CURRENT-1]}
+  case $previous in
+    --output-format) _values 'output-format' text json ndjson; return ;;
+    --data-dir) _files -/; return ;;
+    --manifest) _files; return ;;
+    --text) :; return ;;
+    --text-file) _files; return ;;
+    --mode) _values 'mode' custom design clone; return ;;
+    --variant) _values 'variant' speed quality; return ;;
+    --speaker) :; return ;;
+    --voice-brief) :; return ;;
+    --voice) :; return ;;
+    --reference) _files; return ;;
+    --transcript) :; return ;;
+    --delivery) :; return ;;
+    --delivery-cell) :; return ;;
+    --seed) :; return ;;
+    --variation) _values 'variation' expressive balanced consistent; return ;;
+    --language) :; return ;;
+    --out) _files; return ;;
+    --file) _files; return ;;
+    --out-dir) _files -/; return ;;
+    --name) :; return ;;
+    --audio) _files; return ;;
+    --id) :; return ;;
+    --modes) _values -s , 'modes' custom design clone; return ;;
+    --variants) _values -s , 'variants' speed quality; return ;;
+    --lengths) _values -s , 'lengths' short medium long; return ;;
+    --warm) :; return ;;
+    --prosody-profile) _files; return ;;
+    --label) :; return ;;
+    --force-class) _values 'force-class' 8gb 16gb high iphone; return ;;
+    --telemetry) _values 'telemetry' off lightweight verbose; return ;;
+    --memory-qualification) _values 'memory-qualification' retained-memory-v1; return ;;
+    --run-id) :; return ;;
+    --codec-replay) _files; return ;;
+    --take-sha256) :; return ;;
+    --codec-trace) _files; return ;;
+    --output-dir) _files -/; return ;;
+    --script-file) _files; return ;;
+    --reference-wav) _files; return ;;
+    --codec-roundtrip) _files; return ;;
+    --codec-loop) _files; return ;;
+  esac
 
-  case $command in
-    generate|gen) options=( $generate ) ;;
-    custom|design|clone)
-      if (( ${words[(I)--file]} || ${words[(I)--file=*]} )); then
-        options=( $batch )
-      else
-        options=( $generate '--file:Read input lines from a file' )
-      fi
-      ;;
-    batch) options=( $batch ) ;;
-    bench|benchmark) options=( $bench ) ;;
-    voices|voice)
-      actions=( 'list:List saved voices' 'ls:List saved voices'
-                'enroll:Save a clone voice' 'add:Save a clone voice'
-                'delete:Delete a saved voice' 'rm:Delete a saved voice'
-                'help:Show voices help' )
-      action=${words[3]}
-      case $action in
-        enroll|add)
-          options=( '--name:Name the voice' '--audio:Use a reference WAV'
-                    '--transcript:Supply a reference transcript'
-                    '--confirm-consent:Confirm permission to clone the voice'
-                    $runtime $common ) ;;
-        delete|rm) options=( '--id:Select a saved voice' $runtime $common ) ;;
-        *) options=( '--json:Write JSON output' $runtime $common ) ;;
-      esac
-      ;;
-    speakers|speaker)
-      actions=( 'list:List speakers' 'ls:List speakers' 'help:Show speakers help' )
-      options=( '--json:Write JSON output' $runtime ) ;;
-    modes)
-      actions=( 'list:List modes' 'ls:List modes' )
-      options=( '--json:Write JSON output' '--quiet:Suppress progress notes'
-                '--verbose:Show detailed progress notes' $common ) ;;
-    deliveries|delivery)
-      actions=( 'list:List deliveries' 'ls:List deliveries' )
-      options=( '--json:Write JSON output' '--shipped-only:Show shipped presets'
-                '--quiet:Suppress progress notes' '--verbose:Show detailed progress notes'
-                $common ) ;;
-    models|model)
-      actions=( 'list:List models' 'ls:List models' 'status:Show install status'
-                'install:Install a model' 'help:Show models help' )
-      action=${words[3]}
-      options=( $runtime )
-      [[ $action == install ]] || options+=( '--json:Write JSON output' )
-      ;;
+  case $key in
+    generate)
+      options=(
+        '--text:the script ("-" reads stdin)'
+        '--text-file:read the script from a file ("-" reads stdin)'
+        '--mode:custom (default) | design | clone'
+        '--variant:speed (default) | quality'
+        '--speaker:(custom) Built-in Voice speaker id'
+        '--voice-brief:(design) the voice description'
+        '--voice:(clone) a saved voice'
+        '--reference:(clone) a reference clip instead of a saved voice'
+        '--transcript:(clone) the reference clip'\''s words'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--delivery:delivery instruction (custom and design'
+        '--delivery-cell:(custom) a preset cell such as calm.normal (see `vocello deliveries`)'
+        '--app-delivery:with no delivery given, send the apps'\'' default (Neutral) delivery, as a new Studio draft does'
+        '--seed:deterministic sampling seed\: the same request and seed reproduce the take'
+        '--variation:expressive (default) | balanced | consistent'
+        '--language:auto, a Qwen3 language name or a code such as en, fr or ja-JP'
+        '--out:write the take to this .wav file (replaced only by a successful take)'
+        '--stream:streaming synthesis at the app'\''s cadence (the default)'
+        '--no-stream:accumulate the whole take before decoding'
+        '--play:play the take when done'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    batch)
+      options=(
+        '--file:input lines, one clip per line ("-" reads stdin)'
+        '--mode:custom (default) | design | clone'
+        '--variant:speed (default) | quality'
+        '--speaker:(custom) Built-in Voice speaker id'
+        '--voice-brief:(design) the voice description'
+        '--voice:(clone) a saved voice'
+        '--reference:(clone) a reference clip instead of a saved voice'
+        '--transcript:(clone) the reference clip'\''s words'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--delivery:delivery instruction (custom and design'
+        '--delivery-cell:(custom) a preset cell such as calm.normal (see `vocello deliveries`)'
+        '--app-delivery:with no delivery given, send the apps'\'' default (Neutral) delivery, as a new Studio draft does'
+        '--seed:deterministic sampling seed\: the same request and seed reproduce the take'
+        '--variation:expressive (default) | balanced | consistent'
+        '--out-dir:output folder (default <data>/outputs/cli/batch)'
+        '--long-form:each line is one long-form project\: planned into segments and joined'
+        '--play:play each result when done'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_list)
+      options=(
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_enroll)
+      options=(
+        '--name:the voice'\''s name'
+        '--audio:the reference clip'
+        '--transcript:the clip'\''s words'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    voices_delete)
+      options=(
+        '--id:the saved voice id (see `vocello voices list`)'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    speakers_list)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    modes_list)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    deliveries_list)
+      options=(
+        '--shipped-only:one row per product preset, Neutral included, at its shipped tier'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    models_list)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    models_status)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    models_install)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    capabilities)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    completions)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    bench)
+      options=(
+        '--modes:strict comma list of modes (default all)'
+        '--variants:strict comma list of variants (default both)'
+        '--lengths:strict comma list of lengths (default all)'
+        '--warm:warm repetitions per cell and length (default 3)'
+        '--no-cold:with --delivery, skip the Custom/Design cold take'
+        '--voice:(clone) saved voice name'
+        '--confirm-consent:confirms you own or have permission to clone this voice (required to clone or save one'
+        '--speaker:(custom) exact Built-in Voice speaker id'
+        '--voice-brief:(design) voice brief'
+        '--delivery:add instruct-bearing cells'
+        '--prosody-profile:a calibrated prosody profile for the delivery analysis'
+        '--continue-delivery-failures:with --delivery and --no-summary, keep typed failures and continue'
+        '--label:opaque 1-96 character run label'
+        '--force-class:run a constrained memory tier'
+        '--telemetry:telemetry level (default verbose)'
+        '--memory-qualification:require the retained-memory protocol'
+        '--seed:deterministic sampling seed applied to every take'
+        '--no-stream:accumulate each result before decoding'
+        '--ttfc:add an engine first-chunk-latency probe per cell'
+        '--keep:append to existing diagnostics (default\: clear first)'
+        '--force:allow clearing even the real (non-debug) app data folder'
+        '--no-summary:skip the aggregator and registry'
+        '--codec-replay:internal diagnostics\: replay collected codes'
+        '--take-sha256:the original take digest (--codec-replay)'
+        '--codec-trace:the collected binary trace (--codec-replay)'
+        '--output-dir:new untracked diagnostic output folder'
+        '--script-file:the original model-facing script (--codec-replay)'
+        '--reference-wav:the canonical reference clip (--codec-replay)'
+        '--codec-roundtrip:internal diagnostics\: resynthesize reference clips'
+        '--codec-loop:internal diagnostics\: decode repeated codec spans'
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    help)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    version)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
     *) return ;;
   esac
 
-  if (( CURRENT == 3 )) && (( ${#actions} )); then
-    if [[ ${words[CURRENT]} != -* ]]; then
-      _describe -t actions 'action' actions
-      return
-    fi
-  fi
-  if [[ ${words[CURRENT]} == --* || -z ${words[CURRENT]} ]]; then
-    _describe -t options 'option' options
-    return
-  fi
-  if [[ $command == model || $command == models ]] && [[ $action == install || $action == status ]]; then
-    # Model identifiers depend on the user's contract, so do not hard-code them.
-    return
-  fi
   if [[ ${words[CURRENT]} == -* ]]; then
     _describe -t options 'option' options
+    return
   fi
+  case $key in
+    models_list) return ;;
+    models_status) return ;;
+    models_install) return ;;
+    completions) _values 'shell' zsh bash fish; return ;;
+    help) return ;;
+  esac
+  _describe -t options 'option' options
 }
 
 _vocello "$@"

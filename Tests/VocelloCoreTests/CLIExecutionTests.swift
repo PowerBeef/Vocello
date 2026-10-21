@@ -210,7 +210,7 @@ final class CLIExecutionTests: XCTestCase {
         let requests = (0..<2).map { request($0, root: URL(fileURLWithPath: "/missing/\(UUID())")) }
         let missing = await CLIBatchExecution.run(requests) { self.result($0) }
         XCTAssertEqual(missing.rows.map(\.status), [.failed, .notAttempted])
-        XCTAssertEqual(missing.rows[0].errorCode, "published_output_missing")
+        XCTAssertEqual(missing.rows[0].errorCode, "output_missing")
         let cancelled = await CLIBatchExecution.run(requests) { _ in throw CancellationError() }
         XCTAssertEqual(cancelled.rows.map(\.status), [.cancelled, .notAttempted])
         XCTAssertTrue(cancelled.cancelled)
@@ -314,6 +314,29 @@ final class CLIExecutionTests: XCTestCase {
         deadline.enforceDeadline()
         XCTAssertEqual(deadlineForced.withLock { $0 }, [130])
         XCTAssertNil(deadline.finish(code: 130), "a command that ends after the deadline must not exit too")
+    }
+
+    /// RF-25: a closed stdout stops the command like a first signal (exit 141), but never
+    /// escalates: after a real signal it changes nothing, so that signal's cleanup and status stand.
+    func testABrokenStdoutStopsTheCommandOnceAndNeverForcesAnExit() async {
+        let forced = Mutex<[Int32]>([])
+        let supervisor = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        let command = Task<Int32, Never> {
+            while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+            return 1
+        }
+        supervisor.attach(command)
+        XCTAssertTrue(supervisor.receiveBrokenOutput())
+        XCTAssertFalse(supervisor.receiveBrokenOutput(), "a second EPIPE changes nothing")
+        let status = await command.value
+        XCTAssertEqual(supervisor.finish(code: status), 141)
+        XCTAssertTrue(forced.withLock { $0.isEmpty })
+
+        let signalled = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        signalled.receive(SIGINT)
+        XCTAssertFalse(signalled.receiveBrokenOutput(), "the reader died with the signal; cleanup continues")
+        XCTAssertTrue(forced.withLock { $0.isEmpty }, "never a forced exit")
+        XCTAssertEqual(signalled.finish(code: 1), 130, "the signal's status stands")
     }
 
     func testSignalBeforeAttachmentCancelsTheLateCommand() async {

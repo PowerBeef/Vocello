@@ -24,11 +24,18 @@ import shutil
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import wave
 from typing import Callable, Iterator
 import xml.etree.ElementTree as ElementTree
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from lib import vocello_cli_json  # noqa: E402
 from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -279,10 +286,13 @@ def smoke(directory: Path, expected: dict, *, launcher: Path | None = None) -> d
         for alias in (["--version"], ["version"], ["-v"]):
             if command([binary, *alias], work, environment).strip() != "vocello " + expected["marketingVersion"]:
                 raise ValueError("CLI embedded version mismatch")
-        modes = json.loads(command([binary, "modes", "--json"], work, environment))
+        modes = vocello_cli_json.rows(
+            vocello_cli_json.read_result(command([binary, "modes", "--json"], work, environment)), "modes")
         if {row["mode"] for row in modes} != {"custom", "design", "clone"} or len(modes) != 3:
             raise ValueError("CLI mode discovery mismatch")
-        speakers = json.loads(command([binary, "speakers", "list", "--json", "--data-dir", str(work / "data")], work, environment))
+        speakers = vocello_cli_json.rows(vocello_cli_json.read_result(
+            command([binary, "speakers", "list", "--json", "--data-dir", str(work / "data")], work, environment)
+        ), "speakers")
         catalog = json.loads((directory / CATALOGS[0]).read_text())
         expected_speakers = {speaker for group in catalog["speakers"].values() for speaker in group}
         if {row["id"] for row in speakers} != expected_speakers or len(speakers) != len(expected_speakers):
@@ -326,8 +336,8 @@ def _run_qualification_generation(
     if process.returncode != 0:
         raise ValueError("CLI qualification generation failed")
     try:
-        payload = json.loads(stdout)
-    except json.JSONDecodeError as error:
+        payload = vocello_cli_json.read_result(stdout, exit_code=process.returncode)
+    except (ValueError, vocello_cli_json.VocelloCLIError) as error:
         raise ValueError("CLI qualification generation returned invalid JSON") from error
     if not isinstance(payload, dict):
         raise ValueError("CLI qualification generation returned a non-object")
@@ -345,6 +355,8 @@ def _stop_qualification_process(process: subprocess.Popen) -> None:
 def _run_qualification_cancellation(
     argv: list[str], cwd: Path, environment: dict[str, str], timeout: int = 900
 ) -> dict:
+    """SIGINT a take once its `generation_started` event is on stdout (`--ndjson`), then
+    require exit 130 and a final envelope reporting the cancellation, with no forced exit."""
     process = subprocess.Popen(
         argv, cwd=cwd, env=environment, stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -355,7 +367,6 @@ def _run_qualification_cancellation(
     try:
         assert process.stderr is not None and process.stdout is not None
         pipes = [process.stderr, process.stdout]
-        pending = b""
         output = bytearray()
         while time.monotonic() < deadline:
             if not pipes:
@@ -366,13 +377,12 @@ def _run_qualification_cancellation(
                 if not chunk:
                     pipes.remove(pipe)
                     continue
-                if pipe is process.stdout:
-                    output.extend(chunk)
-                    if len(output) > 65536:
-                        raise ValueError("CLI cancellation probe returned unexpected output")
+                if pipe is not process.stdout:
                     continue
-                pending = (pending + chunk)[-65536:]
-                if b"generating (" in pending:
+                output.extend(chunk)
+                if len(output) > 1 << 20:
+                    raise ValueError("CLI cancellation probe returned unexpected output")
+                if b'"type":"generation_started"' in output:
                     generation_started = True
                     os.killpg(process.pid, signal.SIGINT)
                     break
@@ -380,13 +390,18 @@ def _run_qualification_cancellation(
                 break
         if not generation_started:
             raise ValueError("CLI cancellation probe did not reach generation")
-        stdout, _stderr = process.communicate(timeout=max(1.0, deadline - time.monotonic()))
+        stdout, stderr = process.communicate(timeout=max(1.0, deadline - time.monotonic()))
     except BaseException:
         _stop_qualification_process(process)
         raise
-    if (process.returncode != 130 or output.strip() or stdout.strip()
-            or b"Cancelled; command cleanup completed." not in _stderr
-            or b"forced exit" in _stderr):
+    try:
+        _events, envelope = vocello_cli_json.read_ndjson((bytes(output) + stdout).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        envelope = None
+    error = envelope.get("error") if isinstance(envelope, dict) else None
+    if (process.returncode != 130 or b"forced exit" in stderr or not isinstance(error, dict)
+            or envelope.get("ok") is not False or error.get("code") != "cancelled"
+            or error.get("exitCode") != 130 or (error.get("detail") or {}).get("signal") != "SIGINT"):
         raise ValueError("CLI cancellation probe did not terminate cleanly")
     return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
 
@@ -618,7 +633,7 @@ def qualify(
             binary, "generate", "--mode", "custom", "--variant", "speed",
             "--speaker", "aiden", "--language", "english", "--seed", "30000004",
             "--variation", "consistent", "--text", long_text,
-            "--out", str(cancellation_output), "--data-dir", str(runtime), "--json",
+            "--out", str(cancellation_output), "--data-dir", str(runtime), "--ndjson",
         ], work, environment, 900)
         # Qualification observes cleanup; it must never perform it for the CLI.
         if (cancellation_output.exists() or cancellation_output.is_symlink()
@@ -639,7 +654,7 @@ def qualify(
         command([binary, "unknown-package-qualification-command"], work, environment, expected=2)
         command([
             binary, "generate", "--mode", "invalid", "--text", "Invalid mode fixture.",
-        ], work, environment, expected=1)
+        ], work, environment, expected=2)
 
     encoded = json.dumps(runs, sort_keys=True, separators=(",", ":")).encode()
     result = {
@@ -657,7 +672,7 @@ def qualify(
         "runs": runs,
         "runsDigest": hashlib.sha256(encoded).hexdigest(),
         "cancellation": cancellation,
-        "failureExitChecks": {"unknownCommand": 2, "invalidMode": 1},
+        "failureExitChecks": {"unknownCommand": 2, "invalidMode": 2},
         "serialExecution": True,
         "publicationAuthority": "none",
     }

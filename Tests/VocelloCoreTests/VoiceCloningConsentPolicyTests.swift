@@ -387,17 +387,21 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
     }
 
     func testCLIConsentFlagIsBareAndRejectsAValue() throws {
-        XCTAssertTrue(try CLIVoiceCloningConsent.policy(from: Args(["--confirm-consent"])).isConsentRecorded)
+        func generate(_ argv: [String]) throws -> Args { try CLIParser.args(argv, for: "generate") }
+        XCTAssertTrue(try CLIVoiceCloningConsent.policy(from: generate(["--confirm-consent"])).isConsentRecorded)
         XCTAssertTrue(try CLIVoiceCloningConsent.policy(
-            from: Args(["--confirm-consent", "--mode", "clone"])
+            from: generate(["--confirm-consent", "--mode", "clone"])
         ).isConsentRecorded)
-        XCTAssertFalse(try CLIVoiceCloningConsent.policy(from: Args(["--mode", "clone"])).isConsentRecorded)
+        XCTAssertFalse(try CLIVoiceCloningConsent.policy(from: generate(["--mode", "clone"])).isConsentRecorded)
         // A value would otherwise parse as `--key value` and silently mean no consent.
-        for argv in [["--confirm-consent", "yes"], ["--confirm-consent=yes"], ["--confirm-consent="]] {
-            XCTAssertThrowsError(try CLIVoiceCloningConsent.policy(from: Args(argv)), "\(argv)") { error in
-                XCTAssertTrue(error is CLIError, "\(argv): \(error)")
+        for argv in [["--confirm-consent=yes"], ["--confirm-consent="]] {
+            XCTAssertThrowsError(try generate(argv), "\(argv)") { error in
+                XCTAssertEqual((error as? CLIError)?.code, .usageError, "\(argv): \(error)")
                 XCTAssertTrue(String(describing: error).contains("takes no value"), "\(argv): \(error)")
             }
+        }
+        XCTAssertThrowsError(try generate(["--confirm-consent", "yes"])) { error in
+            XCTAssertTrue(String(describing: error).contains("unexpected argument 'yes'"), "\(error)")
         }
     }
 

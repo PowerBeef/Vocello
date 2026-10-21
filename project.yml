@@ -306,6 +306,7 @@ targets:
       # The files VocelloCLICore owns compile there, once, for the CLI and its tests.
       - path: Sources/VocelloCLI
         excludes:
+          - Core
           - CLIProcessSupervisor.swift
           - CLIBatchExecution.swift
           - CLIVoiceCloningConsent.swift
@@ -354,6 +355,9 @@ targets:
     type: framework.static
     platform: macOS
     sources:
+      # The command model (parser, help, completions, capabilities) and the
+      # machine contract (envelope, typed errors, NDJSON events).
+      - path: Sources/VocelloCLI/Core
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift
       - path: Sources/VocelloCLI/CLIVoiceCloningConsent.swift

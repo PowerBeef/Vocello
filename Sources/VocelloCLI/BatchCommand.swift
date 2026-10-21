@@ -7,14 +7,14 @@ import VocelloCLICore
 /// throughput win over repeated `generate` calls (which reboot + reload the model
 /// every time).
 enum BatchCommand {
-    struct ItemJSON: Encodable {
+    struct ItemJSON: Encodable, Sendable {
         let index: Int
         let text: String
         let audioPath: String
         let durationSeconds: Double
         let finishReason: String?
     }
-    struct BatchJSON: Encodable {
+    struct BatchJSON: Encodable, Sendable {
         let mode: String
         let variant: String
         let modelID: String
@@ -22,7 +22,7 @@ enum BatchCommand {
         let wallSeconds: Double
         let items: [ItemJSON]
     }
-    struct FailedBatchJSON: Encodable {
+    struct FailedBatchJSON: Encodable, Sendable {
         let schemaVersion = 2
         let mode: String
         let variant: String
@@ -37,29 +37,30 @@ enum BatchCommand {
 
     /// One planned segment of a long-form project and the engine's take of it.
     /// No text: the project's line is the item's. `index` counts from 0.
-    struct LongFormSegmentJSON: Encodable {
+    struct LongFormSegmentJSON: Encodable, Sendable {
         let index: Int
         let segmentID: String
         let boundary: String
         let intendedPauseMilliseconds: Int
-        let effectiveSeed: UInt64
+        /// A decimal string, as every 64-bit value in the machine contract.
+        let effectiveSeed: String
         let generationID: String
         let audioPath: String
         let durationSeconds: Double
         let finishReason: String?
     }
-    struct LongFormItemJSON: Encodable {
+    struct LongFormItemJSON: Encodable, Sendable {
         let index: Int
         let text: String
         let audioPath: String
         let durationSeconds: Double
         let finishReason: String?
-        let longFormBaseSeed: UInt64
+        let longFormBaseSeed: String
         let longFormPlanDigest: String
         let longFormSegments: [LongFormSegmentJSON]
         let longFormAssembly: LongFormAssemblyEvidence
     }
-    struct LongFormBatchJSON: Encodable {
+    struct LongFormBatchJSON: Encodable, Sendable {
         let longForm = true
         let mode: String
         let variant: String
@@ -73,7 +74,7 @@ enum BatchCommand {
     /// it is nil when the join, not a take, failed or was cancelled, and unset
     /// when the project stopped before its first take was submitted. A stopped
     /// project keeps the segment takes it completed.
-    struct LongFormRow: Encodable {
+    struct LongFormRow: Encodable, Sendable {
         let index: Int
         var generationID: UUID?
         var status: CLIBatchExecution.Status = .notAttempted
@@ -82,12 +83,12 @@ enum BatchCommand {
         var finishReason: String?
         var errorCode: String?
         var cancellationRequested: Bool?
-        var longFormBaseSeed: UInt64?
+        var longFormBaseSeed: String?
         var longFormPlanDigest: String?
         var longFormSegments: [LongFormSegmentJSON]?
         var longFormAssembly: LongFormAssemblyEvidence?
     }
-    struct FailedLongFormBatchJSON: Encodable {
+    struct FailedLongFormBatchJSON: Encodable, Sendable {
         let schemaVersion = 2
         let longForm = true
         let mode: String
@@ -100,29 +101,17 @@ enum BatchCommand {
     }
 
     @MainActor
-    static func run(_ argv: [String]) async throws {
-        let args = Args(argv)
-        if args.flag("help") { printHelp(); return }
-        CLIOutput.configure(args)
-        for flag in ["language", "stream", "out"] where args.string(flag) != nil || args.flag(flag) {
-            throw CLIError("--\(flag) is not supported by batch; use generate or omit it. Batch uses per-text Auto language and non-streaming output.")
-        }
-        if let value = args.string("long-form") {
-            // A value would silently fall back to the short-form batch.
-            throw CLIError("--long-form takes no value (got \"\(value)\"): pass the bare flag --long-form")
-        }
+    static func run(_ args: Args) async throws {
+        // The parser refuses --language, --stream and --out (batch uses per-text
+        // Auto language and non-streaming output) and a value on a bare flag.
         let appDelivery = try GenerateCommand.parseAppDelivery(args)
-        if let value = args.string("capture-codec-trace") {
-            throw CLIError(
-                "--capture-codec-trace takes no value (got \"\(value)\"): pass the bare flag --capture-codec-trace"
-            )
-        }
         let captureCodecTrace = args.flag("capture-codec-trace")
         if captureCodecTrace {
             // The engine persists each take's trace only for a registered run
             // identity with telemetry on; refuse rather than silently keep none.
             guard RuntimeDebugGate.isEnabled(), TelemetryGate.resolvedEnabled else {
                 throw CLIError(
+                    .usageError,
                     "--capture-codec-trace requires an internal-diagnostics build, QWENVOICE_DEBUG=1 "
                         + "and telemetry that is not explicitly off."
                 )
@@ -131,10 +120,10 @@ enum BatchCommand {
                 environment: ProcessInfo.processInfo.environment,
                 telemetryEnabled: TelemetryGate.resolvedEnabled
             ) != nil else {
-                throw CLIError("--capture-codec-trace requires a registered bench run id (QVOICE_MAC_BENCH_RUN_ID).")
+                throw CLIError(.usageError, "--capture-codec-trace requires a registered bench run id (QVOICE_MAC_BENCH_RUN_ID).")
             }
             guard !args.flag("long-form") else {
-                throw CLIError("--capture-codec-trace applies to short-form batches only (not --long-form)")
+                throw CLIError(.usageError, "--capture-codec-trace applies to short-form batches only (not --long-form)")
             }
         }
 
@@ -147,7 +136,7 @@ enum BatchCommand {
 
         let lines = try readLines(args)
         guard !lines.isEmpty else {
-            throw CLIError("no input lines — pass --file <path> (one clip per line) or pipe text on stdin")
+            throw CLIError(.usageError, "no input lines — pass --file <path> (one clip per line), or --file - to read stdin")
         }
         // A short-form line is one take: the same single-take rule as
         // `generate`, checked for every line before the engine boots, so a
@@ -161,8 +150,10 @@ enum BatchCommand {
         let manifestOverride = args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
 
         note("booting engine (data: \(dataDir.path))")
+        CLIPresenter.event(.engineBooting)
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
+        CLIPresenter.event(.engineReady)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         // One shared payload keeps the loaded model/session reusable while the
         // command owns each item's result, cancellation, and retained receipt.
@@ -206,14 +197,20 @@ enum BatchCommand {
         let wallStart = ContinuousClock.now
         let outcome = await CLIBatchExecution.run(requests, progress: { index, total in
             noteVerbose("item \(index + 1)/\(total)")
+            CLIPresenter.event(.generationStarted, generationID: requests[index].generationID, data: [
+                "index": .integer(index), "total": .integer(total), "mode": .string(mode.rawValue),
+                "modelID": .string(modelID),
+            ])
+        }, finished: { index, row in
+            Self.reportRow(row, generationID: requests[index].generationID)
         }) { request in
             return try await runtime.generate(request)
         }
         let results = outcome.results
         let wall = wallStart.elapsedSeconds
         if !outcome.passed {
-            if args.flag("json") {
-                emitJSON(FailedBatchJSON(mode: mode.rawValue, variant: quality ? "quality" : "speed",
+            if CLIPresenter.isMachine {
+                CLIPresenter.recordPartialResult(FailedBatchJSON(mode: mode.rawValue, variant: quality ? "quality" : "speed",
                     modelID: modelID, plannedCount: requests.count, completedCount: results.count,
                     wallSeconds: wall, items: outcome.rows))
             } else {
@@ -226,17 +223,21 @@ enum BatchCommand {
             }
             if outcome.cancelled { throw CancellationError() }
             if let engineCancellation = outcome.engineCancellation { throw engineCancellation }
-            throw CLIError("batch stopped; completed outputs retained, remaining rows not attempted")
+            throw CLIError(
+                .batchIncomplete, "batch stopped; completed outputs retained, remaining rows not attempted",
+                detail: ["completedCount": .integer(results.count), "plannedCount": .integer(requests.count)]
+            )
         }
 
-        if args.flag("json") {
+        var machineResult: BatchJSON?
+        if CLIPresenter.isMachine {
             let items = (0..<results.count).map { i in
                 ItemJSON(index: i, text: lines[i], audioPath: results[i].audioPath,
                          durationSeconds: results[i].durationSeconds,
                          finishReason: results[i].finishReason?.rawValue)
             }
-            emitJSON(BatchJSON(mode: mode.rawValue, variant: quality ? "quality" : "speed",
-                               modelID: modelID, count: results.count, wallSeconds: wall, items: items))
+            machineResult = BatchJSON(mode: mode.rawValue, variant: quality ? "quality" : "speed",
+                                      modelID: modelID, count: results.count, wallSeconds: wall, items: items)
         } else {
             for r in results { print(r.audioPath) }
         }
@@ -244,10 +245,33 @@ enum BatchCommand {
         note(unsafe "✓ \(results.count) clip(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
 
         if args.flag("play") { try await CLIPlayback.play(results.map(\.audioPath)) }
+        if let machineResult { CLIPresenter.succeed(machineResult) }
     }
 
     /// The apps refuse a long-form plan of more segments (`IOSLongFormCoordinator.maxSegments`).
-    static let longFormMaximumSegments = 100
+    static let longFormMaximumSegments = CLILimits.longFormMaximumSegments
+
+    /// A batch row's terminal event (ndjson only).
+    static func reportRow(_ row: CLIBatchExecution.Row, generationID: UUID?) {
+        switch row.status {
+        case .completed:
+            if let path = row.audioPath {
+                CLIPresenter.event(.outputPublished, generationID: generationID, data: ["audioPath": .string(path)])
+            }
+            CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
+                "index": .integer(row.index),
+                "durationSeconds": row.durationSeconds.map { .number($0) } ?? .null,
+            ])
+        case .failed:
+            CLIPresenter.event(.generationFailed, generationID: generationID, data: [
+                "index": .integer(row.index), "code": row.errorCode.map { .string($0) } ?? .null,
+            ])
+        case .cancelled:
+            CLIPresenter.event(.generationCancelled, generationID: generationID, data: ["index": .integer(row.index)])
+        case .notAttempted:
+            break
+        }
+    }
 
     /// `--long-form`: each line is one long-form project, run the way the apps'
     /// long-form runner runs one (`IOSLongFormProjectRequest`): the shipping
@@ -282,10 +306,11 @@ enum BatchCommand {
                 )
             } catch {
                 // The planner's errors carry no text, so the line number says which project failed.
-                throw CLIError("line \(lineIndex + 1): the long-form planner refused the project (\(error))")
+                throw CLIError(.invalidInput, "line \(lineIndex + 1): the long-form planner refused the project (\(error))")
             }
             guard plan.segments.count <= longFormMaximumSegments else {
                 throw CLIError(
+                    .textTooLong,
                     "line \(lineIndex + 1): the project plans \(plan.segments.count) segments, "
                         + "more than the \(longFormMaximumSegments) the apps accept"
                 )
@@ -304,7 +329,7 @@ enum BatchCommand {
         projects: for (index, plan) in plans.enumerated() {
             let name = unsafe "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
             let joinedURL = outDir.appendingPathComponent("\(name).wav")
-            rows[index].longFormBaseSeed = plan.configuration.baseSeed
+            rows[index].longFormBaseSeed = String(plan.configuration.baseSeed)
             rows[index].longFormPlanDigest = plan.evidence.planDigest
             var segments: [LongFormSegmentJSON] = []
             var sources: [LongFormAssemblySegmentSource] = []
@@ -324,10 +349,15 @@ enum BatchCommand {
                     // Named once submitted: a project cancelled first names no take the engine never saw.
                     rows[index].generationID = generationID
                     noteVerbose("project \(index + 1)/\(plans.count), segment \(position + 1)/\(plan.segments.count)")
+                    CLIPresenter.event(.generationStarted, generationID: generationID, data: [
+                        "index": .integer(index), "segment": .integer(position),
+                        "segments": .integer(plan.segments.count), "mode": .string(mode.rawValue),
+                        "modelID": .string(modelID),
+                    ])
                     let (result, _, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                     guard FileManager.default.fileExists(atPath: result.audioPath) else {
                         rows[index].status = .failed
-                        rows[index].errorCode = "published_output_missing"
+                        rows[index].errorCode = VocelloErrorCode.outputMissing.rawValue
                         if Task.isCancelled { rows[index].cancellationRequested = true }
                         stopped = true
                         break projects
@@ -336,12 +366,16 @@ enum BatchCommand {
                         index: position, segmentID: segment.segmentID,
                         boundary: segment.evidence.boundary.rawValue,
                         intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds,
-                        effectiveSeed: segment.evidence.effectiveSubseed,
+                        effectiveSeed: String(segment.evidence.effectiveSubseed),
                         generationID: generationID.uuidString, audioPath: result.audioPath,
                         durationSeconds: result.durationSeconds, finishReason: result.finishReason?.rawValue
                     ))
                     // A stopped project keeps the segment takes it completed.
                     rows[index].longFormSegments = segments
+                    CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
+                        "index": .integer(index), "segment": .integer(position),
+                        "durationSeconds": .number(result.durationSeconds),
+                    ])
                     sources.append(LongFormAssemblySegmentSource(
                         segmentID: segment.segmentID, lineage: segment.evidence.lineage,
                         audioURL: URL(fileURLWithPath: result.audioPath), boundary: segment.evidence.boundary,
@@ -363,7 +397,7 @@ enum BatchCommand {
                 } catch {
                     // Typed: a genuine failure that coincides with a signal stays failed.
                     rows[index].status = .failed
-                    rows[index].errorCode = "generation_failed"
+                    rows[index].errorCode = CLIFailure.rowCode(for: error).rawValue
                     if Task.isCancelled { rows[index].cancellationRequested = true }
                     stopped = true
                     break projects
@@ -391,7 +425,7 @@ enum BatchCommand {
                 try? FileManager.default.removeItem(at: joinedURL)
                 rows[index].generationID = nil
                 rows[index].status = .failed
-                rows[index].errorCode = "assembly_failed"
+                rows[index].errorCode = VocelloErrorCode.assemblyFailed.rawValue
                 if Task.isCancelled { rows[index].cancellationRequested = true }
                 stopped = true
                 break projects
@@ -402,13 +436,14 @@ enum BatchCommand {
             let truncated = segments.contains { $0.finishReason == GenerationFinishReason.maxTokens.rawValue }
             let finishReason = truncated ? GenerationFinishReason.maxTokens.rawValue : segments.last?.finishReason
             rows[index].status = .completed
+            CLIPresenter.event(.outputPublished, data: ["index": .integer(index), "audioPath": .string(joinedPath)])
             rows[index].audioPath = joinedPath
             rows[index].durationSeconds = duration
             rows[index].finishReason = finishReason
             rows[index].longFormAssembly = assembly
             items.append(LongFormItemJSON(
                 index: index, text: lines[index], audioPath: joinedPath, durationSeconds: duration,
-                finishReason: finishReason, longFormBaseSeed: plan.configuration.baseSeed,
+                finishReason: finishReason, longFormBaseSeed: String(plan.configuration.baseSeed),
                 longFormPlanDigest: plan.evidence.planDigest, longFormSegments: segments,
                 longFormAssembly: assembly
             ))
@@ -416,8 +451,8 @@ enum BatchCommand {
         let wall = started.elapsedSeconds
         let variant = quality ? "quality" : "speed"
         if stopped {
-            if args.flag("json") {
-                emitJSON(FailedLongFormBatchJSON(
+            if CLIPresenter.isMachine {
+                CLIPresenter.recordPartialResult(FailedLongFormBatchJSON(
                     mode: mode.rawValue, variant: variant, modelID: modelID, plannedCount: plans.count,
                     completedCount: items.count, wallSeconds: wall, items: rows
                 ))
@@ -431,13 +466,17 @@ enum BatchCommand {
             }
             if cancelled { throw CancellationError() }
             if let engineCancellation { throw engineCancellation }
-            throw CLIError("long-form batch stopped; completed projects retained, remaining projects not attempted")
+            throw CLIError(
+                .batchIncomplete, "long-form batch stopped; completed projects retained, remaining projects not attempted",
+                detail: ["completedCount": .integer(items.count), "plannedCount": .integer(plans.count)]
+            )
         }
-        if args.flag("json") {
-            emitJSON(LongFormBatchJSON(
+        var machineResult: LongFormBatchJSON?
+        if CLIPresenter.isMachine {
+            machineResult = LongFormBatchJSON(
                 mode: mode.rawValue, variant: variant, modelID: modelID, count: items.count,
                 wallSeconds: wall, items: items
-            ))
+            )
         } else {
             for item in items { print(item.audioPath) }
         }
@@ -445,6 +484,7 @@ enum BatchCommand {
         note(unsafe "✓ \(items.count) long-form project(s), \(segmentCount) segment(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
 
         if args.flag("play") { try await CLIPlayback.play(items.map(\.audioPath)) }
+        if let machineResult { CLIPresenter.succeed(machineResult) }
     }
 
     private static func readLines(_ args: Args) throws -> [String] {
@@ -454,10 +494,13 @@ enum BatchCommand {
             else {
                 let path = (f as NSString).expandingTildeInPath
                 do { raw = try String(contentsOfFile: path, encoding: .utf8) }
-                catch { throw CLIError("could not read --file \(path): \(error.localizedDescription)") }
+                catch {
+                    let code: VocelloErrorCode = FileManager.default.fileExists(atPath: path) ? .ioError : .inputFileNotFound
+                    throw CLIError(code, "could not read --file \(path): \(error.localizedDescription)")
+                }
             }
         } else {
-            raw = readStdinText() ?? ""
+            raw = readImplicitStdinText() ?? ""
         }
         return raw.split(whereSeparator: { $0.isNewline })
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -469,65 +512,5 @@ enum BatchCommand {
             return URL(fileURLWithPath: (d as NSString).expandingTildeInPath, isDirectory: true)
         }
         return dataDir.appendingPathComponent("outputs/cli/batch", isDirectory: true)
-    }
-
-    static func printHelp() {
-        print("""
-        vocello batch — synthesize many clips with a single model load
-
-        Usage:
-          vocello batch --file <path|-> --mode custom|design|clone --variant speed|quality \\
-                        [--speaker <id> | --voice <name> | --voice-brief "…"] [options]
-
-        One non-empty line per clip; all clips share the same voice/mode/variant
-        (the engine batches them through one loaded model — far faster than repeated
-        `generate` calls). Reads stdin when --file is omitted or "-".
-
-        Options:
-          --file         input file, one clip per line ("-" or omitted = stdin)
-          --mode         custom (default) | design | clone
-          --variant      speed (default) | quality
-          --speaker      (custom) speaker id; default = contract default; an empty
-                         value is refused
-          --voice-brief  (design) voice description
-          --voice        (clone) saved voice name or id
-          --reference    (clone) path to a reference .wav
-          --transcript   (clone) transcript of the --reference clip
-          --confirm-consent  (clone) required: confirms you own or have permission
-                         to clone this voice (ignored by other modes)
-          --delivery     optional delivery style (applies to all clips; custom and
-                         design only, refused in clone)
-          --app-delivery with no --delivery/--delivery-cell, send the apps' default
-                         delivery (the Neutral preset instruction) on Custom and
-                         Design, as a new Studio draft does; otherwise uninstructed
-          --out-dir      output directory; default → <data>/outputs/cli/batch/
-          --seed         deterministic sampling seed, applied to every item
-                         (re-running the batch reproduces it; steadier segments)
-          --variation    expressive (default, official) | balanced | consistent
-          --long-form    each line is one long-form project, run like the apps' long-form
-                         path: planned into segments (--seed is every project's base
-                         seed), each segment a streaming take, joined by the bounded
-                         assembler; only the engine's per-segment Fast QC applies; the
-                         JSON adds each project's segments and assembly evidence
-          --capture-codec-trace  internal diagnostics only (QWENVOICE_DEBUG=1, telemetry
-                         on, short-form): the engine keeps each take's codec trace
-                         (codec-trace v1) beside its diagnostics when the run names a
-                         bench run id (QVOICE_MAC_BENCH_RUN_ID); its engine row records
-                         the trace digest. Sampling and output are unchanged.
-          --play         play each result with afplay when done
-          --json         emit a JSON summary on stdout instead of one path per line
-          --quiet|--verbose   suppress / expand stderr progress notes
-          --data-dir     runtime dir (default ~/Library/Application Support/QwenVoice[-Debug])
-          --manifest     override path to qwenvoice_contract.json
-
-        Prints one output WAV path per line on stdout (or a JSON object with --json).
-        All-success JSON is unchanged. Partial failure/cancellation emits schemaVersion 2
-        with every planned row and exits nonzero. No failed item is retried. A take the
-        engine stopped under memory pressure is a failed row (errorCode memory_pressure)
-        and exits 75; Ctrl-C makes it cancelled and exits 130.
-        Batch uses Auto language per text and non-streaming output (a --long-form segment
-        streams, as the apps' long-form path does); --language/--stream/--out are rejected
-        rather than silently ignored. Use generate for those controls.
-        """)
     }
 }

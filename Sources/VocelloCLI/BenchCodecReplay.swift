@@ -60,6 +60,7 @@ enum BenchCodecReplay {
         // QWENVOICE_NATIVE_TELEMETRY_MODE=off refuses it even with QWENVOICE_DEBUG=1.
         guard RuntimeDebugGate.isEnabled(), TelemetryGate.resolvedEnabled else {
             throw CLIError(
+                .usageError,
                 "Codec replay requires an internal-diagnostics build, QWENVOICE_DEBUG=1 "
                 + "and telemetry that is not explicitly off."
             )
@@ -71,17 +72,17 @@ enum BenchCodecReplay {
         // Bounds before allocation. The original terminal take format is reused.
         guard (try takeURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 4 * 1_024 * 1_024,
               (try traceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 3 * 1_024 * 1_024 else {
-            throw CLIError("Replay input exceeds the bounded evidence size.")
+            throw CLIError(.invalidInput, "Replay input exceeds the bounded evidence size.")
         }
         let takeData = try Data(contentsOf: takeURL)
-        guard digest(takeData) == expectedDigest else { throw CLIError("Source take digest mismatch.") }
+        guard digest(takeData) == expectedDigest else { throw CLIError(.integrityFailed, "Source take digest mismatch.") }
         let take = try JSONDecoder().decode(Take.self, from: takeData)
         let receipt = take.requestReceipt
         let script: String?
         if let path = args.string("script-file") {
             let url = URL(fileURLWithPath: path)
             guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 64 * 1_024 else {
-                throw CLIError("Replay script exceeds the bounded evidence size.")
+                throw CLIError(.invalidInput, "Replay script exceeds the bounded evidence size.")
             }
             script = try String(contentsOf: url, encoding: .utf8)
         } else {
@@ -98,7 +99,7 @@ enum BenchCodecReplay {
               receipt.modelIntegrityManifestDigest != nil,
               take.diagnosticArtifacts.filter({ $0.kind == .codecTrace }).count == 1,
               let evidence = take.diagnosticArtifacts.first(where: { $0.kind == .codecTrace }) else {
-            throw CLIError("Replay requires a correlated CustomVoice or transcript-backed Clone v2/v3 take and complete codec identity.")
+            throw CLIError(.invalidInput, "Replay requires a correlated CustomVoice or transcript-backed Clone v2/v3 take and complete codec identity.")
         }
         let trace = try StartupReliabilityDiagnosticEvidence.verifiedReplayTrace(
             data: Data(contentsOf: traceURL), evidence: evidence
@@ -108,14 +109,14 @@ enum BenchCodecReplay {
         if isClone {
             guard receipt.schemaVersion == 3, let expected = receipt.normalizedReferenceAudioDigest,
                   let path = args.string("reference-wav") else {
-                throw CLIError("Clone replay requires a v3 conditioning-WAV digest and --reference-wav (canonical mono PCM16 24 kHz, at most 60 seconds).")
+                throw CLIError(.usageError, "Clone replay requires a v3 conditioning-WAV digest and --reference-wav (canonical mono PCM16 24 kHz, at most 60 seconds).")
             }
             referenceSamples = try CodecRoundTripEvidence.verifiedInputSamples(
                 CodecRoundTripEvidence.readBoundedInput(at: URL(fileURLWithPath: path)), expectedSHA256: expected
             )
             referenceDigest = expected
         } else {
-            guard args.string("reference-wav") == nil else { throw CLIError("Reference history applies only to transcript-backed Clone takes.") }
+            guard args.string("reference-wav") == nil else { throw CLIError(.usageError, "Reference history applies only to transcript-backed Clone takes.") }
             referenceSamples = nil
             referenceDigest = nil
         }
@@ -132,7 +133,7 @@ enum BenchCodecReplay {
                     || $0.id == receipt.modelID + "_" + (receipt.modelRuntimeIdentity?.modelVariant ?? "speed"))
         }
         guard candidates.count == 1, let model = candidates.first else {
-            throw CLIError("No unambiguous installed model matches the source receipt.")
+            throw CLIError(.modelNotInstalled, "No unambiguous installed model matches the source receipt.")
         }
         let artifact = try catalog.artifactMatchingMacOSDescriptor(
             folder: model.folder, repo: model.huggingFaceRepo, revision: model.huggingFaceRevision,
@@ -150,7 +151,7 @@ enum BenchCodecReplay {
               installedManifest.revision.count == 40,
               installedManifest.revision.allSatisfy({ "0123456789abcdef".contains($0) }),
               artifact.files.first(where: { $0.relativePath == "speech_tokenizer/model.safetensors" })?.sha256 == expectedTokenizer else {
-            throw CLIError("Installed model or tokenizer identity differs from the source take.")
+            throw CLIError(.integrityFailed, "Installed model or tokenizer identity differs from the source take.")
         }
         // Installation manifests contain creation time and can retain an older
         // repository revision with identical files. Bind cross-host replay to
@@ -162,7 +163,7 @@ enum BenchCodecReplay {
             }
         )
         // mkdir is exclusive: failed or completed evidence can never be overwritten.
-        guard unsafe mkdir(output.path, 0o700) == 0 else { throw CLIError("Replay output must be a new directory with an existing parent.") }
+        guard unsafe mkdir(output.path, 0o700) == 0 else { throw CLIError(.outputUnavailable, "Replay output must be a new directory with an existing parent.") }
         let runID = "codec-replay-" + UUID().uuidString.lowercased()
         var report = Report(
             sourceTakeSHA256: expectedDigest, sourceReceipt: receipt, trace: evidence,
@@ -191,7 +192,7 @@ enum BenchCodecReplay {
             } else if let speakerID = receipt.speakerID {
                 payload = .custom(speakerID: speakerID, deliveryStyle: nil)
             } else {
-                throw CLIError("CustomVoice replay requires a recorded speaker.")
+                throw CLIError(.invalidInput, "CustomVoice replay requires a recorded speaker.")
             }
             let request = GenerationRequest(
                 mode: isClone ? .clone : .custom, modelID: model.id, text: "", outputPath: "",

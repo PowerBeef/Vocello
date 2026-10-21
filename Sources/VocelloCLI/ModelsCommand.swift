@@ -7,7 +7,7 @@ import VocelloCLICore
 /// machinery — honors the no-bundled-weights framing. Uses the lightweight
 /// registry bootstrap (no engine boot).
 enum ModelsCommand {
-    struct ModelJSON: Encodable {
+    struct ModelJSON: Encodable, Sendable {
         let id: String
         let mode: String
         let name: String
@@ -41,24 +41,24 @@ enum ModelsCommand {
         return catalog.installedFileSizeMismatches(for: artifact, modelsRoot: modelsDirectory)
     }
 
+    struct Rows: Encodable, Sendable {
+        let models: [ModelJSON]
+    }
+
+    struct Installed: Encodable, Sendable {
+        let modelID: String
+        let status: String
+        let installedBytes: Int64
+    }
+
+    /// `action` is the canonical subcommand the parser resolved: list, status or install.
     @MainActor
-    static func run(_ argv: [String]) async throws {
-        var argv = argv
-        let action = argv.first?.lowercased() ?? "list"
-        if action == "help" || action == "--help" { printHelp(); return }
+    static func run(action: String, _ args: Args) async throws {
         if action == "install" {
-            argv.removeFirst()
-            try await runInstall(argv)
+            try await runInstall(args)
             return
         }
         let detailed = (action == "status")
-        if !argv.isEmpty, action == "list" || action == "ls" || action == "status" { argv.removeFirst() }
-        guard action == "list" || action == "ls" || action == "status" || action.hasPrefix("--") else {
-            throw CLIError("unknown models action '\(action)' (use list | status [<id>])")
-        }
-
-        let args = Args(argv)
-        CLIOutput.configure(args)
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
@@ -87,9 +87,14 @@ enum ModelsCommand {
                 updateAvailable: !stale.isEmpty,
                 stalePaths: stale))
         }
-        if let onlyID, rows.isEmpty { throw CLIError("no model '\(onlyID)' in the contract") }
+        if let onlyID, rows.isEmpty {
+            throw CLIError(.modelUnknown, "no model '\(onlyID)' in the contract", hint: "see `vocello models list` for the ids")
+        }
 
-        if args.flag("json") { emitJSON(rows); return }
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Rows(models: rows))
+            return
+        }
 
         guard !rows.isEmpty else { print("(no models in contract)"); return }
         for r in rows {
@@ -112,12 +117,9 @@ enum ModelsCommand {
     /// engine (the same one the macOS app uses) into the shared models directory. A
     /// CLI-installed model is immediately usable by the app, and vice-versa.
     @MainActor
-    static func runInstall(_ argv: [String]) async throws {
-        let args = Args(argv)
-        CLIOutput.configure(args)
-
+    static func runInstall(_ args: Args) async throws {
         guard let modelID = args.positionals.first?.lowercased() else {
-            throw CLIError("install requires a model id (e.g. pro_custom_speed). Run `vocello models list` for ids.")
+            throw CLIError(.usageError, "install requires a model id (e.g. pro_custom_speed). Run `vocello models list` for ids.")
         }
 
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
@@ -125,7 +127,7 @@ enum ModelsCommand {
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
 
         guard let descriptor = ctx.registry.model(id: modelID) else {
-            throw CLIError("unknown model id '\(modelID)' (run `vocello models list` for valid ids)")
+            throw CLIError(.modelUnknown, "unknown model id '\(modelID)' (run `vocello models list` for valid ids)")
         }
 
         let targetDir = descriptor.installDirectory(in: ctx.modelsDirectory)
@@ -146,6 +148,11 @@ enum ModelsCommand {
             let stale = catalog.installedFileSizeMismatches(for: artifact, modelsRoot: ctx.modelsDirectory)
             if stale.isEmpty {
                 note("Already installed: \(modelID)")
+                if CLIPresenter.isMachine {
+                    CLIPresenter.succeed(Installed(
+                        modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir)
+                    ))
+                }
                 return
             }
             repairingStaleInstall = true
@@ -197,6 +204,11 @@ enum ModelsCommand {
                 let speed = progress.bytesPerSecond.map { "\(humanBytes($0))/s" } ?? "—"
                 let eta = progress.estimatedSecondsRemaining.map { " · ETA \(max(1, Int($0.rounded())))s" } ?? ""
                 noteVerbose("  \(progress.phase.rawValue) · \(pct)% · \(humanBytes(progress.downloadedBytes))/\(humanBytes(progress.totalBytes)) · \(speed)\(eta)")
+                CLIPresenter.event(.downloadProgress, data: [
+                    "modelID": .string(modelID), "phase": .string(progress.phase.rawValue),
+                    "downloadedBytes": .string(String(progress.downloadedBytes)),
+                    "totalBytes": .string(String(progress.totalBytes)),
+                ])
             },
             engineConfiguration: engineConfiguration,
             transferMetricsHandler: { diagnostics.record(metrics: $0) },
@@ -227,27 +239,13 @@ enum ModelsCommand {
             throw error
         }
 
-        print("✓ \(repairingStaleInstall ? "Updated" : "Installed") \(modelID) (\(humanBytes(directorySize(targetDir))))")
-    }
-
-    static func printHelp() {
-        print("""
-        vocello models — inventory and install models
-
-        Usage:
-          vocello models list [--json]
-          vocello models status [<id>] [--json]               # adds missing-file detail
-          vocello models install <id> [--verbose]             # download into the shared models dir
-
-        <id> may be a variant-scoped id (pro_custom_speed / pro_custom_quality / …) or a
-        base alias (pro_custom → preferred variant). Same engine + dir as the macOS app,
-        so a CLI-installed model is immediately usable in the app.
-
-        Options:
-          --json       emit JSON instead of a table (list/status)
-          --verbose    show per-update download progress (install)
-          --data-dir   runtime dir (default ~/Library/Application Support/QwenVoice[-Debug])
-          --manifest   override path to qwenvoice_contract.json
-        """)
+        let installedBytes = directorySize(targetDir)
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Installed(
+                modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: installedBytes
+            ))
+        } else {
+            print("✓ \(repairingStaleInstall ? "Updated" : "Installed") \(modelID) (\(humanBytes(installedBytes)))")
+        }
     }
 }

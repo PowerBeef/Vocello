@@ -270,7 +270,14 @@ class CLIPackageTests(unittest.TestCase):
         if argv[1] in {"--version", "version", "-v"}:
             return "vocello 3.0.0\n"
         if argv[1] == "modes":
-            return json.dumps([{"mode": mode} for mode in ("custom", "design", "clone")])
+            # A v1 envelope here, today's bare array for speakers: the reader takes both.
+            return json.dumps({
+                "schemaVersion": 1, "ok": True, "command": "modes.list", "requestID": "fixture",
+                "result": {"modes": [{"mode": mode} for mode in ("custom", "design", "clone")]},
+                "error": None, "warnings": [],
+                "meta": {"vocelloVersion": "3.0.0", "build": "24", "contractRevision": 1, "durationMs": 1,
+                         "replayed": False},
+            })
         if argv[1] == "speakers":
             self.assertIn("--data-dir", argv)
             return '[{"id":"fixture"}]'
@@ -479,17 +486,36 @@ class CLIPackageTests(unittest.TestCase):
         self.assertNotIn("GenerationRequest(", command)
         self.assertNotIn("request.batchIndex", command)
 
-    def test_cancellation_observes_unterminated_progress_line(self):
-        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: (os.write(2,b'Cancelled; command cleanup completed.'),os._exit(130))); os.write(2,b'generating (fixture)'); time.sleep(30)"
+    # A fake CLI: a `generation_started` record (unterminated), then on SIGINT the final
+    # result record with the cancellation envelope, or a bare exit.
+    CANCELLED_RESULT = json.dumps({
+        "schemaVersion": 1, "seq": 1, "t": 0.5, "requestID": "fixture", "type": "result",
+        "data": {"schemaVersion": 1, "ok": False, "command": "generate", "requestID": "fixture", "result": None,
+                 "error": {"code": "cancelled", "category": "cancelled", "exitCode": 130,
+                           "message": "cancelled by SIGINT; command cleanup completed", "retryable": False,
+                           "retryAfterMs": None, "hint": None, "detail": {"signal": "SIGINT"}},
+                 "warnings": [], "meta": {"vocelloVersion": "3.0.0", "build": "24", "contractRevision": 1,
+                                          "durationMs": 500, "replayed": False}},
+    })
+
+    def fake_cancellable_cli(self, on_interrupt: str) -> list[str]:
+        started = '{"schemaVersion":1,"seq":0,"t":0,"requestID":"fixture","type":"generation_started","data":{}}'
+        code = (f"import os,signal,time; signal.signal(signal.SIGINT, lambda *_: ({on_interrupt}, os._exit(130))); "
+                f"os.write(1, {started.encode()!r}); time.sleep(30)")
+        return [sys.executable, "-c", code]
+
+    def test_cancellation_observes_the_generation_started_event(self):
         result = package._run_qualification_cancellation(
-            [sys.executable, "-c", code], self.root, dict(os.environ), 3)
+            self.fake_cancellable_cli(f"os.write(1, b'\\n' + {self.CANCELLED_RESULT.encode()!r} + b'\\n')"),
+            self.root, dict(os.environ), 3)
         self.assertEqual(result, {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True})
 
-    def test_forced_signal_exit_is_not_clean_cancellation(self):
-        code = "import os,signal,time; signal.signal(signal.SIGINT, lambda *_: os._exit(130)); os.write(2,b'generating (fixture)'); time.sleep(30)"
-        with self.assertRaisesRegex(ValueError, "terminate cleanly"):
-            package._run_qualification_cancellation(
-                [sys.executable, "-c", code], self.root, dict(os.environ), 3)
+    def test_an_exit_without_the_cancellation_envelope_is_not_clean(self):
+        for on_interrupt in ("None", "os.write(2, b'forced exit')",
+                             f"os.write(1, b'\\n' + {self.CANCELLED_RESULT.replace('SIGINT', 'SIGTERM').encode()!r})"):
+            with self.subTest(on_interrupt=on_interrupt), self.assertRaisesRegex(ValueError, "terminate cleanly"):
+                package._run_qualification_cancellation(
+                    self.fake_cancellable_cli(on_interrupt), self.root, dict(os.environ), 3)
 
     def test_partial_progress_timeout_terminates_process(self):
         with self.assertRaisesRegex(ValueError, "did not reach generation"):

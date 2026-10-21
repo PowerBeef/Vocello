@@ -17,8 +17,39 @@ public final class CLIProcessSupervisor: Sendable {
     private let children: CLIChildProcesses
     private let forceExit: @Sendable (Int32) -> Void
 
+    /// The signal that cancelled the running command, for its typed report.
+    private static let signalRecord = Mutex<Int32?>(nil)
+    /// Stops the running command when stdout's reader goes away.
+    private static let brokenOutputHandler = Mutex<(@Sendable () -> Void)?>(nil)
+
+    /// The signal that cancelled the command; nil while none has.
+    public static var receivedSignal: Int32? { signalRecord.withLock { $0 } }
+
+    /// stdout's reader went away (EPIPE): the command stops as if signalled
+    /// with SIGPIPE, cleaning up what it owns. Nothing more can be reported.
+    @Sendable public static func outputBroken() {
+        let handler = brokenOutputHandler.withLock { $0 }
+        handler?()
+    }
+
+    /// A closed stdout cancels the command like a first signal (exit 141), but
+    /// never escalates: after a real signal it changes nothing, so that
+    /// signal's cleanup and exit status stand. Returns whether it cancelled.
+    @discardableResult
+    func receiveBrokenOutput() -> Bool {
+        let command = state.withLock { state -> Task<Int32, Never>?? in
+            guard !state.finished, state.firstSignal == nil else { return nil }
+            state.firstSignal = SIGPIPE
+            return .some(state.command)
+        }
+        guard let command else { return false }
+        Self.signalRecord.withLock { $0 = SIGPIPE }
+        command?.cancel()
+        return true
+    }
+
     init(children: CLIChildProcesses = CLIChildProcesses(), forceExit: @escaping @Sendable (Int32) -> Void = { code in
-        FileHandle.standardError.write(Data("Cancellation cleanup did not finish; forced exit. Recovery artifacts may remain.\n".utf8))
+        CLIStandardError.write("Cancellation cleanup did not finish; forced exit. Recovery artifacts may remain.\n")
         exit(code)
     }) {
         self.children = children
@@ -34,17 +65,18 @@ public final class CLIProcessSupervisor: Sendable {
     }
 
     func receive(_ signal: Int32) {
-        let action = state.withLock { state -> (Task<Int32, Never>?, Bool) in
-            guard !state.finished else { return (nil, false) }
+        let action = state.withLock { state -> (command: Task<Int32, Never>?, force: Bool, first: Bool) in
+            guard !state.finished else { return (nil, false, false) }
             if state.firstSignal != nil {
                 state.forcing = true
-                return (nil, true)
+                return (nil, true, false)
             }
             state.firstSignal = signal
-            return (state.command, false)
+            return (state.command, false, true)
         }
-        if action.1 { forced(128 + signal) }
-        else { action.0?.cancel() }
+        if action.first { Self.signalRecord.withLock { $0 = signal } }
+        if action.force { forced(128 + signal) }
+        else { action.command?.cancel() }
     }
 
     func enforceDeadline() {
@@ -102,6 +134,14 @@ public final class CLIProcessSupervisor: Sendable {
             signal(number, SIG_IGN)
             sources.append(source)
         }
+        signalRecord.withLock { $0 = nil }
+        brokenOutputHandler.withLock {
+            $0 = { @Sendable in
+                if supervisor.receiveBrokenOutput() {
+                    queue.asyncAfter(deadline: .now() + 30) { @Sendable in supervisor.enforceDeadline() }
+                }
+            }
+        }
         let command = Task { await operation() }
         supervisor.attach(command)
         // A forced exit's reap also unblocks the command while the forced
@@ -112,6 +152,7 @@ public final class CLIProcessSupervisor: Sendable {
         }
         for source in sources { source.cancel() }
         for number in signals { signal(number, SIG_DFL) }
+        brokenOutputHandler.withLock { $0 = nil }
         return code
     }
 

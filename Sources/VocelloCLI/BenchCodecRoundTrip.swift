@@ -67,21 +67,21 @@ enum BenchCodecRoundTrip {
     @MainActor
     static func run(_ args: Args) async throws {
         guard RuntimeDebugGate.isEnabled() else {
-            throw CLIError("Codec round trip requires an internal-diagnostics build and QWENVOICE_DEBUG=1.")
+            throw CLIError(.usageError, "Codec round trip requires an internal-diagnostics build and QWENVOICE_DEBUG=1.")
         }
         let jobURL = URL(fileURLWithPath: try args.require("codec-roundtrip", "round-trip job JSON"))
         let output = URL(fileURLWithPath: try args.require("output-dir", "new untracked output directory"))
         // Bounds before allocation.
         guard (try jobURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max)
                 <= CodecRoundTripEvidence.maximumJobBytes else {
-            throw CLIError("The round-trip job exceeds the bounded size.")
+            throw CLIError(.invalidInput, "The round-trip job exceeds the bounded size.")
         }
         let jobData = try Data(contentsOf: jobURL)
         let items: [CodecRoundTripEvidence.Item]
         do {
             items = try CodecRoundTripEvidence.decodeJob(jobData)
         } catch {
-            throw CLIError("The round-trip job is invalid (\(failureCode(for: error))).")
+            throw CLIError(.invalidInput, "The round-trip job is invalid (\(failureCode(for: error))).")
         }
         let jobDirectory = jobURL.deletingLastPathComponent()
         // Every input is bound and parsed before a model loads or a file is written.
@@ -94,7 +94,7 @@ enum BenchCodecRoundTrip {
                     expectedSHA256: item.wavSHA256
                 )
             } catch {
-                throw CLIError("Round-trip input \(item.id) is invalid (\(failureCode(for: error))).")
+                throw CLIError(.invalidInput, "Round-trip input \(item.id) is invalid (\(failureCode(for: error))).")
             }
         }
 
@@ -106,7 +106,7 @@ enum BenchCodecRoundTrip {
         // every catalog artifact shares its speech tokenizer.
         let candidates = context.registry.models.filter { $0.mode == .clone && $0.id.hasSuffix("_speed") }
         guard candidates.count == 1, let model = candidates.first else {
-            throw CLIError("No unambiguous Voice Cloning Speed model is registered.")
+            throw CLIError(.modelNotInstalled, "No unambiguous Voice Cloning Speed model is registered.")
         }
         let artifact = try catalog.artifactMatchingMacOSDescriptor(
             folder: model.folder, repo: model.huggingFaceRepo, revision: model.huggingFaceRevision,
@@ -124,7 +124,7 @@ enum BenchCodecRoundTrip {
               let tokenizerSHA256 = artifact.files.first(where: {
                   $0.relativePath == "speech_tokenizer/model.safetensors"
               })?.sha256 else {
-            throw CLIError("Installed model or tokenizer identity differs from the pinned catalog.")
+            throw CLIError(.integrityFailed, "Installed model or tokenizer identity differs from the pinned catalog.")
         }
         // Bind the round trip to actual catalog bytes, as the codec replay does.
         try SharedModelComponentStore(modelsRoot: context.modelsDirectory).validateInstalledModelFiles(
@@ -135,7 +135,7 @@ enum BenchCodecRoundTrip {
         )
         // mkdir is exclusive: failed or completed evidence can never be overwritten.
         guard unsafe mkdir(output.path, 0o700) == 0 else {
-            throw CLIError("Round-trip output must be a new directory with an existing parent.")
+            throw CLIError(.outputUnavailable, "Round-trip output must be a new directory with an existing parent.")
         }
         let runID = "codec-roundtrip-" + UUID().uuidString.lowercased()
         var report = Report(
@@ -170,7 +170,7 @@ enum BenchCodecRoundTrip {
                 try Task.checkCancellation()
                 if result.didLoadModel { report.modelLoadCount += 1 }
                 guard report.modelLoadCount == 1 else {
-                    throw CLIError("The round trip must run on exactly one model load.")
+                    throw CLIError(.internalError, "The round trip must run on exactly one model load.")
                 }
                 guard result.sampleRate == CodecRoundTripEvidence.sampleRate,
                       result.audio.count == samples.count else {

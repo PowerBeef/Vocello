@@ -88,12 +88,14 @@ the qualifier never invents one. Each row must return the exact model,
 language, output path, finite positive duration, normal EOS, RIFF/WAVE bytes, and a strict QC `pass`.
 Seed and streaming fields are explicitly **requested**, not claimed observed engine receipts.
 The schema-v2 qualification report also requires one two-item Built-in batch process at seed
-`30000005`. It verifies ordered legacy-success JSON, distinct retained WAVs, finite matching
+`30000005`. It verifies the ordered batch result (read through `scripts/lib/vocello_cli_json.py`,
+which takes the v1 envelope and the older bare JSON alike), distinct retained WAVs, finite matching
 durations, EOS, bounded PCM integrity, and no leftover outputs/staging. Batch JSON does not expose
 per-item QC receipts: this block reports engine acceptance and PCM integrity, not an invented
 strict-QC or semantic verdict. Raw batch JSON, including failure rows, stays with the ignored audio.
 It then interrupts
-a live Built-in take only after observing generation start, requires exit 130 plus an explicit cleanup acknowledgement, rejects leftover final/staging
+a live Built-in take (`--ndjson`) only after its `generation_started` event, requires exit 130 and a final
+envelope reporting `cancelled` by SIGINT with no forced exit, rejects leftover final/staging
 output without deleting it, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
 only to an existing operator-provided model store; it downloads nothing. Its privacy-safe report
 contains digests, sizes, timings, public identities, and verdicts—not prompts, transcripts, audio,
@@ -122,50 +124,89 @@ distributed builds cannot activate that environment override. `--data-dir <path>
 explicit CLI interface. `bench` defaults to the debug-isolated folder (which holds the full model
 set) and forces telemetry on.
 
-## Zsh completion
+## Shell completion
 
-The checked-in completion file suggests CLI commands, actions, flags, and selected option values.
-The release DMG's `Vocello CLI` folder does not include it. To use it from a checkout, copy it to a
-directory in zsh's `fpath`:
+`vocello completions zsh|bash|fish` prints a completion script generated from the command model
+the parser runs on, so it offers exactly the commands, aliases, subcommands, options and choice
+values the CLI accepts. The checked-in `scripts/completions/_vocello` is that zsh output
+(`CLICommandModelGoldenTests` keeps them equal). From a checkout or an installed CLI:
 
 ```sh
 mkdir -p ~/.zsh/completions
-cp scripts/completions/_vocello ~/.zsh/completions/
+vocello completions zsh > ~/.zsh/completions/_vocello
 ```
 
-Add this line to `~/.zshrc` before any existing `compinit` call:
+Add `fpath=(~/.zsh/completions $fpath)` to `~/.zshrc` before any `compinit` call (add
+`autoload -Uz compinit && compinit` after it if completion is not initialized yet), then open a new
+shell. For bash, `source <(vocello completions bash)`; for fish,
+`vocello completions fish > ~/.config/fish/completions/vocello.fish`.
 
-```zsh
-fpath=(~/.zsh/completions $fpath)
-```
+## Command line
 
-If your configuration does not already initialize completion, add this line after it.
-Then open a new shell:
+One declarative command model (`Sources/VocelloCLI/Core/CommandModel/VocelloCommandTree.swift`)
+drives the parser, help, completions and `vocello capabilities`; its rendering is checked in as
+`config/cli-contract/v1/commands.json`.
 
-```zsh
-autoload -Uz compinit && compinit
-```
+- Strict: an unknown command, subcommand or option, a missing option value, a value on a bare flag
+  and an extra operand are usage errors (exit 2) with a did-you-mean hint when one is close.
+- `-h`/`--help` anywhere shows that command's help; `vocello help models install` equals
+  `vocello models install --help`.
+- Global options work anywhere before `--`: `--output-format text|json|ndjson` (`--json`,
+  `--ndjson`), `--quiet`, `--verbose`, `--no-input`, `--data-dir <dir>`, `--manifest <path>`,
+  `--help`.
+- `--name=value` carries a value that starts with `--`; `--` ends options.
+- A command with subcommands runs its default when none is named (`vocello models` is
+  `vocello models list`); options before the subcommand belong to that default.
+- `vocello custom|design|clone …` runs `generate --mode <mode> …`, or `batch` when `--file` is given.
 
-With `vocello` on your `PATH`, `vocello <TAB>` lists commands and
-`vocello bench --<TAB>` lists benchmark flags.
+## Machine contract (v1)
 
-## Conventions
+Text output is for people and is not a contract. The machine formats are, under the additive-only
+compatibility policy in `config/cli-contract/v1/README.md` (validated by
+`scripts/cli_contract.py validate`):
 
-- **stdout is machine-readable** (an output path, one per line, or a JSON object); **stderr carries
-  human progress notes**. Pipe stdout to capture results cleanly.
-- `--json` switches stdout to a structured JSON object/array (on `generate`, `batch`, `voices list`,
-  `speakers list`, `models`).
-- `--quiet` suppresses the stderr notes; `--verbose` adds per-step detail.
-- Exit codes: `0` success · `1` error · `2` usage / unknown command · `75` the engine stopped a take
-  on its own under memory pressure (no signal reached the CLI; retry later) · `130` interrupted
-  (Ctrl-C) · `143` terminated (SIGTERM).
-- Signal handling is armed before any command work starts. The first SIGINT/SIGTERM cancels the
-  owned command and awaits its cleanup. A second signal or 30-second deadline forces exit with an
-  explicit stderr warning after killing any `--play` child and waiting up to 2 seconds for its
-  reap; exit status alone is not proof of clean cancellation. Model/loading/finalization cleanup
-  remains engine-owned.
-- A signalled run exits `130`/`143` even when the command also failed for another reason; stderr
-  (`error: …` versus `Cancelled; …`) and batch rows say which it was.
+- `--json`: stdout carries exactly one envelope, success or failure:
+  `{schemaVersion, ok, command, requestID, result, error, warnings, meta}`. `command` is the dotted
+  canonical path (`models.install`); `result` may accompany a failure (a partial batch keeps its
+  rows); `error` is `{code, category, exitCode, message, retryable, retryAfterMs, hint, detail}`.
+- `--ndjson`: stdout carries event records `{schemaVersion, seq, t, requestID, type,
+  generationID?, data}` (`started`, `engine_booting`, `model_loading`, `generation_started`, `chunk`,
+  `download_progress`, `output_published`, `generation_completed`, `warning`, …) ending in one
+  `result` record whose `data` is the envelope. Running records coalesce under load and never block
+  generation; terminal records are never dropped; consumers ignore unknown types. No text,
+  transcript or audio ever travels in an event.
+- stderr carries no CLI notes in the machine formats unless `--verbose` (the engine's own
+  model-load lines still appear there until the owned package routes them).
+- The machine formats and `--no-input` never prompt and never read stdin unless a flag names it
+  (`--text -`, `--file -`), so a caller whose stdin never closes cannot hang a command.
+- 64-bit values the CLI reports, such as `seed`, `effectiveSeed` and `longFormBaseSeed`, are decimal
+  strings; an embedded engine receipt (`completionReceipt`) keeps its own numeric fields.
+- `vocello capabilities --json` describes every command, option, error code, exit code, event type,
+  mode, language, delivery cell and limit with no engine boot.
+- `bench` is an internal tool with its own output; it refuses `--json`/`--ndjson`.
+
+| Exit | Category | Meaning |
+| --- | --- | --- |
+| 0 | ok | Success. |
+| 1 | failure | Generation, QC, publication, assembly, a stopped batch, a download, an integrity check or an internal error failed. |
+| 2 | usage | The invocation or its input was refused before any work. |
+| 66 | not_found | A named voice, speaker, model, History item or input file does not exist. |
+| 69 | precondition | A model is not installed, or speech recognition is unavailable. |
+| 73 | output | The output location cannot be written. |
+| 74 | io | Storage is full or a file could not be read or written. |
+| 75 | transient | The engine or a store is busy, memory is short or under pressure, or the network is unavailable: retry later. |
+| 77 | permission | Voice-cloning consent is missing or a path is not allowed. |
+| 78 | config | The configuration or a store schema is unusable. |
+| 130 | cancelled | Interrupted by SIGINT. |
+| 143 | cancelled | Terminated by SIGTERM. |
+
+Signal handling is armed before any command work starts. The first SIGINT/SIGTERM cancels the owned
+command and awaits its cleanup. A second signal or 30-second deadline forces exit with an explicit
+stderr warning after killing any `--play` child and waiting up to 2 seconds for its reap; exit
+status alone is not proof of clean cancellation. A signalled run exits `130`/`143` even when the
+command also failed for another reason; its envelope then reports `cancelled` with that failure in
+`detail.failure`. A closed stdout (EPIPE) stops the command the same way and exits `141`, with
+nothing more reported; after a real signal it changes nothing.
 
 ## Commands
 
@@ -180,7 +221,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 |---|---|
 | `--mode` | `custom` (default) · `design` · `clone` |
 | `--variant` | `speed` (default, 4-bit) · `quality` (8-bit) |
-| `--text` / `--text-file` | inline text or a file (`-` reads stdin); with neither, piped stdin is used |
+| `--text` / `--text-file` | inline text or a file (`-` reads stdin); with neither, piped stdin is used in text mode (the machine formats and `--no-input` read stdin only for `-`) |
 | `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`); an empty or blank value is refused |
 | `--voice-brief` | (design) plain-language voice description |
 | `--voice` / `--reference` / `--transcript` | (clone) a saved voice name/id, or a reference `.wav` + optional transcript |
@@ -194,7 +235,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
-| `--json` | emit a JSON result object instead of the bare path |
+| `--json` / `--ndjson` | the v1 envelope (result: the take) instead of the bare path, or events ending in it |
 
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
@@ -204,13 +245,14 @@ guarantee identical output across them. Use `--no-stream` for accumulate-then-de
 
 **Selecting a mode** — three equivalent ways: the shortcut subcommands `vocello custom|design|clone …`
 (a `--file` makes them route to `batch`), the explicit `--mode <mode>` flag, or — when you omit `--mode`
-at an interactive terminal — a numbered picker. Scripted/piped runs without `--mode` default to `custom`
-(no prompt). `vocello modes` lists the modes and what each needs.
+at an interactive terminal with text output and no `--no-input` — a numbered picker. Every other run
+without `--mode` defaults to `custom` (no prompt). `vocello modes` lists the modes and what each needs.
 
-Prints the output WAV path on stdout (or a JSON object: `audioPath`, `durationSeconds`, `wallSeconds`,
+Prints the output WAV path on stdout (or, with `--json`, the envelope whose `result` carries `audioPath`, `durationSeconds`, `wallSeconds`,
 `realtimeFactor` (standard RTF: `wallSeconds ÷ durationSeconds`, lower is faster, below 1.0 is faster than
-real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, and — when `--stream` — `firstChunkMS`
-and `chunks`).
+real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, `seed` (the
+effective seed as a decimal string: pass it back as `--seed` to reproduce the take), and — when `--stream` —
+`firstChunkMS` and `chunks`).
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
 never share a file. An explicit `--out` that names an existing file is replaced atomically only by a
@@ -230,7 +272,8 @@ vocello batch --file <path|-> --mode … --variant … \
 
 One non-empty line per clip; all clips share the same voice/mode/variant, so the engine runs them
 through **one loaded model** — far faster than repeated `generate` calls. Reads stdin when `--file` is
-omitted or `-`. Prints one output WAV path per line (or a JSON summary with `--json`). Also accepts
+omitted or `-` (in the machine formats only for `-`). Prints one output WAV path per line (or, with
+`--json`, the envelope whose `result` is the batch summary). Also accepts
 `--seed` (applied to every item — re-running the batch reproduces it, and a fixed seed steadies
 cross-segment character) and `--variation`, like `generate`.
 
@@ -239,13 +282,14 @@ accounting belong to the CLI; engine-only batch fields must not be passed to `ge
 The command uses the same request builder exercised against the real engine support policy in
 `CLIExecutionTests`, including negative controls that retain the single-take rejection guard.
 
-Batch stops at the first failure. Its failure-only JSON is versioned (`schemaVersion: 2`) and
-contains every planned index/generation identity with `completed`, `failed`, `cancelled`, or
+Batch stops at the first failure. Its envelope is then `ok: false` with `error.code`
+`batch_incomplete` (or `memory_pressure`, `engine_busy`, `cancelled`), and its `result` keeps the
+failure rows (`schemaVersion: 2`): every planned index/generation identity with `completed`, `failed`, `cancelled`, or
 `not_attempted` status; completed paths are retained. Only a signalled cancellation makes a
 row `cancelled`; a genuine failure that coincides with a signal stays `failed` and adds
 `cancellationRequested: true`. A take the engine stopped on its own under memory pressure is
-`failed` with `errorCode: memory_pressure` and the command exits `75`. Failure exits nonzero. All-success JSON stays
-compatible. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
+`failed` with `errorCode: memory_pressure` and the command exits `75`. A failed row's `errorCode` is a
+contract error code (`output_missing`, `qc_rejected`, `generation_failed`, …). Failure exits nonzero. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
 language per text and non-streaming output (with `--long-form`, each line is a long-form project
 whose segments stream); `--language`, `--stream`, and `--out` are rejected
 instead of silently ignored (use `generate` or batch `--out-dir`).
@@ -459,8 +503,8 @@ directory.
 # Built-in Voice, speed, save to a path
 vocello generate --mode custom --variant speed --text "The train left at dawn." --out /tmp/clip.wav
 
-# Pipe a script in, stream it, get JSON with first-chunk latency
-echo "Hello there." | vocello generate --variant speed --stream --json
+# Pipe a script in, stream it, get the JSON envelope with first-chunk latency
+echo "Hello there." | vocello generate --variant speed --text - --json
 
 # Voice Design from a brief
 vocello generate --mode design --voice-brief "A warm, calm narrator" --text "Once upon a time…"

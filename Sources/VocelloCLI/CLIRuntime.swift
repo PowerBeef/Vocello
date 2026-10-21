@@ -107,16 +107,16 @@ public struct CLIRuntime {
     /// (e.g. `pro_custom_speed` / `pro_custom_quality`).
     public func modelID(mode: GenerationMode, quality: Bool) throws -> String {
         guard let base = registry.model(for: mode) else {
-            throw CLIError("No model for mode '\(mode.rawValue)' in the manifest.")
+            throw CLIError(.configError, "No model for mode '\(mode.rawValue)' in the manifest.")
         }
         let variants = base.platformVariants(for: .macOS)
         guard !variants.isEmpty else {
-            throw CLIError("No macOS variants for mode '\(mode.rawValue)'.")
+            throw CLIError(.configError, "No macOS variants for mode '\(mode.rawValue)'.")
         }
         let wanted: ModelVariantKind = quality ? .quality : .speed
         guard let variant = variants.first(where: { $0.kind == wanted }) else {
             let available = variants.map { $0.kind.rawValue }.joined(separator: ", ")
-            throw CLIError("No \(quality ? "Quality" : "Speed") variant for '\(mode.rawValue)' (have: \(available)).")
+            throw CLIError(.configError, "No \(quality ? "Quality" : "Speed") variant for '\(mode.rawValue)' (have: \(available)).")
         }
         return base.variantScopedID(for: variant)
     }
@@ -128,14 +128,14 @@ public struct CLIRuntime {
 
     static func locateManifestURL() throws -> URL {
         guard let url = locateTrustAnchor(named: "qwenvoice_contract") else {
-            throw CLIError("Could not locate qwenvoice_contract.json. Pass --manifest <path>.")
+            throw CLIError(.configError, "Could not locate qwenvoice_contract.json. Pass --manifest <path>.")
         }
         return url
     }
 
     public static func locateProductionCatalogURL() throws -> URL {
         guard let url = locateTrustAnchor(named: "qwenvoice_production_model_catalog") else {
-            throw CLIError("Could not locate authenticated production model catalog.")
+            throw CLIError(.configError, "Could not locate authenticated production model catalog.")
         }
         return url
     }

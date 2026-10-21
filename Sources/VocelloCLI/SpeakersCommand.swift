@@ -6,7 +6,7 @@ import VocelloCLICore
 /// so users don't have to guess `--speaker` ids. Read-only: uses the lightweight
 /// registry bootstrap (no engine boot, returns instantly).
 enum SpeakersCommand {
-    struct SpeakerJSON: Encodable {
+    struct SpeakerJSON: Encodable, Sendable {
         let id: String
         let group: String
         let displayName: String
@@ -15,15 +15,12 @@ enum SpeakersCommand {
         let isDefault: Bool
     }
 
-    @MainActor
-    static func run(_ argv: [String]) async throws {
-        var argv = argv
-        let action = argv.first?.lowercased() ?? "list"
-        if action == "help" || action == "--help" { printHelp(); return }
-        if !argv.isEmpty, action == "list" || action == "ls" { argv.removeFirst() }
+    struct Rows: Encodable, Sendable {
+        let speakers: [SpeakerJSON]
+    }
 
-        let args = Args(argv)
-        CLIOutput.configure(args)
+    @MainActor
+    static func run(_ args: Args) async throws {
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
@@ -31,12 +28,12 @@ enum SpeakersCommand {
         let defaultID = ctx.registry.defaultSpeaker.id
         let speakers = ctx.registry.allSpeakers
 
-        if args.flag("json") {
-            emitJSON(speakers.map { s in
+        if CLIPresenter.isMachine {
+            CLIPresenter.succeed(Rows(speakers: speakers.map { s in
                 SpeakerJSON(id: s.id, group: s.group, displayName: s.displayName,
                             language: s.nativeLanguage, description: s.shortDescription,
                             isDefault: s.id == defaultID)
-            })
+            }))
             return
         }
 
@@ -46,19 +43,5 @@ enum SpeakersCommand {
             let lang = s.nativeLanguage.map { " · \($0)" } ?? ""
             print("\(s.group)\t\(s.id)\t\(s.displayName)\(lang)\(star)")
         }
-    }
-
-    static func printHelp() {
-        print("""
-        vocello speakers — list Built-in Voice speakers
-
-        Usage:
-          vocello speakers list [--json]
-
-        Options:
-          --json       emit JSON instead of a table
-          --data-dir   runtime dir (default ~/Library/Application Support/QwenVoice[-Debug])
-          --manifest   override path to qwenvoice_contract.json
-        """)
     }
 }

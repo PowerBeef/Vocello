@@ -73,6 +73,7 @@ enum BenchCodecLoop {
         // QWENVOICE_NATIVE_TELEMETRY_MODE=off refuses it even with QWENVOICE_DEBUG=1.
         guard RuntimeDebugGate.isEnabled(), TelemetryGate.resolvedEnabled else {
             throw CLIError(
+                .usageError,
                 "Codec-loop replay requires an internal-diagnostics build, QWENVOICE_DEBUG=1 "
                     + "and telemetry that is not explicitly off."
             )
@@ -82,14 +83,14 @@ enum BenchCodecLoop {
         // Bounds before allocation.
         guard (try jobURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max)
                 <= CodecLoopMutationEvidence.maximumJobBytes else {
-            throw CLIError("The codec-loop job exceeds the bounded size.")
+            throw CLIError(.invalidInput, "The codec-loop job exceeds the bounded size.")
         }
         let jobData = try Data(contentsOf: jobURL)
         let job: CodecLoopMutationEvidence.Job
         do {
             job = try CodecLoopMutationEvidence.decodeJob(jobData)
         } catch {
-            throw CLIError("The codec-loop job is invalid (\(failureCode(for: error))).")
+            throw CLIError(.invalidInput, "The codec-loop job is invalid (\(failureCode(for: error))).")
         }
         let jobDirectory = jobURL.deletingLastPathComponent()
         // Every trace is bound, parsed and its recipe applied before a model
@@ -98,7 +99,7 @@ enum BenchCodecLoop {
             do {
                 _ = try frames(for: item, jobDirectory: jobDirectory)
             } catch {
-                throw CLIError("Codec-loop item \(item.id) is invalid (\(failureCode(for: error))).")
+                throw CLIError(.invalidInput, "Codec-loop item \(item.id) is invalid (\(failureCode(for: error))).")
             }
         }
 
@@ -109,7 +110,7 @@ enum BenchCodecLoop {
         // The replay's model: every catalog artifact shares its speech tokenizer.
         let candidates = context.registry.models.filter { $0.mode == .custom && $0.id.hasSuffix("_speed") }
         guard candidates.count == 1, let model = candidates.first else {
-            throw CLIError("No unambiguous CustomVoice Speed model is registered.")
+            throw CLIError(.modelNotInstalled, "No unambiguous CustomVoice Speed model is registered.")
         }
         let artifact = try catalog.artifactMatchingMacOSDescriptor(
             folder: model.folder, repo: model.huggingFaceRepo, revision: model.huggingFaceRevision,
@@ -127,10 +128,10 @@ enum BenchCodecLoop {
               let tokenizerSHA256 = artifact.files.first(where: {
                   $0.relativePath == "speech_tokenizer/model.safetensors"
               })?.sha256 else {
-            throw CLIError("Installed model or tokenizer identity differs from the pinned catalog.")
+            throw CLIError(.integrityFailed, "Installed model or tokenizer identity differs from the pinned catalog.")
         }
         if let expected = job.tokenizerSHA256, expected != tokenizerSHA256 {
-            throw CLIError("The source takes were generated with another speech tokenizer than the replay model's.")
+            throw CLIError(.invalidInput, "The source takes were generated with another speech tokenizer than the replay model's.")
         }
         // Bind the replay to actual catalog bytes, as the codec replay does.
         try SharedModelComponentStore(modelsRoot: context.modelsDirectory).validateInstalledModelFiles(
@@ -141,7 +142,7 @@ enum BenchCodecLoop {
         )
         // mkdir is exclusive: failed or completed evidence can never be overwritten.
         guard unsafe mkdir(output.path, 0o700) == 0 else {
-            throw CLIError("Codec-loop output must be a new directory with an existing parent.")
+            throw CLIError(.outputUnavailable, "Codec-loop output must be a new directory with an existing parent.")
         }
         let runID = "codec-loop-" + UUID().uuidString.lowercased()
         let markingEnabled = AudioMarkingPolicy.resolvedEnabled()

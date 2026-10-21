@@ -177,17 +177,13 @@ enum BenchCommand {
             do {
                 return try DeliveryInstructionCell.resolveStrict(explicit)
             } catch {
-                throw CLIError(error.localizedDescription)
+                throw CLIError(.invalidInput, error.localizedDescription)
             }
         }
     }
 
     @MainActor
-    static func run(_ argv: [String]) async throws {
-        let args = Args(argv)
-        if args.flag("help") { printHelp(); return }
-        CLIOutput.configure(args)
-
+    static func run(_ args: Args) async throws {
         if args.string("codec-replay") != nil || args.flag("codec-replay") {
             try await BenchCodecReplay.run(args)
             return
@@ -229,11 +225,11 @@ enum BenchCommand {
         let noSummary = args.flag("no-summary")
         let label = try validatedBenchmarkLabel(args.string("label"))
         if args.flag("speaker") {
-            throw CLIError("--speaker requires a speaker id")
+            throw CLIError(.usageError, "--speaker requires a speaker id")
         }
         let requestedCustomSpeakerID = args.string("speaker")
         if requestedCustomSpeakerID != nil, !modes.contains("custom") {
-            throw CLIError("--speaker applies only when --modes includes custom")
+            throw CLIError(.usageError, "--speaker applies only when --modes includes custom")
         }
 
         // Published schema-v2 benchmarks require the exact raw sampler sidecars.
@@ -242,12 +238,13 @@ enum BenchCommand {
         // before model work begins.
         let telemetryRaw = (args.string("telemetry") ?? "verbose").lowercased()
         guard ["off", "lightweight", "verbose"].contains(telemetryRaw) else {
-            throw CLIError("--telemetry must be off, lightweight, or verbose")
+            throw CLIError(.usageError, "--telemetry must be off, lightweight, or verbose")
         }
         let telemetryOff = telemetryRaw == "off"
         let telemetryVerbose = telemetryRaw == "verbose"
         guard telemetryOff || telemetryVerbose || noSummary else {
             throw CLIError(
+                .usageError,
                 "history-producing benchmarks require --telemetry verbose for schema-v2 memory evidence"
             )
         }
@@ -292,7 +289,7 @@ enum BenchCommand {
         let warm: Int
         if let rawWarm = args.string("warm") {
             guard let parsedWarm = Int(rawWarm), parsedWarm >= 0 else {
-                throw CLIError("--warm must be a non-negative whole number")
+                throw CLIError(.usageError, "--warm must be a non-negative whole number")
             }
             warm = parsedWarm
         } else {
@@ -314,7 +311,7 @@ enum BenchCommand {
             deliveryItems = []
         }
         if warm == 0, modes.contains("clone") {
-            throw CLIError("--warm 0 cannot be used with Clone because Clone has no separate cold cell")
+            throw CLIError(.usageError, "--warm 0 cannot be used with Clone because Clone has no separate cold cell")
         }
         // PA-17: a Clone cell needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
@@ -322,11 +319,11 @@ enum BenchCommand {
             try consent.admitGeneration(mode: mode)
         }
         if warm == 0, !deliveryItems.isEmpty {
-            throw CLIError("--warm 0 cannot be used with --delivery because delivery analysis requires a neutral warm cell")
+            throw CLIError(.usageError, "--warm 0 cannot be used with --delivery because delivery analysis requires a neutral warm cell")
         }
         let continueDeliveryFailures = args.flag("continue-delivery-failures")
         if continueDeliveryFailures, deliveryItems.isEmpty {
-            throw CLIError("--continue-delivery-failures requires --delivery")
+            throw CLIError(.usageError, "--continue-delivery-failures requires --delivery")
         }
         // Audit #104: a delivery sweep never pairs the cold take, which cost about
         // 11.5 % of sweep time. `--no-cold` skips it, loads the model and runs
@@ -335,7 +332,7 @@ enum BenchCommand {
         // --delivery.
         let noCold = args.flag("no-cold")
         if noCold, deliveryItems.isEmpty {
-            throw CLIError("--no-cold is a delivery-sweep mode and requires --delivery")
+            throw CLIError(.usageError, "--no-cold is a delivery-sweep mode and requires --delivery")
         }
         // The 8 GB tier defers the dedicated Custom prewarm into the first
         // generation, so nothing but a generation can warm Custom there, and a
@@ -344,12 +341,13 @@ enum BenchCommand {
            CLIRuntime.customPrewarmPolicy(for: NativeMemoryPolicyResolver.deviceClass())
                == .skipDedicatedCustomPrewarm {
             throw CLIError(
+                .usageError,
                 "--no-cold cannot warm Custom on this Mac's memory tier, where the Custom prewarm "
                     + "folds into the first generation; run Custom without --no-cold"
             )
         }
         if continueDeliveryFailures, !noSummary {
-            throw CLIError("--continue-delivery-failures requires --no-summary")
+            throw CLIError(.usageError, "--continue-delivery-failures requires --no-summary")
         }
         let prosodyProfilePath = args.string("prosody-profile")
         let memoryQualification = try memoryQualificationDeclaration(
@@ -365,7 +363,7 @@ enum BenchCommand {
             hasDeliveryCells: !deliveryItems.isEmpty
         )
         if memoryQualification != nil, requestedCustomSpeakerID != nil {
-            throw CLIError("--speaker cannot alter the fixed retained-memory qualification fixture")
+            throw CLIError(.usageError, "--speaker cannot alter the fixed retained-memory qualification fixture")
         }
         // Publication needs the exact verbose sidecar of every take, and the
         // ad-hoc budget keeps only the newest 48. Size this run's budget to its
@@ -384,6 +382,7 @@ enum BenchCommand {
                 plannedSidecars: plannedGenerations
             ) else {
                 throw CLIError(
+                    .usageError,
                     "this matrix plans \(plannedGenerations) verbose generations; one run keeps at most "
                     + "\(GenerationTelemetrySidecarBudget.maximumRunSidecarFiles) sidecars, so split it into smaller runs"
                 )
@@ -409,6 +408,7 @@ enum BenchCommand {
         let knownCustomSpeakerIDs = Set(registryContext.registry.allSpeakers.map(\.id))
         guard knownCustomSpeakerIDs.contains(customSpeakerID) else {
             throw CLIError(
+                .speakerNotFound,
                 "unknown --speaker '\(customSpeakerID)' (use `vocello speakers list`)"
             )
         }
@@ -455,7 +455,7 @@ enum BenchCommand {
             if let v = voices.first(where: { $0.name == cloneVoiceName || $0.id == cloneVoiceName }) {
                 cloneReference = CloneReference(audioPath: v.audioPath, transcript: nil, preparedVoiceID: v.id)
             } else {
-                throw CLIError("clone bench needs saved voice '\(cloneVoiceName)' (have: \(have.isEmpty ? "none" : have))")
+                throw CLIError(.voiceNotFound, "clone bench needs saved voice '\(cloneVoiceName)' (have: \(have.isEmpty ? "none" : have))")
             }
         }
         var fixtureDigests = [
@@ -479,7 +479,7 @@ enum BenchCommand {
 
         for modeStr in modes {
             guard let mode = GenerationMode(rawValue: modeStr) else {
-                throw CLIError("invalid --modes value '\(modeStr)'")
+                throw CLIError(.invalidInput, "invalid --modes value '\(modeStr)'")
             }
             for variantStr in variants {
                 let quality = variantStr.lowercased() == "quality"
@@ -517,6 +517,7 @@ enum BenchCommand {
                         } ?? false
                         guard prewarmRan else {
                             throw CLIError(
+                                .generationFailed,
                                 "--no-cold could not prewarm \(mode.rawValue)/\(variantStr.lowercased()) before its first take"
                             )
                         }
@@ -618,7 +619,7 @@ enum BenchCommand {
                         // neutral take labelled as instructed — the plumbing
                         // null the audit's H3 could never rule out. Refuse.
                         guard !item.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                            throw CLIError("delivery cell \(item.id) resolved an empty instruction")
+                            throw CLIError(.invalidInput, "delivery cell \(item.id) resolved an empty instruction")
                         }
                         let deliveryPayload = try Self.payload(
                             for: mode, customSpeaker: customSpeakerID,
@@ -690,7 +691,7 @@ enum BenchCommand {
             // can never enter the current run's evidence.
             if !deliveryItems.isEmpty {
                 guard let prosodyScript = locateDeliveryProsodyAnalyzer() else {
-                    throw CLIError("delivery prosody script not found from \(FileManager.default.currentDirectoryPath)")
+                    throw CLIError(.configError, "delivery prosody script not found from \(FileManager.default.currentDirectoryPath)")
                 }
                 try runDeliveryProsodyAnalysis(
                     script: prosodyScript,
@@ -735,13 +736,13 @@ enum BenchCommand {
             var rows: [TTFCRow] = []
             for modeStr in modes {
                 guard let mode = GenerationMode(rawValue: modeStr) else {
-                    throw CLIError("invalid --modes value '\(modeStr)'")
+                    throw CLIError(.invalidInput, "invalid --modes value '\(modeStr)'")
                 }
                 for variantStr in variants {
                     let quality = variantStr.lowercased() == "quality"
                     let modelID = try runtime.modelID(mode: mode, quality: quality)
                     guard let probeLen = coldLen ?? lengths.first else {
-                        throw CLIError("benchmark matrix has no lengths")
+                        throw CLIError(.invalidInput, "benchmark matrix has no lengths")
                     }
                     let probeText = try requiredText(for: probeLen)
                     let payload = try payload(for: mode, customSpeaker: customSpeakerID,
@@ -766,7 +767,7 @@ enum BenchCommand {
         // a tracked PASS record has already been created.
         if let historyPublisher {
             guard let summarizerScript else {
-                throw CLIError("benchmark publisher is available but the telemetry summarizer is missing")
+                throw CLIError(.configError, "benchmark publisher is available but the telemetry summarizer is missing")
             }
             try prepareEngineHistoryEvidence(
                 publisher: historyPublisher,
@@ -857,8 +858,8 @@ enum BenchCommand {
         // the published figure and this line is operator feedback.
         let rtfTag = result.durationSeconds > 0
             ? unsafe "  rtf=\(String(format: "%.2f", wall / result.durationSeconds))" : ""
-        FileHandle.standardError.write(Data(
-            unsafe "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(rtfTag)\(ttfcTag)\n".utf8))
+        CLIStandardError.write(
+            unsafe "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(rtfTag)\(ttfcTag)\n")
         return BenchTakeResult(
             takeIndex: takeIndex,
             generationID: generationID.uuidString,
@@ -1065,7 +1066,7 @@ enum BenchCommand {
         case .custom: return .custom(speakerID: customSpeaker, deliveryStyle: deliveryStyle)
         case .design: return .design(voiceDescription: designBrief, deliveryStyle: deliveryStyle)
         case .clone:
-            guard let cloneReference else { throw CLIError("clone reference unavailable") }
+            guard let cloneReference else { throw CLIError(.generationFailed, "clone reference unavailable") }
             return .clone(reference: cloneReference)
         }
     }
@@ -1076,7 +1077,7 @@ enum BenchCommand {
 
     private static func requiredText(for length: String) throws -> String {
         guard let text = text(for: length) else {
-            throw CLIError("benchmark corpus has no text for length '\(length)'")
+            throw CLIError(.invalidInput, "benchmark corpus has no text for length '\(length)'")
         }
         return text
     }
@@ -1100,11 +1101,11 @@ enum BenchCommand {
         if !label.isEmpty { pargs += ["--label", label] }
         p.arguments = pargs
         do { try p.run() } catch {
-            throw CLIError("could not start telemetry summarizer: \(error.localizedDescription)")
+            throw CLIError(.internalError, "could not start telemetry summarizer: \(error.localizedDescription)")
         }
         p.waitUntilExit()
         guard p.terminationStatus == 0 else {
-            throw CLIError("strict telemetry summarizer failed for runID=\(runID)")
+            throw CLIError(.internalError, "strict telemetry summarizer failed for runID=\(runID)")
         }
     }
 
@@ -1138,13 +1139,13 @@ enum BenchCommand {
         let errorPipe = Pipe()
         process.standardError = errorPipe
         do { try process.run() } catch {
-            throw CLIError("could not start benchmark provenance capture: \(error.localizedDescription)")
+            throw CLIError(.internalError, "could not start benchmark provenance capture: \(error.localizedDescription)")
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             let detail = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown failure"
-            throw CLIError("benchmark provenance capture failed: \(detail)")
+            throw CLIError(.internalError, "benchmark provenance capture failed: \(detail)")
         }
     }
 
@@ -1177,7 +1178,7 @@ enum BenchCommand {
         process.standardOutput = outputPipe
         process.standardError = errorPipe
         do { try process.run() } catch {
-            throw CLIError("could not start benchmark history publication: \(error.localizedDescription)")
+            throw CLIError(.internalError, "could not start benchmark history publication: \(error.localizedDescription)")
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
@@ -1186,7 +1187,7 @@ enum BenchCommand {
             // The publisher writes benchmark-evidence.json before invoking the
             // registry. Its stderr therefore contains the safe delayed-repair
             // command, which records that frozen manifest without rebuilding it.
-            throw CLIError("benchmark passed but evidence validation failed: \(detail)")
+            throw CLIError(.internalError, "benchmark passed but evidence validation failed: \(detail)")
         }
         if let published = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines), !published.isEmpty {
@@ -1199,7 +1200,7 @@ enum BenchCommand {
         artifactDirectory: URL
     ) throws {
         guard FileManager.default.fileExists(atPath: historyScript.path) else {
-            throw CLIError("benchmark history recorder is missing at \(historyScript.path)")
+            throw CLIError(.configError, "benchmark history recorder is missing at \(historyScript.path)")
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -1212,13 +1213,14 @@ enum BenchCommand {
         process.standardOutput = outputPipe
         process.standardError = errorPipe
         do { try process.run() } catch {
-            throw CLIError("could not start benchmark history recording: \(error.localizedDescription)")
+            throw CLIError(.internalError, "could not start benchmark history recording: \(error.localizedDescription)")
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             let detail = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown failure"
             throw CLIError(
+                .internalError,
                 "benchmark passed but history publication failed: \(detail); repair: "
                 + "python3 scripts/benchmark_history.py record --artifact-dir '\(artifactDirectory.path)'"
             )
@@ -1281,7 +1283,7 @@ enum BenchCommand {
             [SidecarEntry].self, from: Data(contentsOf: sidecarURL)
         )
         guard !entries.isEmpty else {
-            throw CLIError("composed quality: prosody sidecar has no delivery takes")
+            throw CLIError(.internalError, "composed quality: prosody sidecar has no delivery takes")
         }
 
         let rowsURL = diagnostics
@@ -1289,7 +1291,7 @@ enum BenchCommand {
             .appendingPathComponent("generations.jsonl")
         guard let rowData = try? Data(contentsOf: rowsURL),
               let rowText = String(data: rowData, encoding: .utf8) else {
-            throw CLIError("composed quality: engine telemetry rows not found at \(rowsURL.path)")
+            throw CLIError(.internalError, "composed quality: engine telemetry rows not found at \(rowsURL.path)")
         }
         let decoder = JSONDecoder()
         var rowsByID: [String: ComposeEngineRow] = [:]
@@ -1306,14 +1308,14 @@ enum BenchCommand {
         var abstentions: [String] = []
         for entry in entries {
             guard let row = rowsByID[entry.generationID] else {
-                throw CLIError("composed quality: no engine row for generation \(entry.generationID)")
+                throw CLIError(.internalError, "composed quality: no engine row for generation \(entry.generationID)")
             }
             guard let reasonRaw = row.finishReason,
                   let finishReason = GenerationFinishReason(rawValue: reasonRaw) else {
-                throw CLIError("composed quality: row \(entry.generationID) has no typed finish reason")
+                throw CLIError(.internalError, "composed quality: row \(entry.generationID) has no typed finish reason")
             }
             guard let chunkCount = row.chunkTimeline?.count else {
-                throw CLIError("composed quality: row \(entry.generationID) has no chunk timeline")
+                throw CLIError(.internalError, "composed quality: row \(entry.generationID) has no chunk timeline")
             }
             let notes = row.notes ?? [:]
             let hitTokenCap = finishReason == .maxTokens || notes.contains { key, value in
@@ -1322,11 +1324,11 @@ enum BenchCommand {
             }
             let wavURL = outputs.appendingPathComponent(entry.deliveryWav)
             guard let wavData = try? Data(contentsOf: wavURL) else {
-                throw CLIError("composed quality: delivery output missing: \(entry.deliveryWav)")
+                throw CLIError(.internalError, "composed quality: delivery output missing: \(entry.deliveryWav)")
             }
             let wavDigest = sha256(wavData)
             guard let generationID = UUID(uuidString: entry.generationID) else {
-                throw CLIError("composed quality: invalid generation ID \(entry.generationID)")
+                throw CLIError(.internalError, "composed quality: invalid generation ID \(entry.generationID)")
             }
             let report = GenerationQualityReportProducer.deepReport(
                 generationID: generationID,
@@ -1350,7 +1352,7 @@ enum BenchCommand {
             )
             let verdict: QualityGateRegistryVerdict
             do { verdict = try QualityGateRegistry.evaluate(report) } catch {
-                throw CLIError("composed quality: registry rejected \(entry.generationID): \(error)")
+                throw CLIError(.internalError, "composed quality: registry rejected \(entry.generationID): \(error)")
             }
             // Fast-consistency guard: the row already carries the fast verdict
             // this take finalized with; composing must never improve on it.
@@ -1359,6 +1361,7 @@ enum BenchCommand {
                GenerationQualityComposition.rank(of: verdict.outcome)
                    < GenerationQualityComposition.rank(of: fastOutcome) {
                 throw CLIError(
+                    .internalError,
                     "composed quality: verdict for \(entry.generationID) (\(verdict.outcome.rawValue)) "
                         + "is better than its stored fast verdict (\(fastRaw)); evidence reconstruction drifted"
                 )
@@ -1397,12 +1400,13 @@ enum BenchCommand {
                 + "\(uncalibrated) uncalibrated, \(abstentions.count) abstained → bench-quality-composed.json"
         )
         if !failures.isEmpty {
-            throw CLIError("composed canonical quality FAILED: \(failures.joined(separator: "; "))")
+            throw CLIError(.qcRejected, "composed canonical quality FAILED: \(failures.joined(separator: "; "))")
         }
         // Composer precedence: fail > unavailable > abstain > warning. An
         // abstention blocks a claimed pass without naming a defect.
         if !abstentions.isEmpty {
             throw CLIError(
+                .qcRejected,
                 "composed canonical quality INCONCLUSIVE: \(abstentions.count) take(s) abstained, "
                     + "which is not a pass: \(abstentions.joined(separator: "; "))"
             )
@@ -1433,7 +1437,7 @@ enum BenchCommand {
         func copy(_ source: URL, required: Bool) throws {
             guard fileManager.fileExists(atPath: source.path) else {
                 if required {
-                    throw CLIError("evidence archive: missing required file \(source.lastPathComponent)")
+                    throw CLIError(.internalError, "evidence archive: missing required file \(source.lastPathComponent)")
                 }
                 return
             }
@@ -1490,11 +1494,11 @@ enum BenchCommand {
         }
         p.arguments = pargs
         do { try p.run() } catch {
-            throw CLIError("could not start delivery prosody analysis: \(error.localizedDescription)")
+            throw CLIError(.internalError, "could not start delivery prosody analysis: \(error.localizedDescription)")
         }
         p.waitUntilExit()
         guard p.terminationStatus == 0 else {
-            throw CLIError("delivery prosody analysis failed")
+            throw CLIError(.internalError, "delivery prosody analysis failed")
         }
     }
 
@@ -1505,7 +1509,7 @@ enum BenchCommand {
         case "high_memory_mac", "high": return "high_memory_mac"
         case "iphone_pro", "iphone": return "iphone_pro"
         default:
-            throw CLIError("invalid --force-class '\(raw)' (use 8gb | 16gb | high | iphone, or the canonical *_mac names)")
+            throw CLIError(.usageError, "invalid --force-class '\(raw)' (use 8gb | 16gb | high | iphone, or the canonical *_mac names)")
         }
     }
 
@@ -1515,6 +1519,7 @@ enum BenchCommand {
         let expression = try NSRegularExpression(pattern: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$"#)
         guard expression.firstMatch(in: raw, range: range)?.range == range else {
             throw CLIError(
+                .usageError,
                 "--label must be an opaque 1-96 character ID using letters, digits, dot, underscore, or hyphen"
             )
         }
@@ -1534,11 +1539,11 @@ enum BenchCommand {
         hasDeliveryCells: Bool
     ) throws -> BenchMemoryQualification? {
         if wasBareFlag {
-            throw CLIError("--memory-qualification requires retained-memory-v1")
+            throw CLIError(.usageError, "--memory-qualification requires retained-memory-v1")
         }
         guard let rawPolicy else { return nil }
         guard rawPolicy == "retained-memory-v1" else {
-            throw CLIError("unsupported --memory-qualification policy '\(rawPolicy)' (use retained-memory-v1)")
+            throw CLIError(.usageError, "unsupported --memory-qualification policy '\(rawPolicy)' (use retained-memory-v1)")
         }
         guard modes == ["custom", "design", "clone"],
               variants == ["speed"],
@@ -1549,6 +1554,7 @@ enum BenchCommand {
               !noStream,
               !hasDeliveryCells else {
             throw CLIError(
+                .usageError,
                 "retained-memory-v1 requires --modes custom,design,clone "
                 + "--variants speed --lengths medium --warm 3 --telemetry verbose "
                 + "--seed 19790615 with streaming enabled and no delivery cells"
@@ -1585,7 +1591,7 @@ enum BenchCommand {
         guard unsafe setenv("QWENVOICE_DEBUG", "1", 1) == 0,
               unsafe setenv(key, value, 1) == 0,
               RuntimeDebugGate.value(for: key) == value else {
-            throw CLIError("failed to install the requested benchmark runtime override")
+            throw CLIError(.internalError, "failed to install the requested benchmark runtime override")
         }
     }
 
@@ -1603,7 +1609,7 @@ enum BenchCommand {
             productionDataDirectory: realAppDataDir(),
             force: force
         ) {
-            throw CLIError("refusing to clear diagnostics in the real app data dir (\(dataDir.path)); pass --keep to append or --force to override")
+            throw CLIError(.usageError, "refusing to clear diagnostics in the real app data dir (\(dataDir.path)); pass --keep to append or --force to override")
         }
         // Start clean so the aggregate reflects only this run.
         try? FileManager.default.removeItem(at: dataDir.appendingPathComponent("diagnostics", isDirectory: true))
@@ -1624,7 +1630,7 @@ enum BenchCommand {
         var missing: [String] = []
         for modeStr in modes {
             guard let mode = GenerationMode(rawValue: modeStr) else {
-                throw CLIError("invalid --modes value '\(modeStr)'")
+                throw CLIError(.invalidInput, "invalid --modes value '\(modeStr)'")
             }
             for variantStr in variants {
                 let quality = variantStr.lowercased() == "quality"
@@ -1635,18 +1641,18 @@ enum BenchCommand {
         }
         guard missing.isEmpty else {
             let uniq = Array(Set(missing)).sorted().joined(separator: ", ")
-            throw CLIError("preflight: missing models — \(uniq). Install them in the app (Settings → Model downloads), or point --data-dir at a populated models dir.")
+            throw CLIError(.modelNotInstalled, "preflight: missing models — \(uniq). Install them in the app (Settings → Model downloads), or point --data-dir at a populated models dir.")
         }
     }
 
     /// Print the engine first-chunk-latency table (stderr) + write a sidecar JSON.
     private static func reportTTFC(_ rows: [TTFCRow], diagnostics: URL) {
         guard !rows.isEmpty else { return }
-        FileHandle.standardError.write(Data(
-            "\nEngine first-chunk latency (TTFC, ms) — warm streaming probe (engine-side, not the app's playback-scheduled latency)\n".utf8))
+        CLIStandardError.write(
+            "\nEngine first-chunk latency (TTFC, ms) — warm streaming probe (engine-side, not the app's playback-scheduled latency)\n")
         for r in rows {
             let ms = r.firstChunkMS.map { unsafe String(format: "%.0f", $0) } ?? "-"
-            FileHandle.standardError.write(Data("  \(r.mode)/\(r.variant)\t\(ms)\n".utf8))
+            CLIStandardError.write("  \(r.mode)/\(r.variant)\t\(ms)\n")
         }
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -1671,7 +1677,7 @@ enum BenchCommand {
         allowed: [String]
     ) throws -> [String] {
         guard !wasBareFlag else {
-            throw CLIError("invalid --\(option): a comma-list value is required")
+            throw CLIError(.usageError, "invalid --\(option): a comma-list value is required")
         }
         guard let raw else { return defaults }
         let values = raw
@@ -1682,11 +1688,12 @@ enum BenchCommand {
         guard invalid.isEmpty else {
             let rendered = invalid.map { $0.isEmpty ? "<empty>" : $0 }.joined(separator: ", ")
             throw CLIError(
+                .usageError,
                 "invalid --\(option) value(s): \(rendered) (use \(allowed.joined(separator: ",")))"
             )
         }
         guard Set(values).count == values.count else {
-            throw CLIError("invalid --\(option): duplicate values are not allowed")
+            throw CLIError(.usageError, "invalid --\(option): duplicate values are not allowed")
         }
         return values
     }

@@ -5,166 +5,6 @@ import Synchronization
 import Darwin
 #endif
 
-/// A user-facing CLI error whose message is printed verbatim (no stack noise).
-public struct CLIError: Error, CustomStringConvertible {
-    public let description: String
-    public init(_ message: String) { self.description = message }
-}
-
-/// A take the engine stopped on its own while no signal reached the command
-/// (P15-02). In a CLI process the engine's kernel memory-pressure responder is
-/// the only such source: a critical event cancels the active take with reason
-/// `memory_pressure`. It is reported apart from an operator interrupt (exit
-/// 130): `vocello` exits `exitStatus` and a batch row ends `failed` with
-/// `errorCode`, never `cancelled`.
-public struct CLIEngineCancellation: Error, LocalizedError, Equatable {
-    /// sysexits.h `EX_TEMPFAIL`: a temporary failure that a later retry may clear.
-    public static let exitStatus: Int32 = 75
-
-    let reason: GenerationCancellationReason
-
-    /// A batch row's `errorCode`: the typed reason (`memory_pressure`).
-    public var errorCode: String { reason.rawValue }
-
-    public var errorDescription: String? {
-        switch reason {
-        case .memoryPressure:
-            return "the engine stopped this take under critical memory pressure, so no audio was written. "
-                + "Free memory (quit other apps) or use --variant speed, then retry."
-        case .user, .superseded, .shutdown:
-            return "the engine stopped this take on its own (\(reason.rawValue)), so no audio was written."
-        }
-    }
-
-    /// The error a command reports for `error`: a `CancellationError` that its own
-    /// task never received (no SIGINT or SIGTERM cancelled it) is the engine's.
-    /// `observedReason` is the typed reason a streaming run read off the take's
-    /// `.cancelled` event; without one (or with the engine's `user` default) the
-    /// reason is memory pressure, the engine's only cancellation of its own here.
-    /// Every other error, and a signalled run's cancellation, passes through.
-    static func classify(
-        _ error: any Error,
-        commandCancelled: Bool,
-        observedReason: GenerationCancellationReason? = nil
-    ) -> any Error {
-        if let stopped = error as? CLIEngineCancellation {
-            return stopped.refined(by: observedReason)
-        }
-        guard error is CancellationError, !commandCancelled else { return error }
-        return CLIEngineCancellation(reason: .memoryPressure).refined(by: observedReason)
-    }
-
-    private func refined(by observedReason: GenerationCancellationReason?) -> CLIEngineCancellation {
-        guard let observedReason, observedReason != .user else { return self }
-        return CLIEngineCancellation(reason: observedReason)
-    }
-}
-
-/// Minimal flag parser: `--key value` pairs, `--key=value`, bare `--flag`s, and
-/// positionals. A bare `--` ends flag parsing (everything after is positional).
-/// Note: a value cannot itself begin with `--` (it would parse as a flag) — use
-/// the `--key=value` form for such values. Clean enough for a focused tool
-/// without pulling in an external arg-parser dependency.
-public struct Args: Sendable {
-    private var values: [String: String] = [:]
-    private var flags: Set<String> = []
-    public private(set) var positionals: [String] = []
-
-    public init(_ argv: [String]) {
-        var i = 0
-        var flagsEnded = false
-        while i < argv.count {
-            let token = argv[i]
-            if !flagsEnded, token == "--" {
-                flagsEnded = true
-                i += 1
-                continue
-            }
-            if !flagsEnded, token.hasPrefix("--") {
-                let key = String(token.dropFirst(2))
-                if let eq = key.firstIndex(of: "=") {
-                    values[String(key[..<eq])] = String(key[key.index(after: eq)...])
-                    i += 1
-                } else if i + 1 < argv.count, !argv[i + 1].hasPrefix("--") {
-                    values[key] = argv[i + 1]
-                    i += 2
-                } else {
-                    flags.insert(key)
-                    i += 1
-                }
-            } else {
-                positionals.append(token)
-                i += 1
-            }
-        }
-    }
-
-    public func string(_ key: String) -> String? { values[key] }
-    public func flag(_ key: String) -> Bool { flags.contains(key) }
-
-    public func require(_ key: String, _ hint: String) throws -> String {
-        guard let v = values[key], !v.isEmpty else {
-            throw CLIError("missing required --\(key) (\(hint))")
-        }
-        return v
-    }
-}
-
-/// Which command `vocello <command> …` runs, and with which arguments. Pure, so the
-/// dispatch table is unit-tested apart from the commands it starts.
-public enum CLICommandRoute: Equatable, Sendable {
-    case generate([String])
-    case batch([String])
-    case modes([String])
-    case deliveries([String])
-    case voices([String])
-    case speakers([String])
-    case models([String])
-    case bench([String])
-    case help
-    case version
-    case unknown(String)
-    case missingCommand
-
-    public init(_ argv: [String]) {
-        guard let command = argv.first else {
-            self = .missingCommand
-            return
-        }
-        let rest = Array(argv.dropFirst())
-        switch command {
-        case "generate", "gen":
-            self = .generate(rest)
-        case "custom", "design", "clone":
-            // Mode subcommand shortcut: inject --mode and forward. `--file` routes
-            // to bulk batch; otherwise single-clip generate.
-            let forwarded = ["--mode", command] + rest
-            let toBatch = rest.contains { $0 == "--file" || $0.hasPrefix("--file=") }
-            self = toBatch ? .batch(forwarded) : .generate(forwarded)
-        case "batch":
-            self = .batch(rest)
-        case "modes":
-            self = .modes(rest)
-        case "deliveries", "delivery":
-            self = .deliveries(rest)
-        case "voices", "voice":
-            self = .voices(rest)
-        case "speakers", "speaker":
-            self = .speakers(rest)
-        case "models", "model":
-            self = .models(rest)
-        case "bench", "benchmark":
-            self = .bench(rest)
-        case "help", "-h", "--help":
-            self = .help
-        case "version", "--version", "-v":
-            self = .version
-        default:
-            self = .unknown(command)
-        }
-    }
-}
-
 public enum CLIPaths {
     /// Resolve the runtime data directory the engine roots at (models/, cache/,
     /// outputs/, diagnostics/). Mirrors the app's AppPaths selection without
@@ -204,23 +44,45 @@ public enum CLIPaths {
 /// CLI output verbosity, set once at command start from `--quiet` / `--verbose`.
 /// stdout (machine-readable surface) is never affected — only the human notes on
 /// stderr are gated.
-enum CLIVerbosity: Int, Comparable, Sendable {
+public enum CLIVerbosity: Int, Comparable, Sendable {
     case quiet = 0, normal = 1, verbose = 2
-    static func < (l: CLIVerbosity, r: CLIVerbosity) -> Bool { l.rawValue < r.rawValue }
+    public static func < (l: CLIVerbosity, r: CLIVerbosity) -> Bool { l.rawValue < r.rawValue }
 }
 
 public enum CLIOutput {
-    private static let storedVerbosity = Mutex(CLIVerbosity.normal)
-
-    static var verbosity: CLIVerbosity {
-        get { storedVerbosity.withLock { $0 } }
-        set { storedVerbosity.withLock { $0 = newValue } }
+    private struct Settings: Sendable {
+        var verbosity = CLIVerbosity.normal
+        var noInput = false
+        var format = CLIOutputFormat.text
     }
 
-    /// Configure from parsed args (call once at the start of each command).
-    public static func configure(_ args: Args) {
-        if args.flag("quiet") { verbosity = .quiet }
-        else if args.flag("verbose") { verbosity = .verbose }
+    private static let settings = Mutex(Settings())
+
+    static var verbosity: CLIVerbosity {
+        get { settings.withLock { $0.verbosity } }
+        set { settings.withLock { $0.verbosity = newValue } }
+    }
+
+    /// Configure once from the parsed invocation. The machine formats keep
+    /// stderr quiet unless `--verbose` asks for notes.
+    public static func configure(_ invocation: CLIInvocation) {
+        settings.withLock {
+            $0.verbosity = invocation.verbosity ?? (invocation.format.isMachine ? .quiet : .normal)
+            $0.noInput = invocation.noInput
+            $0.format = invocation.format
+        }
+    }
+
+    /// Prompts need a person: text output, a terminal and no `--no-input`.
+    static var promptsAllowed: Bool {
+        settings.withLock { !$0.noInput && !$0.format.isMachine } && isInteractiveStdin()
+    }
+
+    /// Unnamed piped stdin is read only in text mode without `--no-input`; the
+    /// machine formats read stdin only when a flag names it (`-`), so an agent
+    /// whose stdin never closes cannot hang a command.
+    static var implicitStdinAllowed: Bool {
+        settings.withLock { !$0.noInput && !$0.format.isMachine }
     }
 }
 
@@ -228,18 +90,20 @@ public enum CLIOutput {
 /// definition shared by every command. Suppressed under `--quiet`.
 public func note(_ message: String) {
     guard CLIOutput.verbosity >= .normal else { return }
-    FileHandle.standardError.write(Data("• \(message)\n".utf8))
+    CLIStandardError.write("• \(message)\n")
 }
 
 /// Extra per-step detail → stderr, only under `--verbose`.
 public func noteVerbose(_ message: String) {
     guard CLIOutput.verbosity >= .verbose else { return }
-    FileHandle.standardError.write(Data("  · \(message)\n".utf8))
+    CLIStandardError.write("  · \(message)\n")
 }
 
 // MARK: - JSON output + stdin
 
-/// Print a compact, stable-keyed JSON value to stdout (the machine-readable surface).
+/// Print a compact, stable-keyed bare JSON value to stdout: `bench`'s own output,
+/// which is not part of the machine contract. Every other command reports through
+/// `CLIPresenter`.
 public func emitJSON<T: Encodable>(_ value: T) {
     let enc = JSONEncoder()
     enc.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -249,12 +113,17 @@ public func emitJSON<T: Encodable>(_ value: T) {
 }
 
 /// Read all of stdin as UTF-8 when it isn't an interactive TTY (i.e. piped/redirected);
-/// nil otherwise. Lets `generate`/`batch` accept piped text.
+/// nil otherwise. For an explicit `-`; unnamed stdin goes through `readImplicitStdinText`.
 public func readStdinText() -> String? {
     if isatty(FileHandle.standardInput.fileDescriptor) != 0 { return nil }
     let data = FileHandle.standardInput.readDataToEndOfFile()
     guard !data.isEmpty else { return nil }
     return String(data: data, encoding: .utf8)
+}
+
+/// Piped stdin that no flag named: read only where `CLIOutput.implicitStdinAllowed`.
+public func readImplicitStdinText() -> String? {
+    CLIOutput.implicitStdinAllowed ? readStdinText() : nil
 }
 
 /// True when stdin is an interactive terminal (a human is typing) — used to decide

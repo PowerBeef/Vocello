@@ -1034,7 +1034,7 @@ class LongFormManifestTests(Fixture):
             path.write_bytes(b"RIFF segment " + f"{take_id}/{position}".encode("utf-8"))
             segments.append({"index": position, "segmentID": f"lfseg_{position}", "boundary": "sentence" if position
                              == 0 else "end_of_text", "intendedPauseMilliseconds": 300 if position == 0 else 0,
-                             "effectiveSeed": 11 + position, "generationID": f"0A1B2C3D-0000-4000-8000-00000000000{position}",
+                             "effectiveSeed": str(11 + position), "generationID": f"0A1B2C3D-0000-4000-8000-00000000000{position}",
                              "audioPath": str(path), "durationSeconds": 30.0, "finishReason": "eos"})
         assembly = {"schemaVersion": 1, "algorithmVersion": 2, "sampleRate": 24_000, "blockFrames": 4096,
                     "segmentCount": 2, "outputFrameCount": 1_447_200, "workingSetFrameUpperBound": 12_288,

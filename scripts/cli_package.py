@@ -347,7 +347,8 @@ def _run_qualification_generation(
 def _stop_qualification_process(process: subprocess.Popen) -> None:
     try:
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
+        # Gone already; macOS answers EPERM for a group whose leader exited unreaped.
         pass
     process.communicate()
 
@@ -628,7 +629,8 @@ def qualify(
         if report:
             atomic_json(report, state)
         cancellation_output = outputs / "cancelled.wav"
-        long_text = " ".join(["The cancellation probe remains intentionally unfinished."] * 80)
+        # Long enough to be interrupted mid-take, within the single-take limit the CLI enforces.
+        long_text = " ".join(["The cancellation probe remains intentionally unfinished."] * 15)
         cancellation = cancellation_runner([
             binary, "generate", "--mode", "custom", "--variant", "speed",
             "--speaker", "aiden", "--language", "english", "--seed", "30000004",

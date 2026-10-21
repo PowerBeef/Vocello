@@ -334,6 +334,9 @@ class CLIPackageTests(unittest.TestCase):
 
         def cancel(argv, cwd, environment, timeout):
             calls.append((list(argv), cwd, dict(environment), timeout))
+            # The probe's script must be one take the CLI accepts (900 characters at most).
+            self.assertLessEqual(len(argv[argv.index("--text") + 1]), 900)
+            self.assertIn("--ndjson", argv)
             return {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True}
 
         with mock.patch.object(package, "command", return_value="") as failure_runner:

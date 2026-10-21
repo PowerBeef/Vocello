@@ -6,10 +6,11 @@
 # entitlement set (scripts/entitlement_contract.py). Called by the managed artifact-verification
 # step through `verify_packaged_dmg.sh … --include-cli [--include-pkg <pkg>]`, not a release lane.
 #
-# The install test writes to /usr/local with sudo, so it runs only on a CI runner (CI=true) with
-# passwordless sudo, which is ephemeral; anywhere else --include-pkg is refused with exit 2 before
-# anything runs and sudo is never invoked. A local package is checked without root by
-# `scripts/cli_package.py pkg-verify --root-free-install` (release.sh runs it).
+# The install test writes to /usr/local with sudo, so it runs only on a GitHub-hosted Actions
+# runner (CI=true, GITHUB_ACTIONS=true, RUNNER_ENVIRONMENT=github-hosted) with passwordless sudo,
+# which is ephemeral; anywhere else, a self-hosted runner included, --include-pkg is refused with
+# exit 2 before anything runs and sudo is never invoked. A local package is checked without root
+# by `scripts/cli_package.py pkg-verify --root-free-install` (release.sh runs it).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/release_signing.sh
@@ -30,10 +31,13 @@ fail() {
     exit 1
 }
 
-# Whether this host may run the install test: a CI runner with passwordless sudo. sudo is not
-# consulted unless CI=true.
+# Whether this host may run the install test: a GitHub-hosted runner with passwordless sudo.
+# sudo is not consulted unless all three variables name one.
 pkg_install_host_ready() {
-    [ "${CI:-}" = "true" ] || return 1
+    if [ "${CI:-}" != "true" ] || [ "${GITHUB_ACTIONS:-}" != "true" ] \
+        || [ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]; then
+        return 1
+    fi
     sudo -n true >/dev/null 2>&1
 }
 
@@ -203,7 +207,8 @@ if [ "$#" -eq 3 ]; then
     CLI_PKG="$3"
     if ! pkg_install_host_ready; then
         echo "verify_packaged_cli.sh: --include-pkg installs the package into /usr/local with sudo," \
-            "so it runs only on a CI runner (CI=true) with passwordless sudo. Refusing on this host;" \
+            "so it runs only on a GitHub-hosted runner (CI=true, GITHUB_ACTIONS=true," \
+            "RUNNER_ENVIRONMENT=github-hosted) with passwordless sudo. Refusing on this host;" \
             "check a local package with: python3 scripts/cli_package.py pkg-verify --root-free-install" >&2
         exit 2
     fi

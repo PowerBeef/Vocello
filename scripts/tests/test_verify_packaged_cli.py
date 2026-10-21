@@ -3,7 +3,7 @@
 The scripts run from sandboxes (scripts/tests/shell_stubs.py) whose `sudo`, `installer`,
 `pkgutil`, `hdiutil`, `codesign`, `xcrun` and `spctl` are recorded stand-ins and whose
 `scripts/cli_package.py` and `scripts/entitlement_contract.py` are recorded helpers. Whole-script
-runs cover the refusal outside CI and every check before anything is installed. The install,
+runs cover the refusal outside a GitHub-hosted runner and every check before anything is installed. The install,
 upgrade and uninstall sequence runs the shipped functions after sourcing the script, with the
 paths the package owns moved under a sandbox volume (as LaneShell moves build paths): the
 `installer` stand-in plays Installer with its preinstall and postinstall there, `sudo` runs the
@@ -106,6 +106,12 @@ def cli_sandbox(test: unittest.TestCase) -> ScriptSandbox:
     return sandbox
 
 
+# A GitHub-hosted Actions runner, the only host the install test runs on. Every run names all
+# three variables, so a test run on such a runner inherits none of them.
+HOSTED_RUNNER = {"CI": "true", "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted"}
+NO_RUNNER = {name: "" for name in HOSTED_RUNNER}
+
+
 def store_state(sandbox: ScriptSandbox) -> dict[str, str]:
     store = sandbox.home / "Library/Application Support/QwenVoice"
     return {path.relative_to(store).as_posix(): path.read_text(encoding="utf-8")
@@ -113,7 +119,7 @@ def store_state(sandbox: ScriptSandbox) -> dict[str, str]:
 
 
 class InstallTestRefusalTests(unittest.TestCase):
-    """The whole script: --include-pkg never reaches sudo outside a CI runner."""
+    """The whole script: --include-pkg never reaches sudo outside a GitHub-hosted runner."""
 
     def setUp(self) -> None:
         self.sandbox = cli_sandbox(self)
@@ -121,18 +127,29 @@ class InstallTestRefusalTests(unittest.TestCase):
         self.package = self.sandbox.file(f"dist/{PACKAGE}", "package")
 
     def run_cli(self, *arguments: str, **env: str) -> subprocess.CompletedProcess[str]:
-        return self.sandbox.run_script(*arguments, env={"CI": "", **env})
+        return self.sandbox.run_script(*arguments, env={**NO_RUNNER, **env})
 
-    def test_outside_ci_the_install_test_is_refused_without_sudo(self) -> None:
-        completed = self.run_cli(str(self.metadata), "--include-pkg", str(self.package))
-        self.assertEqual(completed.returncode, 2)
-        self.assertIn("runs only on a CI runner (CI=true) with passwordless sudo", completed.stderr)
-        self.assertEqual(self.sandbox.calls_to("sudo"), [])
-        self.assertEqual(self.sandbox.calls(), [])
+    def test_outside_a_github_hosted_runner_the_install_test_is_refused_without_sudo(self) -> None:
+        hosts = {
+            "local": {},
+            "other CI": {"CI": "true"},
+            "self-hosted runner": {**HOSTED_RUNNER, "RUNNER_ENVIRONMENT": "self-hosted"},
+            "no Actions": {**HOSTED_RUNNER, "GITHUB_ACTIONS": "false"},
+            "not CI": {**HOSTED_RUNNER, "CI": ""},
+        }
+        for host, env in hosts.items():
+            with self.subTest(host=host):
+                self.sandbox.log.write_text("", encoding="utf-8")
+                completed = self.run_cli(str(self.metadata), "--include-pkg", str(self.package), **env)
+                self.assertEqual(completed.returncode, 2)
+                self.assertIn("runs only on a GitHub-hosted runner (CI=true, GITHUB_ACTIONS=true, "
+                              "RUNNER_ENVIRONMENT=github-hosted) with passwordless sudo", completed.stderr)
+                self.assertEqual(self.sandbox.calls_to("sudo"), [])
+                self.assertEqual(self.sandbox.calls(), [])
 
-    def test_a_ci_runner_without_passwordless_sudo_is_refused(self) -> None:
+    def test_a_hosted_runner_without_passwordless_sudo_is_refused(self) -> None:
         completed = self.run_cli(str(self.metadata), "--include-pkg", str(self.package),
-                                 CI="true", SUDO_N_STATUS="1")
+                                 **HOSTED_RUNNER, SUDO_N_STATUS="1")
         self.assertEqual(completed.returncode, 2)
         self.assertEqual(self.sandbox.calls(), [["sudo", "-n", "true"]])
 
@@ -141,14 +158,14 @@ class InstallTestRefusalTests(unittest.TestCase):
                           (str(self.metadata), "--other", str(self.package)),
                           (str(self.metadata), "--include-pkg", "")):
             with self.subTest(arguments=arguments):
-                completed = self.run_cli(*arguments, CI="true")
+                completed = self.run_cli(*arguments, **HOSTED_RUNNER)
                 self.assertEqual(completed.returncode, 1)
                 self.assertIn("Usage:", completed.stderr)
                 self.assertEqual(self.sandbox.calls_to("sudo"), [])
 
 
 class PackageChecksBeforeInstallingTests(unittest.TestCase):
-    """The whole script on a CI runner: the DMG folder, then every package check before installing."""
+    """The whole script on a hosted runner: the DMG folder, then every package check before installing."""
 
     def setUp(self) -> None:
         self.sandbox = cli_sandbox(self)
@@ -194,7 +211,7 @@ class PackageChecksBeforeInstallingTests(unittest.TestCase):
         (self.dist / "cli-pkg-verification.json").write_text(json.dumps(payload), encoding="utf-8")
 
     def verify(self, *, signed: bool = False, **env: str) -> subprocess.CompletedProcess[str]:
-        environment = {"CI": "true", **env}
+        environment = {**HOSTED_RUNNER, **env}
         if signed:
             environment.update({"QWENVOICE_EXPECT_SIGNED_RELEASE": "1", "QWENVOICE_EXPECT_NOTARIZED_DMG": "1",
                                 "QWENVOICE_EXPECT_TEAM_ID": TEAM})
@@ -224,7 +241,7 @@ class PackageChecksBeforeInstallingTests(unittest.TestCase):
     def test_the_package_must_be_the_one_the_metadata_names(self) -> None:
         other = self.dist / "Other-cli.pkg"
         other.write_text("package", encoding="utf-8")
-        completed = self.sandbox.run_script(str(self.metadata), "--include-pkg", str(other), env={"CI": "true"})
+        completed = self.sandbox.run_script(str(self.metadata), "--include-pkg", str(other), env=HOSTED_RUNNER)
         self.assert_not_installed(completed, "is not the one the release metadata names")
 
     def test_the_package_must_be_the_one_release_sh_verified(self) -> None:
@@ -289,7 +306,7 @@ class PackageInstallTests(unittest.TestCase):
             f"pkg_install_test {quote(self.package)} 3.0.0 24 {COMMIT} {DIGEST}\n"
         )
         return subprocess.run(["bash", "-c", script], cwd=self.sandbox.root,
-                              env=self.sandbox.environment({"CI": "true", **env}),
+                              env=self.sandbox.environment({**HOSTED_RUNNER, **env}),
                               capture_output=True, text=True, timeout=60, check=False)
 
     def sequence(self) -> list[list[str]]:

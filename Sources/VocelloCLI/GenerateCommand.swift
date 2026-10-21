@@ -721,6 +721,9 @@ public enum GenerateCommand {
             ])
         }, finished: { index, row in
             CLIBatchExecution.reportRow(row, generationID: requests[index].generationID)
+            if row.status == .completed {
+                CLIPresenter.event(.progress, data: ["lines": .integer(requests.count), "finished": .integer(index + 1)])
+            }
         }) { request in
             try await runtime.generate(request)
         }

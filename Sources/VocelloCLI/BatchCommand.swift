@@ -204,6 +204,9 @@ enum BatchCommand {
             ])
         }, finished: { index, row in
             CLIBatchExecution.reportRow(row, generationID: requests[index].generationID)
+            if row.status == .completed {
+                CLIPresenter.event(.progress, data: ["items": .integer(requests.count), "finished": .integer(index + 1)])
+            }
         }) { request in
             return try await runtime.generate(request)
         }

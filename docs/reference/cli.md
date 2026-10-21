@@ -172,7 +172,9 @@ compatibility policy in `config/cli-contract/v1/README.md` (validated by
 - `--ndjson`: stdout carries event records `{schemaVersion, seq, t, requestID, type,
   generationID?, data}` (`started`, `engine_booting`, `model_loading`, `generation_started`, `chunk`,
   `download_progress`, `output_published`, `generation_completed`, `warning`, …) ending in one
-  `result` record whose `data` is the envelope. Running records coalesce under load and never block
+  `result` record whose `data` is the envelope. `progress` counts finished work: a batch's `items`, a
+  line batch's `lines`, a long-form project's `segments` (with its `index` among `projects`), or
+  `run`'s `requests`, each with `finished`. Running records coalesce under load and never block
   generation; terminal records are never dropped; consumers ignore unknown types. No text,
   transcript or audio ever travels in an event.
 - stderr carries no CLI notes in the machine formats unless `--verbose` (the engine's own

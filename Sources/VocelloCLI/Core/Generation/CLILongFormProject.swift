@@ -174,9 +174,14 @@ public enum CLILongFormProject {
                     "mode": .string(mode.rawValue), "modelID": .string(modelID),
                 ])
             case .segmentSaved(let index, let generationID, let durationSeconds):
+                submissions.saved += 1
                 CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
                     "index": .integer(projectIndex), "segment": .integer(index),
                     "durationSeconds": durationSeconds.map { .number($0) } ?? .null,
+                ])
+                CLIPresenter.event(.progress, data: [
+                    "index": .integer(projectIndex), "projects": .integer(projectCount),
+                    "segments": .integer(plan.segments.count), "finished": .integer(submissions.saved),
                 ])
             case .segmentFailed(let index, let generationID, let qcRejected):
                 CLIPresenter.event(.generationFailed, generationID: generationID, data: [
@@ -192,10 +197,11 @@ public enum CLILongFormProject {
         return report(result, into: outcome, lastSubmitted: submissions.last, signalled: Task.isCancelled)
     }
 
-    /// The take the runner submitted last.
+    /// The take the runner submitted last, and how many it kept.
     @MainActor
     private final class Submissions {
         var last: UUID?
+        var saved = 0
     }
 
     /// The runner's outcome as the CLI reports it. `signalled`: whether a signal

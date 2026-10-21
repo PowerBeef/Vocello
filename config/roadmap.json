@@ -231,32 +231,17 @@
         ".github/workflows/release.yml"
       ],
       "updated": "2026-10-21",
-      "notes": "Re-gated into the release plan 2026-10-21 for a signed .pkg at the maintainer's request (docs/audits/2026-10-21-cli-overhaul-plan.md). Landed: cli_package.py pkg/pkg-verify with preinstall, postinstall and a sealed uninstall.sh (cdb5eea6); the qualifier's cancellation probe fits one take again (79699c8a; it had exceeded the later single-take limit). Hardened-runtime probe PASS (cli-hardened-runtime-probe-20261021-032734-rerun): an optimized CLI signed ad hoc with --options runtime and no entitlements passed Custom, French Design and Clone (Fast QC pass), the two-item batch, a live SIGINT (cancelled envelope, no output) and exits 2/2, so the macos-cli role is empty. In flight: evidence/SBOM/policy and the release pipeline (agents). Maintainer step: a Developer ID Installer certificate and the release secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD; the first signed run proves Developer ID and notarized-pkg verification. Earlier history (2.4.0 ad hoc qualification, DMG packaging): git log -p -- config/roadmap.json.",
+      "notes": "Re-gated into the release plan 2026-10-21 for a signed .pkg at the maintainer's request (docs/audits/2026-10-21-cli-overhaul-plan.md). Landed: cli_package.py pkg/pkg-verify and the package scripts (cdb5eea6); evidence binding, the empty macos-cli entitlement role, release.sh build/sign/notarize/verify, the CI install test and template v3 (3acf1251 to 9133bf01); the security review's fixes (c5f1870b to 2d3ed9e5). Hardened-runtime probe PASS (cli-hardened-runtime-probe-20261021-032734-rerun): an optimized CLI signed ad hoc with --options runtime and no entitlements passed Custom, French Design and Clone (Fast QC pass), the batch, a live SIGINT and exits 2/2. Open: the first rehearsal on GitHub (maintainer dispatch) confirms the runner's /usr/local ownership; the maintainer's Developer ID Installer certificate and the release secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD; the first signed run proves Developer ID, notarization and stapled pkg-verify. History: git log -p -- config/roadmap.json.",
       "legacyIds": [
         "F-17"
       ],
       "due": "2026-11-06"
     },
     {
-      "id": "RF-26",
-      "plan": "release-first-3-0-2026-09",
-      "title": "CLI desktop core and read-only parity",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.",
-      "sourceOfTruth": [
-        "project.yml",
-        "docs/audits/2026-10-21-cli-overhaul-plan.md"
-      ],
-      "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
-      "due": "2026-10-30"
-    },
-    {
       "id": "RF-27",
       "plan": "release-first-3-0-2026-09",
       "title": "CLI generation on the app's pipeline",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.",
       "sourceOfTruth": [
@@ -1924,6 +1909,21 @@
       "updated": "2026-10-20",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-20 in RF-09's freeze checks on 029427c9: three SIGINT cases failed in the full parallel run (a 10 s subprocess deadline, exit 0 or 1 for 130, and record_lane_ledger not found on one signal path), then passed 15/15 three times alone and in the next full run. Parked without investigation under the focus lock."
+    },
+    {
+      "id": "BKL-27",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iOS signing identity is imported non-extractable in the release workflow",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "release.yml's iOS distribution-certificate import passes -x like the macOS imports (RF-08 security review L5), with the credential-hygiene test covering it, and a signed iOS archive still exports.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        "scripts/tests/test_supply_chain_contract.py"
+      ],
+      "updated": "2026-10-21",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-21 by the RF-08 security review: the macOS Application and Installer imports gained -x in 2d3ed9e5; the iOS import was left unchanged so the release path the 3.0 submission uses does not move before it."
     },
     {
       "id": "ER-01",

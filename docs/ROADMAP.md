@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 21/53 (40%) |
+| `release-first-3-0-2026-09` | active | release-qa | 22/53 (42%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/28 (46%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/29 (45%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -71,8 +71,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
-| `RF-26` | in-flight | CLI desktop core and read-only parity | — |
-| `RF-27` | planned | CLI generation on the app's pipeline | — |
+| `RF-27` | in-flight | CLI generation on the app's pipeline | — |
 | `RF-28` | planned | CLI saved voices, models and settings writes | — |
 | `RF-29` | planned | vocello mcp server | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
@@ -165,10 +164,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-23`** (planned, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.
 
-- **`RF-26`** (in-flight, due 2026-10-30) — CLI desktop core and read-only parity.
-  gate: A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.
-
-- **`RF-27`** (planned, due 2026-11-06) — CLI generation on the app's pipeline.
+- **`RF-27`** (in-flight, due 2026-11-06) — CLI generation on the app's pipeline.
   gate: Product commands host TTSEngineStore like the Mac app; takes run the shared single-take executor with headless hooks, long-form runs IOSLongFormCoordinator and the line batch the app's plan; app settings are the defaults; --plan, run --request(s), the request ledger, ndjson progress and the engine lease work; History writes are opt-in until RF-30; one real take per mode and a long-form project pass on the Mac.
 
 - **`RF-28`** (planned, due 2026-11-10) — CLI saved voices, models and settings writes.
@@ -581,6 +577,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-24` | parked | The iOS control audit does not count trailing-closure buttons | — |
 | `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
 | `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
+| `BKL-27` | parked | The iOS signing identity is imported non-extractable in the release workflow | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
 
@@ -636,6 +633,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-26`** (parked) — The UI-finalization signal tests fail under the parallel full Python suite.
   gate: scripts/tests/test_ui_failure_finalization.py passes reliably inside the full parallel suite (check_project_inputs.sh, pytest -n auto), shown by repeated full runs, without weakening what the signal cases prove.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-27`** (parked) — The iOS signing identity is imported non-extractable in the release workflow.
+  gate: release.yml's iOS distribution-certificate import passes -x like the macOS imports (RF-08 security review L5), with the credential-hygiene test covering it, and a signed iOS archive still exports.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

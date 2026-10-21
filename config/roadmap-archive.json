@@ -5293,6 +5293,28 @@
         "commit:0403cd34",
         "file:config/cli-contract/v1/baseline.json"
       ]
+    },
+    {
+      "id": "RF-26",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI desktop core and read-only parity",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.",
+      "sourceOfTruth": [
+        "project.yml",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Done 2026-10-21: VocelloDesktopCore compiles the app's History record, page query, migrations, brief catalog, export copy and variant resolution by path; DesktopShared/MacAppSettingsKeys is shared with the Mac app. Read-only parity: history list|search|show|export, settings list|get, briefs, languages, voices show|banks, models active|verify, doctor, capabilities runtime facts. Swift review blocker fixed in the interim: History reads refuse while the app runs on the same data root, because the app commits with SQLite's immediate-error busy mode (RF-30 adds the busy timeout and lock). Deferred: extracting ModelManagerViewModel's install-state logic into DesktopShared (the CLI mirrors it; RF-28).",
+      "due": "2026-10-30",
+      "evidence": [
+        "commit:701c0da9",
+        "commit:5ba5984f",
+        "commit:6950f227",
+        "commit:5876d990",
+        "commit:87c01ec0"
+      ]
     }
   ]
 }

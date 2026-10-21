@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-20
+reviewed: 2026-10-21
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,30 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 20, night — the iPhone 3.0.0 candidate is frozen at `029427c9` (resume here)
+### October 21 — the freeze moves to `0919e998`; Mac updates land (resume here)
+
+`main` is pushed through `0919e998`, the freeze commit; the freeze record follows it. The maintainer
+holds the release: no tag yet.
+
+- **RF-24 (release blocker, maintainer report): the iPhone Clone Studio matches the other modes.**
+  Clone had stacked its reference transcript review under the canvas (since `46504a11`), pushing
+  Generate up and squeezing the script. The review now sits at the top of the Reference panel
+  (`50761bcc`, `08372fdd`, reviewed). `ios smoke --scenario studio-layout` (also part of full smoke)
+  passed on the iPhone (`ios-xcui-smoke-20261021-050240-000ce5bc`): Generate sits 8.6 pt above the
+  tab dock in all three modes. macOS was never affected (its review lives in a popover).
+- **RF-23 (maintainer request): Sparkle updates for the Mac app.** Vocello > Check for Updates…, a
+  Settings > Updates category, Sparkle's second-launch prompt, no silent installs, a signed feed
+  required and updates verified before extraction; the EdDSA key is in the maintainer's keychain
+  and the `release` environment. The release workflow signs the DMG and the feed in a minimal job;
+  the Swift and security reviews' findings are fixed; the Mac layout lane passes; the privacy page
+  names the check. Left: the release rehearsal on GitHub and one end-to-end update between signed
+  builds.
+- **The freeze:** the full checks pass on `0919e998` (website browser smoke included now that
+  Playwright's Chromium is installed locally); `focusLock.freeze` names it.
+- **Next:** the maintainer's signed `v3.0.0` tag (tag-signing key setup first), then ASR-10's signed
+  archive and TestFlight (RF-12, RF-15), each on the maintainer's go.
+
+### October 20, night — the iPhone 3.0.0 candidate is frozen at `029427c9`
 
 `main` is pushed through `029427c9`, the freeze commit, and its push CI is green (run 39531352634); the freeze record follows it.
 
@@ -203,18 +226,3 @@ included). PR #110's zsh completion landed earlier in the day; #110 and #87 are 
   - P2-5, the test-adequacy seams;
   - P3-5, lane orchestration in Python.
 - The local arenas are warm again. The RF-18 E4 note below still applies.
-
-### October 18 — workflow audit saved; the local build arenas are cold
-
-`main` is pushed through `1b02555f`; the release state is unchanged from the October 17 entry below.
-
-- **Workflow audit:** [docs/audits/2026-10-18-dev-workflow-audit.md](audits/2026-10-18-dev-workflow-audit.md)
-  holds the verified findings and the phased programme. It is recommendations only: nothing is
-  scheduled until the maintainer picks a phase, and picked items after the freeze join the release plan.
-- **Cold arenas (audit W-13):** every `build/cache/xcode/*` root vanished at 21:15 EDT on October 17
-  while the disk was 98% full, most likely macOS's low-storage purge. This corrects the earlier report
-  that the build caches were untouched. The repository cleaner only dry-ran, and the models, QC v2
-  caches, RF-18 data and corpora are intact. `build/vocello` and `build/Vocello.app` dangle. The next
-  `check` regenerates the project, and the first native build is cold, so it is never a measurement.
-- **RF-18 E4:** the resume script finds no CLI with the screen's digest. It rebuilds
-  `cli-optimized` at HEAD and records the new digest in its driver log; note that in the E4 result.

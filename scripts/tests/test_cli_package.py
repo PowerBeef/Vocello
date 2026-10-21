@@ -1081,6 +1081,17 @@ class CLIInstallerPackageTests(unittest.TestCase):
         self.assertTrue(all(path.endswith("/root with spaces/usr/local/lib/vocello/vocello") for path in inspected))
         self.assertNotIn(str(self.root), report_path.read_text())
 
+        # The real report binds in release evidence beside the DMG of the same sealed payload: as
+        # rehearsal evidence while unsigned, never as release evidence.
+        dmg_report = {"artifact": {"name": "Vocello-macos26-cli.dmg"},
+                      "manifestSHA256": package.digest(self.output / package.MANIFEST),
+                      "fileCount": len(json.loads((self.output / package.MANIFEST).read_text())["files"])}
+        artifacts = [{"kind": "artifact", **report["artifact"]}]
+        release_evidence.validate_cli_installer_verification(report, self.release, artifacts, dmg_report,
+                                                             rehearsal=True)
+        with self.assertRaisesRegex(ValueError, "Developer ID Installer"):
+            release_evidence.validate_cli_installer_verification(report, self.release, artifacts, dmg_report)
+
 
 if __name__ == "__main__":
     unittest.main()

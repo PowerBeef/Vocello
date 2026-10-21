@@ -399,7 +399,9 @@ def _run_qualification_cancellation(
         _events, envelope = vocello_cli_json.read_ndjson((bytes(output) + stdout).decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         envelope = None
-    error = envelope.get("error") if isinstance(envelope, dict) else None
+    if not isinstance(envelope, dict):
+        envelope = {}
+    error = envelope.get("error")
     if (process.returncode != 130 or b"forced exit" in stderr or not isinstance(error, dict)
             or envelope.get("ok") is not False or error.get("code") != "cancelled"
             or error.get("exitCode") != 130 or (error.get("detail") or {}).get("signal") != "SIGINT"):

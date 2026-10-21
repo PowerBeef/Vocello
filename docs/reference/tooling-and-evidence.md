@@ -89,7 +89,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   the checked-out commit, containment in `origin/main` and a successful latest `CI required` run of a
   push to main; the release workflow runs Security on that commit first, and every later job builds
   that authorized commit, never the tag ref again. Promotion runs from the tag under the `release`
-  environment and verifies each DMG's build attestation from `release.yml`. Release-path jobs restore no Actions
+  environment and verifies the build attestation of each DMG and the CLI installer package from `release.yml`. Release-path jobs restore no Actions
   cache (`native-toolchain` with `pip-cache: "false"`); the Sparkle key lives only in `sparkle-feed`, a fresh
   runner that builds nothing, and only `draft-release`, which holds no secret, has `contents: write`.
   Lightweight tags, cross-SHA checks and incomplete

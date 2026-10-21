@@ -59,8 +59,8 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
   their own runners) → `TTSEngineStore.generate` (admission) → `MLXTTSEngine` (typed cancellation,
   `MLXModelLoadCoordinator`, prewarm/clone conditioning) → `VocelloQwen3Engine` actor in
   `Packages/VocelloQwen3Core` → bounded suspending PCM channel → limiter, atomic WAV writer, watermark,
-  Fast QC → `GenerationPersistence` (outbox sidecar, idempotent GRDB commit). The CLI drives
-  `MLXTTSEngine` directly.
+  Fast QC → `GenerationPersistence` (outbox sidecar, idempotent GRDB commit). The CLI's product
+  commands host `MLXTTSEngine` through the same store (`DesktopEngineHost`); `bench` drives it directly.
 - **Owned package** `Packages/VocelloQwen3Core` (SwiftPM name `MLXAudio`): a Qwen3-TTS-only fork. App code
   imports only the `VocelloQwen3Core` facade; `FACADE_API_BASELINE.json` and
   `scripts/qwen3_core_contract.py` enforce it. mlx-swift, mlx-swift-lm, swift-transformers and

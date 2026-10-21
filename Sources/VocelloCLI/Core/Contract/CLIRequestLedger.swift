@@ -68,10 +68,18 @@ public struct CLIRequestLedger: Sendable {
     }
 
     /// The digest that identifies a request: its canonical JSON (sorted keys).
-    public static func digest(of request: CLIJSONValue) -> String {
-        let data = (try? CLIJSONEncoding.encoder().encode(request)) ?? Data()
+    public static func digest(of request: CLIJSONValue) throws -> String {
+        let data: Data
+        do {
+            data = try CLIJSONEncoding.encoder().encode(request)
+        } catch {
+            throw CLIError(.internalError, "the request has no canonical form")
+        }
         return hex(SHA256.hash(data: data))
     }
+
+    /// Pruning runs at most this often, so a completion rarely reads the whole ledger.
+    static let pruneInterval: TimeInterval = 3600
 
     private static func hex(_ digest: SHA256.Digest) -> String {
         digest.map { unsafe String(format: "%02x", $0) }.joined()
@@ -106,7 +114,7 @@ public struct CLIRequestLedger: Sendable {
     public func claim(id: String, request: CLIJSONValue, now: Date = Date()) throws -> Claim {
         try Self.validate(id: id)
         let key = Self.hex(SHA256.hash(data: Data(id.utf8)))
-        let requestDigest = Self.digest(of: request)
+        let requestDigest = try Self.digest(of: request)
         do {
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
@@ -164,36 +172,57 @@ public struct CLIRequestLedger: Sendable {
         release(reservation.lock)
     }
 
-    /// Removes entries completed before the retention window, with their lock
-    /// files, skipping any id a process holds.
-    func prune(now: Date) {
+    /// Removes entries completed before the retention window and the lock files
+    /// of ids that kept nothing (abandoned) for as long, skipping any id a process
+    /// holds; at most once per `pruneInterval` unless `force`.
+    func prune(now: Date, force: Bool = false) {
         _ = try? withLedgerLock {
+            let marker = directory.appendingPathComponent("ledger.pruned")
+            if !force, let last = Self.modified(marker), last <= now, now.timeIntervalSince(last) < Self.pruneInterval {
+                return
+            }
+            FileManager.default.createFile(atPath: marker.path, contents: nil)
+            try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: marker.path)
             let urls = (try? FileManager.default.contentsOfDirectory(
                 at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
             )) ?? []
+            let names = Set(urls.map(\.lastPathComponent))
             for url in urls {
-                if url.pathExtension == "tmp" {
+                let age = now.timeIntervalSince(Self.modified(url) ?? now)
+                switch url.pathExtension {
+                case "tmp":
                     // A write that never reached its rename.
-                    let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
-                        .contentModificationDate ?? now
-                    if now.timeIntervalSince(modified) > 3600 { try? FileManager.default.removeItem(at: url) }
+                    if age > 3600 { try? FileManager.default.removeItem(at: url) }
+                case "json":
+                    let key = url.deletingPathExtension().lastPathComponent
+                    guard let entry = try? readEntry(key: key), isExpired(entry, now: now) else { continue }
+                    removeIdle(key: key, entry: url)
+                case "lock" where url.lastPathComponent != "ledger.lock":
+                    let key = url.deletingPathExtension().lastPathComponent
+                    if !names.contains("\(key).json"), age > Self.retention { removeIdle(key: key, entry: nil) }
+                default:
                     continue
                 }
-                guard url.pathExtension == "json" else { continue }
-                let key = url.deletingPathExtension().lastPathComponent
-                guard let entry = try? readEntry(key: key), isExpired(entry, now: now) else { continue }
-                // Claims open lock files only under the ledger lock, held here, so an
-                // id nobody holds can lose its lock file without racing a claim.
-                guard let lock = try? openLock(key: key) else { continue }
-                guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
-                    try? lock.close()
-                    continue
-                }
-                try? FileManager.default.removeItem(at: url)
-                try? FileManager.default.removeItem(at: lockURL(key: key))
-                release(lock)
             }
         }
+    }
+
+    /// Removes an id's entry and lock file unless a process holds it. Claims open
+    /// lock files only under the ledger lock, which the caller holds, so this
+    /// never races a claim.
+    private func removeIdle(key: String, entry: URL?) {
+        guard let lock = try? openLock(key: key) else { return }
+        guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
+            try? lock.close()
+            return
+        }
+        if let entry { try? FileManager.default.removeItem(at: entry) }
+        try? FileManager.default.removeItem(at: lockURL(key: key))
+        release(lock)
+    }
+
+    private static func modified(_ url: URL) -> Date? {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
     // MARK: - Files
@@ -270,6 +299,11 @@ public struct CLIRequestLedger: Sendable {
                 guard fsync(descriptor.rawValue) == 0 else { throw Errno(rawValue: errno) }
             }
             guard unsafe rename(temporary.path, url.path) == 0 else { throw Errno(rawValue: errno) }
+            // The rename itself survives a crash only once the folder is synced.
+            let folder = try FileDescriptor.open(FilePath(directory.path), .readOnly, options: [.closeOnExec])
+            try folder.closeAfter {
+                guard fsync(folder.rawValue) == 0 else { throw Errno(rawValue: errno) }
+            }
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error

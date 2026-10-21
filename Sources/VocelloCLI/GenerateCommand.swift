@@ -141,7 +141,21 @@ public enum GenerateCommand {
         do {
             result = try await runtime.generate(request)
         } catch {
+            // Only a take the engine started delivers a terminal event. A refusal
+            // before it (the store's support, consent, busy or memory admission)
+            // never does, and an operator's interrupt needs no reason, so the drain
+            // waits only for the engine's own stop, whose `.cancelled` event names
+            // its reason; anything else stops it at once.
+            let engineStopped = !Task.isCancelled && (error is CancellationError || error is CLIEngineCancellation)
+            if !engineStopped { streamTask?.cancel() }
+            // A started take queues its terminal at once; a bound keeps a missing
+            // one from ever stranding the command.
+            let deadline = Task { @concurrent () async in
+                try? await Task.sleep(for: .seconds(5))
+                streamTask?.cancel()
+            }
             let observation = await streamTask?.value
+            deadline.cancel()
             // P15-02: the take's own `.cancelled` event names the engine's reason.
             let classified = CLIEngineCancellation.classify(
                 error,
@@ -279,14 +293,18 @@ public enum GenerateCommand {
     /// `clientRequestID`): the take as the caller asked for it, not how it was
     /// spelled. The text counts by its digest wherever it came from (an argument,
     /// a file or stdin), paths are absolute, parsed options take their canonical
-    /// form, and defaults (the app's settings, Auto language, streaming) count as
-    /// what they mean, so a `generate` command line and the same `run` request are
-    /// one request. The data folder is not part of it: the ledger lives there.
+    /// form, and omitted options count as what they resolve to (the package and
+    /// variation the app's settings choose at run time, the default speaker, Auto
+    /// language, streaming), so a `generate` command line and the same `run`
+    /// request are one request, and an omitted setting the app has since changed
+    /// is a different one. The data folder is not part of it: the ledger lives there.
     static func identity(of take: PreparedTake) throws -> CLIJSONValue {
         let args = take.args
         let normalized: Set<String> = [
             "text", "text-file", "mode", "variant", "seed", "variation", "language", "stream", "no-stream", "out",
-            "reference", "manifest", "data-dir", "long-form",
+            "reference", "manifest", "data-dir", "long-form", "speaker",
+            // Required for clone and ignored elsewhere, so it never tells two takes apart.
+            "confirm-consent",
         ]
         guard case .object(var fields) = args.canonicalForm(excluding: identityExclusions.union(normalized)) else {
             throw CLIError(.internalError, "the request has no canonical form")
@@ -298,9 +316,11 @@ public enum GenerateCommand {
         fields["take"] = .object([
             "mode": .string(take.mode.rawValue),
             "textDigest": .string(sha256(Data(take.text.utf8))),
-            "variant": try parseVariantFlag(args).map { .string($0 ? "quality" : "speed") } ?? .null,
+            "variant": .string(take.quality ? "quality" : "speed"),
             "seed": take.seed.map { .string(String($0)) } ?? .null,
-            "variation": try parseVariation(args).map { .string($0.rawValue) } ?? .null,
+            "variation": .string((take.variation ?? .expressive).rawValue),
+            "speaker": take.mode == .custom
+                ? .string(try explicitSpeaker(args) ?? take.registry.defaultSpeaker.id) : .null,
             "language": take.language.flatMap { $0 == .auto ? nil : CLIJSONValue.string($0.rawValue) } ?? .null,
             "stream": .bool(take.streaming),
             "longForm": .bool(take.longFormPlan != nil),
@@ -973,7 +993,9 @@ public enum GenerateCommand {
     /// The take's text: `--text`, `--text-file`, or `-` for stdin; unnamed piped
     /// stdin only in text mode without --no-input, and only when `implicitStdin`
     /// (never for a request an agent sent).
-    static func resolveText(_ args: Args, implicitStdin: Bool = true) throws -> String {
+    static func resolveText(
+        _ args: Args, implicitStdin: Bool = true, readImplicitStdin: () -> String? = readImplicitStdinText
+    ) throws -> String {
         if let t = args.string("text") {
             return t == "-" ? (readStdinText() ?? "") : t
         }
@@ -986,7 +1008,7 @@ public enum GenerateCommand {
                 throw CLIError(code, "could not read --text-file \(path): \(error.localizedDescription)")
             }
         }
-        if implicitStdin, let piped = readImplicitStdinText() { return piped }
+        if implicitStdin, let piped = readImplicitStdin() { return piped }
         throw CLIError(
             .usageError, "missing text — pass --text \"…\", --text-file <path>, or --text - to read stdin"
         )

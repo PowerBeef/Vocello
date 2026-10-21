@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 import XCTest
 @testable import VocelloCLICore
 
@@ -126,6 +127,26 @@ final class CLIRequestTests: XCTestCase {
         let accumulated = try await identity(["--text", "Hello there.", "--no-stream"], root: root)
         XCTAssertNotEqual(accumulated, hello)
 
+        // Review S1: an omitted option is what it resolves to (the app's package
+        // and variation, the default speaker), so spelling the default out is the
+        // same request; consent never tells two takes apart.
+        let resolved = try await take(["--text", "Hello there."], root: root)
+        let spelledOut = try await identity([
+            "--text", "Hello there.", "--variant", resolved.quality ? "quality" : "speed",
+            "--variation", (resolved.variation ?? .expressive).rawValue,
+            "--speaker", resolved.registry.defaultSpeaker.id, "--confirm-consent",
+        ], root: root)
+        XCTAssertEqual(spelledOut, hello)
+        let otherVariant = try await identity(
+            ["--text", "Hello there.", "--variant", resolved.quality ? "speed" : "quality"], root: root
+        )
+        XCTAssertNotEqual(otherVariant, hello)
+        let relative = try await identity(["--text", "Hello there.", "--out", "take.wav"], root: root)
+        let absolute = try await identity(
+            ["--text", "Hello there.", "--out", FileManager.default.currentDirectoryPath + "/take.wav"], root: root
+        )
+        XCTAssertEqual(relative, absolute, "a relative path is the absolute path it names")
+
         let request = try CLIGenerateRequest.parse(try json(#"{"text":"Hello there.","seed":42,"variant":"speed"}"#))
         let asRequest = try await identity(request.argv, root: root)
         let asCommandLine = try await identity(["--text", "Hello there.", "--seed", "42", "--variant", "speed"], root: root)
@@ -135,9 +156,17 @@ final class CLIRequestTests: XCTestCase {
     /// Review S4: a request with no text never takes unnamed stdin.
     func testARequestNeverReadsUnnamedStdin() throws {
         let args = try CLIParser.args([], for: "generate")
-        XCTAssertThrowsError(try GenerateCommand.resolveText(args, implicitStdin: false)) {
+        var reads = 0
+        let piped: () -> String? = {
+            reads += 1
+            return "Piped text."
+        }
+        XCTAssertThrowsError(try GenerateCommand.resolveText(args, implicitStdin: false, readImplicitStdin: piped)) {
             XCTAssertEqual(($0 as? CLIError)?.code, .usageError)
         }
+        XCTAssertEqual(reads, 0, "stdin is never read for a request")
+        XCTAssertEqual(try GenerateCommand.resolveText(args, implicitStdin: true, readImplicitStdin: piped), "Piped text.")
+        XCTAssertEqual(reads, 1)
     }
 
     // MARK: - Ledger
@@ -182,7 +211,7 @@ final class CLIRequestTests: XCTestCase {
         XCTAssertTrue(ledger.complete(retry, result: try json(#"{"ok":true}"#), now: longAgo))
         func files() throws -> [String] {
             try FileManager.default.contentsOfDirectory(atPath: ledger.directory.path)
-                .filter { $0 != "ledger.lock" }.sorted()
+                .filter { !$0.hasPrefix("ledger.") }.sorted()
         }
         XCTAssertEqual(try files().count, 2, "an entry and its lock file")
         guard case .fresh(let next) = try ledger.claim(id: "job-3", request: request) else { return XCTFail() }
@@ -192,6 +221,10 @@ final class CLIRequestTests: XCTestCase {
             return XCTFail("an entry past retention is pruned, so the id runs again")
         }
         ledger.abandon(again)
+        let later = Date(timeIntervalSinceNow: CLIRequestLedger.retention + 3600)
+        ledger.prune(now: later, force: true)
+        XCTAssertEqual(try files().filter { $0.hasSuffix(".lock") || $0.hasSuffix(".json") }, [],
+                       "expired entries and the lock files of ids that kept nothing are pruned")
         XCTAssertThrowsError(try ledger.claim(id: "", request: request))
         XCTAssertThrowsError(try ledger.claim(id: String(repeating: "a", count: 129), request: request))
     }
@@ -275,22 +308,42 @@ final class CLIRequestTests: XCTestCase {
         var calls = 0
         let stopping: (GenerateCommand.PreparedTake) async throws -> CLIJSONValue = { _ in
             calls += 1
-            if calls == 2 { throw CancellationError() }
+            if calls == 2 {
+                // A signal cancels the command's task, then the take.
+                unsafe withUnsafeCurrentTask { unsafe $0?.cancel() }
+                throw CancellationError()
+            }
             return .object(["audioPath": .string(take.path)])
         }
-        let stopped = await RunCommand.runRequests(
-            [#"{"text":"A."}"#, #"{"text":"B.","clientRequestID":"r-2"}"#, #"{"text":"C."}"#],
-            shared: shared, ledger: ledger, execute: stopping
-        )
+        let stopped = await Task { @MainActor in
+            await RunCommand.runRequests(
+                [#"{"text":"A."}"#, #"{"text":"B.","clientRequestID":"r-2"}"#, #"{"text":"C.","clientRequestID":"r-3"}"#],
+                shared: shared, ledger: ledger, execute: stopping
+            )
+        }.value
         XCTAssertTrue(stopped.stopped)
         XCTAssertEqual(stopped.rows.map(\.index), [0, 1, 2], "every planned row")
         XCTAssertEqual(stopped.rows.map { $0.error?.code }, [nil, .cancelled, .cancelled])
-        XCTAssertEqual(stopped.rows[1].clientRequestID, "r-2")
+        XCTAssertEqual(stopped.rows.map(\.clientRequestID), [nil, "r-2", "r-3"], "unreached rows keep their ids")
         guard case .run(let retry) = try ledger.start(id: "r-2", request: CLIJSONValue.null) else {
             return XCTFail("a stopped request kept nothing")
         }
         ledger.abandon(retry)
         XCTAssertThrowsError(try RunCommand.report(stopped, single: false)) { XCTAssertTrue($0 is CancellationError) }
+
+        // Review N1: a cancellation no signal caused is the engine's own stop: that
+        // request fails with memory_pressure and the others still run.
+        var engineStops = 0
+        let engineStopping: (GenerateCommand.PreparedTake) async throws -> CLIJSONValue = { _ in
+            engineStops += 1
+            if engineStops == 1 { throw CancellationError() }
+            return .object(["audioPath": .string(take.path)])
+        }
+        let continued = await RunCommand.runRequests(
+            [#"{"text":"A."}"#, #"{"text":"B."}"#], shared: shared, ledger: ledger, execute: engineStopping
+        )
+        XCTAssertFalse(continued.stopped)
+        XCTAssertEqual(continued.rows.map { $0.error?.code }, [.memoryPressure, nil])
 
         let failing = await RunCommand.runRequests(
             [#"{"text":"A."}"#], shared: shared, ledger: ledger,
@@ -299,6 +352,10 @@ final class CLIRequestTests: XCTestCase {
         XCTAssertThrowsError(try RunCommand.report(failing, single: true)) {
             XCTAssertEqual($0 as? CLIError, CLIError(.engineBusy, "busy", hint: "wait"),
                            "one request fails exactly as generate would")
+        }
+        // Review N2: with a signal too, the failure still reports itself.
+        XCTAssertThrowsError(try RunCommand.report(.init(rows: failing.rows, stopped: true), single: true)) {
+            XCTAssertEqual(($0 as? CLIError)?.code, .engineBusy)
         }
     }
 

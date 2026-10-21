@@ -215,10 +215,12 @@ public enum CLIFailure {
         switch reason {
         case .memoryPressure, .insufficientMemory:
             return "free memory (quit other apps) or use --variant speed, then retry"
-        case .engineBusy, .engineReleasingMemory, .savedVoiceStoreBusy:
-            return "another Vocello process is busy; retry when it finishes"
+        case .engineBusy, .engineReleasingMemory:
+            return "a take is running or memory is being released, in this or another Vocello process; retry shortly"
+        case .savedVoiceStoreBusy:
+            return "the saved voices are in use by another Vocello process; retry shortly"
         case .scriptTooLongForTake:
-            return "run it as a long-form project with `vocello batch --long-form`"
+            return "run it as a long-form project: `vocello generate` does by default (--long-form auto)"
         case .modelUnavailable:
             return "install it with `vocello models install <id>` (see `vocello models list`)"
         case .audioSilentGap, .audioNoSpeech, .audioUnstable, .audioQualityRejected:

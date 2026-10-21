@@ -347,8 +347,10 @@ the id's digest and private to the user. The same id with the same request repla
 `idempotency_conflict` (2); the same id while another process runs it is `request_in_progress` (75). A
 failed request keeps nothing, so a retry runs again. "The same request" means the same take: the text
 counts by its content wherever it came from (`--text`, a file or stdin), paths count as absolute paths,
-option spellings and defaults count as what they mean (`--variant fast` is `speed`), and how a command
-reports does not count, so a `generate` command line and the same `run` request are one request. A
+option spellings count as what they mean (`--variant fast` is `speed`), an omitted option counts as what
+it resolves to at run time (the package and variation the app's settings choose, the default speaker),
+and neither consent nor how a command reports counts, so a `generate` command line and the same `run`
+request are one request, while one whose omitted setting the app has since changed is not. A
 replay whose take no longer exists fails with `output_missing` (use a new id), and a success whose
 result could not be kept carries the warning `idempotency_not_recorded`.
 

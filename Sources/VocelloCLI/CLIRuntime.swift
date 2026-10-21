@@ -2,10 +2,6 @@ import Foundation
 import QwenVoiceCore
 import VocelloDesktopCore
 
-/// In-process engine for the CLI. Mirrors `MacEngineBootstrap`'s runtime wiring
-/// (manifest → platform-expanded registry → `NativeRuntimeFactory.make` →
-/// `engine.initialize`) — the CLI links `QwenVoiceCore` and drives
-/// `MLXTTSEngine` directly.
 /// Read-only runtime context (registry + model asset store) for commands that
 /// don't generate audio.
 @MainActor
@@ -15,6 +11,11 @@ public struct CLIRegistryContext {
     public let modelsDirectory: URL
 }
 
+/// In-process engine for the CLI. Mirrors `MacEngineBootstrap`'s runtime wiring
+/// (manifest → platform-expanded registry → `NativeRuntimeFactory.make`). The
+/// product commands (generate, batch, run) host the engine through
+/// `DesktopEngineHost`, the shared `TTSEngineStore` with the Mac memory budget;
+/// `bench` drives `MLXTTSEngine` directly.
 @MainActor
 public struct CLIRuntime {
     public let engine: MLXTTSEngine
@@ -70,7 +71,9 @@ public struct CLIRuntime {
     }
 
     /// This runtime's engine under another request's recorded consent (one warm
-    /// engine serves many requests, each with its own `confirmConsent`).
+    /// engine serves many requests, each with its own `confirmConsent`). The host
+    /// is shared, so its consent becomes this request's: requests run one at a
+    /// time, and `generate` also checks the returned runtime's own consent first.
     public func withConsent(_ consent: VoiceCloningConsentPolicy) -> CLIRuntime {
         host?.setConsent(consent)
         return CLIRuntime(

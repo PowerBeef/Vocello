@@ -62,9 +62,9 @@ release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta*
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 11 targets split into **frameworks** and **apps/CLI/tests**; since
+2.46.0). There are 12 targets split into **frameworks** and **apps/CLI/tests**; since
 2026-09-15 no target is macOS-only except the app, the CLI, the CLI's `VocelloCLICore` framework
-(2026-10-19) and their test bundles.
+(2026-10-19), the CLI's share of the app, `VocelloDesktopCore` (2026-10-21), and their test bundles.
 
 ```mermaid
 graph TD
@@ -80,6 +80,7 @@ graph TD
     QwenVoiceCore["QwenVoiceCore<br/>(engine core · iOS+macOS)"]:::fw
     QwenVoiceBackendCore["QwenVoiceBackendCore<br/>(provenance + policy vocabulary · iOS+macOS)"]:::fw
     VocelloCLICore["VocelloCLICore<br/>(CLI runtime + parsing · macOS)"]:::macfw
+    VocelloDesktopCore["VocelloDesktopCore<br/>(the app's store, History, settings · macOS)"]:::macfw
     VocelloCoreTests["VocelloCoreTests<br/>(macOS unit tests)"]:::app
 
     GRDB["GRDB.swift"]:::spm
@@ -95,7 +96,10 @@ graph TD
 
     VocelloCLI --> VocelloCLICore
     VocelloCLI --> QwenVoiceCore
+    VocelloCLICore --> VocelloDesktopCore
     VocelloCLICore --> QwenVoiceCore
+    VocelloDesktopCore --> QwenVoiceCore
+    VocelloDesktopCore --> GRDB
 
     VocelloCoreTests --> QwenVoiceCore
     VocelloCoreTests -.->|"@testable import"| VocelloCLICore
@@ -121,6 +125,7 @@ for the exact link graph.)
 | `VocelloiOS` | application | iOS | `QVoiceiOS` | `com.patricedery.vocello` | iOS SwiftUI app; engine runs in-process. App Group `group.com.patricedery.vocello.shared`. |
 | `VocelloCLI` | tool | macOS | `VocelloCLI` | `com.qwenvoice.cli` | Headless `vocello` binary; engine in-process. Its commands over `VocelloCLICore`. |
 | `VocelloCLICore` | framework.static | macOS | `VocelloCLICore` | `com.qwenvoice.cli.core` | The CLI's runtime, argument parsing and routing, consent, process supervision and batch execution: linked into `vocello` and imported `@testable` by `VocelloCoreTests` instead of compiled there by path (workflow audit P2-3). |
+| `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | (static) | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does; read-only History, app settings (CFPreferences), model selection and inventory. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
@@ -251,12 +256,14 @@ flowchart LR
     end
     subgraph CLI["vocello CLI (in-process)"]
         CLIRuntime["CLIRuntime"]
+        CLIStore["TTSEngineStore via DesktopEngineHost<br/>(generate, batch, run)"]
         Core3["MLXTTSEngine (QwenVoiceCore)"]
     end
 
     MacUI --> MacStore --> Core1
     IOSUI --> IOSStore --> Core2
-    CLIRuntime --> Core3
+    CLIRuntime --> CLIStore --> Core3
+    CLIRuntime -.->|"bench"| Core3
 ```
 
 - **macOS** — `MacEngineBootstrap` builds the runtime from the bundled contract
@@ -271,8 +278,11 @@ flowchart LR
   non-UI extensions are Jetsam-capped independently of the
   `increased-memory-limit` entitlement. iOS holds the engine behind
   `Sources/iOS/TTSEngineStore.swift`, the same file the macOS target compiles.
-- **CLI** — `vocello` links `QwenVoiceCore` and drives `MLXTTSEngine`
-  in-process, reusing models the app already installed.
+- **CLI** — `vocello` builds the same runtime in-process and, for `generate`, `batch` and `run`,
+  hosts it as the Mac app does: `DesktopEngineHost` (`VocelloDesktopCore`) wraps `MLXTTSEngine` in
+  the shared `TTSEngineStore` with `MacMemoryBudgetPolicy`, so a take gets the app's admission and
+  memory guard. `bench` drives `MLXTTSEngine` directly for its measurements. It reuses models the app
+  already installed.
 
 ---
 
@@ -837,8 +847,12 @@ concrete type. Key iOS behaviors:
 `VocelloCLICore` framework with the argument parsing and routing, consent, process supervision,
 batch execution and the `generate` and `modes` commands; the `vocello` executable keeps
 `VocelloMain` and the other commands and links it) bootstraps
-the in-process engine the same way the iOS app does — `NativeRuntimeFactory.make`
-over a data directory — and reuses models already installed by the app. It is
+the in-process engine the same way the apps do — `NativeRuntimeFactory.make`
+over a data directory — and reuses models already installed by the app. `generate`, `batch` and
+`run` pass `hostedLikeTheApp`, so takes go through `DesktopEngineHost` and the shared
+`TTSEngineStore` (support, consent, busy and memory admission, the critical-pressure guard, post-take
+trims), as in `MacEngineBootstrap`; `bench` keeps the raw engine. A script past one take runs as a
+long-form project through `CLILongFormProject` (the apps' planner and bounded assembler). It is
 both a user-facing generator and the deterministic driver for
 benchmarks/quality gates (no Python, no bundled weights).
 

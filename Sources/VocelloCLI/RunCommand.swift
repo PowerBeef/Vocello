@@ -130,7 +130,7 @@ public enum RunCommand {
     ) async -> Outcome {
         var rows: [Row] = []
         for (index, document) in documents.enumerated() {
-            if Task.isCancelled { return stopped(rows, total: documents.count) }
+            if Task.isCancelled { return stopped(rows, documents: documents) }
             var clientRequestID: String?
             var reservation: CLIRequestLedger.Reservation?
             do {
@@ -177,19 +177,21 @@ public enum RunCommand {
             } catch {
                 if let reservation { ledger.abandon(reservation) }
                 // A signal stops every request; a genuine failure that coincides
-                // with it stays this request's failure.
-                if error is CancellationError {
+                // with it stays this request's failure. A cancellation no signal
+                // caused is the engine's own stop (P15-02): this request's failure.
+                let failure = CLIEngineCancellation.classify(error, commandCancelled: Task.isCancelled)
+                if failure is CancellationError {
                     rows.append(Row(
                         index: index, clientRequestID: clientRequestID, ok: false, replayed: false, result: nil,
                         error: CLIErrorObject(code: .cancelled, message: "the run was stopped during this request")
                     ))
-                    return stopped(rows, total: documents.count)
+                    return stopped(rows, documents: documents)
                 }
                 rows.append(Row(
                     index: index, clientRequestID: clientRequestID, ok: false, replayed: false, result: nil,
-                    error: CLIFailure.classify(error), cause: error
+                    error: CLIFailure.classify(failure), cause: failure
                 ))
-                if Task.isCancelled { return stopped(rows, total: documents.count) }
+                if Task.isCancelled { return stopped(rows, documents: documents) }
             }
             CLIPresenter.event(.progress, data: [
                 "requests": .integer(documents.count), "finished": .integer(index + 1),
@@ -198,24 +200,33 @@ public enum RunCommand {
         return Outcome(rows: rows, stopped: false)
     }
 
-    /// Every planned row of a stopped run: those never reached are cancelled.
-    private static func stopped(_ rows: [Row], total: Int) -> Outcome {
+    /// Every planned row of a stopped run: those never reached are cancelled,
+    /// each with the client request id its document names, if any.
+    private static func stopped(_ rows: [Row], documents: [String]) -> Outcome {
         var all = rows
-        for index in rows.count ..< total {
+        for index in rows.count ..< documents.count {
             all.append(Row(
-                index: index, clientRequestID: nil, ok: false, replayed: false, result: nil,
-                error: CLIErrorObject(code: .cancelled, message: "not attempted: the run was stopped")
+                index: index, clientRequestID: namedClientRequestID(documents[index]), ok: false, replayed: false,
+                result: nil, error: CLIErrorObject(code: .cancelled, message: "not attempted: the run was stopped")
             ))
         }
         return Outcome(rows: all, stopped: true)
+    }
+
+    private static func namedClientRequestID(_ document: String) -> String? {
+        guard case .object(let fields)? = try? JSONDecoder().decode(CLIJSONValue.self, from: Data(document.utf8)),
+              case .string(let id)? = fields[CLIGenerateRequest.clientRequestIDField] else { return nil }
+        return id
     }
 
     /// Reports `outcome`: one request exactly as `generate` would, several as rows.
     @MainActor
     static func report(_ outcome: Outcome, single: Bool) throws {
         if single, let row = outcome.rows.first {
-            if outcome.stopped { throw CancellationError() }
+            // A genuine failure reports itself even when a signal arrived with it,
+            // as `generate` does (the signal's exit status, the failure in its detail).
             if let cause = row.cause { throw cause }
+            if outcome.stopped { throw CancellationError() }
             if row.replayed { CLIPresenter.markReplayed() }
             if CLIPresenter.isMachine, let result = row.result {
                 CLIPresenter.succeed(result)

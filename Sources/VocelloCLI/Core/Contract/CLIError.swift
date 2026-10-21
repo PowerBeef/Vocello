@@ -26,11 +26,11 @@ public struct CLIError: Error, CustomStringConvertible, LocalizedError, Equatabl
 }
 
 /// A take the engine stopped on its own while no signal reached the command
-/// (P15-02). In a CLI process the engine's kernel memory-pressure responder is
-/// the only such source: a critical event cancels the active take with reason
-/// `memory_pressure`. It is reported apart from an operator interrupt (exit
-/// 130): `vocello` exits `exitStatus` and a batch row ends `failed` with
-/// `errorCode`, never `cancelled`.
+/// (P15-02). In a CLI process memory pressure is the only such source: the
+/// engine's kernel responder or, for a hosted take, the store's critical
+/// footprint guard cancels the active take with reason `memory_pressure`. It is
+/// reported apart from an operator interrupt (exit 130): `vocello` exits
+/// `exitStatus` and a batch row ends `failed` with `errorCode`, never `cancelled`.
 public struct CLIEngineCancellation: Error, LocalizedError, Equatable {
     /// sysexits.h `EX_TEMPFAIL`: a temporary failure that a later retry may clear.
     public static let exitStatus: Int32 = 75

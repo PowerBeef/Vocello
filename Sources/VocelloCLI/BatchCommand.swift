@@ -153,7 +153,8 @@ enum BatchCommand {
         note("booting engine (data: \(dataDir.path))")
         CLIPresenter.event(.engineBooting)
         let runtime = try await CLIRuntime.bootstrap(
-            dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
+            dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent,
+            hostedLikeTheApp: true)
         CLIPresenter.event(.engineReady)
         let settings = DesktopAppSettings()
         let quality = GenerateCommand.resolveVariant(

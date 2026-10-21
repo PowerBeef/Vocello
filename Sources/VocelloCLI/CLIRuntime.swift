@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloDesktopCore
 
 /// In-process engine for the CLI. Mirrors `MacEngineBootstrap`'s runtime wiring
 /// (manifest → platform-expanded registry → `NativeRuntimeFactory.make` →
@@ -24,11 +25,15 @@ public struct CLIRuntime {
     /// `primeCloneReference` and `enrollPreparedVoice` below, never straight to
     /// `engine`, so the core policy refuses them first.
     let voiceCloningConsent: VoiceCloningConsentPolicy
+    /// RF-27: product commands (generate, batch, run) host the engine as the Mac
+    /// app does, through the shared store; bench drives the raw engine (nil).
+    var host: DesktopEngineHost? = nil
 
     public static func bootstrap(
         dataDirectory: URL,
         manifestOverride: URL?,
-        voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed
+        voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed,
+        hostedLikeTheApp: Bool = false
     ) async throws -> CLIRuntime {
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
@@ -40,12 +45,21 @@ public struct CLIRuntime {
             storeVersionSeed: storeVersionSeed(),
             customPrewarmPolicy: customPrewarmPolicy(for: deviceClass)
         )
-        try await runtime.engine.initialize(appSupportDirectory: dataDirectory)
+        DesktopDataRoot.configure(dataDirectory)
+        var host: DesktopEngineHost?
+        if hostedLikeTheApp {
+            let hosted = DesktopEngineHost(engine: runtime.engine, consent: voiceCloningConsent, deviceClass: deviceClass)
+            try await hosted.initialize(appSupportDirectory: dataDirectory)
+            host = hosted
+        } else {
+            try await runtime.engine.initialize(appSupportDirectory: dataDirectory)
+        }
         return CLIRuntime(
             engine: runtime.engine,
             registry: registry,
             dataDirectory: dataDirectory,
-            voiceCloningConsent: voiceCloningConsent
+            voiceCloningConsent: voiceCloningConsent,
+            host: host
         )
     }
 
@@ -58,7 +72,15 @@ public struct CLIRuntime {
     /// This runtime's engine under another request's recorded consent (one warm
     /// engine serves many requests, each with its own `confirmConsent`).
     public func withConsent(_ consent: VoiceCloningConsentPolicy) -> CLIRuntime {
-        CLIRuntime(engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent)
+        host?.setConsent(consent)
+        return CLIRuntime(
+            engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent, host: host
+        )
+    }
+
+    /// Loads a model through the host's admission when hosted, else on the engine.
+    public func loadModel(id: String) async throws {
+        if let host { try await host.loadModel(id: id) } else { try await engine.loadModel(id: id) }
     }
 
     /// Every CLI generation: clone requests are refused without recorded consent,
@@ -67,6 +89,7 @@ public struct CLIRuntime {
     public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         try voiceCloningConsent.admitGeneration(request)
         do {
+            if let host { return try await host.generate(request) }
             return try await engine.generate(request)
         } catch {
             throw CLIEngineCancellation.classify(error, commandCancelled: Task.isCancelled)

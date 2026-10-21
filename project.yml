@@ -370,6 +370,15 @@ targets:
       - path: Sources/SharedSupport/Services/GenerationOutputFileName.swift
       - path: Sources/Services/MacFileSaveCopy.swift
       - path: Sources/Services/MacModelVariantResolution.swift
+      # RF-27: the engine host the Mac app uses (MacEngineBootstrap), so CLI takes get
+      # the same admission, memory budget, consent and cancellation order.
+      - path: Sources/iOS/TTSEngineStore.swift
+      - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
+      - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
+      - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/AppNotifications.swift
+      - path: Sources/Services/TTSEngineStore+Mac.swift
+      - path: Sources/Services/MacMemoryBudgetPolicy.swift
       # Mac-only pieces the app and the CLI share (the app compiles Sources/DesktopShared too).
       - path: Sources/DesktopShared
     settings:

@@ -311,7 +311,7 @@ public enum GenerateCommand {
             note("booting engine (data: \(take.dataDirectory.path))")
             CLIPresenter.event(.engineBooting)
             let runtime = try await CLIRuntime.bootstrap(
-                dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent)
+                dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride, voiceCloningConsent: take.consent, hostedLikeTheApp: true)
             CLIPresenter.event(.engineReady)
             result = try await execute(take, runtime: runtime)
         } catch {
@@ -350,7 +350,7 @@ public enum GenerateCommand {
 
         note("loading \(modelID)…")
         CLIPresenter.event(.modelLoading, data: ["modelID": .string(modelID)])
-        try await runtime.engine.loadModel(id: modelID)
+        try await runtime.loadModel(id: modelID)
         CLIPresenter.event(.modelLoaded, data: ["modelID": .string(modelID)])
 
         let request = GenerationRequest(

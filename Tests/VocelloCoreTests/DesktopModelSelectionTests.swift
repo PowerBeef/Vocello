@@ -153,3 +153,45 @@ final class DesktopModelInventoryTests: XCTestCase {
         )
     }
 }
+
+/// RF-27: CLI takes run through the app's engine store. Each request is
+/// admitted under its own recorded consent, switched on the one shared host.
+@MainActor
+final class DesktopEngineHostTests: XCTestCase {
+    func testTheHostAdmitsEachRequestUnderItsOwnConsent() async throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DesktopEngineHost-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let runtime = try NativeRuntimeFactory.make(
+            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json"),
+            paths: .rooted(at: root), storeVersionSeed: "rf27-host-fixture"
+        )
+        defer { runtime.engine.stop() }
+        let host = DesktopEngineHost(
+            engine: runtime.engine, consent: VoiceCloningConsentPolicy(isConsentRecorded: false), deviceClass: .mid16GBMac
+        )
+        let clone = GenerationRequest(
+            mode: .clone, modelID: "pro_clone_speed", text: "Hello.",
+            outputPath: root.appendingPathComponent("take.wav").path, shouldStream: false,
+            payload: .clone(reference: CloneReference(
+                audioPath: root.appendingPathComponent("reference.wav").path, transcript: nil, preparedVoiceID: nil
+            )),
+            generationID: UUID()
+        )
+        do {
+            _ = try await host.generate(clone)
+            XCTFail("a clone without recorded consent must be refused")
+        } catch {
+            XCTAssertTrue(error is VoiceCloningConsentRequiredError, "\(error)")
+        }
+        host.setConsent(VoiceCloningConsentPolicy(isConsentRecorded: true))
+        do {
+            _ = try await host.generate(clone)
+            XCTFail("the uninitialized fixture engine cannot generate")
+        } catch {
+            XCTAssertFalse(error is VoiceCloningConsentRequiredError, "consent now admits it; the engine refuses: \(error)")
+        }
+    }
+}

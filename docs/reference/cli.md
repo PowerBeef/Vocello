@@ -240,6 +240,12 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--plan` | resolve the take (mode, model and its source, whether it is installed, language, seed, variation, output path) and report it without loading a model |
 | `--json` / `--ndjson` | the v1 envelope (result: the take) instead of the bare path, or events ending in it |
 
+`generate`, `batch` and `run` host the engine the way the Mac app does (`VocelloDesktopCore`'s
+`DesktopEngineHost` over the app's `TTSEngineStore` with the Mac memory budget): a take passes the app's
+support check, consent admission, busy refusal and memory admission, runs under its critical-pressure
+guard and is followed by its post-take trims. Consent is always the invocation's or the request's,
+never the app's Settings acknowledgment. `bench` keeps driving the raw engine for its measurements.
+
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates — there is no live preview player; `--play` plays the completed file.

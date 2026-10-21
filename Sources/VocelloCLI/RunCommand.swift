@@ -112,7 +112,7 @@ enum RunCommand {
                     CLIPresenter.event(.engineBooting)
                     runtime = try await CLIRuntime.bootstrap(
                         dataDirectory: take.dataDirectory, manifestOverride: take.manifestOverride,
-                        voiceCloningConsent: take.consent
+                        voiceCloningConsent: take.consent, hostedLikeTheApp: true
                     )
                     CLIPresenter.event(.engineReady)
                 }
@@ -159,7 +159,8 @@ enum RunCommand {
                 if let error = row.error {
                     print("\(row.index)\tfailed\t\(error.code.rawValue)\t\(error.message)")
                 } else if case .object(let fields)? = row.result, case .string(let path)? = fields["audioPath"] {
-                    print("\(row.index)\t\(row.replayed ? "replayed" : "ok")\t\(path)")
+                    let outcome = row.replayed ? "replayed" : "ok"
+                    print("\(row.index)\t\(outcome)\t\(path)")
                 }
             }
         }

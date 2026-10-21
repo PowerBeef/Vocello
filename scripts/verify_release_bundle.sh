@@ -14,6 +14,8 @@ TEAM_ID_INFO_KEY="QwenVoiceTeamIdentifier"
 
 # shellcheck source=./lib/shared.sh
 . "$SCRIPT_DIR/lib/shared.sh"
+# shellcheck source=./lib/release_signing.sh
+. "$SCRIPT_DIR/lib/release_signing.sh"
 
 codesign_has_runtime_metadata() {
     local target="$1"
@@ -61,6 +63,8 @@ APP_TEAM_ID="$(plist_read "$APP_INFO_PLIST" "$TEAM_ID_INFO_KEY" || true)"
 [ -e "$APP_PATH/Contents/XPCServices" ] && fail "The app bundle must not embed an XPC service; the engine runs in-process"
 
 RESOURCES_DIR="$APP_PATH/Contents/Resources"
+FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
+TMP_NESTED_CODE=""
 TMP_UI_HOME=""
 TMP_UI_FIXTURE=""
 TMP_UI_STDOUT=""
@@ -68,6 +72,7 @@ TMP_UI_STDERR=""
 
 cleanup() {
     pkill -x "$APP_EXECUTABLE_NAME" 2>/dev/null || true
+    [ -n "$TMP_NESTED_CODE" ] && rm -f "$TMP_NESTED_CODE"
     [ -n "$TMP_UI_HOME" ] && rm -rf "$TMP_UI_HOME"
     [ -n "$TMP_UI_FIXTURE" ] && rm -rf "$TMP_UI_FIXTURE"
     [ -n "$TMP_UI_STDOUT" ] && rm -f "$TMP_UI_STDOUT"
@@ -101,6 +106,12 @@ fi
 if find "$RESOURCES_DIR" \( -name "*.pyc" -o -type d -name "__pycache__" \) -print -quit | grep -q .; then
     fail "Compiled Python artifacts must not be packaged into the native app bundle"
 fi
+# The app is not sandboxed, so release packaging removes Sparkle's XPC services
+# (scripts/lib/release_signing.sh); one left behind is nested code nobody signed or reviewed.
+SPARKLE_FRAMEWORK="$FRAMEWORKS_DIR/Sparkle.framework"
+if [ -e "$SPARKLE_FRAMEWORK" ] && [ -n "$(find "$SPARKLE_FRAMEWORK" -name XPCServices -print)" ]; then
+    fail "Sparkle.framework still contains XPCServices; release packaging must remove them (the app is not sandboxed)"
+fi
 echo "[1/4] Native bundle contents OK"
 echo ""
 
@@ -126,7 +137,28 @@ if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
             || fail "Nested framework $(basename "$framework_path") signature Team ID mismatch: expected $APP_TEAM_ID, got ${FRAMEWORK_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
         python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$framework_path" \
             || fail "Nested framework $(basename "$framework_path") carries unexpected entitlements"
-    done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
+    done < <(find "$FRAMEWORKS_DIR" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
+    # So must every Mach-O anywhere under Contents/Frameworks: each framework's own binary
+    # and the code nested inside it (Sparkle's Autoupdate, and Updater.app through its main
+    # executable, which codesign reads as the bundle). Each needs the release team, the
+    # hardened runtime and no entitlements. The listing is a file so a find failure stops
+    # verification instead of skipping code.
+    if [ -d "$FRAMEWORKS_DIR" ]; then
+        TMP_NESTED_CODE="$(mktemp)"
+        find "$FRAMEWORKS_DIR" -type f -print0 > "$TMP_NESTED_CODE" \
+            || fail "Could not list the code under Contents/Frameworks"
+        while IFS= read -r -d '' nested_path; do
+            release_is_macho "$nested_path" || continue
+            nested_label="${nested_path#"$FRAMEWORKS_DIR"/}"
+            NESTED_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$nested_path" || true)"
+            [ "$NESTED_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] \
+                || fail "Nested code $nested_label signature Team ID mismatch: expected $APP_TEAM_ID, got ${NESTED_SIGNATURE_TEAM_ID:-missing (ad-hoc?)}"
+            codesign_has_runtime_metadata "$nested_path" \
+                || fail "Nested code $nested_label is missing the hardened runtime"
+            python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$nested_path" \
+                || fail "Nested code $nested_label carries unexpected entitlements"
+        done < "$TMP_NESTED_CODE"
+    fi
     echo "[2/4] Signed release checks OK"
 else
     echo "[2/4] Signature checks skipped (set QWENVOICE_EXPECT_SIGNED_RELEASE=1 for release verification)"

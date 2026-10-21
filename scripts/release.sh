@@ -22,6 +22,8 @@ export BUILD_CACHE_DIR="$SOURCE_PACKAGES_DIR/.qwenvoice-cache"
 
 # shellcheck source=lib/build_cache.sh
 . "$SCRIPT_DIR/lib/build_cache.sh"
+# shellcheck source=lib/release_signing.sh
+. "$SCRIPT_DIR/lib/release_signing.sh"
 
 SKIP_BUILD=false
 OUTPUT_NAME="$DEFAULT_OUTPUT_NAME"
@@ -355,9 +357,12 @@ echo "[5/7] Signing and verifying the final app bundle..."
 # the project's default ad-hoc identity ("-"), which notarization
 # rejects ("not signed with a valid Developer ID certificate") — the
 # 2.2.0 candidate failed exactly there on its embedded frameworks.
-# Frameworks first (no entitlements), then the app.
+# Each framework first, inside-out (scripts/lib/release_signing.sh: the code nested in it,
+# such as Sparkle's Autoupdate and Updater.app, then the framework; Sparkle's XPC services
+# are removed because the app is not sandboxed), all without entitlements; then the app.
 while IFS= read -r -d '' framework_path; do
-    run_codesign "$framework_path" --options runtime
+    release_sign_framework "$framework_path" \
+        || release_fail "Could not re-sign $(basename "$framework_path") and the code inside it"
 done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
 run_codesign "$APP_PATH" \
     --options runtime \

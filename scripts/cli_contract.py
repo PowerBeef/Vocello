@@ -14,8 +14,10 @@
 - the schemas agree with the tables (the error schema's code, category and exit enums, the event
   schema's type enum and its result/other branches) and with each other (the envelope's `$defs`
   copy of the error schema, the event schema's copies of the envelope and its definitions);
-- the contract only grew since `baseline.json`: no exit code, error code, event type or schema
-  property was removed or renamed, no exit class, error class or `retryable` changed, no required
+- the contract only grew since `baseline.json`: no exit code, error code, event type, schema
+  property, command, alias or option (in `commands.json`, the Swift command model rendered and kept
+  equal to it by CLICommandModelGoldenTests) was removed or renamed, no option changed between a
+  flag and a value, no exit class, error class or `retryable` changed, no required
   property became optional; anything new must be recorded there (`record`), which bumps
   `contractRevision`;
 - every example validates: each `examples/*.json` as an envelope whose error agrees with the tables,
@@ -77,6 +79,7 @@ class Contract:
     schemas: dict[str, dict[str, Any]]  # by name: envelope, error, event and any other *.schema.json
     baseline: dict[str, Any] | None
     examples: list[Path]
+    commands: dict[str, Any] | None = None  # commands.json: the command model
 
     @property
     def directory(self) -> Path:
@@ -107,7 +110,23 @@ def load_contract(root: Path) -> Contract:
         schemas=schemas,
         baseline=_load(baseline_path) if baseline_path.is_file() else None,
         examples=sorted(examples.iterdir()) if examples.is_dir() else [],
+        commands=_load(directory / "commands.json") if (directory / "commands.json").is_file() else None,
     )
+
+
+def command_surface(contract: Contract) -> dict[str, Any] | None:
+    """What `commands.json` promises: each command path with its aliases and options (name → takes a
+    value), the global options and the mode shortcuts."""
+    if contract.commands is None:
+        return None
+    def options(rows: Any) -> dict[str, bool]:
+        return {row["name"]: bool(row.get("takesValue")) for row in _list(rows) if isinstance(row, dict)}
+    return {
+        "commands": {row["path"]: {"aliases": sorted(_list(row.get("aliases"))), "options": options(row.get("options"))}
+                     for row in _list(contract.commands.get("commands")) if isinstance(row, dict) and "path" in row},
+        "globalOptions": options(contract.commands.get("globalOptions")),
+        "modeShortcuts": sorted(_list(contract.commands.get("modeShortcuts"))),
+    }
 
 
 def _list(value: Any) -> list[Any]:
@@ -363,6 +382,7 @@ def baseline_snapshot(contract: Contract) -> dict[str, Any]:
                                 "retryable": row["retryable"]} for code, row in sorted(codes.items())},
         "eventTypes": sorted(event_types(contract)),
         "schemaProperties": properties,
+        **({"commandSurface": surface} if (surface := command_surface(contract)) is not None else {}),
     }
 
 
@@ -454,6 +474,38 @@ def compare_with_baseline(contract: Contract, baseline: Mapping[str, Any]) -> tu
                        f"record it; {record_hint}" for path in sorted((required - frozen_required) & frozen_every)]
     unrecorded += [f"{name}{SCHEMA_SUFFIX} is not in baseline.json; {record_hint}"
                    for name in sorted(set(schemas) - set(frozen_schemas))]
+
+    surface = current.get("commandSurface")
+    frozen_surface = baseline.get("commandSurface")
+    if surface is not None and frozen_surface is None:
+        unrecorded.append(f"commands.json is not in baseline.json; {record_hint}")
+    elif frozen_surface is not None and surface is None:
+        breaking.append("commands.json was removed; v1 never removes the command model")
+    elif surface is not None and isinstance(frozen_surface, dict):
+        def options_diff(label: str, frozen: Mapping[str, Any], now: Mapping[str, Any]) -> None:
+            for name, takes_value in sorted(frozen.items()):
+                if name not in now:
+                    breaking.append(f"{label}: option --{name} was removed or renamed; v1 never removes an option")
+                elif now[name] != takes_value:
+                    breaking.append(f"{label}: option --{name} changed between a flag and a value")
+            unrecorded.extend(f"{label}: option --{name} is not in baseline.json; {record_hint}"
+                              for name in sorted(set(now) - set(frozen)))
+        options_diff("global", _dict(frozen_surface.get("globalOptions")), surface["globalOptions"])
+        frozen_commands = _dict(frozen_surface.get("commands"))
+        for path, frozen in sorted(frozen_commands.items()):
+            if path not in surface["commands"]:
+                breaking.append(f"command {path} was removed or renamed; v1 never removes a command")
+                continue
+            now = surface["commands"][path]
+            breaking += [f"command {path}: alias {alias} was removed; v1 never removes an alias"
+                         for alias in sorted(set(_list(_dict(frozen).get("aliases"))) - set(now["aliases"]))]
+            unrecorded += [f"command {path}: alias {alias} is not in baseline.json; {record_hint}"
+                           for alias in sorted(set(now["aliases"]) - set(_list(_dict(frozen).get("aliases"))))]
+            options_diff(f"command {path}", _dict(_dict(frozen).get("options")), now["options"])
+        unrecorded += [f"command {path} is not in baseline.json; {record_hint}"
+                       for path in sorted(set(surface["commands"]) - set(frozen_commands))]
+        breaking += [f"mode shortcut {name} was removed; v1 never removes a command"
+                     for name in sorted(set(_list(frozen_surface.get("modeShortcuts"))) - set(surface["modeShortcuts"]))]
     return breaking, unrecorded
 
 

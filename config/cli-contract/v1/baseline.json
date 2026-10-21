@@ -1,4 +1,216 @@
 {
+  "commandSurface": {
+    "commands": {
+      "batch": {
+        "aliases": [],
+        "options": {
+          "app-delivery": false,
+          "confirm-consent": false,
+          "delivery": true,
+          "delivery-cell": true,
+          "file": true,
+          "long-form": false,
+          "mode": true,
+          "out-dir": true,
+          "play": false,
+          "reference": true,
+          "seed": true,
+          "speaker": true,
+          "transcript": true,
+          "variant": true,
+          "variation": true,
+          "voice": true,
+          "voice-brief": true
+        }
+      },
+      "bench": {
+        "aliases": [
+          "benchmark"
+        ],
+        "options": {
+          "codec-loop": true,
+          "codec-replay": true,
+          "codec-roundtrip": true,
+          "codec-trace": true,
+          "confirm-consent": false,
+          "continue-delivery-failures": false,
+          "delivery": true,
+          "force": false,
+          "force-class": true,
+          "keep": false,
+          "label": true,
+          "lengths": true,
+          "memory-qualification": true,
+          "modes": true,
+          "no-cold": false,
+          "no-stream": false,
+          "no-summary": false,
+          "output-dir": true,
+          "prosody-profile": true,
+          "reference-wav": true,
+          "script-file": true,
+          "seed": true,
+          "speaker": true,
+          "take-sha256": true,
+          "telemetry": true,
+          "ttfc": false,
+          "variants": true,
+          "voice": true,
+          "voice-brief": true,
+          "warm": true
+        }
+      },
+      "capabilities": {
+        "aliases": [],
+        "options": {}
+      },
+      "completions": {
+        "aliases": [],
+        "options": {}
+      },
+      "deliveries": {
+        "aliases": [
+          "delivery"
+        ],
+        "options": {}
+      },
+      "deliveries.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {
+          "shipped-only": false
+        }
+      },
+      "generate": {
+        "aliases": [
+          "gen"
+        ],
+        "options": {
+          "app-delivery": false,
+          "confirm-consent": false,
+          "delivery": true,
+          "delivery-cell": true,
+          "language": true,
+          "mode": true,
+          "no-stream": false,
+          "out": true,
+          "play": false,
+          "reference": true,
+          "seed": true,
+          "speaker": true,
+          "stream": false,
+          "text": true,
+          "text-file": true,
+          "transcript": true,
+          "variant": true,
+          "variation": true,
+          "voice": true,
+          "voice-brief": true
+        }
+      },
+      "help": {
+        "aliases": [],
+        "options": {}
+      },
+      "models": {
+        "aliases": [
+          "model"
+        ],
+        "options": {}
+      },
+      "models.install": {
+        "aliases": [],
+        "options": {}
+      },
+      "models.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {}
+      },
+      "models.status": {
+        "aliases": [],
+        "options": {}
+      },
+      "modes": {
+        "aliases": [],
+        "options": {}
+      },
+      "modes.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {}
+      },
+      "speakers": {
+        "aliases": [
+          "speaker"
+        ],
+        "options": {}
+      },
+      "speakers.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {}
+      },
+      "version": {
+        "aliases": [],
+        "options": {}
+      },
+      "voices": {
+        "aliases": [
+          "voice"
+        ],
+        "options": {}
+      },
+      "voices.delete": {
+        "aliases": [
+          "rm"
+        ],
+        "options": {
+          "confirm-consent": false,
+          "id": true
+        }
+      },
+      "voices.enroll": {
+        "aliases": [
+          "add"
+        ],
+        "options": {
+          "audio": true,
+          "confirm-consent": false,
+          "name": true,
+          "transcript": true
+        }
+      },
+      "voices.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {
+          "confirm-consent": false
+        }
+      }
+    },
+    "globalOptions": {
+      "data-dir": true,
+      "help": false,
+      "json": false,
+      "manifest": true,
+      "ndjson": false,
+      "no-input": false,
+      "output-format": true,
+      "quiet": false,
+      "verbose": false
+    },
+    "modeShortcuts": [
+      "clone",
+      "custom",
+      "design"
+    ]
+  },
   "contract": "urn:vocello:cli:v1",
   "contractRevision": 1,
   "errorClasses": {
@@ -282,7 +494,7 @@
   ],
   "revisions": [
     {
-      "change": "The initial v1 machine contract: envelope, error and NDJSON record schemas, exit codes, error codes and event types (RF-25).",
+      "change": "The initial v1 machine contract: envelope, error and NDJSON record schemas, exit codes, error codes, event types and the command surface of commands.json (RF-25).",
       "date": "2026-10-21",
       "revision": 1
     }

@@ -306,6 +306,36 @@ class BaselineTests(ContractFixture):
                 category="usage", exitCode=2, retryable=False))
         self.assertIssue("error code engine_busy was reclassified")
 
+    def test_the_command_surface_only_grows(self) -> None:
+        def command(document: dict[str, Any], path: str) -> dict[str, Any]:
+            return next(row for row in document["commands"] if row["path"] == path)
+
+        self.edit("commands.json", lambda document: command(document, "generate")["options"].pop(0))
+        self.assertIssue("command generate: option --text was removed or renamed")
+
+        self.setUp()
+        self.edit("commands.json", lambda document: command(document, "generate")["options"][0].update(
+            takesValue=False))
+        self.assertIssue("command generate: option --text changed between a flag and a value")
+
+        self.setUp()
+        self.edit("commands.json", lambda document: document.update(
+            commands=[row for row in document["commands"] if row["path"] != "models.install"]))
+        self.assertIssue("command models.install was removed or renamed")
+
+        self.setUp()
+        self.edit("commands.json", lambda document: command(document, "voices")["aliases"].clear())
+        self.assertIssue("command voices: alias voice was removed")
+
+        self.setUp()
+        self.edit("commands.json", lambda document: command(document, "generate")["options"].append(
+            {"name": "fixture", "placeholder": None, "summary": "A fixture flag.", "takesValue": False,
+             "type": "flag", "valueOptional": False}))
+        self.assertIssue("command generate: option --fixture is not in baseline.json")
+        issues, _message = cli_contract.record(self.root, "Adds --fixture.", "2026-10-22")
+        self.assertEqual(issues, [])
+        self.assertEqual(self.run_validate(), [])
+
     def test_an_exit_class_never_changes(self) -> None:
         def move(document: dict[str, Any]) -> None:
             for row in document["exitCodes"]:

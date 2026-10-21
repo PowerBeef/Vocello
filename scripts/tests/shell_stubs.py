@@ -48,6 +48,8 @@ NATIVE_TOOLS = (
     "xcodebuild", "xcrun", "xctrace", "devicectl", "xcodegen", "swift", "swiftc", "clang",
     "codesign", "security", "caffeinate", "lldb", "osascript", "open", "defaults", "tccutil",
     "launchctl", "pkill", "killall", "sudo", "sample",
+    # Installer packages and disk images: build, sign, expand, assess, install, mount.
+    "pkgbuild", "productbuild", "productsign", "pkgutil", "installer", "spctl", "hdiutil",
 )
 
 # Repository helpers that publish records, prune results or write a ledger outside the

@@ -6,7 +6,10 @@ over fabricated framework trees whose code files carry a Mach-O header, with a r
 order, and what is removed. scripts/verify_release_bundle.sh runs from a sandbox
 (scripts/tests/shell_stubs.py) whose `codesign` answers from a table of fabricated signatures;
 in signed mode it holds every Mach-O under Contents except the app's own executable to the
-release team, the hardened runtime and no entitlements.
+release team, the hardened runtime and no entitlements. `release_notarize`, the one
+notarization path of both DMGs and the CLI installer package, runs over a recording `xcrun`
+whose notary verdict each test chooses, and `release_pkg_signer` over recorded
+`pkgutil --check-signature` listings.
 """
 
 from __future__ import annotations
@@ -356,6 +359,155 @@ class VerifyReleaseBundleNestedCodeTests(unittest.TestCase):
         checked = [Path(arguments[-1]) for arguments in self.sandbox.calls_to(
             "scripts/entitlement_contract.py", "verify-bundle", "--role", "macos-framework")]
         self.assertEqual(checked, [self.core, self.core / "Versions/A/QwenVoiceCore"])
+
+
+ISSUER = "12345678-abcd-4def-8abc-1234567890ab"
+
+
+class ReleaseNotarizeTests(unittest.TestCase):
+    """`release_notarize` over a recording `xcrun`: submit, verdict, issue log, staple, validate."""
+
+    def setUp(self) -> None:
+        self.sandbox = ScriptSandbox(self, "scripts/lib/release_signing.sh", {})
+        self.artifact = self.sandbox.file("dist/Vocello-macos26-cli.pkg", "package bytes")
+        self.key = self.sandbox.file("keys/AuthKey_KEY1234567.p8", "fixture key")
+        self.xcrun()
+
+    def xcrun(self, *, status: str = "Accepted", submit: int = 0, staple: int = 0, validate: int = 0) -> None:
+        self.sandbox.tool("xcrun", (
+            'case "$1 $2" in\n'
+            f'  "notarytool submit") printf "  id: sub-0001\\n  status: {status}\\n"; exit {submit} ;;\n'
+            '  "notarytool log") echo "{\\"issues\\": [\\"fixture issue\\"]}"; exit 0 ;;\n'
+            f'  "stapler staple") exit {staple} ;;\n'
+            f'  "stapler validate") exit {validate} ;;\n'
+            "esac\n"
+            "exit 64"
+        ))
+
+    def notarize(self, caller: str = "release_notarize \"$ARTIFACT\"",
+                 **extra: str) -> subprocess.CompletedProcess[str]:
+        script = (
+            "set -euo pipefail\n"
+            f". {quote(self.sandbox.record)}\n"
+            f". {quote(self.sandbox.script)}\n"
+            f"{caller}\n"
+        )
+        environment = self.sandbox.environment({
+            "ARTIFACT": str(self.artifact), "APPLE_API_KEY_PATH": str(self.key),
+            "APPLE_API_KEY_ID": "KEY1234567", "APPLE_API_ISSUER_ID": "", **extra,
+        })
+        return subprocess.run(["bash", "-c", script], cwd=self.sandbox.path, env=environment,
+                              capture_output=True, text=True, timeout=60, check=False)
+
+    def xcrun_calls(self) -> list[list[str]]:
+        return self.sandbox.calls_to("xcrun")
+
+    def test_an_accepted_artifact_is_stapled_then_validated(self) -> None:
+        completed = self.notarize()
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(self.xcrun_calls(), [
+            ["notarytool", "submit", str(self.artifact), "--key", str(self.key), "--key-id", "KEY1234567", "--wait"],
+            ["stapler", "staple", str(self.artifact)],
+            ["stapler", "validate", str(self.artifact)],
+        ])
+        self.assertIn("Using Individual API key (no issuer).", completed.stdout)
+
+    def test_a_team_key_passes_its_uuid_issuer_without_printing_it(self) -> None:
+        completed = self.notarize(APPLE_API_ISSUER_ID=ISSUER)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        submit = self.sandbox.calls_to("xcrun", "notarytool", "submit")[0]
+        self.assertEqual(submit[-3:], ["--issuer", ISSUER, "--wait"])
+        self.assertNotIn(ISSUER, completed.stdout + completed.stderr)
+        self.assertIn("Using Team API key (issuer present).", completed.stdout)
+
+    def test_an_issuer_that_is_not_a_uuid_is_not_passed(self) -> None:
+        completed = self.notarize(APPLE_API_ISSUER_ID="not-a-uuid")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("--issuer", self.sandbox.calls_to("xcrun", "notarytool", "submit")[0])
+
+    def test_a_rejected_artifact_fetches_apples_log_and_is_not_stapled(self) -> None:
+        self.xcrun(status="Invalid")
+        completed = self.notarize()
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("notarization verdict: Invalid (submission sub-0001)", completed.stderr)
+        self.assertIn(["notarytool", "log", "sub-0001", "--key", str(self.key), "--key-id", "KEY1234567"],
+                      self.xcrun_calls())
+        self.assertIn("fixture issue", completed.stdout)
+        self.assertEqual(self.sandbox.calls_to("xcrun", "stapler"), [])
+
+    def test_a_failed_submission_is_not_stapled(self) -> None:
+        self.xcrun(submit=1)
+        completed = self.notarize()
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("notarytool submission failed", completed.stderr)
+        self.assertEqual(self.sandbox.calls_to("xcrun", "stapler"), [])
+
+    def test_a_failed_staple_fails_even_when_the_caller_suspends_set_e(self) -> None:
+        # release.sh calls `release_notarize … || release_fail …`, which turns `set -e` off
+        # inside the function; every step must still be checked.
+        self.xcrun(staple=1)
+        completed = self.notarize('release_notarize "$ARTIFACT" || { echo "caller saw the failure"; exit 3; }')
+        self.assertEqual(completed.returncode, 3, completed.stderr)
+        self.assertIn("caller saw the failure", completed.stdout)
+        self.assertIn("could not staple", completed.stderr)
+        self.assertEqual(self.sandbox.calls_to("xcrun", "stapler", "validate"), [])
+
+    def test_a_ticket_that_does_not_validate_fails(self) -> None:
+        self.xcrun(validate=1)
+        completed = self.notarize('release_notarize "$ARTIFACT" || exit 3')
+        self.assertEqual(completed.returncode, 3)
+        self.assertIn("does not validate", completed.stderr)
+
+    def test_a_missing_artifact_is_never_submitted(self) -> None:
+        completed = self.notarize(ARTIFACT=str(self.sandbox.path / "dist/missing.pkg"))
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(self.xcrun_calls(), [])
+
+
+SIGNED_LISTING = """Package "Vocello-macos26-cli.pkg":
+   Status: signed by a developer certificate issued by Apple for distribution
+   Signed with a trusted timestamp on: 2026-10-21 12:00:00 +0000
+   Certificate Chain:
+    1. {leaf}
+       Expires: 2031-10-21 12:00:00 +0000
+       SHA256 Fingerprint:
+           00 11 22
+       ------------------------------------------------------------------------
+    2. Developer ID Certification Authority
+       Expires: 2031-09-17 00:00:00 +0000
+    3. Apple Root CA
+"""
+
+
+class ReleasePkgSignerTests(unittest.TestCase):
+    """`release_pkg_signer` names the leaf certificate only for an Apple-issued distribution signature."""
+
+    def signer(self, listing: str, status: int = 0) -> subprocess.CompletedProcess[str]:
+        sandbox = ScriptSandbox(self, "scripts/lib/release_signing.sh", {})
+        sandbox.file("listing.txt", listing)
+        sandbox.tool("pkgutil", f'cat "$QV_SANDBOX/listing.txt"\nexit {status}')
+        script = f"set -euo pipefail\n. {quote(sandbox.record)}\n. {quote(sandbox.script)}\nrelease_pkg_signer fixture.pkg\n"
+        return subprocess.run(["bash", "-c", script], cwd=sandbox.path, env=sandbox.environment(),
+                              capture_output=True, text=True, timeout=60, check=False)
+
+    def test_a_developer_id_installer_signature_names_its_leaf(self) -> None:
+        leaf = f"Developer ID Installer: Fixture ({TEAM})"
+        completed = self.signer(SIGNED_LISTING.format(leaf=leaf))
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, leaf + "\n")
+
+    def test_an_unsigned_package_has_no_signer(self) -> None:
+        completed = self.signer('Package "fixture.pkg":\n   Status: no signature\n', status=1)
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(completed.stdout, "")
+
+    def test_a_signature_apple_did_not_issue_for_distribution_has_no_signer(self) -> None:
+        listing = SIGNED_LISTING.format(leaf="Fixture Local Installer").replace(
+            "signed by a developer certificate issued by Apple for distribution",
+            "signed by a certificate trusted by macOS")
+        completed = self.signer(listing)
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(completed.stdout, "")
 
 
 if __name__ == "__main__":

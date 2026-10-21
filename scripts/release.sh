@@ -30,6 +30,10 @@ OUTPUT_NAME="$DEFAULT_OUTPUT_NAME"
 PREFLIGHT="none"
 SIGNING_MODE="${QWENVOICE_SIGNING_MODE:-ad-hoc}"
 SIGNING_IDENTITY="${QWENVOICE_SIGNING_IDENTITY:-}"
+# The "Developer ID Installer: … (TEAMID)" identity that signs the CLI installer package
+# (productsign) in developer-id mode; release.yml resolves it from its keychain as it does
+# the app identity.
+INSTALLER_IDENTITY="${APPLE_DEV_ID_INSTALLER:-}"
 CODESIGN_KEYCHAIN="${QWENVOICE_CODESIGN_KEYCHAIN:-}"
 RELEASE_TEAM_ID="${QWENVOICE_DEVELOPMENT_TEAM:-${APPLE_TEAM_ID:-}}"
 # Notarization is opt-in. Either pass --notarize or set QWENVOICE_NOTARIZE=1.
@@ -43,12 +47,19 @@ release_fail() {
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 [--skip-build] [--output-name <basename>] [--preflight none|full] [--signing-mode ad-hoc|developer-id] [--signing-identity <identity>] [--codesign-keychain <path>] [--notarize]
+Usage: $0 [--skip-build] [--output-name <basename>] [--preflight none|full] [--signing-mode ad-hoc|developer-id] [--signing-identity <identity>] [--installer-identity <identity>] [--codesign-keychain <path>] [--notarize]
 
-Build the macOS app and CLI, sign and package separate DMGs, and emit release metadata.
+Build the macOS app and CLI, sign and package separate DMGs and the CLI installer
+package (<basename>-cli.pkg), and emit release metadata.
 
---notarize submits the DMG to Apple's notarization service via the
-App Store Connect API key flow, then staples the ticket. Requires
+--signing-mode developer-id needs --signing-identity (or QWENVOICE_SIGNING_IDENTITY), a
+"Developer ID Application: … (TEAMID)" identity, and --installer-identity (or
+APPLE_DEV_ID_INSTALLER), the "Developer ID Installer: … (TEAMID)" identity that signs
+the CLI installer package. Both belong to the release Team ID (APPLE_TEAM_ID or
+QWENVOICE_DEVELOPMENT_TEAM). Ad-hoc mode leaves the installer package unsigned.
+
+--notarize submits both DMGs and the installer package to Apple's notarization service
+via the App Store Connect API key flow, then staples each ticket. Requires
 --signing-mode developer-id and these env vars:
   APPLE_API_KEY_PATH   - path to the AuthKey_XXXXXX.p8 file (required)
   APPLE_API_KEY_ID     - the 10-char key ID from the .p8 filename (required)
@@ -56,7 +67,7 @@ App Store Connect API key flow, then staples the ticket. Requires
                          for Team API keys; omit (or leave empty) for
                          Individual API keys (notarytool rejects
                          --issuer with anything non-UUID).
-Notarization typically takes 1-5 minutes of wall-clock per DMG.
+Notarization typically takes 1-5 minutes of wall-clock per artifact.
 EOF
     exit 1
 }
@@ -94,6 +105,11 @@ while [ $# -gt 0 ]; do
             SIGNING_IDENTITY="$2"
             shift 2
             ;;
+        --installer-identity)
+            [ $# -ge 2 ] || usage
+            INSTALLER_IDENTITY="$2"
+            shift 2
+            ;;
         --codesign-keychain)
             [ $# -ge 2 ] || usage
             CODESIGN_KEYCHAIN="$2"
@@ -123,6 +139,14 @@ case "$SIGNING_MODE" in
     developer-id)
         [ -n "$SIGNING_IDENTITY" ] || release_fail "--signing-identity is required for developer-id signing"
         [ -n "$RELEASE_TEAM_ID" ] || release_fail "APPLE_TEAM_ID or QWENVOICE_DEVELOPMENT_TEAM is required for developer-id signing"
+        [ -n "$INSTALLER_IDENTITY" ] \
+            || release_fail "--installer-identity (or APPLE_DEV_ID_INSTALLER) is required for developer-id signing: the CLI installer package is signed with a Developer ID Installer identity"
+        # productsign takes any identity whose name contains the argument; only the full
+        # Developer ID Installer name of the release team may sign the package.
+        case "$INSTALLER_IDENTITY" in
+            "Developer ID Installer: "*" ($RELEASE_TEAM_ID)") ;;
+            *) release_fail "the installer identity must be a 'Developer ID Installer: … ($RELEASE_TEAM_ID)' identity of the release Team ID" ;;
+        esac
         ACTIVE_SIGNING_IDENTITY="$SIGNING_IDENTITY"
         ;;
     *)
@@ -213,10 +237,12 @@ echo "=== Vocello: macOS Release Build ==="
 echo ""
 echo "  scheme: $SCHEME"
 echo "  output DMG: $OUTPUT_NAME.dmg"
+echo "  CLI installer package: $OUTPUT_NAME-cli.pkg"
 echo "  preflight: $PREFLIGHT"
 echo "  signing: $SIGNING_MODE"
 if [ "$SIGNING_MODE" = "developer-id" ]; then
     echo "  signing identity: $SIGNING_IDENTITY"
+    echo "  installer identity: $INSTALLER_IDENTITY"
     echo "  team id: $RELEASE_TEAM_ID"
 fi
 echo "  notarize: $([ "$NOTARIZE" = "1" ] && echo "yes" || echo "no")"
@@ -226,9 +252,9 @@ mkdir -p "$BUILD_DIR" "$SOURCE_PACKAGES_DIR" "$RELEASE_ARTIFACT_DIR"
 SHOW_BUILD_SETTINGS_LOG="$RELEASE_ARTIFACT_DIR/release-build-settings.log"
 
 STEP_START="$(date +%s)"
-echo "[1/7] Ensuring Xcode project is up to date..."
+echo "[1/8] Ensuring Xcode project is up to date..."
 ensure_project_regenerated
-echo "[1/7] Project up to date — done ($(step_time "$STEP_START"))"
+echo "[1/8] Project up to date — done ($(step_time "$STEP_START"))"
 echo ""
 
 if [ "$PREFLIGHT" = "full" ]; then
@@ -242,17 +268,17 @@ if [ "$PREFLIGHT" = "full" ]; then
 fi
 
 STEP_START="$(date +%s)"
-echo "[2/7] Ensuring Swift packages are resolved..."
+echo "[2/8] Ensuring Swift packages are resolved..."
 ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \
     release "$SCHEME" "$CONFIGURATION" 'platform=macOS,arch=arm64'
-echo "[2/7] Swift packages ready — done ($(step_time "$STEP_START"))"
+echo "[2/8] Swift packages ready — done ($(step_time "$STEP_START"))"
 echo ""
 
 STEP_START="$(date +%s)"
 if $SKIP_BUILD; then
-    echo "[3/7] Build Release — skipped"
+    echo "[3/8] Build Release — skipped"
 else
-    echo "[3/7] Building macOS Release app..."
+    echo "[3/8] Building macOS Release app..."
     require_build_free_space release \
         || release_fail "release storage preflight failed immediately before isolated build"
     rm -f "$RELEASE_ARTIFACT_DIR/xcodebuild-release.log"
@@ -292,7 +318,7 @@ else
         "platform=macOS,arch=arm64" arm64 O ad-hoc \
         "$DERIVED_DATA_PATH" "$SOURCE_PACKAGES_DIR"
 fi
-echo "[3/7] Build Release — done ($(step_time "$STEP_START"))"
+echo "[3/8] Build Release — done ($(step_time "$STEP_START"))"
 echo ""
 
 # Use the same isolated Release products and optimization as the app. The public
@@ -310,7 +336,7 @@ if ! $SKIP_BUILD; then
 fi
 
 STEP_START="$(date +%s)"
-echo "[4/7] Resolving and copying built app..."
+echo "[4/8] Resolving and copying built app..."
 xcb_run -project "$PROJECT_FILE" \
     -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
@@ -347,11 +373,11 @@ find "$APP_RESOURCES" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null 
 find "$APP_RESOURCES" -name "*.pyc" -delete 2>/dev/null || true
 find "$APP_RESOURCES" -name "*.whl" -delete 2>/dev/null || true
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --app-bundle "$APP_PATH" >/dev/null
-echo "[4/7] App copied to $APP_PATH ($(step_time "$STEP_START"))"
+echo "[4/8] App copied to $APP_PATH ($(step_time "$STEP_START"))"
 echo ""
 
 STEP_START="$(date +%s)"
-echo "[5/7] Signing and verifying the final app bundle..."
+echo "[5/8] Signing and verifying the final app bundle..."
 # Re-sign nested code inside-out so every seal is valid and every
 # Mach-O carries the release identity. Xcode's build-time signing uses
 # the project's default ad-hoc identity ("-"), which notarization
@@ -375,7 +401,7 @@ if [ "$SIGNING_MODE" = "developer-id" ]; then
 else
     "$SCRIPT_DIR/verify_release_bundle.sh" "$APP_PATH"
 fi
-echo "[5/7] Final app bundle verified ($(step_time "$STEP_START"))"
+echo "[5/8] Final app bundle verified ($(step_time "$STEP_START"))"
 echo ""
 for resource_bundle in "$CLI_PATH"/*.bundle; do
     run_codesign "$resource_bundle"
@@ -386,62 +412,96 @@ python3 "$SCRIPT_DIR/cli_package.py" seal --directory "$CLI_PATH" \
     --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA"
 python3 "$SCRIPT_DIR/cli_package.py" smoke --directory "$CLI_PATH" \
     --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA"
+CLI_MANIFEST_SHA256="$(shasum -a 256 "$CLI_PATH/package-manifest.json" | awk '{print $1}')"
+[[ "$CLI_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || release_fail "Could not digest the sealed CLI manifest"
+
+# The sealed folder ships twice from the same bytes: as the installer package here and as the
+# DMG folder below. The package is signed with the Developer ID Installer identity in
+# developer-id mode (left unsigned under the same name otherwise), notarized and stapled like the
+# DMGs, then expanded and checked against the sealed manifest, including a root-free install,
+# upgrade and smoke through the installed link.
+STEP_START="$(date +%s)"
+echo "[6/8] Building, signing and verifying the CLI installer package..."
+CLI_PKG_NAME="${OUTPUT_NAME}-cli.pkg"
+CLI_PKG_PATH="$BUILD_DIR/$CLI_PKG_NAME"
+CLI_UNSIGNED_PKG_PATH="$BUILD_DIR/${OUTPUT_NAME}-cli.unsigned.pkg"
+CLI_PKG_VERIFICATION_NAME="cli-pkg-verification.json"
+CLI_PKG_VERIFICATION_PATH="$BUILD_DIR/$CLI_PKG_VERIFICATION_NAME"
+# An earlier run's package or report never stands in for this run's; the package tools refuse
+# to overwrite either.
+rm -f "$CLI_UNSIGNED_PKG_PATH" "$CLI_PKG_PATH" "$CLI_PKG_VERIFICATION_PATH" \
+    || release_fail "Could not remove an earlier CLI installer package or its report"
+python3 "$SCRIPT_DIR/cli_package.py" pkg --directory "$CLI_PATH" \
+    --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA" \
+    --output "$CLI_UNSIGNED_PKG_PATH" \
+    || release_fail "Could not build the CLI installer package"
+[ -f "$CLI_UNSIGNED_PKG_PATH" ] && [ ! -L "$CLI_UNSIGNED_PKG_PATH" ] \
+    || release_fail "The built CLI installer package is missing: $CLI_UNSIGNED_PKG_PATH"
+if [ "$SIGNING_MODE" = "developer-id" ]; then
+    productsign_args=(productsign --sign "$INSTALLER_IDENTITY" --timestamp)
+    if [ -n "$CODESIGN_KEYCHAIN" ]; then
+        productsign_args+=(--keychain "$CODESIGN_KEYCHAIN")
+    fi
+    "${productsign_args[@]}" "$CLI_UNSIGNED_PKG_PATH" "$CLI_PKG_PATH" \
+        || release_fail "productsign could not sign $CLI_PKG_NAME with the Developer ID Installer identity"
+    rm -f "$CLI_UNSIGNED_PKG_PATH" || release_fail "Could not remove the unsigned CLI installer package"
+    CLI_PKG_SIGNER="$(release_pkg_signer "$CLI_PKG_PATH")" \
+        || release_fail "$CLI_PKG_NAME carries no Developer ID signature after productsign"
+    [ "$CLI_PKG_SIGNER" = "$INSTALLER_IDENTITY" ] \
+        || release_fail "$CLI_PKG_NAME is not signed by the release installer identity"
+    CLI_PKG_SIGNATURE="developer-id-installer"
+else
+    mv "$CLI_UNSIGNED_PKG_PATH" "$CLI_PKG_PATH" \
+        || release_fail "Could not name the unsigned CLI installer package $CLI_PKG_NAME"
+    CLI_PKG_SIGNATURE="unsigned"
+fi
+if [ "$NOTARIZE" = "1" ]; then
+    release_notarize "$CLI_PKG_PATH" || release_fail "Notarization of $CLI_PKG_NAME failed"
+    CLI_PKG_NOTARIZATION="stapled"
+else
+    CLI_PKG_NOTARIZATION="not-performed"
+fi
+# A new tree inside the staging root, which the exit trap removes.
+CLI_PKG_EXPANDED="$CLI_STAGE_ROOT/expanded-cli-pkg"
+pkgutil --expand-full "$CLI_PKG_PATH" "$CLI_PKG_EXPANDED" \
+    || release_fail "Could not expand $CLI_PKG_NAME for verification"
+python3 "$SCRIPT_DIR/cli_package.py" pkg-verify \
+    --expanded "$CLI_PKG_EXPANDED" --artifact "$CLI_PKG_PATH" \
+    --version "$MARKETING_VERSION" --build "$CURRENT_PROJECT_VERSION" --commit "$COMMIT_SHA" \
+    --manifest-sha256 "$CLI_MANIFEST_SHA256" \
+    --signature "$CLI_PKG_SIGNATURE" --notarization "$CLI_PKG_NOTARIZATION" \
+    --report "$CLI_PKG_VERIFICATION_PATH" --root-free-install \
+    || release_fail "$CLI_PKG_NAME failed its expanded-package verification"
+rm -rf "$CLI_PKG_EXPANDED"
+echo "[6/8] CLI installer package ready at $CLI_PKG_PATH ($(step_time "$STEP_START"))"
+echo ""
 
 STEP_START="$(date +%s)"
-echo "[6/7] Creating and signing the DMG..."
+echo "[7/8] Creating and signing the DMG..."
 "$SCRIPT_DIR/create_dmg.sh" "$APP_PATH" "$OUTPUT_NAME"
 DMG_PATH="$BUILD_DIR/${OUTPUT_NAME}.dmg"
 CLI_DMG_NAME="${OUTPUT_NAME}-cli"
 QWENVOICE_DMG_DISPLAY_NAME="Vocello CLI" \
     "$SCRIPT_DIR/create_dmg.sh" "$CLI_PATH" "$CLI_DMG_NAME" cli
 CLI_DMG_PATH="$BUILD_DIR/${CLI_DMG_NAME}.dmg"
-# Both artifacts use the existing signing/notarization path; neither is published here.
+# Both DMGs and the installer package share one notarization path
+# (scripts/lib/release_signing.sh); nothing is published here.
 APP_DMG_PATH="$DMG_PATH"
 for DMG_PATH in "$APP_DMG_PATH" "$CLI_DMG_PATH"; do
-[ -f "$DMG_PATH" ] || release_fail "Created DMG is missing: $DMG_PATH"
-run_codesign "$DMG_PATH"
-codesign --verify --verbose=4 "$DMG_PATH"
-
-if [ "$NOTARIZE" = "1" ]; then
-    echo "  Submitting $(basename "$DMG_PATH") to Apple notarization via API key (typically 1-5 min)..."
-    # `notarytool submit --wait` exits 0 whenever processing completes,
-    # including an Invalid verdict, so the verdict must be checked
-    # explicitly; on any non-Accepted status fetch Apple's per-issue log
-    # before failing so the reject reasons land in the release log.
-    notary_key_args=(--key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID")
-    # Pass --issuer only when APPLE_API_ISSUER_ID looks like a real
-    # UUID. Required for Team API keys; MUST be omitted for Individual
-    # API keys (notarytool rejects --issuer with anything-non-UUID).
-    if [ -n "${APPLE_API_ISSUER_ID:-}" ] && [[ "$APPLE_API_ISSUER_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        notary_key_args+=(--issuer "$APPLE_API_ISSUER_ID")
-        echo "  Using Team API key (issuer present)."
-    else
-        echo "  Using Individual API key (no issuer)."
+    [ -f "$DMG_PATH" ] || release_fail "Created DMG is missing: $DMG_PATH"
+    run_codesign "$DMG_PATH"
+    codesign --verify --verbose=4 "$DMG_PATH"
+    if [ "$NOTARIZE" = "1" ]; then
+        release_notarize "$DMG_PATH" || release_fail "Notarization of $(basename "$DMG_PATH") failed"
     fi
-    notary_output="$(xcrun notarytool submit "$DMG_PATH" "${notary_key_args[@]}" --wait 2>&1 | tee /dev/stderr)" \
-        || release_fail "notarytool submission failed"
-    notary_id="$(printf '%s\n' "$notary_output" | awk '/^[[:space:]]*id: /{print $2; exit}')"
-    notary_status="$(printf '%s\n' "$notary_output" | awk '/^[[:space:]]*status: /{print $2}' | tail -1)"
-    if [ "$notary_status" != "Accepted" ]; then
-        if [ -n "$notary_id" ]; then
-            echo "  Notarization verdict: ${notary_status:-unknown}; fetching Apple's issue log..."
-            xcrun notarytool log "$notary_id" "${notary_key_args[@]}" || true
-        fi
-        release_fail "notarization verdict: ${notary_status:-unknown} (submission ${notary_id:-unknown})"
-    fi
-    echo "  Stapling notarization ticket to DMG..."
-    xcrun stapler staple "$DMG_PATH"
-    xcrun stapler validate "$DMG_PATH"
-    echo "  Notarization OK and ticket stapled."
-fi
 done
 DMG_PATH="$APP_DMG_PATH"
 
-echo "[6/7] DMG ready at $DMG_PATH ($(step_time "$STEP_START"))"
+echo "[7/8] DMG ready at $DMG_PATH ($(step_time "$STEP_START"))"
 echo ""
 
 STEP_START="$(date +%s)"
-echo "[7/7] Writing release metadata..."
+echo "[8/8] Writing release metadata..."
 APP_BINARY="$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 extract_otool_field() {
     local field="$1"
@@ -472,7 +532,9 @@ METADATA_PATH="$BUILD_DIR/release-metadata.txt"
     echo "build_number=$CURRENT_PROJECT_VERSION"
     echo "dmg_name=$OUTPUT_NAME.dmg"
     echo "cli_dmg_name=$CLI_DMG_NAME.dmg"
-    echo "cli_manifest_sha256=$(shasum -a 256 "$CLI_PATH/package-manifest.json" | awk '{print $1}')"
+    echo "cli_pkg_name=$CLI_PKG_NAME"
+    echo "cli_pkg_verification=$CLI_PKG_VERIFICATION_NAME"
+    echo "cli_manifest_sha256=$CLI_MANIFEST_SHA256"
     echo "app_wrapper_name=$WRAPPER_NAME"
     echo "app_executable_name=$EXECUTABLE_NAME"
     echo "built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -481,13 +543,15 @@ write_build_provenance "$BUILD_DIR/last-build.json" \
     "scripts/release.sh" "$SCHEME" "$CONFIGURATION" \
     "platform=macOS,arch=arm64" arm64 O "$SIGNING_MODE" \
     "$DERIVED_DATA_PATH" "$SOURCE_PACKAGES_DIR"
-echo "[7/7] Release metadata written to $METADATA_PATH ($(step_time "$STEP_START"))"
+echo "[8/8] Release metadata written to $METADATA_PATH ($(step_time "$STEP_START"))"
 echo ""
 
 TOTAL_ELAPSED="$(( $(date +%s) - TOTAL_START ))"
 echo "Vocello macOS release build complete."
 echo "  App:      $APP_PATH"
 echo "  DMG:      $DMG_PATH"
+echo "  CLI DMG:  $CLI_DMG_PATH"
+echo "  CLI pkg:  $CLI_PKG_PATH"
 echo "  Metadata: $METADATA_PATH"
 echo "  Total:    ${TOTAL_ELAPSED}s"
 

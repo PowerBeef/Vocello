@@ -215,6 +215,10 @@ final class CLIArgumentsTests: XCTestCase {
             }
         }
         XCTAssertThrowsError(try GenerateCommand.parseLanguage(generate(["--language"])), "a bare flag has no language")
+        // `vocello languages` lists one code per language; each must parse back to it.
+        for language in Qwen3SupportedLanguage.allCases {
+            XCTAssertEqual(try parse(CLILanguageCodes.code(for: language)), language, language.rawValue)
+        }
     }
 
     /// P15-08 / P05-05: an empty speaker (an unset shell variable) is refused,

@@ -341,6 +341,12 @@ Lists the three generation modes (`custom` / `design` / `clone`) and what each n
 `--voice-brief` / `--voice` | `--reference`). Static and instant. Select a mode via the
 `vocello custom|design|clone …` shortcut, `generate --mode <mode>`, or the interactive picker.
 
+### `languages` — list the generation languages
+
+`vocello languages [--json]` lists every language `--language` accepts with its canonical name, the
+primary code it also answers to (`en`, `fr`, `ja`; a region subtag such as `ja-JP` is ignored) and
+`auto`. Instant, no engine boot.
+
 ### `deliveries` — list delivery presets + instruction text
 
 ```sh

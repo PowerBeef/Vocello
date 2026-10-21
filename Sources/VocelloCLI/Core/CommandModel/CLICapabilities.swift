@@ -90,6 +90,25 @@ public struct CLICommandModelDocument: Encodable, Sendable {
     }
 }
 
+/// The primary code `--language` accepts for each language (region subtags are ignored).
+public enum CLILanguageCodes {
+    public static func code(for language: Qwen3SupportedLanguage) -> String {
+        switch language {
+        case .auto: return "auto"
+        case .chinese: return "zh"
+        case .english: return "en"
+        case .japanese: return "ja"
+        case .korean: return "ko"
+        case .german: return "de"
+        case .french: return "fr"
+        case .russian: return "ru"
+        case .portuguese: return "pt"
+        case .spanish: return "es"
+        case .italian: return "it"
+        }
+    }
+}
+
 /// Limits the CLI enforces before any model work.
 public enum CLILimits {
     /// The apps refuse a long-form plan of more segments (`IOSLongFormCoordinator.maxSegments`).

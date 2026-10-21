@@ -28,6 +28,7 @@ _vocello() {
     voices|voice) command=voices ;;
     speakers|speaker) command=speakers ;;
     modes) command=modes ;;
+    languages|language) command=languages ;;
     deliveries|delivery) command=deliveries ;;
     models|model) command=models ;;
     doctor) command=doctor ;;
@@ -51,6 +52,8 @@ _vocello() {
       'speakers:List Built-in Voice speakers'
       'speaker:List Built-in Voice speakers'
       'modes:List the generation modes'
+      'languages:List the generation languages and their codes'
+      'language:List the generation languages and their codes'
       'deliveries:List delivery presets and their instructions'
       'delivery:List delivery presets and their instructions'
       'models:Inventory and install models'
@@ -125,6 +128,22 @@ _vocello() {
         return
       fi
       [[ -z $sub ]] && key=modes_list
+      ;;
+    languages)
+      case $sub in
+        list|ls) key=languages_list ;;
+        '') ;;
+        *) return ;;
+      esac
+      if [[ -z $sub && ${words[CURRENT]} != -* ]]; then
+        candidates=(
+          'list:List the languages --language accepts'
+          'ls:List the languages --language accepts'
+        )
+        _describe -t subcommands 'subcommand' candidates
+        return
+      fi
+      [[ -z $sub ]] && key=languages_list
       ;;
     deliveries)
       case $sub in
@@ -330,6 +349,18 @@ _vocello() {
         '--help:show help for the command'
       ) ;;
     modes_list)
+      options=(
+        '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
+        '--json:same as --output-format json'
+        '--ndjson:same as --output-format ndjson'
+        '--quiet:suppress progress notes on stderr'
+        '--verbose:more progress notes on stderr (also in the json formats)'
+        '--no-input:never prompt and never read stdin unless a flag names it (-)'
+        '--data-dir:runtime data directory (default ~/Library/Application Support/QwenVoice)'
+        '--manifest:override the bundled qwenvoice_contract.json'
+        '--help:show help for the command'
+      ) ;;
+    languages_list)
       options=(
         '--output-format:text (default), json (one envelope on stdout) or ndjson (events, then the envelope)'
         '--json:same as --output-format json'

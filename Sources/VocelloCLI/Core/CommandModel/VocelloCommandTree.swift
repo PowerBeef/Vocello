@@ -117,6 +117,14 @@ public enum VocelloCommandTree {
         defaultSubcommand: "list"
     )
 
+    static let languages = CLICommandSpec(
+        name: "languages",
+        aliases: ["language"],
+        summary: "List the generation languages and their codes",
+        subcommands: [CLICommandSpec(name: "list", aliases: ["ls"], summary: "List the languages --language accepts")],
+        defaultSubcommand: "list"
+    )
+
     static let deliveries = CLICommandSpec(
         name: "deliveries",
         aliases: ["delivery"],
@@ -226,7 +234,7 @@ public enum VocelloCommandTree {
     )
 
     public static let commands: [CLICommandSpec] = [
-        generate, batch, voices, speakers, modesCommand, deliveries, models, doctor, capabilities, completions,
+        generate, batch, voices, speakers, modesCommand, languages, deliveries, models, doctor, capabilities, completions,
         bench, help, version,
     ]
 

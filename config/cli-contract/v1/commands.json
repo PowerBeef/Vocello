@@ -543,6 +543,39 @@
     },
     {
       "aliases": [
+        "language"
+      ],
+      "defaultSubcommand": "list",
+      "internalTool": false,
+      "machineContract": true,
+      "name": "languages",
+      "operands": [],
+      "options": [],
+      "path": "languages",
+      "refusedOptions": [],
+      "subcommands": [
+        "list"
+      ],
+      "summary": "List the generation languages and their codes",
+      "usage": []
+    },
+    {
+      "aliases": [
+        "ls"
+      ],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "list",
+      "operands": [],
+      "options": [],
+      "path": "languages.list",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "List the languages --language accepts",
+      "usage": []
+    },
+    {
+      "aliases": [
         "delivery"
       ],
       "defaultSubcommand": "list",

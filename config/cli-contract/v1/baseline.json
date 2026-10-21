@@ -117,6 +117,18 @@
         "aliases": [],
         "options": {}
       },
+      "languages": {
+        "aliases": [
+          "language"
+        ],
+        "options": {}
+      },
+      "languages.list": {
+        "aliases": [
+          "ls"
+        ],
+        "options": {}
+      },
       "models": {
         "aliases": [
           "model"

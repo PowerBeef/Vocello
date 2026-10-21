@@ -27,7 +27,7 @@ Only this plan may hold planned or in-flight work, at most 8 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/26 (50%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/28 (46%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -541,6 +541,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-21` | parked | The startup-reliability receipt validator rejects every real receipt's model signature | — |
 | `BKL-22` | parked | Benchmark history publishes runs armed with a runtime diagnostics override | — |
 | `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
+| `BKL-24` | parked | The iOS control audit does not count trailing-closure buttons | — |
+| `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
@@ -585,6 +587,14 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-23`** (parked) — The Mac language bench fails production on a single recognizer's language call.
   gate: A take both families transcribe accurately is not failed by one family's language identification alone (or the cell's expectation says why it should be), with a test over that case, and a production Mac language bench passes.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-24`** (parked) — The iOS control audit does not count trailing-closure buttons.
+  gate: scripts/ios_control_audit.py counts a `Button { … } label:` control as it counts `Button(…)`, the contract's interactiveOccurrenceCount values are re-baselined in the same change, and a test covers both spellings.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-25`** (parked) — The routed check does not select the iOS control-audit tests for an iOS source edit.
+  gate: scripts/dev.sh check selects scripts/tests/test_ios_control_audit.py when a Sources/iOS or Sources/SharedSupport/Views Swift file changes, with a selection test pinning it.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

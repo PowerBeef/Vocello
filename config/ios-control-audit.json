@@ -38,8 +38,8 @@
       "path": "Sources/iOS/Commerce/IOSExportGate.swift",
       "screen": "Export purchase and share sheet",
       "scenario": "stateful",
-      "reason": "Visible purchase, restore, status, privacy/support and dismissal. Buy uses a custom full-width label (separately bound by export-purchase-actions). Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
-      "interactiveOccurrenceCount": 5
+      "reason": "Visible purchase, restore, status, privacy/support and dismissal. Buy is the shared primary CTA (VocelloPrimaryCTAButton, separately bound by export-purchase-actions); close, restore and Try Again are trailing-closure buttons and the two footer links share one Link. Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
+      "interactiveOccurrenceCount": 1
     },
     {
       "path": "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift",

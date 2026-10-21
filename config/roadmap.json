@@ -1770,6 +1770,36 @@
       "notes": "Found 2026-10-20 in RF-20's control run (mac-lang-bench-20261020-220248-067bb65c, production streaming text): custom-es-auto came out inconclusive because Whisper labelled a correct Spanish take English (word error rate 0.048; Qwen3-ASR heard Spanish at 0), which fails spoken content and the lane. Parked without investigation under the focus lock: no release gate runs this bench."
     },
     {
+      "id": "BKL-24",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iOS control audit does not count trailing-closure buttons",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/ios_control_audit.py counts a `Button { … } label:` control as it counts `Button(…)`, the contract's interactiveOccurrenceCount values are re-baselined in the same change, and a test covers both spellings.",
+      "sourceOfTruth": [
+        "scripts/ios_control_audit.py",
+        "config/ios-control-audit.json"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 in RF-22: INTERACTIVE_RE matches `Button(` and `Link(` but not `Button {`, so the export sheet's close, restore and Try Again buttons are not counted (the row's count fell from 5 to 1 with the same controls). Parked without investigation under the focus lock: the identifiers are still bound by the control families."
+    },
+    {
+      "id": "BKL-25",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The routed check does not select the iOS control-audit tests for an iOS source edit",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/dev.sh check selects scripts/tests/test_ios_control_audit.py when a Sources/iOS or Sources/SharedSupport/Views Swift file changes, with a selection test pinning it.",
+      "sourceOfTruth": [
+        "scripts/development_workflow.py",
+        "scripts/tests/test_development_workflow.py"
+      ],
+      "updated": "2026-10-20",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-20 in RF-22: the routed check passed on the export sheet redesign, and only the full gate (scripts/dev.sh ci, RF-09's freeze checks) caught the drifted interactive count. Parked without investigation under the focus lock."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

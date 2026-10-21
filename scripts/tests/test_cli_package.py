@@ -618,9 +618,10 @@ class CLIPackageTests(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("${{ steps.artifacts.outputs.cli_dmg }}"), 5)
         self.assertGreaterEqual(workflow.count("${{ steps.artifacts.outputs.cli_verification }}"), 4)
         variants = json.loads((root / "config/orchestration-contract.json").read_text())["workflows"]["release-macos-candidate"]["commandTemplates"]["artifact-verification"]
-        self.assertEqual(len(variants), 2)
-        current = next(item for item in variants if item["argv"][-1] == "--include-cli")
-        self.assertEqual(current["outputs"], ["build/dist/macos/cli-package-verification.json"])
+        self.assertEqual(len(variants), 3)
+        for current in (item for item in variants if "--include-cli" in item["argv"]):
+            self.assertEqual(current["outputs"], ["build/dist/macos/cli-package-verification.json"])
+        self.assertIn("--include-pkg", variants[0]["argv"])
         self.assertIn("macos-artifact-verification-v1", {item["id"] for item in variants})
 
     def test_stage_adds_completion_and_uninstaller_as_plain_data(self):

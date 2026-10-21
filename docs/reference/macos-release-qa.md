@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-15
+reviewed: 2026-10-21
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -10,8 +10,11 @@ sourceOfTruth:
   - scripts/release_build_number.py
   - docs/reference/macos-app-guide.md
   - .github/workflows/release.yml
+  - .github/workflows/release-rehearsal.yml
+  - .github/workflows/promote-release.yml
   - scripts/macos_test.sh
   - scripts/cli_package.py
+  - scripts/verify_packaged_dmg.sh
   - scripts/verify_packaged_cli.sh
 ---
 # macOS Release QA — the desktop release gate
@@ -110,16 +113,26 @@ release-readiness and artifact checks.
    earlier `v*` tag the check passes; an earlier tag whose `project.yml` cannot be read fails it.
 6. **Local package verification**:
    ```sh
-   ./scripts/release.sh --preflight full --signing-mode developer-id --signing-identity "<Developer ID Application: …>"
+   ./scripts/release.sh --preflight full --signing-mode developer-id \
+     --signing-identity "<Developer ID Application: …>" \
+     --installer-identity "<Developer ID Installer: … (TEAMID)>"
    scripts/verify_release_bundle.sh   # invoked by release.sh; rerun standalone if needed
    ```
+   Developer ID mode needs both identities of the release Team ID (`APPLE_TEAM_ID`); the
+   installer identity may also come from `APPLE_DEV_ID_INSTALLER`, and one whose name does not end
+   in `(<release Team ID>)` is refused before any work starts. Ad-hoc mode leaves the CLI
+   installer package unsigned.
    The release runner requires 20 GiB of host free space before readiness work and checks again
    before its isolated build. If it stops, inspect `python3 scripts/build_output_policy.py status`
    and apply only the bounded cleanup it reports; never delete `build/dist/` or the canonical
    development caches merely to satisfy the release lane.
    Release builds use isolated `build/scratch/derived-data/release-macos/` state and place the
-   signed app, metadata, desktop DMG and separate CLI DMG under `build/dist/macos/`; they never invalidate the persistent
+   signed app, metadata, desktop DMG, separate CLI DMG, CLI installer package
+   (`<output>-cli.pkg`) and its `cli-pkg-verification.json` under `build/dist/macos/`; they never invalidate the persistent
    development cache. Routine cleanup does not remove these distribution outputs.
+   `verify_packaged_dmg.sh … --include-cli --include-pkg <pkg>` installs into `/usr/local` with
+   `sudo`, so locally it refuses with exit 2; run it without `--include-pkg`, and `release.sh`'s
+   root-free `pkg-verify` covers the package.
    An attended launch or generation pass can be performed when models are available, but it is not
    part of the packaging gate.
    (No `--notarize` locally unless the API key env vars are present.)
@@ -135,14 +148,18 @@ release-readiness and artifact checks.
    source-authority job also proves that the tag commit is contained in `origin/main` and that both
    required checks belong to that exact SHA before any platform job starts. The `package` job then
    verifies tag/source/version identity and that the build number grew, builds, signs, notarizes,
-   staples and verifies (`verify_packaged_dmg.sh … --include-cli`) with a read-only token, and hands
-   the DMG on with its SHA-256. The `sparkle-feed` job signs that DMG and `appcast.xml` on a fresh
+   staples and verifies both DMGs and the CLI installer package (`verify_packaged_dmg.sh …
+   --include-cli --include-pkg <output>-cli.pkg`, which also installs, upgrades and uninstalls the
+   package on the runner; see [CLI distribution](#cli-distribution-and-qualification)) with a
+   read-only token, and hands the DMG on with its SHA-256. The `sparkle-feed` job signs that DMG and `appcast.xml` on a fresh
    runner (see [Sparkle updates](#sparkle-updates-rf-23)). The `draft-release` job, the only one
    with `contents: write` and holding no secret, checks both digests, re-verifies the feed, emits
-   SPDX and CycloneDX inventories, writes `SHA256SUMS` plus `release-evidence.json` (the appcast is
-   one of its artifacts), and attests both DMGs. The CLI report is a required,
+   SPDX and CycloneDX inventories, writes `SHA256SUMS` plus `release-evidence.json` (the appcast,
+   the CLI installer package and its `cli-pkg-verification.json` are among its artifacts), and
+   attests both DMGs and the CLI installer package. The CLI report is a required,
    hashed output of the managed artifact-verification step and binds the exact CLI DMG and
-   source/version/build. Only then does it create or reuse
+   source/version/build; `release.sh`'s package report binds the exact package to the same sealed
+   folder. Only then does it create or reuse
    a draft GitHub Release, upload the candidate, download every asset, and verify the digests.
    Reusing a draft first removes every prior asset; the workflow then requires the remote asset-name
    set to match the current candidate exactly before downloading and validating it. The workflow
@@ -164,7 +181,8 @@ release-readiness and artifact checks.
    model-delivery lane; assemble and validate `quality-promotion.json`; then upload it to the draft.
    Dispatch `promote-release.yml` from the tag itself (`gh workflow run promote-release.yml --ref
    <tag> -f tag=<tag>`; any other ref is refused). It runs under the reviewer-gated `release`
-   environment, verifies both DMGs against their build attestations from `release.yml`, requires
+   environment, verifies every DMG and installer package the release evidence names (both DMGs and
+   the CLI package) against its build attestation from `release.yml`, requires
    the release evidence to name the checked-out commit and carry its contracts, and revalidates the
    promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
@@ -271,9 +289,48 @@ The same `release.sh` invocation builds optimized arm64 `VocelloCLI` without int
 capabilities. It stages the executable with source-bound catalogs, dependency resource bundles,
 MLX metallib, project license, and notices rendered from `third_party_attributions.json`.
 No model weights or Python are bundled. The entire `Vocello CLI` folder must remain together.
-The executable is signed with hardened runtime; its separate DMG follows the same opt-in
-Developer ID notarization and stapling sequence as the app. A staging failure does not replace
-any accepted user installation; temporary payloads are removed at exit.
+The executable is signed with hardened runtime and no entitlements (the `macos-cli` entitlement
+role). The sealed folder then ships twice from the same bytes:
+
+- **The installer package `<output>-cli.pkg`** (step 6/8), the primary form. `cli_package.py pkg`
+  builds it from the sealed folder (installed at `/usr/local/lib/vocello`, receipt
+  `com.qwenvoice.cli`, links `/usr/local/bin/vocello` and the zsh completion; the shipped
+  `uninstall.sh` removes them and never the data store). In developer-id mode `productsign
+  --timestamp` signs it with the Developer ID Installer identity, which must name the release
+  Team ID; the signed package's signer must be exactly that identity. It is notarized and stapled
+  through the same `release_notarize` function as both DMGs (`scripts/lib/release_signing.sh`),
+  then expanded with `pkgutil --expand-full` and checked by `cli_package.py pkg-verify
+  --root-free-install` against the sealed manifest digest, with the signature and notarization it
+  claims (`developer-id-installer`/`stapled` for a release, `unsigned`/`not-performed` in ad-hoc
+  mode, where the package keeps the same name). The report is `cli-pkg-verification.json`;
+  `release-metadata.txt` names both as `cli_pkg_name` and `cli_pkg_verification`.
+- **The DMG folder `<output>-cli.dmg`**, which stays the fallback for anyone who cannot or will not
+  use an administrator password: copy the folder anywhere and run it in place. It follows the same
+  Developer ID notarization and stapling sequence as the app.
+
+A staging failure does not replace any accepted user installation; temporary payloads and the
+expanded package are removed at exit.
+
+**The install test.** `verify_packaged_cli.sh --include-pkg <pkg>` (from `verify_packaged_dmg.sh
+… --include-cli --include-pkg`, in the managed artifact-verification step of `release.yml` and of
+the rehearsal) checks that the package is the one the metadata names and `release.sh`'s report
+binds; for a signed release, its Developer ID Installer signature of the release team, its stapled
+ticket and Gatekeeper's install assessment; that its payload holds the sealed manifest and a
+`vocello` with the `macos-cli` entitlement set. Then, on the runner, it runs `sudo installer -pkg …
+-target /`, checks the receipt version, the two relative links resolving into
+`/usr/local/lib/vocello` and the installed manifest, smokes the CLI through `/usr/local/bin/vocello`,
+installs again over a planted stale file that must disappear, runs `sudo sh
+/usr/local/lib/vocello/uninstall.sh`, and requires the receipt, folder and links gone and
+`~/Library/Application Support/QwenVoice` unchanged. It runs only with `CI=true` and passwordless
+`sudo` (an ephemeral GitHub runner); anywhere else it refuses with exit 2 before invoking `sudo`. The
+rehearsal installs the unsigned package. The install test is recorded by the step's ledger and
+command template, not by `cli-pkg-verification.json`, whose `installTest` stays `not-performed`.
+
+**Maintainer setup.** Two secrets in the tag-restricted `release` environment hold the Developer
+ID Installer certificate of the release team: `APPLE_DEV_ID_INSTALLER_P12_BASE64` (the certificate
+and its private key exported from Keychain Access as a `.p12`, then `base64 -i installer.p12`) and
+`APPLE_DEV_ID_INSTALLER_P12_PASSWORD`. `release.yml` imports it into the same temporary keychain as
+the Developer ID Application identity and removes both with that keychain.
 
 The copied-package verifier checks content digests, arm64-only architecture, system-only dynamic
 linkage, embedded version/build, JSON mode/speaker discovery, and invalid-command exit status
@@ -282,7 +339,7 @@ fail closed and must be deliberately packaged and verified before release. No re
 rewrite was needed by the initial relocation proof.
 
 This deterministic smoke does not run synthesis. RF-10 (parked until the iOS submission path clears
-or the maintainer prioritizes desktop/CLI; RF-08, formerly F-17, is parked on the same condition) additionally qualifies all three modes,
+or the maintainer prioritizes desktop/CLI; RF-08, which packages the CLI, is in the release plan) additionally qualifies all three modes,
 French Design with a pinned seed, Clone, one two-item batch in a single process, cancellation, generation-error exit status, and resource
 loading during real inference on the copied **signed candidate**. Record those results separately;
 neither a development CLI smoke nor a valid manifest closes RF-08/RF-10 or authorizes publication.

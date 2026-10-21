@@ -218,8 +218,11 @@ security() {
       [ "$FAIL_STAGE" != cleanup ] || return 57
       command rm -f "${@: -1}"; return ;;
     import)
-      if [ "$FAIL_STAGE" = terminate ]; then kill -TERM "$$"; fi ;;
-    find-identity) printf '%s\n' '1) FIXTURE "Developer ID Application: Fixture"' ;;
+      if [ "$FAIL_STAGE" = terminate ]; then kill -TERM "$$"; fi
+      if [ "$FAIL_STAGE" = installer-import ] && [[ " $* " == *installer-cert.p12* ]]; then return 41; fi ;;
+    find-identity)
+      printf '%s\n' '1) FIXTURE "Developer ID Application: Fixture"'
+      [ "$FAIL_STAGE" = no-installer-identity ] || printf '%s\n' '2) FIXTURE2 "Developer ID Installer: Fixture (FIXTURE123)"' ;;
     cms) printf '%s\n' '<plist><dict/></plist>' ;;
     list-keychain|list-keychains|set-keychain-settings|unlock-keychain|set-key-partition-list) : ;;
     *) return 98 ;;
@@ -265,6 +268,7 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
             "GITHUB_ENV": str(self.env_file), "CREDENTIAL_TEST_ROOT": str(self.root),
             "CREDENTIAL_TEST_HOME": str(self.user_root), "CREDENTIAL_TEST_PYTHON": sys.executable,
             "CERT_BASE64": encoded, "CERT_PASSWORD": "fixture-password",
+            "INSTALLER_CERT_BASE64": encoded, "INSTALLER_CERT_PASSWORD": "fixture-installer-password",
             "IOS_DIST_CERT_P12": encoded, "IOS_DIST_CERT_PASSWORD": "fixture-password",
             "IOS_PROVISION_PROFILE": encoded, "ASC_API_KEY_P8": encoded,
             "APPLE_API_KEY_ID": "FIXTURE123", "ASC_API_KEY_ID": "FIXTURE123",
@@ -296,8 +300,8 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
         env = self.env | {"FAIL_STAGE": failure}
         result = subprocess.run(["bash", "-euo", "pipefail", "-c", self.STUBS + "\n" + body],
                                 cwd=self.root, env=env, capture_output=True, text=True, timeout=15)
-        for secret in ("fixture-password", "fixture-random-password", "fixture-only-not-a-real-credential",
-                       self.env["CERT_BASE64"]):
+        for secret in ("fixture-password", "fixture-installer-password", "fixture-random-password",
+                       "fixture-only-not-a-real-credential", self.env["CERT_BASE64"]):
             self.assertNotIn(secret, result.stdout + result.stderr)
         # Mimic GitHub's next-step environment; partial setup registrations survive.
         for line in self.env_file.read_text().splitlines():
@@ -327,6 +331,9 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
             r = self.run_block(name)
             self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(len(self.credentials()), 2)  # keychain + notary key, no decoded P12
+        # Both identities reach release.sh through the next steps' environment.
+        self.assertEqual(self.env["QWENVOICE_SIGNING_IDENTITY"], "Developer ID Application: Fixture")
+        self.assertEqual(self.env["APPLE_DEV_ID_INSTALLER"], "Developer ID Installer: Fixture (FIXTURE123)")
         self.assertEqual(self.run_block("Cleanup signing material").returncode, 0)
         self.assertFalse(self.credentials())
         r = self.run_block(self.SETUP_IOS)
@@ -337,7 +344,8 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
         self.assertEqual(self.run_block("Cleanup iOS signing material").returncode, 0)
 
     def test_early_failures_and_termination_remove_partial_material(self):
-        cases = [(self.SETUP_MAC, x) for x in ("decode", "create-keychain", "import", "set-key-partition-list", "terminate")]
+        cases = [(self.SETUP_MAC, x) for x in ("decode", "create-keychain", "import", "installer-import",
+                                               "set-key-partition-list", "terminate")]
         cases += [(self.SETUP_KEY, "chmod")]
         cases += [(self.SETUP_IOS, x) for x in ("create-keychain", "decode", "import", "profile-copy", "chmod", "key-copy", "terminate")]
         for name, failure in cases:
@@ -346,8 +354,16 @@ uuidgen() { printf '%s\n' 'fixture-random-password'; }
                 self.assertEqual(r.returncode, 143 if failure == "terminate" else 41, r.stderr)
                 self.assertFalse(self.credentials(), str(self.credentials()))
 
+    def test_a_missing_installer_identity_fails_and_removes_the_keychain(self):
+        r = self.run_block(self.SETUP_MAC, "no-installer-identity")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("No 'Developer ID Installer' identity", r.stdout + r.stderr)
+        self.assertFalse(self.credentials(), str(self.credentials()))
+        self.assertNotIn("APPLE_DEV_ID_INSTALLER", self.env)
+
     def test_existing_files_are_not_overwritten_or_deleted(self):
         cases = [(self.SETUP_MAC, self.runner / "cert.p12"),
+                 (self.SETUP_MAC, self.runner / "installer-cert.p12"),
                  (self.SETUP_KEY, self.runner / "AuthKey_FIXTURE123.p8"),
                  (self.SETUP_IOS, self.user_root / ".appstoreconnect/private_keys/AuthKey_FIXTURE123.p8"),
                  (self.SETUP_IOS, self.user_root / "Library/MobileDevice/Provisioning Profiles/AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE.mobileprovision")]

@@ -14,17 +14,19 @@ name: Release
 # source-bound quality-promotion manifest before changing the verified draft to public.
 #
 # Jobs:
-#   - package: macOS DMG production (signed + notarized + stapled), gated by current macOS
-#     deterministic release checks. It builds third-party code, so it holds only the Apple
-#     signing secrets and a read-only token, and hands the verified DMG to the jobs below as
-#     workflow artifacts with its SHA-256 as a job output.
+#   - package: macOS DMG and CLI installer package production (signed + notarized + stapled),
+#     gated by current macOS deterministic release checks. It builds third-party code, so it
+#     holds only the Apple signing secrets and a read-only token, verifies the packages
+#     (installing, upgrading and uninstalling the CLI package on its ephemeral runner), and
+#     hands the verified DMG to the jobs below as workflow artifacts with its SHA-256 as a job
+#     output; the CLI DMG and package travel with release.sh's reports that bind them.
 #   - sparkle-feed: a fresh runner that builds and installs nothing but the pinned
 #     sign_update. It checks the DMG's digest, reads the feed's values from the app inside
 #     it, signs the DMG and the feed (appcast.xml) with SPARKLE_ED_PRIVATE_KEY and verifies
 #     both signatures before handing the feed on. No other job sees that key.
 #   - draft-release: no secrets. It checks both digests, re-verifies the feed against the
-#     DMG, writes the release evidence and SHA256SUMS, attests both DMGs and uploads the
-#     verified draft; it alone holds contents: write.
+#     DMG, writes the release evidence and SHA256SUMS, attests both DMGs and the CLI installer
+#     package and uploads the verified draft; it alone holds contents: write.
 #   - compile-ios: iOS compile-safety only. Runs in parallel with
 #     `package` and does NOT block macOS publishing if it fails.
 #   - archive-ios: optional manual signed archive / TestFlight lane. Physical-device XCUITest is an
@@ -51,6 +53,15 @@ name: Release
 #
 #   APPLE_DEV_ID_APP_P12_PASSWORD
 #       The password used when exporting the .p12.
+#
+#   APPLE_DEV_ID_INSTALLER_P12_BASE64
+#       The "Developer ID Installer" certificate AND its private key, of the
+#       same team, exported and encoded the same way. It signs the CLI
+#       installer package (productsign); release.sh refuses an installer
+#       identity whose Team ID is not APPLE_TEAM_ID.
+#
+#   APPLE_DEV_ID_INSTALLER_P12_PASSWORD
+#       The password used when exporting that .p12.
 #
 #   APPLE_NOTARY_KEY_ID
 #       The 10-character key ID baked into the AuthKey_XXXXXX.p8 filename
@@ -309,24 +320,29 @@ jobs:
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$commit")" >> "$GITHUB_ENV"
 
       - name: Setup signing keychain
-        # Decode the Developer ID certificate, import it into a fresh
-        # temporary keychain, prepend that keychain to the user search
-        # list so `codesign` finds the identity, and extract the
-        # signing-identity common name back out into $GITHUB_ENV so
-        # release.sh's --signing-identity arg (read from
-        # QWENVOICE_SIGNING_IDENTITY) is populated without a separate
-        # secret. The keychain file is deleted in the "Cleanup signing
-        # material" step, success or failure.
+        # Decode the Developer ID Application and Developer ID Installer
+        # certificates, import both into one fresh temporary keychain,
+        # prepend that keychain to the user search list so `codesign` and
+        # `productsign` find the identities, and extract each identity's
+        # common name back out into $GITHUB_ENV so release.sh's
+        # --signing-identity (read from QWENVOICE_SIGNING_IDENTITY) and
+        # --installer-identity (read from APPLE_DEV_ID_INSTALLER) are
+        # populated without a separate secret. The keychain password exists
+        # only in this step, so both imports happen here. The keychain file
+        # is deleted in the "Cleanup signing material" step, success or
+        # failure.
         env:
           CERT_BASE64: ${{ secrets.APPLE_DEV_ID_APP_P12_BASE64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_DEV_ID_APP_P12_PASSWORD }}
+          INSTALLER_CERT_BASE64: ${{ secrets.APPLE_DEV_ID_INSTALLER_P12_BASE64 }}
+          INSTALLER_CERT_PASSWORD: ${{ secrets.APPLE_DEV_ID_INSTALLER_P12_PASSWORD }}
         run: |
           set +x
           set -euo pipefail
           umask 077
           KEYCHAIN_PATH="$RUNNER_TEMP/vocello-signing.keychain-db"
           # Refuse pre-existing files; cleanup owns only this setup attempt.
-          for path in "$KEYCHAIN_PATH" "$RUNNER_TEMP/cert.p12"; do
+          for path in "$KEYCHAIN_PATH" "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/installer-cert.p12"; do
             [ ! -e "$path" ] && [ ! -L "$path" ] || { echo "::error::signing scratch already exists"; exit 1; }
           done
           cleanup_setup() {
@@ -334,7 +350,7 @@ jobs:
             trap - EXIT
             set +e
             cleanup_result=0
-            rm -f "$RUNNER_TEMP/cert.p12" || cleanup_result=1
+            rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/installer-cert.p12" || cleanup_result=1
             if [ "$result" -ne 0 ] && [ -f "$KEYCHAIN_PATH" ]; then
               security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || cleanup_result=1
             fi
@@ -363,6 +379,15 @@ jobs:
             -k "$KEYCHAIN_PATH"
           rm "$RUNNER_TEMP/cert.p12"
 
+          # The Developer ID Installer identity, which signs the CLI
+          # installer package, goes into the same keychain the same way.
+          echo "$INSTALLER_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/installer-cert.p12"
+          security import "$RUNNER_TEMP/installer-cert.p12" \
+            -P "$INSTALLER_CERT_PASSWORD" \
+            -T /usr/bin/productsign -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          rm "$RUNNER_TEMP/installer-cert.p12"
+
           # Prepend the new keychain to the user search list (preserving
           # the originals — the login keychain stays available so brew
           # etc. keep working).
@@ -378,9 +403,18 @@ jobs:
           [ -n "$IDENTITY" ] || { echo "::error::No 'Developer ID Application' identity found in the imported cert" >&2; exit 1; }
           echo "Resolved signing identity: $IDENTITY"
 
+          # An installer identity is not a code-signing one: it is listed
+          # under the basic policy. Its CN is what productsign --sign expects;
+          # release.sh refuses it unless it names the release Team ID.
+          INSTALLER_IDENTITY="$(security find-identity -v -p basic "$KEYCHAIN_PATH" \
+            | awk -F'"' '/Developer ID Installer/ { print $2; exit }')"
+          [ -n "$INSTALLER_IDENTITY" ] || { echo "::error::No 'Developer ID Installer' identity found in the imported installer cert" >&2; exit 1; }
+          echo "Resolved installer identity: $INSTALLER_IDENTITY"
+
           # Export to subsequent steps without surfacing the value in
           # the workflow UI's "env" panel.
           echo "QWENVOICE_SIGNING_IDENTITY=$IDENTITY"        >> "$GITHUB_ENV"
+          echo "APPLE_DEV_ID_INSTALLER=$INSTALLER_IDENTITY"  >> "$GITHUB_ENV"
 
       - name: Write App Store Connect API key file
         # notarytool's --key flag expects a path to the .p8 file, not
@@ -419,9 +453,10 @@ jobs:
       # resolves packages cold from Package.resolved.
       - name: Run scripts/release.sh (Developer ID + notarized DMG)
         # QWENVOICE_SIGNING_MODE / NOTARIZE / EXPECT_SIGNED_RELEASE /
-        # EXPECT_NOTARIZED_DMG come from job-level env, SIGNING_IDENTITY and
-        # CODESIGN_KEYCHAIN from the two previous steps' $GITHUB_ENV exports,
-        # and the team and notary identifiers from this step's env.
+        # EXPECT_NOTARIZED_DMG come from job-level env, SIGNING_IDENTITY,
+        # APPLE_DEV_ID_INSTALLER and CODESIGN_KEYCHAIN from the keychain
+        # step's $GITHUB_ENV exports, the key path from the next step's, and
+        # the team and notary identifiers from this step's env.
         # APPLE_API_KEY_PATH + APPLE_API_KEY_ID + APPLE_API_ISSUER_ID
         # are consumed by `xcrun notarytool submit --wait` inside
         # release.sh. Wall-clock ~30-45 min (build + sign + notarize); the
@@ -471,13 +506,19 @@ jobs:
           output_name="${OUTPUT_NAME:-Vocello-macos26}"
           dmg="build/dist/macos/${output_name}.dmg"
           cli_dmg="build/dist/macos/${output_name}-cli.dmg"
+          cli_pkg="build/dist/macos/${output_name}-cli.pkg"
+          cli_pkg_verification="build/dist/macos/cli-pkg-verification.json"
           metadata="build/dist/macos/release-metadata.txt"
           [ -f "$dmg" ] || { echo "missing: $dmg" >&2; ls -la build/dist/macos/ >&2; exit 1; }
           [ -f "$cli_dmg" ] || { echo "missing CLI DMG" >&2; exit 1; }
+          [ -f "$cli_pkg" ] || { echo "missing CLI installer package" >&2; exit 1; }
+          [ -f "$cli_pkg_verification" ] || { echo "missing CLI installer package verification" >&2; exit 1; }
           [ -f "$metadata" ] || { echo "missing: $metadata" >&2; exit 1; }
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "cli_dmg=$cli_dmg" >> "$GITHUB_OUTPUT"
           echo "cli_verification=build/dist/macos/cli-package-verification.json" >> "$GITHUB_OUTPUT"
+          echo "cli_pkg=$cli_pkg" >> "$GITHUB_OUTPUT"
+          echo "cli_pkg_verification=$cli_pkg_verification" >> "$GITHUB_OUTPUT"
           echo "metadata=$metadata" >> "$GITHUB_OUTPUT"
           echo "output_name=$output_name" >> "$GITHUB_OUTPUT"
 
@@ -486,16 +527,21 @@ jobs:
         # this also checks `xcrun stapler validate` and the codesign
         # team-id seals — see scripts/verify_packaged_dmg.sh and
         # verify_release_bundle.sh for the per-flag behaviour.
+        # --include-pkg checks the CLI installer package's Developer ID
+        # Installer signature, ticket and payload, then installs, upgrades
+        # and uninstalls it with sudo on this ephemeral runner
+        # (scripts/verify_packaged_cli.sh).
         env:
           QWENVOICE_EXPECT_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           python3 scripts/required_step_ledger.py run \
             --ledger "$RELEASE_STEP_LEDGER" --step artifact-verification \
-            --timeout-seconds 900 -- \
+            --timeout-seconds 1500 -- \
             ./scripts/verify_packaged_dmg.sh \
               "${{ steps.artifacts.outputs.dmg }}" \
-              "${{ steps.artifacts.outputs.metadata }}" --include-cli
+              "${{ steps.artifacts.outputs.metadata }}" --include-cli \
+              --include-pkg "${{ steps.artifacts.outputs.cli_pkg }}"
 
       # The bytes the Sparkle and draft jobs receive: each checks the DMG it downloads
       # against this digest before it signs or publishes anything.
@@ -531,6 +577,8 @@ jobs:
           path: |
             ${{ steps.artifacts.outputs.cli_dmg }}
             ${{ steps.artifacts.outputs.cli_verification }}
+            ${{ steps.artifacts.outputs.cli_pkg }}
+            ${{ steps.artifacts.outputs.cli_pkg_verification }}
             ${{ steps.artifacts.outputs.metadata }}
             ${{ env.RELEASE_SOURCE_IDENTITY }}
             ${{ env.RELEASE_STEP_LEDGER }}
@@ -691,14 +739,18 @@ jobs:
           output_name="$OUTPUT_NAME"
           dmg="build/dist/macos/${output_name}.dmg"
           cli_dmg="build/dist/macos/${output_name}-cli.dmg"
+          cli_pkg="build/dist/macos/${output_name}-cli.pkg"
+          cli_pkg_verification="build/dist/macos/cli-pkg-verification.json"
           metadata="build/dist/macos/release-metadata.txt"
           appcast="build/dist/macos/appcast.xml"
-          for path in "$dmg" "$cli_dmg" "$metadata" "$appcast"; do
+          for path in "$dmg" "$cli_dmg" "$cli_pkg" "$cli_pkg_verification" "$metadata" "$appcast"; do
             [ -f "$path" ] || { echo "missing: $path" >&2; ls -la build/dist/macos/ >&2; exit 1; }
           done
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "cli_dmg=$cli_dmg" >> "$GITHUB_OUTPUT"
           echo "cli_verification=build/dist/macos/cli-package-verification.json" >> "$GITHUB_OUTPUT"
+          echo "cli_pkg=$cli_pkg" >> "$GITHUB_OUTPUT"
+          echo "cli_pkg_verification=$cli_pkg_verification" >> "$GITHUB_OUTPUT"
           echo "metadata=$metadata" >> "$GITHUB_OUTPUT"
           echo "appcast=$appcast" >> "$GITHUB_OUTPUT"
           echo "output_name=$output_name" >> "$GITHUB_OUTPUT"
@@ -743,18 +795,23 @@ jobs:
             --artifact "${{ steps.artifacts.outputs.dmg }}" \
             --artifact "${{ steps.artifacts.outputs.cli_dmg }}" \
             --artifact "${{ steps.artifacts.outputs.cli_verification }}" \
+            --artifact "${{ steps.artifacts.outputs.cli_pkg }}" \
+            --artifact "${{ steps.artifacts.outputs.cli_pkg_verification }}" \
             --artifact "${{ steps.artifacts.outputs.appcast }}" \
             --metadata "${{ steps.artifacts.outputs.metadata }}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"
           python3 scripts/release_evidence.py validate --output-dir build/dist/macos
 
+      # promote-release.yml verifies this attestation for every DMG and package
+      # the release evidence names before it publishes.
       - name: Attest verified DMG provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             ${{ steps.artifacts.outputs.dmg }}
             ${{ steps.artifacts.outputs.cli_dmg }}
+            ${{ steps.artifacts.outputs.cli_pkg }}
 
       - name: Upload verified candidate as workflow artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -764,6 +821,8 @@ jobs:
             ${{ steps.artifacts.outputs.dmg }}
             ${{ steps.artifacts.outputs.cli_dmg }}
             ${{ steps.artifacts.outputs.cli_verification }}
+            ${{ steps.artifacts.outputs.cli_pkg }}
+            ${{ steps.artifacts.outputs.cli_pkg_verification }}
             ${{ steps.artifacts.outputs.appcast }}
             ${{ steps.artifacts.outputs.metadata }}
             ${{ steps.artifacts.outputs.spdx }}
@@ -827,6 +886,8 @@ jobs:
             "${{ steps.artifacts.outputs.dmg }}" \
             "${{ steps.artifacts.outputs.cli_dmg }}" \
             "${{ steps.artifacts.outputs.cli_verification }}" \
+            "${{ steps.artifacts.outputs.cli_pkg }}" \
+            "${{ steps.artifacts.outputs.cli_pkg_verification }}" \
             "${{ steps.artifacts.outputs.appcast }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \
@@ -849,6 +910,8 @@ jobs:
             "${{ steps.artifacts.outputs.dmg }}" \
             "${{ steps.artifacts.outputs.cli_dmg }}" \
             "${{ steps.artifacts.outputs.cli_verification }}" \
+            "${{ steps.artifacts.outputs.cli_pkg }}" \
+            "${{ steps.artifacts.outputs.cli_pkg_verification }}" \
             "${{ steps.artifacts.outputs.appcast }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \

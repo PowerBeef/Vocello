@@ -186,6 +186,24 @@
         ],
         "artifact-verification": [
           {
+            "id": "macos-artifact-verification-with-cli-pkg-v3",
+            "argv": [
+              "./scripts/verify_packaged_dmg.sh",
+              {
+                "pattern": "build/dist/macos/[A-Za-z0-9][A-Za-z0-9 ._-]{0,159}\\.dmg"
+              },
+              "build/dist/macos/release-metadata.txt",
+              "--include-cli",
+              "--include-pkg",
+              {
+                "pattern": "build/dist/macos/[A-Za-z0-9][A-Za-z0-9 ._-]{0,159}-cli\\.pkg"
+              }
+            ],
+            "outputs": [
+              "build/dist/macos/cli-package-verification.json"
+            ]
+          },
+          {
             "id": "macos-artifact-verification-with-cli-v2",
             "argv": [
               "./scripts/verify_packaged_dmg.sh",

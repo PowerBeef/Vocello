@@ -398,6 +398,28 @@ required_steps_finalize {quoted}
                 "build/dist/macos/release-metadata.txt",
             ]
         ))
+        # Template v3: the CLI installer package joins the managed verification (RF-08), and the
+        # v2 command without it still binds to v2 only.
+        with_package = ledger_module.bind_command(macos, "artifact-verification", [
+            "./scripts/verify_packaged_dmg.sh",
+            "build/dist/macos/Vocello candidate.dmg",
+            "build/dist/macos/release-metadata.txt",
+            "--include-cli", "--include-pkg",
+            "build/dist/macos/Vocello candidate-cli.pkg",
+        ])
+        self.assertEqual(with_package["commandTemplateID"], "macos-artifact-verification-with-cli-pkg-v3")
+        self.assertEqual(with_package["declaredOutputs"], ["build/dist/macos/cli-package-verification.json"])
+        self.assertEqual(ledger_module.bind_command(macos, "artifact-verification", [
+            "./scripts/verify_packaged_dmg.sh", "build/dist/macos/Vocello-macos26.dmg",
+            "build/dist/macos/release-metadata.txt", "--include-cli",
+        ])["commandTemplateID"], "macos-artifact-verification-with-cli-v2")
+        for package in ("build/dist/macos/Vocello-macos26.pkg", "/tmp/Vocello-macos26-cli.pkg",
+                        "build/dist/macos/$(id)-cli.pkg"):
+            with self.subTest(package=package), self.assertRaises(ledger_module.LedgerError):
+                ledger_module.bind_command(macos, "artifact-verification", [
+                    "./scripts/verify_packaged_dmg.sh", "build/dist/macos/Vocello-macos26.dmg",
+                    "build/dist/macos/release-metadata.txt", "--include-cli", "--include-pkg", package,
+                ])
 
     def test_declared_outputs_are_hashed_and_missing_outputs_fail_the_step(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

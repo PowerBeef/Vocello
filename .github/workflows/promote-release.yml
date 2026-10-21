@@ -6,8 +6,9 @@ name: Promote verified release
 # and only after an exact-tag quality-promotion manifest validates. It is
 # dispatched from the tag itself (`gh workflow run promote-release.yml --ref
 # <tag> -f tag=<tag>`), runs under the reviewer-gated `release` environment, and
-# checks the draft's DMGs against their build attestations and the tag's
-# checked-out contracts, so the draft cannot vouch for itself.
+# checks every DMG and installer package the release evidence names against
+# its build attestation, and the evidence against the tag's checked-out
+# contracts, so the draft cannot vouch for itself.
 on:
   workflow_dispatch:
     inputs:
@@ -128,19 +129,31 @@ jobs:
           # and the draft holds nothing else but the promotion manifest.
           python3 scripts/release_evidence.py validate --output-dir "$remote" --source-root . \
             --exact-assets quality-promotion.json
-          # Each DMG is the one release.yml built and attested for this tag and
-          # commit on a GitHub-hosted runner, not an artifact of another run.
+          # Each binary the validated evidence names (both DMGs and the CLI
+          # installer package) is the one release.yml built and attested for
+          # this tag and commit on a GitHub-hosted runner, not an artifact of
+          # another run.
           commit="$(git rev-parse HEAD)"
-          dmgs=("$remote"/*.dmg)
-          [ -f "${dmgs[0]}" ] || { echo "::error::draft carries no DMG"; exit 1; }
-          for dmg in "${dmgs[@]}"; do
-            gh attestation verify "$dmg" \
+          python3 - "$remote/release-evidence.json" > "$RUNNER_TEMP/attested-binaries.txt" <<'PY'
+          import json, re, sys
+          artifacts = json.load(open(sys.argv[1], encoding="utf-8")).get("artifacts", [])
+          names = sorted(str(item.get("name", "")) for item in artifacts if isinstance(item, dict)
+                         and str(item.get("name", "")).endswith((".dmg", ".pkg")))
+          if not any(name.endswith(".dmg") for name in names):
+              raise SystemExit("error: the release evidence names no DMG")
+          for name in names:
+              if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]*", name):
+                  raise SystemExit("error: the release evidence names an unsafe binary")
+              print(name)
+          PY
+          while IFS= read -r binary; do
+            gh attestation verify "$remote/$binary" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
               --source-ref "refs/tags/$RELEASE_TAG" \
               --source-digest "$commit" \
-              --deny-self-hosted-runners
-          done
+              --deny-self-hosted-runners < /dev/null
+          done < "$RUNNER_TEMP/attested-binaries.txt"
           python3 scripts/quality_promotion.py validate \
             --platform macos \
             --tag "$RELEASE_TAG" \

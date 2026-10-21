@@ -8,13 +8,18 @@ name: Release rehearsal
 # ledgered commands release.yml's package job runs (release.sh with its
 # release-readiness gate, then the packaged-DMG and CLI verification) with
 # ad-hoc signing and no notarization, and hands the DMG on with its digest.
+# The CLI installer package is built unsigned under its release name and
+# really installed, upgraded and uninstalled on the runner
+# (verify_packaged_dmg.sh --include-cli --include-pkg); the evidence job
+# accepts its unsigned, unstapled claims only under --rehearsal.
 # sparkle-feed, a fresh runner with only the pinned sign_update, signs the DMG
 # and the feed with an ephemeral key (release.yml uses the `release`
 # environment's key and verifies against the app's SUPublicEDKey). evidence
 # re-verifies the feed and builds and validates the release evidence. Only
 # workflow artifacts between those jobs and logs on failure are uploaded.
-# Keychain import, notarization, stapling, attestation and the draft Release
-# steps stay covered by ReleaseCredentialHygieneTests and the next tag.
+# Keychain import, productsign, notarization, stapling, attestation and the
+# draft Release steps stay covered by ReleaseCredentialHygieneTests, the
+# release scripts' shell-stub tests and the next tag.
 on:
   schedule:
     - cron: '17 6 * * 3'
@@ -34,6 +39,7 @@ on:
       - scripts/lib/release_signing.sh
       - scripts/sparkle_appcast.py
       - scripts/cli_package.py
+      - scripts/cli_pkg/**
       - scripts/release_evidence.py
       - scripts/release_build_number.py
       - scripts/release_sbom.py
@@ -113,14 +119,17 @@ jobs:
             --ledger "$RELEASE_STEP_LEDGER" --step release-build \
             --timeout-seconds 7800 -- ./scripts/release.sh --preflight none
 
-      - name: Verify packaged DMG and CLI
+      # The runner is ephemeral with passwordless sudo, so the CLI installer
+      # package is installed, upgraded and uninstalled here for real.
+      - name: Verify packaged DMG, CLI and CLI installer package
         run: |
           python3 scripts/required_step_ledger.py run \
             --ledger "$RELEASE_STEP_LEDGER" --step artifact-verification \
-            --timeout-seconds 900 -- \
+            --timeout-seconds 1500 -- \
             ./scripts/verify_packaged_dmg.sh \
               build/dist/macos/Vocello-macos26.dmg \
-              build/dist/macos/release-metadata.txt --include-cli
+              build/dist/macos/release-metadata.txt --include-cli \
+              --include-pkg build/dist/macos/Vocello-macos26-cli.pkg
 
       - name: Record the verified DMG's digest
         id: digest
@@ -145,6 +154,8 @@ jobs:
           path: |
             build/dist/macos/Vocello-macos26-cli.dmg
             build/dist/macos/cli-package-verification.json
+            build/dist/macos/Vocello-macos26-cli.pkg
+            build/dist/macos/cli-pkg-verification.json
             build/dist/macos/release-metadata.txt
             ${{ env.RELEASE_SOURCE_IDENTITY }}
             ${{ env.RELEASE_STEP_LEDGER }}
@@ -322,7 +333,10 @@ jobs:
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
           python3 scripts/required_step_ledger.py finalize --ledger "$RELEASE_STEP_LEDGER"
+          # --rehearsal accepts the CLI installer package's unsigned,
+          # not-notarized claims; release.yml never passes it.
           python3 scripts/release_evidence.py create \
+            --rehearsal \
             --allow-missing-tag-ref \
             --tag "$REHEARSAL_TAG" \
             --commit "$commit" \
@@ -332,11 +346,13 @@ jobs:
             --artifact build/dist/macos/Vocello-macos26.dmg \
             --artifact build/dist/macos/Vocello-macos26-cli.dmg \
             --artifact build/dist/macos/cli-package-verification.json \
+            --artifact build/dist/macos/Vocello-macos26-cli.pkg \
+            --artifact build/dist/macos/cli-pkg-verification.json \
             --artifact build/dist/macos/appcast.xml \
             --metadata build/dist/macos/release-metadata.txt \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"
-          python3 scripts/release_evidence.py validate --output-dir build/dist/macos
+          python3 scripts/release_evidence.py validate --rehearsal --output-dir build/dist/macos
 
       - name: Upload rehearsal evidence logs on failure
         if: failure()

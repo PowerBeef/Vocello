@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import VocelloCLICore
+import VocelloDesktopCore
 
 /// `vocello batch` — synthesize many clips that share one voice/mode/variant,
 /// reusing one process and loaded model with per-item terminal receipts. The headline
@@ -128,7 +129,7 @@ enum BatchCommand {
         }
 
         let mode = try GenerateCommand.resolveMode(args)
-        let quality = try GenerateCommand.resolveQuality(args)
+        let explicitQuality = try GenerateCommand.parseVariantFlag(args)
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
@@ -154,6 +155,11 @@ enum BatchCommand {
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
         CLIPresenter.event(.engineReady)
+        let settings = DesktopAppSettings()
+        let quality = GenerateCommand.resolveVariant(
+            explicitQuality: explicitQuality, mode: mode, registry: runtime.registry,
+            modelsDirectory: dataDir.appendingPathComponent("models", isDirectory: true), settings: settings
+        ).quality
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         // One shared payload keeps the loaded model/session reusable while the
         // command owns each item's result, cancellation, and retained receipt.
@@ -177,7 +183,7 @@ enum BatchCommand {
         // reproduces it (community testing also reports a fixed seed reduces
         // cross-segment timbre drift; GitHub #30/#47).
         let seed = try GenerateCommand.parseSeed(args)
-        let variation = try GenerateCommand.parseVariation(args)
+        let variation = try GenerateCommand.parseVariation(args) ?? GenerateCommand.appVariation(settings)
         if args.flag("long-form") {
             try await runLongForm(
                 args: args, lines: lines, mode: mode, modelID: modelID, quality: quality,

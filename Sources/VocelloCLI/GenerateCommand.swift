@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import QwenVoiceCore
 import Synchronization
+import VocelloDesktopCore
 
 /// `vocello generate` — synthesize one clip headlessly via the in-process engine.
 public enum GenerateCommand {
@@ -20,6 +21,9 @@ public enum GenerateCommand {
         let mode: String
         let variant: String
         let modelID: String
+        /// Where the variant came from: `flag` (--variant) or `app` (the package the
+        /// Mac app would use for the mode).
+        let variantSource: String
         /// The take's effective seed as a decimal string; passing it back as
         /// --seed reproduces the take. `completionReceipt` is the engine's own
         /// receipt and keeps its numeric fields.
@@ -155,9 +159,24 @@ public enum GenerateCommand {
         return (result, firstChunkMS, chunkCount, firstChunkUptimeNS)
     }
 
+    /// The resolved plan of one take, reported by `--plan` without a model load.
+    struct GeneratePlan: Encodable, Sendable {
+        let mode: String
+        let variant: String
+        let variantSource: String
+        let modelID: String
+        let modelInstalled: Bool
+        let language: String
+        let seed: String?
+        let variation: String
+        let characters: Int
+        let streaming: Bool
+        let outputPath: String
+    }
+
     @MainActor
     public static func run(_ args: Args) async throws {
-        let quality = try resolveQuality(args)
+        let explicitQuality = try parseVariantFlag(args)
         let streaming = !args.flag("no-stream")
 
         // Resolve text first so a missing-text run fails fast (before any prompt).
@@ -173,7 +192,8 @@ public enum GenerateCommand {
         // Every option is checked before boot, so a bad value never costs a model load.
         let language = try parseLanguage(args)
         let seed = try parseSeed(args)
-        let variation = try parseVariation(args)
+        let settings = DesktopAppSettings()
+        let variation = try parseVariation(args) ?? appVariation(settings)
         let appDelivery = try parseAppDelivery(args)
         try validatePayloadOptions(args, mode: mode)
         let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
@@ -182,10 +202,36 @@ public enum GenerateCommand {
         let manifestOverride = args.string("manifest").map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
         }
+        let registryContext = try CLIRuntime.bootstrapRegistryOnly(dataDirectory: dataDir, manifestOverride: manifestOverride)
+        let variant = resolveVariant(
+            explicitQuality: explicitQuality, mode: mode, registry: registryContext.registry,
+            modelsDirectory: registryContext.modelsDirectory, settings: settings
+        )
+        let quality = variant.quality
         // The take's identity names its default output, so the path and the
         // JSON `generationID` agree and no two runs share a file (U28).
         let generationID = UUID()
         let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        if args.flag("plan") {
+            let modelID = try CLIRuntime.modelID(registry: registryContext.registry, mode: mode, quality: quality)
+            let plan = GeneratePlan(
+                mode: mode.rawValue, variant: quality ? "quality" : "speed", variantSource: variant.source,
+                modelID: modelID,
+                modelInstalled: registryContext.registry.model(id: modelID)
+                    .map { DesktopModelInventory.isComplete($0, modelsDirectory: registryContext.modelsDirectory) } ?? false,
+                language: (language ?? .auto).rawValue, seed: seed.map { String($0) },
+                variation: (variation ?? .expressive).rawValue, characters: text.count, streaming: streaming,
+                outputPath: output.path
+            )
+            if CLIPresenter.isMachine {
+                CLIPresenter.succeed(plan)
+            } else {
+                print("\(plan.mode) · \(plan.modelID) (\(plan.variantSource)) · \(plan.language) · \(plan.variation)"
+                    + " · \(plan.characters) characters\(plan.modelInstalled ? "" : " · model not installed")")
+                print(plan.outputPath)
+            }
+            return
+        }
         try prepareOutputFolder(of: output.path)
         if output.replacesExistingFile {
             note("--out names an existing file: a successful take replaces it")
@@ -261,6 +307,7 @@ public enum GenerateCommand {
                 finishReason: result.finishReason?.rawValue,
                 mode: mode.rawValue, variant: quality ? "quality" : "speed",
                 modelID: modelID,
+                variantSource: variant.source,
                 seed: result.completionReceipt.map { String($0.request.seed) },
                 deliveryInstructionChars: deliveryInstructionChars,
                 deliveryInstructionDigest: deliveryInstructionDigest,
@@ -489,12 +536,48 @@ public enum GenerateCommand {
         }
     }
 
-    public static func resolveQuality(_ args: Args) throws -> Bool {
-        switch (args.string("variant") ?? "speed").lowercased() {
+    /// `--variant`: true for quality, false for speed, nil when the app's choice applies.
+    public static func parseVariantFlag(_ args: Args) throws -> Bool? {
+        guard let raw = args.string("variant") else { return nil }
+        switch raw.lowercased() {
         case "speed", "fast": return false
         case "quality", "hq": return true
         case let other: throw CLIError(.invalidInput, "invalid --variant '\(other)' (use speed | quality)")
         }
+    }
+
+    /// The take's package: an explicit `--variant`, else the one the Mac app would
+    /// use for the mode (its explicit choice, lower-memory preference or hardware
+    /// recommendation, falling back to an installed package).
+    public struct VariantChoice: Equatable, Sendable {
+        public let quality: Bool
+        /// `flag` or `app`.
+        public let source: String
+    }
+
+    public static func resolveVariant(
+        explicitQuality: Bool?, mode: GenerationMode, registry: ContractBackedModelRegistry,
+        modelsDirectory: URL, settings: DesktopAppSettings,
+        deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass()
+    ) -> VariantChoice {
+        if let explicitQuality { return VariantChoice(quality: explicitQuality, source: "flag") }
+        let choice = DesktopModelSelection.resolve(
+            registry: registry,
+            explicitVariantID: { settings.explicitVariantID(for: $0) },
+            prefersLowerMemory: settings.prefersLowerMemory,
+            deviceClass: deviceClass,
+            isInstalled: { id in
+                registry.model(id: id).map { DesktopModelInventory.isComplete($0, modelsDirectory: modelsDirectory) } ?? false
+            }
+        ).first { $0.mode == mode.rawValue }
+        let variant = choice?.generationVariant ?? choice?.activeVariant
+        return VariantChoice(quality: variant == ModelVariantKind.quality.rawValue, source: "app")
+    }
+
+    /// The app's variation setting as a request sends it: nil for expressive,
+    /// exactly as the app's `GenerationVariationPreference.requestValue()`.
+    public static func appVariation(_ settings: DesktopAppSettings) -> Qwen3SamplingVariation? {
+        settings.variation == .expressive ? nil : settings.variation
     }
 
     /// Build the payload for a (mode, args) pair. For clone this resolves the

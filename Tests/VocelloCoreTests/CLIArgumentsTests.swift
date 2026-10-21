@@ -2,6 +2,7 @@ import Foundation
 import QwenVoiceCore
 import XCTest
 @testable import VocelloCLICore
+import VocelloDesktopCore
 
 /// TEST-13: the CLI's argument parser, its command dispatch table and the
 /// `generate` option helpers (compiled into this bundle by path), plus where the
@@ -166,10 +167,10 @@ final class CLIArgumentsTests: XCTestCase {
             )
         }
 
-        XCTAssertFalse(try GenerateCommand.resolveQuality(generate([])))
-        XCTAssertFalse(try GenerateCommand.resolveQuality(generate(["--variant", "fast"])))
-        XCTAssertTrue(try GenerateCommand.resolveQuality(generate(["--variant", "HQ"])))
-        XCTAssertThrowsError(try GenerateCommand.resolveQuality(generate(["--variant", "turbo"])))
+        XCTAssertNil(try GenerateCommand.parseVariantFlag(generate([])), "absent: the app's choice applies")
+        XCTAssertEqual(try GenerateCommand.parseVariantFlag(generate(["--variant", "fast"])), false)
+        XCTAssertEqual(try GenerateCommand.parseVariantFlag(generate(["--variant", "HQ"])), true)
+        XCTAssertThrowsError(try GenerateCommand.parseVariantFlag(generate(["--variant", "turbo"])))
 
         XCTAssertNil(try GenerateCommand.resolveDeliveryInstructionCellID(generate([]), mode: .design))
         XCTAssertEqual(
@@ -187,6 +188,46 @@ final class CLIArgumentsTests: XCTestCase {
             generate(["--delivery-cell", "angry"]),
             mode: .custom
         ))
+    }
+
+    /// RF-27: without --variant a take uses the package the Mac app would use for the
+    /// mode; without --variation, the app's variation (nil for expressive, as the app sends it).
+    func testTakesDefaultToTheAppsPackageAndVariation() throws {
+        let manifest = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let registry = try ContractBackedModelRegistry(manifestURL: manifest)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let models = FileManager.default.temporaryDirectory.appendingPathComponent("cli-variant-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: models) }
+        func install(_ id: String) throws {
+            let descriptor = try XCTUnwrap(registry.model(id: id))
+            for path in descriptor.requiredRelativePaths {
+                let url = descriptor.installDirectory(in: models).appendingPathComponent(path)
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data().write(to: url)
+            }
+        }
+        func settings(_ values: [String: any Sendable]) -> DesktopAppSettings {
+            DesktopAppSettings(domain: DesktopAppSettings.releaseDomain) { values[$0] }
+        }
+        func resolve(_ explicit: Bool?, _ stored: [String: any Sendable] = [:]) -> GenerateCommand.VariantChoice {
+            GenerateCommand.resolveVariant(
+                explicitQuality: explicit, mode: .custom, registry: registry, modelsDirectory: models,
+                settings: settings(stored), deviceClass: .mid16GBMac
+            )
+        }
+        try install("pro_custom_speed")
+        XCTAssertEqual(resolve(true), GenerateCommand.VariantChoice(quality: true, source: "flag"), "the flag wins")
+        XCTAssertEqual(resolve(nil), GenerateCommand.VariantChoice(quality: false, source: "app"),
+                       "Quality is recommended but not installed: the installed Speed package")
+        try install("pro_custom_quality")
+        XCTAssertEqual(resolve(nil).quality, true, "the 16 GB recommendation once installed")
+        XCTAssertEqual(resolve(nil, ["QwenVoice.PreferSpeedEverywhere": true]).quality, false)
+        XCTAssertEqual(resolve(nil, ["QwenVoice.MacModelVariantPreference.custom": "speed"]).quality, false)
+
+        XCTAssertNil(GenerateCommand.appVariation(settings([:])), "expressive is sent as no variation")
+        XCTAssertEqual(GenerateCommand.appVariation(settings(["generationVariation": "balanced"])), .balanced)
     }
 
     /// P15-07 / P02-09: an unknown `--language` is refused before boot instead of

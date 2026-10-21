@@ -15,7 +15,7 @@ public enum VocelloCommandTree {
     /// The voice and delivery options `generate` and `batch` share.
     static let voiceOptions: [CLIOptionSpec] = [
         .value("mode", .choice(modes), "mode", "custom (default) | design | clone"),
-        .value("variant", .choice(variants), "variant", "speed (default) | quality"),
+        .value("variant", .choice(variants), "variant", "speed | quality (default: the package the app uses for the mode)"),
         .value("speaker", .text, "id", "(custom) Built-in Voice speaker id; default the contract's (see `vocello speakers list`)"),
         .value("voice-brief", .text, "text", "(design) the voice description"),
         .value("voice", .text, "name|id", "(clone) a saved voice"),
@@ -26,7 +26,7 @@ public enum VocelloCommandTree {
         .value("delivery-cell", .text, "preset.intensity", "(custom) a preset cell such as calm.normal (see `vocello deliveries`)"),
         .flag("app-delivery", "with no delivery given, send the apps' default (Neutral) delivery, as a new Studio draft does"),
         .value("seed", .unsignedInteger, "n", "deterministic sampling seed: the same request and seed reproduce the take"),
-        .value("variation", .choice(variations), "variation", "expressive (default) | balanced | consistent"),
+        .value("variation", .choice(variations), "variation", "expressive | balanced | consistent (default: the app's setting)"),
     ]
 
     static let generate = CLICommandSpec(
@@ -52,6 +52,7 @@ public enum VocelloCommandTree {
             .flag("stream", "streaming synthesis at the app's cadence (the default)"),
             .flag("no-stream", "accumulate the whole take before decoding"),
             .flag("play", "play the take when done"),
+            .flag("plan", "resolve the take (model, variant, language, output) and report it without loading a model"),
         ]
     )
 

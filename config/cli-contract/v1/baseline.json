@@ -111,6 +111,7 @@
           "mode": true,
           "no-stream": false,
           "out": true,
+          "plan": false,
           "play": false,
           "reference": true,
           "seed": true,

@@ -284,6 +284,7 @@
 		4A8055C8BEFAE5C0182D652A /* StudioGenerationAttemptAuthorityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA6CEC8BFFF52B99A74571C /* StudioGenerationAttemptAuthorityTests.swift */; };
 		4AEF21FBA2D39AC50B5D48C0 /* IOSModelDownloadAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F8A4CD0C1BD6C15F3C208A /* IOSModelDownloadAdmission.swift */; };
 		4B05B3B2FBEF9F096EDE8F97 /* VoiceClipTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F068FE73DB34691E0E3372C /* VoiceClipTranscriber.swift */; };
+		4B17A03FAB88559859A89F43 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 89D4638BB2991C112353DCA0 /* GRDB */; };
 		4BF4B47470204A6574C80315 /* IOSModelDownloadProgressMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253E6E86D4DE04A07F3B79DE /* IOSModelDownloadProgressMapping.swift */; };
 		4C400D6AE3BD3DB276F5A7DF /* IOSCommerceErrorDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC8B80ED42BB880C0EC78E9 /* IOSCommerceErrorDiagnostics.swift */; };
 		4CE5B8F81A5CA14230CEDBCF /* AnyTTSEngineBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F7D8151835CEF746B90F5C /* AnyTTSEngineBackend.swift */; };
@@ -895,6 +896,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = BEF56FAC38D0E3D7069EE3A3;
 			remoteInfo = VocelloCLICore;
+		};
+		295AD20AB2DBA2FDF9B1D13C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ED55BB692FF8964B44B4CF30 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5961F0B2F5937F26118B7E80;
+			remoteInfo = VocelloDesktopCore;
 		};
 		4EC15C6767E7F89513327343 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -1643,6 +1651,7 @@
 			files = (
 				00ECA54ED7E3536BA8FC3F2E /* VocelloQwen3Core in Frameworks */,
 				0A5B8DFEA067E05B13EA5C01 /* MLX in Frameworks */,
+				4B17A03FAB88559859A89F43 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2931,12 +2940,14 @@
 			buildRules = (
 			);
 			dependencies = (
+				B7FB458355A67A9982E26FFE /* PBXTargetDependency */,
 				4A45887ED546B33C641B79EC /* PBXTargetDependency */,
 			);
 			name = VocelloCLICore;
 			packageProductDependencies = (
 				3005FF4C6BDA5B27FFCBD767 /* VocelloQwen3Core */,
 				08D21813095DF3A8924648A7 /* MLX */,
+				89D4638BB2991C112353DCA0 /* GRDB */,
 			);
 			productName = VocelloCLICore;
 			productReference = F0CAC94D19442E36EA28436C /* VocelloCLICore.framework */;
@@ -4090,6 +4101,11 @@
 			target = 939725D6CC844653EA90F39E /* QwenVoice */;
 			targetProxy = DE1CEFF4CC123988757DB1AF /* PBXContainerItemProxy */;
 		};
+		B7FB458355A67A9982E26FFE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5961F0B2F5937F26118B7E80 /* VocelloDesktopCore */;
+			targetProxy = 295AD20AB2DBA2FDF9B1D13C /* PBXContainerItemProxy */;
+		};
 		C52FD689463F2C0F7F3A928A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 1AC811490BEB9ED2A301BD4E /* QwenVoiceCore */;
@@ -4680,6 +4696,11 @@
 		8139A1718AAB15681C47BF78 /* VocelloQwen3Core */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = VocelloQwen3Core;
+		};
+		89D4638BB2991C112353DCA0 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7DBAD106D74E98B952A55524 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 		9323A4931B2C0DA71897251A /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;

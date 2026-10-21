@@ -221,7 +221,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | Option | Meaning |
 |---|---|
 | `--mode` | `custom` (default) · `design` · `clone` |
-| `--variant` | `speed` (default, 4-bit) · `quality` (8-bit) |
+| `--variant` | `speed` (4-bit) · `quality` (8-bit); without it, the package the Mac app uses for the mode (its explicit choice, "prefer lower-memory models", or this Mac's recommendation, falling back to an installed package): `vocello models active` shows it, and the result's `variantSource` says `flag` or `app` |
 | `--text` / `--text-file` | inline text or a file (`-` reads stdin); with neither, piped stdin is used in text mode (the machine formats and `--no-input` read stdin only for `-`) |
 | `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`); an empty or blank value is refused |
 | `--voice-brief` | (design) plain-language voice description |
@@ -231,11 +231,12 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--app-delivery` | with no `--delivery`/`--delivery-cell`, send the apps' default delivery (the Neutral preset instruction) on Custom and Design, as `batch --app-delivery` does |
 | `--language` | `auto` or a Qwen3 language (`chinese`, `english`, `japanese`, `korean`, `german`, `french`, `russian`, `portuguese`, `spanish`, `italian`) by name or code, a region subtag ignored (`ja-JP`, `es-MX`); omitted = Auto; any other value is refused before boot |
 | `--seed` | deterministic sampling seed — the same request + seed reproduces the same take bit-for-bit |
-| `--variation` | `expressive` (default, official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability |
+| `--variation` | `expressive` (official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability; without it, the app's Variation setting |
 | `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
+| `--plan` | resolve the take (mode, model and its source, whether it is installed, language, seed, variation, output path) and report it without loading a model |
 | `--json` / `--ndjson` | the v1 envelope (result: the take) instead of the bare path, or events ending in it |
 
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same

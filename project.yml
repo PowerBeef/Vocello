@@ -414,11 +414,14 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
+      # RF-27: takes default to the app's model selection and settings.
+      - target: VocelloDesktopCore
       - target: QwenVoiceCore
       - package: MLXAudio
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
+      - package: GRDB
 
   QwenVoiceCore:
     type: framework.static

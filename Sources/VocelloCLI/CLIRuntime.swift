@@ -106,6 +106,13 @@ public struct CLIRuntime {
     /// Resolve a (mode, variant) to the variant-scoped model id the engine loads
     /// (e.g. `pro_custom_speed` / `pro_custom_quality`).
     public func modelID(mode: GenerationMode, quality: Bool) throws -> String {
+        try Self.modelID(registry: registry, mode: mode, quality: quality)
+    }
+
+    /// The variant-scoped model id for (mode, variant) in `registry`, without an engine.
+    public nonisolated static func modelID(
+        registry: ContractBackedModelRegistry, mode: GenerationMode, quality: Bool
+    ) throws -> String {
         guard let base = registry.model(for: mode) else {
             throw CLIError(.configError, "No model for mode '\(mode.rawValue)' in the manifest.")
         }

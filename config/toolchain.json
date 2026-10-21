@@ -143,6 +143,15 @@
       "url": "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-unknown-linux-gnu.tar.gz",
       "sha256": "a293ac937715ae6fb6b64da86761598379e6149f40fbc00fde9ba8a2a562ac65",
       "archivePath": "ruff-x86_64-unknown-linux-gnu/ruff"
+    },
+    "sparkle": {
+      "version": "2.10.0",
+      "url": "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz",
+      "sha256": "c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c",
+      "archivePath": "bin/sign_update",
+      "versionArgs": [
+        "--help"
+      ]
     }
   },
   "release": {

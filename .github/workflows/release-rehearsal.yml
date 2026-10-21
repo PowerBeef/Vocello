@@ -6,10 +6,13 @@ name: Release rehearsal
 #
 # The macOS job runs the same ledgered commands release.yml's package job runs
 # (release.sh with its release-readiness gate, then the packaged-DMG and CLI
-# verification) with ad-hoc signing and no notarization, then builds and
-# validates the release evidence locally. Nothing is uploaded except logs on
-# failure. Keychain import, notarization, stapling, attestation and the draft
-# Release steps stay covered by ReleaseCredentialHygieneTests and the next tag.
+# verification) with ad-hoc signing and no notarization, signs the DMG for
+# Sparkle and writes its appcast with an ephemeral key (release.yml uses the
+# `release` environment's key and verifies against the app's SUPublicEDKey),
+# then builds and validates the release evidence locally. Nothing is uploaded
+# except logs on failure. Keychain import, notarization, stapling, attestation
+# and the draft Release steps stay covered by ReleaseCredentialHygieneTests and
+# the next tag.
 on:
   schedule:
     - cron: '17 6 * * 3'
@@ -26,6 +29,8 @@ on:
       - scripts/verify_packaged_dmg.sh
       - scripts/verify_packaged_cli.sh
       - scripts/verify_release_bundle.sh
+      - scripts/lib/release_signing.sh
+      - scripts/sparkle_appcast.py
       - scripts/cli_package.py
       - scripts/release_evidence.py
       - scripts/release_sbom.py
@@ -110,6 +115,30 @@ jobs:
               build/dist/macos/Vocello-macos26.dmg \
               build/dist/macos/release-metadata.txt --include-cli
 
+      - name: Install the pinned Sparkle signing tool
+        run: ./scripts/install_pinned_tools.sh sparkle
+
+      # The same command release.yml runs, except that the key is ephemeral and the
+      # signature is verified against its public half; the app must still carry a
+      # well-formed SUPublicEDKey and an SUFeedURL that names appcast.xml.
+      - name: Rehearse the Sparkle signature and appcast (ephemeral key)
+        run: |
+          set -euo pipefail
+          SPARKLE_ED_PRIVATE_KEY="$(python3 -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+          export SPARKLE_ED_PRIVATE_KEY
+          public_key="$(python3 scripts/sparkle_appcast.py public-key)"
+          wrapper="$(awk -F= '$1 == "app_wrapper_name" { print $2; exit }' build/dist/macos/release-metadata.txt)"
+          [ -n "$wrapper" ] || { echo "::error::release metadata names no app wrapper"; exit 1; }
+          releases="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+          python3 scripts/sparkle_appcast.py create \
+            --app "build/dist/macos/$wrapper" \
+            --dmg build/dist/macos/Vocello-macos26.dmg \
+            --url "$releases/download/$REHEARSAL_TAG/Vocello-macos26.dmg" \
+            --link "$releases" \
+            --pub-date-epoch "$SOURCE_DATE_EPOCH" \
+            --public-key "$public_key" \
+            --output build/dist/macos/appcast.xml
+
       - name: Build and validate release evidence (not published)
         run: |
           set -euo pipefail
@@ -124,6 +153,7 @@ jobs:
             --artifact build/dist/macos/Vocello-macos26.dmg \
             --artifact build/dist/macos/Vocello-macos26-cli.dmg \
             --artifact build/dist/macos/cli-package-verification.json \
+            --artifact build/dist/macos/appcast.xml \
             --metadata build/dist/macos/release-metadata.txt \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"

@@ -15,7 +15,7 @@ name: Release
 #
 # Jobs:
 #   - package: macOS DMG production (signed + notarized + stapled), gated by current macOS
-#     deterministic release checks.
+#     deterministic release checks, plus the DMG's Sparkle appcast (appcast.xml).
 #   - compile-ios: iOS compile-safety only. Runs in parallel with
 #     `package` and does NOT block macOS publishing if it fails.
 #   - archive-ios: optional manual signed archive / TestFlight lane. Physical-device XCUITest is an
@@ -60,6 +60,12 @@ name: Release
 #       Ten-character Apple Developer Team ID (e.g. ABCDE12345). Used
 #       for both codesign (--timestamp seal) and the team-ID match in
 #       verify_release_bundle.sh.
+#
+#   SPARKLE_ED_PRIVATE_KEY
+#       The EdDSA private key whose public half is the app's SUPublicEDKey,
+#       as Sparkle's `generate_keys -x` exports it (base64 text). Read only
+#       by the Sparkle signing step, which passes it to sign_update on
+#       standard input and verifies the signature against SUPublicEDKey.
 on:
   push:
     tags: ['v*']
@@ -457,6 +463,7 @@ jobs:
           echo "cli_dmg=$cli_dmg" >> "$GITHUB_OUTPUT"
           echo "cli_verification=build/dist/macos/cli-package-verification.json" >> "$GITHUB_OUTPUT"
           echo "metadata=$metadata" >> "$GITHUB_OUTPUT"
+          echo "appcast=build/dist/macos/appcast.xml" >> "$GITHUB_OUTPUT"
           echo "output_name=$output_name" >> "$GITHUB_OUTPUT"
           echo "spdx=build/dist/macos/vocello-macos.spdx.json" >> "$GITHUB_OUTPUT"
           echo "cyclonedx=build/dist/macos/vocello-macos.cdx.json" >> "$GITHUB_OUTPUT"
@@ -480,6 +487,34 @@ jobs:
               "${{ steps.artifacts.outputs.dmg }}" \
               "${{ steps.artifacts.outputs.metadata }}" --include-cli
 
+      # Sparkle (RF-23). sign_update comes from the SHA-pinned Sparkle release artifact
+      # (config/toolchain.json artifactPins.sparkle), installed before the key is in scope.
+      - name: Install the pinned Sparkle signing tool
+        run: ./scripts/install_pinned_tools.sh sparkle
+
+      # The app's SUFeedURL reads appcast.xml from the latest published Release. The key
+      # reaches sign_update only on standard input, and scripts/sparkle_appcast.py verifies
+      # the stapled DMG's signature against the app's own SUPublicEDKey before it writes the
+      # one-item feed, so a key that is not the app's pair fails here, not on users' Macs.
+      - name: Sign the DMG for Sparkle and write appcast.xml
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          DMG: ${{ steps.artifacts.outputs.dmg }}
+          METADATA: ${{ steps.artifacts.outputs.metadata }}
+          APPCAST: ${{ steps.artifacts.outputs.appcast }}
+        run: |
+          set -euo pipefail
+          wrapper="$(awk -F= '$1 == "app_wrapper_name" { print $2; exit }' "$METADATA")"
+          [ -n "$wrapper" ] || { echo "::error::release metadata names no app wrapper"; exit 1; }
+          releases="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+          python3 scripts/sparkle_appcast.py create \
+            --app "build/dist/macos/$wrapper" \
+            --dmg "$DMG" \
+            --url "$releases/download/$RELEASE_TAG/$(basename "$DMG")" \
+            --link "$releases" \
+            --pub-date-epoch "$SOURCE_DATE_EPOCH" \
+            --output "$APPCAST"
+
       - name: Surface release metadata in log
         run: |
           echo "=== release-metadata.txt ==="
@@ -498,6 +533,7 @@ jobs:
             --artifact "${{ steps.artifacts.outputs.dmg }}" \
             --artifact "${{ steps.artifacts.outputs.cli_dmg }}" \
             --artifact "${{ steps.artifacts.outputs.cli_verification }}" \
+            --artifact "${{ steps.artifacts.outputs.appcast }}" \
             --metadata "${{ steps.artifacts.outputs.metadata }}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY" \
             --step-ledger "$RELEASE_STEP_LEDGER"
@@ -518,6 +554,7 @@ jobs:
             ${{ steps.artifacts.outputs.dmg }}
             ${{ steps.artifacts.outputs.cli_dmg }}
             ${{ steps.artifacts.outputs.cli_verification }}
+            ${{ steps.artifacts.outputs.appcast }}
             ${{ steps.artifacts.outputs.metadata }}
             ${{ steps.artifacts.outputs.spdx }}
             ${{ steps.artifacts.outputs.cyclonedx }}
@@ -580,6 +617,7 @@ jobs:
             "${{ steps.artifacts.outputs.dmg }}" \
             "${{ steps.artifacts.outputs.cli_dmg }}" \
             "${{ steps.artifacts.outputs.cli_verification }}" \
+            "${{ steps.artifacts.outputs.appcast }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \
             "${{ steps.artifacts.outputs.cyclonedx }}" \
@@ -601,6 +639,7 @@ jobs:
             "${{ steps.artifacts.outputs.dmg }}" \
             "${{ steps.artifacts.outputs.cli_dmg }}" \
             "${{ steps.artifacts.outputs.cli_verification }}" \
+            "${{ steps.artifacts.outputs.appcast }}" \
             "${{ steps.artifacts.outputs.metadata }}" \
             "${{ steps.artifacts.outputs.spdx }}" \
             "${{ steps.artifacts.outputs.cyclonedx }}" \

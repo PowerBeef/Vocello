@@ -5,6 +5,8 @@ reviewed: 2026-09-15
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
+  - scripts/lib/release_signing.sh
+  - scripts/sparkle_appcast.py
   - docs/reference/macos-app-guide.md
   - .github/workflows/release.yml
   - scripts/macos_test.sh
@@ -126,8 +128,10 @@ release-readiness and artifact checks.
    source-authority job also proves that the tag commit is contained in `origin/main` and that both
    required checks belong to that exact SHA before any platform job starts. CI then verifies
    tag/source/version identity, builds, signs, notarizes, staples,
-   verifies (`verify_packaged_dmg.sh … --include-cli`), emits SPDX and CycloneDX inventories, writes
-   `SHA256SUMS` plus `release-evidence.json`, and attests both DMGs. The CLI report is a required,
+   verifies (`verify_packaged_dmg.sh … --include-cli`), signs the DMG for Sparkle and writes
+   `appcast.xml` (see [Sparkle updates](#sparkle-updates-rf-23)), emits SPDX and CycloneDX
+   inventories, writes `SHA256SUMS` plus `release-evidence.json` (the appcast is one of its
+   artifacts), and attests both DMGs. The CLI report is a required,
    hashed output of the managed artifact-verification step and binds the exact CLI DMG and
    source/version/build. Only then does it create or reuse
    a draft GitHub Release, upload the candidate, download every asset, and verify the digests.
@@ -156,6 +160,47 @@ release-readiness and artifact checks.
    promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
    notarization, attestation, or draft upload.
+
+## Sparkle updates (RF-23)
+
+The Mac app updates itself with Sparkle 2. Its `SUFeedURL` reads `appcast.xml` from the latest
+published Release (`releases/latest/download/appcast.xml`), and its `SUPublicEDKey` is the public
+half of the EdDSA key held only as the `release` environment secret `SPARKLE_ED_PRIVATE_KEY`.
+Promotion with `--latest` is therefore what offers an update to installed copies; a draft or a
+prerelease offers nothing.
+
+- **Signing the bundle.** `release.sh` re-signs every embedded framework inside-out
+  (`scripts/lib/release_signing.sh`): the code nested in it first, then the framework, then the
+  app. For Sparkle that is `Autoupdate`, then `Updater.app`, then `Sparkle.framework`, each with
+  the release identity, a secure timestamp, the hardened runtime and no entitlements. The app is
+  not sandboxed, so Sparkle's XPC services (`Installer.xpc`, `Downloader.xpc`, which only
+  sandboxed hosts use) are removed before signing; the app must not set
+  `SUEnableInstallerLauncherService` or `SUEnableDownloaderService`. Any other Mach-O nested in a
+  framework is signed the same way, never left ad hoc.
+- **Verifying the bundle.** `verify_release_bundle.sh` fails when `Sparkle.framework` still holds
+  `XPCServices`, and in signed mode checks every Mach-O under `Contents/Frameworks` (each
+  framework's binary, `Autoupdate`, `Updater.app` through its executable) for the release Team ID,
+  the hardened runtime and an empty entitlement set (`entitlement_contract.py verify-bundle
+  --role macos-framework`).
+- **The feed.** After the DMG is notarized, stapled and verified, `release.yml` installs
+  `sign_update` from the SHA-pinned `Sparkle-2.10.0.tar.xz` (`config/toolchain.json`
+  `artifactPins.sparkle`; it moves with the Sparkle package pin) and runs
+  `scripts/sparkle_appcast.py create`. The key reaches `sign_update` only on standard input, and
+  the tool's output is withheld on failure because it echoes a key it cannot decode. The helper
+  verifies the signature against the app's own `SUPublicEDKey` (RFC 8032 Ed25519), so a secret
+  that is not the app's pair fails the run, then writes a one-item RSS feed: `sparkle:version`
+  (CFBundleVersion), `sparkle:shortVersionString`, `sparkle:minimumSystemVersion`
+  (LSMinimumSystemVersion, 26.0), the enclosure URL
+  `…/releases/download/<tag>/<dmg>`, its length and `sparkle:edSignature`, a `pubDate` from the
+  tagged commit's time (`SOURCE_DATE_EPOCH`), and the Releases page as the item link and
+  `sparkle:fullReleaseNotesLink`. No inline release notes are published.
+  `appcast.xml` is a release-evidence artifact, so `SHA256SUMS` covers it, the draft carries it
+  beside the DMG, and promotion's exact-asset check accepts it.
+- **Rehearsal.** `release-rehearsal.yml` runs the same command with an ephemeral key and verifies
+  against that key's public half (`create --public-key`); it still requires the app's
+  `SUPublicEDKey` and an `SUFeedURL` that names `appcast.xml`.
+- **Order matters.** The signature covers the stapled DMG's bytes, so nothing may modify the DMG
+  after the Sparkle step; the evidence then binds both files.
 
 ## Attended walk of the converged screens (per candidate, ten minutes)
 

@@ -79,7 +79,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   distribution outputs.
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
-  artifacts (gh, swiftlint, ruff and periphery on demand; the Linux contracts job installs the
+  artifacts (gh, swiftlint, ruff, periphery and Sparkle's `sign_update` on demand, the last only
+  in the macOS release and rehearsal jobs; the Linux contracts job installs the
   `-linux-x86_64` shellcheck, ruff and swiftlint entries); numpy, pytest and pytest-xdist pip-pin to
   the manifest and Pyright npm-pins to its `npmPins` entry; the website's Node and npm pin only their major version (24 / 11). Dependabot proposes, the manifest and comment change together:
   on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the

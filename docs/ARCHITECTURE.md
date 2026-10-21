@@ -1357,7 +1357,10 @@ authorized commit, not the tag ref. Promotion runs from the tag under the review
 environment and publishes only a draft whose assets are exactly the evidence's, whose DMGs carry
 `release.yml` attestations for that tag and commit, and whose evidence names the checked-out source.
 Release candidates produce SPDX and
-CycloneDX SBOMs, checksums, provenance/attestation, and a validated
+CycloneDX SBOMs, checksums, provenance/attestation, the Sparkle `appcast.xml` (the stapled DMG's
+EdDSA signature, verified against the app's `SUPublicEDKey` before the feed is written; the code
+nested in Sparkle.framework is re-signed inside-out and its XPC services removed, see
+`docs/reference/macos-release-qa.md`), and a validated
 `config/release-evidence-contract.json` evidence set before a draft Release is created. The emitted
 schema-v2 `release-evidence.json` binds the clean tracked-and-untracked source identity, required
 input digests, and a hashed `release-verification.json` bundle. Every required-step manifest must

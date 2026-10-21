@@ -19,6 +19,7 @@ FILES = (
     "config/licenses/Unicode-3.0.txt",
     "config/language-normalization/hant-hans-v1.json",
     "config/language-normalization/hant-hans-v1.txt",
+    "config/notices/sparkle.txt",
     "config/notices/swift-asn1.txt",
     "config/notices/swift-crypto.txt",
     "config/notices/swift-nio.txt",

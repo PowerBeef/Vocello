@@ -36,5 +36,9 @@
     <string>Vocello records reference clips for voice cloning. Audio never leaves your Mac.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Vocello transcribes reference clips on-device to pre-fill transcripts. Nothing is sent to Apple or anyone else.</string>
+    <key>SUFeedURL</key>
+    <string>https://github.com/PowerBeef/Vocello/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>0Lowc/RlE87KDi4CMQ+0KTU99cYD0PvXejaZU4FqD/0=</string>
 </dict>
 </plist>

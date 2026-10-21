@@ -69,6 +69,12 @@ packages:
   MLXSwift:
     url: https://github.com/ml-explore/mlx-swift.git
     exactVersion: "0.32.3"
+  # RF-23: the macOS app's updater, a signed binary framework. The app is not
+  # sandboxed, so scripts/release.sh drops Sparkle's XPC services and re-signs
+  # its helpers inside-out; only the macOS app links it.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.0"
   # No product target links the HuggingFace product (owned sources import no
   # HuggingFace module). The owned package depends on it; this exact pin moves in
   # lockstep with Packages/VocelloQwen3Core/Package.swift.
@@ -274,6 +280,17 @@ targets:
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
+      - package: Sparkle
+    postBuildScripts:
+      # RF-23: arm64-only Sparkle without its sandbox-only XPC services,
+      # re-signed inside-out before Xcode seals the app. The input is the
+      # output of Xcode's CodeSign task for the embedded framework, which
+      # orders this phase after that task rather than beside it.
+      - name: Prepare embedded Sparkle
+        script: '"${SRCROOT}/scripts/prepare_embedded_sparkle.sh"'
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/B
+        basedOnDependencyAnalysis: false
 
   # Headless Swift CLI over the in-process engine (QwenVoiceCore). User-facing
   # generation without the UI + the deterministic driver for benchmarks/perf

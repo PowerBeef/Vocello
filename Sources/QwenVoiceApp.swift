@@ -20,6 +20,9 @@ struct QwenVoiceApp: App {
     @State private var savedVoicesViewModel = SavedVoicesViewModel()
     @State private var appCommandRouter = AppCommandRouter.shared
     @State private var appStartupCoordinator = AppStartupCoordinator()
+    /// Sparkle's updater for the app's lifetime (RF-23); the Vocello menu and
+    /// both Settings hosts share it.
+    @State private var softwareUpdater = MacSoftwareUpdater()
     /// The shell model lives as long as the engine store and the player it
     /// drives (A10-04): its Studio coordinators outlive the window, so a window
     /// closed during a take reopens on that take with its Stop, not on idle
@@ -71,6 +74,9 @@ struct QwenVoiceApp: App {
         .commands {
             SidebarCommands()
             CommandGroup(replacing: .newItem) { }
+            CommandGroup(after: .appInfo) {
+                MacCheckForUpdatesButton(updater: softwareUpdater)
+            }
 
             // Playback commands
             CommandMenu(MacInterfaceText.menuPlayback) {
@@ -186,6 +192,7 @@ struct QwenVoiceApp: App {
                     .environment(modelManager)
                     .environment(savedVoicesViewModel)
                     .environment(appCommandRouter)
+                    .environment(softwareUpdater)
                     .frame(
                         minWidth: MacShellMetrics.windowMinSize.width,
                         minHeight: MacShellMetrics.windowMinSize.height
@@ -210,8 +217,8 @@ struct QwenVoiceApp: App {
     }
 
     /// The Cmd+, scene hosts the same screen the sidebar shows, so muscle
-    /// memory keeps working; the screen reads only the model manager, and the
-    /// deep-link highlight is a no-op in this window.
+    /// memory keeps working; the screen reads the model manager and the
+    /// updater, and the deep-link highlight is a no-op in this window.
     private var settingsWindowContent: some View {
         MacSettingsScreen(highlightedMode: .constant(nil))
             .frame(
@@ -219,6 +226,7 @@ struct QwenVoiceApp: App {
                 minHeight: MacShellMetrics.settingsWindowMinSize.height
             )
             .environment(modelManager)
+            .environment(softwareUpdater)
             .preferredColorScheme(.dark)
     }
 

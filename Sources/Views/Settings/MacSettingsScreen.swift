@@ -6,6 +6,7 @@ import SwiftUI
 /// Cmd+, scene host this view; Studio installation links still target the exact model row.
 struct MacSettingsScreen: View {
     @Environment(ModelManagerViewModel.self) private var viewModel
+    @Environment(MacSoftwareUpdater.self) private var softwareUpdater
     /// Mode-keyed deep-link target: when the sidebar redirects to Settings
     /// because a mode's model is missing, the shell sets this so the models
     /// section scrolls to and flashes that mode's row.
@@ -139,10 +140,41 @@ struct MacSettingsScreen: View {
             MacSettingsSection {
                 categoryButton(.cloning, symbol: "waveform.badge.mic", subtitle: MacInterfaceText.settingsCloneConsentDetail)
             }
-            Text(appVersion)
-                .macType(.caption)
-                .foregroundStyle(MacTheme.Text.tertiary)
+            updatesSection
         }
+    }
+
+    /// RF-23: Sparkle's automatic check and a check on demand, beside the
+    /// version they compare against. Sparkle owns the preference and asks for
+    /// it on the second launch; the toggle mirrors it.
+    private var updatesSection: some View {
+        MacSettingsSection {
+            MacSettingsToggleRow(
+                symbol: "arrow.triangle.2.circlepath",
+                title: MacInterfaceText.settingsAutomaticUpdates,
+                subtitle: MacInterfaceText.settingsAutomaticUpdatesDetail,
+                accessibilityIdentifier: "settings_automaticUpdateChecks",
+                isOn: Binding(
+                    get: { softwareUpdater.checksAutomatically },
+                    set: { softwareUpdater.setChecksAutomatically($0) }
+                )
+            )
+            MacSettingsDivider()
+            MacSettingsRow(
+                symbol: "info.circle",
+                title: [VocelloTheme.Branding.productName, appVersion].joined(separator: " ")
+            ) {
+                EmptyView()
+            } trailing: {
+                Button(MacInterfaceText.checkForUpdates) {
+                    softwareUpdater.checkForUpdates()
+                }
+                .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.accent))
+                .disabled(!softwareUpdater.canCheckForUpdates)
+                .accessibilityIdentifier("settings_checkForUpdates")
+            }
+        }
+        .onAppear { softwareUpdater.refresh() }
     }
 
     private var selectedLanguageName: String {

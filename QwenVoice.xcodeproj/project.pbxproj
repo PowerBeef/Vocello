@@ -282,6 +282,7 @@
 		4D9146CA233F1E1EBF657D97 /* LongFormAssemblyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A704D0B6ADBAF007042048C /* LongFormAssemblyTests.swift */; };
 		4DEDA52653BDA6CD64BDB587 /* MacVoiceDesignScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7208522E5BBC74B0AA0EF3 /* MacVoiceDesignScreen.swift */; };
 		4E910B66DB5E09952E7AE58A /* MacGenerationDraftSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F1987DEC429D7F5536E4B5 /* MacGenerationDraftSupport.swift */; };
+		4EC0A4406C6A83061B2D8C91 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 9323A4931B2C0DA71897251A /* Sparkle */; };
 		4FA8F648891A04CFD886D881 /* NativeEngineRuntimeSeamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7B292DDCE924077FB1C795 /* NativeEngineRuntimeSeamTests.swift */; };
 		50775D1E9628ECA050807AC2 /* VocelloiOSDeliveryCohortUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9B4C586DCEAEA49ACF5872 /* VocelloiOSDeliveryCohortUITests.swift */; };
 		511AA209FF47C9CA245B6AA5 /* ClipReviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76D71A324517246C7A3CBFF /* ClipReviewPlayer.swift */; };
@@ -542,6 +543,7 @@
 		AA5E06A85D27401F48C6F3AE /* WAVProvenanceChunkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D9A750B58726EEBFC326B7 /* WAVProvenanceChunkTests.swift */; };
 		AA9D8D7AAFB3BA4E985F9953 /* GenerationTerminalDiagnosticEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B502E28577B0DE67B3E51C /* GenerationTerminalDiagnosticEvidenceTests.swift */; };
 		AB022B0D9FEFA486E5C6D19C /* LongFormHistoryAcceptance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A76C7F71A0C353A8B9CBBC9 /* LongFormHistoryAcceptance.swift */; };
+		AB182CFCD2933F4368754FD9 /* MacSoftwareUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC858FE47FDAE1505E67A2D /* MacSoftwareUpdater.swift */; };
 		AB19429622392340EF0B9F7D /* GenerationOutputAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A94C8A768AF3FE6E0CD51EC /* GenerationOutputAdapter.swift */; };
 		AB1AB16C2B3B268937A49E8F /* VocelloMacPerfUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC8D0BE5D262D74AB7FEFD5 /* VocelloMacPerfUITests.swift */; };
 		AB9FB31595A50120F7690CE4 /* IOSExportGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35E3A6DD00C5B5E8BB1C313 /* IOSExportGateTests.swift */; };
@@ -1302,6 +1304,7 @@
 		9E0FED1EF94E06A5363542F9 /* StudioScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioScreen.swift; sourceTree = "<group>"; };
 		9E32B4D98926E3BFAD0690C4 /* VocelloPrimaryCTAButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloPrimaryCTAButton.swift; sourceTree = "<group>"; };
 		9E5B333484B86C0E30314380 /* MacRecordVoiceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordVoiceSheet.swift; sourceTree = "<group>"; };
+		9FC858FE47FDAE1505E67A2D /* MacSoftwareUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSoftwareUpdater.swift; sourceTree = "<group>"; };
 		A014ECB4F32BED1D8FE49B68 /* IOSAccessibilityIdentifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSAccessibilityIdentifiers.swift; sourceTree = "<group>"; };
 		A10C91DE69B8163804C5D553 /* DeliveryInstructionAdvisorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryInstructionAdvisorTests.swift; sourceTree = "<group>"; };
 		A1B6925284D75370993339F2 /* GenerationQualityCompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationQualityCompositionTests.swift; sourceTree = "<group>"; };
@@ -1504,6 +1507,7 @@
 				2D5BBF0086459B904EBDD4D8 /* QwenVoiceCore.framework in Frameworks */,
 				E4CEA3E7589F1B62509C9AC0 /* VocelloQwen3Core in Frameworks */,
 				0CF0F58510A8660B4271B74E /* MLX in Frameworks */,
+				4EC0A4406C6A83061B2D8C91 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2100,6 +2104,7 @@
 				916B21B75394EFA8291A6E95 /* MacMetricKitReporter.swift */,
 				A7FE9D2BDA257CCFD9C61608 /* MacModelVariantResolution.swift */,
 				803DDA2894963BDCD16DA65D /* MacSavedVoiceDeletion.swift */,
+				9FC858FE47FDAE1505E67A2D /* MacSoftwareUpdater.swift */,
 				E3967ADEFB3305E5953E7758 /* MacStudioGenerationActions.swift */,
 				2B992E1A6D01B95314004B09 /* MacStudioGenerationRequestFactory.swift */,
 				787DE201F096B74D53823476 /* MacStudioLongFormPlatformHooks.swift */,
@@ -2679,6 +2684,7 @@
 				A9593C511890B0520BB8105E /* Resources */,
 				27632C381181CA8727A15BF1 /* Frameworks */,
 				3DB534C72A242E6ADDE95A29 /* Embed Frameworks */,
+				949F3D1E498CA95C6F4EF655 /* Prepare embedded Sparkle */,
 			);
 			buildRules = (
 			);
@@ -2690,6 +2696,7 @@
 				4BA2E12FB2E8DADF0D68B35C /* GRDB */,
 				E5CE7911DE113C3DED3EB345 /* VocelloQwen3Core */,
 				DA662A93B5FC56B54CAA0A2E /* MLX */,
+				9323A4931B2C0DA71897251A /* Sparkle */,
 			);
 			productName = QwenVoice;
 			productReference = 3ADE213695C11F46205AE6DC /* QwenVoice.app */;
@@ -2823,6 +2830,7 @@
 			packageReferences = (
 				7DBAD106D74E98B952A55524 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				32E79430CFED0938C03DCC61 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				276A86E6C1DF08A9CD5D6FE8 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				50F552015729986D9C4DD1EE /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				60817145678405F65A14F982 /* XCLocalSwiftPackageReference "Packages/VocelloQwen3Core" */,
 			);
@@ -2932,6 +2940,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		949F3D1E498CA95C6F4EF655 /* Prepare embedded Sparkle */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/B",
+			);
+			name = "Prepare embedded Sparkle";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/prepare_embedded_sparkle.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0B2B00D12A4E864EB5DB153C /* Sources */ = {
@@ -3531,6 +3562,7 @@
 				06E706C7F05B460E0699C677 /* MacSettingsScreen.swift in Sources */,
 				DD3F3D17631766BE54C2FC6F /* MacShellMetrics.swift in Sources */,
 				571F292F3B056734B3C0716D /* MacShellStatus.swift in Sources */,
+				AB182CFCD2933F4368754FD9 /* MacSoftwareUpdater.swift in Sources */,
 				66908C8DC8A327E67978DD3E /* MacStartupDiagnosticsView.swift in Sources */,
 				2BC5644A059DDF64699DE784 /* MacStatusStrip.swift in Sources */,
 				28693678E63881522400ABF2 /* MacStudioCanvas.swift in Sources */,
@@ -4283,6 +4315,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		276A86E6C1DF08A9CD5D6FE8 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
 		32E79430CFED0938C03DCC61 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
@@ -4341,6 +4381,11 @@
 		8139A1718AAB15681C47BF78 /* VocelloQwen3Core */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = VocelloQwen3Core;
+		};
+		9323A4931B2C0DA71897251A /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 276A86E6C1DF08A9CD5D6FE8 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		B6C9FFB3937D7299098CA79A /* VocelloQwen3Core */ = {
 			isa = XCSwiftPackageProductDependency;

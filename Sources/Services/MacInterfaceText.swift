@@ -939,6 +939,19 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.menu.playback", defaultValue: "Playback",
                comment: "macOS interface: application menu title. Presentation only.")
     }
+    static var checkForUpdates: String {
+        localization.string(localized: "vocello.mac.menu.checkForUpdates", defaultValue: "Check for Updates…",
+               comment: "macOS interface: Vocello menu item and Settings button that look for a newer version of the app now (Sparkle, RF-23). Presentation only.")
+    }
+    static var settingsAutomaticUpdates: String {
+        localization.string(localized: "vocello.mac.settings.automaticUpdates", defaultValue: "Check for updates automatically",
+               comment: "macOS interface: Settings toggle for the app's daily check for a newer version (Sparkle, RF-23). Presentation only.")
+    }
+    static var settingsAutomaticUpdatesDetail: String {
+        localization.string(localized: "vocello.mac.settings.automaticUpdatesDetail",
+               defaultValue: "Once a day, Vocello checks whether a newer version is available. No information about your Mac is sent.",
+               comment: "macOS interface: explains the automatic update check under its Settings toggle; Sparkle sends no system profile (RF-23). Presentation only.")
+    }
     static var menuSearchHistory: String {
         localization.string(localized: "vocello.mac.menu.searchHistory", defaultValue: "Search History",
                comment: "macOS interface: Navigate menu command (Command-F) that opens History and focuses its search field. Presentation only.")

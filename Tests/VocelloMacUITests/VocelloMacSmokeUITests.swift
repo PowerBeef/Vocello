@@ -59,10 +59,19 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
             XCTAssertTrue(button("settings_category_\(category)", in: settings).isHittable)
         }
+        // RF-23: the updater's controls. The session launches with Sparkle's own
+        // SUEnableAutomaticChecks off, so no prompt or check runs and nothing
+        // here reaches the network.
+        let automaticChecks = element("settings_automaticUpdateChecks")
+        XCTAssertTrue(VocelloUIWait.exists(automaticChecks, timeout: 10), "Settings must offer automatic update checks")
+        XCTAssertEqual(VocelloUIToggle.state(of: automaticChecks), false)
+        XCTAssertTrue(button("settings_checkForUpdates", in: settings).isEnabled)
         VocelloUIScreenshot.attach(settings, named: "mac-settings-command-comma")
         app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(VocelloUIWait.condition("Settings window to close", timeout: 10) { !settings.exists })
         XCTAssertTrue(element("screen_voiceCloning").exists, "Closing Settings must preserve Studio")
+        XCTAssertEqual(menuCommandIsEnabled("Check for Updates…", inMenu: "Vocello"), true,
+                       "The Vocello menu must offer Check for Updates…")
         assertLibrarySizeMatrix()
     }
 

@@ -61,6 +61,19 @@
       ]
     },
     {
+      "identity": "sparkle",
+      "repository": "sparkle-project/Sparkle",
+      "group": "root-application-dependencies",
+      "declarations": ["project.yml"],
+      "locks": ["QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"],
+      "compatibility": [],
+      "requiredEvidence": [
+        "QVOICE_GATES=quick ./scripts/check_project_inputs.sh",
+        "scripts/dev.sh build",
+        "scripts/ui_test.sh macos smoke --scenario layout"
+      ]
+    },
+    {
       "identity": "swift-huggingface",
       "repository": "huggingface/swift-huggingface",
       "group": "model-loading-dependencies",

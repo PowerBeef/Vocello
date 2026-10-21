@@ -135,7 +135,14 @@ public final class VocelloUIApplicationSession {
     ) {
         app.terminate()
         app.launchEnvironment = environment
+        #if os(macOS)
+        // RF-23: Sparkle asks about automatic update checks on the second
+        // launch, over the window. Its own defaults key, set for this launch
+        // only, answers it without a test hook in the app.
+        app.launchArguments = arguments + ["-SUEnableAutomaticChecks", "NO"]
+        #else
         app.launchArguments = arguments
+        #endif
         app.launch()
         VocelloUIFailureEvidence.observedApp = app
     }

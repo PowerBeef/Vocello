@@ -67,7 +67,7 @@ class BenchCommandSourceContractTests(unittest.TestCase):
         self.assertIn("benchmark history not published; local manifest", self.source)
 
     def test_label_is_validated_before_runtime_or_generation_work(self) -> None:
-        run_start = self.source.index("static func run(_ argv: [String]) async throws")
+        run_start = self.source.index("static func run(_ args: Args) async throws")
         label = self.source.index('let label = try validatedBenchmarkLabel(args.string("label"))', run_start)
         data_directory = self.source.index("let resolvedDataDir", label)
         generation = self.source.index("let runtime = try await CLIRuntime.bootstrap", data_directory)
@@ -161,7 +161,7 @@ class BenchCommandSourceContractTests(unittest.TestCase):
         self.assertIn('args.flag("shipped-only")', self.deliveries_source)
         self.assertIn("for preset in EmotionPreset.all", self.deliveries_source)
         self.assertIn("let intensity = preset.shippedIntensity", self.deliveries_source)
-        self.assertIn("including Neutral", self.deliveries_source)
+        self.assertIn("One row per product-visible preset, including instructed", self.deliveries_source)
 
 
 class BenchDeliveryProsodyTests(unittest.TestCase):

@@ -597,6 +597,7 @@
       "subcommands": [
         "list",
         "status",
+        "verify",
         "install"
       ],
       "summary": "Inventory and install models",
@@ -648,6 +649,26 @@
       "aliases": [],
       "internalTool": false,
       "machineContract": true,
+      "name": "verify",
+      "operands": [
+        {
+          "name": "id",
+          "required": false,
+          "summary": "verify only this model",
+          "type": "string"
+        }
+      ],
+      "options": [],
+      "path": "models.verify",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Check every installed file's size and SHA-256 against the catalog",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
       "name": "install",
       "operands": [
         {
@@ -662,6 +683,19 @@
       "refusedOptions": [],
       "subcommands": [],
       "summary": "Download and verify a model into the shared store",
+      "usage": []
+    },
+    {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "doctor",
+      "operands": [],
+      "options": [],
+      "path": "doctor",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Check the data folder, contract, catalog, models, memory and disk (no engine boot)",
       "usage": []
     },
     {

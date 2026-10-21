@@ -82,6 +82,10 @@
           "shipped-only": false
         }
       },
+      "doctor": {
+        "aliases": [],
+        "options": {}
+      },
       "generate": {
         "aliases": [
           "gen"
@@ -130,6 +134,10 @@
         "options": {}
       },
       "models.status": {
+        "aliases": [],
+        "options": {}
+      },
+      "models.verify": {
         "aliases": [],
         "options": {}
       },

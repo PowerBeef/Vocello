@@ -144,6 +144,11 @@ public enum VocelloCommandTree {
                 positionals: [CLIPositionalSpec("id", "show only this model")]
             ),
             CLICommandSpec(
+                name: "verify", summary: "Check every installed file's size and SHA-256 against the catalog",
+                discussion: "Reads every byte of each installed model (several GB); exits 1 (integrity_failed) when a file differs.",
+                positionals: [CLIPositionalSpec("id", "verify only this model")]
+            ),
+            CLICommandSpec(
                 name: "install", summary: "Download and verify a model into the shared store",
                 positionals: [CLIPositionalSpec("id", "the model id to install (see `vocello models list`)", required: true)]
             ),
@@ -202,6 +207,11 @@ public enum VocelloCommandTree {
 
     static let version = CLICommandSpec(name: "version", summary: "Print the version")
 
+    static let doctor = CLICommandSpec(
+        name: "doctor",
+        summary: "Check the data folder, contract, catalog, models, memory and disk (no engine boot)"
+    )
+
     static let capabilities = CLICommandSpec(
         name: "capabilities",
         summary: "Describe commands, options, codes and limits for agents",
@@ -216,8 +226,8 @@ public enum VocelloCommandTree {
     )
 
     public static let commands: [CLICommandSpec] = [
-        generate, batch, voices, speakers, modesCommand, deliveries, models, capabilities, completions, bench,
-        help, version,
+        generate, batch, voices, speakers, modesCommand, deliveries, models, doctor, capabilities, completions,
+        bench, help, version,
     ]
 
     /// The spec at `path`, such as `["models", "install"]`.

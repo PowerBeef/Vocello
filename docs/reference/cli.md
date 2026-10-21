@@ -367,8 +367,13 @@ reports the actual model-facing instruction language, digest, and cell identity.
 ```sh
 vocello models list [--json]
 vocello models status [<id>] [--json]      # adds missing-file detail
+vocello models verify [<id>] [--json]      # every installed file's size and SHA-256
 vocello models install <id> [--verbose]    # headless download into the shared models dir
 ```
+
+`verify` reads every byte of each installed model and compares it with the authenticated catalog's
+exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any difference exits 1 with
+`integrity_failed` and keeps every row.
 
 Shows each model's install state, on-disk size, and (for `status`) any missing required files.
 `install` uses the same `HuggingFaceDownloader` as the macOS app — a CLI-installed model is
@@ -382,6 +387,12 @@ metrics are bounded under `diagnostics/model-downloads/`. See
 For test/bench lanes with `QWENVOICE_DEBUG=1`, weights live under `QwenVoice-Debug/`; the test
 driver symlinks `QwenVoice-Debug/models` → the canonical store (see
 [`testing-runbook.md`](testing-runbook.md) "Model readiness").
+
+### `doctor` — check the setup
+
+`vocello doctor [--json]` checks, with no engine boot, the shared data folder, the bundled model
+contract and authenticated catalog, the installed models, the Mac's memory tier and free disk. A
+missing contract or catalog exits 78 (`config_error`); everything else is a named `ok`/`warn` check.
 
 ### `bench` — drive the perf/quality matrix + aggregate
 

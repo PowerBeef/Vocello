@@ -51,11 +51,30 @@ enum ModelsCommand {
         let installedBytes: Int64
     }
 
-    /// `action` is the canonical subcommand the parser resolved: list, status or install.
+    struct VerifiedModel: Encodable, Sendable {
+        let id: String
+        let installed: Bool
+        /// True when every catalog file has its exact size and SHA-256.
+        let verified: Bool
+        let fileCount: Int
+        let verifiedBytes: Int64
+        let missingPaths: [String]
+        let mismatchedPaths: [String]
+    }
+
+    struct Verified: Encodable, Sendable {
+        let models: [VerifiedModel]
+    }
+
+    /// `action` is the canonical subcommand the parser resolved: list, status, verify or install.
     @MainActor
     static func run(action: String, _ args: Args) async throws {
         if action == "install" {
             try await runInstall(args)
+            return
+        }
+        if action == "verify" {
+            try await runVerify(args)
             return
         }
         let detailed = (action == "status")
@@ -110,6 +129,100 @@ enum ModelsCommand {
                 for p in r.missingPaths { print("    missing: \(p)") }
                 for p in r.stalePaths { print("    stale: \(p)") }
             }
+        }
+    }
+
+    /// `vocello models verify [<id>]`: every installed model's files against the
+    /// authenticated catalog's exact sizes and SHA-256 digests. Read-only; a model
+    /// that is not installed is reported, not verified. Any difference exits 1
+    /// (`integrity_failed`) with every row kept.
+    @MainActor
+    static func runVerify(_ args: Args) async throws {
+        let ctx = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+        let catalog = try ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
+        let onlyID = args.positionals.first
+        let models = ctx.registry.models.filter { onlyID == nil || $0.id == onlyID }
+        if let onlyID, models.isEmpty {
+            throw CLIError(.modelUnknown, "no model '\(onlyID)' in the contract", hint: "see `vocello models list` for the ids")
+        }
+        var rows: [VerifiedModel] = []
+        for descriptor in models {
+            let artifact = try catalog.artifactMatchingMacOSDescriptor(
+                folder: descriptor.folder, repo: descriptor.huggingFaceRepo, revision: descriptor.huggingFaceRevision,
+                artifactVersion: descriptor.artifactVersion, estimatedDownloadBytes: descriptor.estimatedDownloadBytes,
+                requiredRelativePaths: descriptor.requiredRelativePaths
+            )
+            let folder = ctx.modelsDirectory.appendingPathComponent(artifact.folder, isDirectory: true)
+            guard case .available = ctx.registry.availability(forModelID: descriptor.id, in: ctx.modelsDirectory) else {
+                rows.append(VerifiedModel(
+                    id: descriptor.id, installed: false, verified: false, fileCount: artifact.files.count,
+                    verifiedBytes: 0, missingPaths: [], mismatchedPaths: []
+                ))
+                continue
+            }
+            note("verifying \(descriptor.id) (\(artifact.files.count) files)…")
+            let modelID = descriptor.id
+            let files = artifact.files
+            let outcome = try await Task.detached(priority: .utility) { @concurrent () async throws -> ([String], [String], Int64) in
+                var missing: [String] = []
+                var mismatched: [String] = []
+                var bytes: Int64 = 0
+                for (position, file) in files.enumerated() {
+                    try Task.checkCancellation()
+                    let url = folder.appendingPathComponent(file.relativePath, isDirectory: false)
+                    guard FileManager.default.fileExists(atPath: url.path) else {
+                        missing.append(file.relativePath)
+                        continue
+                    }
+                    do {
+                        let actual = try SharedComponentFileIdentity.verify(relativePath: file.relativePath, fileURL: url)
+                        if actual.byteCount == file.sizeBytes, actual.sha256 == file.sha256 {
+                            bytes += actual.byteCount
+                        } else {
+                            mismatched.append(file.relativePath)
+                        }
+                    } catch {
+                        mismatched.append(file.relativePath)
+                    }
+                    CLIPresenter.event(.progress, data: [
+                        "modelID": .string(modelID), "filesChecked": .integer(position + 1),
+                        "fileCount": .integer(files.count),
+                    ])
+                }
+                return (missing.sorted(), mismatched.sorted(), bytes)
+            }.value
+            rows.append(VerifiedModel(
+                id: descriptor.id, installed: true, verified: outcome.0.isEmpty && outcome.1.isEmpty,
+                fileCount: artifact.files.count, verifiedBytes: outcome.2,
+                missingPaths: outcome.0, mismatchedPaths: outcome.1
+            ))
+        }
+        let failed = rows.filter { $0.installed && !$0.verified }
+        if CLIPresenter.isMachine {
+            if failed.isEmpty {
+                CLIPresenter.succeed(Verified(models: rows))
+            } else {
+                CLIPresenter.recordPartialResult(Verified(models: rows))
+            }
+        } else {
+            for row in rows {
+                let mark = !row.installed ? "–" : row.verified ? "✓" : "✗"
+                let detail = !row.installed ? "not installed"
+                    : row.verified ? "\(row.fileCount) files, \(humanBytes(row.verifiedBytes)) verified"
+                    : "\(row.missingPaths.count) missing, \(row.mismatchedPaths.count) differ"
+                print("\(mark) \(row.id)\t\(detail)")
+                for path in row.missingPaths { print("    missing: \(path)") }
+                for path in row.mismatchedPaths { print("    differs: \(path)") }
+            }
+        }
+        if !failed.isEmpty {
+            throw CLIError(
+                .integrityFailed,
+                "\(failed.count) installed model(s) differ from the authenticated catalog: \(failed.map(\.id).joined(separator: ", "))",
+                hint: "remove the model in the app (Settings > Models) and reinstall it with `vocello models install <id>`"
+            )
         }
     }
 

@@ -265,16 +265,20 @@ effective seed as a decimal string: pass it back as `--seed`, with the same vari
 reproduce the take), and — when `--stream` — `firstChunkMS` and `chunks`).
 
 **Long-form projects.** A script past one take is planned, before any model work, by the apps'
-long-form planner (at most 100 segments; `--plan` reports `longForm` and `segments`), run one streaming
-take per segment at the app's cadence (each with the seed derived from the base seed `--seed`, or a
-random one), and joined by the apps' bounded assembler. Segment takes stay in `<output stem>_segments/`
-beside the output; the joined file replaces `--out` only once the project is complete. The result adds
-`longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`, `longFormSegments` (each
-segment's index, boundary, pause, seed, generation id, path, duration and finish reason) and
-`longFormAssembly`; `finishReason` is `max_tokens` when any segment was truncated. A stopped project
-keeps its completed segments and says where (warning `long_form_segments_kept`). Only the engine's Fast
-QC runs, per segment: the apps' joined-output gate, manifest and History acceptance are not part of it
-yet. `--no-stream` does not apply to a project and is refused with one.
+long-form planner (at most 100 segments; `--plan` reports `longForm` and `segments`) and run by the
+apps' own long-form runner: Auto resolves one language over the whole script, each segment is one
+streaming take at the app's cadence (with the seed derived from the base seed `--seed`, or a random
+one) that must pass the engine's Fast QC and the apps' audio QC, the bounded assembler joins them, the
+joined output must pass the apps' QC too, and the manifest v4 is written. A Design project without a
+delivery gets the Neutral one, as the apps send it. Segment takes and the manifest stay in
+`<output stem>_segments/` beside the output; the joined file replaces `--out` only once the project
+passed. The result adds `longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`,
+`longFormLanguage`, `longFormManifestPath`, `longFormSegments` (each kept segment's index, boundary,
+pause, seed, generation id, path, duration, finish reason and QC warnings) and `longFormAssembly`;
+`finishReason` is `max_tokens` when any segment was truncated. A rejected segment or join fails with
+`qc_rejected` (`detail.segment` names the segment); a stopped project keeps its completed segments and
+says where (warning `long_form_segments_kept`). Projects write no History rows until the History lock
+lands (RF-30). `--no-stream` does not apply to a project and is refused with one.
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
 never share a file. An explicit `--out` that names an existing file is replaced atomically only by a
@@ -312,8 +316,9 @@ row `cancelled`; a genuine failure that coincides with a signal stays `failed` a
 `cancellationRequested: true`. A take the engine stopped on its own under memory pressure is
 `failed` with `errorCode: memory_pressure` and the command exits `75`. A failed row's `errorCode` is a
 contract error code (`output_missing`, `qc_rejected`, `generation_failed`, …). Failure exits nonzero. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
-language per text and non-streaming output (with `--long-form`, each line is a long-form project
-whose segments stream); `--language`, `--stream`, and `--out` are rejected
+language per text and non-streaming output (with `--long-form`, each line is a long-form project run
+as `generate` runs one: its segments and manifest in `<project>_segments/`, its joined output
+`<project>.wav`); `--language`, `--stream`, and `--out` are rejected
 instead of silently ignored (use `generate` or batch `--out-dir`).
 
 The bare `--capture-codec-trace` flag (internal-diagnostics binaries with `QWENVOICE_DEBUG=1` and
@@ -331,7 +336,7 @@ vocello run --requests <file|-> [--json|--ndjson]    # JSONL: one request per li
 
 A request is a JSON object of `generate`'s options in camelCase (`mode`, `text`, `textFile`, `speaker`,
 `voiceBrief`, `voice`, `reference`, `transcript`, `confirmConsent`, `delivery`, `deliveryCell`,
-`appDelivery`, `language`, `seed`, `variation`, `variant`, `out`, `stream`), described by
+`appDelivery`, `language`, `seed`, `variation`, `variant`, `out`, `longForm`, `stream`), described by
 `config/cli-contract/v1/generate-request.schema.json`. It becomes `generate` arguments and goes through
 the same strict parser, so an unknown field, a wrong type or `text: "-"` is refused. With `--requests`
 each line (lines end at `\n`) runs on the same engine; a failed request does not stop the others, and the
@@ -348,9 +353,11 @@ the id's digest and private to the user. The same id with the same request repla
 failed request keeps nothing, so a retry runs again. "The same request" means the same take: the text
 counts by its content wherever it came from (`--text`, a file or stdin), paths count as absolute paths,
 option spellings count as what they mean (`--variant fast` is `speed`), an omitted option counts as what
-it resolves to at run time (the package and variation the app's settings choose, the default speaker),
+it resolves to at run time (the package and variation the app's settings and installed packages choose,
+the default speaker),
 and neither consent nor how a command reports counts, so a `generate` command line and the same `run`
-request are one request, while one whose omitted setting the app has since changed is not. A
+request are one request, while one whose omitted setting has since resolved differently (a changed
+app setting, a package installed or removed) is not. A
 replay whose take no longer exists fails with `output_missing` (use a new id), and a success whose
 result could not be kept carries the warning `idempotency_not_recorded`.
 

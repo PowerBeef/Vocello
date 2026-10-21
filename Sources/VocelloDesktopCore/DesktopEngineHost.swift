@@ -9,7 +9,7 @@ import QwenVoiceCore
 /// never the app's Settings acknowledgment.
 @MainActor
 public final class DesktopEngineHost {
-    private let store: TTSEngineStore
+    let store: TTSEngineStore
     private var consent: VoiceCloningConsentPolicy
 
     public init(

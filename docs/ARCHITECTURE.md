@@ -125,7 +125,7 @@ for the exact link graph.)
 | `VocelloiOS` | application | iOS | `QVoiceiOS` | `com.patricedery.vocello` | iOS SwiftUI app; engine runs in-process. App Group `group.com.patricedery.vocello.shared`. |
 | `VocelloCLI` | tool | macOS | `VocelloCLI` | `com.qwenvoice.cli` | Headless `vocello` binary; engine in-process. Its commands over `VocelloCLICore`. |
 | `VocelloCLICore` | framework.static | macOS | `VocelloCLICore` | `com.qwenvoice.cli.core` | The CLI's runtime, argument parsing and routing, consent, process supervision and batch execution: linked into `vocello` and imported `@testable` by `VocelloCoreTests` instead of compiled there by path (workflow audit P2-3). |
-| `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | (static) | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does; read-only History, app settings (CFPreferences), model selection and inventory. |
+| `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | (static) | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does and runs long-form projects through the apps' `IOSLongFormProjectRunner` (compiled by path) headless; read-only History, app settings (CFPreferences), model selection and inventory. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
@@ -852,7 +852,9 @@ over a data directory — and reuses models already installed by the app. `gener
 `run` pass `hostedLikeTheApp`, so takes go through `DesktopEngineHost` and the shared
 `TTSEngineStore` (support, consent, busy and memory admission, the critical-pressure guard, post-take
 trims), as in `MacEngineBootstrap`; `bench` keeps the raw engine. A script past one take runs as a
-long-form project through `CLILongFormProject` (the apps' planner and bounded assembler). It is
+long-form project through the apps' own `IOSLongFormProjectRunner`, driven headless by
+`DesktopEngineHost.runLongForm` (segment and joined-output QC, one script language, manifest v4; no
+History rows until RF-30). It is
 both a user-facing generator and the deterministic driver for
 benchmarks/quality gates (no Python, no bundled weights).
 

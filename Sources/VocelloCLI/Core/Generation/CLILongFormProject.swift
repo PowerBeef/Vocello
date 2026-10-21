@@ -1,16 +1,18 @@
 import Foundation
 import QwenVoiceCore
+import VocelloDesktopCore
 
-/// One long-form project, run the way the apps' long-form runner runs one
-/// (`IOSLongFormProjectRequest`): the shipping planner splits the script (base
-/// seed given or drawn at random, each segment sampling with its derived
-/// subseed), each segment is one streaming take at the app cadence, and the
-/// bounded assembler joins them. Shared by `batch --long-form` (a project per
-/// line) and `generate` (a script past one take). Only the engine's own Fast QC
-/// runs, per segment; the apps' joined-output gate, manifest and History
-/// acceptance are not part of it.
+/// One long-form project, run by the apps' own runner (`IOSLongFormProjectRunner`
+/// through `DesktopEngineHost.runLongForm`): the shipping planner splits the
+/// script (base seed given or drawn at random, each segment sampling with its
+/// derived subseed), Auto resolves one language for the whole script, each
+/// segment is one streaming take at the app cadence that must pass the engine's
+/// Fast QC and the apps' audio QC, the bounded assembler joins them, the joined
+/// output must pass the apps' QC too, and the manifest v4 is written beside the
+/// segments. Shared by `batch --long-form` (a project per line) and `generate`
+/// (a script past one take). No History rows until RF-30's History lock.
 public enum CLILongFormProject {
-    /// One planned segment and the engine's take of it. No text: the project's is the item's.
+    /// One kept segment take. No text: the project's is the item's.
     public struct Segment: Encodable, Sendable {
         let index: Int
         let segmentID: String
@@ -22,12 +24,14 @@ public enum CLILongFormProject {
         let audioPath: String
         let durationSeconds: Double
         let finishReason: String?
+        /// The apps' audio QC warnings on the take (it passed).
+        let qcWarnings: [String]
     }
 
     /// Why a project stopped before its joined output.
     public enum Stop: Sendable {
-        /// A segment or the join failed with `error` (its row code `code`),
-        /// possibly while a signal arrived.
+        /// A segment, the join or a QC check failed with `error` (its row code
+        /// `code`), possibly while a signal arrived.
         case failed(any Error, code: VocelloErrorCode, cancellationRequested: Bool)
         /// A signal stopped it.
         case cancelled
@@ -40,8 +44,12 @@ public enum CLILongFormProject {
         public let planDigest: String
         /// The completed segment takes, kept even when the project stopped.
         public internal(set) var segments: [Segment] = []
+        /// The language every segment carried (the selection, or Auto resolved over the script).
+        public internal(set) var language: String?
         public internal(set) var assembly: LongFormAssemblyEvidence?
+        /// The joined output, in the project's folder until the caller moves it.
         public internal(set) var audioPath: String?
+        public internal(set) var manifestPath: String?
         public internal(set) var durationSeconds: Double?
         public internal(set) var finishReason: String?
         /// The segment take that failed (or the last submitted); nil when the join, not a take,
@@ -82,104 +90,179 @@ public enum CLILongFormProject {
         }
     }
 
-    /// Runs `plan` and joins it into `joinedURL`; segment takes land at `segmentURL(position)`.
+    /// The project's own folder beside `output`: `<stem>_segments`, or, when that
+    /// already exists (an earlier run's, or anyone's), `<stem>_segments-<attempt>`.
+    /// Created here and never reused, so a stop removes only what this attempt
+    /// made and two runs never mix their segments. Being a new subfolder of the
+    /// output's folder, it lies on the output's volume, so the joined output
+    /// moves onto `output` by an atomic rename.
+    public static func makeProjectFolder(beside output: URL, attempt: UUID) throws -> URL {
+        let parent = output.deletingLastPathComponent()
+        let stem = output.deletingPathExtension().lastPathComponent
+        let attemptTag = String(attempt.uuidString.lowercased().prefix(8))
+        for name in ["\(stem)_segments", "\(stem)_segments-\(attemptTag)"] {
+            let folder = parent.appendingPathComponent(name, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+                return folder
+            } catch CocoaError.fileWriteFileExists {
+                continue
+            } catch {
+                throw CLIError(.outputUnavailable, "could not create \(folder.path): \(error.localizedDescription)")
+            }
+        }
+        throw CLIError(
+            .outputUnavailable, "the segment folders for \(output.path) already exist",
+            hint: "choose another --out, or move the existing segment folders away"
+        )
+    }
+
+    /// A clone project never replaces its reference audio: the engine refuses that
+    /// for each take, but the joined output reaches `--out` by the CLI's own
+    /// rename. Lexical, symlink and hard-link aliases all count, as in the engine.
+    static func refuseReferenceAlias(output: String, payload: GenerationRequest.Payload) throws {
+        guard case .clone(let reference) = payload else { return }
+        let outputURL = URL(fileURLWithPath: output).resolvingSymlinksInPath().standardizedFileURL
+        let referenceURL = URL(fileURLWithPath: reference.audioPath).resolvingSymlinksInPath().standardizedFileURL
+        let outputAttributes = try? FileManager.default.attributesOfItem(atPath: outputURL.path)
+        let referenceAttributes = try? FileManager.default.attributesOfItem(atPath: referenceURL.path)
+        let outputFile = outputAttributes?[.systemFileNumber] as? NSNumber
+        let sameFile = outputFile != nil
+            && outputFile == referenceAttributes?[.systemFileNumber] as? NSNumber
+            && outputAttributes?[.systemNumber] as? NSNumber == referenceAttributes?[.systemNumber] as? NSNumber
+        guard outputURL != referenceURL, !sameFile else {
+            throw CLIError(
+                .invalidInput, "the output must not replace the clone reference audio",
+                hint: "choose a different --out"
+            )
+        }
+    }
+
+    /// Runs `plan` with its segments, joined output and manifest in `directory`,
+    /// a folder the caller created for this attempt (`makeProjectFolder`).
     /// `projectIndex` tags events when one batch runs several projects. The caller
-    /// publishes the joined output (`output_published`).
+    /// moves the joined output into place and publishes it (`output_published`).
     @MainActor
     public static func run(
         _ plan: LongFormPlan, mode: GenerationMode, modelID: String, runtime: CLIRuntime,
         payload: GenerationRequest.Payload, deliveryInstructionCellID: String?, variation: Qwen3SamplingVariation?,
-        joinedURL: URL, segmentURL: (Int) -> URL, projectIndex: Int = 0, projectCount: Int = 1
+        languageHint: String?, directory: URL, projectIndex: Int = 0, projectCount: Int = 1
     ) async -> Outcome {
         var outcome = Outcome(baseSeed: plan.configuration.baseSeed, planDigest: plan.evidence.planDigest)
-        var sources: [LongFormAssemblySegmentSource] = []
-        // The planner numbers its segments from 1 (`evidence.index`); the JSON counts from 0.
-        for (position, segment) in plan.segments.enumerated() {
-            let generationID = UUID()
-            let request = CLIBatchExecution.makeLongFormSegmentRequest(
-                mode: mode, modelID: modelID, text: segment.spokenTextForGeneration,
-                outputPath: segmentURL(position).path,
-                payload: payload, generationID: generationID, subseed: segment.evidence.effectiveSubseed,
-                variation: variation, deliveryInstructionCellID: deliveryInstructionCellID
+        guard let host = runtime.host else {
+            outcome.stop = .failed(
+                CLIError(.internalError, "a long-form project needs the hosted engine"), code: .internalError,
+                cancellationRequested: false
             )
-            do {
-                try Task.checkCancellation()
-                // Named once submitted: a project cancelled first names no take the engine never saw.
-                outcome.generationID = generationID
-                noteVerbose("project \(projectIndex + 1)/\(projectCount), segment \(position + 1)/\(plan.segments.count)")
+            return outcome
+        }
+        let submissions = Submissions()
+        let result = await host.runLongForm(
+            DesktopLongFormRequest(
+                mode: mode, modelID: modelID, plan: plan, payload: payload,
+                deliveryInstructionCellID: deliveryInstructionCellID, languageHint: languageHint,
+                variation: variation, directory: directory
+            ),
+            defaultSpeakerID: runtime.defaultSpeakerID
+        ) { event in
+            switch event {
+            case .segmentStarted(let index, let total, let generationID):
+                submissions.last = generationID
+                noteVerbose("project \(projectIndex + 1)/\(projectCount), segment \(index + 1)/\(total)")
                 CLIPresenter.event(.generationStarted, generationID: generationID, data: [
-                    "index": .integer(projectIndex), "segment": .integer(position),
-                    "segments": .integer(plan.segments.count), "mode": .string(mode.rawValue),
-                    "modelID": .string(modelID),
+                    "index": .integer(projectIndex), "segment": .integer(index), "segments": .integer(total),
+                    "mode": .string(mode.rawValue), "modelID": .string(modelID),
                 ])
-                let (result, _, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
-                guard FileManager.default.fileExists(atPath: result.audioPath) else {
-                    outcome.stop = .failed(
-                        CLIError(
-                            .outputMissing,
-                            "engine reported success but no audio file exists for segment \(position); refusing to claim success (CM-7 guard)"
-                        ),
-                        code: .outputMissing, cancellationRequested: Task.isCancelled
-                    )
-                    return outcome
-                }
-                outcome.segments.append(Segment(
-                    index: position, segmentID: segment.segmentID,
-                    boundary: segment.evidence.boundary.rawValue,
-                    intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds,
-                    effectiveSeed: String(segment.evidence.effectiveSubseed),
-                    generationID: generationID.uuidString, audioPath: result.audioPath,
-                    durationSeconds: result.durationSeconds, finishReason: result.finishReason?.rawValue
-                ))
+            case .segmentSaved(let index, let generationID, let durationSeconds):
                 CLIPresenter.event(.generationCompleted, generationID: generationID, data: [
-                    "index": .integer(projectIndex), "segment": .integer(position),
-                    "durationSeconds": .number(result.durationSeconds),
+                    "index": .integer(projectIndex), "segment": .integer(index),
+                    "durationSeconds": durationSeconds.map { .number($0) } ?? .null,
                 ])
-                sources.append(LongFormAssemblySegmentSource(
-                    segmentID: segment.segmentID, lineage: segment.evidence.lineage,
-                    audioURL: URL(fileURLWithPath: result.audioPath), boundary: segment.evidence.boundary,
-                    intendedPauseMilliseconds: segment.evidence.intendedPauseMilliseconds
-                ))
-            } catch let engineStop as CLIEngineCancellation {
-                // The engine stopped the segment on its own (P15-02): a failure, not an interrupt.
-                outcome.stop = .engine(engineStop)
-                return outcome
-            } catch is CancellationError {
-                outcome.stop = .cancelled
-                return outcome
-            } catch {
-                // Typed: a genuine failure that coincides with a signal stays failed.
-                outcome.stop = .failed(error, code: CLIFailure.rowCode(for: error), cancellationRequested: Task.isCancelled)
-                return outcome
+            case .segmentFailed(let index, let generationID, let qcRejected):
+                CLIPresenter.event(.generationFailed, generationID: generationID, data: [
+                    "index": .integer(projectIndex), "segment": .integer(index),
+                    "code": qcRejected ? .string(VocelloErrorCode.qcRejected.rawValue) : .null,
+                ])
+            case .segmentCancelled(let index, let generationID):
+                CLIPresenter.event(.generationCancelled, generationID: generationID, data: [
+                    "index": .integer(projectIndex), "segment": .integer(index),
+                ])
             }
         }
-        let assembly: LongFormAssemblyEvidence
-        do {
-            assembly = try await BoundedLongFormAssembler.assemble(
-                segments: sources, outputURL: joinedURL, provenanceModelID: modelID, provenanceMode: mode.rawValue
+        return report(result, into: outcome, lastSubmitted: submissions.last, signalled: Task.isCancelled)
+    }
+
+    /// The take the runner submitted last.
+    @MainActor
+    private final class Submissions {
+        var last: UUID?
+    }
+
+    /// The runner's outcome as the CLI reports it. `signalled`: whether a signal
+    /// cancelled the command, the one thing that tells an interrupt from the
+    /// engine's own stop (the runner ends both as cancelled).
+    static func report(
+        _ result: DesktopLongFormOutcome, into outcome: Outcome, lastSubmitted: UUID?, signalled: Bool
+    ) -> Outcome {
+        var outcome = outcome
+        outcome.language = result.languageHint
+        outcome.segments = result.segments.compactMap { segment in
+            guard segment.status == .saved, let audioPath = segment.audioPath, let generationID = segment.generationID
+            else { return nil }
+            return Segment(
+                index: segment.index, segmentID: segment.segmentID, boundary: segment.boundary,
+                intendedPauseMilliseconds: segment.intendedPauseMilliseconds, effectiveSeed: String(segment.seed),
+                generationID: generationID.uuidString.lowercased(), audioPath: audioPath,
+                durationSeconds: segment.durationSeconds ?? 0, finishReason: segment.finishReason,
+                qcWarnings: segment.qcWarnings
             )
-        } catch is CancellationError {
-            // The segments were generated: the stop is the join's, not a generation's.
-            try? FileManager.default.removeItem(at: joinedURL)
-            outcome.generationID = nil
-            outcome.stop = .cancelled
-            return outcome
-        } catch {
-            // The assembler can publish and then fail its read-back; the apps remove that file too.
-            try? FileManager.default.removeItem(at: joinedURL)
-            outcome.generationID = nil
-            outcome.stop = .failed(
-                CLIError(.assemblyFailed, "the long-form segments could not be joined"),
-                code: .assemblyFailed, cancellationRequested: Task.isCancelled
-            )
-            return outcome
         }
-        // A truncated middle segment is the project's finish reason, never hidden behind the last one's eos.
-        let truncated = outcome.segments.contains { $0.finishReason == GenerationFinishReason.maxTokens.rawValue }
-        outcome.finishReason = truncated ? GenerationFinishReason.maxTokens.rawValue : outcome.segments.last?.finishReason
-        outcome.audioPath = joinedURL.path
-        outcome.durationSeconds = Double(assembly.outputFrameCount) / Double(assembly.sampleRate)
-        outcome.assembly = assembly
+        let failing = result.segments.first { $0.status == .failed }
+        outcome.generationID = failing?.generationID ?? lastSubmitted
+        switch result.status {
+        case .completed:
+            // A truncated middle segment is the project's finish reason, never hidden behind the last one's eos.
+            let truncated = outcome.segments.contains { $0.finishReason == GenerationFinishReason.maxTokens.rawValue }
+            outcome.finishReason = truncated ? GenerationFinishReason.maxTokens.rawValue : outcome.segments.last?.finishReason
+            outcome.audioPath = result.joinedPath
+            outcome.durationSeconds = result.durationSeconds
+            outcome.manifestPath = result.manifestPath
+            outcome.assembly = result.assembly
+        case .cancelled:
+            outcome.stop = signalled ? .cancelled : .engine(CLIEngineCancellation(reason: .memoryPressure))
+        case .failed:
+            let (code, detail) = classify(result.failure, failing: failing)
+            // The join, not a take, failed: no take is named.
+            if result.failure == .joinedQCRejected || result.failure == .assembly { outcome.generationID = nil }
+            outcome.stop = .failed(
+                CLIError(code, result.message ?? "the long-form project failed", detail: detail),
+                code: code, cancellationRequested: signalled
+            )
+        }
         return outcome
+    }
+
+    /// The contract code and detail of a failed project.
+    static func classify(
+        _ failure: DesktopLongFormOutcome.Failure?, failing: DesktopLongFormSegment?
+    ) -> (VocelloErrorCode, [String: CLIJSONValue]?) {
+        let segmentDetail: [String: CLIJSONValue]? = failing.map { segment in
+            [
+                "segment": .integer(segment.index),
+                "qcRequiredFailures": .array(segment.qcRequiredFailures.map { .string($0) }),
+            ]
+        }
+        switch failure {
+        case .segmentQCRejected?:
+            return (.qcRejected, segmentDetail)
+        case .joinedQCRejected?:
+            return (.qcRejected, ["stage": .string("joined")])
+        case .generation(let reason)?:
+            return (reason.map(CLIFailure.code(for:)) ?? .generationFailed, segmentDetail)
+        case .assembly?:
+            return (.assemblyFailed, nil)
+        case .other?, nil:
+            return (.generationFailed, segmentDetail)
+        }
     }
 }

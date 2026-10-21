@@ -265,6 +265,8 @@ final class CLIRequestTests: XCTestCase {
         try Data("{".utf8).write(to: entry)
         XCTAssertEqual(code { try ledger.start(id: "job-1", request: request) }, .ioError,
                        "a damaged entry fails rather than run a completed request again")
+        ledger.prune(now: Date(timeIntervalSinceNow: CLIRequestLedger.retention + 3600), force: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: entry.path), "a damaged entry ages out by its file date")
     }
 
     private func code(_ body: () throws -> CLIRequestLedger.Start) -> VocelloErrorCode? {

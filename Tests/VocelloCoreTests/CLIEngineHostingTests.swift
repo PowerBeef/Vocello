@@ -69,7 +69,9 @@ final class CLIEngineHostingTests: XCTestCase {
                 _ = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                 XCTFail("an unsupported request is refused")
             } catch {
-                XCTAssertFalse(error is CancellationError, "\(error)")
+                guard case .unsupportedRequest? = error as? TTSEngineError else {
+                    return XCTFail("the store's support check refuses it before the engine: \(error)")
+                }
             }
             returned.fulfill()
         }

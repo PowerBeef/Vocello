@@ -195,8 +195,13 @@ public struct CLIRequestLedger: Sendable {
                     if age > 3600 { try? FileManager.default.removeItem(at: url) }
                 case "json":
                     let key = url.deletingPathExtension().lastPathComponent
-                    guard let entry = try? readEntry(key: key), isExpired(entry, now: now) else { continue }
-                    removeIdle(key: key, entry: url)
+                    // A damaged entry, which no claim can use, ages out by its file date.
+                    let expired = if let entry = try? readEntry(key: key) {
+                        isExpired(entry, now: now)
+                    } else {
+                        age > Self.retention
+                    }
+                    if expired { removeIdle(key: key, entry: url) }
                 case "lock" where url.lastPathComponent != "ledger.lock":
                     let key = url.deletingPathExtension().lastPathComponent
                     if !names.contains("\(key).json"), age > Self.retention { removeIdle(key: key, entry: nil) }
@@ -299,10 +304,11 @@ public struct CLIRequestLedger: Sendable {
                 guard fsync(descriptor.rawValue) == 0 else { throw Errno(rawValue: errno) }
             }
             guard unsafe rename(temporary.path, url.path) == 0 else { throw Errno(rawValue: errno) }
-            // The rename itself survives a crash only once the folder is synced.
-            let folder = try FileDescriptor.open(FilePath(directory.path), .readOnly, options: [.closeOnExec])
-            try folder.closeAfter {
-                guard fsync(folder.rawValue) == 0 else { throw Errno(rawValue: errno) }
+            // The rename survives a crash once the folder is synced. Best effort:
+            // the entry is already visible, so a failed sync is not a lost result.
+            if let folder = try? FileDescriptor.open(FilePath(directory.path), .readOnly, options: [.closeOnExec]) {
+                _ = fsync(folder.rawValue)
+                try? folder.close()
             }
         } catch {
             try? FileManager.default.removeItem(at: temporary)

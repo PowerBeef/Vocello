@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloDesktopCore
 import XCTest
 @testable import VocelloCLICore
 
@@ -96,5 +97,140 @@ final class CLILongFormTests: XCTestCase {
         }
         let request = try CLIGenerateRequest.parse(.object(["longForm": .string("never")]))
         XCTAssertEqual(request.argv, ["--long-form=never"])
+    }
+
+    // MARK: - The apps' runner's outcome
+
+    private func segment(
+        _ index: Int, _ status: DesktopLongFormSegment.Status, qcPassed: Bool? = true, finish: String? = "eos"
+    ) -> DesktopLongFormSegment {
+        DesktopLongFormSegment(
+            index: index, segmentID: "s\(index)", boundary: "sentence", intendedPauseMilliseconds: 300,
+            seed: UInt64.max - UInt64(index), status: status, generationID: UUID(),
+            audioPath: status == .saved ? "/takes/\(index).wav" : nil, durationSeconds: status == .saved ? 2 : nil,
+            finishReason: status == .saved ? finish : nil, qcPassed: status == .pending ? nil : qcPassed,
+            qcRequiredFailures: qcPassed == false ? ["pause_budget"] : [], qcWarnings: []
+        )
+    }
+
+    private func outcome(
+        _ status: DesktopLongFormOutcome.Status, _ segments: [DesktopLongFormSegment],
+        failure: DesktopLongFormOutcome.Failure? = nil
+    ) -> DesktopLongFormOutcome {
+        DesktopLongFormOutcome(
+            status: status, failure: failure, message: failure == nil ? nil : "Segment 2 didn't pass.",
+            segments: segments, languageHint: "english", joinedPath: status == .completed ? "/takes/joined.wav" : nil,
+            durationSeconds: status == .completed ? 4 : nil, manifestPath: status == .completed ? "/takes/m.json" : nil,
+            assembly: nil
+        )
+    }
+
+    /// Every failure reason's copy is distinct, so a failed project's message reads
+    /// back to its own reason and contract code.
+    func testAFailureMessageReadsBackToItsReason() {
+        let messages = GenerationFailurePresentationReason.allCases.map(DesktopLongFormOutcome.Failure.message(for:))
+        XCTAssertEqual(Set(messages).count, messages.count, "two reasons share copy: the read-back would be ambiguous")
+        for reason in GenerationFailurePresentationReason.allCases {
+            let failure = DesktopLongFormOutcome.Failure(
+                message: DesktopLongFormOutcome.Failure.message(for: reason), segments: [segment(0, .failed, qcPassed: nil)]
+            )
+            XCTAssertEqual(failure, .generation(reason))
+            XCTAssertEqual(CLILongFormProject.classify(failure, failing: nil).0, CLIFailure.code(for: reason))
+        }
+        XCTAssertEqual(
+            DesktopLongFormOutcome.Failure(message: "anything", segments: [segment(0, .saved), segment(1, .failed, qcPassed: false)]),
+            .segmentQCRejected(index: 1), "a QC verdict wins over the message"
+        )
+        XCTAssertEqual(DesktopLongFormOutcome.Failure(message: "unknown", segments: [segment(0, .saved)]), .other)
+    }
+
+    /// The runner's outcome as the CLI reports it: kept takes, typed stops, and
+    /// an interrupt told apart from the engine's own stop.
+    func testTheOutcomeMapsToTypedStops() throws {
+        let start = CLILongFormProject.Outcome(baseSeed: 7, planDigest: "digest")
+        let completed = CLILongFormProject.report(
+            outcome(.completed, [segment(0, .saved, finish: "max_tokens"), segment(1, .saved)]),
+            into: start, lastSubmitted: nil, signalled: false
+        )
+        XCTAssertTrue(completed.completed)
+        XCTAssertEqual(completed.segments.map(\.effectiveSeed), [String(UInt64.max), String(UInt64.max - 1)])
+        XCTAssertEqual(completed.finishReason, "max_tokens", "a truncated segment is the project's finish reason")
+        XCTAssertEqual(completed.language, "english")
+        XCTAssertEqual(completed.manifestPath, "/takes/m.json")
+
+        let rejected = CLILongFormProject.report(
+            outcome(.failed, [segment(0, .saved), segment(1, .failed, qcPassed: false), segment(2, .pending)],
+                    failure: .segmentQCRejected(index: 1)),
+            into: start, lastSubmitted: nil, signalled: false
+        )
+        guard case .failed(let error, let code, let signalled)? = rejected.stop else { return XCTFail("failed") }
+        XCTAssertEqual(code, .qcRejected)
+        XCTAssertFalse(signalled)
+        XCTAssertEqual((error as? CLIError)?.detail?["segment"], .integer(1))
+        XCTAssertEqual(rejected.segments.count, 1, "the kept take stays reported")
+        XCTAssertNotNil(rejected.generationID, "the rejected take is named")
+
+        let joined = CLILongFormProject.report(
+            outcome(.failed, [segment(0, .saved)], failure: .joinedQCRejected), into: start, lastSubmitted: UUID(),
+            signalled: false
+        )
+        guard case .failed(_, .qcRejected, _)? = joined.stop else { return XCTFail("the join's QC") }
+        XCTAssertNil(joined.generationID, "the join, not a take, failed")
+
+        let interrupted = CLILongFormProject.report(
+            outcome(.cancelled, [segment(0, .cancelled)]), into: start, lastSubmitted: nil, signalled: true
+        )
+        guard case .cancelled? = interrupted.stop else { return XCTFail("a signal is an interrupt") }
+        let engineStop = CLILongFormProject.report(
+            outcome(.cancelled, [segment(0, .cancelled)]), into: start, lastSubmitted: nil, signalled: false
+        )
+        guard case .engine(let stopped)? = engineStop.stop else { return XCTFail("no signal: the engine stopped it") }
+        XCTAssertEqual(stopped, CLIEngineCancellation(reason: .memoryPressure))
+    }
+
+    // MARK: - Files
+
+    /// Review B1 (01f9206f): each attempt creates its own project folder, so a stop
+    /// never removes another run's segments and two runs never share one.
+    func testEachAttemptOwnsItsProjectFolder() throws {
+        let root = try makeRoot()
+        let output = root.appendingPathComponent("story.wav")
+        let attempt = UUID()
+        let first = try CLILongFormProject.makeProjectFolder(beside: output, attempt: attempt)
+        XCTAssertEqual(first.lastPathComponent, "story_segments")
+        let second = try CLILongFormProject.makeProjectFolder(beside: output, attempt: attempt)
+        XCTAssertEqual(
+            second.lastPathComponent, "story_segments-\(attempt.uuidString.lowercased().prefix(8))",
+            "an existing folder is never reused"
+        )
+        XCTAssertThrowsError(try CLILongFormProject.makeProjectFolder(beside: output, attempt: attempt)) {
+            XCTAssertEqual(($0 as? CLIError)?.code, .outputUnavailable)
+        }
+    }
+
+    /// Review B2 (01f9206f): a clone project never replaces its reference audio,
+    /// whether --out names it directly, through a symlink or as a hard link.
+    func testAProjectNeverReplacesItsCloneReference() throws {
+        let root = try makeRoot()
+        let reference = root.appendingPathComponent("voice.wav")
+        try Data([1]).write(to: reference)
+        let clone = GenerationRequest.Payload.clone(
+            reference: CloneReference(audioPath: reference.path, transcript: nil, preparedVoiceID: nil)
+        )
+        let symlink = root.appendingPathComponent("alias.wav")
+        try FileManager.default.createSymbolicLink(at: symlink, withDestinationURL: reference)
+        let hardLink = root.appendingPathComponent("hard.wav")
+        try FileManager.default.linkItem(at: reference, to: hardLink)
+        for alias in [reference.path, root.path + "/./voice.wav", symlink.path, hardLink.path] {
+            XCTAssertThrowsError(try CLILongFormProject.refuseReferenceAlias(output: alias, payload: clone), alias) {
+                XCTAssertEqual(($0 as? CLIError)?.code, .invalidInput)
+            }
+        }
+        XCTAssertNoThrow(try CLILongFormProject.refuseReferenceAlias(
+            output: root.appendingPathComponent("take.wav").path, payload: clone
+        ))
+        XCTAssertNoThrow(try CLILongFormProject.refuseReferenceAlias(
+            output: reference.path, payload: .custom(speakerID: "ryan", deliveryStyle: nil)
+        ), "only a clone has a reference to protect")
     }
 }

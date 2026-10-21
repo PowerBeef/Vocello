@@ -85,7 +85,8 @@ public enum CLIFailure {
             return CLIErrorObject(
                 code: stopped.contractCode,
                 message: stopped.errorDescription ?? stopped.errorCode,
-                hint: "retry once memory is free; --variant speed needs less",
+                hint: stopped.contractCode == .memoryPressure
+                    ? "retry once memory is free; --variant speed needs less" : "retry shortly",
                 detail: ["reason": .string(stopped.errorCode)]
             )
         }

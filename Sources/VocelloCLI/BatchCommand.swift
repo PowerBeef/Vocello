@@ -48,6 +48,10 @@ enum BatchCommand {
         let longFormPlanDigest: String
         let longFormSegments: [LongFormSegmentJSON]
         let longFormAssembly: LongFormAssemblyEvidence
+        /// The language every segment carried: Auto resolved over the project's script.
+        let longFormLanguage: String?
+        /// The manifest v4 in the project's `_segments` folder.
+        let longFormManifestPath: String?
     }
     struct LongFormBatchJSON: Encodable, Sendable {
         let longForm = true
@@ -76,6 +80,8 @@ enum BatchCommand {
         var longFormPlanDigest: String?
         var longFormSegments: [LongFormSegmentJSON]?
         var longFormAssembly: LongFormAssemblyEvidence?
+        var longFormLanguage: String?
+        var longFormManifestPath: String?
     }
     struct FailedLongFormBatchJSON: Encodable, Sendable {
         let schemaVersion = 2
@@ -265,19 +271,19 @@ enum BatchCommand {
         }
     }
 
-    /// `--long-form`: each line is one long-form project, run the way the apps'
-    /// long-form runner runs one (`IOSLongFormProjectRequest`): the shipping
-    /// planner splits the line (base seed `--seed` for every project, else a
-    /// random one per project as the apps draw; each segment samples with its
-    /// derived subseed), each segment is one streaming take at the app cadence,
-    /// and the bounded assembler joins them. The apps' runner sends the Neutral
-    /// delivery instruction when nobody styled the draft: pass --app-delivery
-    /// for that (without it the segments are uninstructed, like any programmatic
-    /// request). Only the engine's own Fast QC runs,
-    /// per segment: the apps' joined-output quality gate, manifest and History
-    /// acceptance are not part of it. Every project is planned before any model
-    /// work; the batch stops at its first failed segment, keeping the completed
-    /// projects.
+    /// `--long-form`: each line is one long-form project, run by the apps' own
+    /// long-form runner (`CLILongFormProject`): the shipping planner splits the
+    /// line (base seed `--seed` for every project, else a random one per project
+    /// as the apps draw; each segment samples with its derived subseed), Auto
+    /// resolves one language over the line, each segment is one streaming take
+    /// at the app cadence that must pass the engine's and the apps' QC, and the
+    /// joined output must pass the apps' QC too. Segments and the manifest v4
+    /// stay in `<project>_segments/`; the joined output is `<project>.wav`.
+    /// Custom segments are uninstructed unless --delivery or --app-delivery
+    /// names a delivery; a Design project without one gets the Neutral delivery,
+    /// as the apps' runner sends it. No History rows until RF-30. Every project
+    /// is planned before any model work; the batch stops at its first failed
+    /// project, keeping the completed ones.
     @MainActor
     private static func runLongForm(
         args: Args, lines: [String], mode: GenerationMode, modelID: String, quality: Bool,
@@ -306,11 +312,22 @@ enum BatchCommand {
         let started = ContinuousClock.now
         projects: for (index, plan) in plans.enumerated() {
             let name = unsafe "\(filenamePrefix)_\(mode.rawValue)_\(String(format: "%03d", index))"
+            let projectFolder: URL
+            do {
+                projectFolder = try CLILongFormProject.makeProjectFolder(
+                    beside: outDir.appendingPathComponent("\(name).wav"), attempt: UUID()
+                )
+            } catch {
+                rows[index].status = .failed
+                rows[index].errorCode = VocelloErrorCode.outputUnavailable.rawValue
+                stopped = true
+                break projects
+            }
             let outcome = await CLILongFormProject.run(
                 plan, mode: mode, modelID: modelID, runtime: runtime, payload: payload,
                 deliveryInstructionCellID: deliveryInstructionCellID, variation: variation,
-                joinedURL: outDir.appendingPathComponent("\(name).wav"),
-                segmentURL: { outDir.appendingPathComponent(unsafe "\(name)_segment_\(String(format: "%03d", $0)).wav") },
+                // Batch has no --language: Auto, resolved over each project's script as the apps do.
+                languageHint: nil, directory: projectFolder,
                 projectIndex: index, projectCount: plans.count
             )
             rows[index].longFormBaseSeed = String(outcome.baseSeed)
@@ -341,10 +358,23 @@ enum BatchCommand {
             case nil:
                 break
             }
-            guard let joinedPath = outcome.audioPath, let duration = outcome.durationSeconds,
+            guard let joined = outcome.audioPath, let duration = outcome.durationSeconds,
                   let assembly = outcome.assembly else {
                 throw CLIError(.internalError, "a completed long-form project has no joined output")
             }
+            // The project's folder is inside the output folder, so the move is a rename.
+            let joinedPath = outDir.appendingPathComponent("\(name).wav").path
+            do {
+                try FileManager.default.moveItem(atPath: joined, toPath: joinedPath)
+            } catch {
+                rows[index].generationID = nil
+                rows[index].status = .failed
+                rows[index].errorCode = VocelloErrorCode.outputUnavailable.rawValue
+                stopped = true
+                break projects
+            }
+            rows[index].longFormManifestPath = outcome.manifestPath
+            rows[index].longFormLanguage = outcome.language
             rows[index].status = .completed
             CLIPresenter.event(.outputPublished, data: ["index": .integer(index), "audioPath": .string(joinedPath)])
             rows[index].audioPath = joinedPath
@@ -355,7 +385,8 @@ enum BatchCommand {
                 index: index, text: lines[index], audioPath: joinedPath, durationSeconds: duration,
                 finishReason: outcome.finishReason, longFormBaseSeed: String(outcome.baseSeed),
                 longFormPlanDigest: outcome.planDigest, longFormSegments: outcome.segments,
-                longFormAssembly: assembly
+                longFormAssembly: assembly, longFormLanguage: outcome.language,
+                longFormManifestPath: outcome.manifestPath
             ))
         }
         let wall = started.elapsedSeconds

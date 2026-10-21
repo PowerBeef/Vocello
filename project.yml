@@ -380,6 +380,21 @@ targets:
       - path: Sources/iOSSupport/Services/AppNotifications.swift
       - path: Sources/Services/TTSEngineStore+Mac.swift
       - path: Sources/Services/MacMemoryBudgetPolicy.swift
+      # RF-27: the apps' long-form runner (per-segment and joined-output QC, manifest v4,
+      # one script language), driven headless by DesktopLongFormProject.
+      - path: Sources/iOS/Studio/IOSLongFormProject.swift
+      - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
+      - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
+      - path: Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
+      - path: Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift
+      - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
+      - path: Sources/SharedSupport/Services/LivePreviewEstimate.swift
+      - path: Sources/SharedSupport/Services/AudioQualityGate.swift
+      - path: Sources/iOS/Studio/StudioGenerationItems.swift
+      - path: Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
+      - path: Sources/SharedSupport/Database/HistoryPersistenceError.swift
+      - path: Sources/SharedSupport/Database/GenerationHistoryOutbox.swift
       # Mac-only pieces the app and the CLI share (the app compiles Sources/DesktopShared too).
       - path: Sources/DesktopShared
     settings:

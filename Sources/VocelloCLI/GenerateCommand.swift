@@ -56,12 +56,17 @@ public enum GenerateCommand {
         let chunks: Int?
         /// A long-form project (a script past one take, or `--long-form always`):
         /// `seed` is then its base seed, `generationID` names the project, and the
-        /// segments carry their own takes. The single-take receipt fields are null.
+        /// segments carry their own takes. The single-take receipt fields are absent.
         var longForm = false
         var longFormBaseSeed: String?
         var longFormPlanDigest: String?
         var longFormSegments: [CLILongFormProject.Segment]?
         var longFormAssembly: LongFormAssemblyEvidence?
+        /// The language every segment carried: the selection, or Auto resolved
+        /// once over the whole script, as the apps do.
+        var longFormLanguage: String?
+        /// The manifest v4 beside the segments.
+        var longFormManifestPath: String?
     }
 
     /// What a `--stream` run observes off `engine.events`.
@@ -150,12 +155,14 @@ public enum GenerateCommand {
             if !engineStopped { streamTask?.cancel() }
             // A started take queues its terminal at once; a bound keeps a missing
             // one from ever stranding the command.
-            let deadline = Task { @concurrent () async in
-                try? await Task.sleep(for: .seconds(5))
-                streamTask?.cancel()
+            let deadline = streamTask.map { drain in
+                Task { @concurrent () async in
+                    guard (try? await Task.sleep(for: .seconds(5))) != nil else { return }
+                    drain.cancel()
+                }
             }
             let observation = await streamTask?.value
-            deadline.cancel()
+            deadline?.cancel()
             // P15-02: the take's own `.cancelled` event names the engine's reason.
             let classified = CLIEngineCancellation.classify(
                 error,
@@ -275,6 +282,14 @@ public enum GenerateCommand {
         // JSON `generationID` agree and no two runs share a file (U28).
         let generationID = UUID()
         let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        if longFormPlan != nil, let reference = args.string("reference") {
+            // Refused before boot when the path is known; a saved voice's is checked once resolved.
+            let path = URL(fileURLWithPath: (reference as NSString).expandingTildeInPath).path
+            try CLILongFormProject.refuseReferenceAlias(
+                output: output.path,
+                payload: .clone(reference: CloneReference(audioPath: path, transcript: nil, preparedVoiceID: nil))
+            )
+        }
         return PreparedTake(
             args: args, text: text, mode: mode, consent: consent, language: language, seed: seed,
             variation: variation, appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
@@ -570,60 +585,60 @@ public enum GenerateCommand {
     }
 
     /// One long-form project (the apps' runner, `CLILongFormProject`): segment
-    /// takes in `<output stem>_segments/`, joined beside them and moved onto the
-    /// output only once complete, so a failed project never touches an existing
-    /// `--out`. A stopped project keeps its completed segments and says where.
+    /// takes and the manifest in `<output stem>_segments/`, the joined output
+    /// moved onto the output only once it passed the apps' QC, so a failed
+    /// project never touches an existing `--out`. A stopped project keeps its
+    /// completed segments and says where.
     @MainActor
     private static func executeLongForm(
         _ take: PreparedTake, plan: LongFormPlan, runtime: CLIRuntime, modelID: String,
         payload: GenerationRequest.Payload
     ) async throws -> GenerateJSON {
         let output = URL(fileURLWithPath: take.output.path)
-        let segmentsFolder = output.deletingLastPathComponent().appendingPathComponent(
-            output.deletingPathExtension().lastPathComponent + "_segments", isDirectory: true
-        )
-        do {
-            try FileManager.default.createDirectory(at: segmentsFolder, withIntermediateDirectories: true)
-        } catch {
-            throw CLIError(.outputUnavailable, "could not create \(segmentsFolder.path): \(error.localizedDescription)")
-        }
-        let joined = segmentsFolder.appendingPathComponent("joined.wav")
+        try CLILongFormProject.refuseReferenceAlias(output: output.path, payload: payload)
+        let projectFolder = try CLILongFormProject.makeProjectFolder(beside: output, attempt: take.generationID)
         note("generating a long-form project: \(plan.segments.count) segments (\(take.text.count) chars)…")
         let started = ContinuousClock.now
         let outcome = await CLILongFormProject.run(
             plan, mode: take.mode, modelID: modelID, runtime: runtime, payload: payload,
             deliveryInstructionCellID: take.deliveryInstructionCellID, variation: take.variation,
-            joinedURL: joined,
-            segmentURL: { segmentsFolder.appendingPathComponent(unsafe "segment_\(String(format: "%03d", $0)).wav") }
+            languageHint: take.language?.rawValue, directory: projectFolder
         )
-        if let stop = outcome.stop {
-            if !outcome.segments.isEmpty {
-                CLIPresenter.warn(
-                    "long_form_segments_kept",
-                    "the project stopped after \(outcome.segments.count) of \(plan.segments.count) segments; "
-                        + "their takes are kept in \(segmentsFolder.path)",
-                    detail: [
-                        "completedSegments": .integer(outcome.segments.count),
-                        "plannedSegments": .integer(plan.segments.count),
-                        "segmentsFolder": .string(segmentsFolder.path),
-                    ]
-                )
-            } else {
-                try? FileManager.default.removeItem(at: segmentsFolder)
+        func keepOrDiscardSegments() {
+            guard !outcome.segments.isEmpty else {
+                // This attempt created the folder, and nothing in it is worth keeping.
+                try? FileManager.default.removeItem(at: projectFolder)
+                return
             }
+            CLIPresenter.warn(
+                "long_form_segments_kept",
+                "the project stopped after \(outcome.segments.count) of \(plan.segments.count) segments; "
+                    + "their takes are kept in \(projectFolder.path)",
+                detail: [
+                    "completedSegments": .integer(outcome.segments.count),
+                    "plannedSegments": .integer(plan.segments.count),
+                    "segmentsFolder": .string(projectFolder.path),
+                ]
+            )
+        }
+        if let stop = outcome.stop {
+            keepOrDiscardSegments()
             switch stop {
             case .failed(let error, _, _): throw error
             case .cancelled: throw CancellationError()
             case .engine(let engineStop): throw engineStop
             }
         }
-        guard let duration = outcome.durationSeconds, let assembly = outcome.assembly else {
+        guard let joined = outcome.audioPath, let duration = outcome.durationSeconds, let assembly = outcome.assembly
+        else {
             throw CLIError(.internalError, "a completed long-form project has no joined output")
         }
-        // Same folder, so the rename is atomic: an existing --out is replaced whole or not at all.
-        guard unsafe rename(joined.path, output.path) == 0 else {
+        // The project folder is a new subfolder of the output's folder, so the
+        // rename is atomic: an existing --out is replaced whole or not at all.
+        guard unsafe rename(joined, output.path) == 0 else {
             let failure = Errno(rawValue: errno)
-            try? FileManager.default.removeItem(at: joined)
+            try? FileManager.default.removeItem(atPath: joined)
+            keepOrDiscardSegments()
             throw CLIError(.outputUnavailable, "could not write \(output.path): \(failure)")
         }
         let wall = started.elapsedSeconds
@@ -649,7 +664,8 @@ public enum GenerateCommand {
             modelArtifactVersion: nil, modelIntegrityManifestDigest: nil, speechTokenizerDigest: nil,
             completionReceipt: nil, audioQC: nil, firstChunkMS: nil, chunks: nil,
             longForm: true, longFormBaseSeed: String(outcome.baseSeed), longFormPlanDigest: outcome.planDigest,
-            longFormSegments: outcome.segments, longFormAssembly: assembly
+            longFormSegments: outcome.segments, longFormAssembly: assembly, longFormLanguage: outcome.language,
+            longFormManifestPath: outcome.manifestPath
         )
     }
 
@@ -937,11 +953,6 @@ public enum GenerateCommand {
         CloneReference(audioPath: voice.audioPath, transcript: transcriptOverride, preparedVoiceID: voice.id)
     }
 
-    /// Refuses, before the engine boots, a script one take cannot speak: empty,
-    /// nothing to speak (only punctuation, symbols or emoji, which the model
-    /// ends before any audio, U29), or past the apps' single-take limit (CJK
-    /// characters count three, `SingleTakeScriptBudget`), which would spend
-    /// minutes on a take that runs out of tokens (P15-03).
     /// `--long-form auto|always|never` (default auto).
     public enum LongFormRoute: String, Sendable {
         case auto, always, never
@@ -973,6 +984,11 @@ public enum GenerateCommand {
         }
     }
 
+    /// Refuses, before the engine boots, a script one take cannot speak: empty,
+    /// nothing to speak (only punctuation, symbols or emoji, which the model
+    /// ends before any audio, U29), or past the apps' single-take limit (CJK
+    /// characters count three, `SingleTakeScriptBudget`), which would spend
+    /// minutes on a take that runs out of tokens (P15-03).
     static func validateSingleTakeText(
         _ text: String,
         longFormHint: String = "run it as a long-form project with vocello batch --long-form --file <path>, which reads each line as one project"

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 2 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 20/53 (38%) |
+| `release-first-3-0-2026-09` | active | release-qa | 21/53 (40%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -71,8 +71,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
-| `RF-25` | in-flight | CLI command model and machine contract | — |
-| `RF-26` | planned | CLI desktop core and read-only parity | — |
+| `RF-26` | in-flight | CLI desktop core and read-only parity | — |
 | `RF-27` | planned | CLI generation on the app's pipeline | — |
 | `RF-28` | planned | CLI saved voices, models and settings writes | — |
 | `RF-29` | planned | vocello mcp server | — |
@@ -166,10 +165,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-23`** (planned, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.
 
-- **`RF-25`** (in-flight, due 2026-10-27) — CLI command model and machine contract.
-  gate: A declarative in-house command model drives the parser (strict unknown flags, -h anywhere, global flags anywhere, help <cmd>), help, generated completions and the static capabilities; every command speaks one envelope with typed error codes and the exit table (0, 1, 2, 66, 69, 73, 74, 75, 77, 78, 130, 143) in json and ndjson modes, with errors on stdout as envelopes, --no-input, stdin only when named, SIGPIPE handled; schemas under config/cli-contract/v1 rendered from the Swift types and validated by scripts/cli_contract.py; the existing JSON callers migrated; no iPhone-compiled file changes; tests and the routed check pass.
-
-- **`RF-26`** (planned, due 2026-10-30) — CLI desktop core and read-only parity.
+- **`RF-26`** (in-flight, due 2026-10-30) — CLI desktop core and read-only parity.
   gate: A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.
 
 - **`RF-27`** (planned, due 2026-11-06) — CLI generation on the app's pipeline.

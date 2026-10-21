@@ -5270,6 +5270,29 @@
         "commit:50761bcc",
         "commit:08372fdd"
       ]
+    },
+    {
+      "id": "RF-25",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI command model and machine contract",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A declarative in-house command model drives the parser (strict unknown flags, -h anywhere, global flags anywhere, help <cmd>), help, generated completions and the static capabilities; every command speaks one envelope with typed error codes and the exit table (0, 1, 2, 66, 69, 73, 74, 75, 77, 78, 130, 143) in json and ndjson modes, with errors on stdout as envelopes, --no-input, stdin only when named, SIGPIPE handled; schemas under config/cli-contract/v1 rendered from the Swift types and validated by scripts/cli_contract.py; the existing JSON callers migrated; no iPhone-compiled file changes; tests and the routed check pass.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/Support.swift",
+        "scripts/cli_package.py",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-21",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Done 2026-10-21: one declarative command tree drives the strict parser, help, generated zsh/bash/fish completions, capabilities and commands.json; every command but bench reports through the v1 envelope (--json) or NDJSON events (--ndjson) with typed error codes and the 0/1/2/66/69/73/74/75/77/78/130/143 exit table; machine formats never prompt or read stdin implicitly; SIGPIPE ignored, a closed stdout stops without escalating. Contract tables, schemas, examples and the additive-only baseline (command surface included) in config/cli-contract/v1, validated by scripts/cli_contract.py in the contract gate; every JSON caller reads through scripts/lib/vocello_cli_json.py. Swift review findings fixed (B1-B2, S1-S6). Real takes in both formats validate against the schemas; routed check PASS. Known: the owned package's model-load lines still reach stderr in machine formats until after the submission.",
+      "due": "2026-10-27",
+      "evidence": [
+        "commit:26c0cee6",
+        "commit:0e8eeff0",
+        "commit:1d1e72a9",
+        "commit:0403cd34",
+        "file:config/cli-contract/v1/baseline.json"
+      ]
     }
   ]
 }

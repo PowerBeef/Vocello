@@ -238,26 +238,10 @@
       "due": "2026-11-06"
     },
     {
-      "id": "RF-25",
-      "plan": "release-first-3-0-2026-09",
-      "title": "CLI command model and machine contract",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "A declarative in-house command model drives the parser (strict unknown flags, -h anywhere, global flags anywhere, help <cmd>), help, generated completions and the static capabilities; every command speaks one envelope with typed error codes and the exit table (0, 1, 2, 66, 69, 73, 74, 75, 77, 78, 130, 143) in json and ndjson modes, with errors on stdout as envelopes, --no-input, stdin only when named, SIGPIPE handled; schemas under config/cli-contract/v1 rendered from the Swift types and validated by scripts/cli_contract.py; the existing JSON callers migrated; no iPhone-compiled file changes; tests and the routed check pass.",
-      "sourceOfTruth": [
-        "Sources/VocelloCLI/Support.swift",
-        "scripts/cli_package.py",
-        "docs/audits/2026-10-21-cli-overhaul-plan.md"
-      ],
-      "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
-      "due": "2026-10-27"
-    },
-    {
       "id": "RF-26",
       "plan": "release-first-3-0-2026-09",
       "title": "CLI desktop core and read-only parity",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "A macOS static framework VocelloDesktopCore compiles the shared UI-free app files by path and the DesktopShared extractions the Mac app also uses; the CLI reads the app's settings and offers read-only parity (catalog, settings list/get, models list/status/verify, voices list/show/banks, history list/search/show/export through a read-only queue, doctor, runtime capabilities); no iPhone-compiled file changes; tests pass.",
       "sourceOfTruth": [

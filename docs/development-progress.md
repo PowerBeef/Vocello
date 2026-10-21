@@ -17,7 +17,26 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 21 — the freeze moves to `0919e998`; Mac updates land (resume here)
+### October 21, later — the CLI overhaul starts: RF-25 lands, RF-08 builds a .pkg (resume here)
+
+The maintainer asked for a full CLI: Mac-app parity, driven by agents (a JSON contract and an MCP
+server), shipped as a signed `.pkg` beside the releases. The plan is
+`docs/audits/2026-10-21-cli-overhaul-plan.md` (RF-25 to RF-31, RF-08 re-gated); no iPhone-compiled
+file changes before the submission (`git diff --quiet 0919e998 -- Sources/iOS …`).
+
+- **RF-25 done:** one command tree drives the strict parser, help, completions, `capabilities` and
+  `config/cli-contract/v1/commands.json`; every command but `bench` speaks the v1 envelope
+  (`--json`) or NDJSON events (`--ndjson`) with typed codes and exits; the contract, schemas,
+  examples and additive-only baseline validate in the contract gate; every JSON caller reads
+  through `scripts/lib/vocello_cli_json.py` (`26c0cee6`, `0e8eeff0`, reviewed).
+- **RF-08 in flight:** `cli_package.py pkg`/`pkg-verify` build and verify an unsigned installer
+  package with relative `/usr/local` links and a sealed `uninstall.sh` (`cdb5eea6`). Left: evidence
+  and entitlement policy, the release pipeline, the hardened-runtime probe, and the maintainer's
+  Developer ID Installer certificate with its two `release` secrets.
+- **RF-26 in flight next:** `VocelloDesktopCore` and read-only parity.
+- Local commits are not pushed; the iPhone candidate stays at `0919e998` awaiting the maintainer's tag.
+
+### October 21 — the freeze moves to `0919e998`; Mac updates land
 
 `main` is pushed through `0919e998`, the freeze commit; the freeze record follows it. The maintainer
 holds the release: no tag yet.

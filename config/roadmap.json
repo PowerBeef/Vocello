@@ -230,27 +230,12 @@
         "config/orchestration-contract.json",
         ".github/workflows/release.yml"
       ],
-      "updated": "2026-10-21",
-      "notes": "Re-gated into the release plan 2026-10-21 for a signed .pkg at the maintainer's request (docs/audits/2026-10-21-cli-overhaul-plan.md). Landed: cli_package.py pkg/pkg-verify and the package scripts (cdb5eea6); evidence binding, the empty macos-cli entitlement role, release.sh build/sign/notarize/verify, the CI install test and template v3 (3acf1251 to 9133bf01); the security review's fixes (c5f1870b to 2d3ed9e5). Hardened-runtime probe PASS (cli-hardened-runtime-probe-20261021-032734-rerun): an optimized CLI signed ad hoc with --options runtime and no entitlements passed Custom, French Design and Clone (Fast QC pass), the batch, a live SIGINT and exits 2/2. Open: the first rehearsal on GitHub (maintainer dispatch) confirms the runner's /usr/local ownership; the maintainer's Developer ID Installer certificate and the release secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD; the first signed run proves Developer ID, notarization and stapled pkg-verify. History: git log -p -- config/roadmap.json.",
+      "updated": "2026-10-22",
+      "notes": "Re-gated into the release plan 2026-10-21 for a signed .pkg at the maintainer's request (docs/audits/2026-10-21-cli-overhaul-plan.md). Landed: cli_package.py pkg/pkg-verify and the package scripts (cdb5eea6); evidence binding, the empty macos-cli entitlement role, release.sh build/sign/notarize/verify, the CI install test and template v3 (3acf1251 to 9133bf01); the security review's fixes (c5f1870b to 2d3ed9e5). Hardened-runtime probe PASS (cli-hardened-runtime-probe-20261021-032734-rerun): an optimized CLI signed ad hoc with --options runtime and no entitlements passed Custom, French Design and Clone (Fast QC pass), the batch, a live SIGINT and exits 2/2. Open: the first rehearsal on GitHub (maintainer dispatch) confirms the runner's /usr/local ownership; the maintainer's Developer ID Installer certificate and the release secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD; the first signed run proves Developer ID, notarization and stapled pkg-verify. History: git log -p -- config/roadmap.json. 2026-10-22 (bd045167): a take through a link (/usr/local/bin/vocello) could not find the MLX metallib; vocello now execs its real path.",
       "legacyIds": [
         "F-17"
       ],
       "due": "2026-11-06"
-    },
-    {
-      "id": "RF-29",
-      "plan": "release-first-3-0-2026-09",
-      "title": "vocello mcp server",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "An in-house stdio MCP server serving the 2026-07-28 and initialize-era protocols, with the read and write tools on the shared service, progress and typed cancellation, per-request consent, confined paths, one warm engine with a single-flight gate, install_model only behind --allow-model-install, and config helpers; transcript tests pass and a real generate and cancel work from Claude Code.",
-      "sourceOfTruth": [
-        "Sources/VocelloCLI/Support.swift",
-        "docs/audits/2026-10-21-cli-overhaul-plan.md"
-      ],
-      "updated": "2026-10-22",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
-      "due": "2026-11-13"
     },
     {
       "id": "RF-30",
@@ -264,7 +249,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission. From RF-27 (2026-10-21): CLI single takes adopt the shared IOSSingleTakeGenerationExecutor with headless History hooks when History writes land here; until then the CLI writes no History (no opt-in interim).",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission. From RF-27 (2026-10-21): CLI single takes adopt the shared IOSSingleTakeGenerationExecutor with headless History hooks when History writes land here; until then the CLI writes no History (no opt-in interim). From RF-29 (2026-10-22): MCP generate_speech writes no History row until here; delete_history_item joins the MCP tools with History delete.",
       "unparkWhen": "The iOS 3.0 submission is done."
     },
     {
@@ -279,7 +264,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). From RF-28's review (2026-10-22), for the CLI's qualification: models remove checks then deletes without holding a lease, so a concurrent CLI install of the same model can lose its staging; its freedBytes counts hard-linked shared components; the app's reload on a models notice re-digests every model (consider a sizes-only pass).",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). From RF-28's review (2026-10-22), for the CLI's qualification: models remove checks then deletes without holding a lease, so a concurrent CLI install of the same model can lose its staging; its freedBytes counts hard-linked shared components; the app's reload on a models notice re-digests every model (consider a sizes-only pass). From RF-29 (2026-10-22): cancel a generate_speech interactively from Claude Code (Esc; stdio cancel already proven); the MCP server holds the engine lease for its life (consider releasing it at idle unload).",
       "unparkWhen": "The iOS 3.0 submission is done."
     },
     {

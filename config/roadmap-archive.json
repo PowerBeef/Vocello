@@ -5364,6 +5364,25 @@
         "commit:213ded27",
         "doc:docs/reference/cli.md"
       ]
+    },
+    {
+      "id": "RF-29",
+      "plan": "release-first-3-0-2026-09",
+      "title": "vocello mcp server",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "An in-house stdio MCP server serving the 2026-07-28 and initialize-era protocols, with the read and write tools on the shared service, progress and typed cancellation, per-request consent, confined paths, one warm engine with a single-flight gate, install_model only behind --allow-model-install, and config helpers; transcript tests pass and a real generate and cancel work from Claude Code.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/Support.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-22",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). vocello mcp: both protocol eras, 17 tools on the shared commands, one warm engine behind a FIFO gate, per-request consent, confined paths, progress and cancellation. Proven over stdio (take, cancel, take) and by a headless Claude Code session's real take; the interactive Claude Code cancel moves to RF-31. Two Swift reviews, every finding fixed.",
+      "due": "2026-11-13",
+      "evidence": [
+        "commit:bd045167",
+        "doc:docs/reference/cli.md"
+      ]
     }
   ]
 }

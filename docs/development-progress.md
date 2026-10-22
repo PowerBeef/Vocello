@@ -17,7 +17,34 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 22 — RF-28 closes; RF-29 (the MCP server) starts (resume here)
+### October 22, later — RF-29 closes: `vocello mcp` serves agents (resume here)
+
+- **RF-29 done** (`bd045167`): `vocello mcp` is an in-house stdio MCP server.
+  - It serves the stateless 2026-07-28 revision and the `initialize`-era ones.
+  - Its 17 tools run the CLI's own commands, on one warm engine behind a FIFO gate.
+  - Consent is checked per request, and paths are confined: reads come from `<data>/outputs`, writes go
+    to `<data>/outputs/cli`, and `--allow-dir` adds folders for both.
+  - It reports progress and handles cancellation.
+  - `--print-config` and `--self-test` help with setup.
+  - It was proven over stdio with a real take, a cancelled take and a take after it, and a headless
+    Claude Code session (`claude -p --mcp-config`) generated a real take through it.
+  - It had two Swift reviews, with every finding fixed.
+- **Fixed on the way:**
+  - `generate` never replaces a History take's audio.
+  - RF-08: through any link (the installer's `/usr/local/bin/vocello`, `build/vocello` outside the
+    checkout), MLX could not find its metallib, so every take failed. `vocello` now execs its real path.
+- **Moved on:**
+  - To RF-31: the interactive Claude Code cancel (Esc), and the server holding the engine lease for its
+    whole life.
+  - To RF-30: MCP History rows and `delete_history_item`.
+- **CLI work before the submission is complete** (RF-25 to RF-29). RF-30 and RF-31 follow the iOS
+  submission.
+- **RF-08 in flight:** the maintainer still needs the Developer ID Installer certificate, its two
+  `release` secrets and the first rehearsal.
+- **Release items waiting:** RF-09's freeze checks are due 2026-10-23.
+- **Not pushed:** local commits are unpushed; the iPhone candidate stays at `0919e998`.
+
+### October 22 — RF-28 closes; RF-29 (the MCP server) starts
 
 - **RF-28 done:**
   - `settings set`, `models use` and `models prefer-lower-memory` write the app's preferences as its

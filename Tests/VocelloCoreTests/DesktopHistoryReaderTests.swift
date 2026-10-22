@@ -211,6 +211,16 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertNil(check(source), "the take's own file is a no-op")
     }
 
+    func testATakesAudioIsKnownWhateverItsLetterCase() throws {
+        let root = try makeRoot()
+        let take = root.appendingPathComponent("outputs/CustomVoice/take.wav")
+        try seed(root, [row("Take", at: 1, audioPath: take.path)])
+        let reader = DesktopHistoryReader(root: root)
+        XCTAssertTrue(try reader.isTakeAudio(take))
+        XCTAssertTrue(try reader.isTakeAudio(URL(fileURLWithPath: take.path.lowercased())), "the same file on the Mac's volume")
+        XCTAssertFalse(try reader.isTakeAudio(root.appendingPathComponent("outputs/cli/take.wav")))
+    }
+
     func testExportCopiesTheTakeAndTreatsItsOwnFileAsDone() throws {
         let root = try makeRoot()
         let source = root.appendingPathComponent("take.wav")

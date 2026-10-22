@@ -80,6 +80,36 @@ final class CLIRequestTests: XCTestCase {
         }
     }
 
+    // MARK: - History takes
+
+    func testATakeNeverReplacesAHistoryTakesAudio() throws {
+        let data = URL(fileURLWithPath: "/Users/example/Library/Application Support/QwenVoice", isDirectory: true)
+        typealias Destination = GenerateCommand.OutputDestination
+        func refused(_ path: String, replaces: Bool = true, folder: String? = nil, history: @escaping (URL) throws -> Bool)
+            -> Bool {
+            do {
+                try GenerateCommand.refuseReplacingTake(
+                    Destination(path: path, replacesExistingFile: replaces), dataDir: data, appOutputFolder: folder,
+                    isTakeAudio: history
+                )
+                return false
+            } catch {
+                XCTAssertEqual((error as? CLIError)?.code, .outputUnavailable)
+                return true
+            }
+        }
+        struct Busy: Error {}
+        let take = data.appendingPathComponent("outputs/custom/take.wav").path
+        XCTAssertTrue(refused("/Users/example/Desktop/take.wav") { _ in true }, "History names it")
+        XCTAssertFalse(refused("/Users/example/Desktop/take.wav") { _ in false })
+        XCTAssertFalse(refused(take, replaces: false) { _ in throw Busy() }, "a new file is never a take")
+        // History unreadable: the app's take folders count as takes.
+        XCTAssertTrue(refused(take) { _ in throw Busy() })
+        XCTAssertFalse(refused(data.appendingPathComponent("outputs/cli/take.wav").path) { _ in throw Busy() })
+        XCTAssertFalse(refused("/Users/example/Desktop/take.wav") { _ in throw Busy() })
+        XCTAssertTrue(refused("/Users/example/Takes/Custom/a.wav", folder: "/Users/example/Takes") { _ in throw Busy() })
+    }
+
     // MARK: - Identity
 
     private var contract: URL {

@@ -54,8 +54,12 @@ Benchmark records take `toolchain.optimization` from the executable-digest-bound
 records; the -Onone `cli` build is for development and functional runs.
 
 `build/vocello` is the public symlink to the real binary under the policy-owned
-`build/cache/xcode/macos/…` (-Onone) or `build/cache/xcode/macos-optimized/…` (`cli-optimized`) product tree; macOS resolves it so the adjacent MLX shader bundle
-(`default.metallib`) stays reachable. **Do not copy only the binary**: keep the adjacent resource
+`build/cache/xcode/macos/…` (-Onone) or `build/cache/xcode/macos-optimized/…` (`cli-optimized`) product tree.
+MLX and the SwiftPM resource bundles are found beside the executable as it was loaded, which through a
+link is the link's folder, so a `vocello` started through any link (this one, the installer's
+`/usr/local/bin/vocello`, an MCP client's configured path) first execs the real binary, keeping its
+arguments, environment and process id; the adjacent MLX shader bundle (`default.metallib`) then stays
+reachable from any working folder. **Do not copy only the binary**: keep the adjacent resource
 bundles and catalogs. The release workflow stages a complete `Vocello CLI` folder in a separate
 `<desktop-output-name>-cli.dmg`; copy the whole folder to any user-owned location and invoke the
 quoted executable path. No checkout, Python, privileged install, Homebrew formula, or shell-profile
@@ -308,7 +312,10 @@ batch from any item on that property), these takes follow the app.
 
 Default output names carry the take's generation id (the JSON `generationID`), so concurrent runs
 never share a file. An explicit `--out` that names an existing file is replaced atomically only by a
-successful take (QC and publication passed), and a stderr note says so before boot. Failed startup,
+successful take (QC and publication passed), and a stderr note says so before boot. It never replaces
+a History take's audio, as `history export` never does: History is asked, and while the app holds it a
+file in a folder the app writes takes to counts as one (`outputs/cli` aside); either is refused as
+`output_unavailable` (73) before boot. Failed startup,
 QC, cancellation and publication preserve any previous destination. Only attempt-owned staging is
 discarded. Clone rejects a reference/output alias (including symlink and hardlink aliases).
 Two successful writers to the same explicit destination use last-publication-wins; use distinct
@@ -386,6 +393,54 @@ request are one request, while one whose omitted setting has since resolved diff
 app setting, a package installed or removed) is not. A
 replay whose take no longer exists fails with `output_missing` (use a new id), and a success whose
 result could not be kept carries the warning `idempotency_not_recorded`.
+
+### `mcp` — serve AI agents over the Model Context Protocol
+
+```sh
+vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]
+vocello mcp --print-config claude-code|claude-desktop [same options]   # the client's setup, then exit
+vocello mcp --self-test [--json]                                       # a scripted session, no engine
+claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp      # what --print-config claude-code prints
+```
+
+An MCP client starts the server and speaks JSON-RPC 2.0 on its stdin and stdout, one message per line. It
+serves the stateless 2026-07-28 revision (each request names it in `_meta`; `server/discover`) and the
+`initialize`-era revisions 2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05; an unsupported revision in
+`_meta` is answered `-32022` with the supported ones. stdout carries protocol messages only: the server
+writes them to a private copy of it and points descriptor 1 at stderr, where anything else lands (the
+model package's load lines, `--verbose` notes). It exits when the client closes stdin, after answering
+the calls still running; a signal cancels them instead.
+
+| Tool | Runs | |
+|---|---|---|
+| `get_capabilities`, `list_speakers`, `list_languages`, `list_deliveries`, `list_briefs` | `capabilities`, the catalog commands | read |
+| `list_voices`, `get_voice`, `list_models`, `get_settings` | `voices list`/`show`, `models list`, `settings list` | read |
+| `list_history`, `get_history_item`, `export_history_item` | `history list`/`search`/`show`/`export` | read |
+| `get_status` | the server: data folder, allowed folders, engine, queue | read |
+| `generate_speech` | `generate`, from a `run` request without `textFile` | engine |
+| `enroll_voice`, `delete_voice` | `voices enroll`/`delete` | engine |
+| `install_model` | `models install`, offered only with `--allow-model-install` | engine |
+
+Each tool's arguments become its command's options and operands and go through the same strict parser,
+and the command reports to that call only (as in json mode), so a tool can do nothing its command line
+refuses. A success's `structuredContent` is the command's `result` (also given as JSON text, with each
+warning as a text line); a failure is a tool error whose `structuredContent.error` is the contract's error
+object. Reads run at once, beside anything else. Engine tools share one warm engine, booted by the first
+one and unloaded by the engine's idle policy, and run one at a time: up to `--max-queue` (default 4) wait
+in arrival order, and the next is refused with `engine_busy` (75). The engine takes its lease (and its
+8 GB admission) when it first loads a model. With a `progressToken` in `_meta`, a call's events become
+`notifications/progress` (chunks at most twice a second). `notifications/cancelled` stops the call
+through its command's cancellation (a take through the engine's typed barrier), discards a waiting call
+and answers neither.
+
+**Paths and consent:** a path argument is absolute. Clips (`reference`, `audio`) are read from inside
+`<data>/outputs` (History takes included) or a `--allow-dir` folder (several separated by `:`), and audio
+(`out`) is written inside `<data>/outputs/cli` or a `--allow-dir` folder, never into the folders the app
+keeps takes in. Symbolic links resolve before the check, a `..` component or a link to nothing is refused,
+and a path outside is refused before anything about it is looked at, as `path_not_allowed` (77). Reads and
+the engine requests share one warm engine. Cloning
+and saving a voice need `confirmConsent: true` in each request, never inherited. CLI takes write no History
+rows until RF-30's History lock, and `delete_history_item` arrives with it.
 
 ### `history` — read the app's History
 

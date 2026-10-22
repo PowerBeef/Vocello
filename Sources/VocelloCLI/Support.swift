@@ -73,6 +73,15 @@ public enum CLIOutput {
         }
     }
 
+    /// The MCP server's settings (RF-29): stdin carries the protocol, so no
+    /// command reads it or prompts, and notes stay off stderr unless `--verbose`.
+    public static func configureForServer(verbose: Bool) {
+        settings.withLock {
+            $0.noInput = true
+            $0.verbosity = verbose ? .verbose : .quiet
+        }
+    }
+
     /// Prompts need a person: text output, a terminal and no `--no-input`.
     static var promptsAllowed: Bool {
         settings.withLock { !$0.noInput && !$0.format.isMachine } && isInteractiveStdin()

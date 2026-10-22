@@ -10,7 +10,8 @@ import QwenVoiceCore
 @MainActor
 public final class DesktopEngineHost {
     let store: TTSEngineStore
-    private var consent: VoiceCloningConsentPolicy
+    /// The consent the store admits the next request under.
+    public private(set) var consent: VoiceCloningConsentPolicy
 
     /// Any engine: the CLI hosts `MLXTTSEngine`; tests host the fixture engines.
     public init<Engine: TTSEngine & AnyObject>(

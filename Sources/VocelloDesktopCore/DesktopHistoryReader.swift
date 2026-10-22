@@ -128,12 +128,16 @@ public struct DesktopHistoryReader: Sendable {
         }
     }
 
-    /// Whether some History take's audio is the file at `url` (an export must not overwrite it).
+    /// Whether some History take's audio is the file at `url` (an export or a
+    /// take must not overwrite it). Paths match regardless of letter case, as
+    /// the Mac's default volume names the same file.
     public func isTakeAudio(_ url: URL) throws -> Bool {
         guard exists else { return false }
         let path = url.standardizedFileURL.path
         return try read { db in
-            try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM generations WHERE audioPath = ?)", arguments: [path])
+            try Bool.fetchOne(
+                db, sql: "SELECT EXISTS(SELECT 1 FROM generations WHERE audioPath = ? COLLATE NOCASE)", arguments: [path]
+            )
         } ?? false
     }
 

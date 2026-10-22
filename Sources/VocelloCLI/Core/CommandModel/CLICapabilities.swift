@@ -144,6 +144,11 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
 
     struct MCP: Encodable, Sendable {
         let available: Bool
+        /// The protocol revisions `vocello mcp` serves.
+        let protocolVersions: [String]
+        /// The tools it offers, `optInTools` only when started with their flag.
+        let tools: [String]
+        let optInTools: [String: String]
     }
 
     /// Facts about this Mac and its shared store, read without an engine boot.
@@ -207,6 +212,12 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
             eastAsianCharacterWeight: SingleTakeScriptBudget.eastAsianCharacterWeight,
             longFormMaximumSegments: CLILimits.longFormMaximumSegments
         )
-        mcp = MCP(available: false)
+        let defaultTools = MCPTools.catalog(allowModelInstall: false).map(\.name)
+        mcp = MCP(
+            available: true, protocolVersions: MCPProtocol.allVersions,
+            tools: MCPTools.catalog(allowModelInstall: true).map(\.name),
+            optInTools: Dictionary(uniqueKeysWithValues: MCPTools.catalog(allowModelInstall: true).map(\.name)
+                .filter { !defaultTools.contains($0) }.map { ($0, "--allow-model-install") })
+        )
     }
 }

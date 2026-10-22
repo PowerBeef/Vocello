@@ -101,44 +101,48 @@ public enum GenerateCommand {
         let wantedID = request.generationID
         let streamTask: Task<StreamObservation, Never>? = request.shouldStream && wantedID != nil ? {
             let events = runtime.engine.events(for: wantedID!)
+            // A detached task inherits no task-local: an MCP call's capture is carried over.
+            let capture = CLIPresenter.capture
             return Task.detached(priority: .utility) { @concurrent in
-                var firstChunkMS: Double?
-                var firstChunkUptimeNS: UInt64?
-                var count = 0
-                for await event in events {
-                    switch event {
-                    case .chunk:
-                        if firstChunkMS == nil {
-                            // ttfcMS reads its clock first, so the added
-                            // uptime read never lengthens it.
-                            firstChunkMS = submitted.elapsedSeconds * 1000
-                            firstChunkUptimeNS = DispatchTime.now().uptimeNanoseconds
+                await CLIPresenter.$capture.withValue(capture) { () async -> StreamObservation in
+                    var firstChunkMS: Double?
+                    var firstChunkUptimeNS: UInt64?
+                    var count = 0
+                    for await event in events {
+                        switch event {
+                        case .chunk:
+                            if firstChunkMS == nil {
+                                // ttfcMS reads its clock first, so the added
+                                // uptime read never lengthens it.
+                                firstChunkMS = submitted.elapsedSeconds * 1000
+                                firstChunkUptimeNS = DispatchTime.now().uptimeNanoseconds
+                            }
+                            count += 1
+                            // Coalesced by the writer; never blocks the drain.
+                            CLIPresenter.event(.chunk, generationID: wantedID, data: ["chunks": .integer(count)])
+                        case .cancelled(let summary):
+                            return StreamObservation(
+                                firstChunkMS: firstChunkMS,
+                                firstChunkUptimeNS: firstChunkUptimeNS,
+                                chunkCount: count,
+                                cancellationReason: summary.reason
+                            )
+                        case .completed, .failed:
+                            return StreamObservation(
+                                firstChunkMS: firstChunkMS,
+                                firstChunkUptimeNS: firstChunkUptimeNS,
+                                chunkCount: count
+                            )
+                        default:
+                            continue
                         }
-                        count += 1
-                        // Coalesced by the writer; never blocks the drain.
-                        CLIPresenter.event(.chunk, generationID: wantedID, data: ["chunks": .integer(count)])
-                    case .cancelled(let summary):
-                        return StreamObservation(
-                            firstChunkMS: firstChunkMS,
-                            firstChunkUptimeNS: firstChunkUptimeNS,
-                            chunkCount: count,
-                            cancellationReason: summary.reason
-                        )
-                    case .completed, .failed:
-                        return StreamObservation(
-                            firstChunkMS: firstChunkMS,
-                            firstChunkUptimeNS: firstChunkUptimeNS,
-                            chunkCount: count
-                        )
-                    default:
-                        continue
                     }
+                    return StreamObservation(
+                        firstChunkMS: firstChunkMS,
+                        firstChunkUptimeNS: firstChunkUptimeNS,
+                        chunkCount: count
+                    )
                 }
-                return StreamObservation(
-                    firstChunkMS: firstChunkMS,
-                    firstChunkUptimeNS: firstChunkUptimeNS,
-                    chunkCount: count
-                )
             }
         }() : nil
 
@@ -294,6 +298,12 @@ public enum GenerateCommand {
         // JSON `generationID` agree and no two runs share a file (U28).
         let generationID = UUID()
         let output = try resolveOutputDestination(args, dataDir: dataDir, mode: mode, generationID: generationID)
+        let history = DesktopHistoryReader(root: dataDir)
+        try refuseReplacingTake(
+            output, dataDir: dataDir,
+            appOutputFolder: settings.entry("output-folder").flatMap { $0.isDefault ? nil : $0.value },
+            isTakeAudio: history.isTakeAudio
+        )
         let lineOutputDirectory = lineBatch.map { _ in
             args.string("out-dir").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }
                 ?? dataDir.appendingPathComponent("outputs/cli", isDirectory: true)
@@ -1253,6 +1263,39 @@ public enum GenerateCommand {
             throw CLIError(.invalidInput, "--out \(out) is an existing folder; pass a .wav file path inside it")
         }
         return OutputDestination(path: path, replacesExistingFile: exists)
+    }
+
+    /// A take never replaces a History take's audio, as `history export` never
+    /// does (RF-29): History says whether the file `--out` would replace is one,
+    /// and while it cannot be read (the app holds it) a file in a folder the app
+    /// writes takes to counts as one, `outputs/cli` aside.
+    static func refuseReplacingTake(
+        _ output: OutputDestination, dataDir: URL, appOutputFolder: String?, isTakeAudio: (URL) throws -> Bool
+    ) throws {
+        guard output.replacesExistingFile else { return }
+        let url = URL(fileURLWithPath: output.path).standardizedFileURL
+        let resolved = url.resolvingSymlinksInPath()
+        let isTake: Bool
+        do {
+            isTake = try isTakeAudio(url) || isTakeAudio(resolved)
+        } catch {
+            func inside(_ folder: URL) -> Bool {
+                let root = folder.standardizedFileURL.path
+                let prefix = root.hasSuffix("/") ? root : root + "/"
+                return url.path.hasPrefix(prefix) || resolved.path.hasPrefix(prefix)
+            }
+            let outputs = dataDir.appendingPathComponent("outputs", isDirectory: true)
+            let takeFolders = [outputs] + (appOutputFolder.map {
+                [URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)]
+            } ?? [])
+            isTake = takeFolders.contains(where: inside) && !inside(outputs.appendingPathComponent("cli", isDirectory: true))
+        }
+        guard !isTake else {
+            throw CLIError(
+                .outputUnavailable, "--out \(output.path) is a take in History, which is never overwritten",
+                hint: "pass another --out path"
+            )
+        }
     }
 
     /// `yyyyMMdd_HHmmss` in the POSIX locale and the Gregorian calendar.

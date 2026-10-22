@@ -387,9 +387,34 @@ public enum VocelloCommandTree {
         positionals: [CLIPositionalSpec("shell", "zsh, bash or fish", required: true, value: .choice(CLICompletionShell.allCases.map(\.rawValue)))]
     )
 
+    static let mcp = CLICommandSpec(
+        name: "mcp",
+        summary: "Serve Vocello to AI agents over the Model Context Protocol (stdio)",
+        usage: [
+            "vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]",
+            "vocello mcp --print-config claude-code|claude-desktop",
+            "vocello mcp --self-test",
+        ],
+        discussion: """
+        An MCP client starts it and speaks JSON-RPC on its stdin and stdout (the 2026-07-28 revision and \
+        the initialize-era ones). Tools read the catalog, saved voices, models, settings and History, and \
+        generate, enroll and delete on one warm engine, one request at a time. Paths are absolute and \
+        stay inside <data>/outputs and the --allow-dir folders; cloning needs confirmConsent per request.
+        """,
+        options: [
+            .value("allow-dir", .directory, "folders",
+                   "folders tools may read clips from and write audio to, besides <data>/outputs (several: separate with ':')"),
+            .value("max-queue", .integer, "n", "engine requests that may wait behind the running one before engine_busy (default 4)"),
+            .flag("allow-model-install", "offer install_model, which downloads model packages (several GB)"),
+            .value("print-config", .choice(["claude-code", "claude-desktop"]), "client",
+                   "print the setup an MCP client needs to start this server, then exit"),
+            .flag("self-test", "answer a scripted session in process (no engine starts) and report"),
+        ] + engineOptions
+    )
+
     public static let commands: [CLICommandSpec] = [
         generate, batch, run, history, voices, speakers, modesCommand, languages, deliveries, briefs, models, settings,
-        doctor, capabilities, completions,
+        doctor, capabilities, completions, mcp,
         bench, help, version,
     ]
 

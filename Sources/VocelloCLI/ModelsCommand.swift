@@ -394,6 +394,8 @@ enum ModelsCommand {
         default:
             break
         }
+        // The downloader reports from its own queue: an MCP call's capture is carried there.
+        let capture = CLIPresenter.capture
         let downloader = HuggingFaceDownloader(
             progressHandler: { progress in
                 diagnostics.record(progress: progress)
@@ -403,11 +405,13 @@ enum ModelsCommand {
                 let speed = progress.bytesPerSecond.map { "\(humanBytes($0))/s" } ?? "—"
                 let eta = progress.estimatedSecondsRemaining.map { " · ETA \(max(1, Int($0.rounded())))s" } ?? ""
                 noteVerbose("  \(progress.phase.rawValue) · \(pct)% · \(humanBytes(progress.downloadedBytes))/\(humanBytes(progress.totalBytes)) · \(speed)\(eta)")
-                CLIPresenter.event(.downloadProgress, data: [
-                    "modelID": .string(modelID), "phase": .string(progress.phase.rawValue),
-                    "downloadedBytes": .string(String(progress.downloadedBytes)),
-                    "totalBytes": .string(String(progress.totalBytes)),
-                ])
+                CLIPresenter.$capture.withValue(capture) {
+                    CLIPresenter.event(.downloadProgress, data: [
+                        "modelID": .string(modelID), "phase": .string(progress.phase.rawValue),
+                        "downloadedBytes": .string(String(progress.downloadedBytes)),
+                        "totalBytes": .string(String(progress.totalBytes)),
+                    ])
+                }
             },
             engineConfiguration: engineConfiguration,
             transferMetricsHandler: { diagnostics.record(metrics: $0) },

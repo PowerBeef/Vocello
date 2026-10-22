@@ -40,6 +40,13 @@ public struct CLIRuntime {
         concurrency: CLIEngineConcurrency = CLIEngineConcurrency(),
         takesEngineLease: Bool = true
     ) async throws -> CLIRuntime {
+        // RF-29: under the MCP server, every command shares its one warm engine.
+        if let warm = CLIEngineScope.warm {
+            return try await warm.runtime(
+                dataDirectory: dataDirectory, manifestOverride: manifestOverride, consent: voiceCloningConsent,
+                hosted: hostedLikeTheApp, takesEngineLease: hostedLikeTheApp && takesEngineLease
+            )
+        }
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         // A host that loads a model holds a lease; one that never does (saved-voice writes) need not.
@@ -141,6 +148,15 @@ public struct CLIRuntime {
         )
     }
 
+    /// This runtime under a read's consent, leaving the shared host's as it is
+    /// (RF-29: a read runs beside the request that set it).
+    func reading(under consent: VoiceCloningConsentPolicy) -> CLIRuntime {
+        CLIRuntime(
+            engine: engine, registry: registry, dataDirectory: dataDirectory, voiceCloningConsent: consent, host: host,
+            lease: lease
+        )
+    }
+
     /// Loads a model through the host's admission when hosted, else on the engine.
     public func loadModel(id: String) async throws {
         if let host { try await host.loadModel(id: id) } else { try await engine.loadModel(id: id) }
@@ -181,6 +197,10 @@ public struct CLIRuntime {
     public static func bootstrapRegistryOnly(
         dataDirectory: URL, manifestOverride: URL?
     ) throws -> CLIRegistryContext {
+        // RF-29: the MCP server reads one context for its life.
+        if let warm = CLIEngineScope.warm {
+            return try warm.registryContext(dataDirectory: dataDirectory, manifestOverride: manifestOverride)
+        }
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
@@ -243,7 +263,17 @@ public struct CLIRuntime {
     /// `scripts/cli_package.py`; its presence marks a distributed build.
     nonisolated static let sealedPayloadManifestName = "package-manifest.json"
 
-    private static func locateTrustAnchor(named resourceName: String) -> URL? {
+    /// The contract a copy of this executable finds wherever it is started: the
+    /// bundled one or the one beside it, never the repository copy a development
+    /// run finds from its working folder (RF-29: an MCP client starts the server
+    /// from a folder of its own).
+    static func locateShippedManifestURL() -> URL? {
+        locateTrustAnchor(named: "qwenvoice_contract", currentDirectory: "/")
+    }
+
+    private static func locateTrustAnchor(
+        named resourceName: String, currentDirectory: String = FileManager.default.currentDirectoryPath
+    ) -> URL? {
         let bundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
         let bundled = bundles.lazy
             .compactMap { $0.url(forResource: resourceName, withExtension: "json") }
@@ -258,7 +288,7 @@ public struct CLIRuntime {
             fileName: "\(resourceName).json",
             bundledURL: bundled,
             executableDirectory: executableDirectory,
-            currentDirectory: fileManager.currentDirectoryPath,
+            currentDirectory: currentDirectory,
             fileExists: { fileManager.fileExists(atPath: $0) }
         )
     }
@@ -318,6 +348,97 @@ public struct CLIRuntime {
     }
 }
 
+
+/// The engine a scope shares (RF-29): the MCP server runs each tool call under
+/// its own warm engine.
+public enum CLIEngineScope {
+    @TaskLocal public static var warm: CLIWarmEngine?
+}
+
+/// The MCP server's one engine (RF-29). Under its scope every bootstrap returns
+/// this engine instead of starting another, which a long-lived process would
+/// otherwise accumulate: the first boots it (callers arriving meanwhile wait for
+/// that boot), and the first that loads a model takes the engine lease, which
+/// the server then holds. A hosted command takes it under its own consent, which
+/// becomes the shared host's (the server runs those one at a time); a read takes
+/// it under its own without touching the host's. The engine's own idle policy
+/// unloads the model between requests.
+@MainActor
+public final class CLIWarmEngine {
+    public let dataDirectory: URL
+    public let manifestOverride: URL?
+    let concurrency: CLIEngineConcurrency
+    private var runtime: CLIRuntime?
+    private var booting: Task<Result<CLIRuntime, any Error>, Never>?
+    private var registry: CLIRegistryContext?
+
+    public init(dataDirectory: URL, manifestOverride: URL?, concurrency: CLIEngineConcurrency) {
+        self.dataDirectory = dataDirectory
+        self.manifestOverride = manifestOverride
+        self.concurrency = concurrency
+    }
+
+    public var isBooted: Bool { runtime != nil }
+    public var holdsLease: Bool { runtime?.lease != nil }
+
+    func runtime(
+        dataDirectory: URL, manifestOverride: URL?, consent: VoiceCloningConsentPolicy, hosted: Bool,
+        takesEngineLease: Bool
+    ) async throws -> CLIRuntime {
+        try checkRoot(dataDirectory, manifestOverride)
+        var current = try await booted()
+        if takesEngineLease, current.lease == nil {
+            current.lease = try await CLIRuntime.admitEngineHost(
+                deviceClass: NativeMemoryPolicyResolver.deviceClass(), concurrency: concurrency
+            )
+            runtime = current
+        }
+        return hosted ? current.withConsent(consent) : current.reading(under: consent)
+    }
+
+    func registryContext(dataDirectory: URL, manifestOverride: URL?) throws -> CLIRegistryContext {
+        try checkRoot(dataDirectory, manifestOverride)
+        if let registry { return registry }
+        let context = try CLIEngineScope.$warm.withValue(nil) {
+            try CLIRuntime.bootstrapRegistryOnly(dataDirectory: self.dataDirectory, manifestOverride: self.manifestOverride)
+        }
+        registry = context
+        return context
+    }
+
+    private func checkRoot(_ dataDirectory: URL, _ manifestOverride: URL?) throws {
+        guard dataDirectory.standardizedFileURL.path == self.dataDirectory.standardizedFileURL.path,
+              manifestOverride?.standardizedFileURL.path == self.manifestOverride?.standardizedFileURL.path else {
+            throw CLIError(.internalError, "a request named another data folder or contract than the server's")
+        }
+    }
+
+    private func booted() async throws -> CLIRuntime {
+        if let runtime { return runtime }
+        let boot = booting ?? Task { @MainActor in
+            // The boot outlives the call that started it: it keeps none of that call's scope.
+            await CLIPresenter.$capture.withValue(nil) {
+                await CLIEngineScope.$warm.withValue(nil) {
+                    do {
+                        return .success(try await CLIRuntime.bootstrap(
+                            dataDirectory: self.dataDirectory, manifestOverride: self.manifestOverride,
+                            hostedLikeTheApp: true, concurrency: self.concurrency, takesEngineLease: false
+                        ))
+                    } catch {
+                        return .failure(error)
+                    }
+                }
+            }
+        }
+        booting = boot
+        let outcome = await boot.value
+        // Only this boot's waiters clear it: a newer one may have started since.
+        if booting == boot { booting = nil }
+        if runtime == nil { runtime = try outcome.get() }
+        guard let runtime else { throw CLIError(.internalError, "the engine did not start") }
+        return runtime
+    }
+}
 
 /// `--allow-concurrent-engine` and `--wait-for-engine`: what a product command
 /// does when another engine already runs on its data root.

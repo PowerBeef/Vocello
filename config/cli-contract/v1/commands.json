@@ -1556,6 +1556,80 @@
       ]
     },
     {
+      "aliases": [],
+      "internalTool": false,
+      "machineContract": true,
+      "name": "mcp",
+      "operands": [],
+      "options": [
+        {
+          "name": "allow-dir",
+          "placeholder": "folders",
+          "summary": "folders tools may read clips from and write audio to, besides <data>/outputs (several: separate with ':')",
+          "takesValue": true,
+          "type": "directory",
+          "valueOptional": false
+        },
+        {
+          "name": "max-queue",
+          "placeholder": "n",
+          "summary": "engine requests that may wait behind the running one before engine_busy (default 4)",
+          "takesValue": true,
+          "type": "integer",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-model-install",
+          "summary": "offer install_model, which downloads model packages (several GB)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "choices": [
+            "claude-code",
+            "claude-desktop"
+          ],
+          "name": "print-config",
+          "placeholder": "client",
+          "summary": "print the setup an MCP client needs to start this server, then exit",
+          "takesValue": true,
+          "type": "choice",
+          "valueOptional": false
+        },
+        {
+          "name": "self-test",
+          "summary": "answer a scripted session in process (no engine starts) and report",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "allow-concurrent-engine",
+          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
+          "name": "wait-for-engine",
+          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        }
+      ],
+      "path": "mcp",
+      "refusedOptions": [],
+      "subcommands": [],
+      "summary": "Serve Vocello to AI agents over the Model Context Protocol (stdio)",
+      "usage": [
+        "vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]",
+        "vocello mcp --print-config claude-code|claude-desktop",
+        "vocello mcp --self-test"
+      ]
+    },
+    {
       "aliases": [
         "benchmark"
       ],

@@ -183,6 +183,18 @@
         ],
         "options": {}
       },
+      "mcp": {
+        "aliases": [],
+        "options": {
+          "allow-concurrent-engine": false,
+          "allow-dir": true,
+          "allow-model-install": false,
+          "max-queue": true,
+          "print-config": true,
+          "self-test": false,
+          "wait-for-engine": false
+        }
+      },
       "models": {
         "aliases": [
           "model"

@@ -8,6 +8,8 @@ import VocelloCLICore
 @MainActor
 enum VocelloMain {
     static func main() async {
+        // Started through a link, run from where the binary and its bundles live.
+        CLIExecutableLocation.execFromRealPathIfLinked()
         // A closed stdout must fail its writes (EPIPE), never end the process
         // before the command's owned cleanup runs.
         signal(SIGPIPE, SIG_IGN)
@@ -115,6 +117,8 @@ enum VocelloMain {
             try CapabilitiesCommand.run(args)
         case "completions":
             try CompletionsCommand.run(args)
+        case "mcp":
+            try await MCPCommand.run(args) { try await dispatch($0) }
         case "version":
             if CLIPresenter.isMachine {
                 CLIPresenter.succeed(VersionResult(version: vocelloCLIVersion, build: vocelloCLIBuild))

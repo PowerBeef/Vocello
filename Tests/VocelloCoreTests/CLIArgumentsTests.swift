@@ -477,4 +477,28 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(resolve(nil, [sealedManifest, besideExecutable]), besideExecutable)
         XCTAssertNil(resolve(nil, []))
     }
+
+    // MARK: - Started through a link (RF-08)
+
+    func testALinkedStartExecsTheRealBinary() {
+        let links = [
+            "/usr/local/bin/vocello": "/usr/local/lib/vocello/vocello",
+            "/repo/build/vocello": "/repo/build/cache/Release/vocello",
+        ]
+        func real(_ loaded: String, executable: Bool = true) -> String? {
+            CLIExecutableLocation.realPath(
+                ofLoaded: loaded, resolve: { links[$0] ?? $0 }, isExecutable: { _ in executable }
+            )
+        }
+        XCTAssertEqual(real("/usr/local/bin/vocello"), "/usr/local/lib/vocello/vocello")
+        XCTAssertEqual(real("/repo/build/vocello"), "/repo/build/cache/Release/vocello")
+        XCTAssertNil(real("/usr/local/lib/vocello/vocello"), "the real binary runs as it is")
+        XCTAssertNil(real("/usr/local/bin/vocello", executable: false), "a link to nothing runnable keeps the process")
+        XCTAssertNil(
+            CLIExecutableLocation.realPath(
+                ofLoaded: "/private/tmp/payload/vocello", resolve: { _ in "/tmp/payload/vocello" }, isExecutable: { _ in true }
+            ),
+            "the /private firmlinks never cause an exec"
+        )
+    }
 }

@@ -104,12 +104,13 @@ final class CLIEventStreamTests: XCTestCase {
         XCTAssertEqual(output.firstWriteStarted.wait(timeout: .now() + 5), .success)
         struct Seeded: Encodable, Sendable { let seed: UInt64 }
         let finished = DispatchSemaphore(value: 0)
-        let result = CLIEnvelope(
-            ok: true, command: "generate", requestID: "fixture", result: Seeded(seed: UInt64.max), error: nil,
-            warnings: [],
-            meta: CLIEnvelopeMeta(vocelloVersion: "3.0.0", build: "24", contractRevision: 1, durationMs: 1, replayed: false)
-        )
+        // The envelope is not Sendable, so the finishing thread builds its own.
         Thread.detachNewThread {
+            let result = CLIEnvelope(
+                ok: true, command: "generate", requestID: "fixture", result: Seeded(seed: UInt64.max), error: nil,
+                warnings: [],
+                meta: CLIEnvelopeMeta(vocelloVersion: "3.0.0", build: "24", contractRevision: 1, durationMs: 1, replayed: false)
+            )
             stream.finish(result: result)
             finished.signal()
         }

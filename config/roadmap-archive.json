@@ -5340,6 +5340,30 @@
         "commit:f537427a",
         "doc:docs/reference/cli.md"
       ]
+    },
+    {
+      "id": "RF-28",
+      "plan": "release-first-3-0-2026-09",
+      "title": "CLI saved voices, models and settings writes",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/VoicesCommand.swift",
+        "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "updated": "2026-10-22",
+      "notes": "Started and closed 2026-10-21/22. Done: settings set, models use and prefer-lower-memory write the app's preferences as its Settings do (turning prefer-lower-memory on clears the per-mode choices); models install-recommended (--plan) and remove (reconciles a choice that named it, refuses mode aliases, refused beside a running engine); voices enroll, replace, save-take and delete save voices as the app's voice sheet does (--transcribe auto never prompts, --on-warnings keep|discard|fail, a signal discards the candidate); every write posts com.qwenvoice.shared.*DidChange and the Mac app reloads saved voices or its model manager. Reviewed twice by vocello-swift-review, all findings fixed. Real enrollment, replace and delete ran in a scratch data folder; save-take is covered by tests only (the maintainer's History is empty).",
+      "due": "2026-11-10",
+      "evidence": [
+        "commit:d364f073",
+        "commit:d985a430",
+        "commit:a3ebb9e2",
+        "commit:8cf6d4b7",
+        "commit:b1160e36",
+        "commit:213ded27",
+        "doc:docs/reference/cli.md"
+      ]
     }
   ]
 }

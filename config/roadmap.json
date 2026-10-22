@@ -238,32 +238,17 @@
       "due": "2026-11-06"
     },
     {
-      "id": "RF-28",
-      "plan": "release-first-3-0-2026-09",
-      "title": "CLI saved voices, models and settings writes",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "voices enroll (review, transcription policy that never prompts by default, keep/discard), replace, save-take and delete; models install-recommended, remove, use and prefer-lower-memory; settings set; the app hears each change; tests and one real enrollment pass.",
-      "sourceOfTruth": [
-        "Sources/VocelloCLI/VoicesCommand.swift",
-        "docs/audits/2026-10-21-cli-overhaul-plan.md"
-      ],
-      "updated": "2026-10-21",
-      "notes": "Started 2026-10-21 after RF-27 closed; paused 2026-10-21 at the maintainer's request. Done: settings set, models use and models prefer-lower-memory write the app's preferences (d364f073); models install-recommended (--plan) and models remove (d985a430); voices enroll, replace, save-take and delete save voices as the app's voice sheet does, with --transcribe auto|always|never, --audio-only, --language and --on-warnings keep|discard|fail (a3ebb9e2). Every write posts com.qwenvoice.shared.*DidChange. Verified on the Mac (no-op settings writes; remove and every enrollment path in a scratch data folder; real settings, models and voices untouched). Left: a vocello-swift-review of d364f073, d985a430 and a3ebb9e2 and its fixes; the app observing the change notices (a Mac-only edit, or with RF-30); unit coverage for models remove and install-recommended (in the executable target); a real save-take once History has a take.",
-      "due": "2026-11-10"
-    },
-    {
       "id": "RF-29",
       "plan": "release-first-3-0-2026-09",
       "title": "vocello mcp server",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "An in-house stdio MCP server serving the 2026-07-28 and initialize-era protocols, with the read and write tools on the shared service, progress and typed cancellation, per-request consent, confined paths, one warm engine with a single-flight gate, install_model only behind --allow-model-install, and config helpers; transcript tests pass and a real generate and cancel work from Claude Code.",
       "sourceOfTruth": [
         "Sources/VocelloCLI/Support.swift",
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
-      "updated": "2026-10-21",
+      "updated": "2026-10-22",
       "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
       "due": "2026-11-13"
     },
@@ -294,7 +279,7 @@
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
       "updated": "2026-10-21",
-      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md).",
+      "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). From RF-28's review (2026-10-22), for the CLI's qualification: models remove checks then deletes without holding a lease, so a concurrent CLI install of the same model can lose its staging; its freedBytes counts hard-linked shared components; the app's reload on a models notice re-digests every model (consider a sizes-only pass).",
       "unparkWhen": "The iOS 3.0 submission is done."
     },
     {

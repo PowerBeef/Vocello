@@ -418,7 +418,8 @@ default. Voice-cloning consent is never a CLI setting.
 `vocello settings set <name> <value>` changes one as the app's Settings do and reports its new row:
 `autoplay` and `prefer-lower-memory` take `true` or `false` (`on`/`off`, `yes`/`no` too); `variation`
 `expressive`, `balanced` or `consistent`; `output-folder` an existing folder or `default`;
-`variant.<mode>` `speed`, `quality` or `automatic` (`automatic` and `default` remove the choice). A bad
+`variant.<mode>` `speed`, `quality` or `automatic` (`automatic` removes the choice, `default` the folder);
+turning `prefer-lower-memory` on clears every per-mode choice, as the app's toggle does. A bad
 value or name is `invalid_input`; `interface-language` stays the app's. The app reads each value when
 it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidChange`).
 
@@ -462,8 +463,11 @@ engine:
 - **`save-take`** takes a Design or Clone take from History (which is read only while the app is
   closed). A Clone take's text is its transcript and its voice its suggested name; a Design take's text
   is only what was asked for, so it needs `--transcript`, recognition or `--audio-only`, and its name
-  defaults to the one the app suggests from the brief. The record notes it came from Design.
+  defaults to the one the app suggests from the brief. The record notes it came from Design. A Clone
+  take's name defaults to "<voice> Sample", or the take's file name when it has no voice, as in the app.
 - **`delete`** retries for a few seconds while another Vocello process holds the saved-voice store.
+- Saved-voice writes load no model, so they take no engine lease and are not refused beside a running
+  engine.
 
 Each change tells a running app (`com.qwenvoice.shared.savedVoicesDidChange`). The result of `enroll`,
 `replace` and `save-take` is `{outcome, voice, name, qualityWarnings, transcriptSource,
@@ -543,9 +547,12 @@ vocello models prefer-lower-memory on|off           # the app's "Prefer lower-me
 
 `install-recommended` installs, for each mode, the package `models active` names (the app's explicit
 choice, the lower-memory preference, then this Mac's recommendation); its result lists each with
-`planned`, `already_installed`, `installed` or `updated`. `remove` deletes as the app's model manager
-does and is refused (`engine_busy`) while the Vocello app or another vocello engine runs, since either
-may have the model loaded. Installs and removals tell a running app
+`planned`, `update_planned` or `already_installed` with `--plan`, else `installed`, `updated` or
+`already_installed`; a failure keeps the rows already installed. `remove` deletes as the app's model
+manager does and is refused (`engine_busy`) while the Vocello app or another vocello engine runs, since
+either may have the model loaded; a package choice that named the removed model moves to another
+installed package of its mode, or back to the recommendation. Its `freedBytes` is the model folder's
+size; shared components another model still links stay. Installs and removals tell a running app
 (`com.qwenvoice.shared.modelsDidChange`).
 
 `use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and

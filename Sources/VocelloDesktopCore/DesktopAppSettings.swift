@@ -109,9 +109,25 @@ public struct DesktopAppSettings: Sendable {
         default:
             throw SetError.unknownSetting(name)
         }
+        // As the app's toggle (`ModelManagerViewModel.setPrefersLowerMemoryModels`): turning the
+        // preference on clears every per-mode choice, so each mode resolves to Speed at that moment.
+        let clearsChoices = name == "prefer-lower-memory" && stored as? Bool == true && !prefersLowerMemory
         guard write(Self.key(for: name), stored) else { throw SetError.writeFailed(name) }
+        if clearsChoices {
+            for mode in GenerationMode.allCases {
+                try setVariantChoice(nil, for: mode)
+            }
+        }
         guard let entry = entry(name) else { throw SetError.unknownSetting(name) }
         return entry
+    }
+
+    /// Stores a mode's explicit package choice as the app stores it (its variant
+    /// id), or removes it (`nil`: automatic).
+    public func setVariantChoice(_ variantID: String?, for mode: GenerationMode) throws {
+        guard write(MacAppSettingsKeys.variantPreference(for: mode), variantID) else {
+            throw SetError.writeFailed("variant.\(mode.rawValue)")
+        }
     }
 
     private static func key(for name: String) -> String {

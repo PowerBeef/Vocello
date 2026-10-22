@@ -143,21 +143,21 @@ public enum VocelloCommandTree {
                 options: [
                     .value("name", .text, "name", "the voice's name"),
                     .value("audio", .file, "wav", "the reference clip"),
-                ] + enrollmentOptions + [consent] + engineOptions
+                ] + enrollmentOptions + [consent]
             ),
             CLICommandSpec(
                 name: "replace", summary: "Give a saved voice a new reference clip",
                 options: [
                     .value("audio", .file, "wav", "the new reference clip"),
                     .value("name", .text, "name", "a new name (default: the voice's own)"),
-                ] + enrollmentOptions + [consent] + engineOptions,
+                ] + enrollmentOptions + [consent],
                 positionals: [CLIPositionalSpec("id", "the saved voice id (see `vocello voices list`)", required: true)]
             ),
             CLICommandSpec(
                 name: "save-take", summary: "Save a Design or Clone take from History as a voice",
                 options: [
                     .value("name", .text, "name", "the voice's name (default: as the app suggests it)"),
-                ] + enrollmentOptions + [consent] + engineOptions,
+                ] + enrollmentOptions + [consent],
                 positionals: [CLIPositionalSpec("id", "the History id (see `vocello history list`)", required: true)]
             ),
             CLICommandSpec(
@@ -165,7 +165,7 @@ public enum VocelloCommandTree {
             ),
             CLICommandSpec(
                 name: "delete", aliases: ["rm"], summary: "Delete a saved voice",
-                options: [.value("id", .text, "id", "the saved voice id (see `vocello voices list`)"), consent] + engineOptions
+                options: [.value("id", .text, "id", "the saved voice id (see `vocello voices list`)"), consent]
             ),
         ],
         defaultSubcommand: "list"

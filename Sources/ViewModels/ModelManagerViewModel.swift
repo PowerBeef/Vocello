@@ -296,6 +296,13 @@ final class ModelManagerViewModel {
         activeVariantRevision += 1
     }
 
+    /// Another Vocello process (the CLI) changed the package preferences: re-read
+    /// them, so the active package and its controls follow (RF-28).
+    func reloadVariantPreferences() {
+        prefersLowerMemoryModels = MacModelVariantPreferences.preferSpeedEverywhere()
+        activeVariantRevision += 1
+    }
+
     /// Returns all active variants for a generation mode in picker order.
     func variants(for mode: GenerationMode) -> [TTSModel] {
         TTSModel.all

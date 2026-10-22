@@ -388,10 +388,10 @@ final class DesktopVoiceEnrollmentTests: XCTestCase {
         defer { engine.stop() }
         let clip = try clip(10, in: root)
 
-        let cloned = try await host.enrollVoice(
-            request(clip, source: .cloneTake(text: Self.words, suggestedName: "Nora"))
-        )
-        XCTAssertEqual(cloned.name, "Nora", "the voice it was spoken in")
+        let cloned = try await host.enrollVoice(request(clip, source: .cloneTake(text: Self.words, voice: "Nora")))
+        XCTAssertEqual(cloned.name, "Nora Sample", "named as the app's History suggests it")
+        let unnamed = try await host.enrollVoice(request(clip, source: .cloneTake(text: Self.words, voice: nil)))
+        XCTAssertEqual(unnamed.name, "reference-10s", "without a voice: the take's file name")
         XCTAssertEqual(cloned.transcriptSource, "unknown", "a supplied transcript with no new recognition")
         XCTAssertEqual(cloned.voice?.hasTranscript, true)
 
@@ -400,8 +400,27 @@ final class DesktopVoiceEnrollmentTests: XCTestCase {
         let needsWords = await failure(host, request(clip, source: design))
         XCTAssertEqual(needsWords, .transcriptNeeded(reason: "transcription is off"), "the script is intent, not evidence")
         let designed = try await host.enrollVoice(request(clip, transcript: Self.words, source: design))
+        XCTAssertEqual(designed.name, "A_warm_slow_narrator_with_a_gentle")
         XCTAssertEqual(designed.name, DesktopVoiceEnrollment.suggestedName(forVoiceDescription: brief))
         XCTAssertEqual(designed.voice?.enrollmentMetadata?.generatedSourceMode, GenerationMode.design.rawValue)
+        let audioOnly = try await host.enrollVoice(request(clip, name: "Designed Audio", audioOnly: true, source: design))
+        XCTAssertEqual(audioOnly.referenceLanguage, "english", "the take's script language stays, as in the app")
+    }
+
+    /// Review 4 (a3ebb9e2): a signal while the candidate is staged discards it.
+    @MainActor
+    func testASignalDiscardsTheCandidate() async throws {
+        let (host, engine, root) = try await host()
+        defer { engine.stop() }
+        let clip = try clip(10, in: root)
+        let enrollment = Task { @MainActor in
+            try await host.enrollVoice(self.request(clip, name: "Stopped", transcript: Self.words, onWarnings: .keep))
+        }
+        enrollment.cancel()
+        let outcome = await enrollment.result
+        XCTAssertThrowsError(try outcome.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+        let voices = try await host.listVoices()
+        XCTAssertEqual(voices, [], "nothing is committed after a signal")
     }
 }
 

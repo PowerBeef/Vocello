@@ -360,8 +360,8 @@ targets:
   # plan. It compiles the app's own files by path, read-only where the app's store
   # owns writes, so both read one store the same way. Never GenerationPersistence,
   # AudioPlayerViewModel, either AppPaths or either TTSModel. MacInterfaceText is
-  # compiled only because MacLineBatchRequest names it (its validation and mode
-  # label); no CLI path reaches that copy.
+  # compiled because MacLineBatchRequest and the voice sheet's configuration name
+  # it; the CLI reaches only its suggested voice names (English, the CLI's language).
   VocelloDesktopCore:
     type: framework.static
     platform: macOS

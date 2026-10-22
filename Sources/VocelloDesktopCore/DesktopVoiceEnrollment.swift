@@ -29,9 +29,9 @@ public enum DesktopVoiceEnrollment {
     public enum Source: Sendable, Equatable {
         /// A clip the caller names.
         case clip
-        /// A Clone take from History: its text is what it says; `suggestedName`
-        /// is the voice it was spoken in.
-        case cloneTake(text: String, suggestedName: String)
+        /// A Clone take from History: its text is what it says; `voice` is the
+        /// voice it was spoken in, which names the suggestion.
+        case cloneTake(text: String, voice: String?)
         /// A Design take from History: its text is intent, not evidence of what
         /// was spoken, so the take is recognized like any clip.
         case designTake(text: String, voiceDescription: String)
@@ -137,7 +137,12 @@ extension DesktopEngineHost {
                 title: "", subtitle: "", confirmLabel: "", initialName: replaced?.name ?? "", initialAudioPath: "",
                 initialTranscript: "", replacingVoiceID: request.replacingVoiceID
             )
-        case .cloneTake(let text, let suggestedName):
+        case .cloneTake(let text, let voice):
+            // As the app's History suggests it (`MacHistoryScreen.suggestedSavedVoiceName`).
+            let trimmed = voice?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let suggestedName = trimmed.isEmpty
+                ? URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+                : MacInterfaceText.historySuggestedVoiceName(trimmed)
             configuration = .cloneResult(suggestedName: suggestedName, audioPath: path, transcript: text)
         case .designTake(let text, let voiceDescription):
             configuration = .designResult(voiceDescription: voiceDescription, audioPath: path, transcript: text)
@@ -160,8 +165,9 @@ extension DesktopEngineHost {
         )
         var language = ReferenceLanguageSelection(initialLanguage: configuration.initialReferenceLanguage)
         var transcript = configuration.initialTranscript
-        // The clip is chosen: a transcript of another recording no longer describes it.
-        if review.referenceClipChanged(to: path) {
+        // The clip is chosen: a transcript of another recording no longer describes
+        // it. A History take opens the sheet on its own clip, which changes nothing.
+        if request.source == .clip, review.referenceClipChanged(to: path) {
             transcript = ""
             language.referenceClipChanged()
         }
@@ -228,11 +234,21 @@ extension DesktopEngineHost {
                 automaticTranscription: evidence?.outcome.rawValue
             )
         }
+        // A signal while the candidate was staged wins: it is discarded, never
+        // committed (as the app discards one whose sheet closed, MAC-12).
+        if Task.isCancelled {
+            await store.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+            throw CancellationError()
+        }
         let warnings = candidate.qualityWarnings
         if !warnings.isEmpty {
             let hardBlocking = PreparedVoiceQualityWarning.isHardBlocking(warnings)
             if hardBlocking || request.onWarnings != .keep {
-                try await store.discardPreparedVoiceCandidate(id: candidate.id)
+                do {
+                    try await store.discardPreparedVoiceCandidate(id: candidate.id)
+                } catch {
+                    await store.discardAbandonedPreparedVoiceCandidate(id: candidate.id)
+                }
                 if !hardBlocking, request.onWarnings == .discard { return result(.discarded, nil) }
                 throw Failure.qualityRefused(warnings: warnings, hardBlocking: hardBlocking)
             }
@@ -246,7 +262,8 @@ extension DesktopEngineHost {
     }
 
     /// Deletes a saved voice, retrying while another Vocello process holds the
-    /// saved-voice store, as the app's Saved Voices screen retries (F-25).
+    /// saved-voice store, on the schedule the app's Saved Voices screen uses to
+    /// retry a load (F-25).
     public func deleteVoice(id: String, sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) })
         async throws {
         var retry = SavedVoicesBusyRetryPolicy()

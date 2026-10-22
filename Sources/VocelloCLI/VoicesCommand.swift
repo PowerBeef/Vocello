@@ -161,7 +161,8 @@ enum VoicesCommand {
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: dataDirectory,
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) },
-            voiceCloningConsent: consent, hostedLikeTheApp: true, concurrency: CLIEngineConcurrency(args)
+            // Saved-voice writes load no model, so they take no engine lease.
+            voiceCloningConsent: consent, hostedLikeTheApp: true, takesEngineLease: false
         )
         guard let host = runtime.host else { throw CLIError(.internalError, "the engine did not start") }
 
@@ -236,7 +237,7 @@ enum VoicesCommand {
         let source: DesktopVoiceEnrollment.Source
         switch item.mode {
         case GenerationMode.clone.rawValue:
-            source = .cloneTake(text: item.text, suggestedName: item.voice ?? "")
+            source = .cloneTake(text: item.text, voice: item.voice)
         case GenerationMode.design.rawValue:
             source = .designTake(text: item.text, voiceDescription: item.voice ?? "")
         default:

@@ -186,6 +186,49 @@ final class DesktopModelRemovalTests: XCTestCase {
             XCTAssertEqual($0 as? DesktopModelRemoval.Refusal, .notInstalled)
         }
     }
+
+    /// Review 2 (d985a430): a package choice that named the removed model follows
+    /// as the app makes it follow: to an installed sibling, or back to automatic.
+    func testAChoiceThatNamedTheRemovedModelFollows() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let registry = try ContractBackedModelRegistry(
+            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        ).expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let quality = try XCTUnwrap(registry.model(id: "pro_custom_quality"))
+        let speed = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
+        let models = FileManager.default.temporaryDirectory.appendingPathComponent("models-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: models) }
+        let store = Mutex<[String: String]>(["QwenVoice.MacModelVariantPreference.custom": "quality"])
+        let settings = DesktopAppSettings(
+            domain: DesktopAppSettings.debugDomain,
+            read: { key -> Any? in store.withLock { stored -> String? in stored[key] } },
+            write: { key, value in
+                store.withLock { $0[key] = value as? String }
+                return true
+            }
+        )
+        let key = "QwenVoice.MacModelVariantPreference.custom"
+
+        XCTAssertFalse(try DesktopModelRemoval.reconcileChoice(
+            afterRemoving: speed, registry: registry, modelsDirectory: models, settings: settings
+        ), "a choice that names another package stays")
+        XCTAssertTrue(try DesktopModelRemoval.reconcileChoice(
+            afterRemoving: quality, registry: registry, modelsDirectory: models, settings: settings
+        ))
+        XCTAssertNil(store.withLock { $0[key] }, "no sibling installed: back to automatic")
+
+        store.withLock { $0[key] = "quality" }
+        for path in speed.requiredRelativePaths {
+            let url = speed.installDirectory(in: models).appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: url)
+        }
+        XCTAssertTrue(try DesktopModelRemoval.reconcileChoice(
+            afterRemoving: quality, registry: registry, modelsDirectory: models, settings: settings
+        ))
+        XCTAssertEqual(store.withLock { $0[key] }, "speed", "the installed sibling")
+    }
 }
 
 @MainActor

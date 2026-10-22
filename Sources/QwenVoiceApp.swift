@@ -242,15 +242,19 @@ struct QwenVoiceApp: App {
     static var outputsDir: URL { AppPaths.outputsDir }
 
     /// Another Vocello process (the CLI) changed a shared store: reload it.
-    /// Settings are read where they are used; the model manager re-reads the
-    /// package choices and install state. The CLI writes no History until
-    /// RF-30's lock, so History needs nothing yet.
+    /// Other settings are read where they are used; the model manager re-reads
+    /// the package preferences it keeps, and the install state after a model
+    /// change. The CLI writes no History until RF-30's lock, so History needs
+    /// nothing yet.
     private func reloadSharedStore(_ change: SharedStoreChange) {
         switch change {
         case .savedVoices:
             guard let ttsEngineStore else { return }
             Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
-        case .models, .settings:
+        case .settings:
+            modelManager.reloadVariantPreferences()
+        case .models:
+            modelManager.reloadVariantPreferences()
             Task { await modelManager.refresh() }
         case .history:
             break

@@ -803,20 +803,6 @@
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
-        },
-        {
-          "name": "allow-concurrent-engine",
-          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
-        },
-        {
-          "name": "wait-for-engine",
-          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
         }
       ],
       "path": "voices.enroll",
@@ -912,20 +898,6 @@
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
-        },
-        {
-          "name": "allow-concurrent-engine",
-          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
-        },
-        {
-          "name": "wait-for-engine",
-          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
         }
       ],
       "path": "voices.replace",
@@ -1011,20 +983,6 @@
           "takesValue": false,
           "type": "flag",
           "valueOptional": false
-        },
-        {
-          "name": "allow-concurrent-engine",
-          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
-        },
-        {
-          "name": "wait-for-engine",
-          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
         }
       ],
       "path": "voices.save-take",
@@ -1066,20 +1024,6 @@
         {
           "name": "confirm-consent",
           "summary": "confirms you own or have permission to clone this voice (required to clone or save one; ignored otherwise)",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
-        },
-        {
-          "name": "allow-concurrent-engine",
-          "summary": "run beside another Vocello engine (an 8 GB Mac refuses a second one without it)",
-          "takesValue": false,
-          "type": "flag",
-          "valueOptional": false
-        },
-        {
-          "name": "wait-for-engine",
-          "summary": "wait for another Vocello engine on this Mac to exit instead of refusing",
           "takesValue": false,
           "type": "flag",
           "valueOptional": false

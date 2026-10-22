@@ -26,4 +26,26 @@ public enum DesktopModelRemoval {
             modelFolder: modelDirectory.lastPathComponent, reclamation: .immediate
         )
     }
+
+    /// After `removed` is gone, the mode's explicit package choice follows as the
+    /// app's model manager makes it follow (`reconcileActiveVariantAfterDeletion`):
+    /// a choice that named it moves to another installed package of the mode, or
+    /// is cleared so the recommendation applies again. Returns whether it changed.
+    @discardableResult
+    public static func reconcileChoice(
+        afterRemoving removed: ModelDescriptor, registry: ContractBackedModelRegistry, modelsDirectory: URL,
+        settings: DesktopAppSettings
+    ) throws -> Bool {
+        guard let base = registry.model(for: removed.mode) else { return false }
+        let variants = base.platformVariants(for: .macOS)
+        guard let removedVariant = variants.first(where: { base.variantScopedID(for: $0) == removed.id }),
+              settings.explicitVariantID(for: removed.mode) == removedVariant.id else { return false }
+        let installedSibling = variants.first { variant in
+            variant.id != removedVariant.id
+                && registry.model(id: base.variantScopedID(for: variant))
+                    .map { DesktopModelInventory.isComplete($0, modelsDirectory: modelsDirectory) } == true
+        }
+        try settings.setVariantChoice(installedSibling?.id, for: removed.mode)
+        return true
+    }
 }

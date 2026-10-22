@@ -57,7 +57,7 @@ enum ModelsCommand {
     struct Recommended: Encodable, Sendable {
         let mode: String
         let modelID: String
-        /// planned, already_installed, installed or updated.
+        /// planned, update_planned, already_installed (with --plan), installed or updated.
         let status: String
         let estimatedDownloadBytes: Int64?
         let installedBytes: Int64?
@@ -70,6 +70,8 @@ enum ModelsCommand {
 
     struct Removed: Encodable, Sendable {
         let removed: String
+        /// The size of the model's folder; shared components another model still
+        /// links stay, so the space actually freed can be smaller.
         let freedBytes: Int64
     }
 
@@ -431,6 +433,9 @@ enum ModelsCommand {
                 expectedBytes: descriptor.estimatedDownloadBytes ?? directorySize(targetDir),
                 reusedBytes: transferAccounting.reusedVerifiedBytes
             )
+        } catch is CancellationError {
+            // A signal is not a download failure.
+            throw CancellationError()
         } catch {
             diagnostics.recordFailure(classification: "download", error: error)
             throw error
@@ -461,18 +466,29 @@ enum ModelsCommand {
             isInstalled: isInstalled
         )
         let planOnly = args.flag("plan")
+        let catalog = try? ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
         var rows: [Recommended] = []
         for choice in choices {
             guard let modelID = choice.activeModelID else { continue }
             let estimate = ctx.registry.model(id: modelID)?.estimatedDownloadBytes
             if planOnly {
+                // As `install` decides: an installed model whose files no longer match the catalog is updated.
+                let status = !isInstalled(modelID) ? "planned"
+                    : (ctx.registry.model(id: modelID).map { stalePaths(for: $0, catalog: catalog, modelsDirectory: ctx.modelsDirectory) }
+                        ?? []).isEmpty ? "already_installed" : "update_planned"
                 rows.append(Recommended(
-                    mode: choice.mode, modelID: modelID, status: isInstalled(modelID) ? "already_installed" : "planned",
-                    estimatedDownloadBytes: estimate, installedBytes: nil
+                    mode: choice.mode, modelID: modelID, status: status, estimatedDownloadBytes: estimate, installedBytes: nil
                 ))
                 continue
             }
-            let installed = try await install(modelID, ctx: ctx)
+            let installed: Installed
+            do {
+                installed = try await install(modelID, ctx: ctx)
+            } catch {
+                // The installs that finished stay reported.
+                CLIPresenter.recordPartialResult(RecommendedRows(plan: false, models: rows))
+                throw error
+            }
             rows.append(Recommended(
                 mode: choice.mode, modelID: modelID, status: installed.status, estimatedDownloadBytes: estimate,
                 installedBytes: installed.installedBytes
@@ -518,6 +534,13 @@ enum ModelsCommand {
             throw CLIError(.ioError, "could not remove \(modelID): \(error.localizedDescription)")
         }
         DesktopChangeNotice.models.post()
+        // A package choice that named it follows, as the app's model manager makes it follow.
+        if (try? DesktopModelRemoval.reconcileChoice(
+            afterRemoving: descriptor, registry: ctx.registry, modelsDirectory: ctx.modelsDirectory,
+            settings: DesktopAppSettings()
+        )) == true {
+            DesktopChangeNotice.settings.post()
+        }
         if CLIPresenter.isMachine {
             CLIPresenter.succeed(Removed(removed: modelID, freedBytes: freed))
         } else {

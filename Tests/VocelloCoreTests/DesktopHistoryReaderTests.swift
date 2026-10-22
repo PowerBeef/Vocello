@@ -287,6 +287,17 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(stored("generationVariation") as? String, "consistent")
         XCTAssertEqual(try settings.set("variant.design", to: "hq").value, "quality")
         XCTAssertEqual(stored("QwenVoice.MacModelVariantPreference.design") as? String, "quality")
+        // Turning prefer-lower-memory on clears every per-mode choice, as the app's toggle does;
+        // keeping it on, or turning it off, leaves them.
+        XCTAssertEqual(try settings.set("variant.custom", to: "quality").value, "quality")
+        _ = try settings.set("prefer-lower-memory", to: "true")
+        XCTAssertEqual(stored("QwenVoice.MacModelVariantPreference.custom") as? String, "quality", "already on")
+        _ = try settings.set("prefer-lower-memory", to: "false")
+        XCTAssertEqual(stored("QwenVoice.MacModelVariantPreference.custom") as? String, "quality")
+        _ = try settings.set("prefer-lower-memory", to: "on")
+        XCTAssertNil(stored("QwenVoice.MacModelVariantPreference.custom"), "turned on: the choices clear")
+        XCTAssertNil(stored("QwenVoice.MacModelVariantPreference.design"))
+        XCTAssertEqual(try settings.set("variant.design", to: "hq").value, "quality")
         let automatic = try settings.set("variant.design", to: "automatic")
         XCTAssertEqual(automatic.value, "automatic")
         XCTAssertTrue(automatic.isDefault)

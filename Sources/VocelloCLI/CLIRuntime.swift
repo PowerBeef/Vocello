@@ -37,11 +37,13 @@ public struct CLIRuntime {
         manifestOverride: URL?,
         voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed,
         hostedLikeTheApp: Bool = false,
-        concurrency: CLIEngineConcurrency = CLIEngineConcurrency()
+        concurrency: CLIEngineConcurrency = CLIEngineConcurrency(),
+        takesEngineLease: Bool = true
     ) async throws -> CLIRuntime {
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
-        let lease = hostedLikeTheApp
+        // A host that loads a model holds a lease; one that never does (saved-voice writes) need not.
+        let lease = hostedLikeTheApp && takesEngineLease
             ? try await admitEngineHost(deviceClass: deviceClass, concurrency: concurrency)
             : nil
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)

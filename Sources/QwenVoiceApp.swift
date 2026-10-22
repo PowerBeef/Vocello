@@ -23,6 +23,7 @@ struct QwenVoiceApp: App {
     /// Sparkle's updater for the app's lifetime (RF-23); the Vocello menu and
     /// both Settings hosts share it.
     @State private var softwareUpdater = MacSoftwareUpdater()
+    @State private var sharedStoreChanges = MacSharedStoreChangeObserver()
     /// The shell model lives as long as the engine store and the player it
     /// drives (A10-04): its Studio coordinators outlive the window, so a window
     /// closed during a take reopens on that take with its Stop, not on idle
@@ -211,6 +212,7 @@ struct QwenVoiceApp: App {
             appStartupCoordinator.setupAppSupport()
             reconcilePendingHistory()
             startSelectedTTSEngineIfNeeded()
+            sharedStoreChanges.start { change in reloadSharedStore(change) }
             appStartupCoordinator.refreshLaunchDiagnostics()
             AppLaunchConfiguration.openSettingsWindowIfNeeded()
         }
@@ -238,6 +240,22 @@ struct QwenVoiceApp: App {
 
     static var modelsDir: URL { AppPaths.modelsDir }
     static var outputsDir: URL { AppPaths.outputsDir }
+
+    /// Another Vocello process (the CLI) changed a shared store: reload it.
+    /// Settings are read where they are used; the model manager re-reads the
+    /// package choices and install state. The CLI writes no History until
+    /// RF-30's lock, so History needs nothing yet.
+    private func reloadSharedStore(_ change: SharedStoreChange) {
+        switch change {
+        case .savedVoices:
+            guard let ttsEngineStore else { return }
+            Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
+        case .models, .settings:
+            Task { await modelManager.refresh() }
+        case .history:
+            break
+        }
+    }
 
     private func reconcilePendingHistory() {
         Task { @concurrent in

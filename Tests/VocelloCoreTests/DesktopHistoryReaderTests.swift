@@ -314,6 +314,29 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertTrue(DesktopChangeNotice.allCases.allSatisfy { $0.rawValue.hasPrefix("com.qwenvoice.shared.") })
     }
 
+    /// RF-28: the app hears the CLI change a shared store, by the names both use.
+    @MainActor
+    func testTheAppHearsTheCLIChangeAStore() async {
+        XCTAssertEqual(
+            DesktopChangeNotice.allCases.map(\.rawValue), SharedStoreChange.allCases.map(\.rawValue),
+            "one set of names for the poster and the observer"
+        )
+        final class Heard {
+            var changes: [SharedStoreChange] = []
+        }
+        let heard = Heard()
+        let delivered = expectation(description: "the app hears the saved voices change")
+        let observer = MacSharedStoreChangeObserver()
+        observer.start { change in
+            heard.changes.append(change)
+            if change == .savedVoices { delivered.fulfill() }
+        }
+        observer.start { _ in XCTFail("started once, for the app's life") }
+        DesktopChangeNotice.savedVoices.post()
+        await fulfillment(of: [delivered], timeout: 10)
+        XCTAssertEqual(heard.changes, [.savedVoices])
+    }
+
     @MainActor
     func testTheInterfaceLanguageKeyIsTheOneBothAppsWrite() {
         let appKey = IOSAppLanguage.preferenceKey

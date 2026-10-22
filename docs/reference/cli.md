@@ -422,6 +422,12 @@ default. Voice-cloning consent is never a CLI setting.
 value or name is `invalid_input`; `interface-language` stays the app's. The app reads each value when
 it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidChange`).
 
+**A running app hears every change.** Each write posts a distributed notification named for its store
+(`com.qwenvoice.shared.{savedVoices,models,settings}DidChange`; `SharedStoreChange` in
+`Sources/DesktopShared`), and the Mac app reloads that store: its saved voices, or its model manager
+(install state and package choices). The CLI writes no History until RF-30, so it posts no History
+change yet.
+
 ### `briefs` — Voice Design's starting briefs
 
 `vocello briefs [--language <l>] [--json]` lists the app's eight starting briefs by position in a

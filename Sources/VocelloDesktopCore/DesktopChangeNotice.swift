@@ -1,15 +1,22 @@
 import Foundation
 
-/// What the CLI tells a running Vocello app after it changed shared state
-/// (RF-28): a distributed notification per store, which the app observes and
-/// answers by reloading that store. Names only; no payload, no paths.
-public enum DesktopChangeNotice: String, CaseIterable, Sendable {
-    case history = "com.qwenvoice.shared.historyDidChange"
-    case savedVoices = "com.qwenvoice.shared.savedVoicesDidChange"
-    case models = "com.qwenvoice.shared.modelsDidChange"
-    case settings = "com.qwenvoice.shared.settingsDidChange"
+/// What the CLI tells a running Vocello app after it changed a shared store
+/// (RF-28): one distributed notification per store (`SharedStoreChange`, which
+/// the app observes), names only.
+public enum DesktopChangeNotice: CaseIterable, Sendable {
+    case history, savedVoices, models, settings
 
-    public var name: Notification.Name { Notification.Name(rawValue) }
+    var change: SharedStoreChange {
+        switch self {
+        case .history: .history
+        case .savedVoices: .savedVoices
+        case .models: .models
+        case .settings: .settings
+        }
+    }
+
+    public var rawValue: String { change.rawValue }
+    public var name: Notification.Name { change.name }
 
     public func post() {
         DistributedNotificationCenter.default().postNotificationName(

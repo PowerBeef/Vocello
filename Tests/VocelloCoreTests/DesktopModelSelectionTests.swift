@@ -156,6 +156,38 @@ final class DesktopModelInventoryTests: XCTestCase {
 
 /// RF-27: CLI takes run through the app's engine store. Each request is
 /// admitted under its own recorded consent, switched on the one shared host.
+/// RF-28: `models remove` removes as the app's model manager does, and never
+/// while another engine may have the model loaded.
+final class DesktopModelRemovalTests: XCTestCase {
+    func testAModelIsRemovedOnlyWhileNoOtherEngineRuns() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let registry = try ContractBackedModelRegistry(
+            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        ).expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let descriptor = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
+        let models = FileManager.default.temporaryDirectory.appendingPathComponent("models-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: models) }
+        let folder = descriptor.installDirectory(in: models)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(repeating: 0, count: 4096).write(to: folder.appendingPathComponent("model.safetensors"))
+        let other = try XCTUnwrap(registry.model(id: "pro_custom_quality"))
+        try FileManager.default.createDirectory(at: other.installDirectory(in: models), withIntermediateDirectories: true)
+
+        XCTAssertThrowsError(try DesktopModelRemoval.remove(descriptor, modelsDirectory: models, otherEngineRunning: true)) {
+            XCTAssertEqual($0 as? DesktopModelRemoval.Refusal, .engineRunning)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path), "nothing is removed while another engine runs")
+
+        try DesktopModelRemoval.remove(descriptor, modelsDirectory: models, otherEngineRunning: false)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: other.installDirectory(in: models).path), "only that model")
+        XCTAssertThrowsError(try DesktopModelRemoval.remove(descriptor, modelsDirectory: models, otherEngineRunning: false)) {
+            XCTAssertEqual($0 as? DesktopModelRemoval.Refusal, .notInstalled)
+        }
+    }
+}
+
 @MainActor
 final class DesktopEngineHostTests: XCTestCase {
     func testTheHostAdmitsEachRequestUnderItsOwnConsent() async throws {

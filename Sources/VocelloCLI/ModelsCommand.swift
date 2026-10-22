@@ -501,21 +501,18 @@ enum ModelsCommand {
         guard let descriptor = ctx.registry.model(id: modelID) else {
             throw CLIError(.modelUnknown, "unknown model id '\(modelID)'", hint: "see `vocello models list`")
         }
-        let modelDirectory = descriptor.installDirectory(in: ctx.modelsDirectory)
-        guard FileManager.default.fileExists(atPath: modelDirectory.path) else {
+        let freed = directorySize(descriptor.installDirectory(in: ctx.modelsDirectory))
+        do {
+            try DesktopModelRemoval.remove(
+                descriptor, modelsDirectory: ctx.modelsDirectory,
+                otherEngineRunning: DesktopAppPresence.isAppRunning() || !EngineHostLease.liveHosts().isEmpty
+            )
+        } catch DesktopModelRemoval.Refusal.notInstalled {
             throw CLIError(.modelNotInstalled, "\(modelID) is not installed")
-        }
-        if DesktopAppPresence.isAppRunning() || !EngineHostLease.liveHosts().isEmpty {
+        } catch DesktopModelRemoval.Refusal.engineRunning {
             throw CLIError(
                 .engineBusy, "a Vocello engine is running (the app or another vocello) and may have \(modelID) loaded",
                 hint: "quit the Vocello app and wait for other vocello commands, then retry"
-            )
-        }
-        let freed = directorySize(modelDirectory)
-        HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDirectory)
-        do {
-            try SharedModelComponentStore(modelsRoot: ctx.modelsDirectory).deleteModel(
-                modelFolder: modelDirectory.lastPathComponent, reclamation: .immediate
             )
         } catch {
             throw CLIError(.ioError, "could not remove \(modelID): \(error.localizedDescription)")

@@ -338,6 +338,9 @@ final class DesktopHistoryReaderTests: XCTestCase {
         let heard = Heard()
         let delivered = expectation(description: "the app hears the saved voices change")
         let observer = MacSharedStoreChangeObserver()
+        // Another Vocello process on this Mac may post meanwhile: count only this test's notice.
+        delivered.assertForOverFulfill = false
+        defer { observer.stop() }
         observer.start { change in
             heard.changes.append(change)
             if change == .savedVoices { delivered.fulfill() }
@@ -345,7 +348,7 @@ final class DesktopHistoryReaderTests: XCTestCase {
         observer.start { _ in XCTFail("started once, for the app's life") }
         DesktopChangeNotice.savedVoices.post()
         await fulfillment(of: [delivered], timeout: 10)
-        XCTAssertEqual(heard.changes, [.savedVoices])
+        XCTAssertEqual(heard.changes.first, .savedVoices)
     }
 
     @MainActor

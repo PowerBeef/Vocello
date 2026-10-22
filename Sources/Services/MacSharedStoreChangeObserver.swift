@@ -16,4 +16,10 @@ final class MacSharedStoreChangeObserver {
             }
         }
     }
+
+    func stop() {
+        let center = DistributedNotificationCenter.default()
+        observers.forEach(center.removeObserver)
+        observers = []
+    }
 }

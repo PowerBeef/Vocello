@@ -433,11 +433,12 @@ enum ModelsCommand {
                 expectedBytes: descriptor.estimatedDownloadBytes ?? directorySize(targetDir),
                 reusedBytes: transferAccounting.reusedVerifiedBytes
             )
-        } catch is CancellationError {
-            // A signal is not a download failure.
-            throw CancellationError()
         } catch {
-            diagnostics.recordFailure(classification: "download", error: error)
+            // A signal is not a download failure; the downloader reports it as its own
+            // `.cancelled`, or the task as `CancellationError`.
+            let cancelled = Task.isCancelled || error is CancellationError
+                || (error as? HuggingFaceDownloader.DownloadError).map { if case .cancelled = $0 { true } else { false } } == true
+            if !cancelled { diagnostics.recordFailure(classification: "download", error: error) }
             throw error
         }
 
@@ -517,6 +518,14 @@ enum ModelsCommand {
         guard let descriptor = ctx.registry.model(id: modelID) else {
             throw CLIError(.modelUnknown, "unknown model id '\(modelID)'", hint: "see `vocello models list`")
         }
+        // A mode's base id is an alias for one of its packages: name the package itself.
+        if let base = ctx.registry.model(for: descriptor.mode), base.id == modelID {
+            let packages = base.platformVariants(for: .macOS).map { base.variantScopedID(for: $0) }
+            throw CLIError(
+                .invalidInput, "'\(modelID)' names a mode, not a package",
+                hint: "remove one of: \(packages.joined(separator: ", "))"
+            )
+        }
         let freed = directorySize(descriptor.installDirectory(in: ctx.modelsDirectory))
         do {
             try DesktopModelRemoval.remove(
@@ -535,11 +544,19 @@ enum ModelsCommand {
         }
         DesktopChangeNotice.models.post()
         // A package choice that named it follows, as the app's model manager makes it follow.
-        if (try? DesktopModelRemoval.reconcileChoice(
-            afterRemoving: descriptor, registry: ctx.registry, modelsDirectory: ctx.modelsDirectory,
-            settings: DesktopAppSettings()
-        )) == true {
-            DesktopChangeNotice.settings.post()
+        do {
+            if try DesktopModelRemoval.reconcileChoice(
+                afterRemoving: descriptor, registry: ctx.registry, modelsDirectory: ctx.modelsDirectory,
+                settings: DesktopAppSettings()
+            ) {
+                DesktopChangeNotice.settings.post()
+            }
+        } catch {
+            CLIPresenter.warn(
+                "package_choice_not_updated",
+                "\(modelID) was removed, but the app's package choice for \(descriptor.mode.rawValue) still names it",
+                detail: ["mode": .string(descriptor.mode.rawValue)]
+            )
         }
         if CLIPresenter.isMachine {
             CLIPresenter.succeed(Removed(removed: modelID, freedBytes: freed))

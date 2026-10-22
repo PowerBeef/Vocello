@@ -413,14 +413,23 @@ final class DesktopVoiceEnrollmentTests: XCTestCase {
         let (host, engine, root) = try await host()
         defer { engine.stop() }
         let clip = try clip(10, in: root)
-        let enrollment = Task { @MainActor in
-            try await host.enrollVoice(self.request(clip, name: "Stopped", transcript: Self.words, onWarnings: .keep))
+        let request = request(clip, name: "Stopped", transcript: Self.words, onWarnings: .keep)
+        // A non-throwing task (CI's compiler refuses a throwing one that returns a value).
+        let enrollment = Task { @MainActor () -> (any Error)? in
+            do {
+                _ = try await host.enrollVoice(request)
+                return nil
+            } catch {
+                return error
+            }
         }
         enrollment.cancel()
-        let outcome = await enrollment.result
-        XCTAssertThrowsError(try outcome.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+        let error = await enrollment.value
+        XCTAssertTrue(error is CancellationError, "\(String(describing: error))")
         let voices = try await host.listVoices()
         XCTAssertEqual(voices, [], "nothing is committed after a signal")
+        let again = try await host.enrollVoice(request)
+        XCTAssertEqual(again.outcome, .saved, "the candidate was discarded, not stranded under the name")
     }
 }
 

@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -23,6 +24,9 @@ BIN_LINK = "usr/local/bin/vocello"
 ZSH_LINK = "usr/local/share/zsh/site-functions/_vocello"
 
 
+# Installer runs these scripts on macOS only; they read ownership and modes with macOS's `stat -f`,
+# which on Linux reads the file system instead.
+@unittest.skipUnless(sys.platform == "darwin", "the installer scripts use macOS's stat")
 class PackageScriptTests(unittest.TestCase):
     def setUp(self):
         # The scripts trust only folders no other user can change; the folders these tests make

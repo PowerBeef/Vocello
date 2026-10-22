@@ -17,10 +17,15 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 from shell_stubs import ScriptSandbox, quote
+
+# Past the refusals, the scripts read ownership, modes and sizes with macOS's `stat -f` and copy
+# with `ditto`; Linux's stat reads the file system instead, so those runs belong to macOS.
+MACOS_ONLY = unittest.skipUnless(sys.platform == "darwin", "the scripts use macOS's stat and ditto")
 
 TEAM = "TEAM123456"
 COMMIT = "c0ffee" + "0" * 34
@@ -164,6 +169,7 @@ class InstallTestRefusalTests(unittest.TestCase):
                 self.assertEqual(self.sandbox.calls_to("sudo"), [])
 
 
+@MACOS_ONLY
 class PackageChecksBeforeInstallingTests(unittest.TestCase):
     """The whole script on a hosted runner: the DMG folder, then every package check before installing."""
 
@@ -282,6 +288,7 @@ class PackageChecksBeforeInstallingTests(unittest.TestCase):
         self.assertEqual(self.sandbox.calls_to("sudo"), [["-n", "true"]])
 
 
+@MACOS_ONLY
 class PackageInstallTests(unittest.TestCase):
     """`pkg_install_test`, sourced, on a sandbox volume."""
 
@@ -397,6 +404,7 @@ class PackageInstallTests(unittest.TestCase):
         self.assertEqual(self.sandbox.calls_to("sudo"), [])
 
 
+@MACOS_ONLY
 class VerifyPackagedDMGPassThroughTests(unittest.TestCase):
     """verify_packaged_dmg.sh hands --include-pkg to the CLI verifier, only after --include-cli."""
 

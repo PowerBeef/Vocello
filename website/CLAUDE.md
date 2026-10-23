@@ -58,9 +58,14 @@ anchor jumps. The privacy page must continue to disclose website analytics.
 
 ### Responsive layout
 
-- Below 1100 px, the hero stacks copy before the Mac window.
-- Below 900 px, bands, samples, specs, and CTA layouts stack; nav links hide and content centers.
-- Below 600 px, padding and CTA sizing tighten and the former-name clarification hides.
+- The nav steps links out before they can meet the brand: at 1240 px or less, Open source
+  (`nav-link--xl`) hides.
+- At 1100 px or less, the hero stacks copy before the Mac window, How it runs (`nav-link--lg`) hides,
+  and the nav switches to a flex row with space between.
+- At 900 px or less, bands, samples, specs, and CTA layouts stack and content centers; every
+  `nav-link--full` link hides, leaving Listen and Engineering.
+- At 600 px or less, padding, nav gaps, and CTA sizing tighten and the former-name clarification hides;
+  at 480 px or less, Engineering (`nav-link--sm`) hides too.
 
 Use `grid-template-columns: minmax(0, 1fr)` for narrow single-column grids. A bare `1fr` allows
 intrinsic-width children such as max-content point lists to overflow.

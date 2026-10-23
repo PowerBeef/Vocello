@@ -36,6 +36,9 @@ export const IphoneBeta = () => (
           width={780} height={1696}
           alt="Vocello Studio running on an iPhone, with a script ready to generate with a built-in voice"
         />
+        <figcaption className="iphone-shot-caption">
+          An earlier iPhone capture, from before Built-in Voice was renamed from Custom.
+        </figcaption>
       </figure>
     </div>
   </section>

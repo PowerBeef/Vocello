@@ -104,7 +104,7 @@
         app's models, saved voices, and settings.
       </p>
       <ul>
-        <li><code>vocello --version</code> shows the installed version and build. If the shell cannot find <code>vocello</code> after installing the package, open a new Terminal window.</li>
+        <li><code>vocello --version</code> shows the installed version and build. If the shell cannot find <code>vocello</code> after installing the package, open a new Terminal window. The installer adds links only in folders that root alone can change, so if your <code>/usr/local/bin</code> belongs to your user (as some older Homebrew setups leave it), run <code>/usr/local/lib/vocello/vocello</code> or link it into your path yourself.</li>
         <li><code>vocello doctor</code> checks the shared data folder, the bundled model contract and catalog, the installed models, the Mac's memory tier, and free disk, without loading a model. Add <code>--json</code> for a machine-readable report.</li>
         <li><code>vocello models list</code> shows what is installed, and <code>vocello models verify</code> checks every installed file's size and SHA-256 digest.</li>
         <li>An exit status of 75 means the engine or a store is busy, memory is short, or the network is unavailable: retry later. On an 8 GB Mac, one engine runs at a time, so quit the app or the other command first. <code>vocello history</code> reads History only while the Vocello app is closed.</li>

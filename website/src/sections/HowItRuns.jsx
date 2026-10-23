@@ -16,7 +16,7 @@ const ROWS = [
         The Mac app and the vocello command line host the same engine in-process, as the
         iPhone app does on the phone. The command line shares the app's models, saved voices,
         and settings, reads its History, and can serve AI agents over MCP. See{" "}
-        <a href="#cli">command line and agents</a>.
+        <a className="cta-meta-link" href="#cli">command line and agents</a>.
       </>
     ),
     tone: "var(--lavender-300)",

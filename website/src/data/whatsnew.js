@@ -36,7 +36,7 @@ export const SHARED_HIGHLIGHTS = [
   },
   {
     k: "Clearer delivery roster",
-    v: "Neutral, Calm, Whisper and Sad form the measured group. Happy, Angry, Fearful and Surprised remain directional hints that shape energy and pace, not promises of an exact emotion.",
+    v: "Neutral, Sad, Calm and Whisper form the measured group. Happy, Angry, Fearful and Surprised remain directional hints that shape energy and pace, not promises of an exact emotion.",
   },
   {
     k: "Takes read the whole script first",

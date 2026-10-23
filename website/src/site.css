@@ -946,13 +946,23 @@ picture {
 .iphone-stage {
   margin: 0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+}
+
+.iphone-shot-caption {
+  margin: 18px auto 0;
+  max-width: 320px;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .iphone-shot {
   display: block;
   width: min(100%, 320px);
   height: auto;
+  margin-inline: auto;
   filter: drop-shadow(0 28px 60px rgba(0, 0, 0, 0.45));
 }
 
@@ -1312,6 +1322,12 @@ picture {
   line-height: 1.6;
   color: var(--fg-secondary);
   text-wrap: pretty;
+}
+
+.cli-step-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--fg-tertiary);
 }
 
 .cli-step-actions { margin: 18px 0 14px; }

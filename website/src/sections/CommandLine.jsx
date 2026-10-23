@@ -112,6 +112,13 @@ export const CommandLine = () => (
               </a>
             </div>
             <CodeBlock block={INSTALL_PACKAGE} />
+            <p className="cli-step-v cli-step-note">
+              The installer adds links only in folders that root alone can change. If your{" "}
+              <code className="cli-inline">/usr/local/bin</code> belongs to your user, as some
+              older Homebrew setups leave it, the command is installed but not linked there: run{" "}
+              <code className="cli-inline">/usr/local/lib/vocello/vocello</code> or link it into
+              your path yourself.
+            </p>
           </li>
           <li className="cli-step">
             <p className="cli-step-k">Or copy the folder</p>

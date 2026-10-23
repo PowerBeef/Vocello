@@ -12,4 +12,14 @@ export const REPO = "https://github.com/PowerBeef/Vocello";
 // WEB-07: download buttons name the stable tag the page describes, never the latest release.
 export const RELEASE_STABLE = `${REPO}/releases/tag/${STABLE_MAC_RELEASE.tag}`;
 export const RELEASE_FALLBACK = `${REPO}/releases/tag/${FALLBACK_MAC_RELEASE.tag}`;
+export const RELEASES = `${REPO}/releases`;
+// The stable release page carries the curated notes (docs/releases/<tag>.md).
+export const RELEASE_NOTES = RELEASE_STABLE;
+
+// Direct assets of the stable release, named as the release workflow uploads them.
+const RELEASE_DOWNLOAD = `${REPO}/releases/download/${STABLE_MAC_RELEASE.tag}`;
+export const MAC_DMG = `${RELEASE_DOWNLOAD}/Vocello-macos26.dmg`;
+export const CLI_PKG = `${RELEASE_DOWNLOAD}/Vocello-macos26-cli.pkg`;
+export const CLI_DMG = `${RELEASE_DOWNLOAD}/Vocello-macos26-cli.dmg`;
+
 export const TESTFLIGHT = "https://testflight.apple.com/join/Cvp6yCv7";

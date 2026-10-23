@@ -27,10 +27,11 @@ export const Nav = () => {
         <div className="nav-links">
           <a className="nav-link--full" href="#workflows">Workflows</a>
           <a href="#listen">Listen</a>
-          <a className="nav-link--full" href="#how-it-runs">How it runs</a>
+          <a className="nav-link--full nav-link--lg" href="#how-it-runs">How it runs</a>
+          <a className="nav-link--full" href="#cli">Command line</a>
           <a className="nav-link--full" href="#iphone">iPhone</a>
-          <a href="#engineering">Engineering</a>
-          <a className="nav-link--full" href={REPO} target="_blank" rel="noreferrer">Open source</a>
+          <a className="nav-link--sm" href="#engineering">Engineering</a>
+          <a className="nav-link--full nav-link--xl" href={REPO} target="_blank" rel="noreferrer">Open source</a>
         </div>
         <a className="nav-cta" href="#download">
           <Icon name="apple" size={14} />

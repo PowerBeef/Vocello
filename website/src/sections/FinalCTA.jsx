@@ -1,40 +1,99 @@
 import React from "react";
 import { Icon } from "../components/Icon.jsx";
-import { CREDITS, REPO, RELEASE_FALLBACK, RELEASE_STABLE, TESTFLIGHT } from "../data/credits.js";
+import {
+  CLI_DMG,
+  CLI_PKG,
+  CREDITS,
+  MAC_DMG,
+  RELEASES,
+  RELEASE_FALLBACK,
+  RELEASE_NOTES,
+  REPO,
+  TESTFLIGHT,
+} from "../data/credits.js";
 import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "../data/release.js";
 
 export const FinalCTA = () => (
-  <section id="download" className="final-cta-section">
+  <section id="download" className="final-cta-section" aria-labelledby="download-title">
     <div className="container">
       <div className="cta-block">
-        <h2 className="cta-title">Local by design. Yours to keep.</h2>
+        <h2 id="download-title" className="cta-title">Local by design. Yours to keep.</h2>
         <p className="cta-body">
-          Vocello {STABLE_MAC_RELEASE.version} for macOS 26 and Apple Silicon. Free, open-source,
-          ready to install in under a minute.
+          Vocello {STABLE_MAC_RELEASE.version} for macOS 26 and Apple Silicon, free and open
+          source. Three ways in, one local engine.
         </p>
-        <div className="hero-ctas hero-ctas--center">
-          <a className="btn btn-primary" href={RELEASE_STABLE} target="_blank" rel="noreferrer">
+      </div>
+
+      <ul className="ways-in" role="list">
+        <li className="way way--mac">
+          <div className="way-copy">
+            <h3 className="way-k">Mac app</h3>
+            <p className="way-v">
+              Open the DMG and drag Vocello to Applications. From 3.0 on, the app updates itself:
+              choose Vocello &gt; Check for Updates.
+            </p>
+            <p className="way-meta">Vocello-macos26.dmg · Signed and notarized</p>
+          </div>
+          <a className="btn btn-primary" href={MAC_DMG}>
             <Icon name="apple" size={16} />
-            Download Vocello
+            Download for Mac
           </a>
-          <a className="btn btn-secondary" href={REPO} target="_blank" rel="noreferrer">
-            <Icon name="github" size={14} />
-            View on GitHub
+        </li>
+        <li className="way way--cli">
+          <div className="way-copy">
+            <h3 className="way-k">Command line</h3>
+            <p className="way-v">
+              The installer package links <code className="cli-inline">vocello</code> in
+              /usr/local/bin and asks for an administrator password. Or copy the Vocello CLI
+              folder from the{" "}
+              <a className="cta-meta-link" href={CLI_DMG}>folder DMG</a>.
+            </p>
+            <p className="way-meta">Vocello-macos26-cli.pkg · Apple Silicon only</p>
+          </div>
+          <a className="btn btn-secondary" href={CLI_PKG}>
+            <Icon name="download" size={16} />
+            Download the package
           </a>
-        </div>
+        </li>
+        <li className="way way--iphone">
+          <div className="way-copy">
+            <h3 className="way-k">iPhone</h3>
+            <p className="way-v">
+              The iPhone app runs the same engine and stays in public TestFlight until its App
+              Store release.
+            </p>
+            <p className="way-meta">iPhone 15 Pro or newer · iOS 26.0 or later</p>
+          </div>
+          <a className="btn btn-secondary" href={TESTFLIGHT} target="_blank" rel="noreferrer">
+            <Icon name="apple" size={16} />
+            Join on TestFlight
+          </a>
+        </li>
+      </ul>
+
+      <div className="cta-block">
         <p className="cta-meta">
           macOS 26.0+
           <span className="cta-meta-sep" aria-hidden="true">·</span>
-          Apple Silicon required
+          Apple Silicon with 8 GB memory or more (16 GB recommended for Quality models)
           <span className="cta-meta-sep" aria-hidden="true">·</span>
-          iPhone beta on{" "}
-          <a href={TESTFLIGHT} target="_blank" rel="noreferrer" className="cta-meta-link">
-            TestFlight
+          <a href={RELEASE_NOTES} target="_blank" rel="noreferrer" className="cta-meta-link">
+            Release notes
+          </a>
+          <span className="cta-meta-sep" aria-hidden="true">·</span>
+          <a href={RELEASES} target="_blank" rel="noreferrer" className="cta-meta-link">
+            All releases
           </a>
           <span className="cta-meta-sep" aria-hidden="true">·</span>
           Stable build for macOS 15:{" "}
           <a href={RELEASE_FALLBACK} target="_blank" rel="noreferrer" className="cta-meta-link">
             QwenVoice {FALLBACK_MAC_RELEASE.version}
+          </a>
+        </p>
+        <p className="cta-meta cta-meta--source">
+          <a href={REPO} target="_blank" rel="noreferrer" className="cta-source-link">
+            <Icon name="github" size={14} />
+            View the source on GitHub
           </a>
         </p>
         <div className="cta-credits">

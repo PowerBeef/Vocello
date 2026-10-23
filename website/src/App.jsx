@@ -2,11 +2,13 @@ import React, { useEffect } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { Nav } from "./sections/Nav.jsx";
 import { Hero } from "./sections/Hero.jsx";
+import { WhatsNew } from "./sections/WhatsNew.jsx";
 import { WorkflowBand } from "./sections/WorkflowBand.jsx";
 import { Listen } from "./sections/Listen.jsx";
 import { Capabilities } from "./sections/Capabilities.jsx";
 import { WhyCloud } from "./sections/WhyCloud.jsx";
 import { HowItRuns } from "./sections/HowItRuns.jsx";
+import { CommandLine } from "./sections/CommandLine.jsx";
 import { IphoneBeta } from "./sections/IphoneBeta.jsx";
 import { Engineering } from "./sections/Engineering.jsx";
 import { Limitations } from "./sections/Limitations.jsx";
@@ -25,8 +27,9 @@ const useScrollReveal = () => {
     if (!("IntersectionObserver" in window)) return;
 
     const targets = document.querySelectorAll(
-      ".workflow-band, .listen-section, .caps-section, .cloud-section, " +
-        ".runs-section, .iphone-section, .engineering-section, .limitations-section, .final-cta-section",
+      ".whatsnew-section, .workflow-band, .listen-section, .caps-section, .cloud-section, " +
+        ".runs-section, .cli-section, .iphone-section, .engineering-section, .limitations-section, " +
+        ".final-cta-section",
     );
     if (!targets.length) return;
 
@@ -77,6 +80,7 @@ const App = () => {
     <Nav />
     <main id="main-content" tabIndex={-1}>
       <Hero />
+      <WhatsNew />
       <div id="workflows" className="workflows-anchor">
         {WORKFLOWS.map((w, i) => (
           <WorkflowBand key={w.id} workflow={w} index={i} />
@@ -86,6 +90,7 @@ const App = () => {
       <Capabilities />
       <WhyCloud />
       <HowItRuns />
+      <CommandLine />
       <IphoneBeta />
       <Engineering />
       <Limitations />

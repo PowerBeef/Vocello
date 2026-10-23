@@ -105,6 +105,8 @@ def cli_sandbox(test: unittest.TestCase) -> ScriptSandbox:
     sandbox.tool("installer", INSTALLER)
     sandbox.tool("pkgutil", PKGUTIL)
     sandbox.tool("sudo", '[ "$1" != -n ] || exit "${SUDO_N_STATUS:-0}"\nexec "$@"')
+    # Only root can give a folder to root; the sandbox records the request instead.
+    sandbox.tool("chown", "exit 0")
     store = sandbox.home / "Library/Application Support/QwenVoice"
     store.mkdir(parents=True)
     (store / "history.sqlite").write_text("history", encoding="utf-8")
@@ -338,6 +340,24 @@ class PackageInstallTests(unittest.TestCase):
             self.assertFalse(path.exists() or path.is_symlink(), path)
         self.assertFalse((self.sandbox.path / "receipt").exists())
         self.assertEqual(store_state(self.sandbox), before)
+
+    def test_link_folders_the_runner_owns_are_given_to_root_before_installing(self) -> None:
+        # A hosted runner's /usr/local/bin belongs to its user; postinstall links only into a
+        # folder root alone can change, as on a stock Mac.
+        local = self.volume / "usr/local"
+        (local / "bin").mkdir(parents=True)
+        (local / "bin").chmod(0o775)
+        completed = self.install_test()
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        sequence = self.sequence()
+        self.assertEqual(sequence[:4], [
+            ["sudo", "chown", "root:wheel", str(local)],
+            ["sudo", "chmod", "go-w", str(local)],
+            ["sudo", "chown", "root:wheel", str(local / "bin")],
+            ["sudo", "chmod", "go-w", str(local / "bin")],
+        ])
+        self.assertEqual(sequence[4][:2], ["sudo", "installer"])
+        self.assertFalse(any(call[1] in ("chown", "chmod") and "share" in call[-1] for call in sequence))
 
     def test_an_upgrade_that_keeps_a_stale_file_fails_before_uninstalling(self) -> None:
         completed = self.install_test(INSTALLER_SKIPS_PREINSTALL="1")

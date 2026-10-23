@@ -23,6 +23,8 @@ PKG_TARGET="/"
 PKG_LIB="/usr/local/lib/vocello"
 PKG_BIN_LINK="/usr/local/bin/vocello"
 PKG_COMPLETION_LINK="/usr/local/share/zsh/site-functions/_vocello"
+# The folders, below the target volume, that postinstall links into or creates them in.
+PKG_LINK_FOLDERS=(usr/local usr/local/bin usr/local/share usr/local/share/zsh usr/local/share/zsh/site-functions)
 # The data store the CLI shares with the Mac app; installing and removing the CLI never touch it.
 PKG_DATA_STORE="$HOME/Library/Application Support/QwenVoice"
 
@@ -125,6 +127,21 @@ pkg_install() {
     sudo installer -pkg "$1" -target "$PKG_TARGET" || fail "installer could not install $(basename "$1")"
 }
 
+# On a stock Mac those folders belong to root and no one else can change them, the only state in
+# which postinstall links the command. A hosted runner gives /usr/local/bin to its own user, so
+# its ephemeral copies are set to that state first (the folder itself, never its contents); one
+# that does not exist yet is left for postinstall to create.
+pkg_prepare_stock_folders() {
+    local folder path
+    for folder in "${PKG_LINK_FOLDERS[@]}"; do
+        path="${PKG_TARGET%/}/$folder"
+        [ -d "$path" ] && [ ! -L "$path" ] || continue
+        if ! sudo chown root:wheel "$path" || ! sudo chmod go-w "$path"; then
+            fail "could not give $path to root, as a stock Mac has it"
+        fi
+    done
+}
+
 # The installed CLI: its receipt at this version, a real folder holding the sealed manifest,
 # the two relative links postinstall makes, the command link resolving into the folder, and
 # the smoke run through that link.
@@ -171,6 +188,7 @@ pkg_install_test() {
         [ ! -e "$path" ] && [ ! -L "$path" ] || fail "$path already exists; the install test needs a clean runner"
     done
     before="$(pkg_data_store_state)" || fail "could not read the data store's state"
+    pkg_prepare_stock_folders
 
     echo "  Installing $(basename "$pkg")..."
     pkg_install "$pkg"

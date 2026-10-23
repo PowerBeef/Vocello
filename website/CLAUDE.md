@@ -37,12 +37,19 @@ build outputs are generated; do not hand-edit them.
 
 `src/App.jsx` is a thin page composer. Keep content in the existing boundaries:
 
-- `src/sections/`: page sections in render order.
+- `src/sections/`: page sections in render order, including `WhatsNew.jsx` (`#whats-new`, "What's
+  new in 3.0") and `CommandLine.jsx` (`#cli`, "Command line and agents").
 - `src/components/Icon.jsx`: shared SVG vocabulary and deterministic waveform-bar generator.
 - `src/components/Waveform.jsx`: Listen-row waveform primitive.
 - `src/data/workflows.js`: the three workflow bands.
-- `src/data/samples.js`: samples, delivery labels, and colors.
-- `src/data/credits.js`: technology, GitHub, release, and TestFlight URLs.
+- `src/data/samples.js`: samples, delivery labels and groups, and colors. The samples predate 3.0;
+  never present them as 3.0 takes.
+- `src/data/whatsnew.js`: the release's What's new entries, drawn from `../docs/releases/`.
+- `src/data/cli.js`: the command line section's install, uninstall, and MCP setup commands, quoted
+  from `../docs/reference/cli.md`.
+- `src/data/credits.js`: technology, GitHub, release, and TestFlight URLs, plus the tagged Mac DMG,
+  CLI package, CLI folder DMG, and release notes links derived from the stable tag.
+- `src/data/release.js`: the stable and fallback Mac release mirror (see below).
 - `src/site.css` and `src/tokens.css`: global styling and design tokens. Do not add CSS modules or
   styled-component systems without an explicit redesign request.
 
@@ -70,6 +77,8 @@ Existing copy is not evidence. Verify every product claim against the parent rep
 | Canonical performance hardware | `../benchmarks/hardware-profiles.json` |
 | Performance statements | compatible clean records under `../benchmarks/runs/` and generated `../benchmarks/HISTORY.md` |
 | Architecture, privacy, distribution | `../CLAUDE.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
+| Release contents and known limitations | the tag's notes under `../docs/releases/` |
+| Command line, its install, and `vocello mcp` | `../docs/reference/cli.md`, `../Sources/VocelloCLI`, and `../scripts/cli_package.py` |
 
 Voice Cloning has no instruction channel. Its delivery banks select verified reference clips,
 not engine emotion/intensity instructions. Keep public language aligned with

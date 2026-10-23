@@ -9,12 +9,12 @@ const ROWS = [
   },
   {
     k: "Ten languages, detected automatically",
-    v: "Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian. Vocello detects the script's language on its own, and a manual language choice is always available.",
+    v: "Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian. Vocello detects the script's language on its own, and a manual language choice is always available. The interface comes in ten languages too, chosen in Settings separately from the speech language.",
     tone: "var(--lavender-300)",
   },
   {
     k: "Downloads that behave",
-    v: "Model installs run up to six files at a time, retry interrupted transfers automatically, and verify integrity without re-reading multi-gigabyte files. Shared components are stored once across models, saving disk.",
+    v: "On a Mac, model installs run up to six files at a time and retry interrupted transfers automatically. Every file is checked against its exact size and SHA-256 digest before a model is used, and components shared between models are stored once, saving disk.",
     tone: "var(--terracotta-300)",
   },
 ];
@@ -49,7 +49,9 @@ export const Capabilities = () => (
           />
         </div>
         <figcaption className="caps-shot-caption">
-          Generation History keeps every take on your Mac, ready to replay, save, or export.
+          Generation History keeps the app's takes on your Mac, ready to replay, save, or
+          export. Pin a take's seed there, and later generations with the same settings
+          reproduce it.
         </figcaption>
       </figure>
     </div>

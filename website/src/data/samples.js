@@ -1,6 +1,11 @@
 /* `wave` arrays are per-bar RMS envelopes computed from the actual sample
    files by scripts/render-waveforms.mjs, so the Listen rows literally show
-   the local render. Regenerate them whenever a sample WAV changes. */
+   the local render. Regenerate them whenever a sample WAV changes.
+   Provenance: every sample predates 3.0. The narrator and Aiden files arrived
+   with the site's first commit (2026-05-20, the Vocello 2.0.0 release day);
+   the Ono Anna and Ryan files landed on 2026-07-28 (87e19bc3). Each row keeps
+   the delivery that produced it, so Aiden's row still says Excited, a preset
+   3.0 folds into Happy. Never present these files as 3.0 takes. */
 export const SAMPLES = [
   {
     id: "narrator",
@@ -52,15 +57,23 @@ export const SAMPLES = [
   },
 ];
 
+/* The delivery roster as the app's delivery menu groups and orders it: the
+   distinct deliveries (EmotionPreset.distinctDeliveryIDs, the release notes'
+   measured group) first, then the directional hints. */
+export const DELIVERY_GROUPS = [
+  { id: "distinct", label: "Distinct deliveries" },
+  { id: "hint", label: "Directional hints" },
+];
+
 export const DELIVERIES = [
-  { label: "Neutral", color: "var(--emotion-neutral)" },
-  { label: "Happy", color: "var(--emotion-happy)" },
-  { label: "Sad", color: "var(--emotion-sad)" },
-  { label: "Angry", color: "var(--emotion-angry)" },
-  { label: "Fearful", color: "var(--emotion-fearful)" },
-  { label: "Surprised", color: "var(--emotion-surprised)" },
-  { label: "Whisper", color: "var(--emotion-whisper)" },
-  { label: "Calm", color: "var(--emotion-calm)" },
+  { label: "Neutral", color: "var(--emotion-neutral)", group: "distinct" },
+  { label: "Sad", color: "var(--emotion-sad)", group: "distinct" },
+  { label: "Calm", color: "var(--emotion-calm)", group: "distinct" },
+  { label: "Whisper", color: "var(--emotion-whisper)", group: "distinct" },
+  { label: "Happy", color: "var(--emotion-happy)", group: "hint" },
+  { label: "Angry", color: "var(--emotion-angry)", group: "hint" },
+  { label: "Fearful", color: "var(--emotion-fearful)", group: "hint" },
+  { label: "Surprised", color: "var(--emotion-surprised)", group: "hint" },
 ];
 
 export const DELIVERY_COLORS = {

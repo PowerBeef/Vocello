@@ -7,8 +7,13 @@ const COMPARE = [
   { k: "Metering", vocello: "None", cloud: "Per character or per minute" },
   { k: "Account", vocello: "None", cloud: "Required" },
   {
+    k: "Automation and agents",
+    vocello: "The vocello command line and its MCP server, run locally",
+    cloud: "A web API called with an account key",
+  },
+  {
     k: "Raw English naturalness",
-    vocello: "Strong; judge the samples above",
+    vocello: "Varies by take; listen to the samples above",
     cloud: "The best cloud voices still lead",
   },
 ];
@@ -49,7 +54,8 @@ export const WhyCloud = () => (
         </table>
         <p className="compare-footnote">
           Setup is not air-gapped: models download from Hugging Face during setup and
-          updates. After that download, generation runs locally.
+          updates, and the Mac app checks GitHub for new versions when you allow it. After
+          the model download, generation runs locally.
         </p>
       </div>
     </div>

@@ -22,6 +22,11 @@ import React from "react";
   This section is a maintained whole-package surface (docs/reference/macos-release-qa.md
   "Technical sections are maintained surfaces"): refresh facts each release, never a
   single-release billboard.
+  Release 3.0.0: the anchor record (source 30e803a1, app 3.0.0 build 24) predates the engine
+  changes that shipped in 3.0.0 (CONV-21 MLX 0.32.3, RF-14 float32 sampling, RF-21 whole-script
+  prefill), and the release notes make no speed claim, so the copy calls it a development build.
+  The translucency gate (+33.6% warm RTF, 9b6f267b to d02005ae) was measured on the Mac mini M2.
+  The memory figures are OPTIMIZATION.md §F.1 and long-form smoke run 8f15c1fd, both on the M2.
 */
 const MODES = [
   { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.31, 0.28, 0.27] },
@@ -34,19 +39,19 @@ const RTF_SCALE_MAX = 1.2;
 const LEDGER = [
   {
     k: "Swift end to end",
-    v: "Generation runs through Vocello's own Swift runtime on MLX, derived from mlx-audio-swift and narrowed to the Qwen3 voice stack: about 36,000 of 49,000 upstream lines removed, no Python, no local server.",
+    v: "Generation runs through Vocello's own Swift runtime on MLX, derived from mlx-audio-swift and narrowed to the Qwen3 voice stack: about 36,000 of 49,000 upstream lines removed, no Python, no local HTTP server.",
   },
   {
     k: "One engine, three hosts",
-    v: "In 3.0 the Mac engine runs inside the app, exactly as on the iPhone, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure and unloads an idle model. Vocello 2.4.0 still runs it in a separate service process. The command-line tool drives the same engine with no UI.",
+    v: "The Mac app runs the engine in-process, with no separate service, as the iPhone app does, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure and unloads an idle model. The vocello command line hosts the same engine through the Mac app's engine store, with the same admission and memory checks and no UI.",
   },
   {
     k: "Streaming by design",
-    v: "Audio leaves the engine chunk by chunk, so memory stays flat however long the script runs: peak use fell from about 8 GB to about 3 GB, and a ten-minute project ends below its starting footprint.",
+    v: "Audio leaves the engine chunk by chunk, so memory stays flat however long the script runs. On the 8 GB Mac mini M2, streaming took the peak of the same take from about 8 GB to about 3 GB, and a 12-segment project with 10.4 minutes of audio ended 1.1 percent below its starting footprint.",
   },
   {
     k: "Reproducible by construction",
-    v: "Every request carries its own seed and sampler state. Performance changes merge only when fixed-seed output stays byte-identical, so speed work can never quietly change the voice.",
+    v: "Every request carries its own seed and sampler state, so the same request and seed reproduce a take on the same version. Performance changes are checked against fixed-seed takes, so a speed change that alters the audio shows up before it merges. A seed from a version before 3.0 does not reproduce its old take, because sampling changed.",
   },
   {
     k: "Honest benchmarks",
@@ -125,8 +130,11 @@ export const Engineering = () => (
         <p className="section-note">Measured, not promised</p>
         <h2 id="eng-title" className="section-title">A first-party engine, measured take by take.</h2>
         <p className="section-sub">
-          The speed figures were measured on Vocello's benchmark host, a Mac mini M6 with 16 GB;
-          the chart comes from a Vocello 3.0 build from source. The memory figures come from
+          The speed chart comes from one record on Vocello's benchmark host, a Mac mini M6
+          with 16 GB: a 3.0 development build measured on October 7, 2026. The engine changed
+          after it (a newer MLX, full-precision sampling, takes that read the whole script
+          first), and no benchmark of the released build is published yet, so the chart is
+          not a measurement of 3.0.0 itself. The memory figures come from earlier records on
           the 8 GB Mac mini M2, the support floor.
           Speed is the real-time factor: seconds of generation per second of audio.
           Below 1.0, audio generates ahead of playback, and every number here traces
@@ -138,9 +146,10 @@ export const Engineering = () => (
         <figure className="perf-panel">
           <RtfChart />
           <figcaption className="perf-caption">
-            Warm generation by mode and script length, take medians. Since 2.2,
-            translucent app surfaces render solid while audio generates, which
-            improved speed on the same take by about a third.
+            Warm generation by mode and script length, take medians, from a 3.0
+            development build. Translucent app surfaces render solid while audio
+            generates; on the 8 GB Mac mini M2, that change sped up the same take by
+            about a third.
           </figcaption>
         </figure>
 

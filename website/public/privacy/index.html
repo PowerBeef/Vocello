@@ -44,6 +44,7 @@
       strong { color: var(--ink); font-weight: 600; }
       ul { padding-left: 20px; }
       li { margin: 6px 0; }
+      code { color: var(--ink); overflow-wrap: anywhere; }
       hr { border: none; border-top: 1px solid var(--rule); margin: 40px 0; }
       .tldr {
         background: var(--surface);
@@ -60,30 +61,32 @@
     <main class="wrap">
       <a class="back" href="/">&larr; Vocello</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: October 20, 2026</p>
+      <p class="updated">Last updated: October 22, 2026</p>
       <p class="lede">
-        Vocello is a local, on-device voice studio for Apple Silicon. It is built so your
-        work stays on your device. Vocello does not collect, track, or sell your personal
-        data, and your work never leaves your device.
+        Vocello is a local, on-device voice studio for Apple Silicon: a Mac app, an iPhone app,
+        and the <code>vocello</code> command line. It is built so your work stays on your
+        device. Vocello does not collect, track, or sell your personal data, and Vocello itself
+        never sends your work off your device.
       </p>
 
       <div class="tldr">
         <p>
-          <strong>The short version:</strong> the app has no account and no analytics. Your
-          scripts, generated audio, recorded reference clips, transcripts, history, and saved
-          voices stay on your device. Vocello's only network requests are downloads of the AI
-          voice models from Hugging Face when you choose to install one, on iPhone, App Store
-          purchases, which Apple handles, and on Mac, if you allow it, a check for a newer
-          version of the app.
+          <strong>The short version:</strong> the apps and the command line have no account and
+          no analytics. Your scripts, generated audio, recorded reference clips, transcripts,
+          history, and saved voices stay on your device. Vocello's only network requests are
+          downloads of the AI voice models from Hugging Face when you choose to install one, on
+          iPhone, App Store purchases, which Apple handles, and on Mac, if you allow it, a check
+          for a newer version of the app. If you connect an AI agent to <code>vocello mcp</code>,
+          that agent sees what you let it read, and its own privacy terms apply to it.
         </p>
       </div>
 
       <h2>What Vocello does not do</h2>
       <ul>
         <li>No account, sign-in, or user profile.</li>
-        <li>No analytics, telemetry, advertising, or third-party tracking SDKs in the app.</li>
+        <li>No analytics, telemetry, advertising, or third-party tracking SDKs in the apps or the command line.</li>
         <li>No selling or sharing of any data, because none is collected.</li>
-        <li>No transmission of your scripts, recordings, transcripts, or generated audio off your device.</li>
+        <li>No transmission of your scripts, recordings, transcripts, or generated audio off your device by Vocello.</li>
       </ul>
 
       <h2>Data stored on your device</h2>
@@ -115,7 +118,8 @@
       <h2>Network use</h2>
       <p>
         Vocello's own network activity is downloading AI voice model files from Hugging Face,
-        and only when you install a model. These are ordinary anonymous file downloads over
+        and only when you install a model, in an app or with <code>vocello models install</code>.
+        These are ordinary anonymous file downloads over
         HTTPS: Vocello sends no account, identifier, script, recording, or generated audio, and
         receives nothing back except the model files. As with any web server, Hugging Face
         receives your IP address and standard request details, which it handles under its own
@@ -134,7 +138,53 @@
         your IP address and standard request details, including the app's version, which it
         handles under its own
         <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noreferrer">privacy statement</a>;
-        Vocello does not receive or keep them.
+        Vocello does not receive or keep them. Every update is signed, and the app checks that
+        signature before installing it.
+      </p>
+
+      <h2>Marking on generated audio</h2>
+      <p>
+        Every WAV file Vocello generates, in the apps and the command line, carries an inaudible
+        AudioSeal watermark with a fixed Vocello payload and a short provenance note naming the
+        generator, its version, the engine, the model, the mode, and the creation time, so the
+        file can be identified as AI-generated. The marking is the same for everyone: it holds
+        no account, device, or personal identifier, and nothing about it is sent anywhere. Live
+        preview audio heard before the file is written is not marked.
+      </p>
+
+      <h2>The vocello command line</h2>
+      <p>
+        The <code>vocello</code> command line runs on your Mac and uses the Mac app's local data
+        folder, <code>~/Library/Application Support/QwenVoice</code>: the same models, saved
+        voices, and settings, and it reads the app's History. Takes it generates are saved as
+        WAV files, by default in <code>outputs/cli</code> inside that folder, or where you choose.
+        When a request carries a client request ID, its result is kept in that folder for seven
+        days so a retry can replay it instead of generating again.
+      </p>
+      <p>
+        Its only network activity is the Hugging Face model download described above, when you
+        run <code>vocello models install</code> or <code>vocello models install-recommended</code>.
+        Generation and voice enrollment run on your Mac. When it transcribes a reference clip,
+        it uses Apple's on-device speech recognition, and by default only when Speech
+        Recognition is already allowed for your terminal, so it does not prompt unless you ask
+        it to.
+      </p>
+
+      <h2>AI agents and vocello mcp</h2>
+      <p>
+        <code>vocello mcp</code> lets an AI agent you set up, such as Claude Code or Claude
+        Desktop, use Vocello through the Model Context Protocol. The agent starts the server on
+        your Mac and talks to it over standard input and output only: the server opens no
+        network port and makes no network request of its own, except a model download when you
+        start it with <code>--allow-model-install</code> and the agent asks for one.
+      </p>
+      <p>
+        The agent sees what its requests return, which can include saved voice names and
+        transcripts, History text, settings, and file paths, and it may send that to its own AI
+        service under that service's terms. Vocello does not control what the agent does with
+        it. Cloning a voice or saving one needs consent in each request, and a file that a
+        request names is read or written only inside Vocello's output folder unless you start
+        the server with <code>--allow-dir</code>.
       </p>
 
       <h2>Optional export</h2>
@@ -150,6 +200,7 @@
         <li>Delete saved voices from the Voices library.</li>
         <li>Delete downloaded models from Settings.</li>
         <li>On macOS, deleting the Vocello app does not delete its models, voices, outputs, history, or diagnostics from <code>~/Library/Application Support/QwenVoice</code>. Remove that folder separately only after exporting anything you want to keep.</li>
+        <li>Removing the command line, with <code>sudo sh /usr/local/lib/vocello/uninstall.sh</code> for the installer package or by deleting a copied Vocello CLI folder, leaves that same data folder, including the takes in <code>outputs/cli</code>, in place.</li>
         <li>On iPhone, use Vocello's visible deletion controls to remove models, saved voices, generated audio, and history before uninstalling when you need an explicit deletion workflow.</li>
       </ul>
 
@@ -157,8 +208,8 @@
       <p>
         This site (vocello.vercel.app) is hosted on Vercel and uses Vercel Web Analytics, a
         cookieless, aggregate count of page visits. It sets no cookies, stores no identifiers
-        on your device, and does not follow you across sites. The apps themselves contain no
-        analytics of any kind.
+        on your device, and does not follow you across sites. The apps and the command line
+        contain no analytics of any kind.
       </p>
 
       <h2>Children</h2>
@@ -179,7 +230,7 @@
       </p>
 
       <hr />
-      <footer>Vocello. Released under the MIT License. This policy describes the iOS and macOS apps and this website.</footer>
+      <footer>Vocello. Released under the MIT License. This policy describes the iOS and macOS apps, the vocello command line, and this website.</footer>
     </main>
   </body>
 </html>

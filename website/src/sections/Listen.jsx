@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
 import { Waveform } from "../components/Waveform.jsx";
-import { SAMPLES, DELIVERIES } from "../data/samples.js";
+import { SAMPLES, DELIVERIES, DELIVERY_GROUPS } from "../data/samples.js";
 import { Screenshot } from "../components/Screenshot.jsx";
 
 export const Listen = () => {
@@ -37,9 +37,9 @@ export const Listen = () => {
           <p className="section-sub">
             Each row carries the brief or speaker, the script, the delivery setting that
             produced it, and a waveform from the local render. The set includes a Japanese
-            take and a 31 second narration. The samples come from Vocello 2.x, so one row
-            uses Excited, a preset that 3.0 folds into Happy. Install Vocello to generate
-            your own.
+            take and a 31 second narration. These samples were made with earlier versions,
+            before 3.0, so one row uses Excited, a delivery that 3.0 folds into Happy.
+            Install Vocello to generate your own.
           </p>
         </div>
 
@@ -84,20 +84,25 @@ export const Listen = () => {
         </ul>
 
         <div className="listen-deliveries">
-          <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
+          <div className="vc-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
-            In 3.0, Built-in Voice and Voice Design shape a take with one of eight delivery
-            presets or a delivery you describe in your own words. Vocello 2.4.0 offers ten
-            delivery styles at subtle, normal, or strong intensity.
+            Built-in Voice and Voice Design shape a take with one of eight delivery presets
+            or a delivery you describe in your own words. Directional hints shape energy and
+            pace, but the named emotion may not come through on every take.
           </p>
-          <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">
-            {DELIVERIES.map((d) => (
-              <span key={d.label} role="listitem" className="chip" style={{ "--chip-color": d.color }}>
-                <span className="swatch" aria-hidden="true" />
-                {d.label}
-              </span>
-            ))}
-          </div>
+          {DELIVERY_GROUPS.map((group) => (
+            <React.Fragment key={group.id}>
+              <div className="vc-label" id={`delivery-${group.id}-label`}>{group.label}</div>
+              <div className="try-chips" role="list" aria-labelledby={`delivery-${group.id}-label`}>
+                {DELIVERIES.filter((d) => d.group === group.id).map((d) => (
+                  <span key={d.label} role="listitem" className="chip" style={{ "--chip-color": d.color }}>
+                    <span className="swatch" aria-hidden="true" />
+                    {d.label}
+                  </span>
+                ))}
+              </div>
+            </React.Fragment>
+          ))}
         </div>
 
         <figure className="try-shot">
@@ -109,7 +114,8 @@ export const Listen = () => {
             />
           </div>
           <figcaption className="try-shot-caption">
-            All eight presets and the free-text delivery live in the 3.0 app.
+            The delivery menu: the distinct deliveries first, the directional hints after
+            them, and Custom for a delivery in your own words.
           </figcaption>
         </figure>
       </div>

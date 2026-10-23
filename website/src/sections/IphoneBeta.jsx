@@ -17,13 +17,17 @@ export const IphoneBeta = () => (
           recording, audio file import, or a saved voice as the cloning reference, and local
           history.
         </p>
+        <p className="section-sub">
+          It is a public beta on TestFlight while its App Store release is prepared. There is
+          no release date yet.
+        </p>
         <div className="hero-ctas">
           <a className="btn btn-primary" href={TESTFLIGHT} target="_blank" rel="noreferrer">
             <Icon name="apple" size={16} />
             Join the public beta on TestFlight
           </a>
         </div>
-        <p className="hero-meta">Public TestFlight beta · iPhone 15 Pro or newer · iOS 26</p>
+        <p className="hero-meta">Public TestFlight beta · iPhone 15 Pro or newer · iOS 26 or later</p>
       </div>
       <figure className="iphone-stage">
         <Screenshot

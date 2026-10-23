@@ -4,19 +4,35 @@ import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "../data/release.js";
 const LIMITATIONS = [
   {
     k: "macOS 26+",
-    v: `Vocello ${STABLE_MAC_RELEASE.version} targets macOS 26. QwenVoice ${FALLBACK_MAC_RELEASE.version} remains the macOS 15 fallback.`,
+    v: `Vocello ${STABLE_MAC_RELEASE.version} and its command line target macOS 26. QwenVoice ${FALLBACK_MAC_RELEASE.version} remains the macOS 15 fallback.`,
   },
   {
-    k: "Apple Silicon only",
-    v: "The app is built around Swift, MLX, and local model packages for Apple Silicon Macs.",
+    k: "Apple Silicon and memory",
+    v: "Vocello needs an Apple Silicon Mac with at least 8 GB of unified memory. Quality models use larger 8-bit packages and need more headroom than Speed models; 16 GB or more is recommended for them and for long projects.",
+  },
+  {
+    k: "Command line install",
+    v: "The command line is arm64 only, and its installer package needs an administrator password. Without one, copy the Vocello CLI folder from its disk image and keep its executable and resource bundles together.",
+  },
+  {
+    k: "Command line and History",
+    v: "Takes made with the command line, including through vocello mcp, are saved as files and do not appear in History yet; a 3.0 update adds that. The command line reads History only while the Vocello app is closed.",
+  },
+  {
+    k: "Take quality",
+    v: "Take quality is not verified by human listening. Automated checks catch gross failures (silence, a cut-off or unfinished take, missing words, the wrong language), but a take can still carry subtle defects, such as a swallowed syllable or delivery that misses the requested style. Generate again for a different take.",
+  },
+  {
+    k: "Rejected takes",
+    v: "Some French and Chinese takes fail the mandatory audio check, and rarely a long-form take develops a long silent gap without finishing. Vocello rejects such a take instead of saving it and never regenerates one silently; generate it again.",
+  },
+  {
+    k: "Seeds from earlier versions",
+    v: "Sampling changed in 3.0, so a seed pinned in an earlier version does not reproduce its old take.",
   },
   {
     k: "iPhone is in beta",
-    v: "The iPhone app ships as a public TestFlight beta, separate from this Mac release. It needs an iPhone 15 Pro or newer.",
-  },
-  {
-    k: "Quality is heavier",
-    v: "Quality models use larger 8-bit packages and need more memory headroom than Speed models.",
+    v: "The iPhone app is a public TestFlight beta until its App Store release, which has no date yet. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
   },
   {
     k: "Cloning varies",
@@ -24,7 +40,7 @@ const LIMITATIONS = [
   },
   {
     k: "AI disclosure",
-    v: "If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
+    v: "Generated audio files carry an inaudible watermark marking them as AI-generated, but live preview audio heard before the file is written is not marked. If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
   },
 ];
 
@@ -37,8 +53,8 @@ export const Limitations = () => (
           The honest edges.
         </h2>
         <p className="section-sub">
-          Vocello is a stable Mac release, not a claim that every machine,
-          workflow, or voice reference behaves the same.
+          Vocello is a stable release on the Mac and in the terminal, not a claim that every
+          machine, workflow, or voice reference behaves the same.
         </p>
       </div>
 

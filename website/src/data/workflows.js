@@ -9,10 +9,10 @@ export const WORKFLOWS = [
     eyebrow: "Selected speaker presets",
     headline: ["Pick a voice.", " Set the delivery.", " Generate."],
     accent: "Set the delivery.",
-    body: "Choose one of nine built-in Qwen3-TTS CustomVoice speaker presets, set the delivery, and turn a script into a clean spoken line. The simplest path when you want a consistent voice right away.",
+    body: "Choose one of nine built-in Qwen3-TTS CustomVoice speaker presets, set the delivery, and turn a script into a spoken line. A single take reads its whole script before it speaks. The simplest path when you want a consistent voice right away.",
     points: [
       ["Nine built-in speaker presets", "English, Chinese, Japanese, and Korean native presets, each tuned to its language."],
-      ["Delivery presets", "In 3.0, eight delivery presets: four distinct deliveries (Neutral, Calm, Whisper, Sad) that come through reliably, and four directional hints (Happy, Sad-adjacent Fearful, Angry, Surprised) that shape energy and pace. Vocello 2.4.0 offers ten delivery styles at subtle, normal, or strong intensity."],
+      ["Delivery presets", "Neutral, Sad, Calm, and Whisper are the distinct deliveries, the measured group. Happy, Angry, Fearful, and Surprised are directional hints that shape energy and pace, not promises of the exact emotion."],
       ["Custom tone field", "Describe the delivery in your own words when the chips aren't enough."],
     ],
     shot: "assets/screens/custom-voice.png",
@@ -49,7 +49,7 @@ export const WORKFLOWS = [
     points: [
       ["Saved, recorded, or imported", "Pick any voice from Saved Voices, record a clip in the app, or import a reference file on either platform. The Mac open panel accepts WAV, MP3, AIFF, M4A, or FLAC, plus OGG where macOS can decode it; the iPhone Files picker accepts WAV, MP3, AIFF, or M4A. Saved Voices are optimized for repeat use."],
       ["Transcript-backed quality", "Paste the words spoken in the clip, or let Vocello transcribe them locally, for the strongest reusable clone prompt. Audio-only references remain available as a lower-guidance fallback."],
-      ["Source-led delivery", "Voice Cloning follows the reference clip. Delivery presets are not exposed for this path today."],
+      ["Source-led delivery", "Voice Cloning follows the reference clip and takes no delivery instruction. A cloned voice with a curated emotion reference bank offers a delivery choice, each delivery backed by its own verified reference clip."],
     ],
     shot: "assets/screens/voice-cloning.png",
   },

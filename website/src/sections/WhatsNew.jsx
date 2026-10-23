@@ -1,6 +1,7 @@
 import React from "react";
 import { MAC_DMG, RELEASE_NOTES } from "../data/credits.js";
 import {
+  IPHONE_NOTE,
   MAC_HIGHLIGHTS,
   QUALITY_NOTE,
   SHARED_HIGHLIGHTS,
@@ -49,7 +50,8 @@ export const WhatsNew = () => (
         </div>
 
         <div className="whatsnew-shared">
-          <h3 className="whatsnew-group-title">On Mac and iPhone</h3>
+          <h3 className="whatsnew-group-title">In both apps</h3>
+          <p className="whatsnew-shared-note">{IPHONE_NOTE}</p>
           <dl className="whatsnew-list">
             {SHARED_HIGHLIGHTS.map((item) => (
               <div className="whatsnew-row" key={item.k}>
@@ -61,8 +63,8 @@ export const WhatsNew = () => (
         </div>
       </div>
 
-      <aside className="whatsnew-upgrade" aria-labelledby="whatsnew-upgrade-title">
-        <h3 id="whatsnew-upgrade-title" className="whatsnew-upgrade-title">Before you upgrade</h3>
+      <div className="whatsnew-upgrade">
+        <h3 className="whatsnew-upgrade-title">Before you upgrade</h3>
         <div className="whatsnew-upgrade-body">
           <p>{UPGRADE_NOTE}</p>
           <p>{QUALITY_NOTE}</p>
@@ -74,7 +76,7 @@ export const WhatsNew = () => (
             </a>
           </p>
         </div>
-      </aside>
+      </div>
     </div>
   </section>
 );

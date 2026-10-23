@@ -12,14 +12,15 @@ export const IphoneBeta = () => (
           The same studio, in your pocket.
         </h2>
         <p className="section-sub">
-          The iPhone app runs the same local engine in-process on the phone: Built-in Voice,
+          The iPhone app runs its engine locally, in-process on the phone: Built-in Voice,
           Voice Design, and Voice Cloning with the memory-conscious Speed model, microphone
           recording, audio file import, or a saved voice as the cloning reference, and local
           history.
         </p>
         <p className="section-sub">
-          It is a public beta on TestFlight while its App Store release is prepared. There is
-          no release date yet.
+          The public TestFlight beta runs version 2.4. The iPhone app's 3.0 version, on the
+          same engine as the Mac app, follows in the coming days through TestFlight and then
+          the App Store.
         </p>
         <div className="hero-ctas">
           <a className="btn btn-primary" href={TESTFLIGHT} target="_blank" rel="noreferrer">

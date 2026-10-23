@@ -517,6 +517,14 @@ picture {
   color: var(--fg-secondary);
 }
 
+.whatsnew-shared-note {
+  margin: 14px 0 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-tertiary);
+  text-wrap: pretty;
+}
+
 .whatsnew-list { margin: 0; }
 
 .whatsnew-row {
@@ -1655,6 +1663,15 @@ picture {
   margin: 0 auto 36px;
   max-width: 520px;
   line-height: 1.55;
+}
+
+.cta-models {
+  margin: 32px auto 0;
+  max-width: 620px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg-secondary);
+  text-wrap: pretty;
 }
 
 .cta-meta {

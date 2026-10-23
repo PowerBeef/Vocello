@@ -10,7 +10,8 @@ Vocello is a local-first voice studio for Apple Silicon: a Mac app, the `vocello
 `docs/releases/v3.0.0.md` is the public account of this release; quote it rather than older copy.
 - Mac app: redesigned on the iPhone app's visual language; the engine runs inside the app; it updates itself with Sparkle (Vocello > Check for Updates, with automatic checks as a setting). macOS 26 or later, Apple Silicon, 8 GB minimum, 16 GB or more recommended for the Quality models and long projects.
 - Command line: a signed, notarized installer package (`Vocello-macos26-cli.pkg`, needs an administrator password) or a copyable Vocello CLI folder (`Vocello-macos26-cli.dmg`); arm64 only. It shares the app's models, saved voices, and settings and reads History (only while the app is closed). Its takes are files and do not appear in History yet; a 3.0 update adds that. `--json` and `--ndjson` give a typed machine contract, and `vocello mcp` serves AI agents over stdio. `../docs/reference/cli.md` and `../Sources/VocelloCLI` own its facts.
-- Both platforms: AudioSeal marking on generated files (live preview is not marked), the interface in ten languages, a take's seed pinned from History, the distinct deliveries, the measured group (Neutral, Sad, Calm, Whisper, as the app's delivery menu orders them), beside directional hints (Happy, Angry, Fearful, Surprised), Built-in Voice and Voice Design takes that read the whole script first (long-form projects keep the previous layout), and ten speech languages.
+- iPhone timing: the iPhone app's 3.0 version follows in the coming days through the public TestFlight beta and then the App Store; until then the beta runs version 2.4. Copy never implies the iPhone has a 3.0 feature yet: shared changes are "in both apps", with that timing beside them.
+- Both apps (the iPhone app with its 3.0 version): AudioSeal marking on generated takes only (reference clips you record or import and live preview are not marked), the interface in ten languages, a take's seed pinned from History, the distinct deliveries, the measured group (Neutral, Sad, Calm, Whisper, as the app's delivery menu orders them), beside directional hints (Happy, Angry, Fearful, Surprised), Built-in Voice and Voice Design takes that read the whole script first (long-form projects keep the previous layout), and ten speech languages.
 - Limits stay visible: take quality is not verified by human listening, and automated checks catch gross failures only. The Listen samples predate 3.0 and are never presented as 3.0 takes.
 
 ## Audience
@@ -26,6 +27,7 @@ Warm, clear, confident, and human. Vocello explains local AI generation plainly.
 - Say local, not offline or on-device, unless the technical distinction matters.
 - Say generate, voice, script, Voice brief, Speed, Quality, Saved Voices, Generation History, and Models & Files (the Mac Settings category; Voice Models on iPhone) consistently.
 - Call the CLI "the command line" or "the `vocello` command line", and show commands exactly as `../docs/reference/cli.md` gives them.
+- Every copyable command block runs as written in Terminal on a fresh Mac: no `#` comments (zsh does not accept them when pasted), no placeholder files, and only models an earlier block installs. Explain the commands in the prose around the block.
 - Avoid celebration copy, emoji, hype claims, and first-person plural.
 - Use sentence case. Reserve all caps for tiny labels only when they are truly needed.
 - Do not use em dashes in visible copy.

@@ -27,12 +27,16 @@ const LIMITATIONS = [
     v: "Some French and Chinese takes fail the mandatory audio check, and rarely a long-form take develops a long silent gap without finishing. Vocello rejects such a take instead of saving it and never regenerates one silently; generate it again.",
   },
   {
+    k: "Consistent long-form stalls",
+    v: "Long-form projects using the Consistent take variation can still stall, though far less often than in earlier builds: a segment of about a minute may pause for several seconds or never finish. Audio QC rejects that segment instead of saving it, and Resume retries it with a fresh seed. This was not observed with Expressive, the default.",
+  },
+  {
     k: "Seeds from earlier versions",
     v: "Sampling changed in 3.0, so a seed pinned in an earlier version does not reproduce its old take.",
   },
   {
     k: "iPhone is in beta",
-    v: "The iPhone app is a public TestFlight beta until its App Store release, which has no date yet. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
+    v: "The iPhone app is a public TestFlight beta that runs version 2.4. Its 3.0 version follows in the coming days through TestFlight and then the App Store. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
   },
   {
     k: "Cloning varies",
@@ -40,7 +44,7 @@ const LIMITATIONS = [
   },
   {
     k: "AI disclosure",
-    v: "Generated audio files carry an inaudible watermark marking them as AI-generated, but live preview audio heard before the file is written is not marked. If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
+    v: "From 3.0, generated takes are saved with an inaudible watermark marking them as AI-generated (on iPhone, from its 3.0 version). Reference clips you record or import are not marked, and neither is live preview audio heard before the file is written. If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
   },
 ];
 

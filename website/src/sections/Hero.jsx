@@ -14,6 +14,7 @@ export const Hero = () => (
         <a className="hero-eyebrow" href="#whats-new">
           <span className="dot" aria-hidden="true" />
           Vocello {releaseLabel} · macOS 26+ · Apple Silicon
+          <span className="sr-only"> (see what's new in {releaseLabel})</span>
         </a>
         <h1 className="hero-title">
           Premium voice studio. <span className="accent-gold">Proven performance.</span>{" "}

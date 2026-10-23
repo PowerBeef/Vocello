@@ -20,11 +20,15 @@ export const MAC_HIGHLIGHTS = [
   },
 ];
 
-// Shared changes, Mac and iPhone alike.
+// The iPhone app's 3.0 timing, as the release notes' iPhone section gives it.
+export const IPHONE_NOTE =
+  "The iPhone app's 3.0 version brings the same engine and these changes. It follows in the coming days through the public TestFlight beta and then the App Store; until then the beta runs version 2.4.";
+
+// Shared changes, in both apps (on iPhone, with its 3.0 version).
 export const SHARED_HIGHLIGHTS = [
   {
     k: "Generated audio is marked",
-    v: "Every generated WAV, in the apps and the command line, carries an inaudible AudioSeal watermark and a machine-readable provenance note naming the generator, version, model and mode. Live preview audio heard before the file is written is not marked, and publishing a cloned real voice still calls for your own disclosure.",
+    v: "Every generated WAV, in the apps and the command line, carries an inaudible AudioSeal watermark and a machine-readable provenance note naming the generator, version, model and mode. Only generated takes are marked: reference clips you record or import are not, and neither is live preview audio heard before the file is written. Publishing a cloned real voice still calls for your own disclosure.",
   },
   {
     k: "Interface in ten languages",
@@ -49,7 +53,7 @@ export const SHARED_HIGHLIGHTS = [
 ];
 
 export const UPGRADE_NOTE =
-  "Upgrading from 2.4? Install the new DMG as usual: History, saved voices and settings carry over. 3.0 uses updated model packages that include the audio-marking weights, so the model manager offers an update for each model you installed with 2.x.";
+  "Upgrading from 2.4? Install the new DMG by hand once, as usual, since 2.4 has no updater: History, saved voices and settings carry over. 3.0 uses updated model packages that include the audio-marking weights, so the model manager offers an update for each model you installed with 2.x. From 3.0 on, the app updates itself with Vocello > Check for Updates.";
 
 export const QUALITY_NOTE =
   "Take quality in 3.0 is not verified by human listening. Automated checks catch gross failures (silence, a cut-off take, missing words, the wrong language), and a take can still carry subtle defects; generate again for a different take. A seed from an earlier version does not reproduce the same take.";

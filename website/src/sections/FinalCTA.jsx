@@ -44,8 +44,8 @@ export const FinalCTA = () => (
             <h3 className="way-k">Command line</h3>
             <p className="way-v">
               The installer package links <code className="cli-inline">vocello</code> in
-              /usr/local/bin and asks for an administrator password. Or copy the Vocello CLI
-              folder from the{" "}
+              /usr/local/bin and asks for an administrator password; install a newer package to
+              update it. Or copy the Vocello CLI folder from the{" "}
               <a className="cta-meta-link" href={CLI_DMG}>folder DMG</a>.
             </p>
             <p className="way-meta">Vocello-macos26-cli.pkg · Apple Silicon only</p>
@@ -59,8 +59,8 @@ export const FinalCTA = () => (
           <div className="way-copy">
             <h3 className="way-k">iPhone</h3>
             <p className="way-v">
-              The iPhone app runs the same engine and stays in public TestFlight until its App
-              Store release.
+              The public TestFlight beta runs version 2.4. The iPhone app's 3.0 version, on the
+              same engine, follows in the coming days through TestFlight and then the App Store.
             </p>
             <p className="way-meta">iPhone 15 Pro or newer · iOS 26.0 or later</p>
           </div>
@@ -72,6 +72,12 @@ export const FinalCTA = () => (
       </ul>
 
       <div className="cta-block">
+        <p className="cta-models">
+          Models are not bundled: each downloads once from Hugging Face, so installing one needs
+          an internet connection. Check the model sizes and your free storage first. The three
+          Speed models take about 4.8 GB together, because they share one speech tokenizer,
+          stored once. Generation then runs locally.
+        </p>
         <p className="cta-meta">
           macOS 26.0+
           <span className="cta-meta-sep" aria-hidden="true">·</span>

@@ -13,9 +13,9 @@ const ROWS = [
     v: "App or terminal",
     note: (
       <>
-        The Mac app and the vocello command line host the same engine in-process, as the
-        iPhone app does on the phone. The command line shares the app's models, saved voices,
-        and settings, reads its History, and can serve AI agents over MCP. See{" "}
+        The Mac app and the vocello command line host the same engine in-process. The
+        command line shares the app's models, saved voices, and settings, reads its History,
+        and can serve AI agents over MCP. See{" "}
         <a className="cta-meta-link" href="#cli">command line and agents</a>.
       </>
     ),
@@ -36,7 +36,7 @@ const ROWS = [
   {
     k: "Speed model",
     v: "4-bit",
-    note: "Smaller package, faster startup, lower memory. Vocello defaults to Speed on 8 GB Macs. Manage models in Settings, Models & Files, or with vocello models in the terminal.",
+    note: "Smaller package, faster startup, lower memory: the three Speed models take about 4.8 GB together, sharing one speech tokenizer. Vocello defaults to Speed on 8 GB Macs. Check free storage before you install, and manage models in Settings, Models & Files, or with vocello models in the terminal.",
     tone: "var(--status-ready)",
   },
   {

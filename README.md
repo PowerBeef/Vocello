@@ -35,7 +35,7 @@ Generation runs locally once the models are installed. Scripts, recordings, voic
 <img src="docs/readme/icons/fast.svg" width="40" height="40" alt="">
 
 **Fast**<br>
-On a Mac mini M6, once the model is loaded, a minute of speech generates in under 20 seconds, and long scripts play while the rest is still being made.
+Measured on a Mac mini M6 (16 GB) with the Speed models and a 3.0 development build (record `74f026be`): once the model is loaded, a minute of speech generates in under 20 seconds, and long scripts play while the rest is still being made.
 
 </td>
 <td width="33%" valign="top">
@@ -59,19 +59,19 @@ Swift and MLX on Apple Silicon, with no Python and no server. Ten languages, lon
 
 Paste a whole chapter: past 900 characters, Vocello plans the script into segments that play one after another while the rest generates, then joins them into one file. Languages are detected automatically: Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish and Italian.
 
-Clone generation waits for your consent in Settings, and every audio file Vocello writes carries an inaudible AudioSeal watermark that marks it as AI-generated.
+Clone generation waits for your consent in Settings. From 3.0, every take Vocello generates is saved with an inaudible AudioSeal watermark that marks it as AI-generated; reference clips you record or import are not marked.
 
 > [!NOTE]
 > Take quality is not verified by human listening. Automated checks catch gross failures only (silence, a cut-off or unfinished take, missing words, the wrong language), so a take can still carry subtle defects, such as a swallowed syllable, a short false start or a delivery that misses the requested style. Generate again for a different take. The [3.0.0 release notes](docs/releases/v3.0.0.md#evidence-and-limitations) list the known limitations.
 
 ## What's new in 3.0
 
-Vocello 3.0.0 is the current release of the Mac app and the command line. The iPhone app runs the same engine and stays in public TestFlight until its App Store release.
+Vocello 3.0.0 is the current release of the Mac app and the command line. The iPhone app's 3.0 version, on the same engine, follows in the coming days through the public TestFlight beta and then the App Store; until then the beta runs version 2.4.
 
 - **A redesigned Mac app.** The Mac app adopts the iPhone app's visual language: four sidebar destinations, the Studio canvas with its setup chips and mode colors, and Settings in categories. Its engine now runs inside the app, as on iPhone, with one lifecycle and one memory policy for both.
 - **Updates from inside the app.** Choose **Vocello > Check for Updates**, or let Vocello check on its own schedule, a setting you can turn off. Every update is signed, and the app checks that signature before installing.
 - **A command line for scripts and AI agents.** `vocello` installs with a signed package, gives every command a JSON contract and serves AI agents over the Model Context Protocol. See [Command line and AI agents](#command-line-and-ai-agents).
-- **Generated audio is marked as AI-generated.** Every WAV the apps and the command line write carries the AudioSeal watermark and a provenance note naming the generator, model and mode. Live preview audio heard before the file is written is not marked, and publishing a cloned real voice still calls for your own disclosure.
+- **Generated audio is marked as AI-generated.** Every take the apps and the command line generate is saved as a WAV with the AudioSeal watermark and a provenance note naming the generator, model and mode. Only generated takes are marked: reference clips you record or import are not, and neither is live preview audio heard before the file is written. Publishing a cloned real voice still calls for your own disclosure.
 - **The interface in ten languages.** English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified Chinese, Japanese, Korean and Russian, chosen in Settings separately from the speech language.
 - **Pin a take's seed.** Every finished take records its seed. Pin it from History, and later generations with the same settings reproduce the take; leave it unpinned for a fresh take each time.
 - **Clearer delivery choices.** Neutral, Calm, Whisper and Sad are the measured deliveries. Happy, Angry, Fearful and Surprised are directional hints that shape energy and pace, not promises of an exact emotion.
@@ -98,9 +98,9 @@ Every published record is in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md), a
 
 **On a Mac:** [download Vocello 3.0.0](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26.dmg), drag it to Applications, then install a voice model from **Settings > Models & Files**. The app is signed with an Apple Developer ID and notarized, and it updates itself from then on (**Vocello > Check for Updates**).
 
-**In Terminal:** [download the `vocello` installer package](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg). [Command line and AI agents](#command-line-and-ai-agents) covers the folder alternative, removal and connecting AI agents.
+**In Terminal:** [download the `vocello` installer package](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg). [Command line and AI agents](#command-line-and-ai-agents) covers the folder alternative, updates, removal and connecting AI agents.
 
-**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The iPhone app stays in TestFlight until its App Store release.
+**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta runs version 2.4; the iPhone app's 3.0 version follows in the coming days through TestFlight and then the App Store.
 
 | Platform | Requirements | Model variants | Status |
 | --- | --- | --- | --- |
@@ -115,7 +115,7 @@ Speed uses less memory and suits 8 GB Macs; Quality is a Mac option for 16 GB or
 
 <br>
 
-To upgrade from Vocello 2.x, install the new DMG as usual. Your History, saved voices and settings carry over under `~/Library/Application Support/QwenVoice/`, and the model manager offers an update for each model installed with 2.x, because the 3.0 model packages include the audio-marking weights. Vocello was called QwenVoice before 2.2.0; old repository links redirect here. Macs on macOS 15 can use the legacy [QwenVoice 1.2.3](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). Each release's notes are in [`docs/releases/`](docs/releases/), and the [v3.0.0 release](https://github.com/PowerBeef/Vocello/releases/tag/v3.0.0) attaches `release-metadata.txt` with its source and toolchain provenance and `SHA256SUMS` for every file.
+To upgrade from Vocello 2.x, install the new DMG by hand once, as usual: 2.x has no updater, and from 3.0 on the app updates itself. Your History and saved voices carry over in `~/Library/Application Support/QwenVoice/`, your settings carry over in the app's preferences (`com.qwenvoice.app`), and the model manager offers an update for each model installed with 2.x, because the 3.0 model packages include the audio-marking weights. Vocello was called QwenVoice before 2.2.0; old repository links redirect here. Macs on macOS 15 can use the legacy [QwenVoice 1.2.3](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). Each release's notes are in [`docs/releases/`](docs/releases/), and the [v3.0.0 release](https://github.com/PowerBeef/Vocello/releases/tag/v3.0.0) attaches `release-metadata.txt` with its source and toolchain provenance and `SHA256SUMS` for every file.
 
 </details>
 
@@ -123,18 +123,24 @@ To upgrade from Vocello 2.x, install the new DMG as usual. Your History, saved v
 
 `vocello` brings the Mac app's features to Terminal: generate in all three modes, long-form and line by line included; enroll, review and delete saved voices; install, verify and remove models; read and export History; and read and change settings. It uses the Mac app's models, saved voices and settings, so both see the same library.
 
-**Install.** Open [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg) and follow Installer, which asks for an administrator password. It installs `vocello` in `/usr/local/lib/vocello` and links `/usr/local/bin/vocello` and its zsh completion; your shell profile is not changed. The package is signed with Developer ID and notarized, and runs on Apple Silicon only. It adds links only in folders that root alone can change: if your `/usr/local/bin` belongs to your user (as some older Homebrew setups leave it), the command is installed but not linked there, so run `/usr/local/lib/vocello/vocello` or link it into your path yourself. From a new Terminal window:
+**Install.** Open [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg) and follow Installer, which asks for an administrator password. It installs `vocello` in `/usr/local/lib/vocello` and links `/usr/local/bin/vocello` and its zsh completion; your shell profile is not changed. The package is signed with Developer ID and notarized, and runs on Apple Silicon only. It adds links only in folders that root alone can change: if your `/usr/local/bin` belongs to your user (as some older Homebrew setups leave it), the command is installed but not linked there, so run `/usr/local/lib/vocello/vocello` or link it into your path yourself.
+
+From a new Terminal window, these commands check the install, list the model each mode uses with its download size (`--plan` downloads nothing; without it, `install-recommended` installs them all), install the Built-in Voice Speed model (about 2 GB), and play a first take:
 
 ```sh
 vocello --version
-vocello models install-recommended --plan   # lists the model each mode uses; without --plan, installs them
-vocello custom --text "The train left at dawn." --play
-vocello design --voice-brief "A warm, calm narrator" --text "Once upon a time." --json
+vocello models install-recommended --plan
+vocello models install pro_custom_speed
+vocello custom --variant speed --text "The train left at dawn." --play
 ```
+
+Voice Design and Voice Cloning each use their own model. After `vocello models install pro_design_speed`, `vocello design --variant speed --voice-brief "A warm, calm narrator" --text "Once upon a time." --json` makes a Voice Design take and reports it as JSON.
 
 **Without the installer.** Open [`Vocello-macos26-cli.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.dmg) and copy the whole **Vocello CLI** folder to a folder you own, keeping its executable and resource bundles together. Run it by its quoted path, for example `"$HOME/Tools/Vocello CLI/vocello" --version`, and delete the folder to remove it.
 
-**Remove it.** `sudo sh /usr/local/lib/vocello/uninstall.sh` removes what the package installed and leaves your models, saved voices and History untouched.
+**Update it.** **Check for Updates** updates only the app. To update the command line, install the newer `Vocello-macos26-cli.pkg` from its release: it replaces the previous install. For the folder copy, replace the **Vocello CLI** folder with the newer one.
+
+**Remove it.** `sudo sh /usr/local/lib/vocello/uninstall.sh` removes what the package installed and leaves your models, saved voices and History untouched. If users other than root can change `/usr/local/lib`, it removes nothing: it refuses and prints the commands that make the folder root's alone, so run them, then run the uninstaller again.
 
 **For scripts.** `--json` and `--ndjson` give every command a stable machine contract: one envelope, typed error codes, documented exit statuses and progress events. `vocello capabilities --json` describes every command and option, and `vocello run --request` takes JSON requests.
 
@@ -144,7 +150,7 @@ vocello design --voice-brief "A warm, calm narrator" --text "Once upon a time." 
 claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp
 ```
 
-`vocello mcp --print-config claude-code` prints that command, and `--print-config claude-desktop` prints the Claude Desktop setup.
+That line uses the installer package's link. With the folder copy, or when the installer added no link, put the path to your `vocello` executable in its place: run `mcp --print-config claude-code` from that copy (for example `/usr/local/lib/vocello/vocello mcp --print-config claude-code`) and it prints the line with that copy's own path. `--print-config claude-desktop` prints the Claude Desktop setup the same way.
 
 > [!NOTE]
 > Takes made with the command line are saved as files and do not appear in History yet; a 3.0 update adds that. Until then, `vocello history` reports a busy store while the Mac app is open on the same data folder, and on an 8 GB Mac a command-line take is refused while the app is running, unless `--wait-for-engine` waits for it to quit.

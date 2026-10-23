@@ -49,9 +49,10 @@ and local Xcode 27 also builds (roadmap CONV-21). Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retired Mac mini M2
 8 GB records stay history) and iPhone 17 Pro.
-Release identities live in [`project.yml`](../project.yml) (currently the unpublished 3.0.0 /
-build 24 candidate); public facts live in `config/public-product-facts.json`: the stable macOS
-release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta**.
+Release identities live in [`project.yml`](../project.yml) (currently 3.0.0 / build 24); public
+facts live in `config/public-product-facts.json`: the stable macOS release is **Vocello 3.0.0**, the
+Mac app with the signed `vocello` CLI package, and iOS 2.4.0 is the live **public TestFlight beta**
+until the iPhone app's 3.0 follows.
 
 > For repo conventions,
 > build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).

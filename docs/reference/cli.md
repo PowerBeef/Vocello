@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-10-22
 summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
@@ -14,11 +14,24 @@ sourceOfTruth:
 ---
 # The `vocello` CLI
 
-> **Distribution status:** the macOS release workflow already stages a separate
-> `<output-name>-cli.dmg` (the F-17 packaging RF-08 owns). Public CLI release and signed/notarized
-> real-generation qualification stay under RF-08/RF-10, which are parked behind the iOS submission
-> critical path in `config/roadmap.json`; no public CLI release is implied. The current configured
-> source identity is 3.0.0/build 24 in `project.yml`; it is not a published or frozen candidate.
+> **Install (Vocello 3.0.0):** the [v3.0.0 release](https://github.com/PowerBeef/Vocello/releases/tag/v3.0.0)
+> ships `vocello` two ways, both signed with Developer ID and notarized, for Apple Silicon (arm64
+> only) on macOS 26.0 or later:
+>
+> - **Installer package,** [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg).
+>   Open it and follow Installer, which asks for an administrator password. It puts the CLI folder at
+>   `/usr/local/lib/vocello`, links `/usr/local/bin/vocello` to it and adds zsh completion in
+>   `/usr/local/share/zsh/site-functions`; the shell profile is not changed. A newer package replaces
+>   the previous files. `sudo sh /usr/local/lib/vocello/uninstall.sh` removes it and leaves the
+>   models, saved voices and History untouched.
+> - **Folder copy,** [`Vocello-macos26-cli.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.dmg).
+>   Copy the whole **Vocello CLI** folder to a folder you own, keep the executable and its resource
+>   bundles together, and run it by its quoted path. Delete the folder to remove it; its
+>   `uninstall.sh` is only for the installer package.
+>
+> Either way, the CLI uses the Mac app's models, saved voices and settings and reads its History.
+> CLI takes are saved as files and do not appear in History yet; a 3.0 update adds that with the
+> cross-process History lock (RF-30). AI agents connect through [`vocello mcp`](#mcp--serve-ai-agents-over-the-model-context-protocol).
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
@@ -111,7 +124,7 @@ each attempt. Timeouts terminate and await the process group before any next mod
 progress detection handles output without a newline. This is package execution/QC proof, not a
 perceptual Clone-fidelity or multilingual accuracy claim.
 
-RF-10 (currently parked in `config/roadmap.json`) will run this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
+RF-10 runs this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
 the packaging contract but cannot substitute for Developer ID, notarization, or candidate evidence.
 The existing two-argument app-only verifier remains available for historical candidates; the current
 release workflow requires both DMGs.

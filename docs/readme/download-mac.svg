@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="236" height="56" viewBox="0 0 236 56" role="img" aria-labelledby="t">
-  <title id="t">Download Vocello 2.4.0 for macOS 26 or newer</title>
+  <title id="t">Download Vocello 3.0.0 for macOS 26 or newer</title>
   <rect x="0.5" y="0.5" width="235" height="55" rx="27.5" fill="#EDCC8A" stroke="#B5832E" stroke-opacity="0.55"/>
   <g fill="none" stroke="#16181E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M36 18v15"/>
@@ -8,6 +8,6 @@
   </g>
   <g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" fill="#16181E">
     <text x="60" y="25" font-size="16" font-weight="600">Download for Mac</text>
-    <text x="60" y="42" font-size="12" font-weight="500" fill-opacity="0.72">Vocello 2.4.0 · macOS 26+</text>
+    <text x="60" y="42" font-size="12" font-weight="500" fill-opacity="0.72">Vocello 3.0.0 · macOS 26+</text>
   </g>
 </svg>

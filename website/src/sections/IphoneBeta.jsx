@@ -38,7 +38,7 @@ export const IphoneBeta = () => (
           alt="Vocello Studio running on an iPhone, with a script ready to generate with a built-in voice"
         />
         <figcaption className="iphone-shot-caption">
-          An earlier iPhone capture, from before Built-in Voice was renamed from Custom.
+          An earlier iPhone capture: the screen still says Custom Voice, which the iPhone's 3.0 version renames Built-in Voice.
         </figcaption>
       </figure>
     </div>

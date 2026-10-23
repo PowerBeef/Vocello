@@ -146,7 +146,12 @@ export const CommandLine = () => (
               If users other than root can change{" "}
               <code className="cli-inline">/usr/local/lib</code>, the uninstaller removes nothing:
               it prints the commands that make that folder root's alone. Run them, then run the
-              uninstaller again.
+              uninstaller again. If a tool you installed since then needs that folder to stay yours,
+              remove <code className="cli-inline">/usr/local/lib/vocello</code>,{" "}
+              <code className="cli-inline">/usr/local/bin/vocello</code> and{" "}
+              <code className="cli-inline">/usr/local/share/zsh/site-functions/_vocello</code>{" "}
+              yourself, then run{" "}
+              <code className="cli-inline">sudo pkgutil --forget com.qwenvoice.cli</code>.
             </p>
           </li>
         </ol>

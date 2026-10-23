@@ -8,7 +8,7 @@ export const WHATS_NEW_VERSION = "3.0";
 export const MAC_HIGHLIGHTS = [
   {
     k: "A redesigned Mac app",
-    v: "The Mac app adopts the iPhone app's visual language: a new window with four sidebar destinations, the Studio canvas with the phone's setup chips, dock and mode colors, and Settings organized in categories. Custom Voice is now called Built-in Voice on both platforms.",
+    v: "The Mac app adopts the iPhone app's visual language: a new window with four sidebar destinations, the Studio canvas with the phone's setup chips, dock and mode colors, and Settings organized in categories. Custom Voice is now called Built-in Voice, as it is in the iPhone app's 3.0 version.",
   },
   {
     k: "The engine runs inside the app",
@@ -53,7 +53,7 @@ export const SHARED_HIGHLIGHTS = [
 ];
 
 export const UPGRADE_NOTE =
-  "Upgrading from 2.4? Install the new DMG by hand once, as usual, since 2.4 has no updater: History, saved voices and settings carry over. 3.0 uses updated model packages that include the audio-marking weights, so the model manager offers an update for each model you installed with 2.x. From 3.0 on, the app updates itself with Vocello > Check for Updates.";
+  "Upgrading from 2.4? Install the new DMG by hand this one time, since 2.4 has no updater. History, saved voices and settings carry over. 3.0 uses updated model packages that include the audio-marking weights, so the model manager offers an update for each model you installed with 2.x. From 3.0 on, the app updates itself with Vocello > Check for Updates.";
 
 export const QUALITY_NOTE =
   "Take quality in 3.0 is not verified by human listening. Automated checks catch gross failures (silence, a cut-off take, missing words, the wrong language), and a take can still carry subtle defects; generate again for a different take. A seed from an earlier version does not reproduce the same take.";

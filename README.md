@@ -140,7 +140,7 @@ Voice Design and Voice Cloning each use their own model. After `vocello models i
 
 **Update it.** **Check for Updates** updates only the app. To update the command line, install the newer `Vocello-macos26-cli.pkg` from its release: it replaces the previous install. For the folder copy, replace the **Vocello CLI** folder with the newer one.
 
-**Remove it.** `sudo sh /usr/local/lib/vocello/uninstall.sh` removes what the package installed and leaves your models, saved voices and History untouched. If users other than root can change `/usr/local/lib`, it removes nothing: it refuses and prints the commands that make the folder root's alone, so run them, then run the uninstaller again.
+**Remove it.** `sudo sh /usr/local/lib/vocello/uninstall.sh` removes what the package installed and leaves your models, saved voices and History untouched. If users other than root can change `/usr/local/lib`, it removes nothing: it refuses and prints the commands that make the folder root's alone; run them, then run the uninstaller again. If a tool you installed since then needs that folder to stay yours, remove `/usr/local/lib/vocello`, `/usr/local/bin/vocello` and `/usr/local/share/zsh/site-functions/_vocello` yourself, then run `sudo pkgutil --forget com.qwenvoice.cli`.
 
 **For scripts.** `--json` and `--ndjson` give every command a stable machine contract: one envelope, typed error codes, documented exit statuses and progress events. `vocello capabilities --json` describes every command and option, and `vocello run --request` takes JSON requests.
 

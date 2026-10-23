@@ -117,7 +117,7 @@
         <li>An exit status of 75 means the engine or a store is busy, memory is short, or the network is unavailable: retry later. On an 8 GB Mac, one engine runs at a time, so quit the app or the other command first. <code>vocello history</code> reads History only while the Vocello app is closed.</li>
         <li>Takes made with the command line are saved as files and do not appear in History yet.</li>
         <li>If you copied the Vocello CLI folder from <code>Vocello-macos26-cli.dmg</code> instead, run its executable by its quoted full path and keep the folder's executable and resource bundles together.</li>
-        <li>To remove the installer package's copy, run <code>sudo sh /usr/local/lib/vocello/uninstall.sh</code>. It keeps your models, saved voices, and History. If users other than root can change <code>/usr/local/lib</code>, it removes nothing and prints the commands that make that folder root's alone; run them, then run the uninstaller again. Remove a copied folder by deleting it.</li>
+        <li>To remove the installer package's copy, run <code>sudo sh /usr/local/lib/vocello/uninstall.sh</code>. It keeps your models, saved voices, and History. If users other than root can change <code>/usr/local/lib</code>, it removes nothing and prints the commands that make that folder root's alone; run them, then run the uninstaller again. If a tool you installed since then needs that folder to stay yours, remove <code>/usr/local/lib/vocello</code>, <code>/usr/local/bin/vocello</code> and <code>/usr/local/share/zsh/site-functions/_vocello</code> yourself, then run <code>sudo pkgutil --forget com.qwenvoice.cli</code>. Remove a copied folder by deleting it.</li>
       </ul>
 
       <h2>AI agents (vocello mcp)</h2>

@@ -249,11 +249,17 @@ def command(argv: list[str], cwd: Path, environment: dict, expected: int = 0, ti
 
 
 def embedded_info(hex_dump: str) -> dict:
-    # `otool -X -s` emits native-endian 32-bit words on the qualified arm64 host.
-    words = [word for line in hex_dump.splitlines() for word in line.split()[1:]]
-    if not words or len(words) > 16384 or any(not re.fullmatch(r"[0-9a-fA-F]{8}", word) for word in words):
+    # `otool -X -s` emits native-endian 32-bit words on the qualified arm64 host, then the last
+    # one to three bytes of a section whose size is not a multiple of four one byte at a time.
+    tokens = [token for line in hex_dump.splitlines() for token in line.split()[1:]]
+    whole = next((index for index, token in enumerate(tokens) if len(token) != 8), len(tokens))
+    words, tail = tokens[:whole], tokens[whole:]
+    if (not words or len(tokens) > 16384 or len(tail) > 3
+            or any(not re.fullmatch(r"[0-9a-fA-F]{8}", word) for word in words)
+            or any(not re.fullmatch(r"[0-9a-fA-F]{2}", byte) for byte in tail)):
         raise ValueError("invalid CLI embedded Info.plist dump")
-    return plistlib.loads(b"".join(int(word, 16).to_bytes(4, "little") for word in words).rstrip(b"\0"))
+    data = b"".join(int(word, 16).to_bytes(4, "little") for word in words) + bytes.fromhex("".join(tail))
+    return plistlib.loads(data.rstrip(b"\0"))
 
 
 def _launcher(directory: Path, launcher: Path | None) -> str:

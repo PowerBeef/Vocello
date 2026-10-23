@@ -26,9 +26,16 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def plist_dump(info: dict) -> str:
+    """What `otool -X -s __TEXT __info_plist` prints on arm64: 16 bytes a line as little-endian
+    32-bit words, and a section's last one to three bytes one byte at a time."""
     data = plistlib.dumps(info)
-    data += b"\0" * (-len(data) % 4)
-    return "\n".join(f"{index:016x}\t{int.from_bytes(data[index:index+4], 'little'):08x}" for index in range(0, len(data), 4))
+    lines = []
+    for offset in range(0, len(data), 16):
+        chunk = data[offset:offset + 16]
+        whole = len(chunk) - len(chunk) % 4
+        tokens = [f"{int.from_bytes(chunk[index:index + 4], 'little'):08x}" for index in range(0, whole, 4)]
+        lines.append(f"{offset:016x}\t" + " ".join(tokens + [f"{byte:02x}" for byte in chunk[whole:]]))
+    return "\n".join(lines)
 
 
 # What pkgbuild writes for this package (recorded with Xcode 27.1's pkgbuild, InstallCmds-883).
@@ -256,6 +263,21 @@ class CLIPackageTests(unittest.TestCase):
         self.assertEqual(package.embedded_info(plist_dump(info)), info)
         with self.assertRaises(ValueError):
             package.embedded_info("not a plist")
+
+    def test_embedded_plist_of_any_length_decodes(self):
+        # A usage string (RF-28's speech recognition one) leaves the section at any length,
+        # so otool ends the dump with single bytes.
+        lengths = set()
+        for extra in range(4):
+            info = {"CFBundleVersion": "24", "CFBundleShortVersionString": "3.0.0",
+                    "NSSpeechRecognitionUsageDescription": "x" * (40 + extra)}
+            lengths.add(len(plistlib.dumps(info)) % 4)
+            with self.subTest(remainder=len(plistlib.dumps(info)) % 4):
+                self.assertEqual(package.embedded_info(plist_dump(info)), info)
+        self.assertEqual(lengths, {0, 1, 2, 3})
+        for dump in ("0000000000000000\t3c 3f786d6c", "0000000000000000\t3c3f786d 3c 3f 78 6d"):
+            with self.subTest(dump=dump), self.assertRaises(ValueError):
+                package.embedded_info(dump)
 
     def fake_command(self, argv, cwd, environment, expected=0):
         self.assertNotEqual(cwd, self.output)

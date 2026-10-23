@@ -507,8 +507,10 @@ extract_otool_field() {
     local field="$1"
     otool -l "$APP_BINARY" | awk -v key="$field" '
         $1 == "cmd" && $2 == "LC_BUILD_VERSION" { in_block = 1; next }
-        in_block && $1 == key { print $2; exit }
+        in_block && $1 == key && !found { print $2; found = 1 }
     '
+    # awk reads to the end: exiting early would leave otool writing to a closed
+    # pipe, and its SIGPIPE (141) fails the release under pipefail.
 }
 
 APP_MINOS="$(extract_otool_field minos)"

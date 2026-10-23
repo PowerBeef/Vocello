@@ -1255,6 +1255,7 @@ picture {
 }
 
 .cli-head { max-width: 720px; margin-bottom: 48px; }
+.cli-head-link { margin: 18px 0 0; font-size: 14px; }
 
 .cli-inline {
   font-family: var(--font-mono);
@@ -1355,6 +1356,15 @@ picture {
 
 .cli-first { padding-top: 22px; }
 
+.cli-note {
+  margin: 14px 0 0;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg-tertiary);
+  text-wrap: pretty;
+}
+
 /* Code blocks: readable, wrapped rather than scrolled, copyable. */
 .code-block {
   position: relative;
@@ -1379,8 +1389,7 @@ picture {
 
 .code-pre code { font: inherit; display: block; }
 
-.code-line,
-.code-comment {
+.code-line {
   display: block;
   padding-left: 2ch;
   text-indent: -2ch;
@@ -1393,14 +1402,6 @@ picture {
   user-select: none;
   -webkit-user-select: none;
 }
-
-.code-comment {
-  color: var(--fg-tertiary);
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.code-gap { display: block; height: 0.9em; }
 
 .code-copy {
   position: absolute;

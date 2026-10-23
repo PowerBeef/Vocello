@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
-import { CLI_DMG, CLI_PKG } from "../data/credits.js";
+import { CLI_DMG, CLI_PKG, CLI_REFERENCE, RELEASES } from "../data/credits.js";
 import {
   CLI_LIMITS,
   EXIT_STATUSES,
@@ -12,8 +12,6 @@ import {
   UNINSTALL,
 } from "../data/cli.js";
 
-const isComment = (line) => line.startsWith("#");
-
 // Prose with `flags` in backticks, rendered with the flags as unbroken code.
 /** @param {string} text */
 const withCode = (text) =>
@@ -23,15 +21,15 @@ const withCode = (text) =>
 
 // A command block people can read and copy. Each line is its own block, so long
 // commands wrap with a hanging indent instead of scrolling the page sideways.
-// The Copy button copies the commands alone; comment lines and the shell prompt
-// (drawn by CSS) are not selectable either, since zsh does not accept pasted
-// `#` comments by default.
-/** @param {{ block: { label: string, lines: string[] } }} props */
+// The shell prompt is drawn by CSS and is not selectable, so a selection copies
+// the commands alone, as the Copy button does. The button's name is its visible
+// word ("Copy", then "Copied") followed by the block's hidden copyName.
+/** @param {{ block: { label: string, copyName: string, lines: string[] } }} props */
 const CodeBlock = ({ block }) => {
   const [copied, setCopied] = useState(false);
   /** @type {React.RefObject<HTMLElement | null>} */
   const codeRef = useRef(null);
-  const commands = block.lines.filter((line) => line && !isComment(line)).join("\n");
+  const commands = block.lines.join("\n");
 
   useEffect(() => {
     if (!copied) return undefined;
@@ -55,26 +53,16 @@ const CodeBlock = ({ block }) => {
     <div className="code-block" role="group" aria-label={block.label}>
       <pre className="code-pre">
         <code ref={codeRef}>
-          {block.lines.map((line, i) =>
-            line === "" ? (
-              <span key={i} className="code-gap" aria-hidden="true" />
-            ) : (
-              <span key={i} className={isComment(line) ? "code-comment" : "code-line"}>
-                {line}
-              </span>
-            ),
-          )}
+          {block.lines.map((line) => (
+            <span key={line} className="code-line">{line}</span>
+          ))}
         </code>
       </pre>
-      <button
-        type="button"
-        className="code-copy"
-        onClick={copy}
-        aria-label={`Copy ${block.label.toLowerCase()}`}
-      >
+      <button type="button" className="code-copy" onClick={copy}>
         {copied ? "Copied" : "Copy"}
+        <span className="sr-only"> {block.copyName}</span>
       </button>
-      <span className="sr-only" role="status">{copied ? `${block.label} copied` : ""}</span>
+      <span className="sr-only" role="status">{copied ? `Copied ${block.copyName}` : ""}</span>
     </div>
   );
 };
@@ -91,12 +79,17 @@ export const CommandLine = () => (
           voices and models; read and export History; read and change settings. It uses the app's
           models, saved voices and settings, so both see the same library.
         </p>
+        <p className="cli-head-link">
+          <a className="cta-meta-link" href={CLI_REFERENCE} target="_blank" rel="noreferrer">
+            Read the full command line reference
+          </a>
+        </p>
       </header>
 
       <div className="cli-install">
         <ol className="cli-steps">
           <li className="cli-step">
-            <p className="cli-step-k">Install the package</p>
+            <h3 className="cli-step-k">Install the package</h3>
             <p className="cli-step-v">
               <code className="cli-inline">Vocello-macos26-cli.pkg</code> installs{" "}
               <code className="cli-inline">vocello</code> in{" "}
@@ -121,7 +114,7 @@ export const CommandLine = () => (
             </p>
           </li>
           <li className="cli-step">
-            <p className="cli-step-k">Or copy the folder</p>
+            <h3 className="cli-step-k">Or copy the folder</h3>
             <p className="cli-step-v">
               Open <a className="cta-meta-link" href={CLI_DMG}>Vocello-macos26-cli.dmg</a> and copy
               the complete Vocello CLI folder to a folder you own, keeping its executable and
@@ -130,12 +123,31 @@ export const CommandLine = () => (
             </p>
           </li>
           <li className="cli-step">
-            <p className="cli-step-k">Uninstall</p>
+            <h3 className="cli-step-k">Update</h3>
+            <p className="cli-step-v">
+              Vocello &gt; Check for Updates updates only the app. To update the command line,
+              install the newer <code className="cli-inline">Vocello-macos26-cli.pkg</code> from
+              the{" "}
+              <a className="cta-meta-link" href={RELEASES} target="_blank" rel="noreferrer">
+                releases page
+              </a>
+              : it replaces the previous install. For a copied folder, replace it with the newer
+              Vocello CLI folder.
+            </p>
+          </li>
+          <li className="cli-step">
+            <h3 className="cli-step-k">Uninstall</h3>
             <p className="cli-step-v">
               The package's uninstaller removes the command line and leaves your models, voices
               and History untouched.
             </p>
             <CodeBlock block={UNINSTALL} />
+            <p className="cli-step-v cli-step-note">
+              If users other than root can change{" "}
+              <code className="cli-inline">/usr/local/lib</code>, the uninstaller removes nothing:
+              it prints the commands that make that folder root's alone. Run them, then run the
+              uninstaller again.
+            </p>
           </li>
         </ol>
 
@@ -143,9 +155,15 @@ export const CommandLine = () => (
           <h3 className="cli-sub-title">First commands</h3>
           <p className="cli-sub-body">
             Model files are not bundled. Install one once, in the app or from the terminal, and
-            both use it.
+            both use it. These commands list the speakers and models, download the Built-in Voice
+            Speed model (about 2 GB, once), and save a first take to your Desktop.
           </p>
           <CodeBlock block={FIRST_COMMANDS} />
+          <p className="cli-note">
+            Voice Design and Voice Cloning each use their own model.{" "}
+            <code className="cli-inline">vocello models install-recommended --plan</code> lists
+            the model each mode uses and its download size, and downloads nothing.
+          </p>
         </div>
       </div>
 
@@ -156,7 +174,9 @@ export const CommandLine = () => (
             <code className="cli-inline">--json</code> and <code className="cli-inline">--ndjson</code>{" "}
             give every command a stable machine contract: one envelope, typed error codes,
             documented exit statuses and progress events. Text output is for people and is not a
-            contract.
+            contract. These commands pipe a script in for the JSON envelope, describe every
+            command, option, error code and exit status, and send a JSON request on standard
+            input; both takes use the Built-in Voice Speed model installed above.
           </p>
           <CodeBlock block={MACHINE_COMMANDS} />
           <table className="cli-exit-table">
@@ -191,7 +211,18 @@ export const CommandLine = () => (
               <li key={tool}>{tool}</li>
             ))}
           </ul>
+          <p className="cli-sub-body">This adds Vocello to Claude Code for every project:</p>
           <CodeBlock block={MCP_SETUP} />
+          <p className="cli-note">
+            The command names the installer package's link. With a copied folder, or when the
+            installer added no link, use the path to your <code className="cli-inline">vocello</code>{" "}
+            executable instead: run <code className="cli-inline">mcp --print-config claude-code</code>{" "}
+            from that copy, for example{" "}
+            <code className="cli-inline">/usr/local/lib/vocello/vocello mcp --print-config claude-code</code>,
+            and it prints the command with that copy's own path.{" "}
+            <code className="cli-inline">--print-config claude-desktop</code> prints the Claude
+            Desktop setup the same way.
+          </p>
         </div>
       </div>
 

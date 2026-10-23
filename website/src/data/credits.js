@@ -13,6 +13,8 @@ export const REPO = "https://github.com/PowerBeef/Vocello";
 export const RELEASE_STABLE = `${REPO}/releases/tag/${STABLE_MAC_RELEASE.tag}`;
 export const RELEASE_FALLBACK = `${REPO}/releases/tag/${FALLBACK_MAC_RELEASE.tag}`;
 export const RELEASES = `${REPO}/releases`;
+// The full command line reference, as the repository keeps it on main.
+export const CLI_REFERENCE = `${REPO}/blob/main/docs/reference/cli.md`;
 // The stable release page carries the curated notes (docs/releases/<tag>.md).
 export const RELEASE_NOTES = RELEASE_STABLE;
 

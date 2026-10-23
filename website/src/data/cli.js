@@ -2,59 +2,52 @@
 // describe it. Commands are copied from those documents (their examples and the
 // install, uninstall and MCP lines); change them only with the CLI reference.
 
-// One copyable block: optional comment lines (`# ...`, not copied) and commands.
-// A block's `copy` text is its commands, newline-separated.
+// One copyable block. Its lines are commands only, each runnable as written in
+// Terminal on a fresh Mac once the earlier blocks have run: no `#` comments, which
+// zsh does not accept when pasted, and no placeholder files. The prose around a
+// block explains it. `label` names the block; `copyName` completes its Copy
+// button's accessible name ("Copy the install check", then "Copied ...").
 
 export const INSTALL_PACKAGE = {
   label: "Check the install",
+  copyName: "the install check",
   lines: ["vocello --help"],
 };
 
 export const UNINSTALL = {
   label: "Uninstall command",
+  copyName: "the uninstall command",
   lines: ["sudo sh /usr/local/lib/vocello/uninstall.sh"],
 };
 
+// pro_custom_speed is the Built-in Voice Speed model (about 2 GB in the catalog),
+// the one model the take below needs.
 export const FIRST_COMMANDS = {
   label: "First commands",
+  copyName: "the first commands",
   lines: [
-    "# List speakers and models, then install the Built-in Voice Speed model",
     "vocello speakers list",
     "vocello models list",
     "vocello models install pro_custom_speed",
-    "",
-    "# Built-in Voice, Speed model, saved to a path",
-    'vocello generate --mode custom --variant speed --text "The train left at dawn." --out /tmp/clip.wav',
-    "",
-    "# Voice Design from a brief",
-    'vocello generate --mode design --voice-brief "A warm, calm narrator" --text "Once upon a time…"',
+    'vocello generate --mode custom --variant speed --text "The train left at dawn." --out ~/Desktop/hello.wav',
   ],
 };
 
+// Both takes use the Built-in Voice Speed model that FIRST_COMMANDS installs.
 export const MACHINE_COMMANDS = {
   label: "Machine-readable commands",
+  copyName: "the machine-readable commands",
   lines: [
-    "# Pipe a script in and get the JSON envelope",
     'echo "Hello there." | vocello generate --variant speed --text - --json',
-    "",
-    "# Every command, option, error code and exit status",
     "vocello capabilities --json",
-    "",
-    "# A JSON generation request from a file or stdin",
-    "vocello run --request request.json --json",
+    `echo '{"mode":"custom","variant":"speed","text":"Good evening."}' | vocello run --request - --json`,
   ],
 };
 
 export const MCP_SETUP = {
   label: "Claude Code setup command",
-  lines: [
-    "# Add Vocello to Claude Code for every project",
-    "claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp",
-    "",
-    "# Print the setup for Claude Code or Claude Desktop",
-    "vocello mcp --print-config claude-code",
-    "vocello mcp --print-config claude-desktop",
-  ],
+  copyName: "the Claude Code setup command",
+  lines: ["claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp"],
 };
 
 // A few of the documented exit statuses (docs/reference/cli.md, Machine contract).

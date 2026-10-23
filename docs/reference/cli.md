@@ -2,7 +2,7 @@
 status: active
 owner: backend-mlx
 reviewed: 2026-10-22
-summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
+summary: The vocello CLI, the user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
   - Sources/VocelloCLI
@@ -21,7 +21,10 @@ sourceOfTruth:
 > - **Installer package,** [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg).
 >   Open it and follow Installer, which asks for an administrator password. It puts the CLI folder at
 >   `/usr/local/lib/vocello`, links `/usr/local/bin/vocello` to it and adds zsh completion in
->   `/usr/local/share/zsh/site-functions`; the shell profile is not changed. A newer package replaces
+>   `/usr/local/share/zsh/site-functions`; the shell profile is not changed. It adds a link only in a
+>   folder that root alone can change: if `/usr/local/bin` belongs to your user (as some older
+>   Homebrew setups leave it), the command is installed but not linked there, so run
+>   `/usr/local/lib/vocello/vocello` or link it into your path yourself. A newer package replaces
 >   the previous files. `sudo sh /usr/local/lib/vocello/uninstall.sh` removes it and leaves the
 >   models, saved voices and History untouched.
 > - **Folder copy,** [`Vocello-macos26-cli.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.dmg).
@@ -31,21 +34,21 @@ sourceOfTruth:
 >
 > Either way, the CLI uses the Mac app's models, saved voices and settings and reads its History.
 > CLI takes are saved as files and do not appear in History yet; a 3.0 update adds that with the
-> cross-process History lock (RF-30). AI agents connect through [`vocello mcp`](#mcp--serve-ai-agents-over-the-model-context-protocol).
+> cross-process History lock (RF-30). AI agents connect through [`vocello mcp`](#mcp-serve-ai-agents-over-the-model-context-protocol).
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
 It serves two roles:
 
-- **User-facing generation** — synthesize speech from the terminal (Built-in Voice / Voice Design /
+- **User-facing generation:** synthesize speech from the terminal (Built-in Voice / Voice Design /
   Voice Cloning), one clip or many, scriptable with JSON output and stdin piping.
-- **Deterministic benchmark/test driver** — drive the perf/quality matrix in-process (cold/warm
+- **Deterministic benchmark/test driver:** drive the perf/quality matrix in-process (cold/warm
   controlled exactly via load/unload, no UI waits), aggregate run-scoped telemetry, and publish a
   privacy-safe PASS-only benchmark record when running inside this checkout.
 
 It links the engine framework directly, like the apps, **ships no model weights and no Python**, and runs
 **in place** beside its MLX metallib bundle. It shares the same on-disk model store as the app
 (`~/Library/Application Support/QwenVoice/models` by default). Install weights via the app
-(Settings → Models & Files) or headlessly with `vocello models install <id>` — the same
+(Settings → Models & Files) or headlessly with `vocello models install <id>`, with the same
 HuggingFace downloader the app uses. `generate`/`bench` fail fast if a requested model isn't
 installed (`vocello models list` / `models status` show what's present). For macOS UI tests and
 bench in debug context, see [`testing-runbook.md`](testing-runbook.md) "Model readiness"
@@ -115,8 +118,8 @@ a live Built-in take (`--ndjson`) only after its `generation_started` event, req
 envelope reporting `cancelled` by SIGINT with no forced exit, rejects leftover final/staging
 output without deleting it, and verifies the public unknown-command and invalid-mode exits. The isolated runtime links
 only to an existing operator-provided model store; it downloads nothing. Its privacy-safe report
-contains digests, sizes, timings, public identities, and verdicts—not prompts, transcripts, audio,
-or absolute paths—and carries `publicationAuthority: none`. The relative `artifactDirectory`
+contains digests, sizes, timings, public identities, and verdicts (not prompts, transcripts, audio,
+or absolute paths) and carries `publicationAuthority: none`. The relative `artifactDirectory`
 points to retained WAVs below the report's ignored directory. Successful rows and the active stage
 are written atomically before the next subprocess; failure or interruption preserves that record
 and audio, with sanitized failure types. Reusing a report is refused: use a new report path for
@@ -230,7 +233,7 @@ nothing more reported; after a real signal it changes nothing.
 
 ## Commands
 
-### `generate` — synthesize one clip
+### `generate`: synthesize one clip
 
 ```sh
 vocello generate --mode custom|design|clone --variant speed|quality \
@@ -249,8 +252,8 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--delivery` | optional delivery style (custom and design; refused in clone mode, which has no instruction channel) |
 | `--app-delivery` | with no `--delivery`/`--delivery-cell`, send the apps' default delivery (the Neutral preset instruction) on Custom and Design, as `batch --app-delivery` does |
 | `--language` | `auto` or a Qwen3 language (`chinese`, `english`, `japanese`, `korean`, `german`, `french`, `russian`, `portuguese`, `spanish`, `italian`) by name or code, a region subtag ignored (`ja-JP`, `es-MX`); omitted = Auto; any other value is refused before boot |
-| `--seed` | deterministic sampling seed — the same request + seed reproduces the same take bit-for-bit |
-| `--variation` | `expressive` (official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability; without it, the app's Variation setting |
+| `--seed` | deterministic sampling seed: the same request + seed reproduces the same take bit-for-bit |
+| `--variation` | `expressive` (official sampling) · `balanced` · `consistent`, which trade take-to-take liveliness for repeatability; without it, the app's Variation setting |
 | `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
 | `--long-form` | `auto` (default): a script longer than one take (900 characters, East Asian characters counting three) runs as a long-form project, as the apps route it · `always`: any script does · `never`: such a script is refused (`text_too_long`) |
 | `--line-by-line` | one take per line, as the Mac app's line batch runs them (see below); `--out-dir <folder>` names their folder (default `<data>/outputs/cli`) |
@@ -278,20 +281,20 @@ closed.
 
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
-**not** play audio as it generates — there is no live preview player; `--play` plays the completed file.
+**not** play audio as it generates: there is no live preview player; `--play` plays the completed file.
 Streaming and non-streaming are separately qualified paths; identical sampling settings do not
 guarantee identical output across them. Use `--no-stream` for accumulate-then-decode behavior.
 
-**Selecting a mode** — three equivalent ways: the shortcut subcommands `vocello custom|design|clone …`
-(a `--file` makes them route to `batch`), the explicit `--mode <mode>` flag, or — when you omit `--mode`
-at an interactive terminal with text output and no `--no-input` — a numbered picker. Every other run
+**Selecting a mode.** Three equivalent ways: the shortcut subcommands `vocello custom|design|clone …`
+(a `--file` makes them route to `batch`), the explicit `--mode <mode>` flag, or (when you omit `--mode`
+at an interactive terminal with text output and no `--no-input`) a numbered picker. Every other run
 without `--mode` defaults to `custom` (no prompt). `vocello modes` lists the modes and what each needs.
 
 Prints the output WAV path on stdout (or, with `--json`, the envelope whose `result` carries `audioPath`, `durationSeconds`, `wallSeconds`,
 `realtimeFactor` (standard RTF: `wallSeconds ÷ durationSeconds`, lower is faster, below 1.0 is faster than
 real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, `seed` (the
 effective seed as a decimal string: pass it back as `--seed`, with the same variant and variation, to
-reproduce the take), and — when `--stream` — `firstChunkMS` and `chunks`).
+reproduce the take), and, when `--stream`, `firstChunkMS` and `chunks`).
 
 **Long-form projects.** A script past one take is planned, before any model work, by the apps'
 long-form planner (at most 100 segments; `--plan` reports `longForm` and `segments`) and run by the
@@ -335,7 +338,7 @@ Two successful writers to the same explicit destination use last-publication-win
 paths when both outputs must be retained. A Ctrl-C at the interactive mode picker ends the command
 at once (exit 130).
 
-### `batch` — synthesize many clips with a single model load
+### `batch`: synthesize many clips with a single model load
 
 ```sh
 vocello batch --file <path|-> --mode … --variant … \
@@ -343,10 +346,10 @@ vocello batch --file <path|-> --mode … --variant … \
 ```
 
 One non-empty line per clip; all clips share the same voice/mode/variant, so the engine runs them
-through **one loaded model** — far faster than repeated `generate` calls. Reads stdin when `--file` is
+through **one loaded model**, far faster than repeated `generate` calls. Reads stdin when `--file` is
 omitted or `-` (in the machine formats only for `-`). Prints one output WAV path per line (or, with
 `--json`, the envelope whose `result` is the batch summary). Also accepts
-`--seed` (applied to every item — re-running the batch reproduces it, and a fixed seed steadies
+`--seed` (applied to every item: re-running the batch reproduces it, and a fixed seed steadies
 cross-segment character) and `--variation`, like `generate`.
 
 Each item is an ordinary single-take engine request. Batch index, total, progress and outcome
@@ -373,7 +376,7 @@ registered run id (`QVOICE_MAC_BENCH_RUN_ID`) the engine keeps it beside its dia
 codec-trace v1 and records its digest in the take's engine row; sampling and output are unchanged.
 `scripts/macos_test.sh qc-takes` passes it.
 
-### `run` — JSON generation requests (for agents)
+### `run`: JSON generation requests (for agents)
 
 ```sh
 vocello run --request <file|-> [--json|--ndjson]     # one request, reported as generate reports it
@@ -407,7 +410,7 @@ app setting, a package installed or removed) is not. A
 replay whose take no longer exists fails with `output_missing` (use a new id), and a success whose
 result could not be kept carries the warning `idempotency_not_recorded`.
 
-### `mcp` — serve AI agents over the Model Context Protocol
+### `mcp`: serve AI agents over the Model Context Protocol
 
 ```sh
 vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]
@@ -455,7 +458,7 @@ the engine requests share one warm engine. Cloning
 and saving a voice need `confirmConsent: true` in each request, never inherited. CLI takes write no History
 rows until RF-30's History lock, and `delete_history_item` arrives with it.
 
-### `history` — read the app's History
+### `history`: read the app's History
 
 ```sh
 vocello history [list] [--mode custom|design|clone] [--order newest|oldest|longest|shortest|mode] [--limit 1-500] [--json]
@@ -476,7 +479,7 @@ quit the app, or point `--data-dir` elsewhere. `export` copies the take
 the way the app's Save As does (complete before it replaces anything; `--replace` to overwrite).
 Deleting, clearing and recovery come with the cross-process History lock (RF-30).
 
-### `settings` — read and change the app's settings
+### `settings`: read and change the app's settings
 
 `vocello settings [list|get <name>] [--json]` reads the Mac app's preferences (`com.qwenvoice.app`):
 `autoplay`, `output-folder`, `variation`, `prefer-lower-memory`, `variant.custom|design|clone`
@@ -497,12 +500,12 @@ it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidCh
 (install state and package choices). The CLI writes no History until RF-30, so it posts no History
 change yet.
 
-### `briefs` — Voice Design's starting briefs
+### `briefs`: Voice Design's starting briefs
 
 `vocello briefs [--language <l>] [--json]` lists the app's eight starting briefs by position in a
 speech language (default English), with the 500-character description limit.
 
-### `voices` — manage saved clone voices
+### `voices`: manage saved clone voices
 
 ```sh
 vocello voices list [--json]
@@ -552,17 +555,17 @@ engine, and `CLIRuntime` applies the same `VoiceCloningConsentPolicy` again at t
 clone request or enrollment reaches the engine unconfirmed. The flag is accepted and ignored on other
 runs, so scripts may pass it uniformly. Pass it only for voices you own or have permission to clone.
 
-### `speakers` — list built-in Built-in Voice speakers
+### `speakers`: list the Built-in Voice speakers
 
 ```sh
 vocello speakers list [--json]
 ```
 
 Lists the built-in Qwen3 speaker presets (id, display name, language; the contract default is marked)
-so you don't have to guess `--speaker` ids. Read-only — doesn't boot the engine, so it returns
+so you don't have to guess `--speaker` ids. Read-only: it doesn't boot the engine, so it returns
 instantly.
 
-### `modes` — list the generation modes
+### `modes`: list the generation modes
 
 ```sh
 vocello modes [--json]
@@ -572,13 +575,13 @@ Lists the three generation modes (`custom` / `design` / `clone`) and what each n
 `--voice-brief` / `--voice` | `--reference`). Static and instant. Select a mode via the
 `vocello custom|design|clone …` shortcut, `generate --mode <mode>`, or the interactive picker.
 
-### `languages` — list the generation languages
+### `languages`: list the generation languages
 
 `vocello languages [--json]` lists every language `--language` accepts with its canonical name, the
 primary code it also answers to (`en`, `fr`, `ja`; a region subtag such as `ja-JP` is ignored) and
 `auto`. Instant, no engine boot.
 
-### `deliveries` — list delivery presets + instruction text
+### `deliveries`: list delivery presets + instruction text
 
 ```sh
 vocello deliveries [--json]
@@ -599,7 +602,7 @@ the dual-match Mandarin route for `angry.normal` when both the contract-backed s
 resolved output language are Chinese. Free-form `--delivery` stays verbatim. `generate --json`
 reports the actual model-facing instruction language, digest, and cell identity.
 
-### `models` — inventory and install
+### `models`: inventory and install
 
 ```sh
 vocello models list [--json]
@@ -631,7 +634,7 @@ exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any diff
 `integrity_failed` and keeps every row.
 
 Shows each model's install state, on-disk size, and (for `status`) any missing required files.
-`install` uses the same `HuggingFaceDownloader` as the macOS app — a CLI-installed model is
+`install` uses the same `HuggingFaceDownloader` as the macOS app: a CLI-installed model is
 immediately usable in the app, and vice versa. Variant-scoped ids (`pro_custom_speed`, `…_quality`)
 are what `generate --variant` selects. Foreground sessions are invalidated on every terminal path;
 durable staging precedes terminal continuation, bounded progress retains the exact final count,
@@ -643,13 +646,13 @@ For test/bench lanes with `QWENVOICE_DEBUG=1`, weights live under `QwenVoice-Deb
 driver symlinks `QwenVoice-Debug/models` → the canonical store (see
 [`testing-runbook.md`](testing-runbook.md) "Model readiness").
 
-### `doctor` — check the setup
+### `doctor`: check the setup
 
 `vocello doctor [--json]` checks, with no engine boot, the shared data folder, the bundled model
 contract and authenticated catalog, the installed models, the Mac's memory tier and free disk. A
 missing contract or catalog exits 78 (`config_error`); everything else is a named `ok`/`warn` check.
 
-### `bench` — drive the perf/quality matrix + aggregate
+### `bench`: drive the perf/quality matrix + aggregate
 
 ```sh
 vocello bench [--modes custom,design,clone] [--variants speed,quality] \
@@ -671,7 +674,7 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 | `--delivery [list]` | add **instruct-bearing delivery cells** (Custom/Design, warm, medium text, 1 take each): comma list of `<preset>[.<intensity>]` values (e.g. `happy.strong,calm.normal`); the bare flag runs `happy.strong,calm.strong,whisper.strong`. Rows are stamped `notes.delivery` and summarized in their own block; the plain warm takes double as the neutral reference for prosody/delivery A/Bs. Prosody analysis selects only WAVs named by the current run manifest and runs before the final summary. Delivery evidence remains inside the parent engine-generation record. |
 | `--label <opaque-id>` | stamp a privacy-safe identifier using only letters, numbers, `.`, `_`, and `-` |
 | `--run-id <id>` | supply a collision-resistant run ID for orchestration; normal invocations mint one automatically |
-| `--force-class` | **dev/diagnostic only** — force a constrained memory tier on any Mac: `8gb` · `16gb` · `high` · `iphone` (sets the `QWENVOICE_FORCE_MEMORY_CLASS` knob, read in-process by the engine; stamps `notes.deviceClass`) |
+| `--force-class` | **dev/diagnostic only**: force a constrained memory tier on any Mac: `8gb` · `16gb` · `high` · `iphone` (sets the `QWENVOICE_FORCE_MEMORY_CLASS` knob, read in-process by the engine; stamps `notes.deviceClass`) |
 | `--telemetry` | `off` · `lightweight` · `verbose` (default; raw per-sample sidecars). `off` builds no recorder, sampler or sink and writes no engine row even though the bench's runtime overrides set `QWENVOICE_DEBUG=1`; `verbose` sizes the sidecar budget to the planned generations and refuses a plan above 256 |
 | `--seed` | deterministic sampling seed applied to every benchmark take |
 | `--no-stream` | accumulate the full result before decoding (old bench behavior) |
@@ -686,13 +689,13 @@ and disable inline preview PCM (`QWENVOICE_STREAMING_PREVIEW_DATA=off`) so long 
 do not retain chunk events across takes. Pass `--no-stream` to run the old accumulate-then-decode
 behavior for comparison.
 
-**What it measures.** Engine truth — RTF, decode, memory, per-stage GPU, and the `audioQC` verdict.
+**What it measures.** Engine truth: RTF, decode, memory, per-stage GPU, and the `audioQC` verdict.
 It does **not** capture the app's submit-to-first-chunk or submit-to-playback-scheduled timing, nor
 the merged 3-layer telemetry row; those exist only in the real app process topology. CLI rows also
 have no delayed-heartbeat coverage because there is no UI process, so the summarizer's
-`UI heartbeat` column shows `—` for bench runs. `--ttfc` adds an *engine-side* first-chunk probe (a
-warm streaming take per cell, run after the matrix and excluded from its frozen summary selection)
-— distinct from app playback scheduling, which is not proof of acoustic audibility.
+`UI heartbeat` column shows a dash placeholder for bench runs. `--ttfc` adds an *engine-side* first-chunk probe (a
+warm streaming take per cell, run after the matrix and excluded from its frozen summary selection),
+distinct from app playback scheduling, which is not proof of acoustic audibility.
 
 **Preflight.** Before running, `bench` fails fast if any requested `(mode × variant)` model isn't
 installed (listing the missing ids), and fails if `clone` is in `--modes` but the saved voice
@@ -778,7 +781,7 @@ vocello generate --mode design --voice-brief "A warm, calm narrator" --text "Onc
 # Bulk: one model load for many lines
 vocello batch --file lines.txt --mode custom --variant speed --out-dir /tmp/batch
 
-# Discover what's available (instant — no engine boot)
+# Discover what's available (instant, no engine boot)
 vocello speakers list
 vocello models list
 vocello models install pro_custom_speed   # headless; shared with the app
@@ -790,5 +793,5 @@ vocello bench --modes custom --variants speed --lengths short,medium,long --warm
 
 ## See also
 
-- [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — the telemetry schema, the bench
+- [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md): the telemetry schema, the bench
   matrix in depth, autonomous `audioQC`/language/prosody gates, and optional listening annotation.

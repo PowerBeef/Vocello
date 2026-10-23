@@ -89,11 +89,18 @@
 
       <h2>What to include</h2>
       <ul>
-        <li>Vocello version and build number from Settings, or the output of <code>vocello --version</code>.</li>
+        <li>Vocello version and build number from Settings. For the command line, <code>vocello --version</code> prints the version, and <code>vocello version --json</code> reports the version and the build.</li>
         <li>macOS or iOS version.</li>
         <li>The Studio mode and model status involved.</li>
         <li>The visible error title or sanitized error code. For the command line, the error code and exit status that <code>--json</code> reports.</li>
         <li>The steps immediately before the issue occurred.</li>
+      </ul>
+
+      <h2>Updating Vocello</h2>
+      <ul>
+        <li>The Mac app updates itself from 3.0 on: choose <strong>Vocello &gt; Check for Updates</strong>, or let it check on its own schedule, a setting you can turn off. Vocello 2.4 and earlier have no updater, so install the 3.0 DMG by hand once.</li>
+        <li>After upgrading from 2.x, open Settings, Models &amp; Files: the model manager offers an update for each model you installed with 2.x, because the 3.0 model packages include the audio-marking weights.</li>
+        <li>Check for Updates updates only the app. To update the command line, install the newer <code>Vocello-macos26-cli.pkg</code> from the <a href="https://github.com/PowerBeef/Vocello/releases">Vocello releases</a>; it replaces the previous install. Replace a copied Vocello CLI folder with the newer one.</li>
       </ul>
 
       <h2>Command line help</h2>
@@ -104,13 +111,13 @@
         app's models, saved voices, and settings.
       </p>
       <ul>
-        <li><code>vocello --version</code> shows the installed version and build. If the shell cannot find <code>vocello</code> after installing the package, open a new Terminal window. The installer adds links only in folders that root alone can change, so if your <code>/usr/local/bin</code> belongs to your user (as some older Homebrew setups leave it), run <code>/usr/local/lib/vocello/vocello</code> or link it into your path yourself.</li>
+        <li><code>vocello --version</code> shows the installed version, and <code>vocello version --json</code> adds the build number. If the shell cannot find <code>vocello</code> after installing the package, open a new Terminal window. The installer adds links only in folders that root alone can change, so if your <code>/usr/local/bin</code> belongs to your user (as some older Homebrew setups leave it), run <code>/usr/local/lib/vocello/vocello</code> or link it into your path yourself.</li>
         <li><code>vocello doctor</code> checks the shared data folder, the bundled model contract and catalog, the installed models, the Mac's memory tier, and free disk, without loading a model. Add <code>--json</code> for a machine-readable report.</li>
         <li><code>vocello models list</code> shows what is installed, and <code>vocello models verify</code> checks every installed file's size and SHA-256 digest.</li>
         <li>An exit status of 75 means the engine or a store is busy, memory is short, or the network is unavailable: retry later. On an 8 GB Mac, one engine runs at a time, so quit the app or the other command first. <code>vocello history</code> reads History only while the Vocello app is closed.</li>
         <li>Takes made with the command line are saved as files and do not appear in History yet.</li>
         <li>If you copied the Vocello CLI folder from <code>Vocello-macos26-cli.dmg</code> instead, run its executable by its quoted full path and keep the folder's executable and resource bundles together.</li>
-        <li>To remove the installer package's copy, run <code>sudo sh /usr/local/lib/vocello/uninstall.sh</code>. It keeps your models, saved voices, and History. Remove a copied folder by deleting it.</li>
+        <li>To remove the installer package's copy, run <code>sudo sh /usr/local/lib/vocello/uninstall.sh</code>. It keeps your models, saved voices, and History. If users other than root can change <code>/usr/local/lib</code>, it removes nothing and prints the commands that make that folder root's alone; run them, then run the uninstaller again. Remove a copied folder by deleting it.</li>
       </ul>
 
       <h2>AI agents (vocello mcp)</h2>
@@ -120,7 +127,7 @@
       </p>
       <p><code>claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp</code></p>
       <ul>
-        <li><code>vocello mcp --print-config claude-code</code> prints that command, and <code>vocello mcp --print-config claude-desktop</code> prints the setup for Claude Desktop.</li>
+        <li>That command names the installer package's link. With a copied folder, or when the installer added no link, use the path to your <code>vocello</code> executable instead: run <code>mcp --print-config claude-code</code> from that copy (for example <code>/usr/local/lib/vocello/vocello mcp --print-config claude-code</code>) and it prints the command with that copy's own path. <code>--print-config claude-desktop</code> prints the setup for Claude Desktop the same way.</li>
         <li><code>vocello mcp --self-test</code> runs a scripted session without loading a model, to check the server on its own.</li>
         <li>Cloning a voice or saving one needs consent in each request. Files that a request names stay in Vocello's output folder unless you start the server with <code>--allow-dir</code>.</li>
       </ul>

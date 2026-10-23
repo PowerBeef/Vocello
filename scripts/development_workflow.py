@@ -563,7 +563,9 @@ def primary_plan_lines(data: dict, archived_ids: set[str], today: datetime.date)
 
 
 def print_status() -> None:
-    branch = _git("symbolic-ref", "--quiet", "--short", "HEAD").decode().strip() or "detached HEAD"
+    # The release lane checks out a tag: `branch --show-current` prints nothing there, where
+    # `symbolic-ref` fails the whole status.
+    branch = _git("branch", "--show-current").decode().strip() or "detached HEAD"
     paths = changed_paths()
     lanes = [name for name, on in lanes_for(paths).items() if on]
     print(f"branch: {branch}")

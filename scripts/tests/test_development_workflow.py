@@ -382,6 +382,21 @@ class PrimaryPlanStatusTests(unittest.TestCase):
             MODULE.print_status()
         self.assertIn("primaryPlan: unreadable config/roadmap.json", output.getvalue())
 
+    def test_a_tag_checkout_reports_a_detached_head(self) -> None:
+        # The release lane runs the suite on a tag checkout, where HEAD names no branch.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            git = ["git", "-C", directory, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            subprocess.run([*git, "init", "--quiet"], check=True)
+            subprocess.run([*git, "commit", "--quiet", "--allow-empty", "--no-gpg-sign", "-m", "c"], check=True)
+            subprocess.run([*git, "checkout", "--quiet", "--detach"], check=True)
+            output = io.StringIO()
+            with mock.patch.object(MODULE, "ROOT", root), \
+                    mock.patch.object(MODULE, "changed_paths", return_value=[]), \
+                    mock.patch.object(MODULE, "lanes_for", return_value={}), redirect_stdout(output):
+                MODULE.print_status()
+        self.assertIn("branch: detached HEAD\n", output.getvalue())
+
 
 class CommandRunnerTests(unittest.TestCase):
     def test_failed_command_never_continues(self) -> None:

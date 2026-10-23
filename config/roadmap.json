@@ -3,9 +3,9 @@
   "primaryPlan": "release-first-3-0-2026-09",
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
-    "decided": "2026-10-21",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release. On 2026-10-21 the maintainer started the CLI overhaul (parity with the Mac app, an agent contract and a vocello mcp server, a signed .pkg installer, History and settings shared with the app; docs/audits/2026-10-21-cli-overhaul-plan.md) as items of this plan: RF-08 re-gated and RF-25 to RF-31. None changes the iPhone candidate; work that touches iPhone-compiled files (RF-30) and the publication (RF-31) wait for the submission.",
-    "maxInFlight": 2,
+    "decided": "2026-10-22",
+    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release. On 2026-10-21 the maintainer started the CLI overhaul (parity with the Mac app, an agent contract and a vocello mcp server, a signed .pkg installer, History and settings shared with the app; docs/audits/2026-10-21-cli-overhaul-plan.md) as items of this plan: RF-08 re-gated and RF-25 to RF-31. None changes the iPhone candidate; work that touches iPhone-compiled files (RF-30) and the publication (RF-31) wait for the submission. On 2026-10-22 the maintainer chose to release the Mac app and the CLI 3.0 as soon as possible and to submit the iPhone app a few days later, all three from one v3.0.0 tag so every platform ships the same fixes: the tag goes on the release commit that carries RF-08's packaging fixes, and the iPhone archive (ASR-10) is made from that same tag. No iPhone-compiled file has changed since 0919e998, so the iPhone candidate's code is unchanged; focusLock.freeze moves to the tagged commit once its evidence is captured. RF-10 (Mac and CLI qualification and publication) joins this plan in flight, RF-32 announces the release in the README and on the website after publication, and maxInFlight is 3 while they run. RF-30 and RF-31's parity record and extended qualification still wait for the iPhone submission; the CLI 3.0 reads History but does not write it.",
+    "maxInFlight": 3,
     "freeze": {
       "commit": "0919e998fcc4543f36e3a35638a8948b149a1b41"
     }
@@ -268,6 +268,25 @@
       "unparkWhen": "The iOS 3.0 submission is done."
     },
     {
+      "id": "RF-32",
+      "plan": "release-first-3-0-2026-09",
+      "title": "announce the Mac and CLI 3.0 in the README and on the website",
+      "status": "planned",
+      "blockedBy": [
+        "RF-10"
+      ],
+      "due": "2026-10-25",
+      "gate": "After the v3.0.0 GitHub Release is public (never before, since the website deploys from main): config/public-product-facts.json names 3.0.0 as the stable Mac release and drops candidateOnlyClaims; README.md and the website present the Mac app 3.0 (download, Sparkle updates), the CLI 3.0 (signed package install and uninstall, the machine contract, vocello mcp for AI agents) and the iPhone app (public TestFlight until its App Store release) with links to the exact release assets; docs/reference/cli.md drops its unpublished-distribution notice; scripts/public_facts_contract.py, npm --prefix website run check and the website's Playwright acceptance pass.",
+      "sourceOfTruth": [
+        "config/public-product-facts.json",
+        "README.md",
+        "website/",
+        "docs/reference/cli.md"
+      ],
+      "updated": "2026-10-22",
+      "notes": "2026-10-22: opened at the maintainer's request (release Mac and CLI 3.0, update the README and overhaul the website accordingly). The read-only mapping of README and website ran with the promotion audit; the overhaul is prepared in agent worktrees while no measured lane runs, and is integrated and pushed only after publication."
+    },
+    {
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",
@@ -316,13 +335,10 @@
     },
     {
       "id": "RF-10",
-      "plan": "post-3-0-backlog-2026-10",
+      "plan": "release-first-3-0-2026-09",
       "title": "independently qualify macOS and downloadable CLI",
-      "status": "parked",
-      "unparkWhen": "The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.",
-      "blockedBy": [
-        "RF-09"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
       "sourceOfTruth": [
         "scripts/release.sh",
@@ -330,8 +346,9 @@
         "scripts/quality_promotion.py",
         "docs/reference/macos-release-qa.md"
       ],
-      "updated": "2026-09-05",
-      "notes": "September 6 class: deferred non-iOS qualification. Signed desktop/CLI acceptance is parked; all gates and shared-code regression testing remain. Historical checkpoint: September 5: valid local Developer ID and retained signed app exist, but no matching command-bound release-evidence/verification bundle in that distribution directory. Not current 3.0 qualification. Actual candidate QA awaits RF-09 source authority/artifacts; no substitute ad-hoc run or upload. September 5: shared explicit-Play finalization correction F-23 has deterministic and narrow iPhone evidence only; packaged Mac player acceptance remains. Nine iPhone performance scenarios are not Mac evidence or an optimized-synthesis claim; preserve the exploratory generation main-loop outlier. Earlier historical checkpoint: Development-build QA on 14dc148c (3.0.0/build 24) is complete, not signed-candidate acceptance: standard/extended smoke 7/7 each, localization 1/1, the 29-take UI generation matrix, five counted nine-scenario perf runs plus three post-editor-fix runs, and the 11-take retained-memory sequence. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-10-22",
+      "notes": "2026-10-22: re-homed into the release plan in flight (maintainer: release Mac and CLI 3.0 first, the iPhone later from the same tag). The promotion audit found macos-language-benchmark unsatisfiable: the contract has required Custom cells in ten languages since 2026-08-21 while the bench covered six; the release commit adds Russian, Portuguese, Italian and Korean as pinned cells (corpus version 3) with a guard test. Open risks for the eight macOS lanes: any Fast QC warning on any take makes a record unpromotable (only memory.pressure.soft_trim is allowed), custom-ja-auto failed spoken content by two-family consensus at 9cd075bd, and Portuguese passed about 40 percent of an earlier two-family screen. The maintainer chooses the publication route. Earlier development-build QA (14dc148c) is not signed-candidate acceptance. History: git log -p -- config/roadmap.json.",
+      "due": "2026-10-24"
     },
     {
       "id": "RF-12",

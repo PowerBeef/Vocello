@@ -1125,14 +1125,18 @@ Headless matrix for the Qwen3 language path:
 | `config/audio-qc-script-pool-sources.json` | The pinned Common Voice commit and the size and SHA-256 of every file the pool is selected from |
 
 Cells tagged `"quick": true` form the **quick** subset (English + French + negative control, 7 cells).
-**full** runs all 19 cells (6 languages × Custom pinned/Auto + Design explicit-language + negative).
+**full** runs all 23 cells: six languages × Custom pinned/Auto + Design explicit-language, the
+negative control, and a Custom pinned cell each for Russian, Portuguese, Italian and Korean. Those
+four joined in corpus version 3 (2026-10-22) so the full matrix covers every language the
+promotion contract's language lanes require; they have no Auto or Design cell.
 
-The version-2 corpus is deliberately longer than the original smoke snippets: each alphabetic
-script contains at least 15 normalized words and each Chinese, Japanese (and, once scripted, Korean)
-script contains at least 24 normalized characters. The plan refuses a script that fails the corpus
+The corpus is deliberately longer than the original smoke snippets: each alphabetic script
+contains at least 15 normalized words and each Chinese, Japanese and Korean script contains at
+least 24 normalized characters. The plan refuses a script that fails the corpus
 lint ([§5.3](#53-accuracy-contract)). Design always receives the known target language explicitly.
 Custom uses a native-language speaker where the Qwen speaker contract provides one (Chinese
-`vivian`, Japanese `ono_anna`); the remaining languages use the contract's stable `aiden` fixture.
+`vivian`, Japanese `ono_anna`, Korean `sohee`); the remaining languages use the contract's stable
+`aiden` fixture.
 
 The paired Custom pinned/Auto cells intentionally generate the same prompt with the same speaker
 and sampling policy; the shared resolved prompt digest proves that Auto resolves equivalently to the

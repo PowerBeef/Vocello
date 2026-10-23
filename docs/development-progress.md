@@ -17,7 +17,26 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 22, later — RF-29 closes: `vocello mcp` serves agents (resume here)
+### October 22, night — the Mac and CLI 3.0 release starts from the release commit (resume here)
+
+- **Maintainer decision:** release the Mac app and the CLI 3.0 first; submit the iPhone app a few days later
+  from the same `v3.0.0` tag. Recorded in `focusLock` (maxInFlight 3); RF-10 joins the release plan in
+  flight; RF-32 (README and website) follows publication.
+- **Release pipeline repaired on CI's Xcode 26.6 and Linux:** `0ffe6fa3` (event-stream test), `6f3efa57`
+  (macOS-only package tests), `f9326d16` (`release.sh` otool SIGPIPE), `8b0ee46b` (the package smoke
+  read the CLI's Info.plist only at lengths divisible by four). CI is green from `f9326d16`.
+- **Tag signing:** `~/.ssh/vocello_tag_signing` signs tags for this repository only (local git config);
+  the maintainer registers it on GitHub (`gh auth refresh -s admin:ssh_signing_key`, then
+  `gh ssh-key add --type signing`).
+- **Still the maintainer's:** the Developer ID Installer certificate and its two `release` secrets, the
+  signed `v3.0.0` tag, the `release` environment approvals, and the publication route.
+- **Promotion evidence:** an audit of the eight macOS lanes found the language lane unsatisfiable (six of
+  the ten required languages); this commit adds the other four as pinned cells. Lanes run with HEAD on
+  this exact commit and a clean tree; their records move to `build/artifacts/quality-promotion/` before
+  the managed download capture, which needs the tag. No edit or commit until `create` and `validate`
+  pass. Risks: Fast QC warnings, `custom-ja-auto`, Portuguese.
+
+### October 22, later — RF-29 closes: `vocello mcp` serves agents
 
 - **RF-29 done** (`bd045167`): `vocello mcp` is an in-house stdio MCP server.
   - It serves the stateless 2026-07-28 revision and the `initialize`-era ones.

@@ -86,7 +86,7 @@ WORD_BOUNDARY_SPAN_LIMIT = 4
 DELETION_RUN_WARNING_LENGTH = 2
 
 # The product's ten languages (`Qwen3SupportedLanguage` without Auto). The
-# tracked corpus (`config/language-bench-corpus.json`) scripts six of them; a
+# tracked corpus (`config/language-bench-corpus.json`) scripts all ten; a
 # language outside this table fails closed.
 LANGUAGE_LOCALE_CODES: dict[str, str] = {
     "english": "en",

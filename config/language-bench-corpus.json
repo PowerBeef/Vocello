@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "description": "Predeclared multilingual smoke scripts and mode fixtures. Alphabetic scripts contain at least 15 normalized words; CJK scripts contain at least 24 normalized characters.",
+  "version": 3,
+  "description": "Predeclared multilingual smoke scripts and mode fixtures. Alphabetic scripts contain at least 15 normalized words; Chinese, Japanese and Korean scripts contain at least 24 normalized characters.",
   "languages": [
     {
       "id": "english",
@@ -36,6 +36,30 @@
       "id": "japanese",
       "script": "今日は天気がよく、赤い列車が静かな駅を出発して、遠くの町へ向かいます。",
       "customSpeakerID": "ono_anna",
+      "designInstruction": "A warm, friendly narrator with a calm, measured pace."
+    },
+    {
+      "id": "russian",
+      "script": "Утром поезд медленно выехал из тихого города, и пассажиры смотрели на поля, реки и тёмный лес за окном.",
+      "customSpeakerID": "aiden",
+      "designInstruction": "A warm, friendly narrator with a calm, measured pace."
+    },
+    {
+      "id": "portuguese",
+      "script": "Hoje de manhã, o trem saiu da pequena estação, e as pessoas olharam pela janela para os campos verdes e o rio tranquilo.",
+      "customSpeakerID": "aiden",
+      "designInstruction": "A warm, friendly narrator with a calm, measured pace."
+    },
+    {
+      "id": "italian",
+      "script": "Questa mattina il treno è partito dalla piccola stazione, e i passeggeri hanno guardato i campi verdi e il fiume tranquillo.",
+      "customSpeakerID": "aiden",
+      "designInstruction": "A warm, friendly narrator with a calm, measured pace."
+    },
+    {
+      "id": "korean",
+      "script": "아침에 기차가 조용한 역을 떠났고, 사람들은 창밖으로 푸른 들판과 잔잔한 강을 바라보았습니다.",
+      "customSpeakerID": "sohee",
       "designInstruction": "A warm, friendly narrator with a calm, measured pace."
     }
   ]

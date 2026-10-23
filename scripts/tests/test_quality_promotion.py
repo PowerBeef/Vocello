@@ -489,5 +489,17 @@ class QualityPromotionTests(unittest.TestCase):
             )
 
 
+class LanguageBenchCoverageTests(unittest.TestCase):
+    def test_the_full_language_matrix_covers_every_required_language_cell(self) -> None:
+        # Each language lane names a Custom cell per product language; a matrix without one can
+        # never produce a promotable record (four were missing until 2026-10-22).
+        contract = json.loads((REPO_ROOT / "config/quality-promotion-contract.json").read_text(encoding="utf-8"))
+        matrix = json.loads((REPO_ROOT / "config/language-bench-matrix.json").read_text(encoding="utf-8"))
+        takes = [{"cell": cell["id"], "mode": cell["mode"], "variant": cell["variant"]} for cell in matrix["cells"]]
+        for identity in ("macos-language-benchmark", "ios-language-benchmark"):
+            with self.subTest(identity=identity):
+                PROMOTION.validate_take_coverage(identity, {"takes": takes}, contract["evidence"][identity])
+
+
 if __name__ == "__main__":
     unittest.main()

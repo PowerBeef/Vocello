@@ -94,6 +94,27 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(report["failedSteps"][0]["step"], "xcuitest")
         self.assertEqual(report["recordedStatus"], "failed")
 
+    def test_a_refused_ui_preflight_is_an_infrastructure_failure(self):
+        self.run_metadata("failed", 1)
+        self.write("required-steps.json", {
+            "runID": "run-1", "status": "failed", "completedAt": "finished",
+            "expectedSteps": [{"id": "xcuitest", "required": True}, {"id": "ui-preflight", "required": False}],
+            "results": {"ui-preflight": {"status": "failed", "exitCode": 1}},
+        })
+        report = MODULE.triage(self.root)
+        self.assertEqual(report["verdict"], "infrastructure-failure")
+        self.assertEqual(report["failedSteps"][0]["step"], "ui-preflight")
+        self.assertEqual(report["missingRequiredSteps"], ["xcuitest"])
+
+    def test_a_passed_ui_preflight_does_not_classify_a_later_failure(self):
+        self.run_metadata("failed", 1)
+        self.write("required-steps.json", {
+            "runID": "run-1", "status": "failed", "completedAt": "finished",
+            "expectedSteps": [{"id": "xcuitest", "required": True}, {"id": "ui-preflight", "required": False}],
+            "results": {"ui-preflight": {"status": "passed", "exitCode": 0}, "xcuitest": {"status": "failed", "exitCode": 65}},
+        })
+        self.assertEqual(MODULE.triage(self.root)["verdict"], "failure-unclassified")
+
     def test_stale_infrastructure_classification_cannot_override_failure(self):
         self.run_metadata("failed", 1)
         self.ledger({"xcuitest": 1})

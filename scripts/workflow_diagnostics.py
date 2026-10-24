@@ -279,6 +279,13 @@ def triage(run_directory: Path) -> dict:
             evidence.extend(["xcodebuild.log", "xcresult-test-summary.json"])
         else:
             issues.append(f"unbound infrastructure classification: {filename}")
+    # A lane's UI readiness preflight (optional step `ui-preflight`, audit P1-2) refuses
+    # before anything is built or tested: the host or the iPhone was not ready.
+    preflight = (ledger.get("results") or {}).get("ui-preflight") if ledger_valid and ledger else None
+    if isinstance(preflight, dict) and preflight.get("status") == "failed":
+        failed_steps.append({"step": "ui-preflight", "status": "failed", "exitCode": preflight.get("exitCode"),
+                             "evidence": "required-steps.json"})
+        classification = classification or "infrastructure-failure"
 
     verdict_text = ""
     verdict_file = root / "verdict.txt"

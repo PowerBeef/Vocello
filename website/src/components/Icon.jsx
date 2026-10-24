@@ -108,6 +108,18 @@ export const Icon = ({ name, size = 18, stroke = 1.6, className = "" }) => {
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       );
+    case "menu":
+      return (
+        <svg {...props}>
+          <path d="M4 8h16M4 16h16" />
+        </svg>
+      );
+    case "close":
+      return (
+        <svg {...props}>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      );
     case "sparkles":
       return (
         <svg {...props}>

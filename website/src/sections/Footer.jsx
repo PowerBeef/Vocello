@@ -7,8 +7,8 @@ export const Footer = () => (
       <div className="footer-inner">
         <div className="footer-brand">
           <div className="brand">
-            <img className="brand-mark" src="assets/vocello-header-mark.png" alt="" style={{ width: 24, height: 24 }} />
-            <span className="brand-name" style={{ fontSize: 17 }}>Vocello</span>
+            <img className="brand-mark brand-mark--footer" src="assets/vocello-header-mark.png" width={84} height={72} alt="" />
+            <span className="brand-name brand-name--footer">Vocello</span>
           </div>
           <p>
             A local, private AI voice studio for Apple Silicon Macs, with a command line

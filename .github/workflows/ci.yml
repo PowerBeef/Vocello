@@ -605,7 +605,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.website == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # WebKit's system libraries and the layout matrix need more than the
+    # former Chromium-only 10 minutes.
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -626,8 +628,8 @@ jobs:
       - name: Install locked dependencies
         run: npm --prefix website ci
 
-      - name: Install pinned Chromium runtime
-        run: npx --prefix website playwright install --with-deps chromium
+      - name: Install pinned Chromium and WebKit runtimes
+        run: npx --prefix website playwright install --with-deps chromium webkit
 
       - name: Lint, test, and build website
         run: npm --prefix website run check

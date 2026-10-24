@@ -12,7 +12,7 @@ npm --prefix website run lint     # site contract, ESLint (eslint.config.js), ts
 npm --prefix website test         # Node contract fixtures + rendered contract
 npm --prefix website run build    # client + SSR + prerender -> website/dist/
 npm --prefix website run check    # lint + test + build + Playwright browser tests
-                                  # (needs Chromium once: npx --prefix website playwright install --with-deps chromium)
+                                  # (needs Chromium and WebKit once: npx --prefix website playwright install --with-deps chromium webkit)
 npm --prefix website run preview  # serve production build
 ```
 
@@ -58,14 +58,46 @@ anchor jumps. The privacy page must continue to disclose website analytics.
 
 ### Responsive layout
 
-- The nav steps links out before they can meet the brand: at 1240 px or less, Open source
-  (`nav-link--xl`) hides.
-- At 1100 px or less, the hero stacks copy before the Mac window, How it runs (`nav-link--lg`) hides,
-  and the nav switches to a flex row with space between.
-- At 900 px or less, bands, samples, specs, and CTA layouts stack and content centers; every
-  `nav-link--full` link hides, leaving Listen and Engineering.
-- At 600 px or less, padding, nav gaps, and CTA sizing tighten and the former-name clarification hides;
-  at 480 px or less, Engineering (`nav-link--sm`) hides too.
+Four layout tiers, defined in `DESIGN.md` and at the top of `src/site.css`:
+
+| Tier | Widths | Layout |
+| --- | --- | --- |
+| Phone | below 600 px | one column; 56 px bar |
+| Small tablet | 600 to 899 px, and landscape phones | one column; side-panel menu |
+| Tablet | 900 to 1199 px | two-column sections; the hero stacks |
+| Desktop | 1200 px and up | full layout; a 1320 px container from 1600 px |
+
+- Media queries use exactly `max-width: 599.98px`, `899.98px` and `1199.98px`, or `min-width:
+  1200px` and `1600px`. A short landscape screen, `(orientation: landscape) and (max-height:
+  500px)`, also tightens the bar and the display type, and caps screenshots at 80% of the height.
+- Sizes come from the layout tokens in `src/site.css`: `--fs-hero`, `--fs-section`, `--fs-band`,
+  `--fs-cta`, `--fs-quote`, `--section-y`, `--gutter`, `--nav-h` and `--tap`. Display type and
+  section rhythm scale with `clamp()`, so do not add a per-tier font size or section padding.
+- **The bar (`src/sections/Nav.jsx`)** is opaque. Each section link names the narrowest tier
+  that shows it:
+
+  | Tier | Bar contents |
+  | --- | --- |
+  | Desktop | all six section links, plus Open source from 1320 px |
+  | Tablet | four links (`nav-link--tablet`), Download and the menu button |
+  | Below 900 px | brand, Download and the menu button |
+
+  The menu is a native modal `<dialog>` (`#site-menu`) listing every section. It locks the page
+  and hands focus back to the menu button when it closes. The former-name clarification shows
+  only from 1200 px.
+- Every interactive control in the bar and the menu keeps a 44 px target (`--tap`). Hover styles
+  live only inside `@media (hover: hover) and (pointer: fine)`, so a tap never leaves a control
+  looking active.
+- The hero and the closing call to action are the only centered blocks. Body text, lists and
+  tables stay left-aligned at every width.
+- `html` sets `scroll-padding-top`, so anchor jumps land below the bar. The body clips sideways
+  overflow (`overflow-x: clip`), but the layout matrix measures every element regardless, so fix
+  overflow where it starts.
+- `tests/layout-matrix.spec.mjs` checks every page on every tier edge and three landscape sizes in
+  Chromium, plus real iPhone and iPad descriptors in WebKit. It checks that no element extends past
+  the viewport, the bar's items neither overlap nor escape, tap targets are 44 px, the menu behaves
+  and anchor jumps land below the bar. Its widths, devices and pure checks live in
+  `scripts/browser-smoke-contract.mjs`.
 
 Use `grid-template-columns: minmax(0, 1fr)` for narrow single-column grids. A bare `1fr` allows
 intrinsic-width children such as max-content point lists to overflow.
@@ -150,8 +182,9 @@ from unrelated JSX.
 
 1. Cross-check changed claims against authoritative parent-repository sources.
 2. Run `npm --prefix website run check`.
-3. For visual or interaction changes, run the local server and inspect desktop, 900 px, and 600 px
-   boundaries with the Chrome browser tools when callable.
+3. For visual or interaction changes, run the local server and inspect a phone (390 px), a phone
+   on its side (844 x 390), a tablet (1024 px) and a desktop (1440 px) with the Chrome browser
+   tools when callable; the layout matrix covers every tier edge.
 4. Confirm reduced motion, keyboard navigation, anchors, audio mutual exclusion, and external-link
    safety when those surfaces changed.
 5. Refresh repository documentation/generated artifacts only when their registered inputs changed.

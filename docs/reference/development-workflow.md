@@ -102,7 +102,7 @@ venvs under `build/cache/qc/runtimes/`, never in this interpreter; see [`qc.md`]
 
 ```sh
 npm --prefix website ci
-npx --prefix website playwright install chromium
+npx --prefix website playwright install chromium webkit
 npm --prefix website run check
 ```
 

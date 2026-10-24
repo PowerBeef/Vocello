@@ -8,7 +8,7 @@ Run these from the repository root:
 
 ```sh
 npm --prefix website ci
-npx --prefix website playwright install chromium   # once per machine, for the browser tests
+npx --prefix website playwright install chromium webkit   # once per machine, for the browser tests
 npm --prefix website run dev
 npm --prefix website run lint
 npm --prefix website test

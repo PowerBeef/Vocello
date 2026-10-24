@@ -19,6 +19,22 @@ Dark-first premium brand site for a native Mac app. The page should feel like a 
 - Use 16px cards and 22px stage surfaces, but avoid repeated identical card grids.
 - Prefer bands, comparison surfaces, and product-led modules over generic card rows.
 - Mobile should preserve rhythm: avoid turning every section into the same long stack.
+- Four layout tiers:
+
+  | Tier | Widths |
+  | --- | --- |
+  | Phone | below 600 px |
+  | Small tablet and landscape phone | 600 to 899 px |
+  | Tablet | 900 to 1199 px |
+  | Desktop | 1200 px and up |
+
+  Display type and section spacing scale fluidly between them. A short landscape screen
+  tightens the bar and the type and keeps screenshots within its height.
+- Alignment: the hero and the closing call to action center. Everything else, headings
+  included, is left-aligned at every width; centered paragraphs read with two ragged edges.
+- The bar is opaque and never lets page text show through it. Below the desktop tier, a menu
+  button opens a sheet with every section; links never float alone in the bar.
+- Touch: every control has a 44 px target, and hover styling exists only for fine pointers.
 
 ## Motion
 - Quiet and purposeful. Waveform and tab transitions may move, but nothing should bounce, shimmer, or pulse for decoration.

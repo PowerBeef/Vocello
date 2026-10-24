@@ -6,31 +6,12 @@ import {
   validateInternalTargets,
 } from "../scripts/browser-smoke-contract.mjs";
 import { SAMPLES } from "../src/data/samples.js";
-
-function collectBrowserFailures(page) {
-  const failures = [];
-  page.on("pageerror", (error) => failures.push(`pageerror:${error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") failures.push(`console:${message.text()}`);
-  });
-  page.on("requestfailed", (request) => {
-    const failure = request.failure()?.errorText ?? "unknown";
-    failures.push(`request:${request.url()}:${failure}`);
-  });
-  return failures;
-}
+import { collectBrowserFailures, stubAnalytics } from "./browser-helpers.mjs";
 
 for (const viewport of VIEWPORTS) {
   test(`${viewport.name} production page hydrates, navigates, and has no browser errors`, async ({ page }) => {
     await page.setViewportSize(viewport);
-    // Vite preview does not implement Vercel's production analytics endpoint.
-    // Fulfill only that exact first-party script request so the browser smoke
-    // observes application console/network failures without changing the
-    // production bundle or disabling analytics in deployment.
-    await page.route("**/_vercel/insights/script.js", (route) => route.fulfill({
-      contentType: "application/javascript",
-      body: "window.va = window.va || function () {};",
-    }));
+    await stubAnalytics(page);
     const failures = collectBrowserFailures(page);
     await page.goto("/", { waitUntil: "networkidle" });
 

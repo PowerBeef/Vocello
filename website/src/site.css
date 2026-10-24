@@ -1,5 +1,44 @@
 @import url('tokens.css');
 
+/* ============== LAYOUT TOKENS ==============
+   Four layout tiers (DESIGN.md): phone below 600 px, small tablet and
+   landscape phone 600 to 899, tablet 900 to 1199, desktop from 1200. Media
+   queries use exactly these edges (max-width 599.98, 899.98 and 1199.98 px;
+   min-width 1200 and 1600 px). A short landscape screen (at most 500 px
+   tall) also tightens the bar and the display type. Display sizes scale
+   fluidly between the tiers instead of stepping at each one. */
+:root {
+  --bar-bg: #0E0F14;
+  --nav-h: 64px;
+  --gutter: clamp(20px, 5vw, 32px);
+  --container-max: 1180px;
+  --section-y: clamp(56px, 40px + 4vw, 96px);
+  --fs-hero: clamp(2.375rem, 1.4rem + 3vw, 3.75rem);
+  --fs-section: clamp(2.125rem, 1.5rem + 2.2vw, 3.125rem);
+  --fs-band: clamp(2rem, 1.45rem + 1.9vw, 2.75rem);
+  --fs-cta: clamp(2rem, 1.2rem + 2.8vw, 3.375rem);
+  --fs-quote: clamp(1.125rem, 0.95rem + 0.6vw, 1.4375rem);
+  --tap: 44px;
+}
+
+@media (max-width: 599.98px) {
+  :root { --nav-h: 56px; }
+}
+
+@media (min-width: 1600px) {
+  :root { --container-max: 1320px; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --nav-h: 52px;
+    --fs-hero: 2.5rem;
+    --fs-section: 2.25rem;
+    --fs-band: 2rem;
+    --fs-cta: 2.25rem;
+  }
+}
+
 /* ============== SITE BASE ============== */
 
 * { box-sizing: border-box; }
@@ -7,7 +46,6 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg-canvas);
   color: var(--fg-primary);
   font-family: var(--font-text);
   font-size: 16px;
@@ -16,17 +54,38 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
-html { scroll-behavior: smooth; }
+html {
+  background: var(--bg-canvas);
+  scroll-behavior: smooth;
+  /* Anchor jumps land below the sticky bar. */
+  scroll-padding-top: calc(var(--nav-h) + 16px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* The menu sheet holds the page still while it is open. */
+html:has(.menu-sheet[open]) { overflow: hidden; }
 
 body {
+  min-height: 100vh;
+  /* clip, not hidden: overflow is fixed where it starts, and the body never
+     becomes a scroll container. */
+  overflow-x: clip;
+}
+
+/* The page glows sit on a fixed layer: iOS ignores background-attachment:
+   fixed and would stretch them over the whole page height. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(ellipse 80% 60% at 50% -10%, rgba(237, 204, 138, 0.10), transparent 65%),
     radial-gradient(ellipse 90% 50% at 100% 30%, rgba(191, 170, 219, 0.08), transparent 60%),
     radial-gradient(ellipse 90% 50% at 0% 60%, rgba(219, 168, 135, 0.06), transparent 60%),
     linear-gradient(180deg, #0E0F14 0%, #131520 40%, #16181E 100%);
-  background-attachment: fixed;
-  min-height: 100vh;
-  overflow-x: hidden;
 }
 
 .skip-link {
@@ -68,9 +127,10 @@ a { color: inherit; text-decoration: none; }
 }
 
 .container {
-  max-width: 1180px;
+  max-width: var(--container-max);
   margin: 0 auto;
-  padding: 0 32px;
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
 
 /* ============== NAV ============== */
@@ -79,21 +139,21 @@ a { color: inherit; text-decoration: none; }
   position: sticky;
   top: 0;
   z-index: 100;
-  /* The base fill must stand alone: backdrop-filter can silently fail to
-     composite even where it is supported, and page content collides with
-     the links when the bar leans on blur for legibility. The blur only
-     softens the remaining sliver of translucency. */
-  background: rgba(14, 15, 20, 0.94);
-  backdrop-filter: saturate(140%) blur(20px);
-  -webkit-backdrop-filter: saturate(140%) blur(20px);
+  /* Opaque: a translucent bar let page text show through it on every
+     screen, and backdrop blur can silently fail to composite. */
+  background: var(--bar-bg);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: env(safe-area-inset-top);
 }
 
+/* Brand, centered links and actions. The side columns share the remaining
+   width, so the links stay centered whatever the brand and actions measure. */
 .nav-inner {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
-  height: 64px;
+  gap: 16px;
+  height: var(--nav-h);
 }
 
 .nav-progress {
@@ -113,12 +173,16 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-self: start;
+  min-height: var(--tap);
 }
 
+/* The mark is 84 x 72: a fixed height keeps its shape. */
 .brand-mark {
-  width: 28px;
+  width: auto;
   height: 28px;
 }
+.brand-mark--footer { height: 24px; }
 
 .brand-name {
   font-family: var(--font-display);
@@ -126,6 +190,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 19px;
   letter-spacing: 0;
 }
+.brand-name--footer { font-size: 17px; }
 
 .brand-rebrand {
   font-size: 11px;
@@ -135,15 +200,44 @@ a { color: inherit; text-decoration: none; }
 
 .nav-links {
   display: flex;
-  gap: 24px;
+  gap: 4px;
   font-size: 14px;
   color: var(--fg-secondary);
 }
 
-.nav-links a:hover { color: var(--fg-primary); }
+/* Links keep a 44 px target; the padding is invisible. */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 10px;
+  white-space: nowrap;
+  transition: color var(--motion-quick) var(--ease-standard);
+}
 
-.nav-cta {
+.nav-link[aria-current] {
+  color: var(--fg-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--accent) 70%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 8px;
+}
+
+.nav-actions {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The link is the 44 px target; the pill inside it is the visible button. */
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+}
+
+.nav-cta-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -154,19 +248,159 @@ a { color: inherit; text-decoration: none; }
   color: #1B1D24;
   font-weight: 600;
   font-size: 13px;
+  white-space: nowrap;
   border: 1px solid rgba(237, 204, 138, 0.34);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   transition: opacity var(--motion-quick) var(--ease-standard);
 }
-.nav-cta:hover { opacity: 0.92; }
-.nav-cta:active { opacity: 0.78; }
+.nav-cta:active .nav-cta-pill { opacity: 0.78; }
+
+.nav-menu-button {
+  display: none;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-primary);
+  transition: background-color var(--motion-quick) var(--ease-standard);
+}
+.nav-menu-button:active { background: rgba(255, 255, 255, 0.08); }
+
+/* Bar contents by tier. Desktop: every section link, and Open source from
+   1320 px. Tablet: four links and the menu. Below 900 px: brand, Download
+   and the menu; the former name steps out below 1200 px. */
+.nav-link--wide { display: none; }
+
+@media (min-width: 1320px) {
+  .nav-link--wide { display: inline-flex; }
+}
+
+@media (max-width: 1199.98px) {
+  .nav-link--desktop,
+  .brand-rebrand { display: none; }
+  .nav-menu-button { display: grid; }
+}
+
+@media (max-width: 899.98px) {
+  .nav-link--tablet { display: none; }
+}
+
+@media (max-width: 599.98px) {
+  .nav-inner { gap: 8px; }
+  .nav-cta-pill { height: 34px; padding: 0 12px; }
+}
+
+/* ============== MENU SHEET ============== */
+
+/* Full height on phones; a side panel from 600 px. A native modal <dialog>
+   traps focus, closes on Esc and returns focus to the menu button. */
+.menu-sheet {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--bar-bg);
+  color: var(--fg-primary);
+  overscroll-behavior: contain;
+}
+
+.menu-sheet[open] { animation: panelSettle var(--motion-reveal) var(--ease-standard); }
+
+.menu-sheet::backdrop { background: rgba(6, 7, 10, 0.62); }
+
+@media (min-width: 600px) {
+  .menu-sheet {
+    left: auto;
+    width: min(420px, 100%);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+.menu-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding:
+    env(safe-area-inset-top)
+    max(var(--gutter), env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom))
+    max(var(--gutter), env(safe-area-inset-left));
+}
+
+.menu-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--nav-h);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.menu-sheet-head .nav-menu-button { display: grid; }
+
+.menu-sheet-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.menu-links {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.menu-links a {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.menu-secondary {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.menu-secondary a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: 15px;
+  color: var(--fg-secondary);
+}
+
+.menu-ctas {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 32px;
+}
+
+.menu-ctas .btn { justify-content: center; min-height: 52px; }
 
 /* ============== HERO (editorial split) ============== */
 
 .hero {
   position: relative;
-  padding: 68px 0 88px;
-  overflow: hidden;
+  padding: clamp(40px, 24px + 3.5vw, 68px) 0 clamp(64px, 48px + 3vw, 88px);
+  /* Clip sideways only: the stage glow and shadow fade out below the hero
+     instead of ending on a hard edge. */
+  overflow-x: clip;
 }
 
 .hero-split {
@@ -194,10 +428,6 @@ a.hero-eyebrow {
   transition: border-color var(--motion-quick) var(--ease-standard),
               color var(--motion-quick) var(--ease-standard);
 }
-a.hero-eyebrow:hover {
-  color: var(--fg-primary);
-  border-color: rgba(255, 255, 255, 0.18);
-}
 .hero-eyebrow .dot {
   width: 8px;
   height: 8px;
@@ -209,7 +439,7 @@ a.hero-eyebrow:hover {
 .hero-title {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 58px;
+  font-size: var(--fs-hero);
   line-height: 1.04;
   letter-spacing: 0;
   color: var(--fg-primary);
@@ -239,14 +469,14 @@ a.hero-eyebrow:hover {
   flex-wrap: wrap;
 }
 
-.hero-ctas--center { justify-content: center; }
-
+/* A minimum height, not a fixed one: a label that wraps on a narrow phone
+   grows the button instead of spilling out of it. */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  height: 46px;
-  padding: 0 22px;
+  min-height: 46px;
+  padding: 8px 22px;
   border-radius: var(--radius-pill);
   font-weight: 600;
   font-size: 14px;
@@ -262,17 +492,18 @@ a.hero-eyebrow:hover {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     0 6px 20px rgba(237, 204, 138, 0.18);
+  transition:
+    opacity var(--motion-quick) var(--ease-standard),
+    transform var(--motion-quick) var(--ease-standard),
+    box-shadow var(--motion-quick) var(--ease-standard);
 }
-.btn-primary:hover { opacity: 0.92; }
-.btn-primary:active { opacity: 0.78; }
+.btn-primary:active { opacity: 0.78; transform: translateY(0); }
 
 .btn-secondary {
   background: rgba(255, 255, 255, 0.04);
   color: var(--fg-primary);
   border-color: rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(20px);
 }
-.btn-secondary:hover { background: rgba(255, 255, 255, 0.07); }
 
 .btn .platform-mini {
   font-size: 11px;
@@ -361,8 +592,11 @@ picture {
 
 /* ============== SECTION SHELL ============== */
 
+/* Every section's vertical rhythm derives from --section-y, so it scales
+   with the viewport and no tier override can flatten a section's own
+   proportions. */
 .section {
-  padding: 96px 0;
+  padding: var(--section-y) 0;
   position: relative;
 }
 
@@ -377,7 +611,7 @@ picture {
 .section-title {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 50px;
+  font-size: var(--fs-section);
   line-height: 1.06;
   letter-spacing: 0;
   margin: 0 0 18px;
@@ -397,7 +631,6 @@ picture {
 /* ============== WHAT'S NEW IN 3.0 ============== */
 
 .whatsnew-section {
-  padding: 88px 0 96px;
   border-top: 1px solid rgba(255, 255, 255, 0.045);
 }
 
@@ -488,7 +721,6 @@ picture {
   border-radius: var(--radius-card);
   transition: border-color var(--motion-base) var(--ease-standard);
 }
-.whatsnew-cli:hover { border-color: var(--accent-stroke); }
 
 .whatsnew-cli-prompt {
   display: grid;
@@ -532,7 +764,6 @@ picture {
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   transition: border-color var(--motion-base) var(--ease-standard);
 }
-.whatsnew-row:hover { border-color: rgba(255, 255, 255, 0.16); }
 
 .whatsnew-k {
   margin: 0 0 4px;
@@ -591,8 +822,8 @@ picture {
 
 .workflow-band {
   position: relative;
-  padding: 96px 0;
-  overflow: hidden;
+  padding: var(--section-y) 0;
+  overflow-x: clip;
 }
 
 .workflow-band::before {
@@ -656,7 +887,7 @@ picture {
 .workflow-band-title {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 44px;
+  font-size: var(--fs-band);
   line-height: 1.05;
   letter-spacing: 0;
   margin: 0 0 20px;
@@ -688,7 +919,7 @@ picture {
 
 .workflow-band-points li {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 44px minmax(0, 1fr);
   gap: 18px;
   align-items: baseline;
 }
@@ -721,7 +952,7 @@ picture {
 
 /* ============== LISTEN ============== */
 
-.listen-section { padding: 112px 0 96px; }
+.listen-section { padding: calc(var(--section-y) + 16px) 0 var(--section-y); }
 
 .listen-head { margin-bottom: 48px; max-width: 680px; }
 
@@ -796,7 +1027,7 @@ picture {
 .listen-quote {
   font-family: var(--font-serif);
   font-weight: 400;
-  font-size: 23px;
+  font-size: var(--fs-quote);
   line-height: 1.32;
   letter-spacing: 0;
   color: var(--fg-primary);
@@ -841,11 +1072,6 @@ picture {
               border-color var(--motion-quick) var(--ease-standard),
               color var(--motion-quick) var(--ease-standard);
 }
-.play-btn:hover {
-  background: var(--row-mode, var(--accent));
-  border-color: var(--row-mode, var(--accent));
-  color: #0E0F14;
-}
 
 .hear-wave {
   height: 28px;
@@ -867,7 +1093,7 @@ picture {
 /* ============== WHY NOT CLOUD TTS ============== */
 
 .cloud-section {
-  padding: 72px 0 80px;
+  padding: calc(var(--section-y) * 0.75) 0 calc(var(--section-y) * 0.83);
   border-top: 1px solid rgba(255, 255, 255, 0.045);
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
@@ -1057,7 +1283,6 @@ picture {
 /* ============== WHAT'S NEW (CAPABILITIES) ============== */
 
 .caps-section {
-  padding: 88px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.045);
 }
 
@@ -1120,7 +1345,7 @@ picture {
 /* ============== HOW IT RUNS ============== */
 
 .runs-section {
-  padding: 64px 0 56px;
+  padding: calc(var(--section-y) * 0.67) 0 calc(var(--section-y) * 0.58);
 }
 
 .runs-layout {
@@ -1223,30 +1448,6 @@ picture {
   color: var(--row-tone, var(--fg-primary));
 }
 
-.runs-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.runs-badge--ready {
-  background: rgba(76, 195, 138, 0.12);
-  color: var(--status-ready);
-  border: 1px solid rgba(76, 195, 138, 0.24);
-}
-
-.runs-badge--warn {
-  background: rgba(232, 148, 58, 0.14);
-  color: var(--status-warn);
-  border: 1px solid rgba(232, 148, 58, 0.28);
-}
-
 .runs-note {
   margin: 0;
   font-size: 14px;
@@ -1258,7 +1459,6 @@ picture {
 /* ============== COMMAND LINE AND AGENTS ============== */
 
 .cli-section {
-  padding: 88px 0 96px;
   border-top: 1px solid rgba(255, 255, 255, 0.045);
 }
 
@@ -1427,10 +1627,6 @@ picture {
   transition: border-color var(--motion-quick) var(--ease-standard),
               color var(--motion-quick) var(--ease-standard);
 }
-.code-copy:hover {
-  color: var(--fg-primary);
-  border-color: var(--accent-stroke);
-}
 
 .cli-bands {
   display: grid;
@@ -1549,7 +1745,7 @@ picture {
 /* ============== LIMITATIONS ============== */
 
 .limitations-section {
-  padding: 72px 0 40px;
+  padding: calc(var(--section-y) * 0.75) 0 calc(var(--section-y) * 0.42);
 }
 
 .limits-layout {
@@ -1628,11 +1824,10 @@ picture {
   color: var(--fg-secondary);
   transition: color var(--motion-quick) var(--ease-standard);
 }
-.cta-credits-list a:hover { color: var(--fg-primary); }
 
 /* ============== FINAL CTA ============== */
 
-.final-cta-section { padding: 64px 0 72px; }
+.final-cta-section { padding: calc(var(--section-y) * 0.67) 0 calc(var(--section-y) * 0.75); }
 
 .cta-block {
   margin: 0 auto;
@@ -1640,18 +1835,10 @@ picture {
   text-align: center;
 }
 
-.cta-app-icon {
-  width: 88px;
-  height: 88px;
-  border-radius: 20px;
-  margin: 0 auto 24px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-}
-
 .cta-title {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 54px;
+  font-size: var(--fs-cta);
   line-height: 1.05;
   letter-spacing: 0;
   margin: 0 0 18px;
@@ -1692,7 +1879,6 @@ picture {
   border-bottom: 1px solid color-mix(in oklch, var(--accent) 40%, transparent);
   padding-bottom: 1px;
 }
-.cta-meta-link:hover { color: var(--gold-200); }
 
 /* Three ways in: one list, not a card grid. */
 .ways-in {
@@ -1712,7 +1898,6 @@ picture {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   transition: border-color var(--motion-base) var(--ease-standard);
 }
-.way:hover { border-bottom-color: rgba(255, 255, 255, 0.16); }
 
 .way-k {
   margin: 0 0 6px;
@@ -1753,7 +1938,6 @@ picture {
   color: var(--fg-secondary);
   transition: color var(--motion-quick) var(--ease-standard);
 }
-.cta-source-link:hover { color: var(--fg-primary); }
 
 /* ============== FOOTER ============== */
 
@@ -1804,8 +1988,8 @@ picture {
 .footer-col a {
   font-size: 13px;
   color: var(--fg-secondary);
+  transition: color var(--motion-quick) var(--ease-standard);
 }
-.footer-col a:hover { color: var(--fg-primary); }
 
 .footer-legal {
   margin-top: 48px;
@@ -1833,339 +2017,6 @@ picture {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* ============== SCROLL REVEAL + HOVER POLISH ============== */
-
-/* `.reveal-ready` is set on <html> by JS only when motion is allowed, so the
-   base (no-JS / reduced-motion) state keeps every section fully visible. */
-.reveal-ready .reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition:
-    opacity 0.55s var(--ease-standard),
-    transform 0.55s var(--ease-standard);
-  will-change: opacity, transform;
-}
-.reveal-ready .reveal.is-in {
-  opacity: 1;
-  transform: none;
-}
-
-/* Product window frames lift gently on hover. */
-.workflow-band-shot .window,
-.caps-shot .window,
-.runs-shot .window,
-.try-shot .window,
-.hero-window {
-  transition:
-    transform var(--motion-base) var(--ease-standard),
-    box-shadow var(--motion-base) var(--ease-standard);
-}
-.workflow-band-shot .window:hover,
-.caps-shot .window:hover,
-.runs-shot .window:hover,
-.try-shot .window:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 32px 90px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-/* Definition rows and cards warm their hairline on hover. */
-.compare-table tbody tr,
-.caps-row,
-.runs-row,
-.limits-row {
-  transition: border-color var(--motion-base) var(--ease-standard);
-}
-.compare-table tbody tr:hover,
-.caps-row:hover,
-.runs-row:hover,
-.limits-row:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-/* Primary CTA lifts a touch on hover. */
-.btn-primary {
-  transition:
-    opacity var(--motion-quick) var(--ease-standard),
-    transform var(--motion-quick) var(--ease-standard),
-    box-shadow var(--motion-quick) var(--ease-standard);
-}
-.btn-primary:hover { transform: translateY(-1px); }
-.btn-primary:active { transform: translateY(0); }
-
-/* ============== RESPONSIVE ============== */
-
-/* The centered nav holds seven links only at full container width; links
-   marked --xl and then --lg step out before they can meet the brand. */
-@media (max-width: 1240px) {
-  .nav-links .nav-link--xl { display: none; }
-}
-
-@media (max-width: 1100px) {
-  .nav-inner {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-  }
-  .nav-cta { justify-self: auto; }
-  .nav-links .nav-link--lg { display: none; }
-  .hero-split {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 44px;
-  }
-  .hero-stage { max-width: 720px; margin: 0 auto; }
-  .hero-window { transform: none; }
-  .hero-title { font-size: 52px; }
-  .section-title { font-size: 46px; }
-  .whatsnew-layout,
-  .cli-install,
-  .cli-bands { gap: 40px 44px; }
-  .workflow-band-title { font-size: 40px; }
-}
-
-@media (max-width: 900px) {
-  .nav-inner {
-    display: flex;
-    justify-content: space-between;
-  }
-  .nav-cta { justify-self: auto; }
-  .nav-links { gap: 16px; font-size: 13px; }
-  .nav-links .nav-link--full { display: none; }
-  .workflow-band { padding: 80px 0; }
-  .workflow-band-inner,
-  .workflow-band--reverse .workflow-band-inner {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
-  }
-  .workflow-band-copy,
-  .workflow-band--reverse .workflow-band-copy { order: 1; }
-  .workflow-band-shot,
-  .workflow-band--reverse .workflow-band-shot { order: 2; }
-  .listen-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-    padding: 28px 0;
-  }
-  .runs-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
-  }
-  .runs-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-  .section,
-  .listen-section,
-  .runs-section { padding: 72px 0; }
-  .hero { padding: 64px 0 72px; }
-  .section-title { font-size: 40px; }
-  .workflow-band-title,
-  .cta-title { font-size: 36px; }
-  .listen-quote { font-size: 21px; }
-
-  /* Center text blocks at tablet/mobile (keep internal structures intact) */
-  .hero-copy { text-align: center; }
-  .hero-ctas { justify-content: center; }
-
-  .cloud-layout,
-  .iphone-layout,
-  .limits-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
-  }
-  .cloud-copy,
-  .iphone-copy,
-  .limits-copy {
-    text-align: center;
-    margin-inline: auto;
-  }
-
-  .workflow-band-copy { text-align: center; }
-  .workflow-band-points {
-    width: max-content;
-    max-width: 100%;
-    margin: 0 auto;
-    text-align: left;
-  }
-
-  .listen-row { text-align: center; }
-  .listen-row-meta { align-items: center; }
-  .listen-row-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .try-copy { text-align: center; max-width: 620px; margin-inline: auto; }
-  .try-chips { justify-content: center; }
-
-  .runs-head {
-    grid-column: 1;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-    text-align: center;
-    max-width: 680px;
-    margin-inline: auto;
-  }
-  .runs-head .section-note,
-  .runs-head .section-title,
-  .runs-head .section-sub {
-    grid-column: 1;
-    grid-row: auto;
-    margin-inline: auto;
-  }
-  .runs-head .section-sub { align-self: auto; }
-  .runs-shot { grid-column: 1; max-width: 620px; margin-inline: auto; }
-  .runs-shot-caption { margin-inline: auto; text-align: center; }
-  .runs-table { grid-column: 1; }
-  .runs-row { text-align: center; }
-  .runs-v { justify-content: center; }
-
-  .caps-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 36px;
-  }
-  .caps-copy { text-align: center; max-width: 620px; margin-inline: auto; }
-  .caps-list { max-width: 520px; margin-inline: auto; text-align: left; }
-  .caps-shot { max-width: 620px; margin-inline: auto; }
-  .caps-shot-caption { text-align: center; margin-inline: auto; }
-
-  .limits-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    text-align: center;
-  }
-
-  .footer-inner { justify-content: center; text-align: center; }
-  .footer-brand { max-width: 480px; margin-inline: auto; }
-  .footer-cols { justify-content: center; }
-  .footer-legal { justify-content: center; text-align: center; }
-
-  .whatsnew-head {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-    text-align: center;
-    max-width: 680px;
-    margin-inline: auto;
-    margin-bottom: 44px;
-  }
-  .whatsnew-head .section-note,
-  .whatsnew-head .section-title,
-  .whatsnew-head .section-sub {
-    grid-column: 1;
-    grid-row: auto;
-  }
-  .whatsnew-layout {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 620px;
-    margin-inline: auto;
-  }
-  .whatsnew-upgrade {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 620px;
-    margin-inline: auto;
-    text-align: center;
-  }
-  .whatsnew-upgrade-body .whatsnew-upgrade-links { justify-content: center; }
-
-  .cli-head { text-align: center; margin-inline: auto; }
-  .cli-install,
-  .cli-bands {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 620px;
-    margin-inline: auto;
-  }
-  .cli-bands { margin-top: 56px; }
-  .cli-limits-title {
-    margin-top: 56px;
-    text-align: center;
-  }
-  .cli-limits { max-width: 620px; margin-inline: auto; }
-
-  .way {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    text-align: center;
-  }
-  .way-v { margin-inline: auto; }
-
-  /* Center max-width-constrained blocks as blocks (not just their inner text) */
-  .hero-sub,
-  .section-sub,
-  .section-head,
-  .listen-head,
-  .workflow-band-body { margin-inline: auto; }
-}
-
-/* A phone-width nav keeps the brand, one link and Download apart. */
-@media (max-width: 480px) {
-  .nav-links .nav-link--sm { display: none; }
-}
-
-@media (max-width: 600px) {
-  .container {
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-
-  .nav-inner { height: 58px; gap: 12px; }
-  .nav-links { gap: 14px; }
-
-  .brand-rebrand { display: none; }
-
-  .nav-cta {
-    height: 34px;
-    padding: 0 12px;
-  }
-
-  .hero-title { font-size: 42px; }
-  .hero-sub { font-size: 17px; }
-  .hero-meta { margin-top: 16px; }
-  .section-title { font-size: 34px; }
-  .workflow-band-title,
-  .cta-title { font-size: 32px; }
-
-  .compare-table { min-width: 440px; }
-
-  .btn { min-width: min(100%, 312px); justify-content: center; }
-
-  .workflow-band-points li {
-    grid-template-columns: 34px 1fr;
-    gap: 12px;
-  }
-  .workflow-band-num { font-size: 18px; }
-
-  .listen-quote { font-size: 18px; }
-
-  .cta-credits-list { gap: 6px 14px; }
-  .cta-credits-list a { font-size: 15px; }
-
-  .whatsnew-lead-item {
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 12px;
-  }
-  .whatsnew-lead-num { font-size: 18px; }
-  .whatsnew-lead-k { font-size: 21px; }
-  .whatsnew-cli {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    text-align: center;
-  }
-
-  .cli-step { padding-left: 34px; }
-  .cli-step::before { font-size: 18px; }
-  .cli-step-k,
-  .way-k { font-size: 22px; }
-  .cli-sub-title { font-size: 23px; }
-  .code-block { padding-top: 34px; }
-  .code-pre { font-size: 12px; padding: 6px 14px 14px; }
-  .code-copy { top: 8px; right: 8px; height: 28px; }
-  .cli-exit-table { font-size: 12px; }
-  .way .btn { min-width: min(100%, 312px); }
 }
 
 /* ============== ENGINEERING ============== */
@@ -2242,10 +2093,249 @@ picture {
 .perf-provenance a { color: var(--fg-secondary); }
 .perf-mono { font-family: var(--font-mono); font-size: 11px; }
 
-@media (max-width: 900px) {
-  .perf-layout { grid-template-columns: minmax(0, 1fr); }
-  .perf-head { margin-inline: auto; }
-  .perf-provenance { text-align: center; }
+/* ============== SCROLL REVEAL ============== */
+
+/* `.reveal-ready` is set on <html> by JS only when motion is allowed, so the
+   base (no-JS / reduced-motion) state keeps every section fully visible. */
+.reveal-ready .reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.55s var(--ease-standard),
+    transform 0.55s var(--ease-standard);
+}
+.reveal-ready .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.workflow-band-shot .window,
+.caps-shot .window,
+.runs-shot .window,
+.try-shot .window,
+.hero-window {
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.compare-table tbody tr,
+.caps-row,
+.runs-row,
+.limits-row {
+  transition: border-color var(--motion-base) var(--ease-standard);
+}
+
+/* ============== HOVER (fine pointers only) ==============
+   A hover state sticks after a tap on a touch screen: a paused sample's
+   play button stayed filled like a playing one, and a tapped link looked
+   current. Hover styling therefore exists only where a pointer hovers. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-link:hover,
+  .menu-secondary a:hover,
+  .cta-credits-list a:hover,
+  .cta-source-link:hover,
+  .footer-col a:hover { color: var(--fg-primary); }
+
+  .nav-cta:hover .nav-cta-pill { opacity: 0.92; }
+  .nav-menu-button:hover { background: rgba(255, 255, 255, 0.06); }
+  .menu-links a:hover { color: var(--accent-strong); }
+
+  a.hero-eyebrow:hover {
+    color: var(--fg-primary);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+
+  .btn-primary:hover { opacity: 0.92; transform: translateY(-1px); }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.07); }
+  .cta-meta-link:hover { color: var(--gold-200); }
+
+  .whatsnew-cli:hover { border-color: var(--accent-stroke); }
+  .whatsnew-row:hover,
+  .compare-table tbody tr:hover,
+  .caps-row:hover,
+  .runs-row:hover,
+  .limits-row:hover { border-color: rgba(255, 255, 255, 0.16); }
+  .way:hover { border-bottom-color: rgba(255, 255, 255, 0.16); }
+
+  .play-btn:hover {
+    background: var(--row-mode, var(--accent));
+    border-color: var(--row-mode, var(--accent));
+    color: #0E0F14;
+  }
+
+  .code-copy:hover {
+    color: var(--fg-primary);
+    border-color: var(--accent-stroke);
+  }
+
+  /* Product window frames lift gently. */
+  .workflow-band-shot .window:hover,
+  .caps-shot .window:hover,
+  .runs-shot .window:hover,
+  .try-shot .window:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 32px 90px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* ============== RESPONSIVE ============== */
+
+/* Below the desktop tier the hero stacks, centered. The hero and the
+   closing call to action are the only centered blocks on the site. */
+@media (max-width: 1199.98px) {
+  .hero-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+  }
+  .hero-copy { text-align: center; }
+  .hero-sub { margin-inline: auto; }
+  .hero-ctas { justify-content: center; }
+  .hero-stage { max-width: 760px; margin: 0 auto; }
+  .hero-window { transform: none; }
+  .whatsnew-layout,
+  .cli-install,
+  .cli-bands { gap: 40px 44px; }
+}
+
+/* Below the tablet tier multi-column layouts stack into one column. Body
+   text stays left-aligned: centered paragraphs read with two ragged edges
+   and turned every section into the same stack. */
+@media (max-width: 899.98px) {
+  .workflow-band-inner,
+  .workflow-band--reverse .workflow-band-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .workflow-band-copy,
+  .workflow-band--reverse .workflow-band-copy { order: 1; }
+  .workflow-band-shot,
+  .workflow-band--reverse .workflow-band-shot { order: 2; }
+
+  .listen-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 28px 0;
+  }
+
+  .whatsnew-head {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 44px;
+  }
+  .whatsnew-head .section-note,
+  .whatsnew-head .section-title,
+  .whatsnew-head .section-sub {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .whatsnew-layout,
+  .whatsnew-upgrade,
+  .caps-layout,
+  .cloud-layout,
+  .iphone-layout,
+  .limits-layout,
+  .perf-layout,
+  .cli-install,
+  .cli-bands,
+  .runs-layout { grid-template-columns: minmax(0, 1fr); }
+  .caps-layout { gap: 36px; }
+  .cloud-layout,
+  .iphone-layout,
+  .limits-layout { gap: 32px; }
+  .runs-layout { gap: 40px; }
+  .cli-bands { margin-top: 56px; }
+  .cli-limits-title { margin-top: 56px; }
+
+  .runs-head {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .runs-head .section-note,
+  .runs-head .section-title,
+  .runs-head .section-sub {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .runs-head .section-sub { align-self: auto; }
+  .runs-shot,
+  .runs-table { grid-column: 1; }
+  .runs-row,
+  .limits-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .way {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+  .way-v { margin-inline: auto; }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 36px;
+  }
+  .footer-cols { gap: 32px 48px; }
+}
+
+@media (max-width: 599.98px) {
+  .btn { min-width: min(100%, 312px); justify-content: center; }
+
+  .compare-table { min-width: 440px; }
+
+  .workflow-band-points li {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .workflow-band-num { font-size: 18px; }
+
+  .cta-credits-list { gap: 6px 14px; }
+  .cta-credits-list a { font-size: 15px; }
+
+  .whatsnew-lead-item {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .whatsnew-lead-num { font-size: 18px; }
+  .whatsnew-lead-k { font-size: 21px; }
+
+  .cli-step { padding-left: 34px; }
+  .cli-step::before { font-size: 18px; }
+  .way-k { font-size: 22px; }
+  .cli-sub-title { font-size: 23px; }
+  .code-block { padding-top: 34px; }
+  .code-pre { font-size: 12px; padding: 6px 14px 14px; }
+  .code-copy { top: 8px; right: 8px; height: 28px; }
+  .cli-exit-table { font-size: 12px; }
+
+  .footer-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A phone on its side: screenshots stay within the visible height. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero { padding-top: 32px; }
+  .hero-stage,
+  .workflow-band-shot,
+  .caps-shot,
+  .runs-shot,
+  .try-shot {
+    max-width: min(100%, calc(80svh * 1.5));
+    margin-inline: auto;
+  }
+  .iphone-shot {
+    width: auto;
+    max-width: 100%;
+    height: 80svh;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

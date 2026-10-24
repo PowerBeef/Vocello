@@ -25,8 +25,9 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
-    // Playwright specs pass callbacks to page.evaluate, which run in the page.
-    files: ["tests/**/*.spec.mjs"],
+    // Playwright specs and their helpers pass callbacks to page.evaluate,
+    // which run in the page.
+    files: ["tests/**/*.spec.mjs", "tests/browser-helpers.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 ];

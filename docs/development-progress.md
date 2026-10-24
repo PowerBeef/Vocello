@@ -17,7 +17,27 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 22, night — the Mac and CLI 3.0 release starts from the release commit (resume here)
+### October 23 — Vocello 3.0.0 for the Mac and the CLI is public (resume here)
+
+- **Published 2026-10-24 00:06 UTC as the latest release** by the maintainer's route A (from the signed
+  draft, without a quality-promotion record). Release run 40020993733 on `e7a8e2ae` passed Security,
+  source authority, packaging (Developer ID, notarized and stapled DMGs and pkg, the runner's install,
+  upgrade and uninstall), the Sparkle feed and the draft. Before publication the draft was checked
+  locally: SHA256SUMS, stapled tickets, Gatekeeper, the pkg signature, attestations, app 3.0.0 (24),
+  `vocello 3.0.0`, the appcast enclosure and signature, and notes identical to `docs/releases/v3.0.0.md`.
+  The published DMG's Developer ID CLI passed `cli_package.py qualify`. RF-08 and RF-32 are closed.
+- **The first run (39914320626 on `41a147f6`) stopped before signing:** the tag checkout's detached HEAD
+  made `dev.sh status` raise in `release.sh`'s Python suite. `e7a8e2ae` fixed it and `v3.0.0` moved there
+  (the maintainer authorized the agent once to sign and replace it with hooks paused in the untracked
+  `settings.local.json`, restored byte-identical).
+- **Developer ID Installer certificate:** issued 2026-10-23, expires 2027-11-22; its `release`
+  environment secrets are set.
+- **README and website (RF-32):** integrated as `3aa8f20c`..`f269bf71`; the site goes live when `main`
+  is pushed. The agent worktrees `wf_9f99b8e0-4f2-1`..`4` are integrated and can be removed.
+- **Next:** the iPhone submission from the same `v3.0.0` tag in the coming days (RF-10's packaged-app
+  checks stay open); RF-30 and RF-31 after it.
+
+### October 22, night — the Mac and CLI 3.0 release starts from the release commit
 
 - **Maintainer decision:** release the Mac app and the CLI 3.0 first; submit the iPhone app a few days later
   from the same `v3.0.0` tag. Recorded in `focusLock` (maxInFlight 3); RF-10 joins the release plan in

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 25/55 (45%) |
+| `release-first-3-0-2026-09` | active | release-qa | 27/55 (49%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -64,7 +64,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `F-01` | planned | High — make saved-voice review transactional and add iOS deletion | — |
 | `F-16` | planned | P1 — transactionally accept long-form projects and replacement segments | — |
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-08` | in-flight | package the downloadable optimized CLI | — |
 | `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `ASR-08`, `BG-01`, `CONV-21`, `RF-13`, `RF-14`, `RF-18`, `RF-19`, `RF-20`, `RF-21`, `RF-22`, `RF-24` |
 | `RF-10` | in-flight | independently qualify macOS and downloadable CLI | — |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
@@ -74,7 +73,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
-| `RF-32` | planned | announce the Mac and CLI 3.0 in the README and on the website | `RF-10` |
 
 ### Open items in detail
 
@@ -141,9 +139,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
   unparkWhen: The maintainer resumes the App Store Connect account steps: the Paid Apps agreement (Apple's two-factor prompt), banking, tax and EU trader (DSA) status.
 
-- **`RF-08`** (in-flight, due 2026-11-06) — package the downloadable optimized CLI.
-  gate: In the existing release workflow (formerly F-17): one sealed optimized arm64 CLI payload shipped twice from the same bytes: a Developer ID Installer-signed, notarized and stapled <output>-cli.pkg (receipt com.qwenvoice.cli) that installs it at /usr/local/lib/vocello, links /usr/local/bin/vocello and the zsh completion, removes only a previous installed payload before upgrading, and ships an uninstaller that forgets the receipt and never touches the shared data store; and the <output>-cli.dmg folder as the no-administrator fallback. Requirements: complete libraries, resources, notices and instructions; discovery through the symlink without a checkout; inside-out Developer ID Application signatures with the hardened runtime under the macos-cli entitlement role, confirmed by a real take per mode; non-relocatable bundles; arm64 and macOS 26 host checks; checksums, attestations and SBOM entries for both CLI artifacts; expanded-package verification proving the payload equals the sealed manifest, and a CI install, upgrade and uninstall on an ephemeral runner. Not allowed: a Homebrew route, shell-profile edits, a CLI auto-updater or a second release system; only the pkg asks for administrator rights, and only to write under /usr/local.
-
 - **`RF-09`** (planned, due 2026-10-23) — verify the coherent tree and freeze the 3.0.0 candidate.
   gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 still match config/public-product-facts.json candidateRelease and ASR-08's fresh read-only check shows build 24 unused; (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json, and the annotated v3.0.0 tag is a separate maintainer action proved by scripts/release_source_authority.py; (4) RF-14's winning defaults and the release blockers' code fixes have landed, with their device proof left to RF-15; (5) the freeze commit is recorded as focusLock.freeze in config/roadmap.json, so every later commit names an item of this plan in its subject.
 
@@ -173,9 +168,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-31`** (parked) — CLI parity record, documentation and qualification.
   gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
   unparkWhen: The iOS 3.0 submission is done.
-
-- **`RF-32`** (planned, due 2026-10-25) — announce the Mac and CLI 3.0 in the README and on the website.
-  gate: After the v3.0.0 GitHub Release is public (never before, since the website deploys from main): config/public-product-facts.json names 3.0.0 as the stable Mac release and drops candidateOnlyClaims; README.md and the website present the Mac app 3.0 (download, Sparkle updates), the CLI 3.0 (signed package install and uninstall, the machine contract, vocello mcp for AI agents) and the iPhone app (public TestFlight until its App Store release) with links to the exact release assets; docs/reference/cli.md drops its unpublished-distribution notice; scripts/public_facts_contract.py, npm --prefix website run check and the website's Playwright acceptance pass.
 
 ## Engine remediation programme (2026-10-16 audit)
 

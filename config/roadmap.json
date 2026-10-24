@@ -216,28 +216,6 @@
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
     },
     {
-      "id": "RF-08",
-      "plan": "release-first-3-0-2026-09",
-      "title": "package the downloadable optimized CLI",
-      "status": "in-flight",
-      "gate": "In the existing release workflow (formerly F-17): one sealed optimized arm64 CLI payload shipped twice from the same bytes: a Developer ID Installer-signed, notarized and stapled <output>-cli.pkg (receipt com.qwenvoice.cli) that installs it at /usr/local/lib/vocello, links /usr/local/bin/vocello and the zsh completion, removes only a previous installed payload before upgrading, and ships an uninstaller that forgets the receipt and never touches the shared data store; and the <output>-cli.dmg folder as the no-administrator fallback. Requirements: complete libraries, resources, notices and instructions; discovery through the symlink without a checkout; inside-out Developer ID Application signatures with the hardened runtime under the macos-cli entitlement role, confirmed by a real take per mode; non-relocatable bundles; arm64 and macOS 26 host checks; checksums, attestations and SBOM entries for both CLI artifacts; expanded-package verification proving the payload equals the sealed manifest, and a CI install, upgrade and uninstall on an ephemeral runner. Not allowed: a Homebrew route, shell-profile edits, a CLI auto-updater or a second release system; only the pkg asks for administrator rights, and only to write under /usr/local.",
-      "sourceOfTruth": [
-        "project.yml",
-        "scripts/release.sh",
-        "scripts/cli_package.py",
-        "scripts/verify_packaged_cli.sh",
-        "scripts/release_evidence.py",
-        "config/orchestration-contract.json",
-        ".github/workflows/release.yml"
-      ],
-      "updated": "2026-10-22",
-      "notes": "Re-gated into the release plan 2026-10-21 for a signed .pkg at the maintainer's request (docs/audits/2026-10-21-cli-overhaul-plan.md). Landed: cli_package.py pkg/pkg-verify and the package scripts (cdb5eea6); evidence binding, the empty macos-cli entitlement role, release.sh build/sign/notarize/verify, the CI install test and template v3 (3acf1251 to 9133bf01); the security review's fixes (c5f1870b to 2d3ed9e5). Hardened-runtime probe PASS (cli-hardened-runtime-probe-20261021-032734-rerun): an optimized CLI signed ad hoc with --options runtime and no entitlements passed Custom, French Design and Clone (Fast QC pass), the batch, a live SIGINT and exits 2/2. Open: the first rehearsal on GitHub (maintainer dispatch) confirms the runner's /usr/local ownership; the maintainer's Developer ID Installer certificate and the release secrets APPLE_DEV_ID_INSTALLER_P12_BASE64 and APPLE_DEV_ID_INSTALLER_P12_PASSWORD; the first signed run proves Developer ID, notarization and stapled pkg-verify. History: git log -p -- config/roadmap.json. 2026-10-22 (bd045167): a take through a link (/usr/local/bin/vocello) could not find the MLX metallib; vocello now execs its real path.",
-      "legacyIds": [
-        "F-17"
-      ],
-      "due": "2026-11-06"
-    },
-    {
       "id": "RF-30",
       "plan": "release-first-3-0-2026-09",
       "title": "Cross-process History for the app and the CLI",
@@ -266,25 +244,6 @@
       "updated": "2026-10-21",
       "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). From RF-28's review (2026-10-22), for the CLI's qualification: models remove checks then deletes without holding a lease, so a concurrent CLI install of the same model can lose its staging; its freedBytes counts hard-linked shared components; the app's reload on a models notice re-digests every model (consider a sizes-only pass). From RF-29 (2026-10-22): cancel a generate_speech interactively from Claude Code (Esc; stdio cancel already proven); the MCP server holds the engine lease for its life (consider releasing it at idle unload).",
       "unparkWhen": "The iOS 3.0 submission is done."
-    },
-    {
-      "id": "RF-32",
-      "plan": "release-first-3-0-2026-09",
-      "title": "announce the Mac and CLI 3.0 in the README and on the website",
-      "status": "planned",
-      "blockedBy": [
-        "RF-10"
-      ],
-      "due": "2026-10-25",
-      "gate": "After the v3.0.0 GitHub Release is public (never before, since the website deploys from main): config/public-product-facts.json names 3.0.0 as the stable Mac release and drops candidateOnlyClaims; README.md and the website present the Mac app 3.0 (download, Sparkle updates), the CLI 3.0 (signed package install and uninstall, the machine contract, vocello mcp for AI agents) and the iPhone app (public TestFlight until its App Store release) with links to the exact release assets; docs/reference/cli.md drops its unpublished-distribution notice; scripts/public_facts_contract.py, npm --prefix website run check and the website's Playwright acceptance pass.",
-      "sourceOfTruth": [
-        "config/public-product-facts.json",
-        "README.md",
-        "website/",
-        "docs/reference/cli.md"
-      ],
-      "updated": "2026-10-22",
-      "notes": "2026-10-22: opened at the maintainer's request (release Mac and CLI 3.0, update the README and overhaul the website accordingly). The read-only mapping of README and website ran with the promotion audit; the overhaul is prepared in agent worktrees while no measured lane runs, and is integrated and pushed only after publication."
     },
     {
       "id": "RF-09",
@@ -347,7 +306,7 @@
         "docs/reference/macos-release-qa.md"
       ],
       "updated": "2026-10-22",
-      "notes": "2026-10-22: re-homed into the release plan in flight (maintainer: release Mac and CLI 3.0 first, the iPhone later from the same tag). The promotion audit found macos-language-benchmark unsatisfiable: the contract has required Custom cells in ten languages since 2026-08-21 while the bench covered six; the release commit adds Russian, Portuguese, Italian and Korean as pinned cells (corpus version 3) with a guard test. Open risks for the eight macOS lanes: any Fast QC warning on any take makes a record unpromotable (only memory.pressure.soft_trim is allowed), custom-ja-auto failed spoken content by two-family consensus at 9cd075bd, and Portuguese passed about 40 percent of an earlier two-family screen. The maintainer chooses the publication route. Earlier development-build QA (14dc148c) is not signed-candidate acceptance. History: git log -p -- config/roadmap.json.",
+      "notes": "2026-10-23: the Mac app and CLI 3.0.0 were published (latest) by the maintainer's route A, without a quality-promotion record. Verified before publication: SHA256SUMS, stapled tickets and Gatekeeper on both DMGs and the pkg, the pkg signature, build attestations, app 3.0.0 (24), the Sparkle appcast and the notes; the shipped Developer ID CLI passed cli_package.py qualify (three modes, batch, cancellation). Still open in this gate: the packaged app's in-process startup evidence and the Studio checks (Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form). The promotion audit's risks stay recorded: the language lane gained Russian, Portuguese, Italian and Korean cells (corpus v3); Fast QC warnings make a record unpromotable; custom-ja-auto failed spoken content at 9cd075bd; Portuguese passed about 40 percent of an earlier screen. History: git log -p -- config/roadmap.json.",
       "due": "2026-10-24"
     },
     {

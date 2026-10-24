@@ -598,24 +598,6 @@
       "notes": "The repository's V26-02 preservation fix and its failure-schedule tests landed in 78142e07 (2026-09-04); PreparedVoiceRepositoryTests and saved_voice_lifecycle_contract pass. 2026-10-13 (UI audit G1, G3, G4): every review surface (iOS recorder and import, iOS Design save, Mac sheet) discards its candidate however it closes, a save still staging included. The store finishes a discard it could not take the lock for on its next operation, and a review save removes the review candidates an ended app session left, never the CLI's one-shot ones. iOS Delete also waits while a long-form project runs; the Mac's same gap is parked as BKL-13. G2 decided (maintainer, 2026-10-14): replacement stays macOS-only with repository tests, and RF-15's iPhone row is save and delete. Device proof comes from RF-15. Earlier history: git log -p -- config/roadmap.json."
     },
     {
-      "id": "F-05",
-      "plan": "engineering-review-remediation-2026-08",
-      "title": "Medium — restore packaged macOS launch verification",
-      "status": "parked",
-      "gate": "Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.",
-      "sourceOfTruth": [
-        ".github/workflows/release.yml",
-        "scripts/verify_release_bundle.sh",
-        "scripts/verify_packaged_dmg.sh"
-      ],
-      "updated": "2026-09-13",
-      "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-10. Hosted macos-26 launch-smoke evidence exists only on a signed candidate, which RF-10 owns and RF-10 is parked. No source work is pending on this item until the blocker moves; status reflects that, not a regression. Source remediation completed 2026-08-26: release.yml no longer bypasses launch smoke, the macos-26 package job verifies both the staged app and extracted DMG app, the verifier rejects the skip in CI, and supply-chain fixtures fail on runner downgrade or weakened startup evidence. A real external launch of build/Vocello.app passed locally. The item remains planned until an explicitly requested signed candidate supplies hosted macos-26 evidence; no release or tag was created to manufacture closure.",
-      "blockedBy": [
-        "RF-10"
-      ],
-      "unparkWhen": "RF-10 unparks (a signed macOS candidate is authorized)."
-    },
-    {
       "id": "F-06",
       "plan": "engineering-review-remediation-2026-08",
       "title": "Medium — durably couple audio publication and History persistence",
@@ -826,7 +808,7 @@
         "commit:87636935"
       ],
       "updated": "2026-10-12",
-      "notes": "The active runbook now uses current Ready terminology, Apple's one highest-resolution iPhone-set rule with 6.9-inch preferred/6.5-inch fallback, exact catalog byte totals, Wi-Fi/free-space guidance, cancellation/adoption/finalization behavior, offline behavior, and the immutable-host outage posture. ASR-05 remains open only for privacy-safe accepted-size screenshots from the exact signed candidate and live metadata verification. V26-11 review on September 4 corrected the local reviewer free-space advice to at least 4 GB available before each install. IOSModelDeliverySupport requires max(2 * catalog bytes, catalog bytes + 256 MiB), approximately 3.42-3.47 GB for the current iOS models; the coordinator passes full catalog bytes. No runtime threshold or live App Store Connect field was changed. Candidate screenshots and live metadata verification remain open."
+      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-24 read-only live check (asc validate on version 3.0.0, PREPARE_FOR_SUBMISSION): name, privacy URL and the en-US Support URL match config/support-contact.json; the review notes' three byte totals match the shipped catalog. Not yet in App Store Connect: description, keywords, subtitle, What's New, review details and notes, screenshots, an attached build, and the export purchase's metadata (MISSING_METADATA, with RF-02). The repository drafts no description, keywords or subtitle yet. Writing any of it is an App Store Connect write that needs the maintainer's request; screenshots come from the signed candidate on the iPhone. History: git log -p -- config/roadmap.json."
     },
     {
       "id": "ASR-06",
@@ -854,30 +836,6 @@
       "notes": "The schema-v1 path contract classifies every maintained iOS data class, applies CompleteUntilFirstUserAuthentication recursively before stores open, excludes models, downloads, caches and diagnostics from backup, and keeps outputs, voices and History in backup. Metadata updates briefly add owner write permission to read-only hard links and restore the exact mode (tested). Signed-device proof of effective attributes, backup exclusion, locked-background behavior, deletion and relaunch remains required; earlier history is in git. 2026-10-13 core engine review: the launch protection pass resets the iPhone reclamation clock, so startup reclamation frees nothing (STOR-1, BKL-04); crash-stranded clone-prompt staging sits in backed-up voices/ (STOR-6); Studio drafts of up to 30,000 characters per mode live in UserDefaults outside the contract (SEC-4); voices and History could take .complete, since only models and downloads need access while locked (SEC-6)."
     },
     {
-      "id": "ASR-07",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Complete final release logging, API, symbol, and analyzer hygiene",
-      "status": "planned",
-      "due": "2026-10-26",
-      "blockedBy": [
-        "ASR-10"
-      ],
-      "gate": "Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioCore/ModelUtils.swift",
-        "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
-        "config/runtime-debug-knobs.json",
-        "config/ios-release-analyzer-warning-policy.json",
-        "scripts/ios_release_analyzer_warnings.py",
-        "scripts/verify_ios_release_artifacts.py"
-      ],
-      "evidence": [
-        "commit:87636935"
-      ],
-      "updated": "2026-10-12",
-      "notes": "Path-bearing owned-runtime prints are replaced by privacy-safe Logger messages. Archive/IPA verification now rejects script payloads, unexpected/test/debug executables, enabled diagnostic strings, absolute developer paths, dynamic loading symbols, escaping symlinks, missing third-party privacy manifests, and missing or UUID-mismatched dSYMs; 26 focused verifier fixtures pass. A generic-device Release Analyze succeeded on 2026-09-01 after resolving every application-source warning. Its 19 residual diagnostics are fail-closed and count-bounded in six reviewed classes: 14 MLXArray single-owner isolation warnings, four empty cross-platform shim objects, and one intentional no-App-Intents notice. ASR-07 remains open only for the exact signed archive/export scan and confirmation that its analysis produces no unregistered warning. 2026-10-24: the exact signed archive and export passed the string and dynamic-loading scans in release run 40085945191 (no absolute paths, no dlopen); the analyzer-warning confirmation is still open."
-    },
-    {
       "id": "ASR-09",
       "plan": "release-first-3-0-2026-09",
       "title": "Prove reviewer access to immutable model hosting",
@@ -900,28 +858,6 @@
       ],
       "updated": "2026-10-12",
       "notes": "2026-10-12 maintainer decision: 3.0 is sold worldwide with North America as the verified download region (where App Review runs); Europe and East Asia stay unverified as a recorded residual risk (global CDN, support reports as the monitor, no paid hosts). The 2026-09-01 North America proof passed full digests for the three largest iOS files (4,024,541,635 bytes, no retry or rate limit). Reviewer notes already cover exact bytes, Wi-Fi, 4 GB free, cancellation/adoption, offline use and recovery. Remaining: a fresh full-artifact North America proof within 24 hours of submission, after the freeze (about 4 GB; the maintainer's go first). Due moved from 2026-10-16 to 2026-10-30 because the decision is recorded and only that proof remains."
-    },
-    {
-      "id": "ASR-10",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Produce and verify the signed archive and exported IPA",
-      "status": "planned",
-      "due": "2026-10-26",
-      "blockedBy": [
-        "RF-09"
-      ],
-      "gate": "Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate. The maintainer dispatches the release workflow's archive-ios job from the v3.0.0 tag and approves the release environment.",
-      "sourceOfTruth": [
-        ".github/workflows/release.yml",
-        "scripts/verify_ios_release_artifacts.py",
-        "Sources/iOS/VocelloiOSRelease.entitlements",
-        "config/release-evidence-contract.json"
-      ],
-      "evidence": [
-        "commit:87636935"
-      ],
-      "updated": "2026-10-24",
-      "notes": "2026-10-24: the signed iPhone archive and App Store export pass in CI. Release run 40055267495 (v3.0.0) failed the IPA path scan on mlx-c __FILE__ paths (fixed by -fmacro-prefix-map, 13e9d05d). 40073640058 (v3.0.0-ios.1) failed the dynamic-loading scan on dlsym and dladdr from metal-cpp and MLX; only dlopen is banned now, and the export keeps the archived executable (50c347a8). 40085945191 (v3.0.0-ios.2) archived, exported and verified the IPA, then failed writing release evidence: release_evidence.py still expected the verifier's summary from before September (no releaseHygiene, attribution manifest or device capabilities), since no iPhone release had reached that step. The verifier now builds the summary in one function the evidence tests use. Next: a new tag reruns the archive and uploads 3.0.0 (24) to TestFlight. Cross-reference F-05, ASR-07 and RF-12."
     },
     {
       "id": "ASR-11",
@@ -1885,6 +1821,21 @@
       "updated": "2026-10-24",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-24 on TestFlight build 24, ios-xcui-candidate-smoke-20261024-201553-857a53b4: Dynamic Type partially unsupported on Studio and on the purchase sheet's support and privacy links, purchase-sheet contrast, text clipped in Design and Clone at AX-XXXL. No accessibility declaration is published in App Store Connect, so not a metadata mismatch. Not investigated (focus rules). Maintainer decision 2026-10-24: accepted as a 3.0 known limitation in RF-15, fixed after the submission; publish no accessibility declaration claiming Larger Text or Sufficient Contrast before the fix."
+    },
+    {
+      "id": "BKL-32",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Give each shared iOS folder a single group in the generated project",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "An iOS Release Analyze and the macOS build emit no \"is a member of multiple groups\" warning for Sources/iOS/Studio or Sources/iOSSupport/{Models,Services,ViewModels}, and the generated-project-shared-folder-groups class leaves config/ios-release-analyzer-warning-policy.json.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/ios-release-analyzer-warning-policy.json"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-24 by ASR-07's Release Analyze (and in candidate 3.0.0 (24)'s CI archive log): these folders appear in their iOS group and again in the group of iOS files the macOS target compiles by path. Target membership is unaffected. project.yml is a candidate product input, so the fix waits for the submission. Not investigated further (focus rules)."
     },
     {
       "id": "ER-01",

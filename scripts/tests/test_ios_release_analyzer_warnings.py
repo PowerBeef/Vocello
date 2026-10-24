@@ -64,6 +64,37 @@ class IOSReleaseAnalyzerWarningPolicyTests(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["registeredCounts"]["no-app-intents-framework"], 1)
 
+    def test_xcode_27_app_intents_wording_is_registered(self) -> None:
+        result = module.analyze_log(
+            "appintentsmetadataprocessor[12:34] warning: Metadata extraction skipped, "
+            "no AppIntents.framework dependency found\n",
+            self.policy,
+        )
+        self.assertEqual(result["status"], "PASS")
+
+    def test_package_checkout_warning_is_a_dependency_not_repository_source(self) -> None:
+        checkouts = "/opt/work/QwenVoice/build/cache/xcode/source-packages/checkouts"
+        result = module.analyze_log(
+            f"{checkouts}/mlx-swift/Source/Cmlx/mlx-generated/metal/utils.h:80:3: "
+            "warning: inline variables are a C++17 extension [-Wc++17-extensions]\n"
+            f"{checkouts}/swift-transformers/Sources/Hub/Hub.swift:3:1: warning: unsafe behavior\n",
+            self.policy,
+        )
+        self.assertEqual(result["registeredCounts"]["mlx-metal-header-cxx17-extensions"], 1)
+        self.assertEqual(result["unexpected"], [
+            {"source": "dependency:swift-transformers", "message": "unsafe behavior"},
+        ])
+
+    def test_generated_project_group_warning_is_bounded(self) -> None:
+        line = (
+            "2026-10-24 16:48:20.089 xcodebuild[1:2] warning:  The file reference for "
+            '"Sources/iOS/Studio" is a member of multiple groups ("iOS" and "")\n'
+        )
+        row = next(r for r in self.policy["allowedWarnings"] if r["id"] == "generated-project-shared-folder-groups")
+        self.assertEqual(module.analyze_log(line * row["maximumCount"], self.policy)["status"], "PASS")
+        result = module.analyze_log(line * (row["maximumCount"] + 1), self.policy)
+        self.assertEqual(result["exceeded"][0]["id"], row["id"])
+
     def test_legacy_audio_event_warning_is_not_covered_by_completion_allowance(self) -> None:
         result = module.analyze_log(
             "/opt/work/QwenVoice/Packages/VocelloQwen3Core/Sources/MLXAudioCore/Generation/GenerationTypes.swift:272:10: "

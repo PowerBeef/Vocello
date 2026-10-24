@@ -17,19 +17,19 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 30/57 (53%) |
+| `release-first-3-0-2026-09` | active | release-qa | 32/57 (56%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
 | `delivery-prompting-2026-08` | parked | backend-mlx | 33/34 (97%) |
-| `engineering-review-remediation-2026-08` | parked | backend-and-platform | 17/24 (71%) |
+| `engineering-review-remediation-2026-08` | parked | backend-and-platform | 18/24 (75%) |
 | `ios-app-store-readiness-2026-08` | parked | release-qa | 2/3 (67%) |
 | `ios-control-audit-2026-08` | parked | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/32 (41%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/33 (39%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -49,9 +49,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `ASR-04` | parked | Bundle complete attributions and record content rights | — |
 | `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `RF-12` |
 | `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `RF-12` |
-| `ASR-07` | planned | Complete final release logging, API, symbol, and analyzer hygiene | `ASR-10` |
 | `ASR-09` | planned | Prove reviewer access to immutable model hosting | `RF-09` |
-| `ASR-10` | planned | Produce and verify the signed archive and exported IPA | `RF-09` |
 | `ASR-11` | parked | Audit live App Store Connect and regional compliance read-only | `RF-02` |
 | `AUD-01` | planned | iOS launch and deep-link dead ends | `RF-15` |
 | `AUD-02` | planned | One owner for the iOS audio session | — |
@@ -89,14 +87,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`ASR-06`** (planned, due 2026-10-29) — Define and verify sensitive-file protection and backup policy.
   gate: A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.
 
-- **`ASR-07`** (planned, due 2026-10-26) — Complete final release logging, API, symbol, and analyzer hygiene.
-  gate: Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.
-
 - **`ASR-09`** (planned, due 2026-10-30) — Prove reviewer access to immutable model hosting.
   gate: The exact anonymous catalog URLs must be probed from each distribution region the maintainer records as in scope for 3.0 (a recorded North-America-only scope, with the residual risk for other regions noted, satisfies this) for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
-
-- **`ASR-10`** (planned, due 2026-10-26) — Produce and verify the signed archive and exported IPA.
-  gate: Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate. The maintainer dispatches the release workflow's archive-ios job from the v3.0.0 tag and approves the release environment.
 
 - **`ASR-11`** (parked) — Audit live App Store Connect and regional compliance read-only.
   gate: Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
@@ -385,7 +377,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `F-05` | parked | Medium — restore packaged macOS launch verification | `RF-10` |
 | `F-06` | parked | Medium — durably couple audio publication and History persistence | — |
 | `F-15` | parked | P1 — preserve macOS Voice Design language, seed, and variation at launch | `RF-10` |
 | `F-18` | parked | P1 — preserve pre-existing generation destinations across failure and cancellation | `RF-10` |
@@ -394,10 +385,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-23` | parked | P2 — preserve explicit Play intent across live-to-file finalization | `RF-10` |
 
 ### Open items in detail
-
-- **`F-05`** (parked) — Medium — restore packaged macOS launch verification.
-  gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
-  unparkWhen: RF-10 unparks (a signed macOS candidate is authorized).
 
 - **`F-06`** (parked) — Medium — durably couple audio publication and History persistence.
   gate: Preserve the implemented durable History outbox, startup/open reconciliation and database-first deletion. Close the remaining enqueue-failure gap with typed saved/queued-for-recovery/unable-to-queue outcomes, visible retry/export while successful audio remains playable, idempotent retry and long-form integration on both platform paths. Prove enqueue/database failures and recovery cannot duplicate History, delete referenced audio, or mislabel successful synthesis as an engine failure. Source tests and applicable corrected-candidate acceptance are required.
@@ -566,6 +553,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-29` | parked | The CLI installer package's Bom check fails on a macOS 27 host | — |
 | `BKL-30` | parked | The session-start cache-health test fails under parallel load | — |
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
+| `BKL-32` | parked | Give each shared iOS folder a single group in the generated project | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -640,6 +628,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-31`** (parked) — Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping.
   gate: The RF-15 accessibility row (scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario accessibility) passes on a candidate: no Dynamic Type, contrast or clipping issue on Studio, the purchase sheet or Settings.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-32`** (parked) — Give each shared iOS folder a single group in the generated project.
+  gate: An iOS Release Analyze and the macOS build emit no "is a member of multiple groups" warning for Sources/iOS/Studio or Sources/iOSSupport/{Models,Services,ViewModels}, and the generated-project-shared-folder-groups class leaves config/ios-release-analyzer-warning-policy.json.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

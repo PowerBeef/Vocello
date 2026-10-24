@@ -316,9 +316,13 @@ hours of submission remains (ASR-09).
 Before producing a signed candidate, run a generic-device Release Analyze with the repository's
 governed caches and validate its log with
 `python3 scripts/ios_release_analyzer_warnings.py check --log <log>`. Application-source warnings
-are not allowlisted. The reviewed residual MLX isolation, cross-platform shim, and no-App-Intents
-classes are count-bounded by `config/ios-release-analyzer-warning-policy.json`; a new warning or
-count increase blocks the candidate.
+are not allowlisted. The reviewed residual MLX isolation, cross-platform shim, no-App-Intents,
+mlx-swift Metal header (C++17 extensions) and shared-folder project group classes are count-bounded
+by `config/ios-release-analyzer-warning-policy.json`; a warning from a resolved package checkout is
+attributed to that dependency, never to repository source. A new warning or count increase blocks
+the candidate. Run the analyze in the isolated `build/scratch/derived-data/release-ios` root and
+remove it afterwards: an incremental cache skips package compilation, so its log omits the MLX
+classes.
 
 Two paths produce the same App-Store-uploadable IPA.
 

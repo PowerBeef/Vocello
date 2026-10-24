@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "owner": "apple-platform-release",
-  "reviewedAt": "2026-09-01",
+  "reviewedAt": "2026-10-24",
   "policy": "A Release static-analysis log may contain only these reviewed warnings. Application-source warnings are not allowlisted; MLX tensor isolation remains governed until MLXArray gains checked Sendable semantics.",
   "allowedWarnings": [
     {
@@ -47,10 +47,26 @@
     {
       "id": "no-app-intents-framework",
       "source": "tool:appintentsmetadataprocessor",
-      "messageContains": "Metadata extraction skipped. No AppIntents.framework dependency found.",
+      "messageContains": "AppIntents.framework dependency found",
       "maximumCount": 1,
       "reason": "Vocello exposes no App Intents and therefore has no AppIntents.framework metadata to extract.",
-      "removalCondition": "Remove if the target adopts App Intents or Xcode stops emitting an informational warning when the framework is absent."
+      "removalCondition": "Remove if the target adopts App Intents or Xcode stops emitting an informational warning when the framework is absent. Xcode 26 and 27 word it differently (\"skipped. No\" and \"skipped, no\"), so the match is the shared tail."
+    },
+    {
+      "id": "mlx-metal-header-cxx17-extensions",
+      "source": "dependency:mlx-swift",
+      "messageContains": "a C++17 extension [-Wc++17-extensions]",
+      "maximumCount": 76,
+      "reason": "The pinned mlx-swift's generated Metal kernel headers (Source/Cmlx/mlx-generated/metal: complex.h, utils.h, the steel attention kernels) use static_assert without a message, inline variables and constexpr if under an older language mode; the release toolchain (Xcode 26.6, candidate 3.0.0 (24) archive) and Xcode 27.1 both emit exactly 76. Reviewed 2026-10-24 (ASR-07); the shipped kernels are unchanged by the warning.",
+      "removalCondition": "Remove when the pinned mlx-swift compiles its Metal headers in C++17 mode or rewrites them, or when a reviewed repin drops these warnings."
+    },
+    {
+      "id": "generated-project-shared-folder-groups",
+      "source": "tool:xcodebuild",
+      "messageContains": "is a member of multiple groups",
+      "maximumCount": 4,
+      "reason": "The generated project lists Sources/iOS/Studio and Sources/iOSSupport/{Models,Services,ViewModels} in their iOS group and again in the group of iOS files the macOS target compiles by path; Xcode keeps one group membership and target membership is unaffected (it says so), so the archive is unchanged. Seen on the release toolchain (Xcode 26.6) and Xcode 27.1; reviewed 2026-10-24 (ASR-07).",
+      "removalCondition": "Remove when project.yml gives each shared folder a single group (BKL-32), which waits for the 3.0 submission because project.yml is a candidate product input."
     }
   ]
 }

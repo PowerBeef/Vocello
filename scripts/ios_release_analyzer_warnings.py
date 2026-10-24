@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "config/ios-release-analyzer-warning-policy.json"
 WARNING_RE = re.compile(r"^(?P<prefix>.*?)(?::|\]) warning: (?P<message>.*)$")
+# The governed clone root (build/cache/xcode/source-packages) or Xcode's default SourcePackages.
+CHECKOUT_RE = re.compile(r"/(?:source-packages|SourcePackages)/checkouts/([^/]+)/")
 
 
 def load_policy(path: Path = POLICY_PATH) -> dict:
@@ -52,8 +54,8 @@ def validate_policy(policy: dict) -> list[str]:
             errors.append(f"{label} requires source")
         elif source.startswith(("Sources/", "Packages/")) and not (ROOT / source).is_file():
             errors.append(f"{label} source does not resolve: {source}")
-        elif not source.startswith(("Sources/", "Packages/", "tool:")):
-            errors.append(f"{label} source must be repository-relative or tool-scoped")
+        elif not source.startswith(("Sources/", "Packages/", "tool:", "dependency:")):
+            errors.append(f"{label} source must be repository-relative, tool- or dependency-scoped")
         message = row.get("messageContains")
         if not isinstance(message, str) or len(message) < 12:
             errors.append(f"{label} requires a substantive messageContains")
@@ -67,6 +69,11 @@ def validate_policy(policy: dict) -> list[str]:
 
 
 def normalize_source(prefix: str) -> str:
+    # A resolved package checkout is a pinned dependency, never repository source,
+    # even where its own tree has a Sources/ folder.
+    checkout = CHECKOUT_RE.search(prefix)
+    if checkout:
+        return "dependency:" + checkout.group(1)
     for marker in ("Packages/", "Sources/"):
         marker_index = prefix.find(marker)
         if marker_index >= 0:
@@ -77,6 +84,8 @@ def normalize_source(prefix: str) -> str:
         return "tool:libtool"
     if "appintentsmetadataprocessor" in prefix:
         return "tool:appintentsmetadataprocessor"
+    if "xcodebuild[" in prefix:
+        return "tool:xcodebuild"
     return "tool:unknown"
 
 

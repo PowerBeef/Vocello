@@ -5515,6 +5515,78 @@
         "commit:2b74d2f6",
         "run:40113274650"
       ]
+    },
+    {
+      "id": "ASR-10",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Produce and verify the signed archive and exported IPA",
+      "status": "done",
+      "due": "2026-10-26",
+      "blockedBy": [
+        "RF-09"
+      ],
+      "gate": "Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate. The maintainer dispatches the release workflow's archive-ios job from the v3.0.0 tag and approves the release environment.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        "scripts/verify_ios_release_artifacts.py",
+        "Sources/iOS/VocelloiOSRelease.entitlements",
+        "config/release-evidence-contract.json"
+      ],
+      "evidence": [
+        "commit:87636935",
+        "run:40103005257",
+        "commit:26995f71ed074142aa89607dac9c1f8b920425b6"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Done 2026-10-24: release run 40103005257 (v3.0.0-ios.3, 26995f71) archived, exported and verified 3.0.0 (24), wrote release evidence and uploaded it to TestFlight (RF-12). Rechecked locally: SHA256SUMS match, ios-release-artifact-verification verdict passed, gh attestation verify on the IPA passes. Earlier failed runs: 40055267495 (v3.0.0, mlx-c __FILE__ paths, fixed 13e9d05d), 40073640058 (v3.0.0-ios.1, dlsym/dladdr, fixed 50c347a8), 40085945191 (v3.0.0-ios.2, stale evidence summary). History: git log -p -- config/roadmap.json."
+    },
+    {
+      "id": "F-05",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "Medium — restore packaged macOS launch verification",
+      "status": "done",
+      "gate": "Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        "scripts/verify_release_bundle.sh",
+        "scripts/verify_packaged_dmg.sh"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Done 2026-10-24: the signed v3.0.0 candidate recorded the hosted proof. Release run 40020993733 (e7a8e2ae, the published Mac 3.0.0) ran its package job on macos-26-arm64 (image 20261013.0424) and logged \"Packaged app startup smoke OK\" for the staged app and again for the app extracted from the DMG, with no skip (verify_release_bundle.sh refuses QWENVOICE_SKIP_LAUNCH_SMOKE in CI). Source remediation landed 2026-08-26. History: git log -p -- config/roadmap.json.",
+      "blockedBy": [
+        "RF-10"
+      ],
+      "evidence": [
+        "run:40020993733",
+        "commit:e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
+      ]
+    },
+    {
+      "id": "ASR-07",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Complete final release logging, API, symbol, and analyzer hygiene",
+      "status": "done",
+      "due": "2026-10-26",
+      "blockedBy": [
+        "ASR-10"
+      ],
+      "gate": "Remove or privacy-gate product-reachable raw prints that can expose absolute cache paths or model locations, resolve or register every iOS Release analyzer warning, and make the exported IPA scan fail closed on private/dynamic-loading APIs, enabled diagnostics, test or debug dylibs, forbidden environment behavior, sensitive strings, unexpected executables, missing dependency privacy manifests, and symbol/dSYM drift.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioCore/ModelUtils.swift",
+        "Sources/QwenVoiceCore/RuntimeDebugGate.swift",
+        "config/runtime-debug-knobs.json",
+        "config/ios-release-analyzer-warning-policy.json",
+        "scripts/ios_release_analyzer_warnings.py",
+        "scripts/verify_ios_release_artifacts.py"
+      ],
+      "evidence": [
+        "commit:87636935",
+        "run:40103005257",
+        "file:config/ios-release-analyzer-warning-policy.json",
+        "file:scripts/ios_release_analyzer_warnings.py"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Done 2026-10-24. Path-bearing runtime prints are privacy-safe Logger messages; the IPA verifier fails closed (script payloads, test/debug executables, diagnostic strings, absolute paths, dlopen, escaping symlinks, privacy manifests, dSYM UUIDs) and passed on candidate 3.0.0 (24) in release run 40103005257. A full generic-device Release Analyze of the candidate source (no product input changed since 26995f71; Xcode 27.1, isolated release-ios root) logged 99 warnings, all registered: the 14 MLX tensor isolation warnings at their bounds, 4 empty shims, the App Intents notice (Xcode 27 rewords it), and two classes reviewed today that the candidate's Xcode 26.6 archive log also shows: 76 C++17-extension warnings from the pinned mlx-swift Metal headers, and 4 shared-folder project group warnings (fix parked as BKL-32). Checkout warnings are now attributed to their dependency, never to repository source. History: git log -p -- config/roadmap.json."
     }
   ]
 }

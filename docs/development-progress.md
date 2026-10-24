@@ -49,14 +49,21 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 - **Desktop session, 15:40 UTC:** rehearsal 40103799663 passed and #107 is closed. `main` is pushed
   with `1b1ab348` (the Claude desktop app workflow, DW-04), CI green; release run 40103005257 was still
   in CodeQL.
-- **Resume here, in order:**
-  1. When run 40103005257 asks for the `release` environment, approve it. The maintainer asked to
+- **Build 24 is on TestFlight (16:44 UTC):** the `release` gate was approved at 15:42, run 40103005257
+  passed end to end and build 3.0.0 (24), `e008a349-a87b-4d9d-8790-be4c0e4a687c`, went VALID. Its What
+  to Test notes are in, Internal testers have it (the group has access to all builds, so adding it by
+  hand is refused), and beta review is submitted (WAITING_FOR_REVIEW). No external group: Public Beta
+  waits for RF-17.
+- **Same session:** the README became a project page (`e52d8d1e`, RF-32), a CI stub race was fixed
+  (`9ced9a37`), and RF-34 redesigns the website home page for regular users.
+- **Resume here, in order** (steps 1 to 3 are done):
+  1. Done: when run 40103005257 asked for the `release` environment, it was approved. The maintainer asked to
      fast-track: `gh api -X POST repos/PowerBeef/Vocello/actions/runs/40103005257/pending_deployments
      -F 'environment_ids[]=22764362076' -f state=approved -f comment="fast-track the 3.0 RC"`.
      If the run fails, fix the cause, push `main`, wait for CI, then cut the next candidate with
      `python3 scripts/ios_candidate_tag.py`.
-  2. When `asc builds list --app 6794692745 --platform IOS --build-number 24 --processing-state all`
-     shows VALID, distribute it with the build's id:
+  2. Done (see above): when `asc builds list --app 6794692745 --platform IOS --build-number 24
+     --processing-state all` showed VALID, it was distributed with the build's id:
      - `asc builds test-notes create --build-id ID --locale en-US --whats-new TEXT`, where TEXT is the
        candidate text in `docs/releases/v3.0.0.md` ("TestFlight: what to test");
      - `asc builds add-groups --build-id ID --group 70bd66ea-9d12-4f77-84b5-38e7a64ed871` (Internal);

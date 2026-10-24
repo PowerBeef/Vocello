@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="art.css">
+<style>
+  /* The phone-width hero: the README shows it below 700 px through <picture>. */
+  :root { --w: 400px; --h: 620px; }
+  .head { text-align: center; padding: 30px 20px 0; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; }
+  .brand img { width: 40px; height: 40px; }
+  .brand span { font-size: 27px; font-weight: 600; letter-spacing: -0.3px; }
+  h1 { margin-top: 16px; font-size: 25px; line-height: 31px; font-weight: 600; letter-spacing: -0.2px; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .sub { margin-top: 10px; font-size: 14px; line-height: 19px; color: var(--fg-secondary); }
+  .modes { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .mac { position: absolute; left: 16px; top: 338px; width: 300px; }
+  .phone {
+    position: absolute; left: 262px; top: 352px; width: 116px; padding: 4px;
+    border-radius: 21px; background: #0A0B0E; border: 1px solid var(--stroke-card);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+  .phone img { width: 100%; display: block; border-radius: 17px; }
+</style></head>
+<body>
+  <div class="head">
+    <div class="brand"><img src="../../Sources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" alt=""><span>Vocello</span></div>
+    <h1>Premium voice studio.<br><em>Proven performance.</em><br>Private by design.</h1>
+    <p class="sub">Write a script, pick or describe a voice, and generate speech locally on your Mac and iPhone.</p>
+    <div class="modes">
+      <span class="pill"><i class="dot custom"></i>Built-in Voice</span>
+      <span class="pill"><i class="dot design"></i>Voice Design</span>
+      <span class="pill"><i class="dot clone"></i>Voice Cloning</span>
+    </div>
+  </div>
+  <img class="window mac" src="../../docs/screenshots/vocello-custom-voice.png" alt="">
+  <div class="phone"><img src="../../docs/screenshots/vocello-ios-studio.png" alt=""></div>
+</body></html>

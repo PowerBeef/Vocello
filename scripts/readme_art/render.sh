@@ -18,5 +18,9 @@ render() { # name width height
 render hero 800 616
 render modes 800 276
 render performance 800 246
+# Phone-width versions, which the README serves below 700 px through <picture>.
+render hero-narrow 400 620
+render modes-narrow 400 1064
+render performance-narrow 400 560
 sips -Z 112 "$root/Sources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" --out "$out/icon.png" >/dev/null
 echo "copied docs/readme/icon.png"

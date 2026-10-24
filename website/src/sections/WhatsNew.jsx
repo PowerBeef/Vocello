@@ -3,11 +3,18 @@ import { MAC_DMG, RELEASE_NOTES } from "../data/credits.js";
 import {
   IPHONE_NOTE,
   MAC_HIGHLIGHTS,
-  QUALITY_NOTE,
   SHARED_HIGHLIGHTS,
   UPGRADE_NOTE,
   WHATS_NEW_VERSION,
 } from "../data/whatsnew.js";
+
+// The home page keeps the shared changes people notice first; the release
+// notes link carries the rest, and the take-quality note lives with the
+// limitations further down the page.
+const SHARED_ON_HOME = ["Generated audio is marked", "Takes read the whole script first", "Interface in ten languages"];
+const sharedHighlights = SHARED_ON_HOME
+  .map((k) => SHARED_HIGHLIGHTS.find((item) => item.k === k))
+  .filter((item) => item !== undefined);
 
 export const WhatsNew = () => (
   <section className="section whatsnew-section" id="whats-new" aria-labelledby="whatsnew-title">
@@ -53,7 +60,7 @@ export const WhatsNew = () => (
           <h3 className="whatsnew-group-title">In both apps</h3>
           <p className="whatsnew-shared-note">{IPHONE_NOTE}</p>
           <dl className="whatsnew-list">
-            {SHARED_HIGHLIGHTS.map((item) => (
+            {sharedHighlights.map((item) => (
               <div className="whatsnew-row" key={item.k}>
                 <dt className="whatsnew-k">{item.k}</dt>
                 <dd className="whatsnew-v">{item.v}</dd>
@@ -67,12 +74,11 @@ export const WhatsNew = () => (
         <h3 className="whatsnew-upgrade-title">Before you upgrade</h3>
         <div className="whatsnew-upgrade-body">
           <p>{UPGRADE_NOTE}</p>
-          <p>{QUALITY_NOTE}</p>
           <p className="whatsnew-upgrade-links">
             <a className="cta-meta-link" href={MAC_DMG}>Download the Mac app</a>
             <span className="cta-meta-sep" aria-hidden="true">·</span>
             <a className="cta-meta-link" href={RELEASE_NOTES} target="_blank" rel="noreferrer">
-              Read the full release notes
+              Read the full release notes, with every change
             </a>
           </p>
         </div>

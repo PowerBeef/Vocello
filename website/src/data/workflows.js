@@ -15,7 +15,7 @@ export const WORKFLOWS = [
       ["Delivery presets", "Neutral, Sad, Calm, and Whisper are the distinct deliveries, the measured group. Happy, Angry, Fearful, and Surprised are directional hints that shape energy and pace, not promises of the exact emotion."],
       ["Custom tone field", "Describe the delivery in your own words when the chips aren't enough."],
     ],
-    shot: "assets/screens/custom-voice.png",
+    shot: "/assets/screens/custom-voice.png",
   },
   {
     id: "design",
@@ -33,7 +33,7 @@ export const WORKFLOWS = [
       ["Save what works", "Keep designed voices in Saved Voices and re-use them in any future script."],
       ["Local generation", "The brief never leaves your Mac. Designed voices live in app storage."],
     ],
-    shot: "assets/screens/voice-design.png",
+    shot: "/assets/screens/voice-design.png",
   },
   {
     id: "clone",
@@ -51,6 +51,6 @@ export const WORKFLOWS = [
       ["Transcript-backed quality", "Paste the words spoken in the clip, or let Vocello transcribe them locally, for the strongest reusable clone prompt. Audio-only references remain available as a lower-guidance fallback."],
       ["Source-led delivery", "Voice Cloning follows the reference clip and takes no delivery instruction. A cloned voice with a curated emotion reference bank offers a delivery choice, each delivery backed by its own verified reference clip."],
     ],
-    shot: "assets/screens/voice-cloning.png",
+    shot: "/assets/screens/voice-cloning.png",
   },
 ];

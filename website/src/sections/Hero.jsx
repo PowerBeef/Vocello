@@ -37,9 +37,12 @@ export const Hero = () => (
             Command line
           </a>
         </div>
-        <p className="hero-meta">
-          Signed and notarized · Updates itself · MIT app code · Swift + MLX
-        </p>
+        <ul className="hero-meta meta-list" aria-label="Release facts">
+          <li>Signed and notarized</li>
+          <li>Updates itself</li>
+          <li>MIT app code</li>
+          <li>Swift + MLX</li>
+        </ul>
         <p className="hero-meta">
           On iPhone, Vocello is in public TestFlight until its App Store release:{" "}
           <a className="cta-meta-link" href={TESTFLIGHT} target="_blank" rel="noreferrer">
@@ -51,7 +54,7 @@ export const Hero = () => (
         <div className="hero-stage-glow" aria-hidden="true" />
         <div className="window hero-window">
           <Screenshot
-            src="assets/screens/custom-voice.png"
+            src="/assets/screens/custom-voice.png"
             width={2080} height={1380}
             priority
             alt="Vocello Built-in Voice screen showing speaker, delivery, model, and script controls"

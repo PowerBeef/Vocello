@@ -1,3 +1,5 @@
+import { SITE_PAGES, STATIC_PAGES } from "./site-pages.mjs";
+
 export const VIEWPORTS = Object.freeze([
   Object.freeze({ name: "wide", width: 1440, height: 900 }),
   Object.freeze({ name: "narrow", width: 390, height: 844 }),
@@ -57,7 +59,10 @@ export const LANDSCAPE_SIZES = Object.freeze([
   Object.freeze({ width: 844, height: 390 }),
   Object.freeze({ width: 932, height: 430 }),
 ]);
-export const LAYOUT_PATHS = Object.freeze(["/", "/support/", "/privacy/"]);
+export const LAYOUT_PATHS = Object.freeze([
+  ...SITE_PAGES.map(({ path }) => path),
+  ...STATIC_PAGES,
+]);
 export const DESKTOP_MIN_WIDTH = 1200;
 export const MIN_TAP = 44;
 

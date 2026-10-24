@@ -35,10 +35,30 @@ build outputs are generated; do not hand-edit them.
 
 ## Architecture
 
-`src/App.jsx` is a thin page composer. Keep content in the existing boundaries:
+The site has three React pages, listed in `scripts/site-pages.mjs`:
 
-- `src/sections/`: page sections in render order, including `WhatsNew.jsx` (`#whats-new`, "What's
-  new in 3.0") and `CommandLine.jsx` (`#cli`, "Command line and agents").
+| Page | Entry | Content |
+| --- | --- | --- |
+| `/` | `index.html` | the home page, which summarizes |
+| `/cli/` | `cli/index.html` | the full command line guide |
+| `/engineering/` | `engineering/index.html` | engine, speed and every current limitation |
+
+- Each entry names its page on `<div id="root" data-page="...">`. `src/App.jsx` composes the
+  skip link, bar, page (`PAGES` from `src/pages/`), footer and analytics.
+- `vite.config.js` builds every entry. `scripts/prerender.mjs` renders each page into its HTML.
+  The site contract checks each page's head, and the rendered contract checks each page's
+  landmarks.
+- Home sections the other pages link to are `/#id`. A home teaser keeps its section id, so old
+  anchors still land: `#cli`, `#engineering` and `#limitations`.
+
+Keep content in the existing boundaries:
+
+- `src/sections/`: page sections in render order, including:
+  - `WhatsNew.jsx` (`#whats-new`, "What's new in 3.0");
+  - `CommandLine.jsx`: `CommandLineTeaser` (`#cli`) and `CommandLineGuide` (`/cli/`);
+  - `Engineering.jsx`: `EngineeringTeaser` (`#engineering`) and `EngineeringDetail`
+    (`/engineering/`), with the HTML speed chart;
+  - `Limitations.jsx`: a `summary` on the home page and the `full` list on `/engineering/`.
 - `src/components/Icon.jsx`: shared SVG vocabulary and deterministic waveform-bar generator.
 - `src/components/Waveform.jsx`: Listen-row waveform primitive.
 - `src/data/workflows.js`: the three workflow bands.
@@ -150,9 +170,13 @@ do not hard-code duplicate hex values.
 
 Asset ownership:
 
-- `public/assets/screens/`: product screenshots, including `ios-studio.png`. Each PNG ships with an
-  AVIF sibling (`sips -s format avif -s formatOptions 80 x.png --out x.avif`) and renders through
-  `src/components/Screenshot.jsx` with its pixel size; only the hero loads eagerly.
+- `public/assets/screens/`: product screenshots, including `ios-studio.png`.
+  - Each PNG ships with an AVIF sibling: `sips -s format avif -s formatOptions 80 x.png --out
+    x.avif`.
+  - A 2080 px Mac capture also ships `x-1040.avif` and `x-1560.avif`. Make each with `sips -Z
+    <width>` to a temporary PNG, then the AVIF command; commit only the AVIF.
+  - Screenshots render through `src/components/Screenshot.jsx` with their pixel size and a
+    srcset of those widths; only the hero loads eagerly.
 - `public/assets/voice-samples/`: WAV samples referenced by `src/data/samples.js`. When audio
   changes, regenerate waveform arrays with `website/scripts/render-waveforms.mjs`.
 - `public/assets/favicon-32.png`, `apple-touch-icon.png` (180 px), `vocello-header-mark.png`, and
@@ -164,7 +188,8 @@ from unrelated JSX.
 
 ## Interaction and accessibility
 
-- There is no client-side router. Internal navigation uses plain hash anchors.
+- There is no client-side router. Internal navigation uses plain hash anchors and links between the
+  three pages.
 - Listen uses one shared `<audio>` element with `preload="none"` and source swapping for mutual
   exclusion.
 - Reuse the existing `panelSettle` motion and easing. Animate only opacity, transform,

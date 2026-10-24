@@ -2,35 +2,40 @@ import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
 import { REPO, TESTFLIGHT } from "../data/credits.js";
 
-// Section links in page order. `tier` is the narrowest layout tier whose bar
-// still shows the link (website/DESIGN.md): "tablet" links show from 900 px,
-// "desktop" links from 1200 px. Below the desktop tier the menu sheet lists
-// every link, so nothing depends on the bar's width.
-const SECTION_LINKS = [
-  { href: "#workflows", label: "Workflows", tier: "tablet" },
-  { href: "#listen", label: "Listen", tier: "tablet" },
-  { href: "#how-it-runs", label: "How it runs", tier: "desktop" },
-  { href: "#cli", label: "Command line", tier: "tablet" },
-  { href: "#iphone", label: "iPhone", tier: "tablet" },
-  { href: "#engineering", label: "Engineering", tier: "desktop" },
+// Bar links in page order. A `hash` link is a home-page section; a `path`
+// link is its own page (`page` names it). `tier` is the narrowest layout tier
+// whose bar still shows the link (website/DESIGN.md): "tablet" links show from
+// 900 px, "desktop" links from 1200 px. Below the desktop tier the menu sheet
+// lists every link, so nothing depends on the bar's width.
+const BAR_LINKS = [
+  { hash: "#workflows", label: "Workflows", tier: "tablet" },
+  { hash: "#listen", label: "Listen", tier: "tablet" },
+  { hash: "#how-it-runs", label: "How it runs", tier: "desktop" },
+  { path: "/cli/", page: "cli", label: "Command line", tier: "tablet" },
+  { hash: "#iphone", label: "iPhone", tier: "tablet" },
+  { path: "/engineering/", page: "engineering", label: "Engineering", tier: "desktop" },
 ];
 
 const MENU_LINKS = [
-  { href: "#whats-new", label: "What's new" },
-  ...SECTION_LINKS,
-  { href: "#limitations", label: "Limitations" },
+  { hash: "#whats-new", label: "What's new" },
+  ...BAR_LINKS,
+  { hash: "#limitations", label: "Limitations" },
 ];
 
+/** A home section is a plain anchor on the home page and "/#id" elsewhere. */
+const hrefFor = (link, page) => link.path ?? (page === "home" ? link.hash : `/${link.hash}`);
+
 const Brand = () => (
-  <a className="brand" href="#main-content">
-    <img className="brand-mark" src="assets/vocello-header-mark.png" width={84} height={72} alt="" />
+  <a className="brand" href="/">
+    <img className="brand-mark" src="/assets/vocello-header-mark.png" width={84} height={72} alt="" />
     <span className="brand-name">Vocello</span>
     <span className="brand-rebrand">formerly QwenVoice</span>
-    <span className="sr-only"> (top of the page)</span>
+    <span className="sr-only"> (home)</span>
   </a>
 );
 
-export const Nav = () => {
+/** @param {{ page?: string }} props */
+export const Nav = ({ page = "home" }) => {
   const [progress, setProgress] = useState(0);
   const [current, setCurrent] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,8 +56,8 @@ export const Nav = () => {
   // The bar marks the section crossing the middle of the viewport; sections
   // without a bar link (the hero, What's new, the download block) clear it.
   useEffect(() => {
-    if (!("IntersectionObserver" in window)) return;
-    const linked = new Set(SECTION_LINKS.map((link) => link.href));
+    if (page !== "home" || !("IntersectionObserver" in window)) return;
+    const linked = new Set(BAR_LINKS.map((link) => link.hash).filter(Boolean));
     const sections = document.querySelectorAll("main > section, main > div[id]");
     const io = new IntersectionObserver(
       (entries) => {
@@ -66,7 +71,13 @@ export const Nav = () => {
     );
     sections.forEach((section) => io.observe(section));
     return () => io.disconnect();
-  }, []);
+  }, [page]);
+
+  /** @param {{ hash?: string, page?: string }} link */
+  const currentFor = (link) => {
+    if (link.page) return link.page === page ? "page" : undefined;
+    return page === "home" && current === link.hash ? "location" : undefined;
+  };
 
   const openMenu = () => {
     menuRef.current?.showModal();
@@ -74,17 +85,32 @@ export const Nav = () => {
   };
   const closeMenu = () => menuRef.current?.close();
 
+  // A menu link to a section of this page navigates after the sheet has closed:
+  // while it is open the page cannot scroll, so a jump made in the same click
+  // could land nowhere. Links to another page navigate as usual.
+  /** @param {React.MouseEvent<HTMLAnchorElement>} event */
+  const followMenuLink = (event) => {
+    const href = event.currentTarget.getAttribute("href") ?? "";
+    closeMenu();
+    if (!href.startsWith("#")) return;
+    event.preventDefault();
+    window.requestAnimationFrame(() => {
+      if (window.location.hash === href) document.querySelector(href)?.scrollIntoView();
+      else window.location.hash = href;
+    });
+  };
+
   return (
     <nav className="nav" aria-label="Main">
       <div className="container nav-inner">
         <Brand />
         <div className="nav-links">
-          {SECTION_LINKS.map((link) => (
+          {BAR_LINKS.map((link) => (
             <a
-              key={link.href}
+              key={link.label}
               className={`nav-link nav-link--${link.tier}`}
-              href={link.href}
-              aria-current={current === link.href ? "location" : undefined}
+              href={hrefFor(link, page)}
+              aria-current={currentFor(link)}
             >
               {link.label}
             </a>
@@ -141,8 +167,10 @@ export const Nav = () => {
           </div>
           <ul className="menu-links">
             {MENU_LINKS.map((link) => (
-              <li key={link.href}>
-                <a href={link.href} onClick={closeMenu}>{link.label}</a>
+              <li key={link.label}>
+                <a href={hrefFor(link, page)} aria-current={currentFor(link)} onClick={followMenuLink}>
+                  {link.label}
+                </a>
               </li>
             ))}
           </ul>
@@ -152,7 +180,7 @@ export const Nav = () => {
             <li><a href="/privacy/">Privacy</a></li>
           </ul>
           <div className="menu-ctas">
-            <a className="btn btn-primary" href="#download" onClick={closeMenu}>
+            <a className="btn btn-primary" href="#download" onClick={followMenuLink}>
               <Icon name="apple" size={16} />
               Download for macOS&nbsp;26
             </a>

@@ -94,3 +94,12 @@ export function measureMenuTargets() {
     };
   });
 }
+
+// Runs in the page: images that have no height before they load. A lazy image
+// must reserve its space (width and height attributes on a box with a definite
+// width); otherwise the page grows under the reader after an anchor jump.
+export function measureUnsizedImages() {
+  return [...document.querySelectorAll("main img")]
+    .filter((image) => image.getClientRects().length > 0 && image.getBoundingClientRect().height === 0)
+    .map((image) => image.getAttribute("src"));
+}

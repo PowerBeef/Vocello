@@ -1,13 +1,28 @@
 import React from "react";
 import { RELEASES, RELEASE_NOTES, REPO } from "../data/credits.js";
 
-export const Footer = () => (
+// Home sections are plain anchors on the home page and "/#id" elsewhere.
+const PRODUCT_LINKS = [
+  { hash: "#workflows", label: "Workflows" },
+  { hash: "#listen", label: "Listen" },
+  { hash: "#whats-new", label: "What's new" },
+  { hash: "#how-it-runs", label: "How it runs" },
+  { path: "/cli/", label: "Command line" },
+  { hash: "#iphone", label: "iPhone" },
+  { path: "/engineering/", label: "Engineering" },
+  { hash: "#download", label: "Download", everyPage: true },
+  { path: "/support/", label: "Support" },
+  { path: "/privacy/", label: "Privacy" },
+];
+
+/** @param {{ page?: string }} props */
+export const Footer = ({ page = "home" }) => (
   <footer className="footer">
     <div className="container">
       <div className="footer-inner">
         <div className="footer-brand">
           <div className="brand">
-            <img className="brand-mark brand-mark--footer" src="assets/vocello-header-mark.png" width={84} height={72} alt="" />
+            <img className="brand-mark brand-mark--footer" src="/assets/vocello-header-mark.png" width={84} height={72} alt="" />
             <span className="brand-name brand-name--footer">Vocello</span>
           </div>
           <p>
@@ -21,16 +36,13 @@ export const Footer = () => (
           <div className="footer-col">
             <h2>Product</h2>
             <ul>
-              <li><a href="#workflows">Workflows</a></li>
-              <li><a href="#listen">Listen</a></li>
-              <li><a href="#whats-new">What's new</a></li>
-              <li><a href="#how-it-runs">How it runs</a></li>
-              <li><a href="#cli">Command line</a></li>
-              <li><a href="#iphone">iPhone</a></li>
-              <li><a href="#engineering">Engineering</a></li>
-              <li><a href="#download">Download</a></li>
-              <li><a href="/support/">Support</a></li>
-              <li><a href="/privacy/">Privacy</a></li>
+              {PRODUCT_LINKS.map((link) => (
+                <li key={link.label}>
+                  <a href={link.path ?? (page === "home" || link.everyPage ? link.hash : `/${link.hash}`)}>
+                    {link.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
           <div className="footer-col">

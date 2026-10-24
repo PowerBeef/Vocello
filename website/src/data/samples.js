@@ -16,7 +16,7 @@ export const SAMPLES = [
     quote: "The valley opens after the last bend, slow, and quieter than the road would suggest.",
     duration: "0:08",
     delivery: "Calm",
-    src: "assets/voice-samples/voice-design-calm-subtle.wav",
+    src: "/assets/voice-samples/voice-design-calm-subtle.wav",
     wave: [0.36, 0.62, 1, 0.73, 0.74, 0.46, 0.54, 0.64, 0.3, 0.59, 0.62, 0.16, 0.75, 0.67, 0.35, 0.06, 0.06, 0.06, 0.07, 0.26, 0.88, 0.62, 0.32, 0.14, 0.34, 0.43, 0.64, 0.78, 0.5, 0.56, 0.51, 0.75, 0.44, 0.29, 0.18, 0.52, 0.43, 0.12, 0.06, 0.06],
   },
   {
@@ -28,7 +28,7 @@ export const SAMPLES = [
     quote: "Hey, welcome back to Field Notes. Today we're walking through the demo build, end to end.",
     duration: "0:06",
     delivery: "Excited",
-    src: "assets/voice-samples/custom-voice-aiden-excited.wav",
+    src: "/assets/voice-samples/custom-voice-aiden-excited.wav",
     wave: [0.64, 0.57, 0.11, 0.08, 1, 0.61, 0.69, 0.24, 0.12, 0.78, 0.42, 0.33, 0.08, 0.06, 0.06, 0.18, 0.59, 0.57, 0.46, 0.3, 0.24, 0.45, 0.18, 0.4, 0.48, 0.65, 0.71, 0.79, 0.23, 0.06, 0.06, 0.21, 0.52, 0.34, 0.06, 0.42, 0.19, 0.42, 0.23, 0.07],
   },
   {
@@ -40,7 +40,7 @@ export const SAMPLES = [
     quote: "音声はすべて、このMacの上で生成されます。台本も声も、どこにもアップロードされません。",
     duration: "0:09",
     delivery: "Neutral",
-    src: "assets/voice-samples/custom-voice-ono-anna-japanese.wav",
+    src: "/assets/voice-samples/custom-voice-ono-anna-japanese.wav",
     wave: [0.2, 0.36, 0.22, 0.34, 0.06, 0.06, 0.51, 1, 0.54, 0.63, 0.42, 0.3, 0.45, 0.26, 0.38, 0.06, 0.06, 0.06, 0.06, 0.08, 0.32, 0.31, 0.3, 0.53, 0.18, 0.06, 0.06, 0.67, 0.99, 0.84, 0.58, 0.93, 0.39, 0.46, 0.29, 0.37, 0.06, 0.06, 0.06, 0.06],
   },
   {
@@ -52,7 +52,7 @@ export const SAMPLES = [
     quote: "Chapter one. The harbor was quiet at that hour, and the water held the last of the light. She walked the length of the pier with her notes in one hand…",
     duration: "0:31",
     delivery: "Calm",
-    src: "assets/voice-samples/custom-voice-ryan-calm-narration.wav",
+    src: "/assets/voice-samples/custom-voice-ryan-calm-narration.wav",
     wave: [0.7, 0.41, 0.7, 0.81, 0.54, 0.85, 0.94, 0.68, 0.37, 0.5, 0.64, 0.5, 0.67, 0.52, 0.61, 1, 0.71, 0.32, 0.55, 0.58, 0.48, 0.6, 0.52, 0.88, 0.64, 0.63, 0.79, 0.74, 0.86, 0.21, 0.46, 0.72, 0.56, 0.46, 0.56, 0.2, 0.48, 0.68, 0.6, 0.49],
   },
 ];

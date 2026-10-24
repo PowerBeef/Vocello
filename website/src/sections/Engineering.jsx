@@ -1,4 +1,5 @@
 import React from "react";
+import { Icon } from "../components/Icon.jsx";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
@@ -35,6 +36,7 @@ const MODES = [
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;
+const RTF_TICKS = [0.25, 0.5, 0.75, 1.0];
 
 const LEDGER = [
   {
@@ -59,71 +61,70 @@ const LEDGER = [
   },
 ];
 
-const RtfChart = () => {
-  const width = 640;
-  const left = 96;
-  const right = 64;
-  const x0 = left;
-  const x1 = width - right;
-  const xFor = (v) => x0 + ((x1 - x0) * Math.min(v, RTF_SCALE_MAX)) / RTF_SCALE_MAX;
-  const barH = 14;
-  const inGap = 7;
-  const groupGap = 24;
-  const top = 16;
-  let y = top;
-  const rows = [];
-  MODES.forEach((mode) => {
-    rows.push(
-      <g key={`${mode.name}-head`}>
-        <circle cx={14} cy={y + 3} r={4.5} fill={mode.tone} />
-        <text x={26} y={y + 7} className="perf-mode-label">{mode.name}</text>
-      </g>
-    );
-    y += 18;
-    mode.takes.forEach((value, i) => {
-      const bw = xFor(value) - x0;
-      rows.push(
-        <g key={`${mode.name}-${LENGTHS[i]}`}>
-          <text x={x0 - 8} y={y + barH - 3} textAnchor="end" className="perf-tick">{LENGTHS[i]}</text>
-          <path
-            d={`M${x0} ${y} h${bw - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h-${bw - 4} z`}
-            fill={mode.tone}
-          />
-          <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{value.toFixed(2)}</text>
-        </g>
-      );
-      y += barH + inGap;
-    });
-    y += groupGap - inGap;
-  });
-  const plotBottom = y - groupGap + 8;
-  const gridlines = [0.25, 0.5, 0.75, 1.0].map((v) => (
-    <g key={v}>
-      <line
-        x1={xFor(v)} y1={top - 4} x2={xFor(v)} y2={plotBottom}
-        stroke={v === 1.0 ? "var(--fg-tertiary)" : "var(--stroke-inline)"}
-        strokeWidth="1"
-        strokeDasharray={v === 1.0 ? "" : "3 3"}
-      />
-      <text x={xFor(v)} y={plotBottom + 18} textAnchor="middle" className="perf-tick">
-        {v === 1.0 ? "1.0 · realtime" : v.toFixed(2)}
-      </text>
-    </g>
-  ));
-  return (
-    <svg
-      className="perf-chart"
-      viewBox={`0 0 ${width} ${plotBottom + 30}`}
-      role="img"
-      aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.27 to 0.31, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.32. Every bar sits below the real-time line at 1.0."
-    >
-      {gridlines}
-      {rows}
-    </svg>
-  );
-};
+// The speed chart is HTML, not a fixed-width SVG: its bars reflow with the
+// panel, so labels keep their size on a phone instead of shrinking with a
+// scaled drawing. Bar lengths and gridlines share one scale (--rtf, 0 to 1 of
+// RTF_SCALE_MAX).
+const scale = (value) => Math.min(value, RTF_SCALE_MAX) / RTF_SCALE_MAX;
 
-export const Engineering = () => (
+const RtfChart = () => (
+  <div
+    className="rtf-chart"
+    role="img"
+    aria-label="Warm real-time factor by mode and script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.27 to 0.31, Voice Design 0.26 to 0.31, Voice Cloning 0.27 to 0.32. Every bar sits below the real-time line at 1.0."
+  >
+    {MODES.map((mode) => (
+      <div className="rtf-group" key={mode.name} style={{ "--bar-tone": mode.tone }}>
+        <p className="rtf-mode">
+          <span className="rtf-dot" aria-hidden="true" />
+          {mode.name}
+        </p>
+        {mode.takes.map((value, i) => (
+          <div className="rtf-row" key={LENGTHS[i]}>
+            <span className="rtf-len">{LENGTHS[i]}</span>
+            <span className="rtf-track" style={{ "--rtf": scale(value) }}>
+              <span className="rtf-bar" />
+              <span className="rtf-val">{value.toFixed(2)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    ))}
+    <div className="rtf-row rtf-axis" aria-hidden="true">
+      <span />
+      <span className="rtf-track">
+        {RTF_TICKS.map((tick) => (
+          <span
+            key={tick}
+            className={`rtf-tick${tick === 1.0 ? " rtf-tick--realtime" : ""}`}
+            style={{ "--rtf": scale(tick) }}
+          >
+            {tick === 1.0 ? (
+              <>
+                1.0<span className="rtf-tick-note"> real time</span>
+              </>
+            ) : tick.toFixed(2)}
+          </span>
+        ))}
+      </span>
+    </div>
+  </div>
+);
+
+const SpeedPanel = () => (
+  <figure className="perf-panel">
+    <RtfChart />
+    <figcaption className="perf-caption">
+      Warm generation by mode and script length, take medians, from a 3.0
+      development build. Translucent app surfaces render solid while audio
+      generates; on the 8 GB Mac mini M2, that change sped up the same take by
+      about a third.
+    </figcaption>
+  </figure>
+);
+
+// Home: the measured speed with its qualification, then a link to /engineering/.
+export const EngineeringTeaser = () => (
   <section className="section engineering-section" id="engineering" aria-labelledby="eng-title">
     <div className="container">
       <header className="perf-head">
@@ -141,18 +142,40 @@ export const Engineering = () => (
           to a tracked record in the open repository.
         </p>
       </header>
+      <div className="perf-teaser">
+        <SpeedPanel />
+      </div>
+      <p className="section-more">
+        <a className="more-link" href="/engineering/">
+          How the engine is built, and every current limitation
+          <Icon name="arrow-right" size={16} />
+        </a>
+      </p>
+    </div>
+  </section>
+);
 
+// /engineering/: the full engineering story.
+export const EngineeringDetail = () => (
+  <section className="section engineering-section" aria-labelledby="eng-title">
+    <div className="container">
+      <header className="perf-head page-head">
+        <p className="section-note">Measured, not promised</p>
+        <h1 id="eng-title" className="section-title page-title">A first-party engine, measured take by take.</h1>
+        <p className="section-sub">
+          The speed chart comes from one record on Vocello's benchmark host, a Mac mini M6
+          with 16 GB: a 3.0 development build measured on October 7, 2026. The engine changed
+          after it (a newer MLX, full-precision sampling, takes that read the whole script
+          first), and no benchmark of the released build is published yet, so the chart is
+          not a measurement of 3.0.0 itself. The memory figures come from earlier records on
+          the 8 GB Mac mini M2, the support floor.
+          Speed is the real-time factor: seconds of generation per second of audio.
+          Below 1.0, audio generates ahead of playback, and every number here traces
+          to a tracked record in the open repository.
+        </p>
+      </header>
       <div className="perf-layout">
-        <figure className="perf-panel">
-          <RtfChart />
-          <figcaption className="perf-caption">
-            Warm generation by mode and script length, take medians, from a 3.0
-            development build. Translucent app surfaces render solid while audio
-            generates; on the 8 GB Mac mini M2, that change sped up the same take by
-            about a third.
-          </figcaption>
-        </figure>
-
+        <SpeedPanel />
         <dl className="eng-ledger" aria-label="How the Vocello engine is built">
           {LEDGER.map((row) => (
             <div className="eng-row" key={row.k}>
@@ -162,7 +185,6 @@ export const Engineering = () => (
           ))}
         </dl>
       </div>
-
       <p className="perf-provenance">
         Record <span className="perf-mono">74f026be</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">

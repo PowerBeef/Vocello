@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderRepositoryApp, validateRenderedMarkup } from "../scripts/rendered-contract.mjs";
+import { renderRepositoryPages, validateRenderedMarkup } from "../scripts/rendered-contract.mjs";
+import { SITE_PAGES } from "../scripts/site-pages.mjs";
 
-test("the rendered application satisfies the accessibility contract", async () => {
-  assert.deepEqual(validateRenderedMarkup(await renderRepositoryApp()), []);
+test("every rendered page satisfies the accessibility contract", async () => {
+  const pages = await renderRepositoryPages();
+  assert.deepEqual(Object.keys(pages).sort(), SITE_PAGES.map(({ page }) => page).sort());
+  for (const [page, markup] of Object.entries(pages)) {
+    assert.deepEqual(validateRenderedMarkup(markup), [], page);
+  }
 });
 
 test("rendered controls and labels fail closed", () => {

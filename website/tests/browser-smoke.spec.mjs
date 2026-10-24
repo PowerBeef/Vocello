@@ -5,6 +5,7 @@ import {
   validateHydrationProbe,
   validateInternalTargets,
 } from "../scripts/browser-smoke-contract.mjs";
+import { SITE_PAGES, STATIC_PAGES } from "../scripts/site-pages.mjs";
 import { SAMPLES } from "../src/data/samples.js";
 import { collectBrowserFailures, stubAnalytics } from "./browser-helpers.mjs";
 
@@ -62,13 +63,10 @@ for (const viewport of VIEWPORTS) {
       links: [...document.querySelectorAll("a[href]")].map((link) => link.getAttribute("href")),
       ids: [...document.querySelectorAll("[id]")].map((element) => element.id),
     }));
-    validateInternalTargets(
-      targetInventory.links,
-      targetInventory.ids,
-      ["/", "/support/", "/privacy/"],
-    );
+    const pagePaths = [...SITE_PAGES.map(({ path }) => path), ...STATIC_PAGES];
+    validateInternalTargets(targetInventory.links, targetInventory.ids, pagePaths);
 
-    for (const path of ["/support/", "/privacy/"]) {
+    for (const path of pagePaths.filter((pagePath) => pagePath !== "/")) {
       const response = await page.goto(path, { waitUntil: "networkidle" });
       expect(response?.status()).toBe(200);
       await expect(page.locator("main")).toBeVisible();

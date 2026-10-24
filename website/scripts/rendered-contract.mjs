@@ -59,7 +59,8 @@ export const validateRenderedMarkup = (markup) => {
   return [...new Set(errors)].sort();
 };
 
-export const renderRepositoryApp = async () => {
+// Renders every page App knows (src/App.jsx PAGES), keyed by page name.
+export const renderRepositoryPages = async () => {
   const server = await createServer({
     root,
     appType: "custom",
@@ -67,15 +68,19 @@ export const renderRepositoryApp = async () => {
     server: { middlewareMode: true },
   });
   try {
-    const { default: App } = await server.ssrLoadModule("/src/App.jsx");
-    return renderToStaticMarkup(React.createElement(App));
+    const { default: App, PAGES } = await server.ssrLoadModule("/src/App.jsx");
+    return Object.fromEntries(
+      Object.keys(PAGES).map((page) => [page, renderToStaticMarkup(React.createElement(App, { page }))]),
+    );
   } finally {
     await server.close();
   }
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const errors = validateRenderedMarkup(await renderRepositoryApp());
+  const pages = await renderRepositoryPages();
+  const errors = Object.entries(pages).flatMap(([page, markup]) =>
+    validateRenderedMarkup(markup).map((error) => `${page}: ${error}`));
   if (errors.length) {
     for (const error of errors) console.error(`error: ${error}`);
     process.exitCode = 1;

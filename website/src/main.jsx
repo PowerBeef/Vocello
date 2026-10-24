@@ -3,10 +3,11 @@ import { createRoot, hydrateRoot } from "react-dom/client";
 import App from "./App.jsx";
 import "./site.css";
 
+// Each HTML entry names its page on the root element (data-page).
 const container = document.getElementById("root");
 const app = (
   <React.StrictMode>
-    <App />
+    <App page={container.dataset.page ?? "home"} />
   </React.StrictMode>
 );
 

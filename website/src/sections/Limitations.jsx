@@ -1,4 +1,5 @@
 import React from "react";
+import { Icon } from "../components/Icon.jsx";
 import { FALLBACK_MAC_RELEASE, STABLE_MAC_RELEASE } from "../data/release.js";
 
 const LIMITATIONS = [
@@ -48,28 +49,45 @@ const LIMITATIONS = [
   },
 ];
 
-export const Limitations = () => (
-  <section className="section limitations-section" id="limitations" aria-labelledby="limitations-title">
-    <div className="container limits-layout">
-      <div className="limits-copy">
-        <p className="section-note">Current limitations</p>
-        <h2 id="limitations-title" className="section-title">
-          The honest edges.
-        </h2>
-        <p className="section-sub">
-          Vocello is a stable release on the Mac and in the terminal, not a claim that every
-          machine, workflow, or voice reference behaves the same.
-        </p>
-      </div>
+// The home page keeps the limitations that decide whether Vocello fits a Mac
+// or a use; /engineering/ lists every one. Neither page hides the rest: the
+// summary links to the full list.
+const SUMMARY_KEYS = ["macOS 26+", "Apple Silicon and memory", "Take quality", "iPhone is in beta"];
 
-      <dl className="limits-list" aria-label="Vocello current limitations">
-        {LIMITATIONS.map((item) => (
-          <div className="limits-row" key={item.k}>
-            <dt className="limits-k">{item.k}</dt>
-            <dd className="limits-v">{item.v}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  </section>
-);
+/** @param {{ variant?: "summary" | "full" }} props */
+export const Limitations = ({ variant = "full" }) => {
+  const summary = variant === "summary";
+  const rows = summary ? LIMITATIONS.filter((item) => SUMMARY_KEYS.includes(item.k)) : LIMITATIONS;
+  return (
+    <section className="section limitations-section" id="limitations" aria-labelledby="limitations-title">
+      <div className="container limits-layout">
+        <div className="limits-copy">
+          <p className="section-note">Current limitations</p>
+          <h2 id="limitations-title" className="section-title">
+            The honest edges.
+          </h2>
+          <p className="section-sub">
+            Vocello is a stable release on the Mac and in the terminal, not a claim that every
+            machine, workflow, or voice reference behaves the same.
+          </p>
+          {summary ? (
+            <p className="section-more">
+              <a className="more-link" href="/engineering/#limitations">
+                All {LIMITATIONS.length} current limitations
+                <Icon name="arrow-right" size={16} />
+              </a>
+            </p>
+          ) : null}
+        </div>
+        <dl className="limits-list" aria-label="Vocello current limitations">
+          {rows.map((item) => (
+            <div className="limits-row" key={item.k}>
+              <dt className="limits-k">{item.k}</dt>
+              <dd className="limits-v">{item.v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+};

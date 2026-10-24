@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { SITE_PAGES } from "./scripts/site-pages.mjs";
 
 // `vite preview` (and so the Playwright smoke run) serves the production build with the
 // same response headers Vercel sends, so a Content-Security-Policy that blocks one of the
@@ -12,7 +14,13 @@ if (!siteRule?.headers?.some(({ key }) => key === "Content-Security-Policy")) {
 }
 const siteHeaders = Object.fromEntries(siteRule.headers.map(({ key, value }) => [key, value]));
 
+// One HTML entry per page (scripts/site-pages.mjs); they share the bundle.
+const input = Object.fromEntries(
+  SITE_PAGES.map(({ page, html }) => [page, fileURLToPath(new URL(`./${html}`, import.meta.url))]),
+);
+
 export default defineConfig({
   plugins: [react()],
+  build: { rollupOptions: { input } },
   preview: { headers: siteHeaders },
 });

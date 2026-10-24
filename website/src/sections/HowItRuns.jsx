@@ -63,7 +63,7 @@ export const HowItRuns = () => (
         <figure className="runs-shot">
           <div className="window">
             <Screenshot
-              src="assets/screens/model-downloads.png"
+              src="/assets/screens/model-downloads.png"
               width={2080} height={1380}
               alt="The Vocello model manager showing Speed and Quality models ready"
             />

@@ -108,7 +108,7 @@ export const Listen = () => {
         <figure className="try-shot">
           <div className="window">
             <Screenshot
-              src="assets/screens/delivery-presets.png"
+              src="/assets/screens/delivery-presets.png"
               width={2080} height={1380}
               alt="The Vocello delivery menu open, listing the eight presets, the four distinct deliveries first and the directional hints after them, plus Custom"
             />

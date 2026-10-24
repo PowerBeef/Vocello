@@ -33,7 +33,7 @@ export const IphoneBeta = () => (
       <figure className="iphone-stage">
         <Screenshot
           className="iphone-shot"
-          src="assets/screens/ios-studio.png"
+          src="/assets/screens/ios-studio.png"
           width={780} height={1696}
           alt="Vocello Studio running on an iPhone, with a script ready to generate with a built-in voice"
         />

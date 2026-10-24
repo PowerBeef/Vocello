@@ -46,8 +46,8 @@ export const WhyCloud = () => (
             {COMPARE.map((row) => (
               <tr key={row.k}>
                 <th scope="row">{row.k}</th>
-                <td>{row.vocello}</td>
-                <td>{row.cloud}</td>
+                <td data-label="Vocello">{row.vocello}</td>
+                <td data-label="Cloud TTS services">{row.cloud}</td>
               </tr>
             ))}
           </tbody>

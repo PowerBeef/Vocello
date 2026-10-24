@@ -293,6 +293,15 @@ a { color: inherit; text-decoration: none; }
   .nav-cta-pill { height: 34px; padding: 0 12px; }
 }
 
+/* The narrowest phones (and wider fallback fonts) keep the bar inside the
+   viewport: the Download pill drops its icon and the wordmark tightens. */
+@media (max-width: 379.98px) {
+  .nav-cta-pill { padding: 0 11px; }
+  .nav-cta-pill svg { display: none; }
+  .brand { gap: 8px; }
+  .brand-name { font-size: 17px; }
+}
+
 /* ============== MENU SHEET ============== */
 
 /* Full height on phones; a side panel from 600 px. A native modal <dialog>
@@ -405,7 +414,7 @@ a { color: inherit; text-decoration: none; }
 
 .hero-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: 56px;
   align-items: center;
 }
@@ -527,10 +536,23 @@ a.hero-eyebrow {
   text-wrap: balance;
 }
 
+.meta-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+}
+.meta-list li { white-space: nowrap; }
+.meta-list li:not(:last-child)::after {
+  content: "·";
+  margin: 0 0.5em;
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .hero-stage {
   position: relative;
   isolation: isolate;
-  max-width: 680px;
 }
 
 .hero-stage-glow {
@@ -1037,7 +1059,7 @@ picture {
 
 .listen-row-controls {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: var(--tap) minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
 }
@@ -1060,8 +1082,8 @@ picture {
 .listen-sep { color: rgba(255, 255, 255, 0.18); }
 
 .play-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--tap);
+  height: var(--tap);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1078,9 +1100,13 @@ picture {
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
+  overflow: hidden;
 }
+/* Bars give up width before the row overflows: 2 px each, 1 px at least. */
 .hear-wave .bar {
-  width: 2px;
+  flex: 0 1 2px;
+  min-width: 1px;
   background: var(--hear-mode);
   opacity: 0.5;
   border-radius: 1px;
@@ -1230,17 +1256,14 @@ picture {
   margin-top: 6px;
 }
 
+/* Delivery names are labels, not controls, so they carry no button chrome. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-chip);
-  font-size: 12px;
+  padding: 2px 14px 2px 0;
+  font-size: 13px;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--fg-secondary);
   transition: background-color var(--motion-quick) var(--ease-standard),
               border-color var(--motion-quick) var(--ease-standard),
@@ -1616,7 +1639,7 @@ picture {
   top: 10px;
   right: 10px;
   min-width: 64px;
-  height: 30px;
+  height: 34px;
   padding: 0 12px;
   border-radius: var(--radius-chip);
   background: rgba(255, 255, 255, 0.06);
@@ -2039,15 +2062,90 @@ picture {
   box-shadow: var(--inset-glass-top);
 }
 
-.perf-chart { width: 100%; height: auto; display: block; }
-.perf-chart text { font-family: var(--font-text); }
-.perf-mode-label { font-size: 13px; font-weight: 600; fill: var(--fg-primary); }
-.perf-tick { font-size: 11px; fill: var(--fg-tertiary); }
-.perf-value {
-  font-size: 11px;
-  fill: var(--fg-secondary);
+/* The speed chart: HTML rows on one scale (--rtf is 0 to 1 of the axis), so
+   bars reflow with the panel and labels keep their size. Gridlines mark 0.25,
+   0.5 and 0.75; the stronger line is real time (1.0). */
+.rtf-chart { display: grid; gap: 18px; }
+.rtf-group { display: grid; gap: 6px; }
+
+.rtf-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.rtf-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bar-tone);
+}
+
+/* Each value sits just past its bar's end, inside the track's scale. */
+.rtf-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.rtf-len {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  text-align: right;
+}
+
+.rtf-track {
+  position: relative;
+  height: 14px;
+  background:
+    linear-gradient(var(--fg-tertiary), var(--fg-tertiary)) 83.333% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--stroke-inline), var(--stroke-inline)) 20.833% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--stroke-inline), var(--stroke-inline)) 41.667% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--stroke-inline), var(--stroke-inline)) 62.5% 0 / 1px 100% no-repeat;
+}
+
+.rtf-bar {
+  display: block;
+  height: 100%;
+  width: calc(var(--rtf) * 100%);
+  border-radius: 2px 4px 4px 2px;
+  background: var(--bar-tone);
+}
+
+.rtf-val {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--rtf) * 100% + 8px);
+  transform: translateY(-50%);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--fg-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+.rtf-axis .rtf-track { background: none; height: 16px; }
+
+.rtf-tick {
+  position: absolute;
+  top: 0;
+  left: calc(var(--rtf) * 100%);
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  white-space: nowrap;
+}
+.rtf-tick--realtime { color: var(--fg-secondary); }
+
+@media (max-width: 599.98px) {
+  .rtf-tick-note { display: none; }
+}
+
+.perf-teaser { max-width: 760px; }
 
 .perf-caption {
   margin-top: 14px;
@@ -2092,6 +2190,45 @@ picture {
 }
 .perf-provenance a { color: var(--fg-secondary); }
 .perf-mono { font-family: var(--font-mono); font-size: 11px; }
+
+/* ============== PAGES AND TEASERS ============== */
+
+/* A page's leading section opens closer to the bar than a home section. */
+main > .section:first-child {
+  padding-top: clamp(40px, 24px + 3.5vw, 68px);
+}
+
+.page-title { font-size: var(--fs-hero); }
+
+/* A teaser section ends with one link to the page that holds the detail. */
+.section-more { margin: 32px 0 0; }
+
+.more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.more-link svg {
+  flex: none;
+  transition: transform var(--motion-quick) var(--ease-standard);
+}
+
+.cli-teaser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px 64px;
+  align-items: start;
+}
+
+.cli-teaser-item {
+  min-width: 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
 
 /* ============== SCROLL REVEAL ============== */
 
@@ -2139,7 +2276,9 @@ picture {
 
   .nav-cta:hover .nav-cta-pill { opacity: 0.92; }
   .nav-menu-button:hover { background: rgba(255, 255, 255, 0.06); }
-  .menu-links a:hover { color: var(--accent-strong); }
+  .menu-links a:hover,
+  .more-link:hover { color: var(--accent-strong); }
+  .more-link:hover svg { transform: translateX(3px); }
 
   a.hero-eyebrow:hover {
     color: var(--fg-primary);
@@ -2192,12 +2331,41 @@ picture {
   }
   .hero-copy { text-align: center; }
   .hero-sub { margin-inline: auto; }
-  .hero-ctas { justify-content: center; }
-  .hero-stage { max-width: 760px; margin: 0 auto; }
+  .hero-ctas,
+  .hero-copy .meta-list { justify-content: center; }
+  .hero-stage { width: 100%; max-width: 760px; margin: 0 auto; }
   .hero-window { transform: none; }
   .whatsnew-layout,
   .cli-install,
   .cli-bands { gap: 40px 44px; }
+
+  /* Listen: the controls move under the quote, so the waveform keeps its
+     width beside a narrower meta column. */
+  .listen-row { grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1.45fr); }
+  .listen-row-controls { grid-column: 2; }
+
+  /* How it runs: the screenshot above a full-width table, so each row's
+     note gets room to read. */
+  .runs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .runs-head {
+    grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .runs-head .section-note,
+  .runs-head .section-title,
+  .runs-head .section-sub {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .runs-head .section-sub { align-self: auto; }
+  .runs-shot,
+  .runs-table { grid-column: 1; }
+
+  .cli-limits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Below the tablet tier multi-column layouts stack into one column. Body
@@ -2219,6 +2387,8 @@ picture {
     gap: 16px;
     padding: 28px 0;
   }
+  .listen-row-controls { grid-column: 1; }
+  .cli-teaser { grid-template-columns: minmax(0, 1fr); }
 
   .whatsnew-head {
     grid-template-columns: minmax(0, 1fr);
@@ -2240,31 +2410,14 @@ picture {
   .limits-layout,
   .perf-layout,
   .cli-install,
-  .cli-bands,
-  .runs-layout { grid-template-columns: minmax(0, 1fr); }
+  .cli-bands { grid-template-columns: minmax(0, 1fr); }
   .caps-layout { gap: 36px; }
   .cloud-layout,
   .iphone-layout,
   .limits-layout { gap: 32px; }
-  .runs-layout { gap: 40px; }
   .cli-bands { margin-top: 56px; }
   .cli-limits-title { margin-top: 56px; }
 
-  .runs-head {
-    grid-column: 1;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-  }
-  .runs-head .section-note,
-  .runs-head .section-title,
-  .runs-head .section-sub {
-    grid-column: 1;
-    grid-row: auto;
-  }
-  .runs-head .section-sub { align-self: auto; }
-  .runs-shot,
-  .runs-table { grid-column: 1; }
-  .runs-row,
   .limits-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
@@ -2287,7 +2440,44 @@ picture {
 @media (max-width: 599.98px) {
   .btn { min-width: min(100%, 312px); justify-content: center; }
 
-  .compare-table { min-width: 440px; }
+  /* Comparison: each row becomes a stacked pair, labelled from its column,
+     instead of a table that scrolls sideways. */
+  .compare-table,
+  .compare-table tbody,
+  .compare-table tr,
+  .compare-table th,
+  .compare-table td { display: block; }
+  .compare-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .compare-table tbody tr { padding: 14px 0; }
+  .compare-table tbody th { padding: 0 0 6px; }
+  .compare-table tbody td { padding: 4px 0; }
+  .compare-table tbody td::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    color: var(--fg-tertiary);
+  }
+  .compare-table tbody td:nth-of-type(1)::before { color: var(--gold-300); }
+
+  .runs-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .cli-limits { grid-template-columns: minmax(0, 1fr); }
+
+  /* Wrapped fact rows drop their dots rather than leave one at a line edge. */
+  .meta-list { gap: 4px 14px; }
+  .meta-list li:not(:last-child)::after { content: none; }
+  .cta-meta-sep { display: none; }
+  .cta-meta { gap: 4px 14px; }
+
+  .perf-panel { padding: 20px 16px 16px; }
 
   .workflow-band-points li {
     grid-template-columns: 34px minmax(0, 1fr);
@@ -2309,9 +2499,9 @@ picture {
   .cli-step::before { font-size: 18px; }
   .way-k { font-size: 22px; }
   .cli-sub-title { font-size: 23px; }
-  .code-block { padding-top: 34px; }
-  .code-pre { font-size: 12px; padding: 6px 14px 14px; }
-  .code-copy { top: 8px; right: 8px; height: 28px; }
+  .code-block { padding-top: 58px; }
+  .code-pre { font-size: 12px; padding: 0 14px 14px; }
+  .code-copy { top: 8px; right: 8px; height: var(--tap); }
   .cli-exit-table { font-size: 12px; }
 
   .footer-cols {
@@ -2320,14 +2510,24 @@ picture {
   }
 }
 
+/* Copy buttons keep a 44 px target wherever the pointer is a finger. */
+@media (pointer: coarse) and (min-width: 600px) {
+  .code-copy { height: var(--tap); }
+  .code-pre { padding-right: 96px; min-height: 64px; }
+}
+
 /* A phone on its side: screenshots stay within the visible height. */
 @media (orientation: landscape) and (max-height: 500px) {
   .hero { padding-top: 32px; }
+  /* width: 100% keeps these frames from shrinking to their content: WebKit
+     gives a lazy image no width until it loads, so a centred frame would
+     collapse to nothing and grow under the reader after a jump. */
   .hero-stage,
   .workflow-band-shot,
   .caps-shot,
   .runs-shot,
   .try-shot {
+    width: 100%;
     max-width: min(100%, calc(80svh * 1.5));
     margin-inline: auto;
   }

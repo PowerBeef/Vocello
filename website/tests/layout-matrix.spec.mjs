@@ -15,6 +15,7 @@ import {
   measureBar,
   measureMenuTargets,
   measureOverflow,
+  measureUnsizedImages,
   stubAnalytics,
 } from "./browser-helpers.mjs";
 
@@ -39,6 +40,7 @@ for (const path of LAYOUT_PATHS) {
         const overflow = await page.evaluate(measureOverflow);
         validateNoOverflow(overflow.offenders, label);
         expect(overflow.docOverflow, `${label}: document scrolls sideways`).toBeLessThanOrEqual(1);
+        expect(await page.evaluate(measureUnsizedImages), `${label}: images with no reserved height`).toEqual([]);
         const bar = await page.evaluate(measureBar);
         if (!bar) return;
         validateBarLayout(bar.items, size.width, label);
@@ -91,11 +93,16 @@ test("the menu sheet opens, holds focus, closes, and lands its links below the b
   await activate(sheet.getByRole("link", { name: "Listen", exact: true }));
   await expect(sheet).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#listen");
-  const landing = await page.evaluate(() => ({
+  // The jump runs after the sheet closes, so wait for the scroll to settle.
+  const measure = () => page.evaluate(() => ({
     targetTop: Math.round(document.querySelector("#listen").getBoundingClientRect().top),
     barBottom: Math.round(document.querySelector(".nav").getBoundingClientRect().bottom),
   }));
-  validateAnchorLanding(landing, "menu link Listen");
+  await expect.poll(async () => {
+    const { targetTop, barBottom } = await measure();
+    return targetTop - barBottom;
+  }, { timeout: 5_000 }).toBeLessThanOrEqual(48);
+  validateAnchorLanding(await measure(), "menu link Listen");
   expect(failures).toEqual([]);
 });
 
@@ -104,11 +111,11 @@ test("desktop bar links land their sections below the bar", async ({ page }, tes
   await page.setViewportSize({ width: 1440, height: 900 });
   await stubAnalytics(page);
   await page.goto("/", { waitUntil: "networkidle" });
-  await page.locator(".nav-links").getByRole("link", { name: "Command line", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#cli");
+  await page.locator(".nav-links").getByRole("link", { name: "How it runs", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#how-it-runs");
   const landing = await page.evaluate(() => ({
-    targetTop: Math.round(document.querySelector("#cli").getBoundingClientRect().top),
+    targetTop: Math.round(document.querySelector("#how-it-runs").getBoundingClientRect().top),
     barBottom: Math.round(document.querySelector(".nav").getBoundingClientRect().bottom),
   }));
-  validateAnchorLanding(landing, "bar link Command line");
+  validateAnchorLanding(landing, "bar link How it runs");
 });

@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SITE_PAGES } from "./site-pages.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const websiteRoot = path.resolve(scriptDir, "..");
@@ -17,14 +18,9 @@ const walk = (root, suffixes) => {
   });
 };
 
-export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) => {
+// Every page entry carries the same head metadata (scripts/site-pages.mjs).
+export const validatePageHead = (html, name, canonicalPath = null) => {
   const errors = [];
-  const combined = sources.map(({ text }) => text).join("\n");
-  const visibleVersion = publicFacts?.stableMacRelease?.version;
-  const publicDisplayVersion = visibleVersion?.replace(/\.0$/, "");
-  if (!visibleVersion || !indexHTML.includes(`Vocello ${publicDisplayVersion}`)) {
-    errors.push("index metadata does not match the public stable Mac release");
-  }
   for (const [label, pattern] of [
     ["English document language", /<html\s+lang=["']en["']/],
     ["description metadata", /<meta\s+[^>]*name=["']description["']/s],
@@ -37,8 +33,27 @@ export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) =>
     ["robots directive", /<meta\s+[^>]*name=["']robots["']/s],
     ["document title", /<title>/],
   ]) {
-    if (!pattern.test(indexHTML)) errors.push(`index.html is missing ${label}`);
+    if (!pattern.test(html)) errors.push(`${name} is missing ${label}`);
   }
+  if (canonicalPath !== null
+    && !html.includes(`<link rel="canonical" href="https://vocello.vercel.app${canonicalPath}" />`)) {
+    errors.push(`${name} canonical URL does not name ${canonicalPath}`);
+  }
+  return errors;
+};
+
+// A PNG's width is the first field of its IHDR chunk (bytes 16 to 19).
+const pngWidth = (file) => fs.readFileSync(file).readUInt32BE(16);
+
+export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) => {
+  const errors = [];
+  const combined = sources.map(({ text }) => text).join("\n");
+  const visibleVersion = publicFacts?.stableMacRelease?.version;
+  const publicDisplayVersion = visibleVersion?.replace(/\.0$/, "");
+  if (!visibleVersion || !indexHTML.includes(`Vocello ${publicDisplayVersion}`)) {
+    errors.push("index metadata does not match the public stable Mac release");
+  }
+  errors.push(...validatePageHead(indexHTML, "index.html"));
   for (const { name, text } of sources) {
     if (text.includes("—")) errors.push(`${name} contains a prohibited em dash`);
     if (/faster than (?:real[ -]?time|playback)/i.test(text)) {
@@ -64,6 +79,15 @@ export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) =>
     const avif = match[1].replace(/\.png$/, ".avif");
     if (/^assets\/screens\/.+\.png$/.test(match[1]) && !fs.existsSync(path.join(publicRoot, avif))) {
       errors.push(`missing AVIF sibling: ${avif}`);
+    }
+    // A Mac capture (2080 px wide) also ships its 1040 and 1560 px AVIF copies,
+    // which src/components/Screenshot.jsx lists in its srcset.
+    const png = path.join(publicRoot, match[1]);
+    if (/^assets\/screens\/.+\.png$/.test(match[1]) && fs.existsSync(png) && pngWidth(png) === 2080) {
+      for (const width of [1040, 1560]) {
+        const variant = match[1].replace(/\.png$/, `-${width}.avif`);
+        if (!fs.existsSync(path.join(publicRoot, variant))) errors.push(`missing AVIF variant: ${variant}`);
+      }
     }
   }
   errors.push(...validateReleaseMirror({ sources, publicFacts }));
@@ -171,8 +195,18 @@ export const validateRepository = () => {
     publicFacts: JSON.parse(fs.readFileSync(path.join(repositoryRoot, "config/public-product-facts.json"), "utf8")),
     publicRoot: path.join(websiteRoot, "public"),
   });
+  const pageErrors = SITE_PAGES.flatMap(({ page, html, path: pagePath }) => {
+    const file = path.join(websiteRoot, html);
+    if (!fs.existsSync(file)) return [`${html} is missing`];
+    const text = fs.readFileSync(file, "utf8");
+    const errors = validatePageHead(text, html, pagePath);
+    if (!text.includes(`<div id="root" data-page="${page}"></div>`)) {
+      errors.push(`${html} does not name its page on the root element`);
+    }
+    return errors;
+  });
   const contrastErrors = validateTokenContrast(fs.readFileSync(path.join(websiteRoot, "src/tokens.css"), "utf8"));
-  return [...textErrors, ...contrastErrors].sort();
+  return [...new Set([...textErrors, ...pageErrors, ...contrastErrors])].sort();
 };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

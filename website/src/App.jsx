@@ -1,36 +1,35 @@
 import React, { useEffect } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { Nav } from "./sections/Nav.jsx";
-import { Hero } from "./sections/Hero.jsx";
-import { WhatsNew } from "./sections/WhatsNew.jsx";
-import { WorkflowBand } from "./sections/WorkflowBand.jsx";
-import { Listen } from "./sections/Listen.jsx";
-import { Capabilities } from "./sections/Capabilities.jsx";
-import { WhyCloud } from "./sections/WhyCloud.jsx";
-import { HowItRuns } from "./sections/HowItRuns.jsx";
-import { CommandLine } from "./sections/CommandLine.jsx";
-import { IphoneBeta } from "./sections/IphoneBeta.jsx";
-import { Engineering } from "./sections/Engineering.jsx";
-import { Limitations } from "./sections/Limitations.jsx";
-import { FinalCTA } from "./sections/FinalCTA.jsx";
 import { Footer } from "./sections/Footer.jsx";
-import { WORKFLOWS } from "./data/workflows.js";
+import { HomePage } from "./pages/HomePage.jsx";
+import { CliPage } from "./pages/CliPage.jsx";
+import { EngineeringPage } from "./pages/EngineeringPage.jsx";
 
-// Scroll-reveal: sections below the hero fade up as they enter view. The base
+// Each HTML entry (index.html, cli/index.html, engineering/index.html) names
+// its page on the root element; main.jsx and the prerender pass it here.
+export const PAGES = Object.freeze({
+  home: HomePage,
+  cli: CliPage,
+  engineering: EngineeringPage,
+});
+
+// Scroll-reveal: sections below the first fade up as they enter view. The base
 // state stays visible (content shows if JS never runs), and the whole effect is
 // skipped under prefers-reduced-motion. Targets are selected by class so section
-// JSX stays untouched.
+// JSX stays untouched; a page's leading section is already in view and never
+// fades.
 const useScrollReveal = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if (!("IntersectionObserver" in window)) return;
 
-    const targets = document.querySelectorAll(
+    const targets = [...document.querySelectorAll(
       ".whatsnew-section, .workflow-band, .listen-section, .caps-section, .cloud-section, " +
         ".runs-section, .cli-section, .iphone-section, .engineering-section, .limitations-section, " +
         ".final-cta-section",
-    );
+    )].filter((el) => el !== document.querySelector("main > :first-child"));
     if (!targets.length) return;
 
     targets.forEach((el) => el.classList.add("reveal"));
@@ -72,31 +71,19 @@ const useScrollReveal = () => {
   }, []);
 };
 
-const App = () => {
+/** @param {{ page?: string }} props */
+const App = ({ page = "home" }) => {
   useScrollReveal();
+  const name = Object.hasOwn(PAGES, page) ? page : "home";
+  const Page = PAGES[name];
   return (
   <>
     <a className="skip-link" href="#main-content">Skip to main content</a>
-    <Nav />
+    <Nav page={name} />
     <main id="main-content" tabIndex={-1}>
-      <Hero />
-      <WhatsNew />
-      <div id="workflows" className="workflows-anchor">
-        {WORKFLOWS.map((w, i) => (
-          <WorkflowBand key={w.id} workflow={w} index={i} />
-        ))}
-      </div>
-      <Listen />
-      <Capabilities />
-      <WhyCloud />
-      <HowItRuns />
-      <CommandLine />
-      <IphoneBeta />
-      <Engineering />
-      <Limitations />
-      <FinalCTA />
+      <Page />
     </main>
-    <Footer />
+    <Footer page={name} />
     <Analytics />
   </>
   );

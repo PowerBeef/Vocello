@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import { CodeBlock } from "../components/CodeBlock.jsx";
 import { Icon } from "../components/Icon.jsx";
 import { CLI_DMG, CLI_PKG, CLI_REFERENCE, RELEASES } from "../data/credits.js";
 import {
@@ -19,60 +20,60 @@ const withCode = (text) =>
     i % 2 === 1 ? <code key={i} className="cli-inline cli-flag">{part}</code> : part,
   );
 
-// A command block people can read and copy. Each line is its own block, so long
-// commands wrap with a hanging indent instead of scrolling the page sideways.
-// The shell prompt is drawn by CSS and is not selectable, so a selection copies
-// the commands alone, as the Copy button does. The button's name is its visible
-// word ("Copy", then "Copied") followed by the block's hidden copyName.
-/** @param {{ block: { label: string, copyName: string, lines: string[] } }} props */
-const CodeBlock = ({ block }) => {
-  const [copied, setCopied] = useState(false);
-  /** @type {React.RefObject<HTMLElement | null>} */
-  const codeRef = useRef(null);
-  const commands = block.lines.join("\n");
-
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(commands);
-      setCopied(true);
-    } catch {
-      // No clipboard access (an insecure context or a denied permission):
-      // select the block so Command-C copies it.
-      const selection = window.getSelection();
-      if (selection && codeRef.current) selection.selectAllChildren(codeRef.current);
-    }
-  };
-
-  return (
-    <div className="code-block" role="group" aria-label={block.label}>
-      <pre className="code-pre">
-        <code ref={codeRef}>
-          {block.lines.map((line) => (
-            <span key={line} className="code-line">{line}</span>
-          ))}
-        </code>
-      </pre>
-      <button type="button" className="code-copy" onClick={copy}>
-        {copied ? "Copied" : "Copy"}
-        <span className="sr-only"> {block.copyName}</span>
-      </button>
-      <span className="sr-only" role="status">{copied ? `Copied ${block.copyName}` : ""}</span>
-    </div>
-  );
-};
-
-export const CommandLine = () => (
+// Home: what the command line is, the package download and the agent setup,
+// then a link to the full guide on /cli/.
+export const CommandLineTeaser = () => (
   <section className="section cli-section" id="cli" aria-labelledby="cli-title">
     <div className="container">
       <header className="cli-head">
         <p className="section-note">New in Vocello 3.0</p>
         <h2 id="cli-title" className="section-title">Command line and agents.</h2>
+        <p className="section-sub">
+          <code className="cli-inline">vocello</code> brings the Mac app's features to the
+          terminal: generate in all three modes, long-form and line by line included; manage saved
+          voices and models; read and export History; read and change settings. It uses the app's
+          models, saved voices and settings, so both see the same library.
+        </p>
+      </header>
+      <div className="cli-teaser">
+        <div className="cli-teaser-item">
+          <h3 className="cli-sub-title">Install the package</h3>
+          <p className="cli-sub-body">
+            A signed, notarized installer for Apple Silicon Macs with macOS 26 or later. It asks
+            for an administrator password; without one, copy the Vocello CLI folder from{" "}
+            <a className="cta-meta-link" href={CLI_DMG}>its disk image</a> instead.
+          </p>
+          <a className="btn btn-primary" href={CLI_PKG}>
+            <Icon name="download" size={16} />
+            Download the CLI package
+          </a>
+        </div>
+        <div className="cli-teaser-item">
+          <h3 className="cli-sub-title">For AI agents</h3>
+          <p className="cli-sub-body">
+            <code className="cli-inline">vocello mcp</code> serves Claude Code, Claude Desktop and
+            other MCP clients over stdio. This adds Vocello to Claude Code for every project:
+          </p>
+          <CodeBlock block={MCP_SETUP} />
+        </div>
+      </div>
+      <p className="section-more">
+        <a className="more-link" href="/cli/">
+          Command line guide: install, update, uninstall, scripts and limits
+          <Icon name="arrow-right" size={16} />
+        </a>
+      </p>
+    </div>
+  </section>
+);
+
+// /cli/: the full guide.
+export const CommandLineGuide = () => (
+  <section className="section cli-section cli-page" aria-labelledby="cli-title">
+    <div className="container">
+      <header className="cli-head page-head">
+        <p className="section-note">New in Vocello 3.0</p>
+        <h1 id="cli-title" className="section-title page-title">Command line and agents.</h1>
         <p className="section-sub">
           <code className="cli-inline">vocello</code> brings the Mac app's features to the
           terminal: generate in all three modes, long-form and line by line included; manage saved
@@ -85,7 +86,6 @@ export const CommandLine = () => (
           </a>
         </p>
       </header>
-
       <div className="cli-install">
         <ol className="cli-steps">
           <li className="cli-step">

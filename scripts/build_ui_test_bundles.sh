@@ -120,8 +120,14 @@ if [[ "$MODE" == "ios" || "$MODE" == "all" ]]; then
     [[ "$optimization" != "-Onone" ]] || swift_settings+=(SWIFT_COMPILATION_MODE=incremental)
     build VocelloiOSUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
       CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES "${swift_settings[@]}"
+    # The candidate runner shares the iOS test base, so a base change must not
+    # break it unnoticed; it builds no app.
+    build VocelloiOSCandidateUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES "${swift_settings[@]}"
   else
     build VocelloiOSUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
+      CODE_SIGNING_ALLOWED=NO
+    build VocelloiOSCandidateUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
       CODE_SIGNING_ALLOWED=NO
   fi
 fi

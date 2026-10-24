@@ -141,6 +141,7 @@ def run_metadata(values: dict[str, str], directory: Path) -> dict[str, Any]:
     if values["candidate_evidence"]:
         payload["evidenceClass"] = "preinstalled-candidate-black-box"
         payload["lane"] = "candidate-smoke"
+        payload["scenario"] = scenario or "navigation"
         payload["modes"] = []
         payload["lengths"] = []
         payload["warm"] = 0

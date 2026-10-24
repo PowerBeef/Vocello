@@ -161,12 +161,41 @@ keep the original failure and compare it with planner behavior before regenerati
 After separately authorized signing/upload and installation, use:
 
 ```sh
-scripts/ui_test.sh ios smoke --preinstalled-candidate <verified-release-directory> --retain-result
+scripts/ui_test.sh ios smoke --preinstalled-candidate <verified-release-directory> [--scenario ROW] --retain-result
 ```
 
-This is a **black-box navigation route proof**, not the instrumented smoke suite or complete
-processed-candidate acceptance. The helper validates command-bound iOS release evidence and requires
-the exact clean source commit. CoreDevice must identify exactly one matching bundle/version/build
+These are **black-box journeys** on the installed candidate, not the instrumented smoke suite.
+`--scenario` picks an RF-15 row (`scripts/ios_candidate_acceptance.py` maps each to its tests):
+
+| Row | Journey |
+| --- | --- |
+| `navigation` (default) | every tab, and the version in About |
+| `modes` | a take in each mode in English and in French, chosen with Studio's language picker |
+| `voice-lifecycle` | a Design take saved as a voice, then deleted from Voices (F-01) |
+| `one-word` | a one-token script in each mode (DA-04) |
+| `record-then-play` | a clip recorded from Clone's reference plays to its end (AUD-02) |
+| `long-form` | a long-form project, then one segment regenerated |
+| `accessibility` | XCTest's audit on Studio, Settings and the purchase sheet; clipping at AX-XXXL |
+| `all` | every row above, in one run |
+
+The journeys share `VocelloiOSUITestCase` and `VocelloiOSSharedJourneys.swift` with the development
+lanes. In a candidate session the app gets no environment, and launch arguments only for standard
+UIKit preferences (Dynamic Type); English comes from the visible App Language picker. Nothing reads
+telemetry or the app's container, so a row proves only what its visible UI shows.
+
+Preconditions: onboarding done, the three models Ready, and the benchmark clone voice in Saved
+Voices (the clone rows use it and never create it). The rows turn Clone consent on.
+
+What a run leaves on the phone. Restored while the app is still running at the end: App Language,
+Take variation, each mode's Studio language, and the `RF15 Candidate Voice` throwaway (also removed
+at the start of the next voice-lifecycle run). Left changed: Clone consent, each mode's script, the
+Design brief, Clone's reference (the benchmark voice), the new takes and long-form project in History,
+and the completed project in Studio.
+
+The helper validates command-bound iOS release evidence and requires a clean tree at the release
+commit, or at a later commit that changed no product input (`Sources/`, `Packages/`, `project.yml`,
+`QwenVoice.xcodeproj/`): the installed binary is fixed, so a runner built from such a commit still
+matches its UI (`runnerRelation` in the identity records which). CoreDevice must identify exactly one matching bundle/version/build
 with `isBuiltByDeveloper == false`, before and after testing; unknown origin fails closed. This
 binds the unique version/build to approved IPA evidence but does **not** claim to measure the
 installed TestFlight binary's digest.
@@ -174,16 +203,16 @@ installed TestFlight binary's digest.
 The standalone `VocelloiOSCandidateUI` scheme has no production-app dependency. Only its test runner
 is built and installed. Xcode's documented `UseDestinationArtifacts` mode prevents installation
 during `test-without-building`. Runner configuration rejects target-app build products and removes
-all app launch arguments/overrides. It never pulls the distribution app's private data container.
-The genuine tab and Settings-version journey retains screenshots and its candidate identity,
-restores the original tab, terminates the app and returns Home. A missing/failed/duplicate test or
-missing identity attachment fails the route. Collection of post-run identity, attachments and
-system-crash deltas is attempted even after failure/interruption; new system reports require review.
+all xctestrun-level app arguments and overrides. It never pulls the distribution app's private data
+container. Each journey retains screenshots and its candidate identity. A missing, failed or
+duplicate journey, or a missing identity attachment, fails the run. Collection of post-run identity,
+attachments and system-crash deltas is attempted even after failure/interruption; new system reports
+require review.
 
-Keep this evidence separate from instrumented engine receipts and the 201-take campaign. Full
-downloads/generation/enrollment/long-form/permission/upgrade acceptance must still be performed on
-the processed candidate. Do not uninstall or bypass onboarding here: fresh-install acceptance needs
-verified recovery and immediate maintainer approval. Finish authorized device work with the screen
+Keep this evidence separate from instrumented engine receipts and the 201-take campaign. Downloads,
+onboarding, the offline relaunch, permissions and the hand VoiceOver pass are not journeys here and
+are still performed on the processed candidate. Do not uninstall or bypass onboarding here:
+fresh-install acceptance needs verified recovery and immediate maintainer approval. Finish authorized device work with the screen
 protection procedure below, not an implicit global Settings mutation.
 
 ### Development-device preflight

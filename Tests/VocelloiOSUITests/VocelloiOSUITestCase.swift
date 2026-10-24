@@ -20,6 +20,9 @@ class VocelloiOSUITestCase: XCTestCase {
     private var pendingAutoplayPreferenceRestore: Bool?
     private var pendingInterfaceLanguageRestore: String?
     private var pendingVariationRestore: String?
+    /// RF-15: the session drives the installed distribution candidate black-box.
+    private(set) var isCandidateSession = false
+    private var pendingJourneyRestores: [() -> Void] = []
 
     var app: XCUIApplication { session.app }
 
@@ -31,6 +34,8 @@ class VocelloiOSUITestCase: XCTestCase {
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
         pendingVariationRestore = nil
+        pendingJourneyRestores = []
+        isCandidateSession = false
         session = VocelloUIApplicationSession()
         launchApp(
             additionalEnvironment: additionalEnvironment,
@@ -39,6 +44,39 @@ class VocelloiOSUITestCase: XCTestCase {
         // A persisted in-app override wins over AppleLanguages. Use the genuine picker,
         // recording its original choice before mutation, so existing locale fixtures remain honest.
         selectInterfaceLanguageForTest("system")
+        select(tab: .studio)
+    }
+
+    static let candidateBundleIdentifier = "com.patricedery.vocello"
+
+    /// RF-15: begins a session on the installed distribution candidate (a TestFlight
+    /// build), black-box. The runner launches it by bundle identifier with no
+    /// environment, and with arguments only for standard UIKit preferences such as
+    /// Dynamic Type; the visible App Language picker, not `-AppleLanguages`, pins
+    /// English, and every exit path restores the original choice. The approved
+    /// candidate identity the runner was handed is attached to every journey.
+    func beginCandidateSession(additionalArguments: [String] = []) throws {
+        continueAfterFailure = false
+        assertToggleNormalizerContract()
+        let encoded = try XCTUnwrap(ProcessInfo.processInfo.environment["VOCELLO_CANDIDATE_IDENTITY"],
+                                    "Candidate journeys run only through ui_test.sh --preinstalled-candidate")
+        let identity = try XCTUnwrap(Data(base64Encoded: encoded))
+        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: identity) as? [String: Any])
+        XCTAssertEqual(fields["evidenceClass"] as? String, "preinstalled-candidate-black-box")
+        XCTAssertEqual(fields["bundleIdentifier"] as? String, Self.candidateBundleIdentifier)
+        let attachment = XCTAttachment(data: identity, uniformTypeIdentifier: "public.json")
+        attachment.name = "preinstalled-candidate-identity.json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        pendingAutoplayPreferenceRestore = nil
+        pendingVariationRestore = nil
+        pendingJourneyRestores = []
+        isCandidateSession = true
+        session = VocelloUIApplicationSession(
+            app: XCUIApplication(bundleIdentifier: Self.candidateBundleIdentifier)
+        )
+        launchApp(additionalArguments: additionalArguments)
+        selectInterfaceLanguageForTest("en")
         select(tab: .studio)
     }
 
@@ -51,6 +89,12 @@ class VocelloiOSUITestCase: XCTestCase {
         try await super.tearDown()
     }
 
+    /// Registers a journey's own restoration (a Studio language, a throwaway voice),
+    /// which endSession runs first, newest first, on every exit path.
+    func registerSessionRestore(_ restore: @escaping () -> Void) {
+        pendingJourneyRestores.append(restore)
+    }
+
     func endSession() {
         defer {
             session?.terminate()
@@ -58,6 +102,7 @@ class VocelloiOSUITestCase: XCTestCase {
             pendingAutoplayPreferenceRestore = nil
             pendingInterfaceLanguageRestore = nil
             pendingVariationRestore = nil
+            pendingJourneyRestores = []
         }
         // The software keyboard covers the floating tab dock, so a journey that
         // ended mid-entry (a History search an interruption cut short) submits
@@ -65,6 +110,11 @@ class VocelloiOSUITestCase: XCTestCase {
         if session != nil, app.keyboards.firstMatch.exists,
            app.textFields["historySearchField"].firstMatch.exists {
             dismissHistorySearchKeyboardIfNeeded()
+        }
+        if session != nil, app.state == .runningForeground {
+            let restores = pendingJourneyRestores
+            pendingJourneyRestores = []
+            restores.reversed().forEach { $0() }
         }
         restorePendingAutoplayPreference()
         if let original = pendingVariationRestore, session != nil {
@@ -148,6 +198,7 @@ class VocelloiOSUITestCase: XCTestCase {
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
         pendingVariationRestore = nil
+        isCandidateSession = false
         session = VocelloUIApplicationSession()
         launchProcess(additionalEnvironment: ["QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE": "1"])
     }
@@ -158,6 +209,16 @@ class VocelloiOSUITestCase: XCTestCase {
         additionalEnvironment: [String: String] = [:],
         additionalArguments: [String] = []
     ) {
+        if isCandidateSession {
+            XCTAssertTrue(additionalEnvironment.isEmpty, "A candidate launch carries no environment")
+            session.launch(environment: [:], arguments: additionalArguments)
+            XCTAssertTrue(
+                VocelloUIWait.condition("Vocello to enter the foreground", timeout: 30) {
+                    self.app.state == .runningForeground
+                }
+            )
+            return
+        }
         var environment = [
             "QWENVOICE_DEBUG": "1",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
@@ -193,6 +254,11 @@ class VocelloiOSUITestCase: XCTestCase {
             }
         )
         guard skip.exists else { return }
+        // A candidate is upgrade-tested; first-launch acceptance is its own approved session.
+        guard !isCandidateSession else {
+            XCTFail("Complete authorized first-launch acceptance separately")
+            return
+        }
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: skip, timeout: 15))
         XCTAssertTrue(VocelloUIWait.disappears(element("onboarding_cta"), timeout: 20))

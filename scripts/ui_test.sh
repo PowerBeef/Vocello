@@ -47,7 +47,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario record-then-play
   scripts/ui_test.sh ios smoke --scenario studio-layout
   scripts/ui_test.sh ios smoke --scenario long-form
-  scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
+  scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--scenario ROW] [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
@@ -106,8 +106,11 @@ from its cell through the registered QWENVOICE_BENCH_SEED_POLICY knob; `generate
 any version but the canonical one publishes focused records.
 `smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
 It generates no audio and exports its raw transcript untracked; success is an observation, not full smoke acceptance.
-`--preinstalled-candidate` is a separate, black-box navigation proof, not instrumented smoke.
-It requires the exact clean release source and an already installed, matching non-development app.
+`--preinstalled-candidate` runs black-box journeys on an already installed, matching non-development
+app (a TestFlight build), not instrumented smoke. `--scenario` picks the RF-15 row: navigation (the
+default), modes, voice-lifecycle, one-word, record-then-play, long-form, accessibility or all. It requires
+a clean tree at the release commit, or at a later one that changed no product input (Sources/,
+Packages/, project.yml, the Xcode project).
 Only the standalone test runner is built/installed. Distribution acceptance remains separately authorized.
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
@@ -251,6 +254,11 @@ elif [[ "$lane" == "take-variation" ]]; then
   [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "expressive" \
       || "$scenario_argument" == "balanced" || "$scenario_argument" == "consistent" ]] \
     || die "take-variation --scenario must be inspect, expressive, balanced or consistent"
+elif [[ -n "$candidate_evidence" ]]; then
+  # RF-15 rows; scripts/ios_candidate_acceptance.py owns what each one runs.
+  scenario_argument="${scenario_argument:-navigation}"
+  [[ "$scenario_argument" =~ ^(navigation|modes|voice-lifecycle|one-word|record-then-play|long-form|accessibility|all)$ ]] \
+    || die "candidate --scenario must be navigation, modes, voice-lifecycle, one-word, record-then-play, long-form, accessibility or all"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
         || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \
@@ -1356,7 +1364,8 @@ collect_candidate_forensics() {
   required_step_run "$step_ledger" candidate-result \
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" validate-results \
       --summary "$out/test-results.json" --attachments "$out/attachments" \
-      --identity "$out/candidate-identity.json" --output "$out/candidate-result.json" || failed=1
+      --identity "$out/candidate-identity.json" --scenario "$scenario_argument" \
+      --output "$out/candidate-result.json" || failed=1
   return "$failed"
 }
 
@@ -1394,7 +1403,7 @@ PY
   required_step_run "$step_ledger" candidate-runner-configuration \
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" prepare-runner \
       --xctestrun "$xctestrun" --runner "$runner" --identity "$out/candidate-identity.json" \
-      --output "$out/candidate.xctestrun" || return 1
+      --scenario "$scenario_argument" --output "$out/candidate.xctestrun" || return 1
   codesign --verify --deep --strict "$runner" >"$out/candidate-runner-signature.log" 2>&1 || return 1
   required_step_run "$step_ledger" candidate-runner-install \
     xcrun devicectl device install app --device "$device" "$runner" \

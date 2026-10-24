@@ -19,6 +19,23 @@ BUNDLE_ID = "com.patricedery.vocello"
 TARGET = "VocelloiOSCandidateUITests"
 RUNNER_ID = BUNDLE_ID + ".candidateuitests.xctrunner"
 TEST = TARGET + "/VocelloiOSCandidateAcceptanceUITests/testPreinstalledCandidateNavigation"
+JOURNEYS = TARGET + "/VocelloiOSCandidateJourneyUITests/"
+# RF-15 rows, each a black-box journey on the installed candidate; "all" runs every row.
+SCENARIOS = {
+    "navigation": [TEST],
+    "modes": [JOURNEYS + "testTakesInEachModeAndLanguage"],
+    "voice-lifecycle": [JOURNEYS + "testDesignedVoiceSaveAndDelete"],
+    "one-word": [JOURNEYS + "testOneWordScript"],
+    "record-then-play": [JOURNEYS + "testRecordThenPlay"],
+    "long-form": [JOURNEYS + "testLongFormAndSegmentRegeneration"],
+    "accessibility": [JOURNEYS + "testAccessibilityAuditsAndLargestText"],
+}
+SCENARIOS["all"] = [test for name in list(SCENARIOS) for test in SCENARIOS[name]]
+# The installed binary is fixed, so a runner from a later commit still tests it
+# faithfully when nothing the app is built from changed since the candidate's commit:
+# its sources, its package and pins, and the project spec that sets its targets.
+PRODUCT_PREFIXES = ("Sources/", "Packages/", "QwenVoice.xcodeproj/")
+PRODUCT_FILES = ("project.yml",)
 
 
 def snapshot_crashes(device: str, destination: Path) -> None:
@@ -71,15 +88,17 @@ def candidate_identity(directory: Path, root: Path = ROOT) -> dict:
         raise ValueError("candidate evidence is not iOS")
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True).strip()
-    if commit != release["commitSHA"] or dirty:
-        raise ValueError("candidate tests require the exact clean source commit")
+    if dirty:
+        raise ValueError("candidate tests require a clean source tree")
+    relation = runner_relation(release["commitSHA"], commit, root)
     verified = read_json(directory / release_evidence.IOS_ARTIFACT_VERIFICATION_NAME)
     expected = verified["expectedIdentity"]
     if expected["bundleIdentifier"] != BUNDLE_ID:
         raise ValueError("unexpected candidate bundle identifier")
     return {
         "schemaVersion": 1, "evidenceClass": "preinstalled-candidate-black-box",
-        "sourceCommit": commit, "tag": release["tag"], "bundleIdentifier": BUNDLE_ID,
+        "sourceCommit": release["commitSHA"], "runnerCommit": commit, "runnerRelation": relation,
+        "tag": release["tag"], "bundleIdentifier": BUNDLE_ID,
         "marketingVersion": expected["marketingVersion"], "buildNumber": expected["buildNumber"],
         "releaseEvidenceSHA256": digest(directory / release_evidence.EVIDENCE_NAME),
         "artifactVerificationSHA256": digest(directory / release_evidence.IOS_ARTIFACT_VERIFICATION_NAME),
@@ -87,6 +106,20 @@ def candidate_identity(directory: Path, root: Path = ROOT) -> dict:
         "bindingMethod": "unique-version-build-and-non-development-origin",
         "installedBinaryDigestObserved": False,
     }
+
+
+def runner_relation(candidate: str, head: str, root: Path) -> str:
+    if head == candidate:
+        return "exact"
+    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", candidate, head], cwd=root)
+    if ancestor.returncode != 0:
+        raise ValueError("the runner source does not descend from the candidate commit")
+    # Without renames a move out of Sources/ names both paths; -z keeps every byte.
+    changed = subprocess.check_output(["git", "diff", "--no-renames", "--name-only", "-z", candidate, head],
+                                      cwd=root, text=True).split("\0")
+    if any(path.startswith(PRODUCT_PREFIXES) or path in PRODUCT_FILES for path in changed if path):
+        raise ValueError("product inputs changed since the candidate commit")
+    return "test-only-descendant"
 
 
 def installed_identity(apps: dict, expected: dict) -> dict:
@@ -106,12 +139,13 @@ def installed_identity(apps: dict, expected: dict) -> dict:
             "buildNumber": app["bundleVersion"], "isBuiltByDeveloper": False}
 
 
-def validate_results(summary: dict, attachments: Path, identity: dict) -> dict:
+def validate_results(summary: dict, attachments: Path, identity: dict, scenario: str = "navigation") -> dict:
+    expected = sorted(test.split("/", 1)[1] for test in SCENARIOS[scenario])
     tests = summary.get("tests")
-    if (not isinstance(tests, list) or len(tests) != 1 or not isinstance(tests[0], dict)
-            or tests[0].get("test") != TEST.rsplit("/", 1)[1]
-            or tests[0].get("verdict") != "passed"):
-        raise ValueError("candidate navigation must execute and pass exactly once")
+    if (not isinstance(tests, list) or not all(isinstance(test, dict) for test in tests)
+            or sorted(f"{test.get('suite')}/{test.get('test')}" for test in tests) != expected
+            or any(test.get("verdict") != "passed" for test in tests)):
+        raise ValueError("every candidate journey in the scenario must execute and pass exactly once")
     matched = []
     for path in attachments.rglob("*"):
         if not path.is_file() or path.stat().st_size > 65536:
@@ -123,12 +157,13 @@ def validate_results(summary: dict, attachments: Path, identity: dict) -> dict:
             continue
     if not matched:
         raise ValueError("candidate runner identity attachment was not collected")
-    return {"schemaVersion": 1, "evidenceClass": "preinstalled-candidate-black-box",
-            "scope": "navigation-route-proof-only", "status": "passed",
-            "testCount": 1, "identityAttachmentSHA256": sorted(set(matched))}
+    return {"schemaVersion": 2, "evidenceClass": "preinstalled-candidate-black-box",
+            "scenario": scenario, "scope": "visible-ui-journeys-only", "status": "passed",
+            "tests": expected, "testCount": len(expected),
+            "identityAttachmentSHA256": sorted(set(matched))}
 
 
-def runner_configuration(payload: dict, runner_info: dict, identity: dict) -> dict:
+def runner_configuration(payload: dict, runner_info: dict, identity: dict, scenario: str = "navigation") -> dict:
     """Xcode's documented UseDestinationArtifacts prohibits installation during test."""
     if set(payload) != {TARGET, "__xctestrun_metadata__"}:
         raise ValueError("candidate xctestrun must contain only the standalone candidate runner")
@@ -153,7 +188,7 @@ def runner_configuration(payload: dict, runner_info: dict, identity: dict) -> di
         "TestHostBundleIdentifier": RUNNER_ID,
         "TestBundleDestinationRelativePath": f"__TESTHOST__/PlugIns/{TARGET}.xctest",
         "UITargetAppBundleIdentifier": BUNDLE_ID,
-        "OnlyTestIdentifiers": [TEST.split("/", 1)[1]],
+        "OnlyTestIdentifiers": [test.split("/", 1)[1] for test in SCENARIOS[scenario]],
         "CommandLineArguments": [], "UITargetAppCommandLineArguments": [],
         "UITargetAppEnvironmentVariables": {},
         "EnvironmentVariables": {"VOCELLO_CANDIDATE_IDENTITY": base64.b64encode(
@@ -184,6 +219,7 @@ def main() -> int:
     prepare.add_argument("--runner", required=True, type=Path)
     prepare.add_argument("--identity", required=True, type=Path)
     prepare.add_argument("--output", required=True, type=Path)
+    prepare.add_argument("--scenario", choices=sorted(SCENARIOS), default="navigation")
     snapshot = sub.add_parser("snapshot-crashes")
     snapshot.add_argument("--device", required=True)
     snapshot.add_argument("--output", required=True, type=Path)
@@ -196,6 +232,7 @@ def main() -> int:
     results.add_argument("--attachments", required=True, type=Path)
     results.add_argument("--identity", required=True, type=Path)
     results.add_argument("--output", required=True, type=Path)
+    results.add_argument("--scenario", choices=sorted(SCENARIOS), default="navigation")
     args = parser.parse_args()
     try:
         if args.output.exists():
@@ -204,7 +241,8 @@ def main() -> int:
             snapshot_crashes(args.device, args.output)
             return 0
         if args.command == "validate-results":
-            value = validate_results(read_json(args.summary), args.attachments, read_json(args.identity))
+            value = validate_results(read_json(args.summary), args.attachments, read_json(args.identity),
+                                     args.scenario)
         elif args.command == "crash-delta":
             value = crash_delta(args.before, args.after, args.output)
         elif args.command == "identity":
@@ -214,7 +252,7 @@ def main() -> int:
         else:
             value = runner_configuration(plistlib.loads(args.xctestrun.read_bytes()),
                                          plistlib.loads((args.runner / "Info.plist").read_bytes()),
-                                         read_json(args.identity))
+                                         read_json(args.identity), args.scenario)
             release_evidence.atomic_write(args.output, plistlib.dumps(value))
             print("Candidate runner: destination artifacts only; target installation disabled")
             return 0

@@ -868,6 +868,7 @@ targets:
       - path: Tests/VocelloiOSUITests
         excludes:
           - VocelloiOSCandidateAcceptanceUITests.swift
+          - VocelloiOSCandidateJourneyUITests.swift
     dependencies:
       - target: VocelloiOS
     settings:
@@ -897,6 +898,10 @@ targets:
     sources:
       - path: Tests/UIAutomationSupport
       - path: Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift
+      # RF-15 journeys reuse the shared base and journeys on the installed candidate.
+      - path: Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
+      - path: Tests/VocelloiOSUITests/VocelloiOSSharedJourneys.swift
+      - path: Tests/VocelloiOSUITests/VocelloiOSCandidateJourneyUITests.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.patricedery.vocello.candidateuitests

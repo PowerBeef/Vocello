@@ -108,7 +108,7 @@ class CheckPlanTests(unittest.TestCase):
         """
         expected = {
             "macos": {"VocelloMacUI": "platform=macOS,arch=arm64"},
-            "ios": {"VocelloiOSUI": "generic/platform=iOS"},
+            "ios": {"VocelloiOSUI": "generic/platform=iOS", "VocelloiOSCandidateUI": "generic/platform=iOS"},
         }
         expected["all"] = {**expected["macos"], **expected["ios"]}
         for mode, schemes in expected.items():

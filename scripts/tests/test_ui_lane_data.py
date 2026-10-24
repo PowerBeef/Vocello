@@ -137,8 +137,12 @@ class RunMetadataTests(LaneDataCase):
     def test_a_candidate_run_reads_the_identity_beside_run_json(self) -> None:
         values = metadata_values(platform="ios", lane="smoke", candidate_evidence="candidate.json")
         without = lane.run_metadata(values, self.directory)
-        self.assertEqual((without["lane"], without["evidenceClass"], without["modes"]),
-                         ("candidate-smoke", "preinstalled-candidate-black-box", []))
+        self.assertEqual((without["lane"], without["evidenceClass"], without["modes"], without["scenario"]),
+                         ("candidate-smoke", "preinstalled-candidate-black-box", [], "navigation"))
+        for row in ("modes", "long-form", "record-then-play"):
+            focused = lane.run_metadata(values | {"scenario": row}, self.directory)
+            self.assertEqual((focused["lane"], focused["scenario"], focused["modes"]),
+                             ("candidate-smoke", row, []))
         self.assertNotIn("candidateIdentity", without)
         (self.directory / "candidate-identity.json").write_text(json.dumps({"build": "3.0 (12)"}))
         self.assertEqual(lane.run_metadata(values, self.directory)["candidateIdentity"], {"build": "3.0 (12)"})

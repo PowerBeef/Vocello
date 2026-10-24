@@ -14,6 +14,7 @@ import {
   collectBrowserFailures,
   measureBar,
   measureBlockHeights,
+  measureBrokenImages,
   measureMenuTargets,
   measureOverflow,
   measureUnsizedImages,
@@ -49,6 +50,8 @@ for (const path of LAYOUT_PATHS) {
         validateTapTargets(bar.items, label);
       });
     }
+    // After the layout checks, so they see lazy images before they load.
+    expect(await page.evaluate(measureBrokenImages), `${path}: images that do not decode`).toEqual([]);
     expect(failures).toEqual([]);
   });
 }

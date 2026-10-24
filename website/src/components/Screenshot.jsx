@@ -4,11 +4,12 @@ import React from "react";
 // intrinsic size so the layout reserves space, and loads lazily unless it is
 // the above-the-fold hero. The site contract requires the AVIF sibling.
 //
-// Mac screenshots (2080 px wide) also ship AVIF copies 1040 and 1560 px wide
-// (`name-1040.avif`, `name-1560.avif`, required by the site contract), so a
-// phone decodes the size it shows instead of the full capture. The PNG
-// fallback stays full size; only browsers without AVIF use it.
-export const VARIANT_WIDTHS = Object.freeze([1040, 1560]);
+// Mac screenshots (2080 px wide) also ship an AVIF copy 1040 px wide
+// (`name-1040.avif`, required by the site contract), so a 2x phone decodes the
+// size it shows instead of the full capture. A 1560 px copy was dropped: macOS
+// sips encoded it with a different structure that Linux WebKit could not
+// decode. The PNG fallback stays full size; only browsers without AVIF use it.
+export const VARIANT_WIDTHS = Object.freeze([1040]);
 export const VARIANT_SOURCE_WIDTH = 2080;
 
 // The width a screenshot takes in each layout tier (website/DESIGN.md): the

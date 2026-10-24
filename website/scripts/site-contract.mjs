@@ -80,11 +80,11 @@ export const validateText = ({ indexHTML, sources, publicFacts, publicRoot }) =>
     if (/^assets\/screens\/.+\.png$/.test(match[1]) && !fs.existsSync(path.join(publicRoot, avif))) {
       errors.push(`missing AVIF sibling: ${avif}`);
     }
-    // A Mac capture (2080 px wide) also ships its 1040 and 1560 px AVIF copies,
-    // which src/components/Screenshot.jsx lists in its srcset.
+    // A Mac capture (2080 px wide) also ships its 1040 px AVIF copy, which
+    // src/components/Screenshot.jsx lists in its srcset.
     const png = path.join(publicRoot, match[1]);
     if (/^assets\/screens\/.+\.png$/.test(match[1]) && fs.existsSync(png) && pngWidth(png) === 2080) {
-      for (const width of [1040, 1560]) {
+      for (const width of [1040]) {
         const variant = match[1].replace(/\.png$/, `-${width}.avif`);
         if (!fs.existsSync(path.join(publicRoot, variant))) errors.push(`missing AVIF variant: ${variant}`);
       }

@@ -173,8 +173,9 @@ Asset ownership:
 - `public/assets/screens/`: product screenshots, including `ios-studio.png`.
   - Each PNG ships with an AVIF sibling: `sips -s format avif -s formatOptions 80 x.png --out
     x.avif`.
-  - A 2080 px Mac capture also ships `x-1040.avif` and `x-1560.avif`. Make each with `sips -Z
-    <width>` to a temporary PNG, then the AVIF command; commit only the AVIF.
+  - A 2080 px Mac capture also ships `x-1040.avif`: `sips -Z 1040` to a temporary PNG, then the
+    AVIF command; commit only the AVIF. No 1560 px copy: sips encoded that width with a structure
+    Linux WebKit could not decode. The layout matrix fails on any image that does not decode.
   - Screenshots render through `src/components/Screenshot.jsx` with their pixel size and a
     srcset of those widths; only the hero loads eagerly.
 - `public/assets/voice-samples/`: WAV samples referenced by `src/data/samples.js`. When audio

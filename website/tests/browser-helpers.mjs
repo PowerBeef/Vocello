@@ -115,3 +115,17 @@ export function measureBlockHeights() {
   });
   return Object.fromEntries(entries);
 }
+
+// Runs in the page: loads every image now (lazy ones included) and lists those
+// that loaded but cannot be decoded, which a browser shows as alt text.
+export async function measureBrokenImages() {
+  const images = [...document.querySelectorAll("main img")];
+  images.forEach((image) => { image.loading = "eager"; });
+  await Promise.all(images.map((image) => (image.complete
+    ? Promise.resolve()
+    : new Promise((resolve) => {
+      image.addEventListener("load", resolve, { once: true });
+      image.addEventListener("error", resolve, { once: true });
+    }))));
+  return images.filter((image) => image.naturalWidth === 0).map((image) => image.currentSrc || image.getAttribute("src"));
+}

@@ -36,15 +36,33 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   runs black-box rows on the installed TestFlight build: modes, voice-lifecycle, one-word,
   record-then-play, long-form, accessibility or all. Development-build evidence the same day: startup
   Retry and the unverified purchase locked until Restore (AUD-07), both PASS.
-- **Housekeeping:** issue #108 (stale nightly) is closed. The release rehearsal (#107) was dispatched
-  on `26995f71` to prove today's build-number fix: a Mac tag no longer compares with `-ios` tags.
-  RF-10's due date moved to 2026-10-31.
-- **Next:**
-  - distribute 3.0.0 (24);
-  - install it from TestFlight;
-  - run `--scenario all`;
-  - by hand: the offline relaunch and VoiceOver;
-  - the approved fresh install, last.
+- **Housekeeping:** issue #108 (stale nightly) is closed. RF-10's due date moved to 2026-10-31.
+- **Keep-voice capture fix proven** (macos-xcui-marketing-20261024-145129-78cc21e5): the range
+  warning appeared, Keep was clicked and the designed voice saved. The test then found no "Voice
+  added" alert and failed; that is parked as BKL-28.
+- **State at 15:04 UTC, when the CLI session ended** (the work moves to the Claude Code desktop app):
+  - Release run 40103005257 (`v3.0.0-ios.3`) was still in the Security CodeQL Swift scan, with no
+    approval pending and no build 24 in App Store Connect.
+  - The release rehearsal 40103799663, dispatched on `26995f71` for issue #107, was still running.
+  - `main` had local commits not yet pushed (the checkpoint and roadmap updates).
+- **Resume here, in order:**
+  1. When run 40103005257 asks for the `release` environment, approve it. The maintainer asked to
+     fast-track: `gh api -X POST repos/PowerBeef/Vocello/actions/runs/40103005257/pending_deployments
+     -F 'environment_ids[]=22764362076' -f state=approved -f comment="fast-track the 3.0 RC"`.
+     If the run fails, fix the cause, push `main`, wait for CI, then cut the next candidate with
+     `python3 scripts/ios_candidate_tag.py`.
+  2. When `asc builds list --app 6794692745 --platform IOS --build-number 24 --processing-state all`
+     shows VALID, distribute it with the build's id:
+     - `asc builds test-notes create --build-id ID --locale en-US --whats-new TEXT`, where TEXT is the
+       candidate text in `docs/releases/v3.0.0.md` ("TestFlight: what to test");
+     - `asc builds add-groups --build-id ID --group 70bd66ea-9d12-4f77-84b5-38e7a64ed871` (Internal);
+     - `asc testflight review submit --build-id ID --confirm`;
+     - `asc builds add-groups --build-id ID --group 2375b641-4224-486c-8c0a-0fa326d7b641` (Public Beta).
+  3. Close #107 if rehearsal 40103799663 passed.
+  4. The maintainer installs 3.0.0 (24) from TestFlight over the development build. Then run
+     `scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario all`, where DIR is the run's
+     verified `vocello-ios-release-candidate` artifact. Then by hand: the offline relaunch and VoiceOver.
+  5. Last: the approved fresh install (onboarding and the file opened during onboarding).
 
 ### October 23 — Vocello 3.0.0 for the Mac and the CLI is public
 

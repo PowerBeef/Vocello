@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/28 (46%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/29 (45%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -566,6 +566,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
 | `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
 | `BKL-27` | parked | The iOS signing identity is imported non-extractable in the release workflow | — |
+| `BKL-28` | parked | The Mac Voice Design save shows no "Voice added" alert after Keep voice | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -624,6 +625,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-27`** (parked) — The iOS signing identity is imported non-extractable in the release workflow.
   gate: release.yml's iOS distribution-certificate import passes -x like the macOS imports (RF-08 security review L5), with the credential-hygiene test covering it, and a signed iOS archive still exports.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-28`** (parked) — The Mac Voice Design save shows no "Voice added" alert after Keep voice.
+  gate: After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

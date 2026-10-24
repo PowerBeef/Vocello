@@ -293,8 +293,8 @@
         "scripts/verify_ios_release_artifacts.py",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-10-16",
-      "notes": "2026-10-24: the maintainer asked to update TestFlight to the 3.0 release candidate and fast-track it: Internal now, then the Public Beta group after Apple's beta review, with What to Test notes on finding the last bugs and testing the hardware floor (iPhone 15 Pro). iPhone candidates are now cut by python3 scripts/ios_candidate_tag.py (fc8bb78e), whose v<version>-ios.N push runs only the iPhone archive and TestFlight upload. v3.0.0-ios.3 on 26995f71 (release run 40103005257) carries the release-evidence fix that stopped v3.0.0-ios.2 (run 40085945191, ASR-10). The beta description now names Built-in Voice, Voice Design and Voice Cloning. Still open in this gate: the processed build installed on the iPhone over the development build, preserving data, and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). RF-15's journeys run on the installed build. Earlier history: git log -p -- config/roadmap.json."
+      "updated": "2026-10-24",
+      "notes": "2026-10-24: the maintainer asked to fast-track the 3.0 release candidate to TestFlight: the agent approves the release gate, then distributes when Apple ends processing (Internal, What to Test notes from docs/releases/v3.0.0.md, beta review submission, Public Beta group). iPhone candidates are cut by python3 scripts/ios_candidate_tag.py (fc8bb78e); a v<version>-ios.N push runs only the iPhone archive and upload. v3.0.0-ios.3 on 26995f71 started release run 40103005257, which carries the release-evidence fix that stopped v3.0.0-ios.2. At 15:04 UTC it was still in the Security CodeQL Swift scan, with no approval pending and no build 24 in App Store Connect. The session watching it ended, so its next step (approve the release environment when it asks, then distribute) waits for the next session. The beta description already names the three modes. Still open in this gate: the processed build installed on the iPhone over the development build, keeping data, and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "RF-15",
@@ -1844,6 +1844,22 @@
       "updated": "2026-10-21",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-21 by the RF-08 security review: the macOS Application and Installer imports gained -x in 2d3ed9e5; the iOS import was left unchanged so the release path the 3.0 submission uses does not move before it."
+    },
+    {
+      "id": "BKL-28",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac Voice Design save shows no \"Voice added\" alert after Keep voice",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-24 in macos-xcui-marketing-20261024-145129-78cc21e5, which proved the capture's Keep-voice fix (cd9541df): the warning appeared, Keep was clicked and the voice saved. The test then waited 20 s for the OK of the \"Voice added\" alert, which handleSavedVoice sets while the save sheet dismisses itself, and none appeared. The lane was interrupted in teardown, so the result bundle has no screenshot. Parked without investigation under the focus lock: Mac-only and not a release blocker."
     },
     {
       "id": "ER-01",

@@ -1843,6 +1843,21 @@
       "notes": "Found 2026-10-24 in macos-xcui-marketing-20261024-145129-78cc21e5, which proved the capture's Keep-voice fix (cd9541df): the warning appeared, Keep was clicked and the voice saved. The test then waited 20 s for the OK of the \"Voice added\" alert, which handleSavedVoice sets while the save sheet dismisses itself, and none appeared. The lane was interrupted in teardown, so the result bundle has no screenshot. Parked without investigation under the focus lock: Mac-only and not a release blocker."
     },
     {
+      "id": "BKL-29",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer package's Bom check fails on a macOS 27 host",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as on macOS 26, with check_bom in scripts/cli_package.py still refusing a package whose Bom differs from its payload.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or a release job moves to a macOS 27 runner.",
+      "notes": "Found 2026-10-24 by the full local Python suite on macOS 27.0.1: check_bom raises 'CLI installer Bom differs from the payload' every time, in under a second, with no repository change to the package code. CI's Python job runs on Linux and the release jobs on macOS 26, so neither sees it. Not investigated (focus rules)."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

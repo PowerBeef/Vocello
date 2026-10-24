@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/29 (45%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/30 (43%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -563,6 +563,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
 | `BKL-27` | parked | The iOS signing identity is imported non-extractable in the release workflow | — |
 | `BKL-28` | parked | The Mac Voice Design save shows no "Voice added" alert after Keep voice | — |
+| `BKL-29` | parked | The CLI installer package's Bom check fails on a macOS 27 host | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -626,6 +627,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-28`** (parked) — The Mac Voice Design save shows no "Voice added" alert after Keep voice.
   gate: After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-29`** (parked) — The CLI installer package's Bom check fails on a macOS 27 host.
+  gate: scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as on macOS 26, with check_bom in scripts/cli_package.py still refusing a package whose Bom differs from its payload.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or a release job moves to a macOS 27 runner.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

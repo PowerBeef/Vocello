@@ -779,10 +779,23 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
             raise VerificationError("archive CFBundleExecutable is missing")
         _validate_dsym_uuid_match(archive, declared_executable, archived.macho_uuids)
         compare_archive_and_export(archived, exported)
-    payload: dict[str, Any] = {
+    payload = summary_payload(ipa.name, _sha256(ipa), expected, archived, exported)
+    _atomic_json(output, payload)
+    return payload
+
+
+def summary_payload(
+    ipa_name: str,
+    ipa_sha256: str,
+    expected: ExpectedIOSIdentity,
+    archived: BundleSnapshot,
+    exported: BundleSnapshot,
+) -> dict[str, Any]:
+    """The verified summary; scripts/release_evidence.py validates exactly this shape."""
+    return {
         "schemaVersion": SCHEMA_VERSION,
         "verdict": "passed",
-        "artifact": {"ipaName": ipa.name, "ipaSHA256": _sha256(ipa)},
+        "artifact": {"ipaName": ipa_name, "ipaSHA256": ipa_sha256},
         "expectedIdentity": {
             "bundleIdentifier": expected.bundle_identifier,
             "marketingVersion": expected.marketing_version,
@@ -803,8 +816,6 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
         },
         "privacy": {"containsTeamIdentifier": False, "containsAbsolutePaths": False},
     }
-    _atomic_json(output, payload)
-    return payload
 
 
 def _parser() -> argparse.ArgumentParser:

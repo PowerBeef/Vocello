@@ -29,6 +29,8 @@ ORCHESTRATION_RELATIVE = Path("config/orchestration-contract.json")
 VERIFICATION_DIR = Path("release-verification")
 VERIFICATION_BUNDLE_NAME = "release-verification.json"
 IOS_ARTIFACT_VERIFICATION_NAME = "ios-release-artifact-verification.json"
+# The runtime hardware floor; scripts/verify_ios_release_artifacts.py REQUIRED_DEVICE_CAPABILITIES.
+IOS_REQUIRED_DEVICE_CAPABILITIES = sorted(("arm64", "iphone-performance-gaming-tier"))
 # The macOS CLI ships one sealed payload twice: in `<output-name>-cli.dmg`, smoke-checked into
 # the first report, and in `<output-name>-cli.pkg`, checked by `cli_package.py pkg-verify` into
 # the second.
@@ -704,9 +706,10 @@ def _validate_entry_files(output_dir: Path, entries: list[dict[str, Any]]) -> di
 def validate_ios_release_artifact_verification(
     payload: dict[str, Any], release: dict[str, Any], artifacts: list[dict[str, Any]]
 ) -> None:
+    # scripts/verify_ios_release_artifacts.py summary_payload writes this shape.
     top_level = {
         "schemaVersion", "verdict", "artifact", "expectedIdentity", "archive", "export",
-        "archiveExportIdentityMatch", "privacy",
+        "archiveExportIdentityMatch", "releaseHygiene", "privacy",
     }
     if set(payload) != top_level or payload.get("schemaVersion") != 2 or payload.get("verdict") != "passed":
         raise ValueError("iOS release artifact verification summary is malformed or did not pass")
@@ -729,6 +732,7 @@ def validate_ios_release_artifact_verification(
     identity_fields = {
         "bundleIdentifier", "marketingVersion", "buildNumber", "architectures",
         "applicationGroups", "increasedMemoryLimit", "privacyManifestSHA256",
+        "attributionManifestSHA256",
     }
     if not isinstance(identity, dict) or set(identity) != identity_fields:
         raise ValueError("iOS verification expected identity is malformed")
@@ -745,19 +749,21 @@ def validate_ios_release_artifact_verification(
         or len(application_groups) != len(set(application_groups))
         or any(not isinstance(value, str) or not value.startswith("group.") for value in application_groups)
         or identity.get("increasedMemoryLimit") is not True
-        or not isinstance(identity.get("privacyManifestSHA256"), str)
-        or DIGEST.fullmatch(identity["privacyManifestSHA256"]) is None
+        or any(not isinstance(identity.get(field), str) or DIGEST.fullmatch(identity[field]) is None
+               for field in ("privacyManifestSHA256", "attributionManifestSHA256"))
     ):
         raise ValueError("iOS verification expected identity differs from release evidence")
 
     snapshot_fields = {
         "label", "bundleIdentifier", "marketingVersion", "buildNumber", "architectures",
+        "requiredDeviceCapabilities",
         "machOUUIDs", "executableSHA256", "signatureNormalizedExecutableSHA256", "bundleSHA256",
         "signatureVerified", "signingAuthorityVerified", "signingCertificateTrustVerified",
         "distributionAuthorityVerified",
         "teamIdentifierVerified", "provisioningProfileVerified", "signerProfileCertificateMatch",
         "applicationIdentifierVerified", "applicationGroups", "increasedMemoryLimit", "getTaskAllow",
         "privacyManifestSHA256", "privacyManifestVerified",
+        "attributionManifestSHA256", "attributionManifestVerified",
     }
     snapshots: dict[str, dict[str, Any]] = {}
     for label in ("archive", "export"):
@@ -776,8 +782,10 @@ def validate_ios_release_artifact_verification(
                 "signatureVerified", "signingAuthorityVerified", "signingCertificateTrustVerified",
                 "teamIdentifierVerified",
                 "provisioningProfileVerified", "signerProfileCertificateMatch",
-                "applicationIdentifierVerified", "privacyManifestVerified",
+                "applicationIdentifierVerified", "privacyManifestVerified", "attributionManifestVerified",
             ))
+            or not isinstance(snapshot.get("requiredDeviceCapabilities"), list)
+            or sorted(map(str, snapshot["requiredDeviceCapabilities"])) != IOS_REQUIRED_DEVICE_CAPABILITIES
             or not isinstance(snapshot.get("distributionAuthorityVerified"), bool)
             or (label == "export" and snapshot.get("distributionAuthorityVerified") is not True)
             or (label == "export" and snapshot.get("getTaskAllow") is not False)
@@ -793,6 +801,7 @@ def validate_ios_release_artifact_verification(
             or not isinstance(snapshot.get("bundleSHA256"), str)
             or DIGEST.fullmatch(snapshot["bundleSHA256"]) is None
             or snapshot.get("privacyManifestSHA256") != identity.get("privacyManifestSHA256")
+            or snapshot.get("attributionManifestSHA256") != identity.get("attributionManifestSHA256")
         ):
             raise ValueError(f"iOS verification {label} snapshot failed its release contract")
         snapshots[label] = snapshot
@@ -802,8 +811,11 @@ def validate_ios_release_artifact_verification(
         or snapshots["archive"]["signatureNormalizedExecutableSHA256"]
         != snapshots["export"]["signatureNormalizedExecutableSHA256"]
         or snapshots["archive"]["privacyManifestSHA256"] != snapshots["export"]["privacyManifestSHA256"]
+        or snapshots["archive"]["requiredDeviceCapabilities"] != snapshots["export"]["requiredDeviceCapabilities"]
     ):
         raise ValueError("iOS archive and exported IPA identities do not match")
+    if payload.get("releaseHygiene") != {"archiveVerified": True, "exportVerified": True, "dSYMUUIDMatch": True}:
+        raise ValueError("iOS verification summary release hygiene did not pass")
     if payload.get("privacy") != {"containsTeamIdentifier": False, "containsAbsolutePaths": False}:
         raise ValueError("iOS verification summary privacy declaration is invalid")
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import copy
+import dataclasses
 import json
 import subprocess
 import sys
@@ -19,6 +20,7 @@ SPEC = importlib.util.spec_from_file_location("release_evidence", SCRIPTS / "rel
 assert SPEC and SPEC.loader
 release_evidence = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release_evidence)
+import verify_ios_release_artifacts as verifier  # noqa: E402
 
 
 IDENTITY_DIGESTS = [
@@ -598,60 +600,56 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
     @staticmethod
     def ios_verification_fixture() -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
+        # Built by the verifier's own summary_payload, so the evidence validator is
+        # tested against the shape a release run actually writes.
         release = {"marketingVersion": "2.1.0", "buildNumber": "18"}
-        expected = {
-            "bundleIdentifier": "com.patricedery.vocello",
-            "marketingVersion": "2.1.0",
-            "buildNumber": "18",
-            "architectures": ["arm64"],
-            "applicationGroups": ["group.com.patricedery.vocello.shared"],
-            "increasedMemoryLimit": True,
-            "privacyManifestSHA256": "1" * 64,
-        }
-        snapshot = {
-            "label": "archive",
-            "bundleIdentifier": expected["bundleIdentifier"],
-            "marketingVersion": expected["marketingVersion"],
-            "buildNumber": expected["buildNumber"],
-            "architectures": ["arm64"],
-            "machOUUIDs": ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"],
-            "executableSHA256": "b" * 64,
-            "signatureNormalizedExecutableSHA256": "9" * 64,
-            "bundleSHA256": "c" * 64,
-            "signatureVerified": True,
-            "signingAuthorityVerified": True,
-            "signingCertificateTrustVerified": True,
-            "distributionAuthorityVerified": False,
-            "teamIdentifierVerified": True,
-            "provisioningProfileVerified": True,
-            "signerProfileCertificateMatch": True,
-            "applicationIdentifierVerified": True,
-            "applicationGroups": expected["applicationGroups"],
-            "increasedMemoryLimit": True,
-            "getTaskAllow": True,
-            "privacyManifestSHA256": expected["privacyManifestSHA256"],
-            "privacyManifestVerified": True,
-        }
+        expected = verifier.ExpectedIOSIdentity(
+            bundle_identifier="com.patricedery.vocello",
+            marketing_version="2.1.0",
+            build_number="18",
+            application_groups=("group.com.patricedery.vocello.shared",),
+            increased_memory_limit=True,
+            privacy_manifest_sha256="1" * 64,
+            attribution_manifest_sha256="2" * 64,
+        )
+        archived = verifier.BundleSnapshot(
+            label="archive",
+            bundle_identifier=expected.bundle_identifier,
+            marketing_version=expected.marketing_version,
+            build_number=expected.build_number,
+            architectures=("arm64",),
+            required_device_capabilities=verifier.REQUIRED_DEVICE_CAPABILITIES,
+            macho_uuids=("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",),
+            executable_sha256="b" * 64,
+            signature_normalized_executable_sha256="9" * 64,
+            bundle_sha256="c" * 64,
+            signature_verified=True,
+            signing_authority_verified=True,
+            signing_certificate_trust_verified=True,
+            distribution_authority_verified=False,
+            team_identifier_verified=True,
+            provisioning_profile_verified=True,
+            signer_profile_certificate_match=True,
+            application_identifier_verified=True,
+            application_groups=expected.application_groups,
+            increased_memory_limit=True,
+            get_task_allow=True,
+            privacy_manifest_sha256=expected.privacy_manifest_sha256,
+            privacy_manifest_verified=True,
+            attribution_manifest_sha256=expected.attribution_manifest_sha256,
+            attribution_manifest_verified=True,
+        )
         # App Store export can re-sign the Mach-O, changing its byte digest while
         # preserving the executable UUID and product identity.
-        exported = dict(
-            snapshot,
+        exported = dataclasses.replace(
+            archived,
             label="export",
-            executableSHA256="f" * 64,
-            bundleSHA256="d" * 64,
-            distributionAuthorityVerified=True,
-            getTaskAllow=False,
+            executable_sha256="f" * 64,
+            bundle_sha256="d" * 64,
+            distribution_authority_verified=True,
+            get_task_allow=False,
         )
-        payload = {
-            "schemaVersion": 2,
-            "verdict": "passed",
-            "artifact": {"ipaName": "Vocello.ipa", "ipaSHA256": "a" * 64},
-            "expectedIdentity": expected,
-            "archive": snapshot,
-            "export": exported,
-            "archiveExportIdentityMatch": True,
-            "privacy": {"containsTeamIdentifier": False, "containsAbsolutePaths": False},
-        }
+        payload = verifier.summary_payload("Vocello.ipa", "a" * 64, expected, archived, exported)
         artifacts = [
             {"name": "export/Vocello.ipa", "kind": "artifact", "sha256": "a" * 64},
             {
@@ -661,6 +659,10 @@ class ReleaseEvidenceTests(unittest.TestCase):
             },
         ]
         return payload, release, artifacts
+
+    def test_ios_capability_floor_matches_the_verifier(self) -> None:
+        self.assertEqual(release_evidence.IOS_REQUIRED_DEVICE_CAPABILITIES,
+                         sorted(verifier.REQUIRED_DEVICE_CAPABILITIES))
 
     def test_ios_verification_summary_is_structurally_release_bound(self) -> None:
         payload, release, artifacts = self.ios_verification_fixture()
@@ -676,6 +678,13 @@ class ReleaseEvidenceTests(unittest.TestCase):
             ("certificate binding", lambda value: value["export"].update(signerProfileCertificateMatch=False), "failed"),
             ("privacy manifest", lambda value: value["export"].update(privacyManifestSHA256="7" * 64), "failed"),
             ("privacy", lambda value: value.update(privacy={"containsTeamIdentifier": True, "containsAbsolutePaths": False}), "privacy"),
+            ("attribution manifest", lambda value: value["export"].update(attributionManifestSHA256="7" * 64), "failed"),
+            ("attribution check", lambda value: value["archive"].update(attributionManifestVerified=False), "failed"),
+            ("capabilities", lambda value: value["export"].update(requiredDeviceCapabilities=["arm64"]), "failed"),
+            ("both capabilities", lambda value: [value[label].update(requiredDeviceCapabilities=["arm64"])
+                                                 for label in ("archive", "export")], "failed"),
+            ("hygiene", lambda value: value["releaseHygiene"].update(dSYMUUIDMatch=False), "hygiene"),
+            ("unknown field", lambda value: value.update(extra=True), "malformed"),
         ):
             with self.subTest(label=label):
                 tampered = copy.deepcopy(payload)

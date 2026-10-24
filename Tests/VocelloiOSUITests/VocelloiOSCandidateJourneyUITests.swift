@@ -5,9 +5,102 @@ import XCTest
 /// build), selected by `scripts/ui_test.sh ios smoke --preinstalled-candidate
 /// <verified-release-dir> --scenario <row>`. Black-box: no diagnostics, telemetry
 /// or container access, so each row proves only what its visible UI shows. The
-/// benchmark clone voice is a fixture the phone already holds; nothing here creates it.
+/// benchmark clone voice is a fixture the phone already holds; only the clone-voice
+/// row creates it, from a Voice Design take, after a fresh install.
 @MainActor
 final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
+    /// RF-15 first launch (`--scenario first-launch`, run before the other rows on a fresh
+    /// install): onboarding through its own pages, then the three shipping models installed
+    /// from Voice Models. Nothing here raises a permission prompt, so it runs unattended.
+    /// Everything goes through visible controls and nothing is staged in the app's container.
+    /// On a phone already set up it confirms each step instead of repeating it, and the kept
+    /// `first-launch-outcome` attachment records which, so only a run that walked onboarding
+    /// counts as first-launch evidence.
+    func testFirstLaunchOnboardingAndModels() throws {
+        try beginCandidateSession(firstLaunch: true)
+        defer { endSession() }
+        let walkedOnboarding = didWalkFirstLaunch
+        VocelloUIScreenshot.attach(app, named: walkedOnboarding
+            ? "candidate-first-launch-studio" : "candidate-first-launch-already-set-up")
+        let started = installMissingShippingModels()
+        assertVisibleModelReadiness()
+        let downloaded = started.map { "\"\($0)\"" }.joined(separator: ", ")
+        let outcome = XCTAttachment(
+            string: "{\"walkedOnboarding\": \(walkedOnboarding), \"modelsDownloaded\": [\(downloaded)]}"
+        )
+        outcome.name = "first-launch-outcome"
+        outcome.lifetime = .keepAlways
+        add(outcome)
+    }
+
+    /// RF-15 clone voice (`--scenario clone-voice`, after first-launch): the benchmark clone
+    /// voice saved from a Voice Design take of its own brief, then handed to Clone as its
+    /// reference. Save as Voice transcribes the take, so on a fresh install iOS asks for
+    /// Speech Recognition here, and the maintainer answers that prompt: the row never does.
+    /// With the voice already saved it only confirms the handoff.
+    func testBenchmarkCloneVoiceFromDesignTake() throws {
+        try beginCandidateSession()
+        defer { endSession() }
+        ensureCloneConsentEnabled()
+        let voiceName = VocelloUIBenchMatrix.cloneVoiceID
+        // Search, not a raw lookup: Saved Voices is a lazy list.
+        if revealSavedVoiceControls(named: voiceName, timeout: 10) != nil {
+            clearVoicesSearch()
+        } else {
+            select(tab: .studio)
+            prepare(mode: .design)
+            replaceScript(with: "The harbor was quiet at dawn, and the old boats rocked gently while "
+                + "the fishermen talked about the weather and the long season ahead.")
+            XCTAssertFalse(generateAndWaitForCompletedPlayer(timeout: 300).isEmpty)
+            saveCompletedTakeAsVoice(named: voiceName)
+            VocelloUIScreenshot.attach(app, named: "candidate-clone-voice-saved")
+        }
+        // The saved voice must hand off to Clone as the benchmark reference.
+        prepare(mode: .clone)
+        VocelloUIScreenshot.attach(app, named: "candidate-clone-voice-ready")
+    }
+
+    /// Starts every missing shipping model from its own Voice Models row, then waits for each
+    /// to reach Ready, and returns the models it started. A transfer that ends on Retry,
+    /// Repair or Download fails the row.
+    private func installMissingShippingModels() -> [String] {
+        openVoiceModels()
+        let models = ["pro_custom", "pro_design", "pro_clone"]
+        var started: [String] = []
+        for modelID in models {
+            let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
+            XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
+            XCTAssertTrue(revealSettingsElement(status, swipingUp: modelID == "pro_clone"))
+            let download = element("iosModelDownload_\(modelID)")
+            guard download.exists else { continue }
+            started.append(modelID)
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: download, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.condition("\(modelID) to start or queue", timeout: 120) {
+                self.element("iosModelProgress_\(modelID)").exists
+                    || self.element("iosModelPhaseActivity_\(modelID)").exists
+                    || self.element("iosModelCancel_\(modelID)").exists
+                    || self.element("iosModelDelete_\(modelID)").exists
+            })
+        }
+        for modelID in models {
+            let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
+            XCTAssertTrue(revealSettingsElement(status, swipingUp: modelID == "pro_clone"))
+            var stoppedAt: String?
+            XCTAssertTrue(VocelloUIWait.condition("\(modelID) to finish installing", timeout: 3_600) {
+                if self.element("iosModelDelete_\(modelID)").exists { return true }
+                for action in ["Retry", "Repair", "Download"] where self.element("iosModel\(action)_\(modelID)").exists {
+                    stoppedAt = action
+                    return true
+                }
+                return false
+            })
+            XCTAssertNil(stoppedAt, "\(modelID) stopped at \(stoppedAt ?? "") before Ready")
+        }
+        VocelloUIScreenshot.attach(app, named: "candidate-first-launch-models-ready")
+        leaveVoiceModels()
+        return started
+    }
+
     /// A take in each mode in English and in French, each language chosen with
     /// Studio's own picker. Every mode's original language is read before anything
     /// changes and put back on every exit path.
@@ -50,13 +143,30 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
         prepare(mode: .design)
         replaceScript(with: "A calm voice for a quick candidate check, saved and then removed.")
         XCTAssertFalse(generateAndWaitForCompletedPlayer(timeout: 300).isEmpty)
+        saveCompletedTakeAsVoice(named: Self.throwawayVoiceName) { [unowned self] in
+            self.registerSessionRestore { [unowned self] in self.deleteThrowawayVoiceIfPresent() }
+        }
+
+        guard revealSavedVoiceControls(named: Self.throwawayVoiceName, timeout: 60) != nil else {
+            XCTFail("The saved designed voice did not expose an activatable row and menu")
+            return
+        }
+        VocelloUIScreenshot.attach(app, named: "candidate-designed-voice-saved")
+        clearVoicesSearch()
+        XCTAssertTrue(deleteThrowawayVoiceIfPresent(), "The saved voice must delete through its menu")
+        select(tab: .studio)
+    }
+
+    /// Saves the completed take as a voice through the player's Save as Voice sheet.
+    /// `beforeSave` runs once the sheet is ready, before the voice exists.
+    private func saveCompletedTakeAsVoice(named name: String, beforeSave: () -> Void = {}) {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studio_inlinePlayer_saveAsVoice"), timeout: 20))
 
         let nameField = element("saveVoice_nameField")
         XCTAssertTrue(VocelloUIWait.exists(nameField, timeout: 30))
-        XCTAssertTrue(VocelloUITextEntry.replace(in: nameField, with: Self.throwawayVoiceName, timeout: 20))
+        XCTAssertTrue(VocelloUITextEntry.replace(in: nameField, with: name, timeout: 20))
         XCTAssertTrue(VocelloUIWait.condition("the voice name to read exactly", timeout: 15) {
-            (nameField.value as? String) == Self.throwawayVoiceName
+            (nameField.value as? String) == name
         })
         // The keyboard covers the sheet's last control, Save.
         if app.keyboards.firstMatch.exists {
@@ -72,13 +182,13 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.condition("recognition to resolve", timeout: 180) {
             (save.exists && save.isEnabled) || audioOnly.exists
         })
-        if !save.isEnabled, audioOnly.exists {
+        if !(save.exists && save.isEnabled), audioOnly.exists {
             VocelloUIScroll.reveal(audioOnly, in: app)
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: audioOnly, timeout: 20))
         }
         VocelloUIScroll.reveal(save, in: app)
         XCTAssertTrue(VocelloUIWait.enabled(save, timeout: 20))
-        registerSessionRestore { [unowned self] in self.deleteThrowawayVoiceIfPresent() }
+        beforeSave()
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: save, timeout: 20))
         // A reference outside the recommended range asks Keep or Discard once the
         // candidate is prepared, which can take a while.
@@ -90,15 +200,6 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keep, timeout: 20))
         }
         XCTAssertTrue(VocelloUIWait.disappears(nameField, timeout: 60))
-
-        guard revealSavedVoiceControls(named: Self.throwawayVoiceName, timeout: 60) != nil else {
-            XCTFail("The saved designed voice did not expose an activatable row and menu")
-            return
-        }
-        VocelloUIScreenshot.attach(app, named: "candidate-designed-voice-saved")
-        clearVoicesSearch()
-        XCTAssertTrue(deleteThrowawayVoiceIfPresent(), "The saved voice must delete through its menu")
-        select(tab: .studio)
     }
 
     private static let throwawayVoiceName = "RF15 Candidate Voice"

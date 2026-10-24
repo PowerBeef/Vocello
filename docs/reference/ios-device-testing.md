@@ -171,12 +171,14 @@ These are **black-box journeys** on the installed candidate, not the instrumente
 | --- | --- |
 | `navigation` (default) | every tab, and the version in About |
 | `modes` | a take in each mode in English and in French, chosen with Studio's language picker |
+| `clone-voice` | the benchmark clone voice saved from a Voice Design take of its brief, then handed to Clone; with the voice already saved, only the handoff |
 | `voice-lifecycle` | a Design take saved as a voice, then deleted from Voices (F-01) |
 | `one-word` | a one-token script in each mode (DA-04) |
 | `record-then-play` | a clip recorded from Clone's reference plays to its end (AUD-02) |
 | `long-form` | a long-form project, then one segment regenerated |
 | `accessibility` | XCTest's audit on Studio, Settings and the purchase sheet; clipping at AX-XXXL |
 | `all` | every row above, in one run |
+| `first-launch` | a fresh install's onboarding through its three pages, then the three shipping models from Voice Models; run it first on a fresh install, never inside `all`. Its kept `first-launch-outcome` attachment says whether it walked onboarding and which models it downloaded, and only a run that walked onboarding is first-launch evidence |
 
 The journeys share `VocelloiOSUITestCase` and `VocelloiOSSharedJourneys.swift` with the development
 lanes. In a candidate session the app gets no environment, and launch arguments only for standard
@@ -184,7 +186,18 @@ UIKit preferences (Dynamic Type); English comes from the visible App Language pi
 telemetry or the app's container, so a row proves only what its visible UI shows.
 
 Preconditions: onboarding done, the three models Ready, and the benchmark clone voice in Saved
-Voices (the clone rows use it and never create it). The rows turn Clone consent on.
+Voices (only `clone-voice` creates it; XCTest runs a class's tests in name order, so inside `all` it
+runs before the rows that use the voice). The rows turn Clone consent on. On a fresh install the
+order is `first-launch`, `clone-voice`, then `all`; set Auto-Lock to Never first, since the app holds
+the screen awake only while it generates, not while models download.
+
+Permission prompts stay with the maintainer: no row answers one. A fresh install asks for Speech
+Recognition at the first Save as Voice (`clone-voice` and `voice-lifecycle`) and for the microphone at
+the first recording (`record-then-play`), so those rows need the maintainer at the phone the first
+time; `first-launch`, `navigation`, `long-form` and `accessibility` raise no prompt and run
+unattended, and `modes` and `one-word` do too once the clone voice exists. The clone voice saved
+on a candidate phone shares only its name with the development phone's benchmark voice; never compare
+their clone takes.
 
 What a run leaves on the phone. Restored while the app is still running at the end: App Language,
 Take variation, each mode's Studio language, and the `RF15 Candidate Voice` throwaway (also removed
@@ -215,10 +228,10 @@ duplicate journey, or a missing identity attachment, fails the run. Collection o
 attachments and system-crash deltas is attempted even after failure/interruption; new system reports
 require review.
 
-Keep this evidence separate from instrumented engine receipts and the 201-take campaign. Downloads,
-onboarding, the offline relaunch, permissions and the hand VoiceOver pass are not journeys here and
-are still performed on the processed candidate. Do not uninstall or bypass onboarding here:
-fresh-install acceptance needs verified recovery and immediate maintainer approval. Finish authorized device work with the screen
+Keep this evidence separate from instrumented engine receipts and the 201-take campaign. The offline
+relaunch, answering permission prompts and the hand VoiceOver pass are not journeys here and are
+still performed on the processed candidate. Never uninstall the app or bypass onboarding from a
+row: a fresh install is the maintainer's step, and only `first-launch` walks the onboarding it shows. Finish authorized device work with the screen
 protection procedure below, not an implicit global Settings mutation.
 
 ### Development-device preflight

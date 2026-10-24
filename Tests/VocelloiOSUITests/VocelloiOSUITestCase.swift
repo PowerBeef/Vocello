@@ -22,6 +22,10 @@ class VocelloiOSUITestCase: XCTestCase {
     private var pendingVariationRestore: String?
     /// RF-15: the session drives the installed distribution candidate black-box.
     private(set) var isCandidateSession = false
+    /// RF-15 first launch: the maintainer authorized walking a fresh install's onboarding.
+    private var isFirstLaunchAuthorized = false
+    /// Whether this session walked the onboarding pages, which only a fresh install shows.
+    private(set) var didWalkFirstLaunch = false
     private var pendingJourneyRestores: [() -> Void] = []
 
     var app: XCUIApplication { session.app }
@@ -36,6 +40,8 @@ class VocelloiOSUITestCase: XCTestCase {
         pendingVariationRestore = nil
         pendingJourneyRestores = []
         isCandidateSession = false
+        isFirstLaunchAuthorized = false
+        didWalkFirstLaunch = false
         session = VocelloUIApplicationSession()
         launchApp(
             additionalEnvironment: additionalEnvironment,
@@ -55,7 +61,9 @@ class VocelloiOSUITestCase: XCTestCase {
     /// Dynamic Type; the visible App Language picker, not `-AppleLanguages`, pins
     /// English, and every exit path restores the original choice. The approved
     /// candidate identity the runner was handed is attached to every journey.
-    func beginCandidateSession(additionalArguments: [String] = []) throws {
+    /// `firstLaunch` is the maintainer-authorized RF-15 first-launch row: a fresh install's
+    /// onboarding is walked through its own pages instead of failing the journey.
+    func beginCandidateSession(additionalArguments: [String] = [], firstLaunch: Bool = false) throws {
         continueAfterFailure = false
         assertToggleNormalizerContract()
         let encoded = try XCTUnwrap(ProcessInfo.processInfo.environment["VOCELLO_CANDIDATE_IDENTITY"],
@@ -72,6 +80,8 @@ class VocelloiOSUITestCase: XCTestCase {
         pendingVariationRestore = nil
         pendingJourneyRestores = []
         isCandidateSession = true
+        isFirstLaunchAuthorized = firstLaunch
+        didWalkFirstLaunch = false
         session = VocelloUIApplicationSession(
             app: XCUIApplication(bundleIdentifier: Self.candidateBundleIdentifier)
         )
@@ -167,7 +177,8 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     /// Launches the production UI. First-run onboarding is completed through
-    /// its visible Skip control; no onboarding bypass environment is injected.
+    /// its visible Skip control, or on an authorized candidate first launch
+    /// through each of its pages; no onboarding bypass environment is injected.
     /// `additionalArguments` reach `UserDefaults` through the standard
     /// `NSArgumentDomain` (`-key value`), the same mechanism a user-typed
     /// `defaults` override uses; they configure production preferences only.
@@ -255,13 +266,38 @@ class VocelloiOSUITestCase: XCTestCase {
         )
         guard skip.exists else { return }
         // A candidate is upgrade-tested; first-launch acceptance is its own approved session.
-        guard !isCandidateSession else {
+        guard !isCandidateSession || isFirstLaunchAuthorized else {
             XCTFail("Complete authorized first-launch acceptance separately")
+            return
+        }
+        if isCandidateSession {
+            walkOnboardingThroughItsPages()
             return
         }
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: skip, timeout: 15))
         XCTAssertTrue(VocelloUIWait.disappears(element("onboarding_cta"), timeout: 20))
+    }
+
+    /// RF-15 first launch: every onboarding page through its primary action, never Skip. Each
+    /// page's action has its own title, so a tap is proven by the title changing or the
+    /// onboarding closing; the device's interface language does not matter.
+    private func walkOnboardingThroughItsPages() {
+        let cta = element("onboarding_cta")
+        XCTAssertTrue(VocelloUIWait.exists(cta, timeout: 30))
+        var page = 0
+        while cta.exists, page < 6 {
+            page += 1
+            VocelloUIScreenshot.attach(app, named: "candidate-first-launch-onboarding-\(page)")
+            let title = cta.label
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cta, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.condition("onboarding page \(page) to advance or finish", timeout: 20) {
+                !cta.exists || cta.label != title
+            })
+        }
+        XCTAssertTrue(VocelloUIWait.disappears(cta, timeout: 20), "Onboarding must finish through its own pages")
+        XCTAssertEqual(page, 3, "The shipped onboarding has three pages, each with its own action")
+        didWalkFirstLaunch = true
     }
 
     func select(tab: VocelloiOSTab) {
@@ -583,7 +619,8 @@ class VocelloiOSUITestCase: XCTestCase {
         Absent fixture: Saved Voices has no "\(VocelloUIBenchMatrix.cloneVoiceID)", and this lane never \
         creates it. Enroll it first (scripts/ui_test.sh ios enroll-clone-fixture after staging the \
         reference WAV and .txt sidecar in the app's Documents, or headless scripts/ios_device.sh \
-        enroll-clone-fixture), then rerun.
+        enroll-clone-fixture), then rerun. On an installed candidate, run its clone-voice row \
+        (scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario clone-voice) instead.
         """
 
     @discardableResult

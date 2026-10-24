@@ -109,8 +109,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(plistlib.loads(plistlib.dumps(value)), value)
 
     def test_scenarios_select_only_their_journeys(self):
-        rows = {name: tests for name, tests in candidate.SCENARIOS.items() if name != "all"}
+        # `all` is every upgrade row; a fresh install's first launch stays its own row.
+        rows = {name: tests for name, tests in candidate.SCENARIOS.items() if name not in ("all", "first-launch")}
         self.assertEqual(candidate.SCENARIOS["all"], [test for tests in rows.values() for test in tests])
+        self.assertTrue(set(candidate.SCENARIOS["first-launch"]).isdisjoint(candidate.SCENARIOS["all"]))
         self.assertEqual(len(set(candidate.SCENARIOS["all"])), len(candidate.SCENARIOS["all"]))
         for name, tests in candidate.SCENARIOS.items():
             value = candidate.runner_configuration(self.configuration(),
@@ -182,7 +184,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
 
     def test_journey_names_match_the_swift_sources(self):
         sources = {path.stem: path.read_text() for path in (ROOT / "Tests/VocelloiOSUITests").glob("VocelloiOSCandidate*.swift")}
-        for test in candidate.SCENARIOS["all"]:
+        for test in sorted({test for tests in candidate.SCENARIOS.values() for test in tests}):
             suite, method = test.split("/")[1:]
             with self.subTest(test=test):
                 self.assertIn(f"func {method}()", sources[suite])

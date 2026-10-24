@@ -109,7 +109,9 @@ any version but the canonical one publishes focused records.
 It generates no audio and exports its raw transcript untracked; success is an observation, not full smoke acceptance.
 `--preinstalled-candidate` runs black-box journeys on an already installed, matching non-development
 app (a TestFlight build), not instrumented smoke. `--scenario` picks the RF-15 row: navigation (the
-default), modes, voice-lifecycle, one-word, record-then-play, long-form, accessibility or all. It requires
+default), modes, clone-voice, voice-lifecycle, one-word, record-then-play, long-form, accessibility or
+all; on a fresh install run first-launch first (onboarding, the shipping models), then clone-voice (the
+benchmark clone voice; the maintainer answers its Speech Recognition prompt). It requires
 a clean tree at the release commit, or at a later one that changed no product input (Sources/,
 Packages/, project.yml, the Xcode project). Where CoreDevice reports the maintainer's own TestFlight
 build as a developer app, `--candidate-origin-attestation "STATEMENT"` records the maintainer's word
@@ -264,8 +266,8 @@ elif [[ "$lane" == "take-variation" ]]; then
 elif [[ -n "$candidate_evidence" ]]; then
   # RF-15 rows; scripts/ios_candidate_acceptance.py owns what each one runs.
   scenario_argument="${scenario_argument:-navigation}"
-  [[ "$scenario_argument" =~ ^(navigation|modes|voice-lifecycle|one-word|record-then-play|long-form|accessibility|all)$ ]] \
-    || die "candidate --scenario must be navigation, modes, voice-lifecycle, one-word, record-then-play, long-form, accessibility or all"
+  [[ "$scenario_argument" =~ ^(navigation|modes|clone-voice|voice-lifecycle|one-word|record-then-play|long-form|accessibility|all|first-launch)$ ]] \
+    || die "candidate --scenario must be navigation, modes, clone-voice, voice-lifecycle, one-word, record-then-play, long-form, accessibility, all or first-launch"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
         || "$scenario_argument" == "update-models" || "$scenario_argument" == "startup-retry" \

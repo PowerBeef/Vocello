@@ -24,6 +24,7 @@ JOURNEYS = TARGET + "/VocelloiOSCandidateJourneyUITests/"
 SCENARIOS = {
     "navigation": [TEST],
     "modes": [JOURNEYS + "testTakesInEachModeAndLanguage"],
+    "clone-voice": [JOURNEYS + "testBenchmarkCloneVoiceFromDesignTake"],
     "voice-lifecycle": [JOURNEYS + "testDesignedVoiceSaveAndDelete"],
     "one-word": [JOURNEYS + "testOneWordScript"],
     "record-then-play": [JOURNEYS + "testRecordThenPlay"],
@@ -31,6 +32,9 @@ SCENARIOS = {
     "accessibility": [JOURNEYS + "testAccessibilityAuditsAndLargestText"],
 }
 SCENARIOS["all"] = [test for name in list(SCENARIOS) for test in SCENARIOS[name]]
+# A fresh install's first launch is its own maintainer-authorized row, never part of `all`:
+# XCTest runs tests in name order, so it could not run before the rows that need a set-up app.
+SCENARIOS["first-launch"] = [JOURNEYS + "testFirstLaunchOnboardingAndModels"]
 # The installed binary is fixed, so a runner from a later commit still tests it
 # faithfully when nothing the app is built from changed since the candidate's commit:
 # its sources, its package and pins, and the project spec that sets its targets.

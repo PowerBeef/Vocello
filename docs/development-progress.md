@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-21
+reviewed: 2026-10-24
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,36 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 23 — Vocello 3.0.0 for the Mac and the CLI is public (resume here)
+### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
+
+- **Maintainer decision:** iPhone focus. TestFlight carries the 3.0 release candidate, 3.0.0 (24):
+  Internal at once, the Public Beta group after Apple's beta review. The What to Test notes ask for the
+  last bugs and for the hardware floor (iPhone 15 Pro, 8 GB). Fast-tracked: the agent approves the
+  `release` gate and distributes when processing ends.
+- **Archive path repaired:**
+  - `13e9d05d`: mlx-c `__FILE__` paths (ASR-07).
+  - `50c347a8`: `dlopen` is the only banned loader, and the export keeps the archived executable.
+  - `054b5e4a`: release evidence accepts the summary the IPA verifier really writes (ASR-10). Release
+    run 40085945191 failed on that after archiving, exporting and verifying the IPA.
+- **Candidate tags without a Manual-mode session (`fc8bb78e`, RF-12):** on the maintainer's request,
+  `python3 scripts/ios_candidate_tag.py` signs and pushes the next `v<version>-ios.N` tag. It refuses
+  unless main is pushed, CI passed and the build number is unused. A candidate push runs only the iPhone
+  archive and the TestFlight upload. `v3.0.0-ios.3` on `26995f71` started release run 40103005257.
+- **RF-15 journeys (`10d0d603`):** `ui_test.sh ios smoke --preinstalled-candidate DIR --scenario ROW`
+  runs black-box rows on the installed TestFlight build: modes, voice-lifecycle, one-word,
+  record-then-play, long-form, accessibility or all. Development-build evidence the same day: startup
+  Retry and the unverified purchase locked until Restore (AUD-07), both PASS.
+- **Housekeeping:** issue #108 (stale nightly) is closed. The release rehearsal (#107) was dispatched
+  on `26995f71` to prove today's build-number fix: a Mac tag no longer compares with `-ios` tags.
+  RF-10's due date moved to 2026-10-31.
+- **Next:**
+  - distribute 3.0.0 (24);
+  - install it from TestFlight;
+  - run `--scenario all`;
+  - by hand: the offline relaunch and VoiceOver;
+  - the approved fresh install, last.
+
+### October 23 — Vocello 3.0.0 for the Mac and the CLI is public
 
 - **Published 2026-10-24 00:06 UTC as the latest release** by the maintainer's route A (from the signed
   draft, without a quality-promotion record). Release run 40020993733 on `e7a8e2ae` passed Security,
@@ -105,73 +134,3 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   `release` secrets and the first rehearsal.
 - **Release items waiting:** RF-09's freeze checks are due 2026-10-23.
 - **Not pushed:** local commits are unpushed; the iPhone candidate stays at `0919e998`.
-
-### October 21, late — RF-27 closes; RF-28 starts
-
-RF-27 closed with its deviations recorded: `batch` keeps its semantics for the QC lanes, the CLI
-writes no History until RF-30, and the single-take executor moves to RF-30. The maintainer asked
-whether the CLI is over-engineered and chose to continue the approved plan.
-
-### October 21, evening — RF-26 closes; RF-27 hosts takes like the app and routes long scripts
-
-- **RF-26 done:** `VocelloDesktopCore` (the app's store, History records, settings keys and
-  model selection, compiled by path plus `Sources/DesktopShared`) gives the CLI read-only parity:
-  History list/search/show/export (refused while the app runs on the same data root until RF-30),
-  settings, briefs, voices show/banks, models active/verify, languages, doctor and runtime facts in
-  `capabilities` (`701c0da9` to `6950f227`, reviewed).
-- **RF-27 in flight:** takes default to the app's package and variation; `generate --plan`;
-  `run --request(s)` with idempotent client ids whose identity is the resolved take; `generate`,
-  `batch` and `run` host the engine through `TTSEngineStore` as `MacEngineBootstrap` does; a script
-  past one take runs as a long-form project through the shared `CLILongFormProject` runner
-  (`d2eee3c5` to `abc3d300`). Each step had a Swift review; its findings are fixed, including a hang
-  where a store refusal stranded the stream drain. Verified on this Mac: a hosted 2-segment
-  long-form take (60 s of audio in 17 s) and a SIGINT that keeps the finished segment. A review of
-  `01f9206f` and `abc3d300` is running. Left: long-form through `IOSLongFormCoordinator` with its
-  joined-output QC, the line batch on the app's plan, the interim History write policy, the engine
-  lease, NDJSON progress polish and a hosted take per mode.
-- **RF-08 in flight:** the pipeline, evidence and entitlement work landed (`3acf1251` to
-  `e6a0a761`); the maintainer still needs the Developer ID Installer certificate, its two `release`
-  secrets and the first rehearsal.
-- Local commits are not pushed; the iPhone candidate stays at `0919e998` awaiting the maintainer's tag.
-
-### October 21, later — the CLI overhaul starts: RF-25 lands, RF-08 builds a .pkg
-
-The maintainer asked for a full CLI: Mac-app parity, driven by agents (a JSON contract and an MCP
-server), shipped as a signed `.pkg` beside the releases. The plan is
-`docs/audits/2026-10-21-cli-overhaul-plan.md` (RF-25 to RF-31, RF-08 re-gated); no iPhone-compiled
-file changes before the submission (`git diff --quiet 0919e998 -- Sources/iOS …`).
-
-- **RF-25 done:** one command tree drives the strict parser, help, completions, `capabilities` and
-  `config/cli-contract/v1/commands.json`; every command but `bench` speaks the v1 envelope
-  (`--json`) or NDJSON events (`--ndjson`) with typed codes and exits; the contract, schemas,
-  examples and additive-only baseline validate in the contract gate; every JSON caller reads
-  through `scripts/lib/vocello_cli_json.py` (`26c0cee6`, `0e8eeff0`, reviewed).
-- **RF-08 in flight:** `cli_package.py pkg`/`pkg-verify` build and verify an unsigned installer
-  package with relative `/usr/local` links and a sealed `uninstall.sh` (`cdb5eea6`). Left: evidence
-  and entitlement policy, the release pipeline, the hardened-runtime probe, and the maintainer's
-  Developer ID Installer certificate with its two `release` secrets.
-- **RF-26 in flight next:** `VocelloDesktopCore` and read-only parity.
-- Local commits are not pushed; the iPhone candidate stays at `0919e998` awaiting the maintainer's tag.
-
-### October 21 — the freeze moves to `0919e998`; Mac updates land
-
-`main` is pushed through `0919e998`, the freeze commit; the freeze record follows it. The maintainer
-holds the release: no tag yet.
-
-- **RF-24 (release blocker, maintainer report): the iPhone Clone Studio matches the other modes.**
-  Clone had stacked its reference transcript review under the canvas (since `46504a11`), pushing
-  Generate up and squeezing the script. The review now sits at the top of the Reference panel
-  (`50761bcc`, `08372fdd`, reviewed). `ios smoke --scenario studio-layout` (also part of full smoke)
-  passed on the iPhone (`ios-xcui-smoke-20261021-050240-000ce5bc`): Generate sits 8.6 pt above the
-  tab dock in all three modes. macOS was never affected (its review lives in a popover).
-- **RF-23 (maintainer request): Sparkle updates for the Mac app.** Vocello > Check for Updates…, a
-  Settings > Updates category, Sparkle's second-launch prompt, no silent installs, a signed feed
-  required and updates verified before extraction; the EdDSA key is in the maintainer's keychain
-  and the `release` environment. The release workflow signs the DMG and the feed in a minimal job;
-  the Swift and security reviews' findings are fixed; the Mac layout lane passes; the privacy page
-  names the check. Left: the release rehearsal on GitHub and one end-to-end update between signed
-  builds.
-- **The freeze:** the full checks pass on `0919e998` (website browser smoke included now that
-  Playwright's Chromium is installed locally); `focusLock.freeze` names it.
-- **Next:** the maintainer's signed `v3.0.0` tag (tag-signing key setup first), then ASR-10's signed
-  archive and TestFlight (RF-12, RF-15), each on the maintainer's go.

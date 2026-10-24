@@ -20,53 +20,6 @@ const withCode = (text) =>
     i % 2 === 1 ? <code key={i} className="cli-inline cli-flag">{part}</code> : part,
   );
 
-// Home: what the command line is, the package download and the agent setup,
-// then a link to the full guide on /cli/.
-export const CommandLineTeaser = () => (
-  <section className="section cli-section" id="cli" aria-labelledby="cli-title">
-    <div className="container">
-      <header className="cli-head">
-        <p className="section-note">New in Vocello 3.0</p>
-        <h2 id="cli-title" className="section-title">Command line and agents.</h2>
-        <p className="section-sub">
-          <code className="cli-inline">vocello</code> brings the Mac app's features to the
-          terminal: generate in all three modes, long-form and line by line included; manage saved
-          voices and models; read and export History; read and change settings. It uses the app's
-          models, saved voices and settings, so both see the same library.
-        </p>
-      </header>
-      <div className="cli-teaser">
-        <div className="cli-teaser-item">
-          <h3 className="cli-sub-title">Install the package</h3>
-          <p className="cli-sub-body">
-            A signed, notarized installer for Apple Silicon Macs with macOS 26 or later. It asks
-            for an administrator password; without one, copy the Vocello CLI folder from{" "}
-            <a className="cta-meta-link" href={CLI_DMG}>its disk image</a> instead.
-          </p>
-          <a className="btn btn-primary" href={CLI_PKG}>
-            <Icon name="download" size={16} />
-            Download the CLI package
-          </a>
-        </div>
-        <div className="cli-teaser-item">
-          <h3 className="cli-sub-title">For AI agents</h3>
-          <p className="cli-sub-body">
-            <code className="cli-inline">vocello mcp</code> serves Claude Code, Claude Desktop and
-            other MCP clients over stdio. This adds Vocello to Claude Code for every project:
-          </p>
-          <CodeBlock block={MCP_SETUP} />
-        </div>
-      </div>
-      <p className="section-more">
-        <a className="more-link" href="/cli/">
-          Command line guide: install, update, uninstall, scripts and limits
-          <Icon name="arrow-right" size={16} />
-        </a>
-      </p>
-    </div>
-  </section>
-);
-
 // /cli/: the full guide.
 export const CommandLineGuide = () => (
   <section className="section cli-section cli-page" aria-labelledby="cli-title">

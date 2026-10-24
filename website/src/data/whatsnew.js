@@ -4,18 +4,22 @@
 
 export const WHATS_NEW_VERSION = "3.0";
 
-// The Mac app's three headline changes, in the release notes' order.
+// The Mac app's three headline changes, in the release notes' order. `short` is the home page's
+// one-line summary of each; `v` is the full account.
 export const MAC_HIGHLIGHTS = [
   {
     k: "A redesigned Mac app",
+    short: "The iPhone app's look comes to the Mac: a new window, the Studio canvas and mode colors.",
     v: "The Mac app adopts the iPhone app's visual language: a new window with four sidebar destinations, the Studio canvas with the phone's setup chips, dock and mode colors, and Settings organized in categories. Custom Voice is now called Built-in Voice, as it is in the iPhone app's 3.0 version.",
   },
   {
     k: "The engine runs inside the app",
+    short: "One engine inside the app, as on iPhone, with one memory policy for both.",
     v: "The separate engine service is gone. The Mac app hosts the engine in-process, as the iPhone app does, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure, and an idle model unloads according to the Mac's memory tier.",
   },
   {
     k: "The app updates itself",
+    short: "Signed updates from Vocello > Check for Updates, or on its own schedule.",
     v: "Vocello looks for new versions with Sparkle, on its own schedule or when you choose Vocello > Check for Updates, and installs one when you accept it. Automatic checks are a setting you can turn off. Every update is signed, and the app checks that signature before installing.",
   },
 ];
@@ -28,10 +32,12 @@ export const IPHONE_NOTE =
 export const SHARED_HIGHLIGHTS = [
   {
     k: "Generated audio is marked",
+    short: "Every generated take carries an inaudible watermark marking it as AI-generated.",
     v: "Every generated WAV, in the apps and the command line, carries an inaudible AudioSeal watermark and a machine-readable provenance note naming the generator, version, model and mode. Only generated takes are marked: reference clips you record or import are not, and neither is live preview audio heard before the file is written. Publishing a cloned real voice still calls for your own disclosure.",
   },
   {
     k: "Interface in ten languages",
+    short: "Choose the interface language in Settings, apart from the speech language.",
     v: "English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified Chinese, Japanese, Korean and Russian, chosen in Settings independently of the ten speech languages.",
   },
   {
@@ -44,6 +50,7 @@ export const SHARED_HIGHLIGHTS = [
   },
   {
     k: "Takes read the whole script first",
+    short: "Built-in Voice and Voice Design takes see their full text before they speak.",
     v: "Built-in Voice and Voice Design takes now see their full text before speaking, as the reference Qwen3-TTS does. In an automated screen, with no listening, takes with wrong or missing words fell by about half. Long-form projects keep the previous layout.",
   },
   {

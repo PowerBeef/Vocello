@@ -38,6 +38,15 @@
 
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
     <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <noscript>
+      <!-- Without JavaScript the mode switcher cannot switch, so every mode shows (src/sections/Modes.jsx). -->
+      <style>
+        .mode-switch { display: none; }
+        .mode-panel[hidden] { display: grid; }
+        .mode-panel + .mode-panel { margin-top: 80px; }
+        .mode-label { display: inline-flex; }
+      </style>
+    </noscript>
   </head>
   <body>
     <div id="root" data-page="home"></div>

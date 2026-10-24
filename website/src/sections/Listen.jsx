@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import { Icon } from "../components/Icon.jsx";
 import { Waveform } from "../components/Waveform.jsx";
 import { SAMPLES, DELIVERIES, DELIVERY_GROUPS } from "../data/samples.js";
-import { Screenshot } from "../components/Screenshot.jsx";
 
 export const Listen = () => {
   const [playing, setPlaying] = useState(null);
@@ -33,13 +32,11 @@ export const Listen = () => {
       <div className="container">
         <div className="section-head listen-head">
           <p className="section-note">Listen first</p>
-          <h2 className="section-title">Four voices.<br />Two ways to ask for them.</h2>
+          <h2 className="section-title">Hear it before you install.</h2>
           <p className="section-sub">
-            Each row carries the brief or speaker, the script, the delivery setting that
-            produced it, and a waveform from the local render. The set includes a Japanese
-            take and a 31 second narration. These samples were made with earlier versions,
-            before 3.0, so one row uses Excited, a delivery that 3.0 folds into Happy.
-            Install Vocello to generate your own.
+            Four takes made locally, from a built-in speaker or a voice described in words,
+            including a Japanese line and a 31 second narration. They were made with versions
+            before 3.0, so one uses Excited, a delivery 3.0 folds into Happy.
           </p>
         </div>
 
@@ -84,11 +81,10 @@ export const Listen = () => {
         </ul>
 
         <div className="listen-deliveries">
-          <div className="vc-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
-            Built-in Voice and Voice Design shape a take with one of eight delivery presets
-            or a delivery you describe in your own words. Directional hints shape energy and
-            pace, but the named emotion may not come through on every take.
+            Built-in Voice and Voice Design shape each take with a delivery preset, or one you
+            describe in your own words. The hints shape energy and pace; the named emotion may
+            not come through on every take.
           </p>
           {DELIVERY_GROUPS.map((group) => (
             <React.Fragment key={group.id}>
@@ -104,20 +100,6 @@ export const Listen = () => {
             </React.Fragment>
           ))}
         </div>
-
-        <figure className="try-shot">
-          <div className="window">
-            <Screenshot
-              src="/assets/screens/delivery-presets.png"
-              width={2080} height={1380}
-              alt="The Vocello delivery menu open, listing the eight presets, the four distinct deliveries first and the directional hints after them, plus Custom"
-            />
-          </div>
-          <figcaption className="try-shot-caption">
-            The delivery menu: the distinct deliveries first, the directional hints after
-            them, and Custom for a delivery in your own words.
-          </figcaption>
-        </figure>
       </div>
     </section>
   );

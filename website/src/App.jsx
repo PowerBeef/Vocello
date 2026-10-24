@@ -26,8 +26,8 @@ const useScrollReveal = () => {
     if (!("IntersectionObserver" in window)) return;
 
     const targets = [...document.querySelectorAll(
-      ".whatsnew-section, .workflow-band, .listen-section, .caps-section, .cloud-section, " +
-        ".runs-section, .cli-section, .iphone-section, .engineering-section, .limitations-section, " +
+      ".modes-section, .listen-section, .privacy-section, .caps-section, .iphone-section, " +
+        ".whatsnew-section, .dev-section, .cli-section, .engineering-section, .limitations-section, " +
         ".final-cta-section",
     )].filter((el) => el !== document.querySelector("main > :first-child"));
     if (!targets.length) return;

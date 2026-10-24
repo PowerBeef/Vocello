@@ -3,16 +3,16 @@ import { RELEASES, RELEASE_NOTES, REPO } from "../data/credits.js";
 
 // Home sections are plain anchors on the home page and "/#id" elsewhere.
 const PRODUCT_LINKS = [
-  { hash: "#workflows", label: "Workflows" },
+  { hash: "#workflows", label: "Voices" },
   { hash: "#listen", label: "Listen" },
-  { hash: "#whats-new", label: "What's new" },
-  { hash: "#how-it-runs", label: "How it runs" },
-  { path: "/cli/", label: "Command line" },
+  { hash: "#how-it-runs", label: "Privacy" },
   { hash: "#iphone", label: "iPhone" },
+  { hash: "#whats-new", label: "What's new" },
+  { path: "/cli/", label: "Command line" },
   { path: "/engineering/", label: "Engineering" },
   { hash: "#download", label: "Download", everyPage: true },
   { path: "/support/", label: "Support" },
-  { path: "/privacy/", label: "Privacy" },
+  { path: "/privacy/", label: "Privacy policy" },
 ];
 
 /** @param {{ page?: string }} props */

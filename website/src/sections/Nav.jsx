@@ -8,11 +8,11 @@ import { REPO, TESTFLIGHT } from "../data/credits.js";
 // 900 px, "desktop" links from 1200 px. Below the desktop tier the menu sheet
 // lists every link, so nothing depends on the bar's width.
 const BAR_LINKS = [
-  { hash: "#workflows", label: "Workflows", tier: "tablet" },
+  { hash: "#workflows", label: "Voices", tier: "tablet" },
   { hash: "#listen", label: "Listen", tier: "tablet" },
-  { hash: "#how-it-runs", label: "How it runs", tier: "desktop" },
-  { path: "/cli/", page: "cli", label: "Command line", tier: "tablet" },
+  { hash: "#how-it-runs", label: "Privacy", tier: "tablet" },
   { hash: "#iphone", label: "iPhone", tier: "tablet" },
+  { path: "/cli/", page: "cli", label: "Command line", tier: "desktop" },
   { path: "/engineering/", page: "engineering", label: "Engineering", tier: "desktop" },
 ];
 
@@ -177,7 +177,7 @@ export const Nav = ({ page = "home" }) => {
           <ul className="menu-secondary">
             <li><a href={REPO} target="_blank" rel="noreferrer">Open source</a></li>
             <li><a href="/support/">Support</a></li>
-            <li><a href="/privacy/">Privacy</a></li>
+            <li><a href="/privacy/">Privacy policy</a></li>
           </ul>
           <div className="menu-ctas">
             <a className="btn btn-primary" href="#download" onClick={followMenuLink}>

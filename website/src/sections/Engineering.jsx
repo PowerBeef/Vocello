@@ -1,5 +1,4 @@
 import React from "react";
-import { Icon } from "../components/Icon.jsx";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
@@ -121,38 +120,6 @@ const SpeedPanel = () => (
       about a third.
     </figcaption>
   </figure>
-);
-
-// Home: the measured speed with its qualification, then a link to /engineering/.
-export const EngineeringTeaser = () => (
-  <section className="section engineering-section" id="engineering" aria-labelledby="eng-title">
-    <div className="container">
-      <header className="perf-head">
-        <p className="section-note">Measured, not promised</p>
-        <h2 id="eng-title" className="section-title">A first-party engine, measured take by take.</h2>
-        <p className="section-sub">
-          The speed chart comes from one record on Vocello's benchmark host, a Mac mini M6
-          with 16 GB: a 3.0 development build measured on October 7, 2026. The engine changed
-          after it (a newer MLX, full-precision sampling, takes that read the whole script
-          first), and no benchmark of the released build is published yet, so the chart is
-          not a measurement of 3.0.0 itself. The memory figures come from earlier records on
-          the 8 GB Mac mini M2, the support floor.
-          Speed is the real-time factor: seconds of generation per second of audio.
-          Below 1.0, audio generates ahead of playback, and every number here traces
-          to a tracked record in the open repository.
-        </p>
-      </header>
-      <div className="perf-teaser">
-        <SpeedPanel />
-      </div>
-      <p className="section-more">
-        <a className="more-link" href="/engineering/">
-          How the engine is built, and every current limitation
-          <Icon name="arrow-right" size={16} />
-        </a>
-      </p>
-    </div>
-  </section>
 );
 
 // /engineering/: the full engineering story.

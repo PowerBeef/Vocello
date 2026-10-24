@@ -64,7 +64,7 @@ export const Limitations = ({ variant = "full" }) => {
         <div className="limits-copy">
           <p className="section-note">Current limitations</p>
           <h2 id="limitations-title" className="section-title">
-            The honest edges.
+            {summary ? "Good to know." : "The honest edges."}
           </h2>
           <p className="section-sub">
             Vocello is a stable release on the Mac and in the terminal, not a claim that every

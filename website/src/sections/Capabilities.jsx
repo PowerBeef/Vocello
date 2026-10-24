@@ -1,45 +1,28 @@
 import React from "react";
+import { Icon } from "../components/Icon.jsx";
 import { Screenshot } from "../components/Screenshot.jsx";
 
 const ROWS = [
   {
+    icon: "wave-plus",
     k: "Long scripts become projects",
-    v: "A script past the single-take limit is planned into segments, generated in order while you listen along, and joined into one finished audio file. History keeps the project with a per-segment map, and a single weak segment can be regenerated without redoing the rest.",
-    tone: "var(--gold-300)",
+    v: "Paste a whole chapter. Vocello plans it into segments that play while the rest generates, joins them into one file, and lets you redo a single segment.",
   },
   {
-    k: "Ten languages, detected automatically",
-    v: "Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian. Vocello detects the script's language on its own, and a manual language choice is always available. The interface comes in ten languages too, chosen in Settings separately from the speech language.",
-    tone: "var(--lavender-300)",
+    icon: "bubble",
+    k: "Ten languages, detected for you",
+    v: "Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish and Italian. The interface comes in ten languages too.",
   },
   {
-    k: "Downloads that behave",
-    v: "On a Mac, model installs run up to six files at a time and retry interrupted transfers automatically. Every file is checked against its exact size and SHA-256 digest before a model is used, and components shared between models are stored once, saving disk.",
-    tone: "var(--terracotta-300)",
+    icon: "history",
+    k: "Your library, kept",
+    v: "Saved voices and a searchable History of every take, ready to replay or export. Pin a take's seed to make it again with the same settings.",
   },
 ];
 
 export const Capabilities = () => (
   <section className="section caps-section" id="capabilities" aria-labelledby="caps-title">
     <div className="container caps-layout">
-      <div className="caps-copy">
-        <p className="section-note">In the studio</p>
-        <h2 id="caps-title" className="section-title">Built for long scripts.</h2>
-        <p className="section-sub">
-          Vocello turns long scripts into finished projects, speaks ten languages,
-          and installs models reliably. Everything runs locally on your Mac.
-        </p>
-
-        <dl className="caps-list" aria-label="Vocello capabilities">
-          {ROWS.map((r) => (
-            <div className="caps-row" key={r.k} style={{ "--row-tone": r.tone }}>
-              <dt className="caps-k">{r.k}</dt>
-              <dd className="caps-v">{r.v}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-
       <figure className="caps-shot">
         <div className="window">
           <Screenshot
@@ -48,12 +31,22 @@ export const Capabilities = () => (
             alt="Vocello Generation History listing past takes across Built-in Voice, Voice Design, and Voice Cloning"
           />
         </div>
-        <figcaption className="caps-shot-caption">
-          Generation History keeps the app's takes on your Mac, ready to replay, save, or
-          export. Pin a take's seed there, and later generations with the same settings
-          reproduce it.
-        </figcaption>
       </figure>
+      <div className="caps-copy">
+        <p className="section-note">Made for real projects</p>
+        <h2 id="caps-title" className="section-title">From one line to a whole chapter.</h2>
+        <ul className="caps-list" role="list">
+          {ROWS.map((row, index) => (
+            <li className="caps-row" key={row.k} style={{ "--i": index }}>
+              <span className="caps-icon" aria-hidden="true"><Icon name={row.icon} size={20} /></span>
+              <div>
+                <h3 className="caps-k">{row.k}</h3>
+                <p className="caps-v">{row.v}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   </section>
 );

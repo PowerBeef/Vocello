@@ -39,7 +39,7 @@ The site has three React pages, listed in `scripts/site-pages.mjs`:
 
 | Page | Entry | Content |
 | --- | --- | --- |
-| `/` | `index.html` | the home page, which summarizes |
+| `/` | `index.html` | the home page, for people who make voices |
 | `/cli/` | `cli/index.html` | the full command line guide |
 | `/engineering/` | `engineering/index.html` | engine, speed and every current limitation |
 
@@ -48,20 +48,22 @@ The site has three React pages, listed in `scripts/site-pages.mjs`:
 - `vite.config.js` builds every entry. `scripts/prerender.mjs` renders each page into its HTML.
   The site contract checks each page's head, and the rendered contract checks each page's
   landmarks.
-- Home sections the other pages link to are `/#id`. A home teaser keeps its section id, so old
-  anchors still land: `#cli`, `#engineering` and `#limitations`.
+- Home sections the other pages link to are `/#id`. Ids outlive redesigns, so old anchors still
+  land: the privacy section keeps `#how-it-runs` (its comparison `#why-not-cloud-tts`), and the For
+  developers tiles keep `#cli` and `#engineering`.
 
 Keep content in the existing boundaries:
 
-- `src/sections/`: page sections in render order, including:
-  - `WhatsNew.jsx` (`#whats-new`, "What's new in 3.0");
-  - `CommandLine.jsx`: `CommandLineTeaser` (`#cli`) and `CommandLineGuide` (`/cli/`);
-  - `Engineering.jsx`: `EngineeringTeaser` (`#engineering`) and `EngineeringDetail`
-    (`/engineering/`), with the HTML speed chart;
+- `src/sections/`: page sections. The home page (`src/pages/HomePage.jsx`) renders, in order:
+  `Hero`, `Modes` (`#workflows`, the mode switcher), `Listen`, `Privacy` (`#how-it-runs`),
+  `Capabilities`, `IphoneBeta`, `WhatsNew` (`#whats-new`, "What's new in 3.0"), `Developers` (the
+  `#cli` and `#engineering` tiles), `Limitations` (`summary`) and `FinalCTA` (`#download`).
+  - `CommandLine.jsx`: `CommandLineGuide` (`/cli/`);
+  - `Engineering.jsx`: `EngineeringDetail` (`/engineering/`), with the HTML speed chart;
   - `Limitations.jsx`: a `summary` on the home page and the `full` list on `/engineering/`.
 - `src/components/Icon.jsx`: shared SVG vocabulary and deterministic waveform-bar generator.
 - `src/components/Waveform.jsx`: Listen-row waveform primitive.
-- `src/data/workflows.js`: the three workflow bands.
+- `src/data/workflows.js`: the three modes the switcher shows, with the app's short tab names.
 - `src/data/samples.js`: samples, delivery labels and groups, and colors. The samples predate 3.0;
   never present them as 3.0 takes.
 - `src/data/whatsnew.js`: the release's What's new entries, drawn from `../docs/releases/`.
@@ -90,7 +92,7 @@ Four layout tiers, defined in `DESIGN.md` and at the top of `src/site.css`:
 - Media queries use exactly `max-width: 599.98px`, `899.98px` and `1199.98px`, or `min-width:
   1200px` and `1600px`. A short landscape screen, `(orientation: landscape) and (max-height:
   500px)`, also tightens the bar and the display type, and caps screenshots at 80% of the height.
-- Sizes come from the layout tokens in `src/site.css`: `--fs-hero`, `--fs-section`, `--fs-band`,
+- Sizes come from the layout tokens in `src/site.css`: `--fs-display` (the home hero), `--fs-hero`, `--fs-section`, `--fs-band`,
   `--fs-cta`, `--fs-quote`, `--section-y`, `--gutter`, `--nav-h` and `--tap`. Display type and
   section rhythm scale with `clamp()`, so do not add a per-tier font size or section padding.
 - **The bar (`src/sections/Nav.jsx`)** is opaque. Each section link names the narrowest tier
@@ -98,8 +100,8 @@ Four layout tiers, defined in `DESIGN.md` and at the top of `src/site.css`:
 
   | Tier | Bar contents |
   | --- | --- |
-  | Desktop | all six section links, plus Open source from 1320 px |
-  | Tablet | four links (`nav-link--tablet`), Download and the menu button |
+  | Desktop | all six links, plus Open source from 1320 px |
+  | Tablet | four section links (Voices, Listen, Privacy, iPhone), Download and the menu button |
   | Below 900 px | brand, Download and the menu button |
 
   The menu is a native modal `<dialog>` (`#site-menu`) listing every section. It locks the page
@@ -108,8 +110,9 @@ Four layout tiers, defined in `DESIGN.md` and at the top of `src/site.css`:
 - Every interactive control in the bar and the menu keeps a 44 px target (`--tap`). Hover styles
   live only inside `@media (hover: hover) and (pointer: fine)`, so a tap never leaves a control
   looking active.
-- The hero and the closing call to action are the only centered blocks. Body text, lists and
-  tables stay left-aligned at every width.
+- The hero, the closing call to action and short section intros over a centered control or grid
+  (the mode switcher, the privacy facts) are centered. Body text, lists and tables stay left-aligned
+  at every width.
 - `html` sets `scroll-padding-top`, so anchor jumps land below the bar. The body clips sideways
   overflow (`overflow-x: clip`), but the layout matrix measures every element regardless, so fix
   overflow where it starts.
@@ -193,8 +196,11 @@ from unrelated JSX.
   three pages.
 - Listen uses one shared `<audio>` element with `preload="none"` and source swapping for mutual
   exclusion.
-- Reuse the existing `panelSettle` motion and easing. Animate only opacity, transform,
-  border-color, and box-shadow, never layout properties.
+- Motion uses `panelSettle` (the menu sheet and the mode switcher's panels) and `rise` (the hero's
+  one-time entrance), with `--ease-standard`; inside a revealed section its facts and tiles follow
+  in turn (`--i`). Animate only opacity, transform, border-color, and box-shadow, never layout
+  properties. The hero animates in CSS, so it plays without JavaScript; the reduced-motion block
+  removes every animation.
 - Preserve the single `prefers-reduced-motion: reduce` block.
 - Every image needs meaningful alt text or deliberate decorative handling.
 - External `target="_blank"` links require `rel="noreferrer"`; internal targets must resolve.

@@ -121,11 +121,11 @@ test("desktop bar links land their sections below the bar", async ({ page }, tes
   await page.setViewportSize({ width: 1440, height: 900 });
   await stubAnalytics(page);
   await page.goto("/", { waitUntil: "networkidle" });
-  await page.locator(".nav-links").getByRole("link", { name: "How it runs", exact: true }).click();
+  await page.locator(".nav-links").getByRole("link", { name: "Privacy", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#how-it-runs");
   const landing = await page.evaluate(() => ({
     targetTop: Math.round(document.querySelector("#how-it-runs").getBoundingClientRect().top),
     barBottom: Math.round(document.querySelector(".nav").getBoundingClientRect().bottom),
   }));
-  validateAnchorLanding(landing, "bar link How it runs");
+  validateAnchorLanding(landing, "bar link Privacy");
 });

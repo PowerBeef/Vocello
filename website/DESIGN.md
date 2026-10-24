@@ -7,7 +7,9 @@ Dark-first premium brand site for a native Mac app. The page should feel like a 
 - Canonical canvas: charcoal and smoked-glass dark surfaces.
 - Primary accent: Vocello gold, used sparingly for selection, primary actions, and emphasis.
 - Secondary mode tints: lavender for Voice Design, terracotta for Voice Cloning.
-- Status colors stay tiny. Avoid neon, blue-purple SaaS gradients, and decorative glow.
+- Status colors stay tiny. Avoid neon and blue-purple SaaS gradients.
+- A soft, blurred aura of the mode colors may sit behind a product stage (the hero, the selected
+  mode's screenshot, the iPhone, the download icon). Never on text, buttons or cards.
 
 ## Type
 - Use the system stack: SF Pro Text for body, SF Pro Rounded for the wordmark, New York or a system serif only for large brand display moments.
@@ -30,14 +32,20 @@ Dark-first premium brand site for a native Mac app. The page should feel like a 
 
   Display type and section spacing scale fluidly between them. A short landscape screen
   tightens the bar and the type and keeps screenshots within its height.
-- Alignment: the hero and the closing call to action center. Everything else, headings
-  included, is left-aligned at every width; centered paragraphs read with two ragged edges.
+- Alignment: the hero and the closing call to action center, and so may a short section intro
+  (a note, a headline, one sentence) set over a centered control or grid. Everything else,
+  headings included, is left-aligned at every width; centered paragraphs read with two ragged
+  edges.
+- The home page speaks to people who make voices. Developer detail lives on /cli/ and
+  /engineering/, reached from the For developers tiles.
 - The bar is opaque and never lets page text show through it. Below the desktop tier, a menu
   button opens a sheet with every section; links never float alone in the bar.
 - Touch: every control has a 44 px target, and hover styling exists only for fine pointers.
 
 ## Motion
 - Quiet and purposeful. Waveform and tab transitions may move, but nothing should bounce, shimmer, or pulse for decoration.
+- The hero rises in once on load; sections fade up as they enter view, and their facts follow in
+  turn. The mode switcher settles its panel the way the menu sheet does.
 - Respect `prefers-reduced-motion`.
 
 ## Bans

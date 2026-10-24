@@ -1858,6 +1858,21 @@
       "notes": "Found 2026-10-24 by the full local Python suite on macOS 27.0.1: check_bom raises 'CLI installer Bom differs from the payload' every time, in under a second, with no repository change to the package code. CI's Python job runs on Linux and the release jobs on macOS 26, so neither sees it. Not investigated (focus rules)."
     },
     {
+      "id": "BKL-30",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The session-start cache-health test fails under parallel load",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_agent_hooks.py::SessionStartTests::test_cache_health_reports_dangling_public_links_and_low_free_space passes in the routed check's parallel run as it does alone.",
+      "sourceOfTruth": [
+        "scripts/tests/test_agent_hooks.py",
+        "scripts/hooks/session_start.sh"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Found 2026-10-24: failed once in a routed check (-n auto) and passed alone at once. Not investigated (focus rules)."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

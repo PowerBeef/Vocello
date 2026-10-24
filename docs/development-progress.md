@@ -17,6 +17,26 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
+### October 24, evening: RF-15 on build 24 (resume here)
+
+- **Phone state:** build 3.0.0 (24) from TestFlight is installed. The maintainer deleted the
+  development build first, so the app's data is gone and the phone is at first launch, with no models
+  and no clone voice. CoreDevice reports the team's own TestFlight build as `builtByDeveloper: true`
+  with an accessible container, so the lane takes `--candidate-origin-attestation` (`093772a0`).
+  `d157f3f0` fixed the origin field name.
+- **Runs, all retained:** `ios-xcui-candidate-smoke-20261024-171623-786483c6` (phone locked),
+  `-171715-742441fa` (field-name bug), `-173613-91cb0fa1` (every row stopped at the first-launch
+  guard; origin, identity and crash delta passed).
+- **Uncommitted, by design:** a `first-launch` RF-15 row authorized by the maintainer:
+  `Tests/VocelloiOSUITests/VocelloiOSCandidateJourneyUITests.swift`, `VocelloiOSUITestCase.swift`,
+  `scripts/ios_candidate_acceptance.py` and its test, `scripts/ui_test.sh`,
+  `docs/reference/ios-device-testing.md`. It walks onboarding, installs the three shipping models
+  and saves the clone voice from a Design take. Its routed check (UI bundle compile) and a
+  vocello-swift-review were still running at the pause; BKL-30 parks a flaky session-start test.
+- **Resume:** finish the check and review, commit, then with the phone unlocked:
+  `scripts/ui_test.sh ios smoke --preinstalled-candidate build/artifacts/ios/release-candidate-v3.0.0-ios.3 --scenario first-launch --retain-result --candidate-origin-attestation "<statement>"`,
+  then `--scenario all`. Unpushed: `d157f3f0`, `093772a0` and this checkpoint.
+
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
 
 - **Maintainer decision:** iPhone focus. TestFlight carries the 3.0 release candidate, 3.0.0 (24):

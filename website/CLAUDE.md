@@ -7,13 +7,13 @@ do not run Swift, iOS, macOS, Xcode, or native-app UI workflows for website-only
 ## Commands
 
 ```sh
-npm --prefix website run dev      # localhost:5173
+npm --prefix website run dev      # localhost:5173 (the desktop app's browser pane: preview_start website)
 npm --prefix website run lint     # site contract, ESLint (eslint.config.js), tsc --checkJs (jsconfig.json)
 npm --prefix website test         # Node contract fixtures + rendered contract
 npm --prefix website run build    # client + SSR + prerender -> website/dist/
 npm --prefix website run check    # lint + test + build + Playwright browser tests
                                   # (needs Chromium and WebKit once: npx --prefix website playwright install --with-deps chromium webkit)
-npm --prefix website run preview  # serve production build
+npm --prefix website run preview  # serve production build (the browser pane: preview_start website-preview, port 4174)
 ```
 
 Inside `website/`, omit `--prefix website`. `npm run check` is the final deterministic verdict.
@@ -25,10 +25,10 @@ build outputs are generated; do not hand-edit them.
 - Read `PRODUCT.md` and `DESIGN.md` before visual or copy work.
 - Use current primary React/Vite/library documentation; Context7 may assist when callable.
 - For visual, responsive, interactive and accessibility inspection, drive the local dev or preview
-  server with the Chrome browser tools this harness provides (Claude in Chrome or the chrome-devtools
-  MCP) when they are connected; otherwise rely on Playwright output from `npm run check`. Browser
-  evidence supplements rather than replaces `npm run check`. Prefer a fresh tab; reuse an existing
-  signed-in tab only when that state is explicitly needed.
+  server in the Claude desktop app's browser pane (`../.claude/launch.json`: `website`, `website-preview`)
+  or with Claude in Chrome or the chrome-devtools MCP when they are connected; otherwise rely on
+  Playwright output from `npm run check`. Browser evidence supplements rather than replaces `npm run
+  check`. Prefer a fresh tab; reuse an existing signed-in tab only when that state is explicitly needed.
 - Image generation is optional and only appropriate when the user requests new bitmap artwork.
 - Use browser automation only for the website. Never use computer-use, Xcode, Simulator, or native UI
   automation to validate the site.
@@ -209,8 +209,8 @@ from unrelated JSX.
 1. Cross-check changed claims against authoritative parent-repository sources.
 2. Run `npm --prefix website run check`.
 3. For visual or interaction changes, run the local server and inspect a phone (390 px), a phone
-   on its side (844 x 390), a tablet (1024 px) and a desktop (1440 px) with the Chrome browser
-   tools when callable; the layout matrix covers every tier edge.
+   on its side (844 x 390), a tablet (1024 px) and a desktop (1440 px) in the browser pane or with the
+   Chrome browser tools when callable; the layout matrix covers every tier edge.
 4. Confirm reduced motion, keyboard navigation, anchors, audio mutual exclusion, and external-link
    safety when those surfaces changed.
 5. Refresh repository documentation/generated artifacts only when their registered inputs changed.

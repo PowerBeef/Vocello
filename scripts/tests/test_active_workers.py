@@ -67,6 +67,19 @@ class ActiveWorkerTests(unittest.TestCase):
             self.assertTrue(workers.snapshot(base=self.base, inspect=self.inspect)["trackingAvailable"])
         self.assertFalse(workers.snapshot(base=self.base, inspect=self.inspect, session="")["trackingAvailable"])
 
+    def test_other_live_sessions_count_and_end_with_their_session(self) -> None:
+        self.apply("SessionStart")
+        self.apply("SessionStart", session="side")
+        report = self.snapshot()
+        self.assertTrue(report["trackingAvailable"])
+        self.assertEqual((report["activeWorkers"], report["otherSessions"]), (0, 1))
+        self.assertEqual(self.snapshot(session="side")["otherSessions"], 1, "each session sees the other")
+        unmarked = workers.snapshot(base=self.base, inspect=self.inspect, session="")
+        self.assertEqual((unmarked["trackingAvailable"], unmarked["otherSessions"]), (False, 0),
+                         "without a marker the lead-only declaration decides")
+        self.apply("SessionEnd", session="side")
+        self.assertEqual(self.snapshot()["otherSessions"], 0)
+
     def test_dead_reused_and_wrong_command_ownership_are_stale(self) -> None:
         self.apply("SubagentStart", "review")
         for actual in (None, {**self.inspect(43210), "started": "different start"},
@@ -196,6 +209,24 @@ class LifecycleHookTests(unittest.TestCase):
             self.assertIn(rule, agent["hookSpecificOutput"]["additionalContext"])
         self.assertEqual(lifecycle_hook.response({"hook_event_name": "SessionEnd", "session_id": "s"}), {})
 
+    def test_a_session_started_in_a_linked_worktree_is_told_it_is_a_side_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve() / "repo"
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.email=f@example.invalid", "-c", "user.name=F",
+                            "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+            side = root / ".claude/worktrees/side-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "claude/side-1", str(side)],
+                           check=True)
+            with patch.dict(os.environ, {"CLAUDE_ENV_FILE": str(Path(directory) / "env")}):
+                contexts = {cwd: lifecycle_hook.response({"hook_event_name": "SessionStart", "session_id": "s",
+                                                          "cwd": str(cwd)})["hookSpecificOutput"]["additionalContext"]
+                            for cwd in (root, side)}
+        self.assertNotIn("side session", contexts[root])
+        for rule in ("side session", "claude/*", "never push", "native builds", "config/roadmap.json",
+                     workers.key("s")):
+            self.assertIn(rule, contexts[side])
+
 
 class ActiveWorkerCommandTests(unittest.TestCase):
     def invoke(self, report: dict, *args: str, lead_only: str = "") -> tuple[int, str, str]:
@@ -208,11 +239,14 @@ class ActiveWorkerCommandTests(unittest.TestCase):
         return status, out.getvalue(), err.getvalue()
 
     def test_measurement_branch_decisions(self) -> None:
-        base = {"trackingAvailable": True, "activeWorkers": 0, "unknownRecords": 0, "staleRecords": 0}
+        base = {"trackingAvailable": True, "activeWorkers": 0, "otherSessions": 0, "unknownRecords": 0,
+                "staleRecords": 0}
         cases = [
             (base, [], "", 0, ""),
             ({**base, "activeWorkers": 1}, [], "1", 1, "active-workers(1)"),
             ({**base, "activeWorkers": 1}, ["--agents-allowed"], "", 0, "agents:1(allowed)"),
+            ({**base, "otherSessions": 2}, [], "1", 1, "other-sessions(2)"),
+            ({**base, "otherSessions": 1}, ["--agents-allowed"], "", 0, "sessions:1(allowed)"),
             ({**base, "trackingAvailable": False}, [], "", 2, "tracking unavailable"),
             ({**base, "trackingAvailable": False}, [], "1", 0, "lead-only execution declared"),
             ({**base, "unknownRecords": 1}, ["--agents-allowed"], "1", 2, "unreadable ownership"),

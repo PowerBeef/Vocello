@@ -9,7 +9,8 @@
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
 #   * force pushes, pushes of any ref but main, hand-made branches and
 #     worktrees, and ref rewrites (Main is the only published branch; agent
-#     worktrees come only from Claude Code Agent isolation or EnterWorktree)
+#     worktrees come only from Claude Code Agent isolation, EnterWorktree or a
+#     desktop app session)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
 #
 # Everything else exits 0 immediately. The Simulator and cache checks judge each
@@ -76,7 +77,7 @@ if [[ -n "$git_violation" ]]; then
         "Integrate agent branches into main locally, then push main; release tags are maintainer-run, and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
     *)
       block "$reason (CLAUDE.md: Main is the only published branch)." \
-        "Work on main, or use a Claude Code agent worktree (Agent isolation or EnterWorktree); the lead integrates it." ;;
+        "Work on main, or use a Claude Code agent worktree (Agent isolation, EnterWorktree or a desktop app session); the lead integrates it." ;;
   esac
 fi
 

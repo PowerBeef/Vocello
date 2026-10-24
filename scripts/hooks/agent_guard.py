@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for subagents (CLAUDE.md: Agents).
+"""Claude Code PreToolUse guard for subagents and side sessions (CLAUDE.md: Agents).
 
-Only a subagent's hook input carries `agent_id`; the lead's never does, so lead calls
-pass straight through. A subagent may read, edit its assigned files, run the
+Only a subagent's hook input carries `agent_id`; the lead's never does. A call made from a
+linked worktree, such as a desktop app side session's, is screened the same way; the lead works
+in the main checkout, so its calls pass straight through. A subagent may read, edit its assigned files, run the
 deterministic Python and lint checks and commit in its own worktree. It never pushes,
 commits in the main checkout, runs native builds, tests, devices, models or measured
 lanes, or edits the roadmap or the checkpoint (through an edit tool, `roadmap.py`'s writing
@@ -274,10 +275,12 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except ValueError:
         return 0
-    if not isinstance(payload, dict) or not payload.get("agent_id"):
+    if not isinstance(payload, dict):
         return 0
     root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
     cwd = Path(payload.get("cwd") or root)
+    if not payload.get("agent_id") and not (cwd.is_absolute() and adapter.linked_worktree(cwd)):
+        return 0
     tool_input = payload.get("tool_input")
     try:
         if payload.get("tool_name") == "Bash":
@@ -295,7 +298,8 @@ def main() -> int:
         return 0
     if reason:
         print(f"agent guard: BLOCKED — {reason} ({RULE}).", file=sys.stderr)
-        print("Report back to the lead, which owns native builds, measured lanes, pushes, the roadmap and the "
+        print("Agents and side sessions (any call from a linked worktree) report back to the lead, which works "
+              "in the main checkout and owns native builds, measured lanes, pushes, the roadmap and the "
               "checkpoint.", file=sys.stderr)
         return 2
     return 0

@@ -51,6 +51,28 @@ def edit_paths(payload: dict, root: Path) -> list[str]:
     return [str((path if path.is_absolute() else cwd / path).resolve())]
 
 
+def linked_worktree(directory: Path) -> bool:
+    """Inside a linked worktree (an agent's or a desktop side session's), not the main checkout;
+    False outside Git or when Git cannot tell. Only a linked worktree or a submodule has a `.git`
+    file, so the main checkout answers without running Git."""
+    import subprocess
+    try:
+        for parent in (directory, *directory.parents):
+            if (parent / ".git").is_dir():
+                return False
+            if (parent / ".git").is_file():
+                break
+        else:
+            return False
+        result = subprocess.run(["git", "-C", str(directory), "rev-parse", "--path-format=absolute",
+                                 "--absolute-git-dir", "--git-common-dir"],
+                                capture_output=True, text=True, check=False, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    dirs = result.stdout.splitlines()
+    return result.returncode == 0 and len(dirs) == 2 and Path(dirs[0]).resolve() != Path(dirs[1]).resolve()
+
+
 def checkout_root(cwd: Path, fallback: Path) -> Path:
     """Resolve the actual checkout, including registered linked worktrees."""
     import subprocess

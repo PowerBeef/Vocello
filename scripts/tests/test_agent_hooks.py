@@ -447,6 +447,21 @@ class SettingsWiringTests(unittest.TestCase):
                     self.assertTrue(all(r.returncode in (0, 2) for r in results))
 
 
+class LaunchConfigurationTests(unittest.TestCase):
+    def test_the_browser_pane_serves_only_the_website_off_playwrights_port(self):
+        """`.claude/launch.json` feeds the desktop app's preview_start; native apps never run from it."""
+        launch = json.loads((ROOT / ".claude/launch.json").read_text(encoding="utf-8"))
+        self.assertEqual({entry["name"] for entry in launch["configurations"]}, {"website", "website-preview"})
+        for entry in launch["configurations"]:
+            with self.subTest(name=entry["name"]):
+                args = entry["runtimeArgs"]
+                self.assertEqual((entry["runtimeExecutable"], args[:3]), ("npm", ["--prefix", "website", "run"]))
+                self.assertEqual(args[args.index("--port") + 1], str(entry["port"]))
+                self.assertIn("--strictPort", args)
+                # `npm run check` starts Playwright's own preview on 4173 with strictPort.
+                self.assertNotEqual(entry["port"], 4173)
+
+
 class AgentGuardTests(unittest.TestCase):
     """Only subagent hook input carries agent_id; the lead's calls pass through untouched."""
 
@@ -500,11 +515,37 @@ class AgentGuardTests(unittest.TestCase):
                     with self.subTest(tool=tool, path=path, cwd=cwd.name):
                         result = self.guard(edit(path, tool), tool_name=tool, cwd=cwd, root=root)
                         self.assertEqual(result.returncode, 2, result.stderr)
+                        # Without agent_id only the main checkout is the lead's; a worktree is a side session's.
                         self.assertEqual(self.guard(edit(path, tool), tool_name=tool, cwd=cwd, root=root,
-                                                    agent=False).returncode, 0)
+                                                    agent=False).returncode, 2 if cwd == worktree else 0)
                 with self.subTest(tool=tool, path="ordinary"):
                     self.assertEqual(self.guard(edit("Sources/A.swift", tool), tool_name=tool, cwd=worktree,
                                                 root=root).returncode, 0)
+
+    def test_side_sessions_in_a_linked_worktree_follow_the_agent_rules(self):
+        """A desktop app side session carries no agent_id; its worktree makes it a worker, never the lead."""
+        with tempfile.TemporaryDirectory(prefix="vocello side session ") as tmp:
+            root = Path(tmp).resolve() / "main checkout"
+            initialize_repo(root)
+            side = root / ".claude/worktrees/side-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "claude/side-1", str(side)],
+                           check=True)
+            (side / "Sources").mkdir()
+            for command in ("scripts/dev.sh build", "scripts/ui_test.sh ios smoke", "git push origin main",
+                            "python3 scripts/roadmap.py note RF-1 x", f"git -C '{root}' com" "mit -m x"):
+                with self.subTest(command=command):
+                    result = self.guard({"command": command}, agent=False, cwd=side, root=root)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("agent guard: BLOCKED", result.stderr)
+                    lead = self.guard({"command": command}, agent=False, cwd=root, root=root)
+                    self.assertEqual(lead.returncode, 0, lead.stderr)
+            for command in ("git com" "mit -m x", "scripts/dev.sh py scripts/tests/test_x.py", "git status"):
+                with self.subTest(allowed=command):
+                    self.assertEqual(self.guard({"command": command}, agent=False, cwd=side, root=root).returncode, 0)
+            roadmap = self.guard(edit("config/roadmap.json"), tool_name="Edit", agent=False, cwd=side, root=root)
+            self.assertEqual(roadmap.returncode, 2, roadmap.stderr)
+            self.assertEqual(self.guard(edit("Sources/A.swift"), tool_name="Edit", agent=False, cwd=side,
+                                        root=root).returncode, 0)
 
 
 class PermissionTests(unittest.TestCase):
@@ -517,7 +558,8 @@ class PermissionTests(unittest.TestCase):
         for rule in ("Bash(git push)", "Bash(git push *)"):
             self.assertIn(rule, self.ask)
         for rule in ("Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push --tags*)",
-                     "Bash(git push origin HEAD*)", "Bash(git push origin worktree-*)", "Bash(git push -u*)",
+                     "Bash(git push origin HEAD*)", "Bash(git push origin worktree-*)",
+                     "Bash(git push origin claude/*)", "Bash(git push -u*)",
                      "Bash(git checkout -b*)", "Bash(git switch -c*)", "Bash(git worktree add*)",
                      "Bash(git update-ref*)", "Bash(git add -A*)", "Bash(git add .)",
                      "Bash(git commit -a*)"):
@@ -592,10 +634,12 @@ class PermissionTests(unittest.TestCase):
                                              f"launch_app{SIM_SUFFIX}", f"open{SIM_SUFFIX}", f"stop_app{SIM_SUFFIX}",
                                              "screenshot", "snapshot_ui", "clean", "tap")]
         denied.append(f"mcp__XcodeBuildMCP__debug_attach{SIM_SUFFIX}")
+        denied += [f"mcp__Claude_Code_iOS_{SIM}__control", f"mcp__Claude_Code_iOS_{SIM}__build"]
         retained = [server + name for name in ("list_schemes", "discover_projs", "show_build_settings",
                                                "get_coverage_report", "session_show_defaults")]
         retained += ["mcp__XcodeBuildMCP__build_device", "mcp__XcodeBuildMCP__test_macos",
                      "mcp__claude-in-chrome__computer", "mcp__sosumi__searchAppleDocumentation",
+                     "mcp__Claude_Browser__navigate", "mcp__computer-use__request_access",
                      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot"]
         patterns = [rule for rule in self.deny if rule.startswith("mcp__")]
         for name in denied:
@@ -614,7 +658,8 @@ class PermissionTests(unittest.TestCase):
         self.assertNotIn("EnterWorktree", self.deny)
         self.assertFalse([rule for rule in self.deny if rule.startswith(("Agent(Explore", "Agent(general"))])
         for rule in ("Bash(git worktree remove .claude/worktrees/*)", "Bash(git merge --ff-only worktree-*)",
-                     "Bash(git branch -d worktree-*)", "Bash(git cherry-pick *)"):
+                     "Bash(git branch -d worktree-*)", "Bash(git merge --ff-only claude/*)",
+                     "Bash(git branch -d claude/*)", "Bash(git cherry-pick *)"):
             self.assertIn(rule, self.allow)
         for rule in self.allow:
             words = rule[len("Bash("):-1].split() if rule.startswith("Bash(") else []
@@ -641,6 +686,19 @@ class SimulatorToolGuardTests(unittest.TestCase):
             with self.subTest(tool=tool):
                 result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_desktop_simulator_panel_is_refused_but_computer_use_is_not(self):
+        """The desktop app's iOS Simulator server is an unsupported destination. Computer use may reach the
+        Mac app and a mirrored iPhone (maintainer decision 2026-10-24); XCUITest alone yields evidence."""
+        result = invoke("simulator_tool_guard.py", {"action": "attach"}, tool_name=f"mcp__Claude_Code_iOS_{SIM}__control")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        for tool, tool_input in (("request_access", {"apps": ["Vocello", "iPhone Mirroring"], "reason": "x"}),
+                                 ("open_application", {"app": "com.qwenvoice.app"}),
+                                 ("app_click", {"app": "com.apple.ScreenContinuity"}), ("screenshot", {})):
+            with self.subTest(tool=tool):
+                result = invoke("simulator_tool_guard.py", tool_input, tool_name="mcp__computer-use__" + tool)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
 
 class PolicyGuardTests(unittest.TestCase):
     def guard(self, command: str):
@@ -1211,18 +1269,26 @@ class WorktreeCommitLintTests(unittest.TestCase):
         result = self.lint("git -C .claude/worktrees/agent-1 com" "mit -m x", self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_desktop_session_worktree_on_its_claude_branch_may_commit(self):
+        side = self.worktree(".claude/worktrees/side-1", "claude/side-1")
+        self.stage(side)
+        result = self.lint(self.commit, side)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.lint("git push origin claude/side-1", side)
+        self.assertEqual(result.returncode, 2, result.stderr)
+
     def test_retired_codex_branches_cannot_commit_in_a_linked_worktree(self):
         legacy = self.worktree(".claude/worktrees/legacy", "codex/legacy")
         self.stage(legacy)
         result = self.lint(self.commit, legacy)
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("worktree-* branch", result.stderr)
+        self.assertIn("worktree-* or claude/* branch", result.stderr)
 
     def test_wrong_branch_and_unrelated_repository_worktrees_are_blocked(self):
         checkout = self.worktree("wt/wrong-branch", "topic")
         result = self.lint(self.commit, checkout)
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("worktree-* branch", result.stderr)
+        self.assertIn("worktree-* or claude/* branch", result.stderr)
         unrelated = self.root.parent / "unrelated repository"
         initialize_repo(unrelated)
         foreign = unrelated.parent / "foreign agent"

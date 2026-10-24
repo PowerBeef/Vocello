@@ -12,7 +12,8 @@
 #
 # Commits are allowed in exactly two places: the main checkout on `main`, and a
 # registered linked worktree on a `worktree-*` branch (a Claude Code agent
-# worktree under .claude/worktrees), which the lead integrates.
+# worktree under .claude/worktrees) or a `claude/*` branch (a desktop app
+# session's worktree, the app's default branch prefix), which the lead integrates.
 # Pushes are allowed only from the main checkout on `main`. Commits also need
 # clean whitespace in the staged diff and no private path or credential in the
 # staged blobs; a commit that takes more than the index holds when the hook runs
@@ -264,9 +265,9 @@ while IFS= read -r line; do
       "commits in the main checkout are made directly on main (current: ${branch:-detached HEAD})." \
       "Return to main without discarding work; agent work belongs in a Claude Code agent worktree (.claude/worktrees/<name>)."
   elif (( in_agent_worktree )); then
-    [[ "$branch" == worktree-* ]] || block \
-      "agent worktrees commit only on their worktree-* branch (current: ${branch:-detached HEAD})." \
-      "Create agent worktrees through Agent isolation or EnterWorktree; the lead integrates them."
+    [[ "$branch" == worktree-* || "$branch" == claude/* ]] || block \
+      "agent and side-session worktrees commit only on their worktree-* or claude/* branch (current: ${branch:-detached HEAD})." \
+      "Create worktrees through Agent isolation, EnterWorktree or a desktop app session; the lead integrates them."
   else
     block "commits happen on main or in a registered Claude Code agent worktree (CLAUDE.md: Main is the only published branch)." \
       "Use a registered worktree in this repository."

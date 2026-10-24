@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Host-wide Claude Code worker leases. Never use Git worktree locks as activity evidence.
 
-Leases bind a session/agent id to a live Claude Code process and its start time. Unknown
-ownership is inconclusive, not idle. Hooks are supplementary: the lead must also
-join its known workers before measurements. No transcript or prompt is retained.
+Leases bind a session/agent id to a live Claude Code process and its start time. Another
+live session counts like a worker. Unknown ownership is inconclusive, not idle. Hooks are
+supplementary: the lead must also join its known workers before measurements. No transcript
+or prompt is retained.
 """
 from __future__ import annotations
 
@@ -124,6 +125,7 @@ def snapshot(*, base: Path | None = None, inspect=process, session: str | None =
     session = session if session is not None else os.environ.get("QVOICE_WORKER_SESSION", "")
     current_tracked = False
     workers = 0
+    sessions = 0
     stale = 0
     unknown = 0
     for path in base.glob("*.json"):
@@ -142,12 +144,16 @@ def snapshot(*, base: Path | None = None, inspect=process, session: str | None =
                 workers += 1
             elif record["kind"] == "tracking-error":
                 unknown += 1
-            elif session and record.get("session") == session:
+            elif not session:
+                continue  # Without this session's marker no session is told apart: lead-only applies.
+            elif record.get("session") == session:
                 current_tracked = True
+            else:
+                sessions += 1  # Another live session here: a desktop side session, a second terminal.
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
             unknown += 1
     return {"trackingAvailable": current_tracked and unknown == 0,
-            "activeWorkers": workers, "staleRecords": stale, "unknownRecords": unknown}
+            "activeWorkers": workers, "otherSessions": sessions, "staleRecords": stale, "unknownRecords": unknown}
 
 
 def main() -> int:
@@ -169,11 +175,17 @@ def main() -> int:
     if report["activeWorkers"] and not args.agents_allowed:
         print(f"active-workers({report['activeWorkers']})", file=sys.stderr)
         return 1
+    if report["otherSessions"] and not args.agents_allowed:
+        print(f"other-sessions({report['otherSessions']}): stop or archive the other Claude Code sessions "
+              "in this repository first", file=sys.stderr)
+        return 1
     if not report["trackingAvailable"] and os.environ.get("QVOICE_LEAD_ONLY") != "1":
         print("worker tracking unavailable; join all workers, then explicitly use QVOICE_LEAD_ONLY=1", file=sys.stderr)
         return 2
-    if report["activeWorkers"]:
-        print(f"agents:{report['activeWorkers']}(allowed)", file=sys.stderr)
+    allowed = " ".join(f"{label}:{report[field]}" for label, field in
+                       (("agents", "activeWorkers"), ("sessions", "otherSessions")) if report[field])
+    if allowed:
+        print(f"{allowed}(allowed)", file=sys.stderr)
     elif not report["trackingAvailable"]:
         print("worker tracking unavailable; lead-only execution declared", file=sys.stderr)
     return 0

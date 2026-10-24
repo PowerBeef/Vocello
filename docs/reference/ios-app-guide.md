@@ -888,5 +888,5 @@ product accessibility requirements, but are not claimed as coverage of the minim
 | UI frame-health scenarios | `scripts/ui_test.sh ios perf` |
 | Physical-device deterministic/runtime diagnostic | `scripts/ios_device.sh gate` |
 
-Never use an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver, or committed
-coordinate table.
+Never validate with an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver (computer
+use through iPhone Mirroring explores, never validates: `CLAUDE.md`), or committed coordinate table.

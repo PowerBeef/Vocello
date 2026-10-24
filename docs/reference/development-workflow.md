@@ -163,17 +163,22 @@ Open the clone with `claude` at the repository root and trust the workspace; Cla
 path-scoped rules in `.claude/rules`. Check `/hooks` and `/permissions` in the first session and follow
 the [fresh-session procedure](development-workflow.md#claude-code-setup-and-tool-routing).
 Personal overrides go in the untracked `.claude/settings.local.json`; do not change global trust or
-settings automatically. Agent worktrees under `.claude/worktrees` stay untracked.
+settings automatically. Agent worktrees under `.claude/worktrees` stay untracked. The Claude desktop
+app's Code tab runs the same Claude Code with the same hooks, permissions, skills and agents: open
+the lead session on the repository folder itself, without a worktree
+([The Claude desktop app](#the-claude-desktop-app)).
 
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
 models or touching devices. Detect MCP tools in the live session.
 
-The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-10-12 it is:
+The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-10-24 it is:
 
 - **Plugins:** axiom, context7, swift-lsp, clangd-lsp, chrome-devtools-mcp, skill-creator,
   claude-md-management and asc.
 - **MCP servers:** MobileBuildMCP, sosumi and `hf-mcp-server`.
 - **Skills:** the swift-mlx skills.
+- **Desktop app:** the Claude desktop app's Code tab, with its browser pane, Terminal panel and
+  computer use.
 - **Browser and connectors:** Claude in Chrome and the claude.ai GitHub connector.
 - **CLIs:** `hf`, `asc` and `gh`.
 
@@ -182,7 +187,7 @@ through the `hf` CLI and `hf-mcp-server`. Use existing plugins when connected; n
 automatic global installs. Uninstall an unwanted plugin rather than disabling it in settings.
 `.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
 with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
-canonical builds and host serialization. Native UI uses only XCUITest.
+canonical builds and host serialization. Native UI evidence comes only from XCUITest.
 
 For a symbol server, `buildServer.json` is ignored because it holds machine paths. The swift-lsp
 plugin's sourcekit-lsp reads it for the LSP tool. When explicitly setting up an installed
@@ -468,8 +473,9 @@ Preserve the original failure. Investigate it before a rerun; record the reason 
 ## Parallel agents and worktrees
 
 Use selective parallelism for disjoint editing, research, review or triage. At most four agents may be
-active including the lead, inheriting the selected model. This limit is an instruction: a hook cap would
-misread a subagent that died without SubagentStop as still active until its session ends.
+active including the lead, inheriting the selected model; desktop app side sessions count. This limit
+is an instruction: a hook cap would misread a subagent that died without SubagentStop as still active
+until its session ends.
 One full Python suite and one browser acceptance run at a time on the 16 GB development host.
 Agents doing native work remain code-only; the lead owns native builds and all measured lanes.
 
@@ -494,11 +500,29 @@ ignored evidence first; never discard unintegrated work to tidy the workspace (`
 `git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
 `git cherry main worktree-<name>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
 
+The Claude desktop app adds side sessions: separate sessions the lead starts (`start_session`) or the
+maintainer opens, each with its own transcript. They follow the agent rules, and the lead stays in the
+main checkout. A read-only side session (CI or release watching, triage, research) shares the main
+checkout (`use_worktree: false`), often on a cheaper model, and its brief says it edits nothing. An
+editing side session gets the app's own worktree (`use_worktree: true`; omitted, a side session of a
+lead in a plain folder shares that folder, where no guard can tell it from the lead),
+`.claude/worktrees/<name>` on `claude/<name>` (the
+Code tab's default branch prefix `claude` and in-project worktree location; keep both), cut from local
+HEAD, so commit the checkpoint first. The SessionStart hook tells a session that starts in a linked
+worktree that it is a side session, and `agent_guard.py` screens every call made from a linked
+worktree as it screens a subagent's, `agent_id` or not; a lead that `cd`s into a worktree is screened
+the same way until it leaves. The commit lint accepts the `claude/*` branch there. The lead integrates
+it like an agent branch (`git cherry main claude/<name>`, then cherry-pick or `merge --ff-only`),
+archives the session in the app and removes any worktree and branch left behind.
+
 Before source-bound measurements join or stop all delegated work. `scripts/active_workers.py`
 uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events, host-wide leases and the live
 start identity of the native `claude` process. Dead, reused-PID and non-Claude ownership records
 (including retired Codex leases and Node-hosted clients) cannot establish activity.
 Unknown ownership blocks measurements. A locked Git worktree may be idle and is never counted.
+Another live session in this repository (a desktop side session, a second terminal) counts like a
+worker: `active_workers.py check` reports `other-sessions(N)` and the lane waits until those sessions are
+stopped or archived; `--agents-allowed` lanes tolerate them.
 Root interruption/teardown does not prove workers stopped, so live worker leases remain conservative.
 
 The SessionStart hook exports the session's opaque `QVOICE_WORKER_SESSION` marker to later Bash calls
@@ -507,7 +531,9 @@ registration. Another session's receipt cannot establish it.
 If hooks or ownership inventory are unavailable, join all known workers and explicitly use
 `QVOICE_LEAD_ONLY=1` for the lane. Never use that declaration to bypass a known active or unknown
 worker lease. Registration failures invalidate the session receipt and retain a conservative marker;
-inspect unresolved markers after joining work rather than blindly deleting them. Hooks cannot prove
+inspect unresolved markers after joining work rather than blindly deleting them. Without the marker no
+session can be told from another, so the lead-only declaration also covers side sessions: stop or
+archive them first. Hooks cannot prove
 all clients on the host are instrumented, so the lead still checks its known workers and host posture.
 
 `require_quiet_host` also checks native-lock ownership, load and memory pressure. The existing
@@ -534,9 +560,9 @@ and never builds or touches a phone.
 
 | Event | Tool/event matcher | Handler | Effect |
 | --- | --- | --- | --- |
-| SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; bounded local Git/status/checkpoint context |
-| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent limits |
-| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
+| SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; the agent rules for a session started in a linked worktree; bounded local Git/status/checkpoint context |
+| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent and side-session limits |
+| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents and side sessions never edit the roadmap or checkpoint |
 | PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py | Refuses unsupported-destination tool routes |
 | PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
 | SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration with agent rules, completion and conservative teardown |
@@ -550,7 +576,8 @@ chains, subshells and heredocs. These cooperative guards cannot sandbox interpre
 arbitrary external programs.
 
 The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
-the routine loop: read-only Git, scoped staging and commits, worktree integration, `scripts/dev.sh`,
+the routine loop: read-only Git, scoped staging and commits, worktree integration (`worktree-*` and
+`claude/*` branches), `scripts/dev.sh`,
 contract and privacy scripts, the website check and the local `macos_test.sh`, `ui_test.sh` and
 `ios_device.sh` lanes. It also covers read-only Hugging Face queries: the `hf` CLI's `version`,
 `auth whoami`, `models` and `datasets` card/info/list, `papers`, and `cache` list/verify, plus the
@@ -567,8 +594,10 @@ External writes include GitHub, the Vercel CLI and App Store Connect. On Hugging
 
 `deny` covers force and non-main pushes, hand-made branches and worktrees, `update-ref`, stashing,
 broad staging, releases, `.xcodeproj` edits and `hf auth token`, which prints the stored credential. It
-also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, a dozen
-MobileBuildMCP UI tools by name) and the Axiom simulator/test agents. Ask rules still prompt in auto mode and deny
+also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
+desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
+simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the
+maintainer to approve each application it controls. Ask rules still prompt in auto mode and deny
 wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
 overrides and cannot lift a tracked deny.
 
@@ -610,18 +639,22 @@ init message lists the tools, agents and skills it received. The 2026-10-12 migr
 deny rules removing those MCP tools and the three Axiom simulator/test agents, the tooling rule loading
 through its symlink, and a denied `git add -A` being refused. SessionStart, worker receipts and
 SubagentStart/Stop have since been observed in live sessions (a subagent receives the SubagentStart
-context from `worker_lifecycle.py`).
+context from `worker_lifecycle.py`). In the desktop app, run the same check in a new session opened on
+the repository folder without a worktree, and confirm that `preview_start` with `website` serves the
+home page and that no `mcp__Claude_Code_iOS_Simulator__*` tool is offered. The first desktop session
+(2026-10-24) observed the SessionStart output, a non-empty marker, `trackingAvailable: true` with the
+app's `claude` process as owner, and the `website` preview.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
-| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; no alternative native UI driver |
+| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; computer use to explore, never for evidence ([The Claude desktop app](#the-claude-desktop-app)) |
 | Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Axiom skills and read-only auditor agents; sosumi; Xcode's bundled documentation |
 | Libraries | Pinned versions in `config/toolchain.json` and package manifests | Context7 |
 | MLX runtime | Owned facade, exact pins and mlx-guide.md | Installed swift-mlx / swift-mlx-lm skills |
 | Code review | The actual diff and the reference rules | vocello-swift-review; `/code-review`; `/security-review` for hooks, security, persistence and release |
 | Finished native run | `scripts/dev.sh triage <run-directory> --json` and testing-runbook.md | Read-only vocello-xcresult-triage agent, xcresulttool, LLDB when indicated |
 | Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | Verified Axiom axbuild, xcsym and xcprof helpers and the crash-analyzer agent, with script-only fallback |
-| Website | `npm --prefix website run check` | Claude in Chrome or chrome-devtools for local rendered inspection; Vercel deploys from Git (no Vercel plugin; the `vercel` CLI asks) |
+| Website | `npm --prefix website run check` | The desktop app's browser pane (`.claude/launch.json`), Claude in Chrome or chrome-devtools for local rendered inspection; Vercel deploys from Git (no Vercel plugin; the `vercel` CLI asks) |
 | Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
 | Model research | Receipts, exact pins and maintenance contracts | The `hf` CLI and the `hf-mcp-server` MCP for hub search, cards, file sizes, licenses and papers; downloads, Space runs and Jobs need a specific request; no implied repin |
@@ -647,6 +680,57 @@ and rerun routes conflict with this project's physical-iPhone/XCUITest rules. Mi
 never block the script workflow; personal plugins, skills, accounts and credentials are not CI
 dependencies. Never install or change global configuration simply to satisfy a routing table.
 
+### The Claude desktop app
+
+The Code tab of the Claude desktop app is the maintainer's client since 2026-10-24. It runs the same
+Claude Code and loads the same `CLAUDE.md`, hooks, permissions, skills and agents; its session process
+is named `claude`, so worker tracking works unchanged. What it adds, and the rules for each:
+
+- **Sessions.** The lead opens the repository folder without a worktree. Side sessions follow
+  [Parallel agents and worktrees](#parallel-agents-and-worktrees). The task list, chapters, diff pane
+  and next-step box belong to the app and change nothing in the repository's loop.
+- **Browser pane.** `.claude/launch.json` defines `website` (the Vite dev server on 127.0.0.1:5173) and
+  `website-preview` (the built site on 4174, after `npm --prefix website run build`; 4173 stays free
+  for the preview Playwright starts in `npm run check`). `preview_start` with either name opens the
+  pane; `resize_window` sets the widths `website/CLAUDE.md` asks for, and `read_page` or
+  `get_page_text` reads the page before any screenshot. Claude in Chrome stays for pages behind the
+  maintainer's sign-ins, chrome-devtools for Lighthouse, performance traces and heap snapshots. The pane
+  supplements `npm --prefix website run check`, never replaces it.
+- **Computer use** (maintainer decision 2026-10-24). Computer use may drive the Mac app (a development
+  build or the installed release), Xcode, Device Hub and the paired iPhone through iPhone Mirroring: to
+  explore a change before writing its XCUITest, to reproduce a report, to look for a blocking dialog
+  before a UI lane, or for a setup chore such as installing a TestFlight candidate on the phone. Only
+  the lead uses it, never while a native, device or measured lane runs (it shares the display, the
+  phone and the host's load, and iPhone Mirroring needs the phone locked, which device lanes cannot
+  use), and the iPhone only in a window the maintainer announced. What it shows is never a lane verdict,
+  an evidence record or a substitute for XCUITest. It never signs in, enters a credential, accepts terms,
+  grants a privacy permission or changes a system or security setting (the TCC grants in
+  [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc), Developer Mode, UI Automation,
+  airplane mode): those stay the maintainer's. The app asks the maintainer to approve each application it
+  controls. Simulator routes stay unsupported.
+- **Terminal panel.** A command the maintainer must run (a login such as `asc auth login` or
+  `hf auth login`, a model install, a publication step) goes in a `bash` block, whose Run button runs it,
+  or in a Terminal panel tab; any secret is typed there, never in chat. A watcher the maintainer wants to
+  see may also run in a tab.
+- **Waiting.** A background Bash command re-invokes the session when it exits: wait for one event (a run
+  finishing, a deployment waiting for approval) with an `until` loop in the background, and use Monitor
+  for a stream of events; never poll with `sleep`. The app keeps the Mac from idle-sleeping while a
+  session works; before a wait that outlasts the turn (a release run, a lane checked later) call
+  `request_keep_awake` with `until: "session_idle"`. It prevents idle sleep only: a closed lid still
+  sleeps, and a macOS UI lane still needs the session unlocked.
+- **Notifications and Remote Control.** The maintainer may follow a session from the phone.
+  `PushNotification` is for what they must act on now (a `release` approval, a failed lane, a phone to
+  unlock in an announced window), never routine progress; `SendUserFile` hands over a finished report.
+- **Artifacts.** An artifact is hosted on claude.ai, so publish one only on request. Artifacts, file
+  cards and notifications follow the privacy rule: no raw diagnostics, private paths, prompts,
+  transcripts, reference audio or credentials; failure text goes through `DiagnosticPrivacy` summaries,
+  and screenshots showing any of these stay local and untracked.
+- **iOS Simulator panel.** Denied (`mcp__Claude_Code_iOS_Simulator__*` in the permissions, and
+  `simulator_tool_guard.py`); the physical-iPhone lanes stay the only iOS route.
+
+The Code tab's settings (branch prefix, worktree location, keep-awake, notifications) are the
+maintainer's: Claude proposes a change through the app and never changes one to make a check pass.
+
 ### Host and release prerequisites
 
 The development host may use a newer Xcode than the exact CI/release pin. `doctor` reports this
@@ -659,7 +743,8 @@ Missing pinned tools require the existing authorized installation workflow befor
 do not repin dependencies or change global settings to make the inventory green.
 
 For macOS XCUITest, keep one stable interactive desktop session and avoid simultaneous UI work.
-Check visible blocking dialogs and competing automation before starting, then leave the desktop
+Check visible blocking dialogs and competing automation before starting (a computer-use screenshot may
+look; computer use stops before the lane starts), then leave the desktop
 available until collection finishes. Report XCTest display/screenshot errors from retained evidence;
 the earlier Unity modal and display-ID error do not establish a causal link. Do not automatically
 close unrelated apps or modify display settings. Failed UI runs retain their original identities.

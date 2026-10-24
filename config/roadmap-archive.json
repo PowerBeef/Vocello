@@ -5587,6 +5587,26 @@
       ],
       "updated": "2026-10-24",
       "notes": "Done 2026-10-24. Path-bearing runtime prints are privacy-safe Logger messages; the IPA verifier fails closed (script payloads, test/debug executables, diagnostic strings, absolute paths, dlopen, escaping symlinks, privacy manifests, dSYM UUIDs) and passed on candidate 3.0.0 (24) in release run 40103005257. A full generic-device Release Analyze of the candidate source (no product input changed since 26995f71; Xcode 27.1, isolated release-ios root) logged 99 warnings, all registered: the 14 MLX tensor isolation warnings at their bounds, 4 empty shims, the App Intents notice (Xcode 27 rewords it), and two classes reviewed today that the candidate's Xcode 26.6 archive log also shows: 76 C++17-extension warnings from the pinned mlx-swift Metal headers, and 4 shared-folder project group warnings (fix parked as BKL-32). Checkout warnings are now attributed to their dependency, never to repository source. History: git log -p -- config/roadmap.json."
+    },
+    {
+      "id": "DW-02",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Development workflow: structural tooling (audit Phase 1)",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-18-dev-workflow-audit.md",
+        "scripts/macos_test.sh",
+        "scripts/check_project_inputs.sh",
+        ".claude/agents/vocello-swift-review.md"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Done 2026-10-24. Landed 2026-10-18: P1-1 lane ledger and dev.sh status --kpi (4a1f3c34), P1-3 parallel path-selected contract gate (3c227dd1), P1-4 and P1-5 deadline and report-only Main Thread Checker (a59c556d), P1-6 Swift Testing parser (c406eea2), P1-7 and P1-8 shellcheck and pinned ruff against shrinking baselines (eb4ddab3), P1-9 behaviour tests over the shipped shell (27cdbdb9, 1e564f2a), P1-11 (d4b08f21), P1-12 (f0559d98), P1-13 (e834b10f), P1-14 (9204b75d); P1-2's Mac half was the existing ui-preflight. 2026-10-24 in an iPhone window: P1-2's iPhone half, ios_ui_preflight as the recorded ui-preflight step of every iOS lane (cda52661), and its refusal triaging as an infrastructure failure (7ac018a5), proven on the locked phone in 3 s (ios-xcui-candidate-smoke-20261024-220631-2fcca9d6); P1-15's iPhone half, derive_team shared from scripts/lib/dev_signing.sh (cda52661; ios_device.sh preflight resolves signing through it). The other same-named lane functions differ by platform. P1-10 declined (see gate). History: git log -p -- config/roadmap.json.",
+      "evidence": [
+        "commit:cda52661",
+        "commit:7ac018a5"
+      ]
     }
   ]
 }

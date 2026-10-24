@@ -2092,23 +2092,6 @@
       "notes": "Covers PA-26's B6 part (PA-26 stays in project-audit-2026-09)."
     },
     {
-      "id": "DW-02",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Development workflow: structural tooling (audit Phase 1)",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "Audit P1-1 to P1-15 land: a lane ledger with failure classes, a fast UI readiness preflight, parallel path-selected contract validators, a deterministic-lane deadline, report-only Main Thread Checker, Swift Testing-ready parsers proven by a spike, shellcheck and pinned ruff in CI with baselines, behaviour tests instead of shell-text tests, cheaper CI builds, a review agent that checks test adequacy, the Oct 16 findings mapped in the risk spine, a setting-availability probe and nightly coverage, and one shared library for the duplicated lane functions (iOS side in an announced iPhone window). P1-10 is declined: release.sh runs the readiness gate unconditionally by design, and the rehearsal keeps exercising it.",
-      "sourceOfTruth": [
-        "docs/audits/2026-10-18-dev-workflow-audit.md",
-        "scripts/macos_test.sh",
-        "scripts/check_project_inputs.sh",
-        ".claude/agents/vocello-swift-review.md"
-      ],
-      "updated": "2026-10-19",
-      "unparkWhen": "The next announced iPhone window: P1-2's iPhone readiness preflight and P1-15's ios_device.sh half run there.",
-      "notes": "Maintainer approved ruff as a new pinned tool on 2026-10-18. Landed 2026-10-18: P1-1 lane ledger and dev.sh status --kpi (4a1f3c34), P1-3 parallel path-selected contract gate (3c227dd1; about 11 s to 2-3 s), P1-4 and P1-5 deadline and report-only Main Thread Checker (a59c556d), P1-6 Swift Testing parser; the raw xctest runner never runs Swift Testing, so an invariant keeps it out of Tests/ (c406eea2), P1-7 and P1-8 shellcheck and pinned ruff against shrinking baselines (eb4ddab3), P1-9 behaviour tests over the shipped shell (27cdbdb9, 1e564f2a), P1-11 (d4b08f21), P1-12 (f0559d98), P1-13 (e834b10f), P1-14 (9204b75d). P1-10 declined (see gate). P1-2's Mac half is met by the existing ui-preflight: automation mode, session lock, TCC and the clone fixture fail before build-for-testing, about 1 s into the run (retained ledgers, 2026-10-18). Left: P1-2's iPhone half and P1-15's ios_device.sh half, in an iPhone window."
-    },
-    {
       "id": "DW-03",
       "plan": "release-first-3-0-2026-09",
       "title": "Development workflow: product-side quality (audit Phase 2)",
@@ -2139,7 +2122,7 @@
       ],
       "updated": "2026-10-20",
       "due": "2026-10-30",
-      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers (screened from a linked worktree, commit on claude/*, other live sessions hold measured lanes), computer use allowed except as evidence, browser-pane launch.json. Open: the iOS-only lane snippets and ios_device.sh in an iPhone window; CI on Xcode 27 when runners offer it."
+      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers (screened from a linked worktree, commit on claude/*, other live sessions hold measured lanes), computer use allowed except as evidence, browser-pane launch.json. Open: the iOS-only lane snippets and ios_device.sh in an iPhone window; CI on Xcode 27 when runners offer it. 2026-10-24: DW-02 shared derive_team with ios_device.sh; moving the iOS-only lane snippets into tested Python modules still needs an unlocked phone to prove the moved lanes end to end, so it waits for an attended window."
     }
   ]
 }

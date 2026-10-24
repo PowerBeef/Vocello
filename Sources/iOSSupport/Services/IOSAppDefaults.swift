@@ -18,6 +18,7 @@ public enum IOSAppDefaults {
 
     public static let reduceMotionEnabledKey = "vocello.ios.reduceMotionEnabled"
     public static let reduceTransparencyEnabledKey = "vocello.ios.reduceTransparencyEnabled"
+    public static let cellularModelDownloadsKey = "vocello.ios.cellularModelDownloads"
 
     /// True once the user has dismissed the first-run onboarding flow.
     /// Skipped automatically when any model is already installed (returning
@@ -39,5 +40,13 @@ public enum IOSAppDefaults {
     public static var reduceTransparencyEnabled: Bool {
         get { defaults.bool(forKey: reduceTransparencyEnabledKey) }
         set { defaults.set(newValue, forKey: reduceTransparencyEnabledKey) }
+    }
+
+    /// Opt-in for model downloads over cellular data (RF-35). Off by default: a
+    /// download then waits for Wi-Fi. Read as each download request is built, so a
+    /// change applies to downloads that start after it.
+    public static var cellularModelDownloadsAllowed: Bool {
+        get { defaults.bool(forKey: cellularModelDownloadsKey) }
+        set { defaults.set(newValue, forKey: cellularModelDownloadsKey) }
     }
 }

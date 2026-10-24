@@ -517,10 +517,15 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | Update available | `iosModelUpdate_<id>` ("Update") plus `iosModelDelete_<id>` ("Remove") | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
-data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
-downloads are Wi-Fi-only by policy (`allowsCellularAccess = false`), so the state reads "Waiting for
-Wi-Fi" and its detail, the Voice Models caption and the onboarding install page all say that a
-download on cellular waits for Wi-Fi (PA-21, IOS-08). An active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
+data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession.
+Downloads use Wi-Fi unless the Voice Models switch Download over cellular
+(`iosSettings_cellularDownloadsToggle`, off by default, RF-35) allows cellular data. Each request
+carries the setting (`allowsCellularAccess`), so turning it on or off applies to downloads started
+afterwards (PA-21, IOS-08). With the switch off, the waiting state reads "Waiting for Wi-Fi", and its
+detail, the Voice Models caption and the onboarding install page say that a download on cellular
+waits for Wi-Fi. With it on, the state reads "Waiting for a connection", the caption says models
+download over Wi-Fi or cellular, and the waiting detail says a download started before the switch
+waits for Wi-Fi. The control audit turns the switch on and back off (`voice-models-cellular`). An active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
 exact `durable logical catalog bytes / catalog bytes` while transfer is incomplete. The visible
 detail derives its percentage and byte counts from that same presentation value, alongside
 smoothed speed, ETA, retry reason, and verified-file reuse. Transfer completion replaces the

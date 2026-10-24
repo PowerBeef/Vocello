@@ -11,6 +11,7 @@ struct VoiceModelsScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var modelPendingCancel: TTSModel?
+    @AppStorage(IOSAppDefaults.cellularModelDownloadsKey) private var cellularDownloadsAllowed = false
 
     private var managedModelBytes: Int64 {
         TTSModel.all.reduce(into: 0) { total, model in
@@ -56,8 +57,13 @@ struct VoiceModelsScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
 
-                    // IOS-08: downloads are Wi-Fi-only by policy; say so before one starts.
-                    Label(IOSSettingsText.downloadsNeedWiFi, systemImage: "wifi")
+                    // IOS-08 and RF-35: say which networks a download may use before one starts.
+                    Label(
+                        cellularDownloadsAllowed
+                            ? IOSSettingsText.cellularDownloadsAllowed
+                            : IOSSettingsText.downloadsNeedWiFi,
+                        systemImage: cellularDownloadsAllowed ? "antenna.radiowaves.left.and.right" : "wifi"
+                    )
                         .font(.caption)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -75,6 +81,16 @@ struct VoiceModelsScreen: View {
                         )
                     }
 
+                    IOSSettingsSection {
+                        IOSSettingsToggleRow(
+                            symbol: "antenna.radiowaves.left.and.right",
+                            title: IOSSettingsText.cellularDownloads,
+                            subtitle: IOSSettingsText.cellularDownloadsDetail,
+                            accessibilityIdentifier: "iosSettings_cellularDownloadsToggle",
+                            isOn: $cellularDownloadsAllowed
+                        )
+                    }
+
                     IOSSettingsSection(title: IOSSettingsText.studioModels) {
                         ForEach(TTSModel.all) { model in
                             IOSModelRow(
@@ -83,7 +99,8 @@ struct VoiceModelsScreen: View {
                                 operationState: modelInstaller.state(for: model),
                                 onInstall: { modelInstaller.install(model) },
                                 onRequestCancelOptions: { requestCancelOptions(for: model) },
-                                onDelete: { modelInstaller.delete(model) }
+                                onDelete: { modelInstaller.delete(model) },
+                                cellularDownloadsAllowed: cellularDownloadsAllowed
                             )
 
                             if model.id != TTSModel.all.last?.id {

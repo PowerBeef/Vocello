@@ -42,9 +42,12 @@ models/
   .qwenvoice-components-v1/  # content-addressed shared-component blobs and publication state
 ```
 
-iPhone model downloads exclude cellular at the URLSession level (`allowsCellularAccess = false`):
+iPhone model downloads use cellular data only when the user turns on Download over cellular in
+Voice Models (RF-35, off by default). The background session allows cellular and every request,
+byte ranges included, carries the setting (`allowsCellularAccess`), so with the switch off
 multi-gigabyte artifacts stay pinned to Wi-Fi even when Wi-Fi Assist would silently reroute a flaky
-connection over LTE, which collapsed observed throughput to sub-MB/s. The allowlisted
+connection over LTE, which collapsed observed throughput to sub-MB/s. macOS and the CLI set no
+per-request policy. The allowlisted
 `diagnostics/model-downloads/` records (per-transfer task metrics including the cellular/expensive/
 constrained path flags, phase transitions, and terminal summaries) are dual-written into the
 devicectl-pullable caches mirror (`<container>/Library/Caches/Vocello/diagnostics/model-downloads/`) so download
@@ -459,7 +462,8 @@ verified shared speech-tokenizer component — the pulled diagnostics validator 
 three newest successes to account for its full catalog bytes either entirely on the wire or with
 exactly the shared-component bytes reused, and at least two artifacts to show reuse. The same
 validator is the autonomous transfer-health verdict: every payload transfer must report
-`cellular=false` (proving the session-level Wi-Fi pin), and each artifact's payload throughput
+`cellular=false` (proving the request-level Wi-Fi pin with Download over cellular off, as every lane
+runs), and each artifact's payload throughput
 (wire bytes over its network window) must clear the crawl floor —
 `QVOICE_IOS_DOWNLOAD_MIN_MBPS`, default 2 MB/s, deliberately far below healthy Wi-Fi so only a
 genuine collapse fails — with per-artifact and per-transfer rates written into

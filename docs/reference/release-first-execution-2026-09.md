@@ -99,6 +99,14 @@ Between September 4 and October 12 the release did not move:
   nothing public claims otherwise; publishing one before the fix must not claim Larger Text or
   Sufficient Contrast.
 
+  Later that day:
+  - iPhone model downloads may use cellular data behind an opt-in switch, off by default (RF-35),
+    in 3.0. The iPhone freeze moves to the commit that carries it.
+  - Re-testing is proportionate to a change. A new candidate reruns only the rows a change's paths
+    reach, plus the checks only a person can do, and earlier passes on untouched areas stand. A
+    full device campaign is for engine-scale changes. For RF-35 that is the RF-15 navigation row,
+    one model reinstall over Wi-Fi, and one attended download over cellular.
+
 ## The path
 
 Dates are targets; an overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.

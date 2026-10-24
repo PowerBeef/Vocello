@@ -215,7 +215,8 @@ private struct IOSOnboardingInstallPage: View {
                 .frame(maxWidth: 320)
                 .padding(.top, 14)
 
-            // IOS-08: a first download on cellular waits for Wi-Fi; say so up front.
+            // IOS-08: a first download on cellular waits for Wi-Fi (Download over cellular
+            // starts off, RF-35); say so up front.
             Text(IOSSettingsText.downloadsNeedWiFi)
                 .iosScaledFont(size: 13, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.tertiary)

@@ -350,6 +350,7 @@ class VocelloiOSUITestCase: XCTestCase {
         case "voiceCloning_consentAcknowledgment", "iosSettings_privacyPolicyRow", "iosSettings_openIOSSettingsRow": category = "privacyPermissions"
         case "iosSettings_reduceMotionToggle", "iosSettings_reduceTransparencyToggle": category = "accessibility"
         case "iosSettings_supportRow", "iosSettings_openSourceRow", "iosSettings_sourceCodeRow", "iosSettings_versionLabel": category = "about"
+        case "iosSettings_cellularDownloadsToggle": openVoiceModels(); return
         default: openSettingsRoot(); return
         }
         select(tab: .settings)

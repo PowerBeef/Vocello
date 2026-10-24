@@ -432,6 +432,9 @@ struct IOSModelRow: View {
     let onInstall: () -> Void
     let onRequestCancelOptions: () -> Void
     let onDelete: () -> Void
+    /// The Download over cellular switch (RF-35), passed in so the waiting copy
+    /// follows it.
+    var cellularDownloadsAllowed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -716,7 +719,8 @@ struct IOSModelRow: View {
         case .installed: return IOSAppLanguage.shared.presentation.status(.ready)
         case .available: return IOSSettingsText.notInstalled
         case .queued: return IOSSettingsText.queued
-        case .waitingForConnectivity: return IOSSettingsText.waitingForWiFi
+        case .waitingForConnectivity:
+            return cellularDownloadsAllowed ? IOSSettingsText.waitingForConnection : IOSSettingsText.waitingForWiFi
         case .downloading: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.downloading
         case .retrying: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.retrying
         case .verifying: return IOSSettingsText.verifying
@@ -805,7 +809,11 @@ struct IOSModelRow: View {
             modelProgressPresentation(.transfer(
                 durableBytes: downloaded,
                 catalogBytes: total,
-                suffix: IOSSettingsText.downloadsNeedWiFi,
+                // RF-35: while cellular is allowed, a download still waiting has no
+                // connection, or started before the opt-in and keeps its Wi-Fi-only requests.
+                suffix: cellularDownloadsAllowed
+                    ? IOSSettingsText.cellularWaitingNotice
+                    : IOSSettingsText.downloadsNeedWiFi,
                 text: IOSAppLanguage.shared.presentation,
                 formatBytes: IOSSettingsFormatters.fileSize
             ))

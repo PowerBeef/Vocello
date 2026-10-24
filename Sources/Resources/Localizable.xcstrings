@@ -4507,6 +4507,336 @@
         }
       }
     },
+    "vocello.settings.cellularDownloads": {
+      "comment": "Voice Models switch (RF-35): lets model downloads use cellular data. Off by default.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download over cellular"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger sur le réseau cellulaire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar con datos móviles"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Über Mobilfunk laden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica con la rete cellulare"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar pela rede celular"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用蜂窝网络下载"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モバイル通信でダウンロード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셀룰러로 다운로드"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загружать по сотовой сети"
+          }
+        }
+      }
+    },
+    "vocello.settings.cellularDownloadsDetail": {
+      "comment": "Subtitle of the Download over cellular switch: the data cost, and that turning it on or off applies to downloads started afterwards.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About 2 GB per model, which may count against your data plan. A change applies to downloads you start afterwards."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environ 2 Go par modèle, qui peuvent être décomptés de votre forfait de données. Un changement s’applique aux téléchargements lancés ensuite."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unos 2 GB por modelo, que pueden contar para tu plan de datos. Un cambio se aplica a las descargas que inicies después."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwa 2 GB pro Modell, die auf dein Datenvolumen angerechnet werden können. Eine Änderung gilt für Downloads, die du danach startest."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Circa 2 GB per modello, che possono essere conteggiati nel tuo piano dati. Una modifica vale per i download che avvii in seguito."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca de 2 GB por modelo, que podem contar no seu plano de dados. Uma alteração vale para os downloads que você iniciar depois."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每个模型约 2 GB，可能计入你的数据套餐。更改仅适用于之后开始的下载。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデル1つにつき約2 GBで、データプランの通信量に含まれる場合があります。変更は、その後に開始するダウンロードに適用されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델당 약 2GB이며 데이터 요금제에 포함될 수 있습니다. 변경 사항은 이후에 시작하는 다운로드에 적용됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Около 2 ГБ на модель; трафик может учитываться в вашем тарифе. Изменение действует для загрузок, начатых после него."
+          }
+        }
+      }
+    },
+    "vocello.settings.cellularDownloadsAllowed": {
+      "comment": "Voice Models notice while the Download over cellular switch is on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Models download over Wi-Fi or cellular data."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les modèles se téléchargent en Wi-Fi ou sur le réseau cellulaire."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los modelos se descargan por Wi-Fi o con datos móviles."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelle werden über WLAN oder Mobilfunk geladen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I modelli si scaricano tramite Wi-Fi o rete cellulare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os modelos são baixados por Wi-Fi ou pela rede celular."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型可通过无线局域网或蜂窝网络下载。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルはWi-Fiまたはモバイル通信でダウンロードされます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델은 Wi-Fi 또는 셀룰러로 다운로드됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Модели загружаются по Wi-Fi или сотовой сети."
+          }
+        }
+      }
+    },
+    "vocello.settings.cellularWaitingNotice": {
+      "comment": "Detail of a model download waiting for a connection while Download over cellular is on; a download started before the switch keeps waiting for Wi-Fi.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The download continues when a network is available. One started before you allowed cellular data waits for Wi-Fi."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le téléchargement reprend dès qu’un réseau est disponible. Un téléchargement lancé avant l’autorisation du réseau cellulaire attend le Wi-Fi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La descarga continúa cuando haya una red disponible. Una descarga iniciada antes de permitir los datos móviles espera una red Wi-Fi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download wird fortgesetzt, sobald ein Netzwerk verfügbar ist. Ein Download, der vor dem Erlauben von Mobilfunk begonnen hat, wartet auf WLAN."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il download riprende quando è disponibile una rete. Un download avviato prima di consentire la rete cellulare attende il Wi-Fi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O download continua quando houver uma rede disponível. Um download iniciado antes de você permitir a rede celular aguarda Wi-Fi."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有可用网络时下载会继续。在你允许蜂窝网络之前开始的下载会等待无线局域网。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ネットワークが利用できるようになるとダウンロードが再開します。モバイル通信を許可する前に開始したダウンロードは、Wi-Fiを待機します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "네트워크를 사용할 수 있게 되면 다운로드가 계속됩니다. 셀룰러를 허용하기 전에 시작한 다운로드는 Wi-Fi를 기다립니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка продолжится, когда появится сеть. Загрузка, начатая до разрешения сотовой сети, ждёт Wi-Fi."
+          }
+        }
+      }
+    },
+    "vocello.settings.waitingForConnection": {
+      "comment": "Model download status while Download over cellular is on: the transfer is paused until a network is available.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for a connection"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente d’une connexion"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando conexión"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warten auf Verbindung"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In attesa di connessione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aguardando conexão"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待网络连接"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接続を待機中"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "연결 대기 중"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ожидание подключения"
+          }
+        }
+      }
+    },
     "vocello.settings.polish.noModelFiles": {
       "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
       "extractionState": "manual",
@@ -5828,7 +6158,7 @@
       }
     },
     "vocello.settings.polish.waitingForWiFi": {
-      "comment": "Model download status: the transfer is paused until the phone is on Wi-Fi. Model downloads never use cellular data.",
+      "comment": "Model download status: the transfer is paused until the phone is on Wi-Fi. Shown while Download over cellular is off.",
       "extractionState": "manual",
       "localizations": {
         "en": {

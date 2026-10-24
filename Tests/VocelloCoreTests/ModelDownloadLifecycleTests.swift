@@ -1329,7 +1329,8 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         faults: [Int: [RangeStubURLProtocol.Fault]] = [:],
         ignoreRange: Bool = false,
         maxRangeRetries: Int = 3,
-        maxDownloadRetries: Int = 3
+        maxDownloadRetries: Int = 3,
+        cellularAccess: (@Sendable () -> Bool)? = nil
     ) throws -> StubbedDelivery {
         let host = "\(UUID().uuidString.lowercased()).range-stub.invalid"
         let payload = Data((0..<8_192).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) })
@@ -1342,6 +1343,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         configuration.maxRangeRetries = maxRangeRetries
         configuration.maxDownloadRetries = maxDownloadRetries
         configuration.stagingLockPatience = .milliseconds(300)
+        configuration.cellularAccess = cellularAccess
         let ranges = HuggingFaceDownloader.chunkRanges(
             total: Int64(payload.count),
             chunkSize: configuration.chunkTargetSize,
@@ -1386,6 +1388,38 @@ final class ModelDownloadLifecycleTests: XCTestCase {
     private func tearDownStubbedDelivery(_ delivery: StubbedDelivery) {
         RangeStubURLProtocol.uninstall(host: delivery.host)
         try? FileManager.default.removeItem(at: delivery.root)
+    }
+
+    /// RF-35: the iPhone's cellular opt-in rides on every request the downloader builds,
+    /// byte ranges and the whole-file fallback alike, so a download started while it is
+    /// off stays on Wi-Fi even though the iPhone's session allows cellular.
+    @concurrent func testCellularOptInRidesOnEveryRangeAndWholeFileRequest() async throws {
+        for allowed in [false, true] {
+            let delivery = try makeStubbedDelivery(ignoreRange: true, cellularAccess: { allowed })
+            defer { tearDownStubbedDelivery(delivery) }
+
+            try await delivery.run()
+
+            XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+            XCTAssertTrue(delivery.requests.contains(""), "the ignored range fell back to a whole-file request")
+            XCTAssertTrue(delivery.requests.contains { !$0.isEmpty }, "a byte range was requested first")
+            let observed = RangeStubURLProtocol.cellularAccess(host: delivery.host)
+            XCTAssertEqual(observed.count, delivery.requests.count)
+            XCTAssertEqual(Set(observed), [allowed], "every request carries the opt-in")
+        }
+    }
+
+    /// Without a cellular policy (macOS, the CLI) a request keeps URLRequest's default and
+    /// the session's `allowsCellularAccess` decides; with one, the request carries it.
+    func testDownloadRequestCarriesTheCellularPolicyOnlyWhenGiven() {
+        let url = URL(string: "https://example.invalid/model.safetensors")!
+        let unset = HuggingFaceDownloader.downloadRequest(for: url, existingBytes: 0)
+        XCTAssertTrue(unset.allowsCellularAccess)
+        XCTAssertNil(unset.value(forHTTPHeaderField: "Range"))
+
+        let wifiOnly = HuggingFaceDownloader.downloadRequest(for: url, existingBytes: 8, allowsCellularAccess: false)
+        XCTAssertFalse(wifiOnly.allowsCellularAccess)
+        XCTAssertEqual(wifiOnly.value(forHTTPHeaderField: "Range"), "bytes=8-")
     }
 
     @concurrent func testShortRangeBodyRetriesOnlyThatRangeAndKeepsEveryOtherRange() async throws {
@@ -1792,6 +1826,7 @@ private final class RangeStubURLProtocol: URLProtocol {
         var faults: [String: [Fault]]
         var ignoreRange: Bool
         var requests: [String] = []
+        var cellularAccess: [Bool] = []
         var servedBodyBytes = 0
     }
 
@@ -1817,6 +1852,11 @@ private final class RangeStubURLProtocol: URLProtocol {
         scenarios.withLock { $0[host]?.requests ?? [] }
     }
 
+    /// Each request's `allowsCellularAccess`, in arrival order (RF-35).
+    static func cellularAccess(host: String) -> [Bool] {
+        scenarios.withLock { $0[host]?.cellularAccess ?? [] }
+    }
+
     static func servedBodyBytes(host: String) -> Int {
         scenarios.withLock { $0[host]?.servedBodyBytes ?? 0 }
     }
@@ -1835,6 +1875,7 @@ private final class RangeStubURLProtocol: URLProtocol {
         let plan: Plan? = Self.scenarios.withLock { all in
             guard var scenario = all[host] else { return nil }
             scenario.requests.append(rangeHeader)
+            scenario.cellularAccess.append(request.allowsCellularAccess)
             var fault: Fault?
             if var queue = scenario.faults[rangeHeader], !queue.isEmpty {
                 fault = queue.removeFirst()

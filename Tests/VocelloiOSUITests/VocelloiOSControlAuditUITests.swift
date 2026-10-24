@@ -388,6 +388,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         )
 
         openVoiceModels()
+        mutateAndRestoreToggle("iosSettings_cellularDownloadsToggle")
+        recorder.record(
+            scenario: "stateful", controlID: "voice-models-cellular",
+            expected: "Download over cellular changes once and returns to its original value",
+            actual: "Toggle state restored through the production control"
+        )
         for modelID in ["pro_custom", "pro_design", "pro_clone"] {
             let status = element("iosModelStatus_\(modelID)")
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))

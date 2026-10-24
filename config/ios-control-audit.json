@@ -570,6 +570,21 @@
       "availability": "required"
     },
     {
+      "id": "voice-models-cellular",
+      "identifierPattern": "iosSettings_cellularDownloadsToggle",
+      "sourceToken": "iosSettings_cellularDownloadsToggle",
+      "screen": "Voice Models",
+      "prerequisite": "Settings > Models & Files > Voice Models",
+      "role": "toggle",
+      "action": "Turn Download over cellular on and back off",
+      "expectedResult": "Value changes once and the original value (off by default) is restored",
+      "expectedSemantics": "Setting label, value, hint, and enabled state",
+      "minimumTargetPoints": 44,
+      "mutationClass": "reversible",
+      "scenario": "stateful",
+      "availability": "required"
+    },
+    {
       "id": "settings-leftover-audio",
       "identifierPattern": "iosSettings_leftoverAudio(Row|Remove|Keep|Cancel|FailureDismiss)",
       "sourceToken": "iosSettings_leftoverAudioRow",

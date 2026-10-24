@@ -126,6 +126,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// tree (a cancelled run of this process still unwinding, or another process)
         /// before refusing (CORE-13). Background sessions take no staging lock.
         public var stagingLockPatience: Duration = .seconds(5)
+        /// Read as each request is built: whether that request may use cellular data.
+        /// `nil` leaves every request to the session's `allowsCellularAccess` (macOS and
+        /// the CLI). The iPhone allows cellular on its background session and passes the
+        /// user's opt-in here (RF-35), so a request built while it is off stays on Wi-Fi.
+        public var cellularAccess: (@Sendable () -> Bool)?
         public init() {}
     }
 
@@ -1462,10 +1467,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return destination
     }
 
-    static func downloadRequest(for url: URL, existingBytes: Int64) -> URLRequest {
+    static func downloadRequest(
+        for url: URL,
+        existingBytes: Int64,
+        allowsCellularAccess: Bool? = nil
+    ) -> URLRequest {
         var request = URLRequest(url: url)
         if existingBytes > 0 {
             request.setValue("bytes=\(existingBytes)-", forHTTPHeaderField: "Range")
+        }
+        if let allowsCellularAccess {
+            request.allowsCellularAccess = allowsCellularAccess
         }
         return request
     }
@@ -2789,6 +2801,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         } else {
             var request = URLRequest(url: url)
             request.setValue("bytes=\(range.start)-\(range.end)", forHTTPHeaderField: "Range")
+            if let allowsCellularAccess = engineConfiguration.cellularAccess?() {
+                request.allowsCellularAccess = allowsCellularAccess
+            }
             let fresh = transferSession.downloadTask(with: request)
             fresh.taskDescription = await state.expectedEntry(forKey: chunkKey)?
                 .identity.encodedTaskDescription
@@ -3112,7 +3127,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         if await state.cancellationRequested() {
             throw DownloadError.cancelled
         }
-        let request = Self.downloadRequest(for: url, existingBytes: existingBytes)
+        let request = Self.downloadRequest(
+            for: url,
+            existingBytes: existingBytes,
+            allowsCellularAccess: engineConfiguration.cellularAccess?()
+        )
         return try await withCheckedThrowingContinuation { continuation in
             let task = unsafe session.downloadTask(with: request)
             Task { @concurrent in

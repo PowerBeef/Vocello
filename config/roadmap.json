@@ -332,6 +332,22 @@
       "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate. 2026-10-24 (maintainer): build 24 joins the Public Beta group only after this promotion validates; its beta review submission does not wait."
     },
     {
+      "id": "RF-35",
+      "plan": "release-first-3-0-2026-09",
+      "title": "iPhone model downloads may use cellular data, off by default with an opt-in switch",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-27",
+      "gate": "Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/iOS/Settings/VoiceModelsScreen.swift"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
@@ -339,6 +355,7 @@
       "blockedBy": [
         "RF-15",
         "RF-17",
+        "RF-35",
         "ASR-05",
         "ASR-06",
         "ASR-11",

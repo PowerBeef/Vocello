@@ -125,15 +125,35 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.queued", defaultValue: "Queued",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
-    /// Model downloads never use cellular (`allowsCellularAccess = false` in
-    /// `IOSModelDownloadCoordinator`), so the waiting state names Wi-Fi (PA-21, IOS-08).
+    /// Model downloads use cellular only after the opt-in (RF-35): with it off, each
+    /// request stays on Wi-Fi, so a waiting download waits for Wi-Fi (PA-21, IOS-08).
     static var waitingForWiFi: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.waitingForWiFi", defaultValue: "Waiting for Wi-Fi",
-               comment: "Model download status: the transfer is paused until the phone is on Wi-Fi. Model downloads never use cellular data.")
+               comment: "Model download status: the transfer is paused until the phone is on Wi-Fi. Shown while Download over cellular is off.")
+    }
+    static var waitingForConnection: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.waitingForConnection", defaultValue: "Waiting for a connection",
+               comment: "Model download status while Download over cellular is on: the transfer is paused until a network is available.")
     }
     static var downloadsNeedWiFi: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.downloadsNeedWiFi", defaultValue: "Models download over Wi-Fi only. On cellular, a download waits until you're back on Wi-Fi.",
                comment: "Explains before and during a model download that models download over Wi-Fi only; on cellular the download waits. Presentation only.")
+    }
+    static var cellularDownloads: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularDownloads", defaultValue: "Download over cellular",
+               comment: "Voice Models switch (RF-35): lets model downloads use cellular data. Off by default.")
+    }
+    static var cellularDownloadsDetail: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularDownloadsDetail", defaultValue: "About 2 GB per model, which may count against your data plan. A change applies to downloads you start afterwards.",
+               comment: "Subtitle of the Download over cellular switch: the data cost, and that turning it on or off applies to downloads started afterwards.")
+    }
+    static var cellularDownloadsAllowed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularDownloadsAllowed", defaultValue: "Models download over Wi-Fi or cellular data.",
+               comment: "Voice Models notice while the Download over cellular switch is on.")
+    }
+    static var cellularWaitingNotice: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularWaitingNotice", defaultValue: "The download continues when a network is available. One started before you allowed cellular data waits for Wi-Fi.",
+               comment: "Detail of a model download waiting for a connection while Download over cellular is on; a download started before the switch keeps waiting for Wi-Fi.")
     }
     static var finishing: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.finishing", defaultValue: "Finishing",

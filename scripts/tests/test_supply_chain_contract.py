@@ -224,12 +224,8 @@ security() {
       if [ "$FAIL_STAGE" = terminate ]; then kill -TERM "$$"; fi
       if [ "$FAIL_STAGE" = installer-import ] && [[ " $* " == *installer-cert.p12* ]]; then return 41; fi ;;
     find-identity)
-      # One write, as the real tool's buffered output: the workflow's `awk '...; exit'` closes the pipe at
-      # its first match, and a second write after that dies of SIGPIPE (141) under pipefail.
-      identities='1) FIXTURE "Developer ID Application: Fixture"'
-      [ "$FAIL_STAGE" = no-installer-identity ] \
-        || identities+=$'\n''2) FIXTURE2 "Developer ID Installer: Fixture (FIXTURE123)"'
-      printf '%s\n' "$identities" ;;
+      printf '%s\n' '1) FIXTURE "Developer ID Application: Fixture"'
+      [ "$FAIL_STAGE" = no-installer-identity ] || printf '%s\n' '2) FIXTURE2 "Developer ID Installer: Fixture (FIXTURE123)"' ;;
     cms) printf '%s\n' '<plist><dict/></plist>' ;;
     list-keychain|list-keychains|set-keychain-settings|unlock-keychain|set-key-partition-list) : ;;
     *) return 98 ;;

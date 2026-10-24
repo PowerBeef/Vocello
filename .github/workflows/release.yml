@@ -405,10 +405,12 @@ jobs:
 
           # Surface available identities for log evidence + extract the
           # Developer ID Application signing-identity CN. The CN is what
-          # codesign --sign expects.
+          # codesign --sign expects. Each awk keeps its first match but reads
+          # to the end: under pipefail, a reader that leaves early kills the
+          # writer's later output with SIGPIPE and fails the step (141).
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
           IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
-            | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+            | awk -F'"' '/Developer ID Application/ && !found { print $2; found = 1 }')"
           [ -n "$IDENTITY" ] || { echo "::error::No 'Developer ID Application' identity found in the imported cert" >&2; exit 1; }
           echo "Resolved signing identity: $IDENTITY"
 
@@ -416,7 +418,7 @@ jobs:
           # under the basic policy. Its CN is what productsign --sign expects;
           # release.sh refuses it unless it names the release Team ID.
           INSTALLER_IDENTITY="$(security find-identity -v -p basic "$KEYCHAIN_PATH" \
-            | awk -F'"' '/Developer ID Installer/ { print $2; exit }')"
+            | awk -F'"' '/Developer ID Installer/ && !found { print $2; found = 1 }')"
           [ -n "$INSTALLER_IDENTITY" ] || { echo "::error::No 'Developer ID Installer' identity found in the imported installer cert" >&2; exit 1; }
           echo "Resolved installer identity: $INSTALLER_IDENTITY"
 

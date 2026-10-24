@@ -334,7 +334,16 @@ Add these repo **Secrets** (Settings → Secrets and variables → Actions):
 | `QWENVOICE_DEVELOPMENT_TEAM` | the 10-char Apple team id |
 | `ASC_API_KEY_ID` / `ASC_API_ISSUER_ID` / `ASC_API_KEY_P8` | App Store Connect API key (id, issuer, base64 of `.p8`) |
 
-Then run the **Release** workflow from the Actions tab, choosing the version tag itself under
+For a TestFlight candidate, push `main`, wait for its `CI required` check, then run
+`python3 scripts/ios_candidate_tag.py` (`--dry-run` first if you like). It refuses a dirty tree, a
+`HEAD` other than `origin/main`, a commit whose CI has not passed and a build number App Store Connect
+already has, then signs the next `v<version>-ios.N` tag with the configured SSH key, verifies it and
+pushes only that tag. That push runs the iPhone path of `release.yml` alone (source authority, the
+signed archive, IPA verification and evidence, and the TestFlight upload; no Mac packages) once the
+`release` environment is approved. Claude Code may run the script on the maintainer's request
+(CLAUDE.md: Main is the only published branch); any other release tag stays maintainer-run.
+
+To rebuild an existing tag instead, run the **Release** workflow from the Actions tab, choosing the version tag itself under
 "Use workflow from" and entering the same `tag`, with `archive_ios = true`, `package_macos = false`
 and optionally `upload_to_testflight = true` to push straight to TestFlight (from the CLI:
 `gh workflow run release.yml --ref <tag> -f tag=<tag> -f archive_ios=true -f package_macos=false`).

@@ -73,7 +73,7 @@ if [[ -n "$git_violation" ]]; then
         "Push fast-forward commits only; CI required protects main." ;;
     push|config)
       block "$reason; only main is ever pushed (CLAUDE.md: Main is the only published branch)." \
-        "Integrate agent branches into main locally, then push main; release tags are maintainer-run." ;;
+        "Integrate agent branches into main locally, then push main; release tags are maintainer-run, and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
     *)
       block "$reason (CLAUDE.md: Main is the only published branch)." \
         "Work on main, or use a Claude Code agent worktree (Agent isolation or EnterWorktree); the lead integrates it." ;;

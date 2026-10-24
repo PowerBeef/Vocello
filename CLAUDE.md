@@ -119,7 +119,10 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
   Path, decisions and rules: `docs/reference/release-first-execution-2026-09.md`.
 - **Main is the only published branch:** commit on local `main`; push only `main`, fast-forward, on
-  explicit request. No hand-made branches or worktrees, ref rewrites or force pushes.
+  explicit request. No hand-made branches or worktrees, ref rewrites or force pushes. Release tags are
+  maintainer-run, except an iPhone TestFlight candidate: on the maintainer's request, after `main` is
+  pushed and its CI passed, `python3 scripts/ios_candidate_tag.py` signs and pushes the next
+  `v<version>-ios.N` tag, whose push archives the app and uploads it to TestFlight.
 - **Agents:** at most four active including the lead, inheriting its model. Editing agents run through
   the Agent tool with `isolation: "worktree"` (`.claude/worktrees/<name>` on `worktree-<name>`, based on
   local HEAD; commit the checkpoint first because uncommitted files do not carry over). Give each a
@@ -169,12 +172,12 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   `generated_file_guard.sh` (Edit/Write/MultiEdit/NotebookEdit), `agent_guard.py` (subagent Bash and
   edits), `simulator_tool_guard.py` (MCP tools),
   `project_yml_reminder.sh` (after edits) and `worker_lifecycle.py` (SubagentStart/Stop, SessionEnd).
-  Permissions allow the routine loop and local lanes; ask before pushes, destructive git, model
-  installs, cache cleanup, installers, global settings and external writes; deny force or non-main
-  pushes, branch/worktree creation by hand, broad staging, stashing, releases, `.xcodeproj` edits and
-  unsupported-destination MCP tools. Hooks and permissions are guardrails, not authorization; personal
-  overrides go in the untracked `.claude/settings.local.json`. `scripts/tests/test_agent_hooks.py` pins
-  the wiring.
+  Permissions allow the routine loop, local lanes and the candidate tag script; ask before pushes,
+  destructive git, model installs, cache cleanup, installers, global settings and external writes;
+  deny force or non-main pushes, branch/worktree creation by hand, broad staging, stashing, releases,
+  `.xcodeproj` edits and unsupported-destination MCP tools. Hooks and permissions are guardrails, not
+  authorization; personal overrides go in the untracked `.claude/settings.local.json`.
+  `scripts/tests/test_agent_hooks.py` pins the wiring.
 - **Worker tracking:** the SessionStart hook exports `QVOICE_WORKER_SESSION` to Bash; measured lanes
   refuse unknown or active agent leases. If tracking is unavailable, join every agent, then run the lane
   with `QVOICE_LEAD_ONLY=1`.

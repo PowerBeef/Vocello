@@ -140,6 +140,8 @@
       "Bash(scripts/dev.sh *)",
       "Bash(./scripts/dev.sh *)",
       "Bash(python3 scripts/roadmap.py *)",
+      "Bash(python3 scripts/ios_candidate_tag.py)",
+      "Bash(python3 scripts/ios_candidate_tag.py *)",
       "Bash(scripts/regenerate_project.sh *)",
       "Bash(./scripts/regenerate_project.sh *)",
       "Bash(./scripts/check_project_inputs.sh *)",

@@ -91,10 +91,19 @@ def _xcodebuild_reports_only(args: list[str]) -> bool:
     return reports
 
 
+# The candidate tag script signs and pushes a release tag. Wrappers such as `timeout 600` or
+# `cd scripts &&` hide it from the word parser below, so any text naming it is refused unless it
+# is exactly the usage text.
+TAG_SCRIPT = re.compile(r"ios_candidate_tag")
+TAG_SCRIPT_HELP = re.compile(r"\s*python3 (?:\./)?scripts/ios_candidate_tag\.py (?:--help|-h)\s*")
+
+
 def command_violation(command: str, depth: int = 0) -> str:
     """Why a subagent may not run this shell text, else ''."""
     if depth > 3:
         return ""
+    if depth == 0 and TAG_SCRIPT.search(command) and not TAG_SCRIPT_HELP.fullmatch(command):
+        return "`scripts/ios_candidate_tag.py` signs and pushes a release tag; agents never tag or push"
     stripped, bodies = adapter.shell_fed_bodies(command)
     for body in bodies:
         reason = command_violation(body, depth + 1)

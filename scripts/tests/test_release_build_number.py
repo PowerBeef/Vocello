@@ -99,6 +99,13 @@ class ReleaseBuildNumberTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertIn("not greater than v3.0.0-rc.1's build 24", completed.stderr)
 
+    def test_a_mac_release_skips_iphone_candidates_at_its_build(self) -> None:
+        self.release("2.4.0", "23", "v2.4.0")
+        self.release("3.0.1", "25", "v3.0.1-ios.1", "v3.0.1-iOS.2")
+        completed = self.check("v3.0.1")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("than v2.4.0's", completed.stdout)
+
     def test_the_tag_being_built_is_not_its_own_predecessor(self) -> None:
         self.release("2.4.0", "23", "v2.4.0")
         self.release("3.0.0", "24", "v3.0.0")

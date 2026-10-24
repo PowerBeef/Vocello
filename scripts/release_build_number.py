@@ -47,10 +47,15 @@ def tag_key(tag: str) -> TagKey | None:
 
 
 def previous_tag(tags: list[str], current: str) -> str | None:
-    """The highest version tag strictly below `current`; ties and non-version tags are ignored."""
+    """The highest version tag strictly below `current`; ties and non-version tags are ignored.
+
+    A Mac release never follows an iPhone TestFlight candidate (`-ios.<n>`, which App Store
+    Connect numbers on its own), so a Mac release at its candidate's build still passes."""
     current_key = tag_key(current)
     if current_key is None:
         raise ValueError(f"release tag {current!r} is not a vMAJOR.MINOR[.PATCH][-PRERELEASE] tag")
+    if "-ios" not in current.lower():
+        tags = [tag for tag in tags if "-ios" not in tag.lower()]
     earlier = [(key, tag) for tag in tags if (key := tag_key(tag)) is not None and key < current_key]
     return max(earlier)[1] if earlier else None
 

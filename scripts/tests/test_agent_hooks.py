@@ -129,6 +129,13 @@ AGENT_REFUSED = (
     "dd if=/tmp/a of=config/roadmap.json", "python3 scripts/roadmap.py --root . set RF-09 --status done",
     '"$(python3 scripts/select_python.py)" -c "open(\'config/roadmap.json\',\'w\').write(\'x\')"',
     "node -e \"require('fs').writeFileSync('config/roadmap.json','x')\"",
+    # The candidate tag script signs and pushes a release tag; only the lead runs it.
+    "python3 scripts/ios_candidate_tag.py", "python3 scripts/ios_candidate_tag.py --dry-run",
+    "./scripts/ios_candidate_tag.py", '"$(python3 scripts/select_python.py)" scripts/ios_candidate_tag.py',
+    "timeout 600 python3 scripts/ios_candidate_tag.py", "nice -n 5 python3 scripts/ios_candidate_tag.py",
+    "stdbuf -oL python3 scripts/ios_candidate_tag.py", "cd scripts && python3 ios_candidate_tag.py",
+    "python3 scripts//ios_candidate_tag.py", "python3 -W ignore scripts/ios_candidate_tag.py",
+    "python3 -m ios_candidate_tag", "python3 scripts/ios_candidate_tag.py --help; python3 scripts/ios_candidate_tag.py",
 )
 AGENT_ALLOWED = (
     "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
@@ -141,6 +148,7 @@ AGENT_ALLOWED = (
     "cat > notes.md <<'EOF'\nscripts/dev.sh build\nEOF\n", "npm --prefix website run check",
     # Known false positives: the usage text the skills send agents to, and xcodebuild's reports.
     "scripts/ui_test.sh help", "scripts/ui_test.sh --help", "scripts/ui_test.sh -h", "scripts/macos_test.sh help",
+    "python3 scripts/ios_candidate_tag.py --help",
     "./scripts/macos_test.sh --help", "bash scripts/ios_device.sh -h", "scripts/ios_device.sh help 2>&1 | head -40",
     "scripts/dev.sh help", "scripts/dev.sh --help", "bash scripts/dev.sh check --dry-run --json",
     "scripts/dead_code_report.sh help", "./scripts/dead_code_report.sh --help",
@@ -534,6 +542,10 @@ class PermissionTests(unittest.TestCase):
         for rule in ("Edit(/QwenVoice.xcodeproj/**)", "Bash(scripts/release.sh*)", "Bash(gh release create*)",
                      "Bash(gh release upload*)", "Bash(rm -rf build/cache*)"):
             self.assertIn(rule, self.deny)
+        # iPhone TestFlight candidates are the one tag the lead writes, and only through the vetted script.
+        self.assertEqual([rule for rule in self.allow if "ios_candidate_tag" in rule],
+                         ["Bash(python3 scripts/ios_candidate_tag.py)", "Bash(python3 scripts/ios_candidate_tag.py *)"])
+        self.assertEqual([rule for rule in self.allow if rule.startswith("Bash(git tag")], [])
         for rule in ("Bash(scripts/macos_test.sh models install*)", "Bash(scripts/macos_test.sh models ensure*)",
                      "Bash(scripts/ui_test.sh * model-download*)", "Bash(scripts/clean_build_caches.sh*)",
                      "Bash(scripts/install_pinned_tools.sh*)", "Bash(python3 scripts/publish_benchmark_history.py*)",

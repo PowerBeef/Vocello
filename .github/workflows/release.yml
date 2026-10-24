@@ -6,6 +6,9 @@ name: Release
 # Triggers:
 #   - protected v* tag push: verify the tag/source/version identity, build and
 #     verify all assets, create a draft Release, and verify uploaded bytes.
+#   - v<x.y.z>-ios.<n> tag push (scripts/ios_candidate_tag.py): an iPhone TestFlight
+#     candidate. The same source authority, then only the signed iPhone archive, the
+#     IPA verification and evidence, and the TestFlight upload; no Mac packages.
 #   - workflow_dispatch: explicit existing tag, dispatched from that tag's ref
 #     (`gh workflow run release.yml --ref <tag> -f tag=<tag>`) so the tag's own
 #     workflow runs; release-trigger refuses any other ref.
@@ -29,8 +32,9 @@ name: Release
 #     package and uploads the verified draft; it alone holds contents: write.
 #   - compile-ios: iOS compile-safety only. Runs in parallel with
 #     `package` and does NOT block macOS publishing if it fails.
-#   - archive-ios: optional manual signed archive / TestFlight lane. Physical-device XCUITest is an
-#     independent explicit frontend-QA lane and is not required before dispatch.
+#   - archive-ios: signed archive / TestFlight lane, run by an -ios.<n> tag push or a dispatch
+#     with archive_ios. Physical-device XCUITest is an independent explicit frontend-QA lane
+#     and is not required before either.
 #
 # Toolchain pinning is validated against config/toolchain.json:
 #   - Xcode `native.xcode` through .github/actions/native-toolchain (project.yml keeps
@@ -137,17 +141,22 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+    # True only for an exact v<x.y.z>-ios.<n> tag: the iPhone archive and TestFlight upload
+    # run for it, and the Mac packages never do.
+    outputs:
+      ios_candidate: ${{ steps.trigger.outputs.ios_candidate }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Require the tag's own workflow and a contract-safe output name
+        id: trigger
         env:
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_REF: ${{ github.ref }}
           OUTPUT_NAME: ${{ inputs.output_name }}
-        run: python3 scripts/ci/release_trigger.py --event "$EVENT_NAME" --ref "$WORKFLOW_REF" --tag "$RELEASE_TAG" --output-name "$OUTPUT_NAME"
+        run: python3 scripts/ci/release_trigger.py --event "$EVENT_NAME" --ref "$WORKFLOW_REF" --tag "$RELEASE_TAG" --output-name "$OUTPUT_NAME" --github-output "$GITHUB_OUTPUT"
 
   # Security analysis (CodeQL, npm audit) runs on the exact tagged commit before
   # any candidate is built; it no longer runs on every trunk push.
@@ -235,8 +244,8 @@ jobs:
 
   package:
     name: Build + sign + notarize + DMG
-    needs: source-authority
-    if: ${{ github.event_name == 'push' || inputs.package_macos }}
+    needs: [release-trigger, source-authority]
+    if: ${{ needs.release-trigger.outputs.ios_candidate == 'false' && (github.event_name == 'push' || inputs.package_macos) }}
     runs-on: macos-26
     timeout-minutes: 150
     # Signing secrets belong to the tag-restricted `release` environment; a job
@@ -1011,9 +1020,10 @@ jobs:
     # Signed iOS archive + App Store export lane. The job is implemented; account credentials,
     # App Store Connect metadata, and public submission remain maintainer-owned.
     #
-    # GATING: only runs on a MANUAL workflow_dispatch with archive_ios=true. It is
-    # never triggered by a tag push, so a missing-secrets state can never break the
-    # macOS DMG release. Fire it from the Actions tab once signing is set up.
+    # GATING: runs on a push of a v<x.y.z>-ios.<n> tag (release-trigger's ios_candidate
+    # output; it refuses any other tag carrying "-ios" in any case), which also uploads to
+    # TestFlight, or on a MANUAL workflow_dispatch with archive_ios=true. A Mac release tag
+    # push never triggers it, so a missing-secrets state can never break the macOS DMG release.
     #
     # REQUIRED secrets (maintainer adds these in repo Settings → Secrets):
     #   IOS_DIST_CERT_P12        base64 of the iOS Distribution .p12
@@ -1026,8 +1036,8 @@ jobs:
     #                            and the optional TestFlight upload.
     # Full runbook: docs/reference/ios-appstore-submission.md
     name: iOS archive + App Store export
-    needs: source-authority
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.archive_ios }}
+    needs: [release-trigger, source-authority]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.archive_ios) || (github.event_name == 'push' && needs.release-trigger.outputs.ios_candidate == 'true') }}
     runs-on: macos-26
     timeout-minutes: 60
     environment: release
@@ -1320,7 +1330,7 @@ jobs:
       # removed before any later action runs; TestFlight builds are Apple's
       # chain, and the attestation covers the IPA kept as a workflow artifact.
       - name: Upload to TestFlight
-        if: ${{ inputs.upload_to_testflight }}
+        if: ${{ inputs.upload_to_testflight || (github.event_name == 'push' && needs.release-trigger.outputs.ios_candidate == 'true') }}
         env:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}

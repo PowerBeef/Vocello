@@ -426,7 +426,8 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
                                                                        "--verify")
                                   for a in args)
         if not listing:
-            return "ref", "`git tag` writes tags; release tags are maintainer-run"
+            return "ref", ("`git tag` writes tags; release tags are maintainer-run, and iPhone TestFlight "
+                           "candidates go through scripts/ios_candidate_tag.py")
     elif sub == "update-ref":
         return "ref", "`git update-ref` rewrites refs directly"
     elif sub == "symbolic-ref" and len([a for a in args if not a.startswith("-")]) >= 2:

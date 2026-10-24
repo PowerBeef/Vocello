@@ -23,6 +23,10 @@ sys.path.insert(0, str(SCRIPTS))
 from release_source_authority import TAG  # noqa: E402
 
 CONTRACT = SCRIPTS.parent / "config/orchestration-contract.json"
+# An iPhone TestFlight candidate (scripts/ios_candidate_tag.py). release.yml gates its jobs on
+# this job's `ios_candidate` output: a candidate runs only the iPhone archive and TestFlight
+# upload, never the Mac packages. Any tag carrying "-ios" in any case must have exactly this shape.
+IOS_CANDIDATE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+-ios\.[1-9][0-9]*")
 NAMED_BUILD_TEMPLATE = "macos-release-build-named-v1"
 
 
@@ -45,6 +49,8 @@ def validate(event: str, ref: str, tag: str, output_name: str, contract_path: Pa
         raise TriggerError(f"release runs only on a tag push or a dispatch, not {event!r}")
     if not TAG.fullmatch(tag):
         raise TriggerError(f"release tag {tag!r} is not a v<major>.<minor>.<patch> tag")
+    if "-ios" in tag.lower() and not IOS_CANDIDATE.fullmatch(tag):
+        raise TriggerError(f"release tag {tag!r} names an iPhone candidate but is not v<x.y.z>-ios.<n>")
     if ref != f"refs/tags/{tag}":
         raise TriggerError(
             f"release workflow ran from {ref!r}; run it from the tag's own workflow: "
@@ -60,12 +66,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ref", required=True)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--output-name", default="")
+    parser.add_argument("--github-output", type=Path, help="append ios_candidate=true|false to this file")
     args = parser.parse_args(argv)
     try:
         validate(args.event, args.ref, args.tag, args.output_name)
     except (TriggerError, KeyError, json.JSONDecodeError) as error:
         print(f"release-trigger: {error}", file=sys.stderr)
         return 1
+    if args.github_output is not None:
+        with args.github_output.open("a", encoding="utf-8") as stream:
+            stream.write(f"ios_candidate={'true' if IOS_CANDIDATE.fullmatch(args.tag) else 'false'}\n")
     print(f"release-trigger: {args.event} from {args.ref} may build {args.tag}")
     return 0
 

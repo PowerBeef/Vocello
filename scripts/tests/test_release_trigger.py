@@ -23,6 +23,27 @@ class ReleaseTriggerTests(unittest.TestCase):
         MODULE.validate("push", "refs/tags/v3.0.0", "v3.0.0", "")
         MODULE.validate("workflow_dispatch", "refs/tags/v3.0.0-rc.1", "v3.0.0-rc.1", "Vocello-macos26")
 
+    def test_iphone_candidate_tags_have_exactly_one_shape(self) -> None:
+        MODULE.validate("push", "refs/tags/v3.0.0-ios.3", "v3.0.0-ios.3", "")
+        for tag in ("v3.0.0-ios", "v3.0.0-ios.0", "v3.0.0-ios.3.1", "v3.0.0-ios.x", "v3.0.0-iosfix.1",
+                    "v3.0.0-rc.1-ios.2", "v3.0.0-iOS.1", "v3.0.0-IOS.1", "v3.0.0-iOS", "v3.0.0-rc.1-iOS.2"):
+            with self.subTest(tag=tag), self.assertRaises(MODULE.TriggerError):
+                MODULE.validate("push", f"refs/tags/{tag}", tag, "")
+
+    def test_only_an_exact_candidate_sets_the_ios_candidate_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            for tag, expected in (("v3.0.0-ios.3", "true"), ("v3.0.0", "false"), ("v3.0.0-rc.1", "false")):
+                with self.subTest(tag=tag):
+                    output = Path(directory) / f"{tag}.txt"
+                    status = MODULE.main(["--event", "push", "--ref", f"refs/tags/{tag}", "--tag", tag,
+                                          "--github-output", str(output)])
+                    self.assertEqual(status, 0)
+                    self.assertEqual(output.read_text(encoding="utf-8"), f"ios_candidate={expected}\n")
+            refused = Path(directory) / "refused.txt"
+            self.assertEqual(MODULE.main(["--event", "push", "--ref", "refs/tags/v3.0.0-iOS.1", "--tag",
+                                          "v3.0.0-iOS.1", "--github-output", str(refused)]), 1)
+            self.assertFalse(refused.exists())
+
     def test_a_dispatch_from_a_branch_is_refused(self) -> None:
         # The branch's own (possibly edited) release.yml would receive the secrets.
         with self.assertRaises(MODULE.TriggerError) as raised:

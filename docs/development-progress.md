@@ -51,7 +51,16 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   subtitle, What's New, review notes, screenshots, an attached build and the purchase's metadata;
   writing them needs the maintainer. Parked: BKL-33 (a Mac write failure shows engine copy, seen by
   the maintainer during smoke), BKL-34 (the CLI installer round-trip test fails on macOS 27).
-- **Unpushed:** `d157f3f0` through this checkpoint.
+- **Night, after the maintainer granted Microphone and Speech Recognition once:** every remaining
+  automatable row PASS on build 24 with no new crash reports: clone-voice (`223015-956cb58b`),
+  voice-lifecycle (`223349-956b723a`), record-then-play (`223803-96564112`), modes
+  (`224037-4321cbb4`), one-word (`225022-c52c82c5`); DA-04, F-01 and F-16 closed. A first pass under
+  iPhone Mirroring failed (`221807`, `222059`, `222344`: black screenshots, a stuck keyboard, no
+  playback), so XCUITest needs Mirroring ended even when CoreDevice reports the phone unlocked.
+  RF-15 still holds the attended rows: the file opened during onboarding (AUD-01, fresh install),
+  AUD-02's hand checks, the hand VoiceOver row, the offline relaunch, the ~30-take machine screen
+  and the purchase rows (RF-02).
+- **Unpushed:** `fa94e489` through this checkpoint (`a9ddb9c6` and earlier are pushed; CI passed).
 
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
 

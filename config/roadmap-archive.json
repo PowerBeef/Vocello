@@ -5607,6 +5607,78 @@
         "commit:cda52661",
         "commit:7ac018a5"
       ]
+    },
+    {
+      "id": "DA-04",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Engine edge inputs",
+      "status": "done",
+      "due": "2026-10-30",
+      "blockedBy": [
+        "RF-15"
+      ],
+      "gate": "One-token scripts generate (E4-01: the chat-template guard accepts 9 tokens, verified by one model run on request), and E4-02, E4-03 and E4-04 are fixed or recorded as accepted latent behavior. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
+      "sourceOfTruth": [
+        "docs/audits/2026-10-06-deep-audit.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "updated": "2026-10-24",
+      "notes": "2026-10-13: E4-01 fixed: the chat-template guard accepts 9 tokens (3 role + 1 text + 5 tail) and its message names only the count, never the script. E4-02 fixed: a model without talker_config fails typed at generate and prewarm instead of trapping. E4-03 fixed by removing the ignored memoryClearCadence parameter, the constant and the unused speed-profile function; the request's tokenMemoryClearCadence was and stays the cadence. E4-04 fixed: a multi-token step on a non-empty talker cache runs as single-token steps, exact for plain, quantized and rotating caches; the production prefill mask is unchanged. Real-model proof: \"Hi\" at Speed generated through the streamed Custom and full-text Design layouts, ending by EOS with Fast QC pass, and both engine rows record a target token count of 1. Closes after RF-15's device run. Done 2026-10-24: RF-15 one-word PASS on TestFlight build 24 in every mode (ios-xcui-candidate-smoke-20261024-225022-c52c82c5, no new crash reports).",
+      "evidence": [
+        "run:ios-xcui-candidate-smoke-20261024-225022-c52c82c5"
+      ]
+    },
+    {
+      "id": "F-01",
+      "plan": "release-first-3-0-2026-09",
+      "title": "High — make saved-voice review transactional and add iOS deletion",
+      "status": "done",
+      "due": "2026-10-30",
+      "gate": "Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift",
+        "file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
+        "file:scripts/saved_voice_lifecycle_contract.py",
+        "doc:docs/reference/privacy-storage.md",
+        "doc:docs/reference/ios-app-guide.md",
+        "run:ios-xcui-candidate-smoke-20261024-223349-956b723a"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "Sources/iOS/IOSVoicesView.swift",
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ],
+      "updated": "2026-10-24",
+      "notes": "The repository's V26-02 preservation fix and its failure-schedule tests landed in 78142e07 (2026-09-04); PreparedVoiceRepositoryTests and saved_voice_lifecycle_contract pass. 2026-10-13 (UI audit G1, G3, G4): every review surface (iOS recorder and import, iOS Design save, Mac sheet) discards its candidate however it closes, a save still staging included. The store finishes a discard it could not take the lock for on its next operation, and a review save removes the review candidates an ended app session left, never the CLI's one-shot ones. iOS Delete also waits while a long-form project runs; the Mac's same gap is parked as BKL-13. G2 decided (maintainer, 2026-10-14): replacement stays macOS-only with repository tests, and RF-15's iPhone row is save and delete. Device proof comes from RF-15. Earlier history: git log -p -- config/roadmap.json. Done 2026-10-24: RF-15 voice-lifecycle (a Design take saved as a voice, then deleted from Voices) PASS on TestFlight build 24 (ios-xcui-candidate-smoke-20261024-223349-956b723a)."
+    },
+    {
+      "id": "F-16",
+      "plan": "release-first-3-0-2026-09",
+      "title": "P1 — transactionally accept long-form projects and replacement segments",
+      "status": "done",
+      "due": "2026-10-30",
+      "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
+      "sourceOfTruth": [
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "Sources/Views/Studio/MacBatchGenerationSheet.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
+        "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "updated": "2026-10-24",
+      "notes": "Reviewed 2026-10-10 at 38d295c4 (mac-test-20261010-040414). 2026-10-13 (engine review SER-1): reconcile resolves every journal it can; History's confirmed Discard sets aside one that fails on its own data (renamed .unreadable, kept with the audio it names) on iOS and macOS; a device failure sets nothing aside and is reported; a moved container is the journal's own fault; the leftover-audio review keeps set-aside audio. Decisions: a newer build's journal is set aside like a damaged one (revisit at the first journal version change); set-aside records have no count or age limit. Ownership tests cover delete and clear-all. Mac acceptance: regeneration PASS (macos-xcui-smoke-20261014-040507-0f70cdfc) the recovery journey (--scenario long-form-recovery) PASS 2026-10-14 (macos-xcui-smoke-20261014-165645-239d5942: Export offered, Retry keeps, Discard sets aside) and 2026-10-16 on Xcode 27.1 with the on-disk Retry check (macos-xcui-smoke-20261016-170320-da10149d). It found the Mac History window blank with the notice on an empty History, a minimum-size layout bug, now fixed. BKL-14 parks never-started candidates. iOS device proof via RF-15.",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
+        "commit:df79aa96",
+        "run:ios-xcui-candidate-smoke-20261024-200402-db93f093",
+        "run:macos-xcui-smoke-20261024-205357-0952e758"
+      ]
     }
   ]
 }

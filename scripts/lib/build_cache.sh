@@ -646,6 +646,22 @@ QVOICE_OWNED_DEV_SETTINGS=(
     QVOICE_OWNED_TESTABILITY=YES
 )
 
+# An iPhone build never ships the machine's absolute paths (ASR-07): C and C++
+# sources in the Swift packages embed __FILE__ (mlx-c's error macro names every
+# file), which put the build folder into the binary and failed the IPA scan in
+# scripts/verify_ios_release_artifacts.py. Settings on the xcodebuild command
+# line reach the package targets, which project settings cannot, so every
+# iPhone build passes these. Usage: qvoice_path_map_settings "$ROOT_DIR"
+# fills QVOICE_PATH_MAP_SETTINGS.
+qvoice_path_map_settings() {
+    local flag="-fmacro-prefix-map=${1%/}/="
+    # shellcheck disable=SC2034  # read by the scripts that call this function
+    QVOICE_PATH_MAP_SETTINGS=(
+        "OTHER_CFLAGS=\$(inherited) \"$flag\""
+        "OTHER_CPLUSPLUSFLAGS=\$(inherited) \"$flag\""
+    )
+}
+
 # Run xcodebuild, piping output through xcbeautify when it's on PATH and
 # stdout is a terminal. Preserves xcodebuild's exit code in both cases.
 #

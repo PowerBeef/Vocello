@@ -205,6 +205,7 @@ build_ios() {
   fi
   rm -rf "$result_bundle_path" "$logic_result_bundle_path"
 
+  qvoice_path_map_settings "$ROOT_DIR"
   run_foundation_build "iOS app target" "$app_log_path" \
     -project "$PROJECT_FILE" \
     -scheme VocelloiOS \
@@ -220,7 +221,13 @@ build_ios() {
     ARCHS=arm64 \
     ONLY_ACTIVE_ARCH=YES \
     "${swift_settings[@]}" \
+    "${QVOICE_PATH_MAP_SETTINGS[@]}" \
     build
+
+  # The same scan the signed IPA gets: no absolute path or enabled diagnostic in
+  # the executable, so a regression fails here, not on release day.
+  python3 "$ROOT_DIR/scripts/verify_ios_release_artifacts.py" --scan-executable \
+    "$derived_data_path/Build/Products/Release-iphoneos/Vocello.app"
 
   # Compile the standalone iOS policy-test bundle for the physical-device SDK.
   # `build` deliberately does not execute XCTest and does not require a phone.

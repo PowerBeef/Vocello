@@ -1237,7 +1237,13 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_UUID" \
-            QVOICE_IOS_APP_ENTITLEMENTS="$QVOICE_IOS_APP_ENTITLEMENTS" | xcbeautify'
+            QVOICE_IOS_APP_ENTITLEMENTS="$QVOICE_IOS_APP_ENTITLEMENTS" \
+            "OTHER_CFLAGS=\$(inherited) \"-fmacro-prefix-map=$GITHUB_WORKSPACE/=\"" \
+            "OTHER_CPLUSPLUSFLAGS=\$(inherited) \"-fmacro-prefix-map=$GITHUB_WORKSPACE/=\"" | xcbeautify'
+          # The last two settings keep the runner's absolute paths out of the
+          # binary: mlx-c's error macro embeds __FILE__, and the IPA scan below
+          # refuses /Users/ (ASR-07). scripts/lib/build_cache.sh's
+          # qvoice_path_map_settings passes the same flags to every iPhone build.
 
       - name: Verify archive capability + bundled catalog
         # The bundled iOS model catalog must match the contract, and the archived

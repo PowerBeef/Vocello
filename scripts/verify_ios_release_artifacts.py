@@ -405,7 +405,23 @@ def _is_allowed_macho(relative: Path, executable_name: str) -> bool:
 def _validate_release_strings(text: str, label: str) -> None:
     for pattern in PROHIBITED_RELEASE_STRING_PATTERNS:
         if pattern.search(text):
-            raise VerificationError(f"{label} executable contains prohibited release diagnostic or private-path vocabulary")
+            raise VerificationError(
+                f"{label} executable contains prohibited release diagnostic or private-path vocabulary "
+                f"({pattern.pattern})"
+            )
+
+
+def scan_executable(app: Path) -> None:
+    """Run the release string scan on a built app's main executable.
+
+    The generic iPhone build runs it (scripts/build_foundation_targets.sh), so an
+    absolute path or enabled diagnostic in the binary fails ordinary CI rather
+    than the signed archive's verification on release day.
+    """
+    with (app / "Info.plist").open("rb") as handle:
+        executable = app / plistlib.load(handle)["CFBundleExecutable"]
+    strings, _ = _run_bytes(["/usr/bin/strings", "-a", str(executable)])
+    _validate_release_strings(strings.decode("utf-8", errors="replace"), app.name)
 
 
 def _validate_undefined_symbols(symbols: Sequence[str], label: str) -> None:
@@ -788,16 +804,34 @@ def verify(archive: Path, export_dir: Path, expected_team_id: str, output: Path,
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", type=Path, required=True)
-    parser.add_argument("--export-dir", type=Path, required=True)
-    parser.add_argument("--expected-team-id-env", required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--scan-executable", type=Path, metavar="APP",
+                        help="only scan a built .app's main executable for prohibited release strings")
+    parser.add_argument("--archive", type=Path)
+    parser.add_argument("--export-dir", type=Path)
+    parser.add_argument("--expected-team-id-env")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--root", type=Path, default=ROOT)
     return parser
 
 
 def main() -> int:
-    arguments = _parser().parse_args()
+    parser = _parser()
+    arguments = parser.parse_args()
+    if arguments.scan_executable is not None:
+        try:
+            scan_executable(arguments.scan_executable.resolve())
+        except (OSError, KeyError, plistlib.InvalidFileException, VerificationError) as error:
+            raise SystemExit(f"iOS executable scan failed: {error}") from error
+        print(f"iOS executable scan: PASS ({arguments.scan_executable.name})")
+        return 0
+    missing = [flag for flag, value in (
+        ("--archive", arguments.archive),
+        ("--export-dir", arguments.export_dir),
+        ("--expected-team-id-env", arguments.expected_team_id_env),
+        ("--output", arguments.output),
+    ) if value is None]
+    if missing:
+        parser.error(f"the following arguments are required: {', '.join(missing)}")
     expected_team_id = os.environ.get(arguments.expected_team_id_env, "")
     try:
         payload = verify(

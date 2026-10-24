@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 29/57 (51%) |
+| `release-first-3-0-2026-09` | active | release-qa | 30/57 (53%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -72,7 +72,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
-| `RF-34` | in-flight | The website home page speaks to people who make voices | — |
 
 ### Open items in detail
 
@@ -165,9 +164,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-31`** (parked) — CLI parity record, documentation and qualification.
   gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
   unparkWhen: The iOS 3.0 submission is done.
-
-- **`RF-34`** (in-flight, due 2026-10-30) — The website home page speaks to people who make voices.
-  gate: Maintainer request 2026-10-24: the home page presents Vocello to regular users (what it does, how it sounds, why it is private, how to get it) in a more premium, focused design that uses the brand and mode colors, with developer detail behind /cli/ and /engineering/. Old anchors still land, npm --prefix website run check passes, and the page is reviewed at 390, 844x390, 1024 and 1440 px and in production.
 
 ## Engine remediation programme (2026-10-16 audit)
 

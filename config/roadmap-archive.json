@@ -5494,6 +5494,27 @@
         "commit:cd9541df",
         "run:40107403543"
       ]
+    },
+    {
+      "id": "RF-34",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The website home page speaks to people who make voices",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Maintainer request 2026-10-24: the home page presents Vocello to regular users (what it does, how it sounds, why it is private, how to get it) in a more premium, focused design that uses the brand and mode colors, with developer detail behind /cli/ and /engineering/. Old anchors still land, npm --prefix website run check passes, and the page is reviewed at 390, 844x390, 1024 and 1440 px and in production.",
+      "sourceOfTruth": [
+        "website/src/pages/HomePage.jsx",
+        "website/src/sections/",
+        "website/src/site.css",
+        "website/DESIGN.md"
+      ],
+      "updated": "2026-10-24",
+      "due": "2026-10-30",
+      "notes": "Opened 2026-10-24 at the maintainer's request after the README rewrite (e52d8d1e). Maintainer: some design rules may change; DESIGN.md records each change (centered short intros, mode-color auras behind product stages, the hero entrance and staggered reveal). 2026-10-24: closed on the gate. npm --prefix website run check passed locally and in CI run 40113274650's website job (its Python job failed on the release-signing test race fixed in abc32f16). Reviewed at 390, 844x390, 1024 and 1440 px locally, then in production after Vercel deployed 2b74d2f6: ten sections, the bar's Voices, Listen, Privacy and iPhone links, no overflow, no broken image, and the mode switcher by click and keyboard. Old anchors land: #how-it-runs, #why-not-cloud-tts, #cli and #engineering.",
+      "evidence": [
+        "commit:2b74d2f6",
+        "run:40113274650"
+      ]
     }
   ]
 }

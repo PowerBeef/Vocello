@@ -2130,23 +2130,6 @@
       "updated": "2026-10-20",
       "due": "2026-10-30",
       "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers (screened from a linked worktree, commit on claude/*, other live sessions hold measured lanes), computer use allowed except as evidence, browser-pane launch.json. Open: the iOS-only lane snippets and ios_device.sh in an iPhone window; CI on Xcode 27 when runners offer it."
-    },
-    {
-      "id": "RF-34",
-      "plan": "release-first-3-0-2026-09",
-      "title": "The website home page speaks to people who make voices",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Maintainer request 2026-10-24: the home page presents Vocello to regular users (what it does, how it sounds, why it is private, how to get it) in a more premium, focused design that uses the brand and mode colors, with developer detail behind /cli/ and /engineering/. Old anchors still land, npm --prefix website run check passes, and the page is reviewed at 390, 844x390, 1024 and 1440 px and in production.",
-      "sourceOfTruth": [
-        "website/src/pages/HomePage.jsx",
-        "website/src/sections/",
-        "website/src/site.css",
-        "website/DESIGN.md"
-      ],
-      "updated": "2026-10-24",
-      "due": "2026-10-30",
-      "notes": "Opened 2026-10-24 at the maintainer's request after the README rewrite (e52d8d1e). Maintainer: some design rules may change; DESIGN.md records each change (centered short intros, mode-color auras behind product stages, the hero entrance and staggered reveal)."
     }
   ]
 }

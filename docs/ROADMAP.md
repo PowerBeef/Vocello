@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 28/56 (50%) |
+| `release-first-3-0-2026-09` | active | release-qa | 29/56 (52%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -72,7 +72,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
-| `RF-33` | in-flight | website layout overhaul for phone, tablet and desktop | — |
 
 ### Open items in detail
 
@@ -165,9 +164,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-31`** (parked) — CLI parity record, documentation and qualification.
   gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
   unparkWhen: The iOS 3.0 submission is done.
-
-- **`RF-33`** (in-flight, due 2026-10-30) — website layout overhaul for phone, tablet and desktop.
-  gate: The website works and reads well at every width from 320 px to 1920 px and in landscape phones: an opaque top bar with a full-height menu sheet below the desktop tier (keyboard, Esc, focus trap, 44 px targets); one fluid type and spacing scale on four documented layout tiers; the deep Command line and Engineering content on their own prerendered pages (/cli/, /engineering/) with the home page summarizing and linking, existing anchors kept; body text left-aligned at every width; a readable responsive speed chart; responsive image sources. A Playwright layout matrix (16 widths plus three landscape sizes, Chromium plus WebKit iPhone and iPad descriptors) on /, /cli/, /engineering/, /support/ and /privacy/ proves no element overflows the viewport, no bar overlap, 44 px tap targets, the menu behaviour and anchor landing; npm --prefix website run check, the site and rendered contracts and public_facts_contract pass; website/CLAUDE.md and DESIGN.md document the tiers and the alignment rule.
 
 ## Engine remediation programme (2026-10-16 audit)
 

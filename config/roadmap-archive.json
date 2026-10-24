@@ -5469,6 +5469,31 @@
         "run:40020993733",
         "run:40011843175"
       ]
+    },
+    {
+      "id": "RF-33",
+      "plan": "release-first-3-0-2026-09",
+      "title": "website layout overhaul for phone, tablet and desktop",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The website works and reads well at every width from 320 px to 1920 px and in landscape phones: an opaque top bar with a full-height menu sheet below the desktop tier (keyboard, Esc, focus trap, 44 px targets); one fluid type and spacing scale on four documented layout tiers; the deep Command line and Engineering content on their own prerendered pages (/cli/, /engineering/) with the home page summarizing and linking, existing anchors kept; body text left-aligned at every width; a readable responsive speed chart; responsive image sources. A Playwright layout matrix (16 widths plus three landscape sizes, Chromium plus WebKit iPhone and iPad descriptors) on /, /cli/, /engineering/, /support/ and /privacy/ proves no element overflows the viewport, no bar overlap, 44 px tap targets, the menu behaviour and anchor landing; npm --prefix website run check, the site and rendered contracts and public_facts_contract pass; website/CLAUDE.md and DESIGN.md document the tiers and the alignment rule.",
+      "sourceOfTruth": [
+        "website/src/site.css",
+        "website/src/tokens.css",
+        "website/src/sections/Nav.jsx",
+        "website/DESIGN.md",
+        "website/CLAUDE.md",
+        "website/playwright.config.mjs"
+      ],
+      "updated": "2026-10-24",
+      "notes": "2026-10-23: opened at the maintainer's request after a rendered review of the live site at 390x844, 844x390, 820x1180, 1024x1366 and 1920x1080 and audits of the website code and tests. Maintainer decisions: split the deep content into pages, a menu button with a full-height sheet on phones, WebKit in the browser tests, and a new hero screenshot of a filled Studio from the Mac capture lane. Two pushes: the foundation and the new bar first, then the page split and section redesigns. 2026-10-24: closed on the gate. CI run 40107403543 on 1b1ab348 and the local check passed the layout matrix (Chromium at 19 widths and three landscape sizes, WebKit iPhone and iPad) on /, /cli/, /engineering/, /support/ and /privacy/. A rendered review of production in the desktop app's browser pane at 320, 390, 844x390, 820x1180, 1440 and 1920 found no overflow, left-aligned body text, a readable chart and no sideways-scrolling code; the menu sheet opened as a modal, held focus, locked scroll, closed on Esc and returned focus.",
+      "due": "2026-10-30",
+      "evidence": [
+        "commit:eb7c4070",
+        "commit:dc7190c5",
+        "commit:cd9541df",
+        "run:40107403543"
+      ]
     }
   ]
 }

@@ -294,7 +294,7 @@
         "docs/reference/ios-appstore-submission.md"
       ],
       "updated": "2026-10-24",
-      "notes": "2026-10-24: the maintainer asked to fast-track the 3.0 release candidate to TestFlight: the agent approves the release gate, then distributes when Apple ends processing (Internal, What to Test notes from docs/releases/v3.0.0.md, beta review submission, Public Beta group). iPhone candidates are cut by python3 scripts/ios_candidate_tag.py (fc8bb78e); a v<version>-ios.N push runs only the iPhone archive and upload. v3.0.0-ios.3 on 26995f71 started release run 40103005257, which carries the release-evidence fix that stopped v3.0.0-ios.2. At 15:04 UTC it was still in the Security CodeQL Swift scan, with no approval pending and no build 24 in App Store Connect. The session watching it ended, so its next step (approve the release environment when it asks, then distribute) waits for the next session. The beta description already names the three modes. Still open in this gate: the processed build installed on the iPhone over the development build, keeping data, and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). Earlier history: git log -p -- config/roadmap.json."
+      "notes": "2026-10-24: the maintainer asked to fast-track the 3.0 release candidate to TestFlight: the agent approves the release gate, then distributes when Apple ends processing (Internal, What to Test notes from docs/releases/v3.0.0.md, beta review submission). Later that day the maintainer held the Public Beta group until RF-17's exact-tag promotion passes; the beta review submission still goes in at once. iPhone candidates are cut by python3 scripts/ios_candidate_tag.py (fc8bb78e); a v<version>-ios.N push runs only the iPhone archive and upload. v3.0.0-ios.3 on 26995f71 started release run 40103005257, which carries the release-evidence fix that stopped v3.0.0-ios.2. Still open in this gate: the processed build installed on the iPhone over the development build, keeping data, and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "RF-15",
@@ -329,7 +329,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-10-12",
-      "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate."
+      "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate. 2026-10-24 (maintainer): build 24 joins the Public Beta group only after this promotion validates; its beta review submission does not wait."
     },
     {
       "id": "RF-16",

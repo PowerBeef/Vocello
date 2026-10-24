@@ -20,7 +20,8 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
 
 - **Maintainer decision:** iPhone focus. TestFlight carries the 3.0 release candidate, 3.0.0 (24):
-  Internal at once, the Public Beta group after Apple's beta review. The What to Test notes ask for the
+  Internal at once and submitted for Apple's beta review at once; the Public Beta group waits for RF-17's
+  exact-tag promotion (maintainer, later on October 24). The What to Test notes ask for the
   last bugs and for the hardware floor (iPhone 15 Pro, 8 GB). Fast-tracked: the agent approves the
   `release` gate and distributes when processing ends.
 - **Archive path repaired:**
@@ -45,6 +46,9 @@ the last copy with every earlier checkpoint is at commit a0597deb).
     approval pending and no build 24 in App Store Connect.
   - The release rehearsal 40103799663, dispatched on `26995f71` for issue #107, was still running.
   - `main` had local commits not yet pushed (the checkpoint and roadmap updates).
+- **Desktop session, 15:40 UTC:** rehearsal 40103799663 passed and #107 is closed. `main` is pushed
+  with `1b1ab348` (the Claude desktop app workflow, DW-04), CI green; release run 40103005257 was still
+  in CodeQL.
 - **Resume here, in order:**
   1. When run 40103005257 asks for the `release` environment, approve it. The maintainer asked to
      fast-track: `gh api -X POST repos/PowerBeef/Vocello/actions/runs/40103005257/pending_deployments
@@ -57,8 +61,8 @@ the last copy with every earlier checkpoint is at commit a0597deb).
        candidate text in `docs/releases/v3.0.0.md` ("TestFlight: what to test");
      - `asc builds add-groups --build-id ID --group 70bd66ea-9d12-4f77-84b5-38e7a64ed871` (Internal);
      - `asc testflight review submit --build-id ID --confirm`;
-     - `asc builds add-groups --build-id ID --group 2375b641-4224-486c-8c0a-0fa326d7b641` (Public Beta).
-  3. Close #107 if rehearsal 40103799663 passed.
+     - not yet the Public Beta group (`2375b641-4224-486c-8c0a-0fa326d7b641`): it waits for RF-17.
+  3. Done: rehearsal 40103799663 passed and #107 is closed.
   4. The maintainer installs 3.0.0 (24) from TestFlight over the development build. Then run
      `scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario all`, where DIR is the run's
      verified `vocello-ios-release-candidate` artifact. Then by hand: the offline relaunch and VoiceOver.

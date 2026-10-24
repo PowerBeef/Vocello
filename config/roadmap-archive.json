@@ -5434,6 +5434,41 @@
         "run:40020993733",
         "doc:docs/releases/v3.0.0.md"
       ]
+    },
+    {
+      "id": "RF-09",
+      "plan": "release-first-3-0-2026-09",
+      "title": "verify the coherent tree and freeze the 3.0.0 candidate",
+      "status": "done",
+      "due": "2026-10-23",
+      "gate": "On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 still match config/public-product-facts.json candidateRelease and ASR-08's fresh read-only check shows build 24 unused; (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json, and the annotated v3.0.0 tag is a separate maintainer action proved by scripts/release_source_authority.py; (4) RF-14's winning defaults and the release blockers' code fixes have landed, with their device proof left to RF-15; (5) the freeze commit is recorded as focusLock.freeze in config/roadmap.json, so every later commit names an item of this plan in its subject.",
+      "sourceOfTruth": [
+        "project.yml",
+        "config/public-product-facts.json",
+        "scripts/release_source_authority.py",
+        "scripts/release_evidence.py",
+        "scripts/quality_promotion.py"
+      ],
+      "updated": "2026-10-23",
+      "notes": "Frozen 2026-10-20 at 029427c9, moved 2026-10-21 to 0919e998 (RF-24) and 2026-10-23 to e7a8e2ae, the signed v3.0.0 commit, whose iPhone-compiled sources and VocelloiOS target equal 0919e998's. Evidence on e7a8e2ae: exact-SHA push CI 40011843175 (CI required green); release run 40020993733 (Security, the full project-input gate and Python suite in release.sh, the signed Mac build, iOS compile-safety); its descendant eb7c4070 with identical Swift sources passed the macOS deterministic tests, TSan and the generic iOS compile (CI 40048593106). The v3.0.0 tag is annotated and GitHub-verified (release_source_authority.py in the release run). project.yml 3.0.0 (24) matches stableMacRelease; App Store Connect, read-only 2026-10-23: iPhone builds 21-23 only, build 24 unused; two active IOS_APP_STORE profiles. History: git log -p -- config/roadmap.json.",
+      "blockedBy": [
+        "ASR-08",
+        "BG-01",
+        "CONV-21",
+        "RF-13",
+        "RF-14",
+        "RF-18",
+        "RF-19",
+        "RF-20",
+        "RF-21",
+        "RF-22",
+        "RF-24"
+      ],
+      "evidence": [
+        "commit:e7a8e2ae",
+        "run:40020993733",
+        "run:40011843175"
+      ]
     }
   ]
 }

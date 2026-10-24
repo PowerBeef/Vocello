@@ -253,22 +253,9 @@ is complete.
 
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
-> Vocello generates speech entirely on-device. It ships with **no bundled model weights** to keep the app
-> small. On first launch, open Settings → Models & Files → Voice Models and tap **Install** for the Studio mode you want:
-> Built-in Voice is 2,049,696,897 bytes, Voice Design is 2,049,696,404 bytes, and Voice Cloning is
-> 2,073,713,977 bytes. One model is sufficient to review its matching mode. Downloads require Wi-Fi and
-> at least 4.5 GB of free space available before each installation; completion time depends on the review network and may take several
-> minutes. Progress reports exact downloaded catalog bytes. A download can be cancelled and restarted, and
-> an interrupted background download is adopted after relaunch. Final verification/installation is shown as
-> an indeterminate finishing step. Once the model shows **Ready**, that mode works offline. Open Studio,
-> type a short line, choose a speaker where applicable, and tap Generate. No account or login is required.
-> Voice Cloning records its reference with the microphone or imports an audio file the user has rights to;
-> Microphone and Speech Recognition permissions are requested only for recording and local transcription.
-> If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi or use the Support link in
-> Settings. Vocello never substitutes a different model artifact.
-
-No demo account is needed (no login). Note the model download requirement so the app is not judged
-non-functional under Guideline 2.1.
+The notes text to paste is in [`app-store-listing.md`](app-store-listing.md#app-review-notes-4000),
+with the rest of the 3.0.0 listing draft. No demo account is needed (no login); the notes spell out
+the model download requirement so the app is not judged non-functional under Guideline 2.1.
 
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
 `max(2 × catalog bytes, catalog bytes + 256 MiB)`. The coordinator supplies the full model
@@ -293,7 +280,8 @@ hours of submission remains (ASR-09).
       state, personal data, and misleading claims. Do not submit the tracked 780×1696 historical image
       or the 1440×1224 Mac images as iPhone screenshots.
 - [ ] App name, subtitle (≤30 chars each), description, keywords (≤100), marketing URL
-      (`https://vocello.vercel.app`), and copyright.
+      (`https://vocello.vercel.app`), and copyright. The en-US draft, awaiting the maintainer's
+      review, is [`app-store-listing.md`](app-store-listing.md); copyright is not drafted yet.
 - [x] Source support identity is single-sourced in `config/support-contact.json`: the unauthenticated
       support page exposes the monitored address and response owner, the website privacy/footer surfaces
       link it, and Settings opens the exact route. `scripts/support_contact_contract.py` rejects drift,

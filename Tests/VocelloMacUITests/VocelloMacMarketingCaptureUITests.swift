@@ -66,8 +66,12 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
 
     private func captureBuiltInRefresh() {
         prepare(mode: .custom)
+        // The website hero: a script long enough to fill the composer (RF-33).
         replaceScript(with: "Made with Vocello. Bring your words to life, with a voice that feels right. "
-            + "Created locally on your Mac. Yours from the first word to the last.")
+            + "Write your script, pick a speaker and a delivery, and press Generate. "
+            + "Every take is created locally on your Mac, so your words stay with you. "
+            + "Save the takes you love, export them, or pin a seed to hear one again. "
+            + "Yours from the first word to the last.")
         navigate(to: .voices)
         navigate(to: .customVoice)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("delivery_tonePicker"), timeout: 20))
@@ -104,6 +108,16 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUITextEntry.replace(in: element("voicesEnroll_nameField"),
             with: "Studio narrator", timeout: 20))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voicesEnroll_confirmButton"), timeout: 60))
+        // A designed take can fall outside the recommended reference range, and the
+        // sheet then asks before saving; the capture keeps it, as a user may.
+        let keep = button("voicesEnroll_keepDespiteWarning")
+        let warned = XCTWaiter.wait(
+            for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: keep)],
+            timeout: 15
+        )
+        if warned == .completed {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keep, timeout: 10))
+        }
         XCTAssertTrue(VocelloUIWait.condition("designed voice to be saved", timeout: 60) {
             !self.element("voicesEnroll_confirmButton").exists
         })

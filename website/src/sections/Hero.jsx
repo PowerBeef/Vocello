@@ -55,7 +55,7 @@ export const Hero = () => (
         <div className="window hero-window">
           <Screenshot
             src="/assets/screens/custom-voice.png"
-            width={2080} height={1380}
+            width={2080} height={1356}
             priority
             alt="Vocello Built-in Voice screen showing speaker, delivery, model, and script controls"
           />

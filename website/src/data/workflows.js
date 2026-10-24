@@ -16,6 +16,7 @@ export const WORKFLOWS = [
       ["Custom tone field", "Describe the delivery in your own words when the chips aren't enough."],
     ],
     shot: "/assets/screens/custom-voice.png",
+    shotHeight: 1356,
   },
   {
     id: "design",
@@ -34,6 +35,7 @@ export const WORKFLOWS = [
       ["Local generation", "The brief never leaves your Mac. Designed voices live in app storage."],
     ],
     shot: "/assets/screens/voice-design.png",
+    shotHeight: 1380,
   },
   {
     id: "clone",
@@ -52,5 +54,6 @@ export const WORKFLOWS = [
       ["Source-led delivery", "Voice Cloning follows the reference clip and takes no delivery instruction. A cloned voice with a curated emotion reference bank offers a delivery choice, each delivery backed by its own verified reference clip."],
     ],
     shot: "/assets/screens/voice-cloning.png",
+    shotHeight: 1380,
   },
 ];

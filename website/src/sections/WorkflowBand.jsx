@@ -21,7 +21,7 @@ export const WorkflowBand = ({ workflow, index }) => {
       <div className="container workflow-band-inner">
         <figure className="workflow-band-shot">
           <div className="window">
-            <Screenshot src={workflow.shot} width={2080} height={1380} alt={`Vocello ${workflow.title} screen`} />
+            <Screenshot src={workflow.shot} width={2080} height={workflow.shotHeight} alt={`Vocello ${workflow.title} screen`} />
           </div>
         </figure>
         <div className="workflow-band-copy">

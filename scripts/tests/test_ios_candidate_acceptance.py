@@ -69,6 +69,25 @@ class CandidateAcceptanceTests(unittest.TestCase):
             candidate.installed_identity({"result": {"apps": [{**legacy, "isBuiltByDeveloper": False}]}},
                                          self.identity())
 
+    def test_maintainer_attestation_stands_in_only_for_the_origin(self):
+        apps = self.app_inventory()
+        apps["result"]["apps"][0]["builtByDeveloper"] = True
+        value = candidate.installed_identity(apps, self.identity(), "Installed from TestFlight; orange dot shown")
+        self.assertEqual((value["originProof"], value["builtByDeveloper"]), ("maintainer-attestation", True))
+        self.assertEqual(value["originAttestation"], "Installed from TestFlight; orange dot shown")
+        self.assertEqual(candidate.installed_identity(self.app_inventory(), self.identity(), "unused")["originProof"],
+                         "coredevice")
+        for key, wrong in [("version", "2.4.0"), ("bundleVersion", "23"), ("bundleIdentifier", "other")]:
+            with self.subTest(key=key):
+                mismatch = self.app_inventory()
+                mismatch["result"]["apps"][0].update({"builtByDeveloper": True, key: wrong})
+                with self.assertRaises(ValueError):
+                    candidate.installed_identity(mismatch, self.identity(), "Installed from TestFlight")
+        for statement in ("", "   ", "two\nlines", "x" * 301):
+            with self.subTest(statement=statement[:12]):
+                with self.assertRaisesRegex(ValueError, "attestation"):
+                    candidate.installed_identity(apps, self.identity(), statement)
+
     def test_absent_or_duplicate_candidate_fails(self):
         for apps in ({}, {"result": {"apps": []}},
                      {"result": {"apps": self.app_inventory()["result"]["apps"] * 2}}):

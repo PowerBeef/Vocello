@@ -48,6 +48,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario studio-layout
   scripts/ui_test.sh ios smoke --scenario long-form
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--scenario ROW] [--retain-result]
+                               [--candidate-origin-attestation "STATEMENT"]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
@@ -110,7 +111,9 @@ It generates no audio and exports its raw transcript untracked; success is an ob
 app (a TestFlight build), not instrumented smoke. `--scenario` picks the RF-15 row: navigation (the
 default), modes, voice-lifecycle, one-word, record-then-play, long-form, accessibility or all. It requires
 a clean tree at the release commit, or at a later one that changed no product input (Sources/,
-Packages/, project.yml, the Xcode project).
+Packages/, project.yml, the Xcode project). Where CoreDevice reports the maintainer's own TestFlight
+build as a developer app, `--candidate-origin-attestation "STATEMENT"` records the maintainer's word
+as the origin proof; bundle, version and build are still checked before and after.
 Only the standalone test runner is built/installed. Distribution acceptance remains separately authorized.
 `screen-protection` inspects the real iOS Auto-Lock screen (English/French Settings).
 Only explicit `--scenario enable` selects and verifies 3 minutes; no other setting is changed.
@@ -176,6 +179,7 @@ control_take_limit=5
 control_take_limit_explicit=0
 retain_result=0
 candidate_evidence=""
+candidate_attestation=""
 candidate_collection_needed=0
 candidate_collection_attempted=0
 ui_test_attempted=0
@@ -185,6 +189,7 @@ attachments_status=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --preinstalled-candidate) candidate_evidence="${2:?--preinstalled-candidate requires a directory}"; shift 2 ;;
+    --candidate-origin-attestation) candidate_attestation="${2:?--candidate-origin-attestation requires a statement}"; shift 2 ;;
     --scenario) scenario_argument="${2:?--scenario requires a value}"; shift 2 ;;
     --scenario=*) scenario_argument="${1#*=}"; shift ;;
     --history-row-id) history_row_id="${2:?--history-row-id requires a value}"; shift 2 ;;
@@ -236,6 +241,8 @@ if [[ -n "$candidate_evidence" ]]; then
   [[ "$platform" == "ios" && "$lane" == "smoke" && -d "$candidate_evidence" ]] \
     || die "--preinstalled-candidate requires ios smoke and verified release evidence"
 fi
+[[ -z "$candidate_attestation" || -n "$candidate_evidence" ]] \
+  || die "--candidate-origin-attestation requires --preinstalled-candidate"
 
 if [[ "$lane" == "marketing" ]]; then
   scenario_argument="${scenario_argument:-all}"
@@ -1336,7 +1343,8 @@ candidate_inventory() {
     --timeout 60 --quiet >"$out/apps-$phase.log" 2>&1 || return 1
   python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" installed \
     --apps "$out/apps-$phase.json" --identity "$out/candidate-identity.json" \
-    --output "$out/candidate-$phase.json"
+    --output "$out/candidate-$phase.json" \
+    ${candidate_attestation:+--origin-attestation "$candidate_attestation"}
 }
 
 candidate_attachments() {

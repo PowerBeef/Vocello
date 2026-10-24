@@ -198,7 +198,11 @@ commit, or at a later commit that changed no product input (`Sources/`, `Package
 matches its UI (`runnerRelation` in the identity records which). CoreDevice must identify exactly one matching bundle/version/build
 with `builtByDeveloper == false` (the field `devicectl device info apps` reports), before and after
 testing; unknown origin fails closed. A development build of the same version and build still
-reports `true`, and TestFlight may then show Open without replacing it. This
+reports `true`, and TestFlight may then show Open without replacing it. On a phone paired for
+development CoreDevice also reports the team's own TestFlight build as a developer app (observed
+2026-10-24 with build 24 under TestFlight's orange dot); `--candidate-origin-attestation "STATEMENT"`
+then records the maintainer's word as the origin proof (`originProof: maintainer-attestation`, with
+the observed value), and bundle, version and build are still checked before and after. This
 binds the unique version/build to approved IPA evidence but does **not** claim to measure the
 installed TestFlight binary's digest.
 

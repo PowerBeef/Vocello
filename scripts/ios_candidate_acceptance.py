@@ -122,7 +122,10 @@ def runner_relation(candidate: str, head: str, root: Path) -> str:
     return "test-only-descendant"
 
 
-def installed_identity(apps: dict, expected: dict) -> dict:
+def installed_identity(apps: dict, expected: dict, attestation: str | None = None) -> dict:
+    """The installed candidate's identity. Its origin is proven by CoreDevice (`builtByDeveloper` false)
+    or, where CoreDevice reports the maintainer's own TestFlight build as a developer app, by the
+    maintainer's recorded attestation; version and build are checked either way."""
     rows = apps.get("result", {}).get("apps")
     if not isinstance(rows, list):
         raise ValueError("CoreDevice application inventory is missing")
@@ -130,15 +133,23 @@ def installed_identity(apps: dict, expected: dict) -> dict:
     if len(matches) != 1:
         raise ValueError("candidate application is missing or ambiguous")
     app = matches[0]
-    # CoreDevice's `devicectl device info apps` names the origin `builtByDeveloper` (Xcode 27.1);
-    # a row without it is of unknown origin, and unknown origin fails closed.
-    if app.get("builtByDeveloper") is not False:
-        raise ValueError("development installation or unknown application origin is prohibited")
     if (app.get("version") != expected["marketingVersion"]
             or app.get("bundleVersion") != expected["buildNumber"]):
         raise ValueError("installed candidate version/build differs from approved evidence")
-    return {"bundleIdentifier": BUNDLE_ID, "marketingVersion": app["version"],
-            "buildNumber": app["bundleVersion"], "builtByDeveloper": False}
+    # CoreDevice's `devicectl device info apps` names the origin `builtByDeveloper` (Xcode 27.1);
+    # a row without it is of unknown origin, and unknown origin fails closed. On a phone paired for
+    # development it also reports the team's own TestFlight build as a developer app (2026-10-24),
+    # so only the maintainer's attestation, recorded with the observed value, can stand in for it.
+    observed = app.get("builtByDeveloper")
+    value = {"bundleIdentifier": BUNDLE_ID, "marketingVersion": app["version"],
+             "buildNumber": app["bundleVersion"], "builtByDeveloper": observed}
+    if observed is False:
+        return {**value, "originProof": "coredevice"}
+    if attestation is None:
+        raise ValueError("development installation or unknown application origin is prohibited")
+    if not attestation.strip() or len(attestation) > 300 or any(c in attestation for c in "\r\n\0"):
+        raise ValueError("an origin attestation is one line of at most 300 characters")
+    return {**value, "originProof": "maintainer-attestation", "originAttestation": attestation.strip()}
 
 
 def validate_results(summary: dict, attachments: Path, identity: dict, scenario: str = "navigation") -> dict:
@@ -216,6 +227,7 @@ def main() -> int:
     installed.add_argument("--apps", required=True, type=Path)
     installed.add_argument("--identity", required=True, type=Path)
     installed.add_argument("--output", required=True, type=Path)
+    installed.add_argument("--origin-attestation")
     prepare = sub.add_parser("prepare-runner")
     prepare.add_argument("--xctestrun", required=True, type=Path)
     prepare.add_argument("--runner", required=True, type=Path)
@@ -250,7 +262,7 @@ def main() -> int:
         elif args.command == "identity":
             value = candidate_identity(args.evidence.resolve())
         elif args.command == "installed":
-            value = installed_identity(read_json(args.apps), read_json(args.identity))
+            value = installed_identity(read_json(args.apps), read_json(args.identity), args.origin_attestation)
         else:
             value = runner_configuration(plistlib.loads(args.xctestrun.read_bytes()),
                                          plistlib.loads((args.runner / "Info.plist").read_bytes()),

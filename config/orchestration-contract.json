@@ -253,7 +253,8 @@
         "history-publication"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-delivery-cohort": {
@@ -265,7 +266,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-startup-parity": {
@@ -278,7 +280,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-enroll-clone-fixture": {
@@ -290,7 +293,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-saved-voice-lifecycle": {
@@ -302,7 +306,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-purchase": {
@@ -315,7 +320,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-screen-protection": {
@@ -327,7 +333,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-take-variation": {
@@ -339,7 +346,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-control-audit": {
@@ -357,7 +365,8 @@
       ],
       "optionalSteps": [
         "control-audit-device-correlation",
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-control-audit-generation": {
@@ -375,7 +384,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-model-download": {
@@ -388,7 +398,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-perf": {
@@ -402,7 +413,8 @@
       ],
       "optionalSteps": [
         "history-publication",
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-smoke": {
@@ -415,7 +427,8 @@
         "smoke-diagnostics"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-history-transcript": {
@@ -428,7 +441,8 @@
         "smoke-diagnostics"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-update-models": {
@@ -440,7 +454,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-startup-retry": {
@@ -452,7 +467,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-background-warmup": {
@@ -464,7 +480,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-record-then-play": {
@@ -476,7 +493,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-studio-layout": {
@@ -488,7 +506,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-long-form": {
@@ -500,7 +519,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-candidate-smoke": {
@@ -520,7 +540,8 @@
         "candidate-result"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-ios-localization": {
@@ -532,7 +553,8 @@
         "crash-delta"
       ],
       "optionalSteps": [
-        "result-retention"
+        "result-retention",
+        "ui-preflight"
       ]
     },
     "ui-macos-benchmark": {

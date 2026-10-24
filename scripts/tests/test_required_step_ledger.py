@@ -130,7 +130,7 @@ class RequiredStepLedgerTests(unittest.TestCase):
         )
         self.assertEqual(
             workflow["optionalSteps"],
-            ["control-audit-device-correlation", "result-retention"],
+            ["control-audit-device-correlation", "result-retention", "ui-preflight"],
         )
 
     def test_an_explicit_retention_pin_is_written_before_the_lane_runs_anything(self) -> None:

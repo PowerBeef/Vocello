@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/34 (38%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/35 (37%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -555,6 +555,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
 | `BKL-32` | parked | Give each shared iOS folder a single group in the generated project | — |
 | `BKL-33` | parked | An unwritable output folder is reported as an internal engine error on the Mac | — |
+| `BKL-34` | parked | The CLI installer round-trip test fails on a macOS 27 host | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -637,6 +638,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-33`** (parked) — An unwritable output folder is reported as an internal engine error on the Mac.
   gate: With the output folder unwritable, the Mac Studio's failure card and toast show the storage message (storageUnavailable), not the runtime-failure copy, and the status line does not say the engine needs attention; test11_GenerationErrorAndRecovery asserts the message.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-34`** (parked) — The CLI installer round-trip test fails on a macOS 27 host.
+  gate: scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as it does on the macOS 26 release runner.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

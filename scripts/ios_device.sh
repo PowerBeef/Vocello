@@ -83,6 +83,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
+. "$ROOT_DIR/scripts/lib/dev_signing.sh"
 . "$ROOT_DIR/scripts/lib/test_models.sh"
 
 SCHEME="VocelloiOS"
@@ -236,19 +237,8 @@ print(json.dumps({
 # Team id = the OU of the keychain "Apple Development" cert. NOTE: the team is the
 # cert's OU, NOT the parenthetical in its CN ("Apple Development: …(XXXXXXXXXX)") —
 # that parenthetical is a per-developer identifier; mistaking it for the team yields
-# "No Account for Team …". $QWENVOICE_DEVELOPMENT_TEAM overrides if set.
-derive_team() {
-  if [[ -n "${QWENVOICE_DEVELOPMENT_TEAM:-}" ]]; then
-    printf '%s' "$QWENVOICE_DEVELOPMENT_TEAM"; return 0
-  fi
-  local t
-  t="$(security find-certificate -c "Apple Development" -p 2>/dev/null \
-        | openssl x509 -noout -subject 2>/dev/null \
-        | grep -oE 'OU=[A-Z0-9]+' | head -1 | cut -d= -f2)"
-  [[ -n "$t" ]] || return 1
-  export QWENVOICE_DEVELOPMENT_TEAM="$t"
-  printf '%s' "$t"
-}
+# "No Account for Team …". $QWENVOICE_DEVELOPMENT_TEAM overrides if set. derive_team
+# lives in scripts/lib/dev_signing.sh, shared with scripts/ui_test.sh.
 
 require_team() {
   derive_team >/dev/null \

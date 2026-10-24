@@ -13,11 +13,28 @@
 #   2. first "Apple Development: …" identity in the keychain
 #   3. "-" (ad-hoc) with a warning that TCC grants will not survive rebuilds
 #
-# Sourced by scripts/build.sh and scripts/ui_test.sh (the benchmark lane re-signs
-# the XCTest runner with the same identity) — release.sh has its own signing flow
+# Sourced by scripts/build.sh, scripts/ui_test.sh (the benchmark lane re-signs
+# the XCTest runner with the same identity) and scripts/ios_device.sh (the team
+# for device signing) — release.sh has its own signing flow
 # and re-signs every component from scratch, so nothing dev-signed can ship.
 
 # shellcheck shell=bash
+
+# The Apple Development team for device signing: $QWENVOICE_DEVELOPMENT_TEAM, else the
+# OU of the keychain's first Apple Development certificate, exported for later calls.
+derive_team() {
+    if [[ -n "${QWENVOICE_DEVELOPMENT_TEAM:-}" ]]; then
+        printf '%s' "$QWENVOICE_DEVELOPMENT_TEAM"
+        return 0
+    fi
+    local team
+    team="$(security find-certificate -c "Apple Development" -p 2>/dev/null \
+        | openssl x509 -noout -subject 2>/dev/null \
+        | grep -oE 'OU=[A-Z0-9]+' | head -1 | cut -d= -f2)"
+    [[ -n "$team" ]] || return 1
+    export QWENVOICE_DEVELOPMENT_TEAM="$team"
+    printf '%s' "$team"
+}
 
 resolve_dev_signing_identity() {
     if [ -n "${QWENVOICE_DEV_SIGNING_IDENTITY:-}" ]; then

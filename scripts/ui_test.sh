@@ -849,18 +849,52 @@ trap cleanup_ui_run EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-derive_team() {
-  if [[ -n "${QWENVOICE_DEVELOPMENT_TEAM:-}" ]]; then
-    printf '%s' "$QWENVOICE_DEVELOPMENT_TEAM"
-    return
-  fi
-  security find-certificate -c "Apple Development" -p 2>/dev/null \
-    | openssl x509 -noout -subject 2>/dev/null \
-    | grep -oE 'OU=[A-Z0-9]+' | head -1 | cut -d= -f2
-}
 
 ios_probe() {
   python3 "$ROOT_DIR/scripts/lib/ios_coredevice_probe.py" probe
+}
+
+# The iPhone half of the UI readiness preflight (audit P1-2), recorded as the
+# `ui-preflight` step before any crash snapshot or build: the paired phone must
+# be reachable, in Developer Mode and unlocked, and a development team must
+# sign the runner. Sets `device` and `team` for the lane. The Xcode iOS platform
+# component is checked earlier, with the other host checks.
+ios_ui_preflight() {
+  local probe verdict
+  probe="$(ios_probe)" || { warn "ui-preflight: the CoreDevice probe failed"; return 1; }
+  verdict="$(python3 -c '
+import json, sys
+p = json.load(sys.stdin)
+if p.get("reachable") is not True or not p.get("identifier"):
+    print("unreachable")
+elif p.get("availableForDevelopment") is False:
+    print("no-developer-mode")
+elif (p.get("lock") or {}).get("deviceLocked") is True:
+    print("locked")
+elif (p.get("lock") or {}).get("deviceLocked") is None:
+    print("lock-unknown " + p["identifier"])
+else:
+    print("ready " + p["identifier"])
+' <<<"$probe")"
+  case "$verdict" in
+    ready\ *) device="${verdict#ready }" ;;
+    lock-unknown\ *)
+      device="${verdict#lock-unknown }"
+      note "ui-preflight: CoreDevice does not report the lock state; keep the iPhone unlocked" ;;
+    unreachable)
+      warn "ui-preflight: the paired iPhone is not reachable through CoreDevice; unlock it and check USB or local-network connectivity"
+      return 1 ;;
+    no-developer-mode)
+      warn "ui-preflight: the paired iPhone is not available for development; turn Developer Mode on (Settings > Privacy & Security)"
+      return 1 ;;
+    *)
+      warn "ui-preflight: the paired iPhone is locked; XCUITest needs it unlocked for the whole run"
+      return 1 ;;
+  esac
+  team="$(derive_team)" && [[ -n "$team" ]] || {
+    warn "ui-preflight: no Apple Development team found; set QWENVOICE_DEVELOPMENT_TEAM"
+    return 1
+  }
 }
 
 snapshot_ios_crashes() {
@@ -1384,11 +1418,8 @@ run_preinstalled_candidate() {
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" identity \
       --evidence "$candidate_evidence" --output "$out/candidate-identity.json" || return 1
   write_run_metadata running
-  local probe team runner xctestrun
-  probe="$(ios_probe)" || return 1
-  device="$(python3 -c 'import json,sys; p=json.load(sys.stdin); assert p.get("reachable") is True and (p.get("lock") or {}).get("deviceLocked") is False; print(p["identifier"])' <<<"$probe")" || return 1
-  team="$(derive_team)" || return 1
-  [[ -n "$team" ]] || return 1
+  local team runner xctestrun
+  required_step_run "$step_ledger" ui-preflight ios_ui_preflight || return 1
   required_step_run "$step_ledger" candidate-before candidate_inventory before || return 1
   required_step_run "$step_ledger" candidate-crash-baseline \
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
@@ -1624,15 +1655,8 @@ elif [[ "$platform" == "macos" ]]; then
     || die "macOS auto-language check failed (see $out/auto-language-summary.json)"
   terminate_macos_app
 else
-  probe="$(ios_probe)"
-  device="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("identifier") or "")' <<<"$probe")"
-  reachable="$(python3 -c 'import json,sys; print("1" if json.load(sys.stdin).get("reachable") else "0")' <<<"$probe")"
-  locked="$(python3 -c 'import json,sys; print("1" if (json.load(sys.stdin).get("lock") or {}).get("deviceLocked") is True else "0")' <<<"$probe")"
-  [[ -n "$device" && "$reachable" == "1" ]] \
-    || die "paired iPhone is not reachable through CoreDevice; unlock it and check USB/local-network connectivity"
-  [[ "$locked" == "0" ]] || die "paired iPhone is locked; unlock it and retry"
-  team="$(derive_team || true)"
-  [[ -n "$team" ]] || die "no Apple Development team found; set QWENVOICE_DEVELOPMENT_TEAM"
+  required_step_run "$step_ledger" ui-preflight ios_ui_preflight \
+    || die "the iPhone is not ready for XCUITest (see ui-preflight above)"
   required_step_run "$step_ledger" crash-baseline \
     snapshot_ios_crashes "$out/crashes-before" \
     || die "could not establish the pre-run iPhone crash snapshot"

@@ -91,6 +91,13 @@ Between September 4 and October 12 the release did not move:
 - **2026-10-21.** The maintainer reported a release-blocking iPhone Clone layout bug (RF-24). Its fix
   passed on the iPhone, the freeze checks reran, and the freeze moved to `0919e998`; the release
   itself waits for the maintainer.
+- **2026-10-24.** The RF-15 accessibility row's audit findings on TestFlight build 24
+  (`ios-xcui-candidate-smoke-20261024-201553-857a53b4`) are accepted as a 3.0 known limitation and
+  fixed after the submission (BKL-31). The findings: Dynamic Type only partly supported on Studio and
+  on the purchase sheet's support and privacy links, a purchase-sheet contrast failure, and text
+  clipped in Design and Clone at AX-XXXL. App Store Connect carries no accessibility declaration, so
+  nothing public claims otherwise; publishing one before the fix must not claim Larger Text or
+  Sufficient Contrast.
 
 ## The path
 

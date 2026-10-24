@@ -32,8 +32,8 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   navigation PASS (`200241-53f60937`); long-form PASS (`200402-db93f093`); accessibility FAIL
   (`201553-857a53b4`: Dynamic Type partial on Studio and the purchase sheet, purchase-sheet contrast,
   text clipped in Design and Clone at AX-XXXL). Not a release blocker (no accessibility declaration in
-  App Store Connect); parked as BKL-31, and RF-15 needs the maintainer to fix it with a new candidate
-  or accept it as a limitation. Earlier failed runs: `171623` (locked), `171715` (field name),
+  App Store Connect); the maintainer accepted it as a 3.0 known limitation, fixed after the
+  submission (BKL-31). Earlier failed runs: `171623` (locked), `171715` (field name),
   `173613` (first-launch guard).
 - **Resume, with the maintainer at the phone** (the prompts): `--scenario clone-voice`, answering
   Speech Recognition; `voice-lifecycle`; `record-then-play`, answering Microphone; then `modes` and

@@ -103,3 +103,15 @@ export function measureUnsizedImages() {
     .filter((image) => image.getClientRects().length > 0 && image.getBoundingClientRect().height === 0)
     .map((image) => image.getAttribute("src"));
 }
+
+// Runs in the page: the height of every top-level block and image in main, so
+// a test can name what moved when a jump lands in the wrong place.
+export function measureBlockHeights() {
+  const entries = [...document.querySelectorAll("main > *, main img")].map((element, index) => {
+    const name = element.tagName === "IMG"
+      ? `img ${element.getAttribute("src")}`
+      : `${index}:${element.id || element.className.split(" ")[0] || element.tagName}`;
+    return [name, Math.round(element.getBoundingClientRect().height)];
+  });
+  return Object.fromEntries(entries);
+}

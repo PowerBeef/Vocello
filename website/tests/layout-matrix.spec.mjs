@@ -13,6 +13,7 @@ import {
 import {
   collectBrowserFailures,
   measureBar,
+  measureBlockHeights,
   measureMenuTargets,
   measureOverflow,
   measureUnsizedImages,
@@ -90,6 +91,7 @@ test("the menu sheet opens, holds focus, closes, and lands its links below the b
     await expect(sheet).toBeVisible();
   }
 
+  const heightsBefore = await page.evaluate(measureBlockHeights);
   await activate(sheet.getByRole("link", { name: "Listen", exact: true }));
   await expect(sheet).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#listen");
@@ -102,7 +104,12 @@ test("the menu sheet opens, holds focus, closes, and lands its links below the b
     const { targetTop, barBottom } = await measure();
     return targetTop - barBottom;
   }, { timeout: 5_000 }).toBeLessThanOrEqual(48);
-  validateAnchorLanding(await measure(), "menu link Listen");
+  const heightsAfter = await page.evaluate(measureBlockHeights);
+  const moved = Object.keys(heightsAfter)
+    .filter((key) => heightsBefore[key] !== heightsAfter[key])
+    .map((key) => `${key} ${heightsBefore[key]}->${heightsAfter[key]}`);
+  const scrollY = await page.evaluate(() => Math.round(window.scrollY));
+  validateAnchorLanding(await measure(), `menu link Listen (scrollY ${scrollY}; moved: ${moved.join(", ") || "nothing"})`);
   expect(failures).toEqual([]);
 });
 

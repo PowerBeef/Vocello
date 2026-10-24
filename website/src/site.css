@@ -63,7 +63,10 @@ html {
   text-size-adjust: 100%;
 }
 
-/* The menu sheet holds the page still while it is open. */
+/* The menu sheet holds the page still while it is open. The scrollbar's
+   space stays reserved, so where scrollbars take width (Windows, Linux) the
+   page neither shifts nor reflows when the sheet locks it. */
+html { scrollbar-gutter: stable; }
 html:has(.menu-sheet[open]) { overflow: hidden; }
 
 body {

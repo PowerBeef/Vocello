@@ -634,6 +634,15 @@ jobs:
       - name: Lint, test, and build website
         run: npm --prefix website run check
 
+      - name: Upload browser test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website-browser-test-results
+          path: website/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
   dependency-submission:
     name: Submit Swift dependency graph
     if: github.event_name == 'push'

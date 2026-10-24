@@ -121,7 +121,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             languageEvidence.lifetime = .keepAlways
             add(languageEvidence)
             XCTAssertTrue(cleaned, "Local transaction/app cleanup must succeed")
-            emit(["schemaVersion": 4, "scenario": exportChecks ? "exports" : "lifecycle",
+            emit(["schemaVersion": 5, "scenario": exportChecks ? "exports" : "lifecycle",
                   "runID": runID, "fixtureSHA256": digest,
                   "environment": "Xcode", "phases": phases,
                   "restoration": ["transactionsCleared": restoration.transactionsCleared,
@@ -207,6 +207,29 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         try store.refundTransaction(identifier: purchased.identifier)
         try locked()
         record("revoked")
+
+        // AUD-07: a purchase whose signature fails verification is never trusted or
+        // finished. The sheet says so and stays locked; once StoreKit verifies the same
+        // purchase (the simulated failure cleared), Restore grants the entitlement.
+        try await store.setSimulatedError(.verification(.invalidSignature), forAPI: .verification)
+        try tap("exportPurchase_buy")
+        try notice("could not be verified")
+        try locked()
+        let unverified = try XCTUnwrap(store.allTransactions().first {
+            $0.productIdentifier == productID && $0.state == .purchased && $0.identifier != purchased.identifier
+        })
+        record("unverified_locked")
+        try await store.setSimulatedError(nil, forAPI: .verification)
+        let clearedVerification = await store.simulatedError(forAPI: .verification)
+        XCTAssertNil(clearedVerification, "The verification failure must be cleared before Restore")
+        guard clearedVerification == nil else { throw Failure.observation }
+        try tap("exportPurchase_restore")
+        try notice("has been restored")
+        try unlocked()
+        record("unverified_restored")
+        try store.refundTransaction(identifier: unverified.identifier)
+        try locked()
+        record("unverified_revoked")
 
         store.askToBuyEnabled = true
         try tap("exportPurchase_buy")

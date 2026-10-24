@@ -35,8 +35,9 @@ class PurchaseAcceptanceTests(unittest.TestCase):
     def test_current_results_require_individual_restoration_observations(self):
         for scenario in ("lifecycle", "exports"):
             exported = "restored" if scenario == "exports" else "notRequired"
-            result = {**self.result, "schemaVersion": 4, "scenario": scenario,
-                      "phases": subject.EXPORT_PHASES if scenario == "exports" else subject.PHASES,
+            result = {**self.result, "schemaVersion": 5, "scenario": scenario,
+                      "phases": (subject.EXPORT_PHASES_V5 if scenario == "exports"
+                                 else subject.LIFECYCLE_PHASES_V5),
                       "restoration": {"transactionsCleared": True, "tab": "restored",
                                       "historyFilter": exported, "studio": exported,
                                       "appStopped": True}}
@@ -63,6 +64,28 @@ class PurchaseAcceptanceTests(unittest.TestCase):
                 subject.collect(self.line({**result, "scenario": "other"}), "test-owned-run", "a" * 64,
                                 scenario, True)
 
+    def test_schema_five_requires_the_unverified_purchase_phases(self):
+        # AUD-07: the unverified purchase sits between the refund and Ask to Buy.
+        self.assertEqual(subject.LIFECYCLE_PHASES_V5[7:11],
+                         ["revoked", "unverified_locked", "unverified_restored", "unverified_revoked"])
+        for scenario, current, previous in [("lifecycle", subject.LIFECYCLE_PHASES_V5, subject.PHASES),
+                                            ("exports", subject.EXPORT_PHASES_V5, subject.EXPORT_PHASES)]:
+            exported = "restored" if scenario == "exports" else "notRequired"
+            restoration = {"transactionsCleared": True, "tab": "restored", "historyFilter": exported,
+                           "studio": exported, "appStopped": True}
+            result = {**self.result, "schemaVersion": 5, "scenario": scenario, "phases": previous,
+                      "restoration": restoration}
+            with self.subTest(scenario=scenario), self.assertRaises(ValueError):
+                subject.collect(self.line(result), "test-owned-run", "a" * 64, scenario, True)
+            # A schema 4 run stays readable but no longer qualifies the current runner.
+            legacy = {**result, "schemaVersion": 4}
+            self.assertTrue(subject.collect(self.line(legacy), "test-owned-run", "a" * 64,
+                                            scenario)["restorationVerified"])
+            with self.subTest(scenario=scenario), self.assertRaises(ValueError):
+                subject.collect(self.line(legacy), "test-owned-run", "a" * 64, scenario, True)
+            self.assertTrue(subject.collect(self.line({**result, "phases": current}), "test-owned-run",
+                                            "a" * 64, scenario, True)["restorationVerified"])
+
     def test_legacy_results_are_readable_but_cannot_qualify_current_runner(self):
         for scenario, schema, phases in [("lifecycle", 1, subject.PHASES),
                                          ("exports", 2, subject.LEGACY_EXPORT_PHASES)]:
@@ -87,7 +110,7 @@ class PurchaseAcceptanceTests(unittest.TestCase):
         # collector) is an exact check in scripts/repo_invariants.sh: the lane needs a phone.
         root = Path(__file__).resolve().parents[2]
         source = (root / "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift").read_text()
-        self.assertIn('"schemaVersion": 4', source)
+        self.assertIn('"schemaVersion": 5', source)
         self.assertIn('"studio": restoration.studio.rawValue', source)
         self.assertIn('"restoration":', source)
         self.assertIn('let cleaned = restoration.complete', source)

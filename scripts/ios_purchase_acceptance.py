@@ -23,9 +23,23 @@ LEGACY_EXPORT_PHASES = PHASES + ["owned_product_unavailable"] + _surfaces("owned
 # Studio inline card's own Design take on each side of the refund.
 EXPORT_PHASES = (PHASES + ["owned_offline_relaunch", "owned_offline_restore", "owned_design_studio"]
                  + _surfaces("owned") + ["revoked_design_studio"] + _surfaces("revoked"))
-CURRENT_SCHEMA = 4
+# Schema 5 adds AUD-07's unverified purchase after the refund: the sheet stays locked with
+# the unverified notice, Restore grants the entitlement once StoreKit verifies the same
+# purchase, and a second refund puts the lifecycle back where schema 4 continued.
+UNVERIFIED_PHASES = ["unverified_locked", "unverified_restored", "unverified_revoked"]
+
+
+def _with_unverified(phases: list[str]) -> list[str]:
+    index = phases.index("revoked") + 1
+    return phases[:index] + UNVERIFIED_PHASES + phases[index:]
+
+
+LIFECYCLE_PHASES_V5 = _with_unverified(PHASES)
+EXPORT_PHASES_V5 = _with_unverified(EXPORT_PHASES)
+CURRENT_SCHEMA = 5
 RESTORATION_FIELDS = {3: {"transactionsCleared", "tab", "historyFilter", "appStopped"}}
 RESTORATION_FIELDS[4] = RESTORATION_FIELDS[3] | {"studio"}
+RESTORATION_FIELDS[5] = RESTORATION_FIELDS[4]
 
 
 def collect(log: str, run_id: str, fixture_digest: str, scenario: str = "lifecycle",
@@ -64,9 +78,14 @@ def collect(log: str, run_id: str, fixture_digest: str, scenario: str = "lifecyc
                 or restoration["tab"] != "restored" or restoration["historyFilter"] != exported
                 or restoration.get("studio", exported) != exported):
             raise ValueError("Purchase restoration not fully observed")
-    export_phases = EXPORT_PHASES if schema == CURRENT_SCHEMA else LEGACY_EXPORT_PHASES
+    if schema == 5:
+        expected = EXPORT_PHASES_V5 if scenario == "exports" else LIFECYCLE_PHASES_V5
+    elif schema == 4:
+        expected = EXPORT_PHASES if scenario == "exports" else PHASES
+    else:
+        expected = LEGACY_EXPORT_PHASES if scenario == "exports" else PHASES
     if (result["complete"] is not True or result["cleanup"] is not True
-            or result["phases"] != (export_phases if scenario == "exports" else PHASES)):
+            or result["phases"] != expected):
         raise ValueError("Purchase lifecycle or restoration incomplete")
     return {**result, "scope": "physical-device-local-storekit-only",
             "scenario": scenario, "offlineAcceptance": False,

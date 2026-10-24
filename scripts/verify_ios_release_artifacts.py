@@ -41,7 +41,12 @@ PROHIBITED_RELEASE_STRING_PATTERNS = (
     re.compile(r"VOCELLO_INTERNAL_DIAGNOSTICS"),
     re.compile(r"QVOICE_DEVICE_DIAGNOSTICS"),
 )
-PROHIBITED_DYNAMIC_SYMBOLS = {"_dlopen", "_dlsym"}
+# dlopen loads code at run time, which an App Store app may not do with code it
+# did not ship. dlsym and dladdr only look up symbols in images already loaded:
+# Apple's metal-cpp (inside mlx-swift) resolves public Metal functions with
+# dlsym(RTLD_DEFAULT, ...), and MLX's Metal backend finds its own image with
+# dladdr. Without dlopen they cannot load anything, so they stay allowed.
+PROHIBITED_DYNAMIC_SYMBOLS = {"_dlopen"}
 REQUIRED_DEVICE_CAPABILITIES = ("arm64", "iphone-performance-gaming-tier")
 
 
@@ -428,7 +433,7 @@ def _validate_undefined_symbols(symbols: Sequence[str], label: str) -> None:
     normalized = {symbol.strip().split()[-1] for symbol in symbols if symbol.strip()}
     found = sorted(normalized & PROHIBITED_DYNAMIC_SYMBOLS)
     if found:
-        raise VerificationError(f"{label} executable imports prohibited dynamic-loading APIs")
+        raise VerificationError(f"{label} executable imports prohibited dynamic-loading APIs ({', '.join(found)})")
 
 
 def _validate_framework_privacy_manifest(framework: Path, label: str) -> None:

@@ -396,9 +396,10 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         ]:
             with self.assertRaisesRegex(module.VerificationError, "prohibited release"):
                 module._validate_release_strings(leaked, "export")
-        for symbol in ["_dlopen", "_dlsym"]:
-            with self.assertRaisesRegex(module.VerificationError, "dynamic-loading"):
-                module._validate_undefined_symbols([f"U {symbol}"], "export")
+        with self.assertRaisesRegex(module.VerificationError, r"dynamic-loading APIs \(_dlopen\)"):
+            module._validate_undefined_symbols(["U _dlopen", "U _dlsym"], "export")
+        # Lookups in images already loaded (metal-cpp's dlsym, MLX's dladdr) cannot load code.
+        module._validate_undefined_symbols(["U _dlsym", "U _dladdr", "U _objc_msgSend"], "export")
 
     def test_third_party_framework_requires_valid_privacy_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

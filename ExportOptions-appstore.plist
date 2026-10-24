@@ -29,8 +29,12 @@
     <string>automatic</string>
     <key>manageAppVersionAndBuildNumber</key>
     <false/>
+    <!-- The archive already strips the Release executable. Stripping again at export
+         would change its bytes, and scripts/verify_ios_release_artifacts.py requires
+         the exported executable to equal the archived one once the signature is
+         removed (ASR-10's executable continuity). -->
     <key>stripSwiftSymbols</key>
-    <true/>
+    <false/>
     <key>uploadSymbols</key>
     <true/>
     <key>testFlightInternalTestingOnly</key>

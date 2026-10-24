@@ -36,7 +36,7 @@ class FakeCommands:
             "git symbolic-ref": "main\n", "git status": "", "git fetch": "",
             "git rev-parse HEAD": COMMIT + "\n", "git rev-parse refs/remotes/origin/main": COMMIT + "\n",
             "git remote get-url origin": "https://github.com/PowerBeef/Vocello.git\n",
-            "git show": "project.yml at the commit\n",
+            "git show": "the commit's project spec\n",
             "asc builds list": json.dumps({"data": []}),
             "git config --get gpg.format": "ssh\n",
             "git config --get user.signingkey": __file__ + "\n",
@@ -94,7 +94,7 @@ class CandidateTagTests(unittest.TestCase):
         pushes = [call for call in fake.calls if call[:2] == ["git", "push"]]
         self.assertEqual(pushes, [["git", "push", "--no-follow-tags", "origin",
                                    "refs/tags/v3.0.0-ios.3:refs/tags/v3.0.0-ios.3"]])
-        self.assertIn(["git", "show", f"{COMMIT}:project.yml"], fake.calls)
+        self.assertIn(["git", "show", f"{COMMIT}:{cut.PROJECT_SPEC}"], fake.calls)
         sign, verify, push = (fake.calls.index(call) for call in (
             ["git", "tag", "-s", "-m", "Vocello 3.0.0 for iPhone (TestFlight candidate 3, build 24)",
              "v3.0.0-ios.3", COMMIT], ["git", "tag", "-v", "v3.0.0-ios.3"], pushes[0]))

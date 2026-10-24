@@ -27,6 +27,7 @@ from release_source_authority import _flatten_check_runs, _latest_required_check
 
 ROOT = Path(__file__).resolve().parent.parent
 BUNDLE_ID = "com.patricedery.vocello"
+PROJECT_SPEC = "project.yml"
 REQUIRED_CHECK = "CI required"
 # scripts/ci/release_trigger.py IOS_CANDIDATE: the only tag shape release.yml sends to TestFlight.
 IOS_CANDIDATE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+-ios\.[1-9][0-9]*")
@@ -161,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         commit = require_clean_main()
         # The commit's own project.yml, not the working tree's.
-        version, build = project_version_from_text(run(["git", "show", f"{commit}:project.yml"]))
+        version, build = project_version_from_text(run(["git", "show", f"{commit}:{PROJECT_SPEC}"]))
         repository = origin_repository()
         require_ci(repository, commit)
         require_unused_build(build)

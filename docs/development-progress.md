@@ -38,7 +38,20 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 - **Resume, with the maintainer at the phone** (the prompts): `--scenario clone-voice`, answering
   Speech Recognition; `voice-lifecycle`; `record-then-play`, answering Microphone; then `modes` and
   `one-word` (or `all`), each with `--preinstalled-candidate build/artifacts/ios/release-candidate-v3.0.0-ios.3 --retain-result --candidate-origin-attestation "<statement>"`.
-  Unpushed: `d157f3f0`, `093772a0`, `938e259c`, `e7847527` and this checkpoint.
+  The phone was locked at the end of the evening; every iOS lane now refuses a locked phone in
+  seconds at its `ui-preflight` step.
+- **Later that evening, unattended (no maintainer needed):** ASR-10 closed (release run
+  40103005257, attestation verified); ASR-07 closed (a full Release Analyze of the candidate source
+  logs 99 warnings, all registered; mlx-swift Metal header and project group classes reviewed;
+  BKL-32 parks the project fix); F-05 closed (hosted macos-26 packaged-app startup smoke in run
+  40020993733); RF-10 Studio checks PASS 15/15 on the published Mac source
+  (`macos-xcui-smoke-20261024-205357-0952e758`), leaving its benchmark and promotion lanes; DW-02
+  closed (iPhone `ui-preflight` step, shared `derive_team`, preflight refusals triage as
+  infrastructure). ASR-05's read-only listing check: 3.0.0 still lacks description, keywords,
+  subtitle, What's New, review notes, screenshots, an attached build and the purchase's metadata;
+  writing them needs the maintainer. Parked: BKL-33 (a Mac write failure shows engine copy, seen by
+  the maintainer during smoke), BKL-34 (the CLI installer round-trip test fails on macOS 27).
+- **Unpushed:** `d157f3f0` through this checkpoint.
 
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
 

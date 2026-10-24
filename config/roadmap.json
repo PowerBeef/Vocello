@@ -312,7 +312,7 @@
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
       "updated": "2026-10-24",
-      "notes": "Opened 2026-10-12 (risk-based gate); device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04; AUD-09 and AUD-01 close after it; takes get a machine screen for gross failures (2026-10-13). Maintainer decisions 2026-10-24: rows run on the processed TestFlight build through candidate journeys; a fresh install for onboarding and the file-during-onboarding row runs last, losing the phone's Vocello data; with-purchase export, Restore and Cancel wait for the Paid Apps agreement (RF-02); startup Retry (AUD-01) and the unverified purchase (AUD-07) take development-build evidence; accessibility is automated audits plus the largest text size, and the hand VoiceOver row stays open. 2026-10-24 development-build evidence: startup Retry ios-xcui-smoke-20261024-115441-08eddecc, unverified purchase locked until Restore ios-xcui-purchase-20261024-120821-ad3c8846, both PASS. Journeys: ui_test.sh ios smoke --preinstalled-candidate DIR --scenario modes|voice-lifecycle|one-word|record-then-play|long-form|accessibility|all. Long-form at risk (RF-18). History: git log -p -- config/roadmap.json."
+      "notes": "Opened 2026-10-12 (risk-based gate); device proof of AUD-01, AUD-02, AUD-07, F-01, F-16 and DA-04; AUD-09 and AUD-01 close after it; takes get a machine screen (2026-10-13). Decisions 2026-10-24: rows run on TestFlight build 24 through candidate journeys (--candidate-origin-attestation: CoreDevice flags it a developer app); with-purchase export, Restore and Cancel wait for RF-02; startup Retry and the unverified purchase use development evidence (ios-xcui-smoke-20261024-115441-08eddecc, ios-xcui-purchase-20261024-120821-ad3c8846, PASS); the hand VoiceOver row stays open. Build 24 rows, 2026-10-24 (ios-xcui-candidate-smoke-20261024-*): first-launch PASS, onboarding walked and three models downloaded (195718-935a856b); navigation PASS (200241-53f60937); long-form PASS (200402-db93f093); accessibility FAIL (201553-857a53b4, BKL-31), to fix with a new candidate or accept as a limitation. Open, needing the maintainer at the phone for the Speech and Microphone prompts: clone-voice, voice-lifecycle, record-then-play; then modes and one-word; the file during onboarding (AUD-01). Long-form at risk (RF-18). History: git log -p -- config/roadmap.json."
     },
     {
       "id": "RF-17",
@@ -1871,6 +1871,20 @@
       "updated": "2026-10-24",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-24: failed once in a routed check (-n auto) and passed alone at once. Not investigated (focus rules)."
+    },
+    {
+      "id": "BKL-31",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The RF-15 accessibility row (scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario accessibility) passes on a candidate: no Dynamic Type, contrast or clipping issue on Studio, the purchase sheet or Settings.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSCandidateJourneyUITests.swift"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The maintainer decides to fix it for 3.0 (a new candidate) or after the 3.0 submission.",
+      "notes": "Found 2026-10-24 on TestFlight build 24, ios-xcui-candidate-smoke-20261024-201553-857a53b4: Dynamic Type partially unsupported on Studio and on the purchase sheet's support and privacy links, purchase-sheet contrast, text clipped in Design and Clone at AX-XXXL. No accessibility declaration is published in App Store Connect, so not a metadata mismatch. Not investigated (focus rules); RF-15 needs a fix or a maintainer-accepted limitation."
     },
     {
       "id": "ER-01",

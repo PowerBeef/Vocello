@@ -19,23 +19,26 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ### October 24, evening: RF-15 on build 24 (resume here)
 
-- **Phone state:** build 3.0.0 (24) from TestFlight is installed. The maintainer deleted the
-  development build first, so the app's data is gone and the phone is at first launch, with no models
-  and no clone voice. CoreDevice reports the team's own TestFlight build as `builtByDeveloper: true`
-  with an accessible container, so the lane takes `--candidate-origin-attestation` (`093772a0`).
-  `d157f3f0` fixed the origin field name.
-- **Runs, all retained:** `ios-xcui-candidate-smoke-20261024-171623-786483c6` (phone locked),
-  `-171715-742441fa` (field-name bug), `-173613-91cb0fa1` (every row stopped at the first-launch
-  guard; origin, identity and crash delta passed).
-- **Uncommitted, by design:** a `first-launch` RF-15 row authorized by the maintainer:
-  `Tests/VocelloiOSUITests/VocelloiOSCandidateJourneyUITests.swift`, `VocelloiOSUITestCase.swift`,
-  `scripts/ios_candidate_acceptance.py` and its test, `scripts/ui_test.sh`,
-  `docs/reference/ios-device-testing.md`. It walks onboarding, installs the three shipping models
-  and saves the clone voice from a Design take. Its routed check (UI bundle compile) and a
-  vocello-swift-review were still running at the pause; BKL-30 parks a flaky session-start test.
-- **Resume:** finish the check and review, commit, then with the phone unlocked:
-  `scripts/ui_test.sh ios smoke --preinstalled-candidate build/artifacts/ios/release-candidate-v3.0.0-ios.3 --scenario first-launch --retain-result --candidate-origin-attestation "<statement>"`,
-  then `--scenario all`. Unpushed: `d157f3f0`, `093772a0` and this checkpoint.
+- **Phone state:** build 3.0.0 (24) from TestFlight, onboarded by the `first-launch` row, with the
+  three shipping models Ready and no clone voice yet. CoreDevice reports the team's own TestFlight
+  build as `builtByDeveloper: true`, so every run takes `--candidate-origin-attestation`
+  (`093772a0`; `d157f3f0` fixed the field name).
+- **Rows (`e7847527`):** `first-launch` (onboarding and models; no permission prompt, runs
+  unattended) and `clone-voice` (the benchmark voice from a Design take; Save as Voice raises the
+  Speech Recognition prompt on a fresh install, which the maintainer answers, never a row). The
+  review found that blocker before the run.
+- **Unattended runs, all retained** (`ios-xcui-candidate-smoke-20261024-*`): first-launch PASS,
+  onboarding walked through its three pages and all three models downloaded (`195718-935a856b`);
+  navigation PASS (`200241-53f60937`); long-form PASS (`200402-db93f093`); accessibility FAIL
+  (`201553-857a53b4`: Dynamic Type partial on Studio and the purchase sheet, purchase-sheet contrast,
+  text clipped in Design and Clone at AX-XXXL). Not a release blocker (no accessibility declaration in
+  App Store Connect); parked as BKL-31, and RF-15 needs the maintainer to fix it with a new candidate
+  or accept it as a limitation. Earlier failed runs: `171623` (locked), `171715` (field name),
+  `173613` (first-launch guard).
+- **Resume, with the maintainer at the phone** (the prompts): `--scenario clone-voice`, answering
+  Speech Recognition; `voice-lifecycle`; `record-then-play`, answering Microphone; then `modes` and
+  `one-word` (or `all`), each with `--preinstalled-candidate build/artifacts/ios/release-candidate-v3.0.0-ios.3 --retain-result --candidate-origin-attestation "<statement>"`.
+  Unpushed: `d157f3f0`, `093772a0`, `938e259c`, `e7847527` and this checkpoint.
 
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
 

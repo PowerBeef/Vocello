@@ -276,7 +276,7 @@
         "docs/reference/macos-release-qa.md"
       ],
       "updated": "2026-10-22",
-      "notes": "2026-10-23: the Mac app and CLI 3.0.0 were published (latest) by the maintainer's route A, without a quality-promotion record. Verified before publication: SHA256SUMS, stapled tickets and Gatekeeper on both DMGs and the pkg, the pkg signature, build attestations, app 3.0.0 (24), the Sparkle appcast and the notes; the shipped Developer ID CLI passed cli_package.py qualify (three modes, batch, cancellation). Still open in this gate: the packaged app's in-process startup evidence and the Studio checks (Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form). The promotion audit's risks stay recorded: the language lane gained Russian, Portuguese, Italian and Korean cells (corpus v3); Fast QC warnings make a record unpromotable; custom-ja-auto failed spoken content at 9cd075bd; Portuguese passed about 40 percent of an earlier screen. History: git log -p -- config/roadmap.json. 2026-10-24: due moved from 2026-10-24 to 2026-10-31: the maintainer moved the day's focus to the iPhone release candidate, so the packaged-app checks wait for the next Mac session.",
+      "notes": "2026-10-23: the Mac app and CLI 3.0.0 were published (latest) by the maintainer's route A, without a quality-promotion record. Verified before publication: SHA256SUMS, stapled tickets and Gatekeeper on both DMGs and the pkg, the pkg signature, build attestations, app 3.0.0 (24), the Sparkle appcast and the notes; the shipped Developer ID CLI passed cli_package.py qualify (three modes including French Design with a pinned seed, batch, cancellation). 2026-10-24: F-05 closed on release run 40020993733's hosted macos-26 packaged-app startup smoke (staged app and DMG app). Full Mac smoke on the published source (no Mac product input changed since e7a8e2ae) PASS 15/15, macos-xcui-smoke-20261024-205357-0952e758: Built-in, Design and Clone takes, recording, cancellation, long-form and its recovery, line batch, History, cross-language Studio, error recovery, Saved Voices states; it showed BKL-33 (write-error copy). Still open: the canonical benchmark and promotion lanes. Promotion-audit risks stay recorded (corpus v3 cells; Fast QC warnings make a record unpromotable; custom-ja-auto at 9cd075bd; Portuguese ~40 percent of an earlier screen). History: git log -p -- config/roadmap.json.",
       "due": "2026-10-31"
     },
     {
@@ -1836,6 +1836,21 @@
       "updated": "2026-10-24",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Found 2026-10-24 by ASR-07's Release Analyze (and in candidate 3.0.0 (24)'s CI archive log): these folders appear in their iOS group and again in the group of iOS files the macOS target compiles by path. Target membership is unaffected. project.yml is a candidate product input, so the fix waits for the submission. Not investigated further (focus rules)."
+    },
+    {
+      "id": "BKL-33",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "An unwritable output folder is reported as an internal engine error on the Mac",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "With the output folder unwritable, the Mac Studio's failure card and toast show the storage message (storageUnavailable), not the runtime-failure copy, and the status line does not say the engine needs attention; test11_GenerationErrorAndRecovery asserts the message.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/GenerationFailureDiagnosticLogger.swift",
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests+Acceptance.swift"
+      ],
+      "updated": "2026-10-24",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Seen 2026-10-24 by the maintainer and in macos-xcui-smoke-20261024-205357-0952e758 (mac-custom-write-error screenshots): test11 makes each mode's folder unwritable; Studio shows \"The on-device voice engine hit an internal error, so this take was not saved\" and \"Engine needs attention\". The mapping sends storage.write_failed and permission_denied to storageUnavailable, so the write error reaches presentation without its storage code. The test passes because it asserts only a retryable error. Not a release blocker (Mac copy; the iPhone's output folder is not user-changeable). Not investigated (focus rules)."
     },
     {
       "id": "ER-01",

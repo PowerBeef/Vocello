@@ -130,13 +130,15 @@ def installed_identity(apps: dict, expected: dict) -> dict:
     if len(matches) != 1:
         raise ValueError("candidate application is missing or ambiguous")
     app = matches[0]
-    if app.get("isBuiltByDeveloper") is not False:
+    # CoreDevice's `devicectl device info apps` names the origin `builtByDeveloper` (Xcode 27.1);
+    # a row without it is of unknown origin, and unknown origin fails closed.
+    if app.get("builtByDeveloper") is not False:
         raise ValueError("development installation or unknown application origin is prohibited")
     if (app.get("version") != expected["marketingVersion"]
             or app.get("bundleVersion") != expected["buildNumber"]):
         raise ValueError("installed candidate version/build differs from approved evidence")
     return {"bundleIdentifier": BUNDLE_ID, "marketingVersion": app["version"],
-            "buildNumber": app["bundleVersion"], "isBuiltByDeveloper": False}
+            "buildNumber": app["bundleVersion"], "builtByDeveloper": False}
 
 
 def validate_results(summary: dict, attachments: Path, identity: dict, scenario: str = "navigation") -> dict:

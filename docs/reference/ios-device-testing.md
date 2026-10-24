@@ -196,7 +196,9 @@ The helper validates command-bound iOS release evidence and requires a clean tre
 commit, or at a later commit that changed no product input (`Sources/`, `Packages/`, `project.yml`,
 `QwenVoice.xcodeproj/`): the installed binary is fixed, so a runner built from such a commit still
 matches its UI (`runnerRelation` in the identity records which). CoreDevice must identify exactly one matching bundle/version/build
-with `isBuiltByDeveloper == false`, before and after testing; unknown origin fails closed. This
+with `builtByDeveloper == false` (the field `devicectl device info apps` reports), before and after
+testing; unknown origin fails closed. A development build of the same version and build still
+reports `true`, and TestFlight may then show Open without replacing it. This
 binds the unique version/build to approved IPA evidence but does **not** claim to measure the
 installed TestFlight binary's digest.
 

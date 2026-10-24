@@ -25,7 +25,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
 
     def app_inventory(self):
         return {"result": {"apps": [{"bundleIdentifier": candidate.BUNDLE_ID,
-                  "version": "3.0.0", "bundleVersion": "24", "isBuiltByDeveloper": False,
+                  "version": "3.0.0", "bundleVersion": "24", "builtByDeveloper": False,
                   "privatePath": "/private/personal/app"}]}}
 
     def configuration(self):
@@ -44,7 +44,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertNotIn("private", json.dumps(value))
 
     def test_development_unknown_origin_or_wrong_identity_refused(self):
-        for key, value in [("isBuiltByDeveloper", True), ("isBuiltByDeveloper", None),
+        for key, value in [("builtByDeveloper", True), ("builtByDeveloper", None),
                            ("version", "2.4.0"), ("bundleVersion", "23"),
                            ("bundleVersion", 24), ("bundleIdentifier", "other")]:
             with self.subTest(key=key, value=value):
@@ -52,6 +52,22 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 apps["result"]["apps"][0][key] = value
                 with self.assertRaises(ValueError):
                     candidate.installed_identity(apps, self.identity())
+
+    def test_origin_is_read_from_the_field_coredevice_reports(self):
+        # The row `devicectl device info apps` (Xcode 27.1) printed for the development build that
+        # was still installed on 2026-10-24, its private path left out.
+        row = {"appClip": False, "builtByDeveloper": True, "bundleIdentifier": candidate.BUNDLE_ID,
+               "bundleVersion": "24", "containerAccessible": True, "defaultApp": False, "hidden": False,
+               "internalApp": False, "name": "Vocello", "removable": True, "version": "3.0.0"}
+        with self.assertRaisesRegex(ValueError, "development installation"):
+            candidate.installed_identity({"result": {"apps": [row]}}, self.identity())
+        self.assertEqual(candidate.installed_identity({"result": {"apps": [{**row, "builtByDeveloper": False}]}},
+                                                      self.identity())["builtByDeveloper"], False)
+        # A field CoreDevice does not report proves nothing: the origin stays unknown.
+        legacy = {key: value for key, value in row.items() if key != "builtByDeveloper"}
+        with self.assertRaisesRegex(ValueError, "unknown application origin"):
+            candidate.installed_identity({"result": {"apps": [{**legacy, "isBuiltByDeveloper": False}]}},
+                                         self.identity())
 
     def test_absent_or_duplicate_candidate_fails(self):
         for apps in ({}, {"result": {"apps": []}},
@@ -155,7 +171,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_post_test_replacement_is_rejected(self):
         candidate.installed_identity(self.app_inventory(), self.identity())
         after = self.app_inventory()
-        after["result"]["apps"][0]["isBuiltByDeveloper"] = True
+        after["result"]["apps"][0]["builtByDeveloper"] = True
         with self.assertRaises(ValueError):
             candidate.installed_identity(after, self.identity())
 

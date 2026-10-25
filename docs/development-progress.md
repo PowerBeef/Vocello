@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-24
+reviewed: 2026-10-25
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,34 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 24, evening: RF-15 on build 24 (resume here)
+### October 25: build 25, faster UI lanes, computer use as the default route (resume here)
+
+- **Build 25** (3.0.0, `v3.0.0-ios.4` at `3f1d2bda`, RF-35 cellular opt-in plus RF-36 translations)
+  passed release run 40146203055 and processed VALID; internal testers have it; no beta review
+  submitted for it; Public Beta still waits for RF-17. Installed on the phone over build 24.
+- **On build 25:** navigation PASS 15.1 s (`20261025-030310-db58b35b`, was 28.1 s), modes PASS
+  125.4 s (`030425-0c0d2524`, was 530.2 s); RF-35's unattended Wi-Fi reinstall PASS
+  (`184700-55cd4a7d`, `modelsDownloaded: ["pro_design"]`, switch off) after five harness failures,
+  all retained and fixed (runner re-seal, settled reveals, bottom-up starts, a swipe that tapped the
+  cellular switch, too-short swipes). RF-35's attended cellular check is open: the maintainer's
+  screenshot showed 682 MB then "No progress" with Wi-Fi off and the switch off; whether those bytes
+  came over cellular is unanswered. BKL-35, BKL-36 (a short drag flips a Settings toggle) parked.
+- **UI lanes rebuilt (maintainer request):** retention 27 s -> 1 s, step start times in ledgers, a
+  `screenshots/` index for Claude's post-lane review, iPhone dev builds skipped when nothing changed
+  (fingerprint, Xcode, phone and product digests), iOS `ui-preflight` refuses under iPhone
+  Mirroring. macOS smoke 3,843 s -> 637 s, 15/15 PASS (`macos-xcui-smoke-20261025-221609-c2191179`;
+  the earlier `220226-302c01e3` failed on a History-count bug of the new code, fixed in 83655854).
+  The ten-language walk is the localization lane's. iOS suite changes (long-form by title token,
+  snapshot History census, one Settings visit) are committed but not yet run on the phone.
+- **Decision 2026-10-25:** computer use (iPhone via iPhone Mirroring, the Mac directly) is the
+  default route for checks XCUITest cannot cover, in announced windows, records confirmed by the
+  maintainer (`/vocello-ui-autonomy`, `scripts/ios_device.sh mirroring`).
+- **Next window:** the long-form scenario and a candidate row on build 25 to prove the iOS suite
+  changes; RF-35's attended cellular check; the first-window Mirroring probes (start, input incl.
+  typing, handoff lock state, window capture).
+- **Unpushed:** `bc3d07e7` through this checkpoint.
+
+### October 24, evening: RF-15 on build 24
 
 - **Phone state:** build 3.0.0 (24) from TestFlight, onboarded by the `first-launch` row, with the
   three shipping models Ready and no clone voice yet. CoreDevice reports the team's own TestFlight
@@ -62,7 +89,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   and the purchase rows (RF-02).
 - **Unpushed:** `fa94e489` through this checkpoint (`a9ddb9c6` and earlier are pushed; CI passed).
 
-### October 24 — the iPhone 3.0 release candidate goes to TestFlight (resume here)
+### October 24 — the iPhone 3.0 release candidate goes to TestFlight
 
 - **Maintainer decision:** iPhone focus. TestFlight carries the 3.0 release candidate, 3.0.0 (24):
   Internal at once and submitted for Apple's beta review at once; the Public Beta group waits for RF-17's

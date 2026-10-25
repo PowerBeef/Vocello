@@ -636,7 +636,8 @@ public enum VocelloUIScroll {
     }
     #else
     /// Swipes up on the surface (the app by default) until the element is
-    /// hittable; the single replacement for the per-class `reveal` loops.
+    /// hittable; the shared reveal for plain scroll surfaces. Settings rows use
+    /// `VocelloUISettingsReveal`, whose bounded drags keep clear of toggles.
     @discardableResult
     public static func reveal(
         _ element: XCUIElement,

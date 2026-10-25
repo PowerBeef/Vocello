@@ -22,7 +22,7 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
 (generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
 (`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
-`Tests/UIAutomationSupport` or `project.yml`; push CI compiles both bundles in the `macos-tests` and
+`Tests/UIAutomationSupport` or `project.yml`; push CI compiles the three bundles (Mac, iOS, iOS candidate) in the `macos-tests` and
 `ios-compile` jobs (`--gate`) but never executes them; a change only under `Tests/Vocello*UITests`
 skips the deterministic suites and TSan. Use the smallest relevant physical-device or macOS XCUITest lane at a coherent checkpoint.
 

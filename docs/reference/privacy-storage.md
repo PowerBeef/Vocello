@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-26
+reviewed: 2026-10-25
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -459,7 +459,9 @@ eligible scratch while preserving
 source, tracked benchmark history, persistent caches, current UUID-matched dSYMs, distribution
 outputs, publication-repair evidence, and model stores. `--aggressive` additionally removes
 persistent compilation/package caches and the public aliases. `--prune-ui-results` and `--dist`
-target only their named class; `--clobber --yes` removes ignored repository-local generated state.
+target only their named class; `--quick`, valid only with `--prune-ui-results` and what the UI lanes
+run after each run, skips the inventory and the before/after tree walks and reports only the planned
+reclaim (about 1 s instead of 27 s); `--clobber --yes` removes ignored repository-local generated state.
 `--prune-confirmation-caches` removes leftover per-panel confirmation roots of the retired v1 audio
 QC, `build/cache/delivery-analysis/confirmation/<name>` (`childRetention.analysisConfirmation`), and
 nothing else of that cache: a root goes only while the cleanup holds the host analysis lock

@@ -73,8 +73,10 @@ release-readiness and artifact checks.
    an explicit repair/bootstrap action, then start a fresh smoke run.
    XCUITest is the only automated UI evidence and targets its configured native test host; computer
    use, between lanes, covers what it cannot (`/vocello-ui-autonomy`).
-   Smoke covers sidebar navigation, visible model and clone-reference readiness, one real Custom
-   generation, the completed player, and History. Benchmark owns the configurable
+   Smoke runs fifteen journeys in about 11 minutes: navigation, visible model and clone-reference
+   readiness, real Custom, Design and Clone takes with their players, History, cancellation,
+   recording, long-form and line-batch projects, and error, recovery and empty states (the
+   ten-language walk is the localization lane's). Benchmark owns the configurable
    Custom/Design/Clone matrix and defaults to exactly 29 takes. Both lanes fail on a new crash;
    benchmark additionally validates exact telemetry count/order, History, readable WAVs, and
    audio-QC evidence for every take. On PASS, the benchmark automatically publishes one compact

@@ -53,7 +53,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   the tagged commit.
 - Ordinary CI never executes XCUITest, a model or a device; it compiles `VocelloiOS` and the
   policy-test bundle for `-destination generic/platform=iOS`, runs the macOS deterministic bundles with the direct
-  `xcrun xctest` runner, and compiles both XCUITest bundles (`build_ui_test_bundles.sh --gate`,
+  `xcrun xctest` runner, and compiles the three XCUITest bundles (`build_ui_test_bundles.sh --gate`,
   build-for-testing in the deterministic arenas). `repo_invariants.sh` check 2 forbids execution in any
   workflow (`test-without-building`, `scripts/ui_test.sh`, an `xcodebuild`/`xcb_run` `test` action), not
   compilation.

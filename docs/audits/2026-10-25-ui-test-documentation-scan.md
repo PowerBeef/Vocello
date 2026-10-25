@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-10-25
-summary: Read-only scan, at commit 6f9fe5ff, of the repository's documentation, rules, skills, script help texts and test comments for outdated or contradictory statements about the UI test suites and their procedures, after the 2026-10-25 UI-lane rework and computer-use decision. Report only; no fix is applied until the maintainer picks one.
+summary: Read-only scan, at commit 6f9fe5ff, of the repository's documentation, rules, skills, script help texts and test comments for outdated or contradictory statements about the UI test suites and their procedures, after the 2026-10-25 UI-lane rework and computer-use decision. Sections A, B and C were fixed on 2026-10-25 at the maintainer's request; the code risks in D wait for separate decisions.
 sourceOfTruth:
   - scripts/ui_test.sh
   - Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift
@@ -56,6 +56,13 @@ lines now say full matrices are task- or release-specific rather than "explicitl
 
 ## B. Stale details
 
+**Fixed 2026-10-25** at the maintainer's request. Item 12 also amends RF-15's gate to name the
+2026-10-25 route for rows XCUITest cannot drive, and rewrites its notes to the current position
+within the notes limit. Item 16 resolves to the code: the default script is sized for about two
+segments, the planner sets the count and the summary reports it. One more instance the scan missed:
+`ios-device-testing.md`'s App Language setup said the journeys open the picker first; they read the
+Settings root row's value.
+
 8. **iOS smoke size.** `ios-device-testing.md:439` ("Three journeys") and `:445` ("two generation
    journeys"): full smoke runs four tests since 08372fdd (`ui_test.sh:1886-1891`). `ios-app-guide.md:693,
    765-766, 779-780` still put recording and model lifecycle outside smoke.
@@ -100,6 +107,10 @@ lines now say full matrices are task- or release-specific rather than "explicitl
 
 ## C. True in code, missing from the docs
 
+**Fixed 2026-10-25** at the maintainer's request: the build skip and re-seal in
+`ios-device-testing.md`, `--quick` in `privacy-storage.md`, `startedAt` in `testing-runbook.md`'s
+"Read a finished run", and the `mirroring` verbs in the device verb list.
+
 18. The iPhone development build skip (fingerprint, Xcode version, phone and product digests) and
     `xcodebuild-build.log` (`ui_test.sh:1183-1250`); only the Mac's two-phase build is documented.
 19. The candidate runner re-seal (`ensure_ios_candidate_runner_signature`, `ui_test.sh:650-671`).
@@ -107,6 +118,8 @@ lines now say full matrices are task- or release-specific rather than "explicitl
 21. `scripts/ios_device.sh mirroring status|session|capture|stop` in `ios-device-testing.md`'s verb list.
 
 ## D. Code risks the scan surfaced (not documentation)
+
+Open: each waits for its own decision.
 
 22. **The routed check undoes the iPhone build skip.** `build_ui_test_bundles.sh:121-131` compiles the
     iOS UI bundles unsigned and generic into the same DerivedData the lanes use, so after every routed

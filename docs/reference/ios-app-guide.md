@@ -690,7 +690,8 @@ Gotchas:
 2. Dismiss the keyboard before Generate when it obscures the button.
 3. Wait for cold model loading rather than repeating a click.
 4. Attach named screenshots at important semantic states and failures.
-5. Recording and destructive model lifecycle actions are outside smoke and benchmark. The isolated
+5. Destructive model lifecycle actions are outside smoke and benchmark, and smoke records only in its
+   record-then-play journey (AUD-02), which saves nothing. The isolated
    physical-device model-delivery proof is selected explicitly with
    `scripts/ui_test.sh ios model-download` and cleans up through visible Settings controls.
 6. Settings clearance uses the genuine `rootTabDock` container, not a single tab button (the dock
@@ -762,8 +763,8 @@ the joined output as the inline player item.
 #### Voice Design
 
 Design requires a voice brief, entered directly or from a starter, before generation. The benchmark
-lane exercises Design when that mode is selected; the minimal smoke only verifies the mode is
-navigable before performing its single Custom generation. A missing Design model must present the
+lane exercises Design when that mode is selected; smoke prepares Design in its dock-layout journey
+without generating, and its takes are Custom. A missing Design model must present the
 install state instead of Generate.
 
 #### Voice Cloning
@@ -777,8 +778,9 @@ Save stays disabled until editable text exists or the user explicitly selects
 `saveVoice_useAudioOnlyButton`; a delayed recognizer result cannot overwrite a manual edit.
 Successful enrollment selects the exact new voice in `studioChip_reference` and begins ordinary
 Clone priming. Automated smoke and benchmark tests use a prepared non-PII saved reference.
-Recording, Files-picker import, and permission enrollment are separate explicit product-acceptance
-scenarios. The genuine visible
+Smoke records only in its record-then-play journey (AUD-02), which saves nothing and leaves the
+permission prompts to the maintainer; Files-picker import and enrollment are separate explicit
+product-acceptance scenarios. The genuine visible
 `voiceCloning_consentAcknowledgment` control lives in Settings; Clone reads that persistent choice
 and keeps Generate disabled until it is enabled. A transcript is optional: supplied text selects
 transcript-backed conditioning, while an empty transcript selects the distinct audio-only x-vector

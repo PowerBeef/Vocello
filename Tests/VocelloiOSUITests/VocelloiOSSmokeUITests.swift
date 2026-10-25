@@ -157,8 +157,8 @@ final class VocelloiOSScreenProtectionUITests: XCTestCase {
 
 /// Explicit operator recovery of the Take variation preference, isolated from
 /// every acceptance journey (scripts/ui_test.sh ios take-variation). It reads the
-/// visible Settings control and, only when the lane names a value, selects that
-/// value through the same control, e.g. after a journey that pinned Expressive
+/// Settings root's Audio row value (the Audio page when that names none) and, only
+/// when the lane names a different value, selects it through the visible control, e.g. after a journey that pinned Expressive
 /// could not restore the original.
 @MainActor
 final class VocelloiOSTakeVariationUITests: VocelloiOSUITestCase {
@@ -188,9 +188,10 @@ final class VocelloiOSTakeVariationUITests: VocelloiOSUITestCase {
     }
 }
 
-/// One explicit physical-device journey. It exercises visible production UI
-/// in a single app session, cancels one active streamed Custom generation,
-/// and then completes exactly one Custom generation.
+/// Physical-device smoke journeys and the scenarios `scripts/ui_test.sh ios smoke
+/// --scenario` selects. Full smoke runs four: `testPhysicalDeviceSmokeJourney` (one
+/// app session that cancels one active streamed Custom generation, then completes
+/// exactly one), record-then-play, the Studio dock layout and the long-form project.
 @MainActor
 final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     func testSettingsAccessibilityLayoutWalk() {

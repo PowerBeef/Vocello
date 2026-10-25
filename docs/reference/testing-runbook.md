@@ -29,6 +29,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes at coherent checkpoints; computer use only between lanes |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
+| Checks XCUITest cannot cover (system dialogs, installs, Finder, visual inspection) | [Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover), `/vocello-ui-autonomy` | Computer use (iPhone through iPhone Mirroring, the Mac directly) in announced windows, never during a lane; a record closes a row only when the maintainer confirms it; never automated evidence |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |
 | Model download lifecycle | [Model delivery](model-delivery.md) | Explicit isolated root; preserve canonical data and failed evidence |
 | Benchmark operation / publication | [Benchmarking procedure](telemetry-and-benchmarking.md) | Exact-source qualified PASS only; no automatic Git changes |
@@ -54,13 +55,19 @@ Claude Code reads the artifacts directly, or hands the run directory to the read
 subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.
+   Steps the lane runs record `startedAt` beside `completedAt`, so a step's duration comes from the
+   ledger itself (steps recorded after the fact with `required_step_record`, such as a skipped
+   `ui-build` or `result-retention`, carry none).
    The lane's own verdict (`verdict.txt`, or its `test verdict:` / `<platform> <lane> PASS` line)
    decides, never a wrapper's or pipe's exit code; when a lane runs in the background, capture its
    exit status directly.
 2. Inspect the failed test and xcresult summary, then nearby log context. Use the existing bootstrap
    and external-interruption classifiers when applicable; zero launched cases can be infrastructure.
-3. Check the crash delta and attachment manifest for relevant screenshots or control observations.
-4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
+3. Check the crash delta and attachment manifest for relevant control observations.
+4. Review `screenshots/index.json` (readable names, test, time, failure flag): open every failure frame
+   and the key states for clipping, overlap, a wrong state or an unexpected dialog. Report-only; each
+   finding is classified as a release blocker or a backlog line.
+5. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
    deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
 
 The SwiftPM runtime lane keeps XCTest stdout in `runtime.log` and diagnostic stderr in

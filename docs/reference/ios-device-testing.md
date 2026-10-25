@@ -179,7 +179,7 @@ These are **black-box journeys** on the installed candidate, not the instrumente
 | `long-form` | a long-form project, then one segment regenerated |
 | `accessibility` | XCTest's audit on Studio, Settings and the purchase sheet; clipping at AX-XXXL |
 | `all` | every row above, in one run |
-| `first-launch` | a fresh install's onboarding through its three pages, then the three shipping models from Voice Models; run it first on a fresh install, never inside `all`. Its kept `first-launch-outcome` attachment says whether it walked onboarding and which models it downloaded, and only a run that walked onboarding is first-launch evidence |
+| `first-launch` | onboarding when it shows, then every shipping model that is not installed, started from its Download or Retry control bottom row first (`pro_clone`, `pro_design`, `pro_custom`) in Voice Models; run it first on a fresh install, never inside `all`. On a set-up phone it reinstalls only the missing models, which is how RF-35's Wi-Fi reinstall runs. Its kept `first-launch-outcome` attachment says whether it walked onboarding and which models it downloaded, and only a run that walked onboarding is first-launch evidence |
 
 The journeys share `VocelloiOSUITestCase` and `VocelloiOSSharedJourneys.swift` with the development
 lanes. In a candidate session the app gets no environment, and launch arguments only for standard
@@ -223,7 +223,12 @@ installed TestFlight binary's digest.
 The standalone `VocelloiOSCandidateUI` scheme has no production-app dependency. Only its test runner
 is built and installed. Xcode's documented `UseDestinationArtifacts` mode prevents installation
 during `test-without-building`. Runner configuration rejects target-app build products and removes
-all xctestrun-level app arguments and overrides. It never pulls the distribution app's private data
+all xctestrun-level app arguments and overrides. Before installing it, the lane verifies the runner's
+signature: Xcode's incremental build can re-sign the test bundle without re-sealing the runner
+around it ("a sealed resource is missing or invalid", 2026-10-25), and devicectl then refuses it.
+A runner that fails verification is re-sealed with the certificate that signed its test bundle and
+the test target's entitlements, as Xcode's own CodeSign step does; `candidate-runner-signature.log`
+records it, and a runner that still fails verification fails the run. It never pulls the distribution app's private data
 container. Each journey retains screenshots and its candidate identity. A missing, failed or
 duplicate journey, or a missing identity attachment, fails the run. Collection of post-run identity,
 attachments and system-crash deltas is attempted even after failure/interruption; new system reports
@@ -252,7 +257,7 @@ maintainer's. A computer-use record closes a row only when the maintainer confir
 | RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off ends Mirroring |
 | RF-35 navigation row and Wi-Fi reinstall, the ~30-take machine screen | XCUITest (`first-launch`, `navigation`, `modes`) |
 | Purchase rows | XCUITest; the purchase confirmation sheet is the maintainer's |
-| TestFlight installs, model removal or reinstall, in-app settings, reproductions, visual inspection | Computer use |
+| TestFlight installs, removing a model before a reinstall row, in-app settings, reproductions, visual inspection | Computer use |
 
 After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the
 test, time and failure flag), report-only.
@@ -288,6 +293,13 @@ attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [d
 app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
 [--count N]]` emits machine-readable reachability, optionally polling. A diagnostics spec is
 `<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
+`mirroring status [--json]|session LABEL|capture LABEL --step TEXT [--observed TEXT]|stop` runs
+the computer-use records ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)):
+`status` says whether iPhone Mirroring runs and whether the phone is reachable and locked,
+`session` starts a record bound to the source commit and the installed version and build,
+`capture` saves the Mirroring window with one step line, and `stop` quits iPhone Mirroring, which
+`ui-preflight` requires before any XCUITest lane. Records stay untracked under
+`build/artifacts/ios/mirroring` and are never lane evidence.
 
 ### Device gate (`scripts/ios_device.sh gate`)
 
@@ -352,13 +364,23 @@ and after. It never runs as part of another lane.
 ## Explicit XCUITest lanes
 
 Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
-exact model-status assertions do not depend on the phone's language. They first observe the saved
-App Language choice through its genuine picker, temporarily select System Default, and restore
-the original choice during session cleanup. They never write global `AppleLanguages` preferences.
+exact model-status assertions do not depend on the phone's language. They read the saved App
+Language choice from the Settings root row's value, open the genuine picker only to change it,
+temporarily select System Default, and restore the original choice during session cleanup. They never write global `AppleLanguages` preferences.
 The Settings `localization` walk explicitly overrides the process language for French-Default
 (including translated title and variation-value assertions), in addition to Default, AX-L,
 AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
 neither a default-language pass nor a compile substitutes for bilingual device acceptance.
+
+The development lanes build once per source tree: `build-for-testing` writes its log to
+`<run>/xcodebuild-build.log` (copied to `xcodebuild.log` on failure, so signing and provisioning
+failures still classify as infrastructure), then `test-without-building` runs the `.xctestrun`.
+A marker in the iOS DerivedData binds the build inputs' fingerprint (`tree_fingerprint.py
+--build-inputs`), the Xcode version, the phone, the team and the digests of the app, the test
+bundle and the `.xctestrun`; while all of them match, the lane prints `build-for-testing skipped`
+and tests the existing products. A product another build overwrote (a routed check that compiled
+the UI bundles, `ios_device.sh build`) changes a digest and is rebuilt, never tested. Both halves
+run inside the `xcuitest` step.
 
 Smoke diagnostics are collected before the aggregate failure exit, including when XCTest fails.
 A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
@@ -437,13 +459,14 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Three journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map. Record then play (AUD-02): a clip recorded from Clone's reference plays to its end in the save sheet's review, and the sheet closes without saving |
+| Smoke | Four journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map. Record then play (AUD-02): a clip recorded from Clone's reference plays to its end in the save sheet's review, and the sheet closes without saving. Dock layout (RF-24): each Studio mode, prepared with its benchmark setup, keeps an idle Generate just above the tab dock; nothing is generated |
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
 | Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
-Smoke explicitly selects its two generation journeys. The Settings layout walk is selected only by
+Smoke explicitly selects those four journeys; the class's other tests run only in their own lane or
+named scenario. The Settings layout walk is selected only by
 the separate `localization` lane; running smoke does not repeat it. Model-dependent journeys require
 the current catalog's Ready state: an installed model showing Update Available is not readiness proof.
 

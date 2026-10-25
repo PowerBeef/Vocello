@@ -64,9 +64,10 @@ Usage:
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
 `marketing` captures authored Mac product images, generates two demo takes, and saves one designed
 voice through visible controls. It is an asset workflow, not an acceptance or benchmark verdict.
-`localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
-without generating audio or changing installed model state; on macOS it also owns the ten-interface-
-language switch and relaunch walk, which smoke's navigation journey skips.
+`localization` runs a layout walk without generating audio or changing installed model state: on iOS
+the Settings pseudo-localization, long-string and accessibility-size walk; on macOS test01, the
+pseudo-localized navigation journey plus the ten-interface-language switch and relaunch walk, which
+smoke's run of test01 skips.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
 `control-audit` is a source-bound, physical-iPhone-only campaign. Its untracked plan, observations,
 screenshots, xcresult, diagnostics, and restoration proof are retained under the run artifact.
@@ -128,8 +129,9 @@ their language from the chip's menu first and return the mode to Auto afterwards
 and prints a manifest without the script; scripts/auto_language_check.py then joins each take to its
 engine request receipt. It needs the benchmark clone voice, saves no voice and records nothing, so no
 permission prompt interrupts it.
-`take-variation` reads Vocello's Take variation through the visible Settings control; only an explicit
-value selects it and verifies the result. It restores a variation an interrupted journey left pinned
+`take-variation` reads Vocello's Take variation from the Settings root's Audio row (the Audio page
+when that names none); only an explicit value selects it, through the visible control, and verifies
+the result. It restores a variation an interrupted journey left pinned
 (the long-form journey pins Expressive) and never runs as part of another lane.
 Append `--retain-result` to explicitly pin a campaign member against routine UI-result pruning;
 remove its untracked `retention-pin.json` only after the evidence set is retired.

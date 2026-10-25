@@ -25,7 +25,8 @@ Read in this order and stop when the verdict is clear:
 4. `xcodebuild.log` around the first failure, with the two classifiers: zero launched test cases with an
    automation bootstrap error is infrastructure, not product.
 5. The crash delta (`new-crashes.txt` or before/after snapshots); name the process.
-6. The attachments manifest for screenshots and observations that explain the failure.
+6. `screenshots/index.json` (readable names, test, time, failure flag) for the frames that explain the
+   failure, and the attachments manifest for control observations.
 
 Reply with the verdict class (PASS, product failure, infrastructure failure, external interruption,
 restoration gap or incomplete evidence), the one test or step that decides it, the evidence path for each

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-21
+reviewed: 2026-10-25
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml
@@ -189,7 +189,8 @@ German screenshots were visually reviewed. Evidence remains untracked under `bui
 The actual compact outer window was 780x612 pt. The September 22 follow-up corrected the initial
 interpretation: its 52-point toolbar leaves the declared 780x560 content area. Strict content/viewport
 assertions now prove that minimum. The complete ten-language journey also passed inside smoke run
-`macos-xcui-smoke-20260922-041322-1258c968` on `d7058ea6`; see the
+`macos-xcui-smoke-20260922-041322-1258c968` on `d7058ea6`, before smoke stopped running the walk
+(2026-10-25; the localization lane now owns it); see the
 [Mac acceptance scope and limits](macos-ios-ui-reset-2026-09.md#mac-acceptance-september-22).
 This is local UI evidence, not signed-candidate, VoiceOver or native-speaker acceptance.
 

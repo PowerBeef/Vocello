@@ -66,6 +66,7 @@ enum VocelloUILayoutBounds {
 /// Test-only bounded search. Geometry comes from the current accessibility snapshot,
 /// not coordinates to tap or assumptions about the retained scroll position.
 struct VocelloUIRevealSearch {
+    /// The finger's direction. The Settings reveal performs it as an element-to-element drag.
     enum Swipe { case up, down }
     private(set) var attempts = 0
     let preferred: Swipe
@@ -128,9 +129,10 @@ struct VocelloUIRevealSearch {
     }
 }
 
-/// The reveal drags from an anchor's center by the wanted distance. Only use a completely
-/// visible text descendant bounded to half the safe viewport, so both endpoints stay on
-/// content. Never drag from an oversized row/window or a clipped descendant as a fallback.
+/// Picks the reveal's touch anchor; the drag starts on it and ends on a second visible text
+/// about the wanted distance away. Only use a completely visible text descendant bounded to
+/// half the safe viewport, so both endpoints stay on content. Never drag from an oversized
+/// row/window or a clipped descendant as a fallback.
 enum VocelloUITouchScrollAnchor {
     static func index(frames: [CGRect], visible: CGRect, desiredDelta: CGFloat) -> Int? {
         guard VocelloUIRevealRequirement.valid(visible), desiredDelta.isFinite,

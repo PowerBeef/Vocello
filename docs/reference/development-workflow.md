@@ -223,7 +223,7 @@ git push  # only after an explicit request
 Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI
 lanes agree. `scripts/dev.sh check` compiles the affected XCUITest bundles through
 `scripts/build_ui_test_bundles.sh` when UI-test sources or `project.yml` change; it never runs them.
-Push CI compiles both bundles too (`--gate`, after the deterministic builds in their arenas) and never
+Push CI compiles all three bundles too (Mac, iOS and iOS candidate; `--gate`, after the deterministic builds in their arenas) and never
 runs them. XCUITest-only sources never reach the `swift` lane, since no deterministic bundle or TSan
 subset compiles them: `Tests/VocelloMacUITests` routes to `macos_ui`, which runs `macos-tests` for
 the bundle compile alone, and `Tests/VocelloiOSUITests` routes to `ios` alone

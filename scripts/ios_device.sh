@@ -37,8 +37,8 @@
 #   scripts/ios_device.sh voice-reliability-export --plan PLAN.json --evidence SUMMARY.json --output DIR
 #                                                 # digest-filtered private reference export + alias map
 #   scripts/ios_device.sh speech-assets           # resolve/install DE/ES/JA/ZH DictationTranscriber
-#   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #                                                 # assets and recheck Vocello's legacy Speech readiness
+#   scripts/ios_device.sh enroll-clone-fixture --wav W.wav --transcript W.txt  # headless fixture voice enrollment
 #   scripts/ios_device.sh crashes [--test]         # pull + symbolicate on-device crash/hang diagnostics (MetricKit)
 #   scripts/ios_device.sh debug [spec]             # attached launch + LLDB attach guidance (get-task-allow build)
 #   scripts/ios_device.sh logs [spec] [--voice-id SAVED_VOICE_ID]
@@ -564,10 +564,6 @@ pull_speech_asset_run() {
     --destination "$destination" >/dev/null 2>&1
 }
 
-# Explicit, non-generation Speech bootstrap for the physical iPhone. AssetInventory's combined
-# request installs only the four language-output locales and automatically manages this app's
-# reservations. The result is local diagnostic evidence, never benchmark history.
-
 # Headless benchmark clone-fixture enrollment: the wipe-recovery route, with no UI and a
 # hash-pinned reference, beside the genuine Files-import lane
 # (`scripts/ui_test.sh ios enroll-clone-fixture`). Stages the exact reference WAV plus the
@@ -664,6 +660,9 @@ PY
   note "enrollment evidence → $sentinel"
 }
 
+# Explicit, non-generation Speech bootstrap for the physical iPhone. AssetInventory's combined
+# request installs only the four language-output locales and automatically manages this app's
+# reservations. The result is local diagnostic evidence, never benchmark history.
 cmd_speech_assets() {
   [[ $# -eq 0 ]] || die "speech-assets accepts no arguments"
   local locales="de_DE,es_419,ja_JP,zh_CN"

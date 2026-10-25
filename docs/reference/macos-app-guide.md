@@ -331,7 +331,7 @@ The shell harness owns deterministic proof and evidence:
 | Lane | Purpose |
 |------|---------|
 | `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
-| `scripts/ui_test.sh macos smoke` | Fifteen ordered focused journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History with played-audio capture, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (two planned segments by default; `--long-form-segments 2`–`12` scales it for local evidence), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content, long-form recovery Discard, Saved Voices empty and error states; `--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
+| `scripts/ui_test.sh macos smoke` | Fifteen ordered focused journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History with played-audio capture, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (a ~1,900-character script sized for about two segments; the planner sets the count and the summary reports it; `--long-form-segments 2`–`12` scales it for local evidence), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content, long-form recovery Discard, Saved Voices empty and error states; `--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
 | `scripts/ui_test.sh macos perf` | Eleven scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](../audits/2026-08-04-macos-ui-refresh.md)) |
 | `scripts/ui_test.sh macos marketing` | Product image refresh (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`, `--scenario models` for the Model Downloads image): two demo takes and one saved designed voice through visible controls at a 1040×680 window, captures attached for export; `evidenceClass: marketing-assets`, never acceptance or benchmark evidence |
@@ -351,7 +351,9 @@ The shell harness owns deterministic proof and evidence:
 ### Canonical flow
 
 1. Launch → observe `sidebar_customVoice` and `screen_customVoice`.
-2. Navigate by `sidebar_<mode>` → re-observe the destination screen identifier.
+2. Navigate with Cmd+1..6 (`navigate(to:)`, which falls back to `sidebar_<mode>` and records it) →
+   re-observe the destination screen identifier. `test01` and the click-and-type classes (benchmark,
+   perf, marketing, auto-language) click the sidebar.
 3. Compose through `textInput_textEditor` → re-observe the changed semantic value/state.
 4. Generate through `textInput_generateButton` → observe `sidebarPlayer_bar`, then assert the
    matching History/WAV/typed-probe evidence.

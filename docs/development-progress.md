@@ -43,8 +43,8 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   changes; RF-35's attended cellular check; the first-window Mirroring probes (start, input incl.
   typing, handoff lock state, window capture).
 - **UI-test documentation scan:** [`docs/audits/2026-10-25-ui-test-documentation-scan.md`](audits/2026-10-25-ui-test-documentation-scan.md)
-  lists outdated and contradictory statements and four code risks; nothing fixed until the
-  maintainer picks.
+  lists outdated and contradictory statements and five code risks; sections A, B and C are fixed,
+  and the code risks in D (items 22-26) wait for separate decisions.
 - **Pushed:** through `6f9fe5ff` (CI passed).
 
 ### October 24, evening: RF-15 on build 24
@@ -87,9 +87,9 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   (`224037-4321cbb4`), one-word (`225022-c52c82c5`); DA-04, F-01 and F-16 closed. A first pass under
   iPhone Mirroring failed (`221807`, `222059`, `222344`: black screenshots, a stuck keyboard, no
   playback), so XCUITest needs Mirroring ended even when CoreDevice reports the phone unlocked.
-  RF-15 still holds the attended rows: the file opened during onboarding (AUD-01, fresh install),
-  AUD-02's hand checks, the hand VoiceOver row, the offline relaunch, the ~30-take machine screen
-  and the purchase rows (RF-02).
+  RF-15 still holds the attended rows (the file opened during onboarding, AUD-01, on a fresh
+  install; AUD-02's hand checks; the hand VoiceOver row; the offline relaunch) and two XCUITest rows
+  (the ~30-take machine screen and the purchase rows, RF-02; routing corrected 2026-10-25).
 - **Unpushed:** `fa94e489` through this checkpoint (`a9ddb9c6` and earlier are pushed; CI passed).
 
 ### October 24 — the iPhone 3.0 release candidate goes to TestFlight

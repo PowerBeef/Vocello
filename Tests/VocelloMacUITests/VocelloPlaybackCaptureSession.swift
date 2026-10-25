@@ -3,7 +3,8 @@ import CoreAudio
 import Foundation
 import Synchronization
 
-// Played-audio capture for the macOS benchmark lane (PC-01).
+// Played-audio capture for the macOS benchmark lane (PC-01) and smoke's
+// completed-generation journey (`test02_CustomGenerationAndHistory`).
 //
 // A Core Audio process tap on the app under test, read through a private
 // aggregate device, records exactly what the app renders while muting its

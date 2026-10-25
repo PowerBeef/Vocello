@@ -42,9 +42,10 @@ class VocelloMacUITestCase: XCTestCase {
     /// them, stay comparable with earlier baselines.
     class var keepsSteadyWaitCadence: Bool { false }
 
-    /// Lanes whose evidence depends on the click and typing paths keep them: the measured
-    /// lanes time those paths, marketing captures the sidebar as a click leaves it, and
-    /// the auto-language lane types its tracked sentence. Everyone else navigates with
+    /// Lanes whose evidence depends on the click and typing paths keep them: perf times
+    /// those paths, the benchmark keeps its sidebar clicks as its baselines ran them (it
+    /// pastes its scripts outside its timed windows), marketing captures the sidebar as a
+    /// click leaves it, and the auto-language lane types its tracked sentence. Everyone else navigates with
     /// ⌘1–⌘6 and pastes scripts.
     class var keepsClickAndTypePaths: Bool { keepsSteadyWaitCadence }
 

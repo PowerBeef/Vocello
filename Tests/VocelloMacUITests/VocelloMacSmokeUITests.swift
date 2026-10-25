@@ -25,8 +25,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     /// (like the benchmark take-manifest handshake) because the app reading
     /// a file from the test runner's per-app temporary directory triggers the
     /// macOS "access data from other apps" TCC prompt. The lane
-    /// (`scripts/ui_test.sh`) synthesizes it — the Xcode 26 test runner
-    /// cannot write to `/tmp` itself — and this initializer only writes a
+    /// (`scripts/ui_test.sh`) synthesizes it — the test runner could not write
+    /// to `/tmp` itself under Xcode 26, and the lane keeps that route — and this initializer only writes a
     /// fallback for direct-from-Xcode runs, where the write may or may not
     /// be permitted; `test04` asserts the file exists either way.
     private static let virtualClipURL: URL = {

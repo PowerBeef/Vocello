@@ -137,7 +137,8 @@ with the XPC service on 2026-09-15; the lane is core-only since).
 Run them at a coherent checkpoint, the smallest lane that covers the change (local validation lanes
 are authorized; `CLAUDE.md`). `test01_NavigationAndReadiness` (the whole
 `localization` lane, and the second journey of the full `smoke` lane, after
-`test00_WindowSizesAndSettingsScene`) launches the app with Foundation's
+`test00_WindowSizesAndSettingsScene`; smoke sets `QVOICE_MAC_SKIP_LANGUAGE_WALK=1` and skips its
+ten-language walk of about 21 minutes, which only the localization lane runs) launches the app with Foundation's
 `-NSDoubleLocalizedStrings YES -NSShowNonLocalizedStrings YES`, so doubled text (menus included) and
 UPPERCASE labels in its attachment `mac-smoke-readiness-pseudolocalized` are the diagnostic, not a
 defect: doubling is the long-string stress and uppercase marks a key absent from the String Catalog.
@@ -151,7 +152,7 @@ persist.
 Lanes:
 
 ```sh
-scripts/ui_test.sh macos smoke
+scripts/ui_test.sh macos smoke   # about 11 minutes (637 s of tests in run 20261025-221609-c2191179)
 # Focused quality-input journeys through the same genuine controls and collectors:
 scripts/ui_test.sh macos smoke --scenario design-enrollment
 scripts/ui_test.sh macos smoke --scenario clone-reference

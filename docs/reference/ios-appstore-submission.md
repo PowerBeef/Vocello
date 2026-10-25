@@ -439,6 +439,11 @@ onboarding, error/empty states, portrait lock, privacy link). Before submitting,
 device: launch + all 4 tabs; install a model; generate in each mode; record→enroll→clone with mic/speech permission
 **denial + recovery** via Settings → Privacy & Permissions → Permissions (iOS Settings); cancel mid-generation; an incoming call mid-record
 keeps the take; VoiceOver reads the primary controls; the largest Dynamic Type doesn't clip the composer.
+Most of these are rows of the candidate acceptance (RF-15): run them on the processed build with
+`scripts/ui_test.sh ios smoke --preinstalled-candidate` ([Already installed distribution
+candidate](ios-device-testing.md#already-installed-distribution-candidate)). What XCUITest cannot drive
+goes to computer use or the maintainer ([Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover));
+permission prompts, calls and VoiceOver stay the maintainer's.
 
 ## 6. Submit
 

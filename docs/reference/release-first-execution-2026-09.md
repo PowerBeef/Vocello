@@ -183,7 +183,7 @@ The maintainer lifts the focus lock and picks the next primary plan from the par
   en-US, fr-CA and fr-FR details and the app's availability were entered on 2026-10-12 (RF-02); the
   Paid Apps agreement remains the maintainer's. See the
   [app guide](ios-app-guide.md#ios-export-purchase).
-- **Version.** 3.0.0 / build 24 in `project.yml`. A fresh read-only check confirms the build is unused
+- **Version.** 3.0.0 / build 25 in `project.yml`. A fresh read-only check confirms the build is unused
   immediately before the archive.
 - **No substitutes.** No diagnostics or development build stands in for the processed candidate. No
   faked entitlement replaces the purchase.

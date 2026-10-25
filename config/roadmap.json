@@ -1850,6 +1850,21 @@
       "notes": "Seen 2026-10-25 on build 25 (maintainer screenshot): after an XCUITest teardown force-quit the app one second into a Voice Design download, the row read \"Failed to download model.safetensors: L'opération n'a pas pu s'achever. (NSURLErrorDomain erreur -1.)\" under an English App Language. Retry is offered. Not investigated (focus rules)."
     },
     {
+      "id": "BKL-36",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A short drag that starts on an iPhone Settings toggle row can flip the switch",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A drag that starts on a Settings toggle row's label never changes the switch, at any scroll position, while a tap on the row still does.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/iOS/IOSScrollRefinements.swift"
+      ],
+      "updated": "2026-10-25",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Seen 2026-10-25 on build 25 in XCUITest run 20261025-173415-0398b5f1: the whole IOSSettingsCompactToggleStyle row is a Button and IOSScrollView turns bounce off, so near the end of Voice Models a slow upward swipe on the Download over cellular caption landed as a tap and flipped the switch on each of 20 swipes (the network note above switched between its two copies). The same style serves Auto-play, Clone consent and the Accessibility toggles. Not investigated (focus rules)."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

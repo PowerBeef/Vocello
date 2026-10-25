@@ -262,6 +262,28 @@ class RequiredStepLedgerTests(unittest.TestCase):
             self.assertEqual(payload["status"], "passed")
             self.assertEqual(payload["results"]["result-retention"]["status"], "failed")
 
+    def test_a_reported_step_keeps_its_start_time_and_refuses_a_bad_one(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.json"
+            self.run_tool(
+                "init", "--ledger", str(ledger), "--workflow", "macos-release-readiness",
+                "--run-id", "timed", check=True,
+            )
+            self.run_tool(
+                "record", "--ledger", str(ledger), "--step", "project-inputs",
+                "--exit-code", "0", "--started-at", "2026-10-25T17:05:20Z", check=True,
+            )
+            result = json.loads(ledger.read_text(encoding="utf-8"))["results"]["project-inputs"]
+            self.assertEqual(result["startedAt"], "2026-10-25T17:05:20Z")
+            self.assertLessEqual(result["startedAt"], result["completedAt"])
+            for bad in ("2026-10-25 17:05:20", "2999-01-01T00:00:00Z"):
+                refused = self.run_tool(
+                    "record", "--ledger", str(ledger), "--step", "app-build",
+                    "--exit-code", "0", "--started-at", bad,
+                )
+                self.assertNotEqual(refused.returncode, 0, bad)
+            self.assertNotIn("app-build", json.loads(ledger.read_text(encoding="utf-8"))["results"])
+
     def test_duplicate_and_stale_ledger_writes_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             ledger = Path(directory) / "ledger.json"

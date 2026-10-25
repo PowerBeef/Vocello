@@ -357,7 +357,12 @@ def initialize(
     })
 
 
-def record(path: Path, step: str, exit_code: int) -> None:
+UTC_SECOND_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+
+
+def record(path: Path, step: str, exit_code: int, started_at: str | None = None) -> None:
+    if started_at is not None and not UTC_SECOND_RE.fullmatch(started_at):
+        raise LedgerError(f"step {step!r} start time is not a UTC second: {started_at!r}")
     payload = load_json(path)
     validate_ledger(payload)
     if payload.get("status") != "running":
@@ -367,12 +372,18 @@ def record(path: Path, step: str, exit_code: int) -> None:
         raise LedgerError(f"step {step!r} is not declared for workflow {payload['workflow']}")
     if step in payload["results"]:
         raise LedgerError(f"step {step!r} already has a terminal result")
+    completed_at = utc_now()
+    if started_at is not None and started_at > completed_at:
+        raise LedgerError(f"step {step!r} starts after it completes")
     payload["results"][step] = {
         "status": "passed" if exit_code == 0 else "failed",
         "exitCode": exit_code,
         "required": expected[step]["required"],
         "executionMode": "reported-exit-code",
-        "completedAt": utc_now(),
+        # When the orchestrator passes it, the step's own wall time is measurable
+        # without inferring it from the previous step's completion.
+        **({"startedAt": started_at} if started_at is not None else {}),
+        "completedAt": completed_at,
     }
     payload["missingRequiredSteps"] = [
         entry["id"] for entry in payload["expectedSteps"]
@@ -572,6 +583,7 @@ def parser() -> argparse.ArgumentParser:
     step.add_argument("--ledger", type=Path, required=True)
     step.add_argument("--step", required=True)
     step.add_argument("--exit-code", type=int, required=True)
+    step.add_argument("--started-at", help="UTC second the step began (YYYY-MM-DDTHH:MM:SSZ)")
     run = subparsers.add_parser("run")
     run.add_argument("--ledger", type=Path, required=True)
     run.add_argument("--step", required=True)
@@ -597,7 +609,7 @@ def main() -> int:
             initialize(args.ledger, args.contract, args.workflow, args.run_id, args.source_identity)
             return 0
         if args.command == "record":
-            record(args.ledger, args.step, args.exit_code)
+            record(args.ledger, args.step, args.exit_code, args.started_at)
             return 0
         if args.command == "run":
             command = args.argv[1:] if args.argv[:1] == ["--"] else args.argv

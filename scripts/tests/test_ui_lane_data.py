@@ -212,6 +212,59 @@ class LongFormSummaryTests(LaneDataCase):
         self.assertEqual(stdout, "==> " + out.read_text())
 
 
+class ScreenshotIndexTests(LaneDataCase):
+    PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+    UUID = "970130BD-E9FA-4C74-8EA2-2FED85F38514"
+
+    def write_export(self, attachments: list[dict[str, Any]], files: dict[str, bytes]) -> Path:
+        export = self.directory / "attachments"
+        export.mkdir()
+        for name, data in files.items():
+            (export / name).write_bytes(data)
+        manifest = [{"testIdentifier": "Suite/testJourney()", "attachments": attachments}]
+        (export / "manifest.json").write_text(json.dumps(manifest))
+        return export
+
+    def test_images_are_gathered_by_name_in_time_order_and_stubs_are_skipped(self) -> None:
+        export = self.write_export(
+            [
+                {"exportedFileName": "B.png", "suggestedHumanReadableName": f"take-french_0_{self.UUID}.png",
+                 "timestamp": 20.0, "isAssociatedWithFailure": False, "deviceId": "secret-udid"},
+                {"exportedFileName": "A.png", "suggestedHumanReadableName": f"take-english_0_{self.UUID}.png",
+                 "timestamp": 10.0, "isAssociatedWithFailure": False},
+                {"exportedFileName": "C", "suggestedHumanReadableName": "Screenshot 2026-10-25 at 01.24.30 p.m.",
+                 "timestamp": 30.0, "isAssociatedWithFailure": True},
+                {"exportedFileName": "D.png", "suggestedHumanReadableName": "Screenshot 2026-10-25 at 01.25 p.m.",
+                 "timestamp": 40.0, "isAssociatedWithFailure": True},
+            ],
+            {"A.png": self.PNG, "B.png": self.PNG,
+             "C": b"Unexpected Error: Finished test run with pending attachment.", "D.png": self.PNG},
+        )
+        out = self.directory / "screenshots"
+
+        status, stdout, _ = self.run_main("index-screenshots", str(export), str(out))
+
+        self.assertEqual(status, 0)
+        self.assertIn("3 screenshot(s) indexed", stdout)
+        index = json.loads((out / "index.json").read_text())
+        self.assertEqual([shot["file"] for shot in index["screenshots"]],
+                         ["001-take-english.png", "002-take-french.png",
+                          "003-Screenshot-2026-10-25-at-01.25-p.m.png"])
+        self.assertEqual([shot["source"] for shot in index["screenshots"]], ["named", "named", "automatic"])
+        self.assertEqual([shot["failure"] for shot in index["screenshots"]], [False, False, True])
+        self.assertEqual(index["skippedNonImages"], 1)
+        self.assertNotIn("secret-udid", (out / "index.json").read_text())
+        for shot in index["screenshots"]:
+            self.assertEqual((out / shot["file"]).read_bytes(), self.PNG)
+
+    def test_an_export_without_a_manifest_writes_an_empty_index(self) -> None:
+        export = self.directory / "attachments"
+        export.mkdir()
+        out = self.directory / "screenshots"
+        self.assertEqual(lane.index_screenshots(export, out), 0)
+        self.assertEqual(json.loads((out / "index.json").read_text())["screenshots"], [])
+
+
 class VirtualMicTests(LaneDataCase):
     def test_the_fixture_is_12_seconds_of_mono_16_bit_24khz_speech_like_audio(self) -> None:
         path = self.directory / "mic.wav"

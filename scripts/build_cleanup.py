@@ -1450,6 +1450,12 @@ def parse_arguments() -> argparse.Namespace:
     modes.add_argument("--clobber", action="store_true")
     parser.add_argument("--ui-keep", type=int, default=1)
     parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="with --prune-ui-results: skip the repository-wide size measurement and inventory, "
+        "which walk the whole tree; a UI lane prunes this way after every run",
+    )
+    parser.add_argument(
         "--older-than-hours",
         type=float,
         metavar="HOURS",
@@ -1480,6 +1486,8 @@ def parse_arguments() -> argparse.Namespace:
         parser.error("cleanup modes are mutually exclusive")
     if args.ui_keep != 1 and not args.prune_ui_results:
         parser.error("--ui-keep is valid only with --prune-ui-results")
+    if args.quick and not args.prune_ui_results:
+        parser.error("--quick is valid only with --prune-ui-results")
     if (args.external_xcode or args.clobber) and not args.yes:
         parser.error("--external-xcode and --clobber require --yes")
     if args.qc_v1 and not (args.dry_run or args.yes):
@@ -1493,8 +1501,11 @@ def main() -> int:
     args = parse_arguments()
     try:
         policy = load_policy()
-        before = allocated_bytes(REPO_ROOT)
-        inventory(policy)
+        # A lane's per-run prune touches only the UI results; measuring and
+        # listing the whole tree three times cost it ~27 s on every run.
+        before = 0 if args.quick else allocated_bytes(REPO_ROOT)
+        if not args.quick:
+            inventory(policy)
         any_mode = any(
             (
                 args.routine, args.aggressive, args.prune_ui_results, args.dist,
@@ -1588,6 +1599,11 @@ def main() -> int:
                     if not cleaner.dry_run:
                         shutil.rmtree(source)
 
+        if args.quick:
+            print("==> Cleanup summary")
+            print(f"plannedReclaimBytes={cleaner.planned}")
+            print(f"dryRun={'true' if args.dry_run else 'false'}")
+            return 0
         after = before if args.dry_run else allocated_bytes(REPO_ROOT)
         reclaimed = max(0, before - after)
         print("==> Cleanup summary")

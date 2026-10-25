@@ -13,6 +13,9 @@ inline code did:
                                       the order `write_run_metadata` passes them)
     export-attachments RESULT OUT     export an xcresult's attachments in its own process
                                       group, bounded at 60 s, retiring the group on any exit
+    index-screenshots ATTACHMENTS OUT gather the exported images under readable names in
+                                      OUT with an index.json (test, name, time, failure flag)
+                                      for review; text stubs of unfinished captures are skipped
     long-form-summary WALL OUT DIR [SUPPORT]
                                       the macOS long-form project summary, its per-segment
                                       memory trend and the retained per-generation logs
@@ -28,6 +31,7 @@ import glob
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import struct
@@ -219,6 +223,85 @@ def export_attachments(result: str, output: str) -> int:
     return status
 
 
+_EXPORT_SUFFIX = re.compile(r"_\d+_[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}(?:\.[A-Za-z0-9]+)?$")
+
+
+def _image_kind(path: Path) -> str | None:
+    """png, jpeg or heic from the file's own bytes; None for anything else, such as the
+    'Finished test run with pending attachment' text an unfinished capture leaves."""
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(16)
+    except OSError:
+        return None
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if head[4:8] == b"ftyp" and head[8:12] in {b"heic", b"heix", b"mif1", b"msf1"}:
+        return "heic"
+    return None
+
+
+def _slug(name: str) -> str:
+    stem = _EXPORT_SUFFIX.sub("", name)
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-.")
+    return stem[:80] or "attachment"
+
+
+def index_screenshots(attachments: Path, out: Path) -> int:
+    """Every exported image in time order as NNN-<name>.png|jpg in `out`, hard-linked
+    when it can be (HEIC converted to PNG with sips), plus out/index.json. The index
+    names the test, the attachment name, its time, whether XCTest tied it to a failure
+    and whether a test named it or XCTest captured it automatically; no device fields."""
+    manifest_path = attachments / "manifest.json"
+    entries: list[dict[str, Any]] = []
+    if manifest_path.is_file():
+        for test in json.loads(manifest_path.read_text()):
+            for item in test.get("attachments") or []:
+                entries.append({**item, "_test": test.get("testIdentifier", "")})
+    entries.sort(key=lambda item: (float(item.get("timestamp") or 0), str(item.get("exportedFileName"))))
+    out.mkdir(parents=True, exist_ok=True)
+    indexed: list[dict[str, Any]] = []
+    skipped = 0
+    seen: set[str] = set()
+    for item in entries:
+        exported = str(item.get("exportedFileName") or "")
+        source = attachments / exported
+        kind = _image_kind(source)
+        if not exported or kind is None or exported in seen:
+            skipped += kind is None
+            continue
+        seen.add(exported)
+        human = str(item.get("suggestedHumanReadableName") or exported)
+        automatic = human.startswith("Screenshot ")
+        extension = "jpg" if kind == "jpeg" else "png"
+        target = out / f"{len(indexed) + 1:03d}-{_slug(human)}.{extension}"
+        if kind == "heic":
+            converted = subprocess.run(["sips", "-s", "format", "png", str(source), "--out", str(target)],
+                                       capture_output=True)
+            if converted.returncode != 0:
+                skipped += 1
+                continue
+        else:
+            try:
+                os.link(source, target)
+            except OSError:
+                shutil.copy2(source, target)
+        indexed.append({
+            "file": target.name,
+            "test": item["_test"],
+            "name": _EXPORT_SUFFIX.sub("", human),
+            "timestamp": item.get("timestamp"),
+            "failure": bool(item.get("isAssociatedWithFailure")),
+            "source": "automatic" if automatic else "named",
+        })
+    write_json_atomically(out / "index.json", {
+        "schemaVersion": 1, "screenshots": indexed, "skippedNonImages": skipped,
+    })
+    return len(indexed)
+
+
 def _flat(obj: Any, found: dict[str, Any]) -> dict[str, Any]:
     """Every numeric leaf of a telemetry row by key, the first occurrence winning."""
     if isinstance(obj, dict):
@@ -351,7 +434,8 @@ def write_virtual_mic(path: str, sample_rate: int = 24000) -> None:
 # warm count may start with a dash), so there is no option parsing.
 ARITY = {
     "script-file": (1, 1), "matrix": (3, 3), "run-metadata": (1 + len(RUN_METADATA_FIELDS),) * 2,
-    "export-attachments": (2, 2), "long-form-summary": (3, 4), "virtual-mic": (0, 1),
+    "export-attachments": (2, 2), "index-screenshots": (2, 2), "long-form-summary": (3, 4),
+    "virtual-mic": (0, 1),
 }
 
 
@@ -375,6 +459,9 @@ def main(argv: list[str] | None = None) -> int:
         write_json_atomically(path, run_metadata(fields, path.parent))
     elif command == "export-attachments":
         return export_attachments(values[0], values[1])
+    elif command == "index-screenshots":
+        count = index_screenshots(Path(values[0]), Path(values[1]))
+        print(f"==> {count} screenshot(s) indexed in {values[1]}")
     elif command == "long-form-summary":
         support = os.path.expanduser(values[3] if len(values) == 4 else DEBUG_SUPPORT)
         lines = long_form_summary(float(values[0]), values[2], support)

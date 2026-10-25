@@ -311,6 +311,27 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         result = self.run_clean("--prune-ui-results", "--routine", expected=2)
         self.assertIn("mutually exclusive", result.stderr)
 
+    def test_quick_prune_keeps_the_same_retention_without_the_tree_inventory(self) -> None:
+        old = self.ui_run("ios", "smoke", "20260713-000001-a", "passed")
+        newest = self.ui_run("ios", "smoke", "20260713-000002-b", "passed")
+        old_fail = self.ui_run("ios", "smoke", "20260713-000003-c", "failed")
+        newest_fail = self.ui_run("ios", "smoke", "20260713-000004-d", "failed")
+
+        result = self.run_clean("--prune-ui-results", "--ui-keep", "1", "--quick")
+
+        self.assertFalse(old.exists())
+        self.assertTrue(newest.exists())
+        self.assertFalse((old_fail / "result.xcresult").exists())
+        self.assertTrue((old_fail / "retention-summary.json").is_file())
+        self.assertTrue(newest_fail.exists())
+        self.assertNotIn("Build-output inventory", result.stdout)
+        self.assertNotIn("repositoryBytesBefore", result.stdout)
+        self.assertIn("plannedReclaimBytes=", result.stdout)
+
+    def test_quick_is_valid_only_with_prune_ui_results(self) -> None:
+        result = self.run_clean("--quick", expected=2)
+        self.assertIn("--quick is valid only with --prune-ui-results", result.stderr)
+
     def test_explicit_ui_pin_precedes_legacy_metadata_classification(self) -> None:
         run = (
             self.root

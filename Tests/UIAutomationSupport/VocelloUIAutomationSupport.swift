@@ -153,8 +153,26 @@ enum VocelloUISettingsReveal {
                 attachment.name = "settings-touch-scroll-observations"
                 attachment.lifetime = .keepAlways
                 activity.add(attachment)
-                if delta < 0 { anchor.swipeUp(velocity: .slow) }
-                else { anchor.swipeDown(velocity: .slow) }
+                // Drag from the anchor to a second visible text about the wanted distance
+                // away (plus the touch slop), held before release so it does not fling.
+                // Both ends are exact elements. An element swipe on a 20-point caption moved
+                // too little to start a scroll at all (2026-10-25, run 20261025-175901-ac6439cf).
+                let wanted = delta < 0 ? delta - 12 : delta + 12
+                let offsets = texts.compactMap { text -> (XCUIElement, CGFloat)? in
+                    let offset = text.frame.midY - anchor.frame.midY
+                    guard offset * wanted > 0, visible.contains(CGPoint(x: text.frame.midX, y: text.frame.midY)) else {
+                        return nil
+                    }
+                    return (text, offset)
+                }
+                // The nearest text at least the wanted distance away, else the farthest.
+                let farEnough = offsets.filter { abs($0.1) >= abs(wanted) }.min { abs($0.1) < abs($1.1) }
+                guard let destination = farEnough ?? offsets.max(by: { abs($0.1) < abs($1.1) }) else {
+                    observations.append("no visible text to drag the anchor toward")
+                    return
+                }
+                observations.append("dragOffsetY=\(destination.1)")
+                anchor.press(forDuration: 0.05, thenDragTo: destination.0, withVelocity: .slow, thenHoldForDuration: 0.2)
             }
         }
         return false

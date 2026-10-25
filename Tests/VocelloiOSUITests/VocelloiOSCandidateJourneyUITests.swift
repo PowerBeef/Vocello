@@ -61,11 +61,15 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
     }
 
     /// Starts every missing shipping model from its own Voice Models row, then waits for each
-    /// to reach Ready, and returns the models it started. A transfer that ends on Retry,
-    /// Repair or Download fails the row.
+    /// it started to reach Ready, and returns them. A transfer that ends on Retry, Repair or
+    /// Download fails the row.
     private func installMissingShippingModels() -> [String] {
         openVoiceModels()
-        let models = ["pro_custom", "pro_design", "pro_clone"]
+        // Bottom row first: a download's row grows and shrinks with its progress text, which
+        // moves every row below it, and a row below a live download cannot be revealed
+        // reliably (2026-10-25, run 20261025-172241-c8c049cb). Starting upward, each reveal
+        // only has rows above active downloads.
+        let models = ["pro_clone", "pro_design", "pro_custom"]
         var started: [String] = []
         for modelID in models {
             let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
@@ -84,9 +88,9 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
                     || self.element("iosModelDelete_\(modelID)").exists
             })
         }
-        for modelID in models {
-            let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
-            XCTAssertTrue(revealSettingsElement(status, swipingUp: modelID == "pro_clone"))
+        // The list is not lazy, so each row's controls exist off screen: the wait reads them
+        // without revealing rows while downloads still move them.
+        for modelID in started {
             var stoppedAt: String?
             XCTAssertTrue(VocelloUIWait.condition("\(modelID) to finish installing", timeout: 3_600) {
                 if self.element("iosModelDelete_\(modelID)").exists { return true }

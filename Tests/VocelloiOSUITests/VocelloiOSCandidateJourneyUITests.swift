@@ -359,6 +359,14 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
             option.exists && option.isSelected
         })
         closeLanguagePicker()
+        // The chip, not only the picker row, must show the choice the take will use.
+        // Auto shows the detected language instead, so it is not checked here.
+        if language != "auto" {
+            let chip = element("studioChip_language")
+            XCTAssertTrue(VocelloUIWait.condition("the language chip to show \(language)", timeout: 10) {
+                chip.exists && chip.label.localizedCaseInsensitiveContains(language)
+            })
+        }
     }
 
     /// The picker's language rows in view, top to bottom, from one snapshot: those wholly

@@ -104,6 +104,7 @@ class VocelloiOSUITestCase: XCTestCase {
     /// Auto-play, interface-language and pinned Take variation preferences on
     /// every exit path.
     override func tearDown() async throws {
+        attachFailureScreenshotIfFailed()
         endSession()
         try await super.tearDown()
     }
@@ -156,7 +157,32 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_appLanguage"), timeout: 20))
     }
 
+    /// The App Language root row's value for each option (`IOSUILanguage.nativeName`).
+    private static let interfaceLanguageNativeNames = [
+        "en": "English", "fr": "Français", "es": "Español", "de": "Deutsch", "it": "Italiano",
+        "pt-BR": "Português (Brasil)", "zh-Hans": "简体中文", "ja": "日本語", "ko": "한국어", "ru": "Русский",
+    ]
+
     func selectInterfaceLanguageForTest(_ language: String) {
+        // The Settings root row's value already names the selection: a session whose
+        // App Language is the one it pins needs neither the page nor a restore.
+        // Development launches pin -AppleLanguages (en), so "system" reads in English there.
+        let native = language == "system" && !isCandidateSession
+            ? "System Default" : Self.interfaceLanguageNativeNames[language]
+        if let native {
+            openSettingsRoot()
+            let row = element("iosSettings_appLanguageRow")
+            if VocelloUIWait.exists(row, timeout: 20), (row.value as? String) == native {
+                if pendingInterfaceLanguageRestore == nil {
+                    let attachment = XCTAttachment(string: "Original App Language: \(language) (Settings row)")
+                    attachment.name = "interface-language-restoration-baseline"
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                }
+                selectedInterfaceLanguage = language
+                return
+            }
+        }
         openAppLanguageSettings()
         // The page lists every option at once, so one snapshot reads them all.
         let prefix = "iosSettings_appLanguageOption_"
@@ -188,6 +214,16 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.disappears(element("screen_settings_appLanguage"), timeout: 20))
     }
 
+    /// A failed test keeps a named screenshot of the screen as it was when it stopped
+    /// (stop-on-failure leaves the app untouched until teardown), for review.
+    func attachFailureScreenshotIfFailed() {
+        guard let run = testRun, run.failureCount + run.unexpectedExceptionCount > 0, session != nil else { return }
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "failure-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     struct ElementSnapshot {
         let identifier: String
         let isSelected: Bool
@@ -198,6 +234,12 @@ class VocelloiOSUITestCase: XCTestCase {
     /// `exists` and an attribute query per control. A snapshot taken mid-animation can
     /// fail, so it is retried briefly.
     func elementSnapshots(where include: (XCUIElementSnapshot) -> Bool) -> [ElementSnapshot] {
+        strictElementSnapshots(where: include) ?? []
+    }
+
+    /// As `elementSnapshots`, but nil when no snapshot could be taken, for callers that
+    /// must not read a failure as an empty screen (the History census).
+    func strictElementSnapshots(where include: (XCUIElementSnapshot) -> Bool) -> [ElementSnapshot]? {
         var root: XCUIElementSnapshot?
         _ = VocelloUIWait.settles("an accessibility snapshot", timeout: 5) {
             root = try? self.app.snapshot()
@@ -212,7 +254,7 @@ class VocelloiOSUITestCase: XCTestCase {
         }
         guard let root else {
             VocelloUIFailureEvidence.capture(reason: "no accessibility snapshot of the app")
-            return []
+            return nil
         }
         walk(root)
         return found
@@ -652,6 +694,17 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     func selectedVariationID() -> String {
+        // The Settings root's Audio row names the variation in its value: one read, no
+        // page push. Its Audio page is the fallback when the value names none.
+        openSettingsRoot()
+        let audioRow = element("iosSettings_audioRow")
+        if VocelloUIWait.exists(audioRow, timeout: 20) {
+            let summary = ((audioRow.value as? String) ?? "").lowercased()
+            if let id = ["balanced", "consistent", "expressive"].first(where: { summary.contains($0) }) {
+                select(tab: .studio)
+                return id
+            }
+        }
         select(tab: .settings)
         openSettingsPage(for: "iosSettings_variationRow")
         let picker = element("iosSettings_variationRow")
@@ -759,7 +812,11 @@ class VocelloiOSUITestCase: XCTestCase {
                     }
                 )
             }
-            XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
+            // Return is Done on this editor: typed with the script, it dismisses the
+            // keyboard in the same call instead of a second keyboard round trip.
+            // Measured lanes keep the separate Return, so their pauses before a take stay as before.
+            XCTAssertTrue(VocelloUITextEntry.replace(
+                in: editor, with: text, submit: !Self.keepsSteadyWaitCadence, timeout: 20))
         }
 
         XCTAssertTrue(
@@ -777,8 +834,12 @@ class VocelloiOSUITestCase: XCTestCase {
         }
 
         // The production editor configures Return as Done, so this is a semantic
-        // keyboard dismissal rather than a coordinate tap.
-        if app.keyboards.firstMatch.exists {
+        // keyboard dismissal rather than a coordinate tap. After a submitted entry the
+        // keyboard may still be animating out; only one that stays needs a Return.
+        let keyboardGone = VocelloUIWait.settles("the keyboard to leave", timeout: 2) {
+            !self.app.keyboards.firstMatch.exists
+        }
+        if !keyboardGone, app.keyboards.firstMatch.exists {
             editor.typeText("\n")
         }
         XCTAssertTrue(
@@ -1093,7 +1154,7 @@ class VocelloiOSUITestCase: XCTestCase {
         var lastSignature = ""
         var stableSince = ProcessInfo.processInfo.systemUptime
         guard VocelloUIWait.condition("History search results to settle", timeout: 15, evaluate: {
-            let signature = self.historyViewportSignature()
+            let signature = self.historyViewportSignature() ?? "<no snapshot>"
             if signature != lastSignature {
                 lastSignature = signature
                 stableSince = ProcessInfo.processInfo.systemUptime
@@ -1107,9 +1168,10 @@ class VocelloiOSUITestCase: XCTestCase {
         // the lazy list at its end. Exhaustion is an observed viewport condition.
         var reachedTop = false
         for _ in 0..<64 {
-            let before = historyViewportSignature()
+            guard let before = historyViewportSignature() else { return censusSnapshotFailed() }
             scroll.swipeDown()
-            if historyViewportSignature() == before { reachedTop = true; break }
+            guard let after = historyViewportSignature() else { return censusSnapshotFailed() }
+            if after == before { reachedTop = true; break }
         }
         guard reachedTop else {
             XCTFail("History census could not establish the top within its safety bound")
@@ -1117,33 +1179,47 @@ class VocelloiOSUITestCase: XCTestCase {
         }
         var identifiers = Set<String>()
         for _ in 0..<64 {
-            let visible = historyRows().allElementsBoundByIndex
             let rowPrefix = "historyRow_"
-            let ids = visible.map { String($0.identifier.dropFirst(rowPrefix.count)) }
+            guard let rows = strictElementSnapshots(where: { $0.identifier.hasPrefix(rowPrefix) }) else {
+                return censusSnapshotFailed()
+            }
+            let ids = rows.map { String($0.identifier.dropFirst(rowPrefix.count)) }
             guard Set(ids).count == ids.count,
                   ids.allSatisfy({ $0.range(of: #"^generation-[1-9][0-9]*$"#, options: .regularExpression) != nil }) else {
                 XCTFail("History census contains duplicate or non-persisted row identities")
                 return nil
             }
             identifiers.formUnion(ids)
-            let before = historyViewportSignature()
+            guard let before = historyViewportSignature() else { return censusSnapshotFailed() }
             guard ids.isEmpty || !before.isEmpty else {
                 XCTFail("History rows exist but no row action is visible; census cannot prove exhaustion")
                 return nil
             }
             scroll.swipeUp()
-            if historyViewportSignature() == before { return identifiers.sorted() }
+            guard let after = historyViewportSignature() else { return censusSnapshotFailed() }
+            if after == before { return identifiers.sorted() }
         }
         XCTFail("History census exceeded its bound; no History mutation is authorized")
         return nil
     }
 
-    func historyViewportSignature() -> String {
-        app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "historyRowTap_")
-        ).allElementsBoundByIndex.filter { $0.isHittable }.map {
-            "\($0.identifier):\(Int($0.frame.minY)):\(Int($0.frame.height))"
-        }.joined(separator: "|")
+    /// A census that cannot read the screen proves nothing about History.
+    private func censusSnapshotFailed() -> [String]? {
+        XCTFail("History census could not take an accessibility snapshot")
+        return nil
+    }
+
+    /// The History rows in view, from one snapshot: each tappable row's identifier and
+    /// geometry where it lies wholly inside the window above the tab dock. Querying
+    /// `isHittable` and the frame row by row cost several requests per row per look.
+    func historyViewportSignature() -> String? {
+        let dock = element("rootTabDock")
+        let bottom = dock.exists ? dock.frame.minY : app.windows.firstMatch.frame.maxY
+        return strictElementSnapshots { $0.identifier.hasPrefix("historyRowTap_") }?
+            .filter { !$0.frame.isEmpty && $0.frame.minY >= 0 && $0.frame.maxY <= bottom }
+            .sorted { $0.frame.minY < $1.frame.minY }
+            .map { "\($0.identifier):\(Int($0.frame.minY)):\(Int($0.frame.height))" }
+            .joined(separator: "|")
     }
 
     func revealHistoryRow(_ rowID: String) -> XCUIElement? {
@@ -1151,7 +1227,7 @@ class VocelloiOSUITestCase: XCTestCase {
         let scroll = app.scrollViews.firstMatch
         for _ in 0..<64 {
             if row.exists && row.isHittable { return row }
-            let before = historyViewportSignature()
+            guard let before = historyViewportSignature() else { break }
             scroll.swipeDown()
             if historyViewportSignature() == before { break }
         }
@@ -1159,25 +1235,38 @@ class VocelloiOSUITestCase: XCTestCase {
         return nil
     }
 
+    /// The genuine full-player transcript of one History row, read before the player
+    /// closes again; `beforeClosing` sees it while the player is still open. Nil when
+    /// the row or its player cannot be reached or the transcript has no text value.
+    func historyTranscript(rowID: String, beforeClosing: ((String) -> Void)? = nil) -> String? {
+        guard let rowAction = revealHistoryRow(rowID),
+              VocelloUIPrimaryAction.perform(on: rowAction, timeout: 20) else { return nil }
+        let transcript = element("iosPlayer_transcript")
+        guard VocelloUIWait.exists(transcript, timeout: 20) else { return nil }
+        let observed = transcript.value as? String
+        beforeClosing?(observed ?? "<missing String value>")
+        guard VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20),
+              VocelloUIWait.disappears(transcript, timeout: 20) else { return nil }
+        guard let observed else {
+            XCTFail("History row \(rowID) shows no transcript text")
+            return nil
+        }
+        return observed
+    }
+
     /// Verify the genuine full-player transcript before any menu mutation.
     func verifyHistoryTranscript(rowID: String, expectedScript: String) -> Bool {
-        guard let rowAction = revealHistoryRow(rowID),
-              VocelloUIPrimaryAction.perform(on: rowAction, timeout: 20) else { return false }
-        let transcript = element("iosPlayer_transcript")
-        guard VocelloUIWait.exists(transcript, timeout: 20) else { return false }
-        let observed = transcript.value as? String
-        let matches = observed == expectedScript
-        if !matches {
-            // Capture before dismissing: failure teardown cannot recover a value
-            // that has already left the accessibility tree. Attachments stay private.
-            let attachment = XCTAttachment(string: observed ?? "<missing String value>")
+        let observed = historyTranscript(rowID: rowID) { observed in
+            guard observed != expectedScript else { return }
+            // Capture before dismissing: failure teardown cannot recover a value that
+            // has already left the accessibility tree. Attachments stay private.
+            let attachment = XCTAttachment(string: observed)
             attachment.name = "history-transcript-mismatch-\(rowID).txt"
             attachment.lifetime = .keepAlways
-            add(attachment)
+            self.add(attachment)
         }
-        guard VocelloUIPrimaryAction.perform(on: element("iosPlayer_close"), timeout: 20),
-              VocelloUIWait.disappears(transcript, timeout: 20) else { return false }
-        guard matches else {
+        guard let observed else { return false }
+        guard observed == expectedScript else {
             XCTFail("Observed History row full transcript differs from the frozen plan")
             return false
         }

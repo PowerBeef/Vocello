@@ -225,6 +225,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         // restoration. This does not certify other restoration after an abort;
         // the host still requires the explicit audit-restoration observation.
         continueAfterFailure = true
+        attachFailureScreenshotIfFailed()
         endSession()
         // XCTest awaits this MainActor-isolated async teardown before ending
         // the test; no detached cleanup or assumed executor is involved.

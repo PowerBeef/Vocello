@@ -547,7 +547,8 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     /// "Preparing reference". Each pass launches a fresh process, leaves the
     /// foreground as soon as the row shows the prime (or once it is ready), returns
     /// after a dwell and requires the process to still be running; the lane's crash
-    /// delta must stay empty. At least one pass must leave with the prime in flight.
+    /// delta must stay empty. At least one pass must leave with the prime in flight, and
+    /// the passes stop at the first that did.
     func testLeavingDuringCloneWarmupKeepsTheAppRunning() {
         var observations: [String] = []
         for pass in 1...3 {
@@ -574,6 +575,9 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             )
             VocelloUIScreenshot.attach(app, named: "ios-background-warmup-pass\(pass)")
             endSession()
+            // One pass that left with the prime in flight and survived is the proof;
+            // the others exist only for when timing let the prime finish first.
+            if observed == "preparing" { break }
         }
         attachObservations(observations, named: "background-warmup-observations")
         XCTAssertTrue(
@@ -614,6 +618,8 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
             VocelloUIScreenshot.attach(app, named: "ios-background-cold-take-pass\(pass)")
             endSession()
+            // One pass that left during the warm-up and survived is the proof.
+            if observed == "preparing" { break }
         }
         attachObservations(observations, named: "background-cold-take-observations")
         XCTAssertTrue(

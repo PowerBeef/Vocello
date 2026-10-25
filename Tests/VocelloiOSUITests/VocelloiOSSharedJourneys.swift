@@ -86,8 +86,10 @@ extension VocelloiOSUITestCase {
         // exact History equality tests content preservation, not a trailing space.
         script = script.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard let beforeTitleIDs = historyRowCensus(expectedScript: searchTitle),
-              let beforeJoinedIDs = historyRowCensus(expectedScript: script) else { return }
+        // History is searched by the script's title token, which both the joined output
+        // and its first segment carry, never by the 2,000-character script: typing that
+        // into the search field cost about 37 s a time, three times a journey.
+        guard let beforeTitleIDs = historyRowCensus(expectedScript: searchTitle) else { return }
         select(tab: .studio)
         replaceScript(with: script)
         XCTAssertTrue(VocelloUIWait.exists(element("textInput_longFormIndicator"), timeout: 15))
@@ -95,21 +97,33 @@ extension VocelloiOSUITestCase {
         guard !generationID.isEmpty else { return }
         VocelloUIScreenshot.attach(app, named: "ios-longform-complete")
 
-        guard let afterJoinedIDs = historyRowCensus(expectedScript: script),
-              let afterTitleIDs = historyRowCensus(expectedScript: searchTitle) else { return }
-        let addedJoined = Set(afterJoinedIDs).subtracting(beforeJoinedIDs)
+        guard let afterTitleIDs = historyRowCensus(expectedScript: searchTitle) else { return }
         let addedTitle = Set(afterTitleIDs).subtracting(beforeTitleIDs)
-        guard Set(beforeJoinedIDs).isSubset(of: Set(afterJoinedIDs)),
-              Set(beforeTitleIDs).isSubset(of: Set(afterTitleIDs)),
-              addedJoined.count == 1, addedTitle.count == 2,
-              let joinedID = addedJoined.first, addedTitle.contains(joinedID),
-              let firstSegmentID = addedTitle.subtracting(addedJoined).first else {
+        guard Set(beforeTitleIDs).isSubset(of: Set(afterTitleIDs)), addedTitle.count == 2 else {
             XCTFail("Long-form must add its joined output and first segment without changing prior History")
             return
         }
-        replaceHistorySearch(with: script)
-        dismissHistorySearchKeyboardIfNeeded()
-        guard verifyHistoryTranscript(rowID: joinedID, expectedScript: script) else { return }
+        // The joined output is the new row whose full transcript is the whole script; the
+        // other new row is its first segment, a shorter non-empty part of it.
+        var transcripts: [String: String] = [:]
+        for rowID in addedTitle.sorted() {
+            guard let transcript = historyTranscript(rowID: rowID) else { return }
+            transcripts[rowID] = transcript
+        }
+        let joinedIDs = transcripts.filter { $0.value == script }.map(\.key)
+        guard joinedIDs.count == 1, let joinedID = joinedIDs.first,
+              let firstSegmentID = addedTitle.subtracting([joinedID]).first,
+              let segmentTranscript = transcripts[firstSegmentID],
+              segmentTranscript.count < script.count, script.hasPrefix(segmentTranscript),
+              segmentTranscript.hasPrefix(searchTitle) else {
+            let attachment = XCTAttachment(string: transcripts.sorted { $0.key < $1.key }
+                .map { "\($0.key): \($0.value.count) characters" }.joined(separator: "\n"))
+            attachment.name = "long-form-new-rows.txt"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            XCTFail("Exactly one new row must carry the whole script, and the other its first segment")
+            return
+        }
 
         // Without search, the project groups: one joined row plus a per-segment
         // disclosure that expands to the project's segment rows. Clear via the
@@ -210,12 +224,25 @@ extension VocelloiOSUITestCase {
         )
         XCTAssertTrue(VocelloUIWait.enabled(segmentsChip, timeout: 60))
         // RF-04 retains the old accepted joined output when publishing a replacement.
-        guard let regeneratedJoinedIDs = historyRowCensus(expectedScript: script) else { return }
-        let replacementIDs = Set(regeneratedJoinedIDs).subtracting(afterJoinedIDs)
-        guard Set(afterJoinedIDs).isSubset(of: Set(regeneratedJoinedIDs)),
-              replacementIDs.count == 1, let replacementID = replacementIDs.first,
-              verifyHistoryTranscript(rowID: replacementID, expectedScript: script) else {
-            XCTFail("Replacement must preserve prior joined History and add one transcript-verified output")
+        guard let regeneratedTitleIDs = historyRowCensus(expectedScript: searchTitle) else { return }
+        guard Set(afterTitleIDs).isSubset(of: Set(regeneratedTitleIDs)) else {
+            XCTFail("Replacement must preserve prior joined History")
+            return
+        }
+        // Acceptance adds the replacement first segment and a new joined output.
+        let regeneratedIDs = Set(regeneratedTitleIDs).subtracting(afterTitleIDs)
+        var replacementIDs: [String] = []
+        var segmentReplacements = 0
+        for rowID in regeneratedIDs.sorted() {
+            guard let transcript = historyTranscript(rowID: rowID) else { return }
+            if transcript == script {
+                replacementIDs.append(rowID)
+            } else if transcript.count < script.count, script.hasPrefix(transcript), transcript.hasPrefix(searchTitle) {
+                segmentReplacements += 1
+            }
+        }
+        guard regeneratedIDs.count == 2, replacementIDs.count == 1, segmentReplacements == 1 else {
+            XCTFail("Replacement must add exactly one transcript-verified joined output and its first segment")
             return
         }
         VocelloUIScreenshot.attach(app, named: "ios-longform-regenerated")

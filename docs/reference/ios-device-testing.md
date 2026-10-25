@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-16
+reviewed: 2026-10-25
 summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -233,6 +233,28 @@ relaunch, answering permission prompts and the hand VoiceOver pass are not journ
 still performed on the processed candidate. Never uninstall the app or bypass onboarding from a
 row: a fresh install is the maintainer's step, and only `first-launch` walks the onboarding it shows. Finish authorized device work with the screen
 protection procedure below, not an implicit global Settings mutation.
+
+### Checks XCUITest does not cover
+
+Since 2026-10-25 computer use through iPhone Mirroring is the default route for these, inside an
+announced window (`/vocello-ui-autonomy`; [development-workflow.md](development-workflow.md), Computer
+use). Mirroring needs the phone locked, Wi-Fi and Bluetooth on, routes the phone's audio to the Mac and
+disables the microphone, camera and Face ID, so a check that depends on any of those stays the
+maintainer's. A computer-use record closes a row only when the maintainer confirms it.
+
+| Check | Route |
+| --- | --- |
+| AUD-01, a file opened during onboarding | Computer use on a fresh install; the deletion and reinstall, and any permission prompt, are the maintainer's |
+| AUD-02 hand checks (music through launch, Silent switch, interruptions, Control Center mid-recording, startup Retry) | Maintainer: audio routing and interruptions change under Mirroring |
+| Hand VoiceOver row | Maintainer: VoiceOver is a system setting and speaks through the Mac under Mirroring |
+| Offline relaunch | Maintainer: airplane mode is a system setting, and Mirroring needs Wi-Fi |
+| RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off ends Mirroring |
+| RF-35 navigation row and Wi-Fi reinstall, the ~30-take machine screen | XCUITest (`first-launch`, `navigation`, `modes`) |
+| Purchase rows | XCUITest; the purchase confirmation sheet is the maintainer's |
+| TestFlight installs, model removal or reinstall, in-app settings, reproductions, visual inspection | Computer use |
+
+After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the
+test, time and failure flag), report-only.
 
 ### Development-device preflight
 

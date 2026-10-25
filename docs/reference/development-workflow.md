@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -696,18 +696,26 @@ is named `claude`, so worker tracking works unchanged. What it adds, and the rul
   `get_page_text` reads the page before any screenshot. Claude in Chrome stays for pages behind the
   maintainer's sign-ins, chrome-devtools for Lighthouse, performance traces and heap snapshots. The pane
   supplements `npm --prefix website run check`, never replaces it.
-- **Computer use** (maintainer decision 2026-10-24). Computer use may drive the Mac app (a development
-  build or the installed release), Xcode, Device Hub and the paired iPhone through iPhone Mirroring: to
-  explore a change before writing its XCUITest, to reproduce a report, to look for a blocking dialog
-  before a UI lane, or for a setup chore such as installing a TestFlight candidate on the phone. Only
-  the lead uses it, never while a native, device or measured lane runs (it shares the display, the
-  phone and the host's load, and iPhone Mirroring needs the phone locked, which device lanes cannot
-  use), and the iPhone only in a window the maintainer announced. What it shows is never a lane verdict,
-  an evidence record or a substitute for XCUITest. It never signs in, enters a credential, accepts terms,
-  grants a privacy permission or changes a system or security setting (the TCC grants in
-  [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc), Developer Mode, UI Automation,
-  airplane mode): those stay the maintainer's. The app asks the maintainer to approve each application it
-  controls. Simulator routes stay unsupported.
+- **Computer use** (maintainer decisions 2026-10-24 and 2026-10-25). Computer use is the default route
+  for checks XCUITest cannot cover, run through the `/vocello-ui-autonomy` skill. It drives the Mac app
+  (a development build or the installed release), Xcode, Device Hub and the paired iPhone through
+  iPhone Mirroring: exploration before an XCUITest exists, reproductions, blocking dialogs before a UI
+  lane, setup chores such as installing a TestFlight candidate, in-app operations, and the attended
+  rows that survive Mirroring's conditions. Only the lead uses it, never while a native, device or
+  measured lane runs (it shares the display, the phone and the host's load), and the iPhone only in a
+  window the maintainer announced. Inside a window the order is lanes first, with iPhone Mirroring
+  quit (`scripts/ios_device.sh mirroring stop`), then Mirroring once the maintainer locks the phone:
+  XCUITest breaks under Mirroring even while CoreDevice reports the phone unlocked (RF-15 runs 221807,
+  222059 and 222344), so the iOS `ui-preflight` refuses a lane while it runs, and Mirroring needs the
+  phone locked, so going back to lanes needs the maintainer to unlock it. A session keeps a local
+  record (`scripts/ios_device.sh mirroring session|capture`, under `build/artifacts/ios/mirroring`):
+  never a lane verdict or automated evidence, and an attended row closes only when the maintainer
+  confirms it. Computer use never signs in, enters a credential or passcode, accepts terms, grants a
+  privacy permission, deletes the app, confirms a purchase or changes a system or security setting
+  (the TCC grants in [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc), Developer
+  Mode, UI Automation, Wi-Fi, airplane mode, Auto-Lock): those go on the window's setup card or a
+  paused notification, and stay the maintainer's. The app asks the maintainer to approve each
+  application it controls. Simulator routes stay unsupported.
 - **Terminal panel.** A command the maintainer must run (a login such as `asc auth login` or
   `hf auth login`, a model install, a publication step) goes in a `bash` block, whose Run button runs it,
   or in a Terminal panel tab; any secret is typed there, never in chat. A watcher the maintainer wants to
@@ -720,7 +728,8 @@ is named `claude`, so worker tracking works unchanged. What it adds, and the rul
   sleeps, and a macOS UI lane still needs the session unlocked.
 - **Notifications and Remote Control.** The maintainer may follow a session from the phone.
   `PushNotification` is for what they must act on now (a `release` approval, a failed lane, a phone to
-  unlock in an announced window), never routine progress; `SendUserFile` hands over a finished report.
+  unlock or lock in an announced window, a system step a computer-use session paused on), never
+  routine progress; `SendUserFile` hands over a finished report.
 - **Artifacts.** An artifact is hosted on claude.ai, so publish one only on request. Artifacts, file
   cards and notifications follow the privacy rule: no raw diagnostics, private paths, prompts,
   transcripts, reference audio or credentials; failure text goes through `DiagnosticPrivacy` summaries,

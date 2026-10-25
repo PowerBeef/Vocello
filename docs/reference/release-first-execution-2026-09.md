@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-21
+reviewed: 2026-10-25
 summary: The iOS 3.0 App Store submission path rebaselined on October 12, the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
 sourceOfTruth:
   - config/roadmap.json
@@ -106,6 +106,14 @@ Between September 4 and October 12 the release did not move:
     reach, plus the checks only a person can do, and earlier passes on untouched areas stand. A
     full device campaign is for engine-scale changes. For RF-35 that is the RF-15 navigation row,
     one model reinstall over Wi-Fi, and one attended download over cellular.
+- **2026-10-25.** Computer use becomes the default route for device and UI checks XCUITest cannot
+  cover, with as much autonomy as an announced window allows (`/vocello-ui-autonomy`). Inside a
+  window Claude runs the XCUITest lanes, then drives the locked phone through iPhone Mirroring, and
+  stops only for the maintainer's steps: iPhone system settings, permission prompts, the passcode,
+  app deletion and purchase confirmations, which go on a setup card or a paused notification.
+  A computer-use run saves a local step-and-screenshot record; an attended row closes only when the
+  maintainer confirms that record. XCUITest stays the only automated evidence, and the iOS lanes
+  refuse to start while iPhone Mirroring runs.
 
 ## The path
 

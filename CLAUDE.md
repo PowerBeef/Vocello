@@ -146,10 +146,13 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   multi-GB download: ask first; `scripts/lib/ios_platform_preflight.py check` reports it), and the
   phone may need UI automation allowed again ("Timed out while enabling automation mode").
 - **Native UI evidence comes only from XCUITest** via `scripts/ui_test.sh`: genuine shipped controls,
-  no hidden test UI or committed coordinates. Computer use (maintainer decision 2026-10-24) may drive
-  the Mac app, Xcode, Device Hub and the paired iPhone through iPhone Mirroring to explore, reproduce a
-  report or do a setup chore: from the lead only, never while a native lane or measurement runs, the
-  iPhone only in an announced window, and never as a verdict or evidence.
+  no hidden test UI or committed coordinates. Computer use (maintainer decisions 2026-10-24 and
+  2026-10-25) is the default route for what XCUITest cannot cover: it drives the Mac app, Xcode,
+  Device Hub and the paired iPhone through iPhone Mirroring (`/vocello-ui-autonomy`), from the lead
+  only, never while a native lane or measurement runs, and the iPhone only in an announced window.
+  It is never a lane verdict or automated evidence; an attended row closes only when the maintainer
+  confirms its local record. iPhone system settings, permissions, passcodes and purchases stay the
+  maintainer's, and the iOS `ui-preflight` refuses a lane while iPhone Mirroring runs.
 - **Runtime:** MLX only, in-process, actor-owned lifecycle, typed cancellation barrier, serialized
   prewarm, request-local sampling and memory, suspending bounded audio. Register unsafe concurrency in
   `config/concurrency-safety.json`.

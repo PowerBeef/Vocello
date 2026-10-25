@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-12
+reviewed: 2026-10-25
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -893,5 +893,6 @@ product accessibility requirements, but are not claimed as coverage of the minim
 | UI frame-health scenarios | `scripts/ui_test.sh ios perf` |
 | Physical-device deterministic/runtime diagnostic | `scripts/ios_device.sh gate` |
 
-Never validate with an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver (computer
-use through iPhone Mirroring explores, never validates: `CLAUDE.md`), or committed coordinate table.
+Never validate with an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver, or
+committed coordinate table. Computer use through iPhone Mirroring covers what XCUITest cannot, and its
+records close an attended row only on the maintainer's confirmation (`CLAUDE.md`, `/vocello-ui-autonomy`).

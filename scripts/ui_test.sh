@@ -1205,8 +1205,12 @@ ios_ui_products_digest() {
 }
 
 ios_ui_build_for_testing() {
-  local marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint" fingerprint products="" status=0
+  local marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint" fingerprint toolchain products="" status=0
   fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)" || return 1
+  # The toolchain (an Xcode update changes the binary with no source change) and the
+  # phone (a newly registered device needs its provisioning profile) join the key.
+  toolchain="$(xcodebuild -version 2>/dev/null | shasum -a 256 | awk '{print $1}')" || return 1
+  fingerprint="$fingerprint|$toolchain|$device"
   if ios_ui_find_xctestrun; then products="$(ios_ui_products_digest || true)"; fi
   if [[ -n "$products" && -f "$marker" \
       && "$(cat "$marker" 2>/dev/null)" == "$fingerprint|$team|$products" ]]; then
@@ -1214,6 +1218,8 @@ ios_ui_build_for_testing() {
     return 0
   fi
   rm -f "$marker"
+  # An SDK update names a new .xctestrun beside the old one; keep exactly the fresh one.
+  find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSUI_*.xctestrun' -delete 2>/dev/null || true
   xcb_run build-for-testing \
     -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
     -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
@@ -1226,6 +1232,9 @@ ios_ui_build_for_testing() {
     SWIFT_OPTIMIZATION_LEVEL=-O >"$out/xcodebuild-build.log" 2>&1 || status=$?
   if (( status != 0 )); then
     ui_primary_native_exit_code="$status"
+    # The lane ledger classifies infrastructure failures (signing, provisioning) from
+    # xcodebuild.log, which no test run will write now.
+    cp "$out/xcodebuild-build.log" "$out/xcodebuild.log" 2>/dev/null || true
     warn "iPhone UI build-for-testing failed (see $out/xcodebuild-build.log)"
     tail -n 40 "$out/xcodebuild-build.log" >&2 || true
     return "$status"
@@ -1520,27 +1529,17 @@ run_preinstalled_candidate() {
   local team runner xctestrun
   required_step_run "$step_ledger" ui-preflight ios_ui_preflight || return 1
   required_step_run "$step_ledger" candidate-before candidate_inventory before || return 1
-  # The crash baseline needs only the phone and the runner build only the Mac, so the
-  # copy of the phone's crash folder (~7 s) runs while the runner builds. Only the copy
-  # is in the background: both ledger records are written here, one after the other.
-  local baseline_started baseline_pid baseline_status=0 build_status=0
-  baseline_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
-    --device "$device" --output "$out/system-crashes-before" &
-  baseline_pid=$!
+  required_step_run "$step_ledger" candidate-crash-baseline \
+    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
+      --device "$device" --output "$out/system-crashes-before" || return 1
+  candidate_collection_needed=1
   required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
     -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
     -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
     DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-    >"$out/candidate-runner-build.log" 2>&1 || build_status=$?
-  wait "$baseline_pid" || baseline_status=$?
-  required_step_record "$step_ledger" candidate-crash-baseline "$baseline_status" "$baseline_started" \
-    || return 1
-  (( baseline_status == 0 )) || return 1
-  candidate_collection_needed=1
-  (( build_status == 0 )) || return 1
+    >"$out/candidate-runner-build.log" 2>&1 || return 1
   runner="$IOS_DERIVED/Build/Products/Release-iphoneos/VocelloiOSCandidateUITests-Runner.app"
   xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
 import pathlib, sys
@@ -1580,6 +1579,8 @@ elif [[ "$platform" == "macos" ]]; then
     export TEST_RUNNER_QVOICE_MARKETING_CAPTURE=1
   elif [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
+    # Smoke runs test01 without its ten-language walk; this lane runs it.
+    export TEST_RUNNER_QVOICE_MAC_LANGUAGE_WALK=1
   elif [[ "$lane" == "smoke" ]]; then
     # The smoke class runs its fifteen ordered journeys (test00-test14: window
     # sizes + Settings scene, navigation/readiness, completed generation +
@@ -1678,6 +1679,8 @@ elif [[ "$platform" == "macos" ]]; then
   # publication commit alone keeps the skip (audit #75). One implementation
   # prevents UI-build and commit-gate cache semantics from drifting apart.
   mac_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)"
+  # An Xcode update changes the binary with no source change.
+  mac_fingerprint="$mac_fingerprint|$(xcodebuild -version 2>/dev/null | shasum -a 256 | awk '{print $1}')"
   mac_build_marker="$MAC_DERIVED/.vocello-ui-build-fingerprint"
   mac_products_ready="$(find "$MAC_DERIVED/Build/Products" -maxdepth 1 \
     -name 'VocelloMacUI_*.xctestrun' -print -quit 2>/dev/null || true)"

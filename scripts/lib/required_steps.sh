@@ -15,8 +15,8 @@ required_steps_init() {
 required_step_run() {
   local ledger="$1" step="$2"
   shift 2
-  local status=0 started_at
-  started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  local status=0 step_started_at
+  step_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if python3 "$QVOICE_REQUIRED_STEP_TOOL" --contract "$QVOICE_ORCHESTRATION_CONTRACT" \
       fault-requested --workflow "$QVOICE_REQUIRED_STEP_WORKFLOW" --step "$step"; then
     printf '[fault-injection] required step %s:%s forced to fail\n' \
@@ -29,14 +29,14 @@ required_step_run() {
     set -e
   fi
   python3 "$QVOICE_REQUIRED_STEP_TOOL" record --ledger "$ledger" \
-    --step "$step" --exit-code "$status" --started-at "$started_at" || return 98
+    --step "$step" --exit-code "$status" --started-at "$step_started_at" || return 98
   return "$status"
 }
 
 required_step_record() {
-  local ledger="$1" step="$2" status="$3" started_at="${4:-}"
+  local ledger="$1" step="$2" status="$3"
   python3 "$QVOICE_REQUIRED_STEP_TOOL" record --ledger "$ledger" \
-    --step "$step" --exit-code "$status" ${started_at:+--started-at "$started_at"}
+    --step "$step" --exit-code "$status"
 }
 
 required_steps_finalize() {

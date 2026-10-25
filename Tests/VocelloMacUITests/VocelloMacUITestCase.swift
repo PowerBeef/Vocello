@@ -938,7 +938,11 @@ class VocelloMacUITestCase: XCTestCase {
             VocelloUIWait.value(search, contains: text, timeout: 10),
             "typed history filter text must land in the search field"
         )
+        // `screen_history` names both the filter chip row and the outline holding the
+        // rows, and the first match is the chip row, so the rows are read from the window
+        // (the list is filtered by now, so the snapshot stays small).
         let history = element("screen_history")
+        let window = app.windows.firstMatch
         // SwiftUI propagates each row's identifier onto every child element
         // (play button, text fields, trailing group), so the raw match count
         // is a multiple of the visible rows. Count unique identifiers — one
@@ -948,7 +952,7 @@ class VocelloMacUITestCase: XCTestCase {
         let excluded = ["_saveVoice_", "_saveAs_", "_delete_", "_play_", "_title_", "_meta_"]
         let count = { () -> Int? in
             guard history.exists else { return nil }
-            return self.uniqueIdentifiers(under: history, prefix: "historyRow_", excluding: excluded)?.count
+            return self.uniqueIdentifiers(under: window, prefix: "historyRow_", excluding: excluded)?.count
         }
         XCTAssertTrue(
             VocelloUIWait.condition(

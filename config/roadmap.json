@@ -1836,6 +1836,20 @@
       "notes": "Found 2026-10-24 on the maintainer's Mac (macOS 27.0.1) in a routed check's full Python run: cli_package.py raises \"CLI installer Bom differs from the payload\", twice in a row. The shipped 3.0.0 package was built and verified on the macos-26 release runner (CLI package smoke PASS, run 40020993733). Not investigated (focus rules); installing the shipped package on macOS 27 is not shown to be affected."
     },
     {
+      "id": "BKL-35",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A failed iPhone model download shows the raw system error, in the phone's language",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A model download that fails on the iPhone explains the failure in Vocello's own copy, in the App Language, instead of the URL loading system's localized description and error code.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSSettingsViews.swift"
+      ],
+      "updated": "2026-10-25",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Seen 2026-10-25 on build 25 (maintainer screenshot): after an XCUITest teardown force-quit the app one second into a Voice Design download, the row read \"Failed to download model.safetensors: L'opération n'a pas pu s'achever. (NSURLErrorDomain erreur -1.)\" under an English App Language. Retry is offered. Not investigated (focus rules)."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

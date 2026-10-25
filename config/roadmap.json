@@ -348,6 +348,22 @@
       "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off."
     },
     {
+      "id": "RF-36",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog",
+      "status": "in-flight",
+      "blockedBy": [],
+      "due": "2026-10-27",
+      "gate": "Maintainer report 2026-10-24 (Japanese Mac screenshots): Studio (the iPhone tab and the Mac sidebar) was English in every language, the Speed, Quality, Lite and Lite+ variant names in all but French, and the iPhone pinned-seed dialog title was a hard-coded English literal. Done when each has a translation in all ten interface languages (Studio stays Studio where the language uses it: French, German, Italian), the dialog reads from the String Catalog, the localization contract passes with the literal baseline shrunk by one, and the routed check passes. Proportionate (maintainer 2026-10-24): it ships in the RF-35 candidate, whose navigation row covers the tabs; no separate device run.",
+      "sourceOfTruth": [
+        "Sources/Resources/Localizable.xcstrings",
+        "Sources/iOS/IOSDesignSystemPrimitives.swift",
+        "config/localization-unlocalized-baseline.json"
+      ],
+      "updated": "2026-10-24",
+      "notes": "A census of strings identical to English across the nine other languages found these as the only gaps: the remaining matches are correct cognates (Audio, Normal, Pause, Version and the like) or brand names (Vocello, GitHub, AI·TTS). The iPhone app's other baselined literals are formatting, the brand name and OK buttons."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
@@ -356,6 +372,7 @@
         "RF-15",
         "RF-17",
         "RF-35",
+        "RF-36",
         "ASR-05",
         "ASR-06",
         "ASR-11",

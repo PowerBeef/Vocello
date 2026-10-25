@@ -882,7 +882,7 @@ struct IOSSeedPinChip: View {
                 action: { isConfirmingUnpin = true }
             )
             .confirmationDialog(
-                "Seed \(String(seedValue)) is pinned — every take reproduces it with the same settings.",
+                IOSInterfaceText.seedPinnedConfirmation(String(seedValue)),
                 isPresented: $isConfirmingUnpin,
                 titleVisibility: .visible
             ) {

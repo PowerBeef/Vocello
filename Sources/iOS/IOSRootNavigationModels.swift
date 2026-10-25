@@ -249,6 +249,11 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.playbackPositionValue", defaultValue: "%1$@ of %2$@",
                    comment: "iOS interface: VoiceOver value of the playback position; %1$@ is the elapsed time and %2$@ the total duration, both already formatted."), elapsed, duration)
     }
+    /// The pinned-seed chip's confirmation title; `seed` is the decimal seed.
+    static func seedPinnedConfirmation(_ seed: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.seedPinnedConfirmation", defaultValue: "Seed %1$@ is pinned. Every take reproduces it with the same settings.",
+                   comment: "iOS interface: title of the dialog opened from the pinned-seed chip; %1$@ is the seed number. Presentation only."), seed)
+    }
     static func pinSeed(_ seed: String) -> String {
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.pinSeed", defaultValue: "Pin seed %1$@ for new takes",
                    comment: "iOS complete message: pinSeed. Substitutions retain original user content and numeric values."), seed)

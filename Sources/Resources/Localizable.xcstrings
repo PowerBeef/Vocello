@@ -331,6 +331,72 @@
         }
       }
     },
+    "vocello.ui.seedPinnedConfirmation": {
+      "comment": "iOS interface: title of the dialog opened from the pinned-seed chip; %1$@ is the seed number. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seed %1$@ is pinned. Every take reproduces it with the same settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La graine %1$@ est épinglée. Chaque prise la reproduit avec les mêmes réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La semilla %1$@ está fijada. Cada toma la reproduce con los mismos ajustes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Startwert %1$@ ist fixiert. Jede Aufnahme verwendet ihn mit denselben Einstellungen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il seed %1$@ è fisso. Ogni take lo riproduce con le stesse impostazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A semente %1$@ está fixada. Cada tomada a reproduz com os mesmos ajustes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "种子 %1$@ 已固定。每次生成都会在相同设置下复现它。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シード %1$@ を固定しています。同じ設定で毎回これを再現します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "시드 %1$@이(가) 고정되어 있습니다. 동일한 설정에서 매번 이를 재현합니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зерно %1$@ закреплено. Каждый дубль воспроизводит его при тех же настройках."
+          }
+        }
+      }
+    },
     "vocello.ui.keepPinned": {
       "comment": "iOS interface guidance only; never substituted into model input.",
       "extractionState": "manual",
@@ -17816,7 +17882,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Estudio"
           }
         },
         "de": {
@@ -17834,31 +17900,31 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Estúdio"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "工作室"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "スタジオ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "스튜디오"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Студия"
           }
         }
       }
@@ -48086,13 +48152,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "Léger"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "Ligero"
           }
         },
         "de": {
@@ -48110,31 +48176,31 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "Leve"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "轻量"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "ライト"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "라이트"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite"
+            "value": "Лёгкая"
           }
         }
       }
@@ -48152,13 +48218,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "Léger+"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "Ligero+"
           }
         },
         "de": {
@@ -48176,31 +48242,31 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "Leve+"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "轻量+"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "ライト+"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "라이트+"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lite+"
+            "value": "Лёгкая+"
           }
         }
       }
@@ -48224,49 +48290,49 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "Velocidad"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "Tempo"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "Velocità"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "Velocidade"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "速度"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "速度"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "속도"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speed"
+            "value": "Скорость"
           }
         }
       }
@@ -48290,49 +48356,49 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "Calidad"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "Qualität"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "Qualità"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "Qualidade"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "质量"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "品質"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "품질"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quality"
+            "value": "Качество"
           }
         }
       }
@@ -62564,7 +62630,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Estudio"
           }
         },
         "de": {
@@ -62582,31 +62648,31 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Estúdio"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "工作室"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "スタジオ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "스튜디오"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Studio"
+            "value": "Студия"
           }
         }
       }

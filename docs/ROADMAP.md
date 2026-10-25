@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 36/58 (62%) |
+| `release-first-3-0-2026-09` | active | release-qa | 36/59 (61%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -61,12 +61,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-10` | in-flight | independently qualify macOS and downloadable CLI | — |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
+| `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
+| `RF-36` | in-flight | Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog | — |
 
 ### Open items in detail
 
@@ -143,6 +144,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-35`** (in-flight, due 2026-10-27) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
+
+- **`RF-36`** (in-flight, due 2026-10-27) — Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog.
+  gate: Maintainer report 2026-10-24 (Japanese Mac screenshots): Studio (the iPhone tab and the Mac sidebar) was English in every language, the Speed, Quality, Lite and Lite+ variant names in all but French, and the iPhone pinned-seed dialog title was a hard-coded English literal. Done when each has a translation in all ten interface languages (Studio stays Studio where the language uses it: French, German, Italian), the dialog reads from the String Catalog, the localization contract passes with the literal baseline shrunk by one, and the routed check passes. Proportionate (maintainer 2026-10-24): it ships in the RF-35 candidate, whose navigation row covers the tabs; no separate device run.
 
 ## Engine remediation programme (2026-10-16 audit)
 

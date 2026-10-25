@@ -19,12 +19,6 @@
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
     },
     {
-      "call": "confirmationDialog",
-      "count": 1,
-      "literalSha256": "ec6aeeae3a01d346a1adc4bb11405e2bd549d0f91bcfee7e87d301a8471ef8e3",
-      "path": "Sources/iOS/IOSDesignSystemPrimitives.swift"
-    },
-    {
       "call": "Button",
       "count": 2,
       "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",

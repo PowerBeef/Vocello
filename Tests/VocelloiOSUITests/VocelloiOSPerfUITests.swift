@@ -21,6 +21,8 @@ import XCTest
 /// scenarios.
 @MainActor
 final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
+    override class var keepsSteadyWaitCadence: Bool { true }
+
     private static let seededHistoryRows = 400
 
     override func setUp() {
@@ -84,7 +86,7 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         _ body: () -> Void
     ) {
         let start = Self.epochMS()
-        body()
+        VocelloUIWait.withSteadyCadence(body)
         let end = Self.epochMS()
         emit(VocelloUIPerfScenarioMarker(
             scenario: name,

@@ -6,6 +6,8 @@ import XCTest
 /// never skipped.
 @MainActor
 final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
+    override class var keepsSteadyWaitCadence: Bool { true }
+
     func testOrderedConfigurableMatrix() throws {
         beginSession()
         defer { endSession() }

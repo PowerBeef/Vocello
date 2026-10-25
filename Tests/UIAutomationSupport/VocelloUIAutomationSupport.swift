@@ -207,6 +207,50 @@ public enum VocelloUIInterruptionSentinel {
 /// Predicate-backed waits used by both Apple-platform UI-test targets.
 @MainActor
 public enum VocelloUIWait {
+    /// Nesting depth of `withSteadyCadence`; while positive, waits keep XCTest's own
+    /// one-second predicate polling.
+    private static var steadyCadenceDepth = 0
+
+    /// Runs `body` with XCTest's own one-second wait cadence. Measured windows (iPhone
+    /// UI performance, a take from Generate to its completed player) keep the harness
+    /// load their earlier records were taken under, so a new record stays comparable.
+    public static func withSteadyCadence<T>(_ body: () throws -> T) rethrows -> T {
+        steadyCadenceDepth += 1
+        defer { steadyCadenceDepth -= 1 }
+        return try body()
+    }
+
+    /// Sets the cadence at a session's start: steady for a whole measured lane, eager
+    /// otherwise. Stop-on-failure skips `withSteadyCadence`'s `defer`, so this also clears
+    /// a window an earlier test left open.
+    public static func resetCadence(steady: Bool) {
+        steadyCadenceDepth = steady ? 1 : 0
+    }
+
+    /// Polls `evaluate` until it holds or `timeout` passes. On the iPhone it checks at
+    /// once, then backs off from 0.1 s to XCTest's one second: `XCTNSPredicateExpectation`
+    /// and `waitForExistence` poll about once a second, so a wait for a control that is
+    /// already on screen cost a full second, which added minutes to every journey.
+    /// macOS and steady-cadence windows keep XCTest's own waiter.
+    private static func poll(timeout: TimeInterval, evaluate: @escaping () -> Bool) -> Bool {
+        #if os(iOS)
+        if steadyCadenceDepth == 0 {
+            let deadline = Date(timeIntervalSinceNow: timeout)
+            var interval: TimeInterval = 0.1
+            while true {
+                if evaluate() { return true }
+                let remaining = deadline.timeIntervalSinceNow
+                if remaining <= 0 { return false }
+                RunLoop.current.run(until: Date(timeIntervalSinceNow: min(interval, remaining)))
+                interval = min(interval * 2, 1.0)
+            }
+        }
+        #endif
+        let predicate = NSPredicate { _, _ in evaluate() }
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: NSObject())
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
     /// Resolves an element by stable accessibility identifier. Prefer passing
     /// the genuine element `type` (and, for sheet/popover flows, a narrower
     /// `scope`) — a typed, scoped query prunes the accessibility-tree walk
@@ -237,11 +281,7 @@ public enum VocelloUIWait {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> Bool {
-        let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in probe.exists && probe.isHittable },
-            object: NSObject()
-        )
-        let unobstructed = XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        let unobstructed = poll(timeout: timeout) { probe.exists && probe.isHittable }
         if !unobstructed {
             VocelloUIFailureEvidence.capture(reason: "app window obscured or not frontmost")
             XCTFail(
@@ -261,7 +301,13 @@ public enum VocelloUIWait {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> Bool {
+        #if os(iOS)
+        let result = steadyCadenceDepth == 0
+            ? poll(timeout: timeout) { element.exists }
+            : element.waitForExistence(timeout: timeout)
+        #else
         let result = element.waitForExistence(timeout: timeout)
+        #endif
         if !result {
             VocelloUIFailureEvidence.capture(reason: "element never existed: \(element)")
             XCTFail("Expected element to exist within \(timeout)s: \(element)", file: file, line: line)
@@ -350,11 +396,7 @@ public enum VocelloUIWait {
         line: UInt = #line,
         evaluate: @escaping () -> Bool
     ) -> Bool {
-        let anchor = NSObject()
-        let predicate = NSPredicate { _, _ in evaluate() }
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: anchor)
-        let result = XCTWaiter.wait(for: [expectation], timeout: timeout)
-        guard result == .completed else {
+        guard poll(timeout: timeout, evaluate: evaluate) else {
             // Capture specialized evidence before stop-on-failure aborts the test.
             onTimeout?()
             VocelloUIFailureEvidence.capture(reason: description)
@@ -373,10 +415,7 @@ public enum VocelloUIWait {
         timeout: TimeInterval,
         evaluate: @escaping () -> Bool
     ) -> Bool {
-        let anchor = NSObject()
-        let predicate = NSPredicate { _, _ in evaluate() }
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: anchor)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+        poll(timeout: timeout, evaluate: evaluate)
     }
 
     /// Waits for `evaluate` like `condition`, but also gives up early when the

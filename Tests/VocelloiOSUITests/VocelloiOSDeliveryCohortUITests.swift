@@ -11,6 +11,8 @@ import XCTest
 /// readable by `devicectl`); `scripts/ios_device.sh pull` retrieves them.
 @MainActor
 final class VocelloiOSDeliveryCohortUITests: VocelloiOSUITestCase {
+    override class var keepsSteadyWaitCadence: Bool { true }
+
     func testNeutralCustomDeliveryCohort() throws {
         let environment = ProcessInfo.processInfo.environment
         let runID = try XCTUnwrap(

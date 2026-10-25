@@ -19,6 +19,8 @@ class VocelloiOSUITestCase: XCTestCase {
     private(set) var session: VocelloUIApplicationSession!
     private var pendingAutoplayPreferenceRestore: Bool?
     private var pendingInterfaceLanguageRestore: String?
+    /// The App Language the session last chose, so a restore to the same choice is skipped.
+    private var selectedInterfaceLanguage: String?
     private var pendingVariationRestore: String?
     /// RF-15: the session drives the installed distribution candidate black-box.
     private(set) var isCandidateSession = false
@@ -30,11 +32,17 @@ class VocelloiOSUITestCase: XCTestCase {
 
     var app: XCUIApplication { session.app }
 
+    /// A measured lane (benchmark, delivery cohort, UI performance) keeps XCTest's
+    /// one-second wait cadence for its whole run, so the pauses around each take or window,
+    /// and the records taken under them, stay comparable with earlier baselines.
+    class var keepsSteadyWaitCadence: Bool { false }
+
     func beginSession(
         additionalEnvironment: [String: String] = [:],
         additionalArguments: [String] = []
     ) {
         continueAfterFailure = false
+        VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
         pendingVariationRestore = nil
@@ -65,6 +73,7 @@ class VocelloiOSUITestCase: XCTestCase {
     /// onboarding is walked through its own pages instead of failing the journey.
     func beginCandidateSession(additionalArguments: [String] = [], firstLaunch: Bool = false) throws {
         continueAfterFailure = false
+        VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         assertToggleNormalizerContract()
         let encoded = try XCTUnwrap(ProcessInfo.processInfo.environment["VOCELLO_CANDIDATE_IDENTITY"],
                                     "Candidate journeys run only through ui_test.sh --preinstalled-candidate")
@@ -111,6 +120,7 @@ class VocelloiOSUITestCase: XCTestCase {
             session = nil
             pendingAutoplayPreferenceRestore = nil
             pendingInterfaceLanguageRestore = nil
+            selectedInterfaceLanguage = nil
             pendingVariationRestore = nil
             pendingJourneyRestores = []
         }
@@ -130,7 +140,8 @@ class VocelloiOSUITestCase: XCTestCase {
         if let original = pendingVariationRestore, session != nil {
             restoreVariation(original)
         }
-        if let original = pendingInterfaceLanguageRestore, session != nil {
+        // A phone already on the pinned language needs no trip back to App Language.
+        if let original = pendingInterfaceLanguageRestore, original != selectedInterfaceLanguage, session != nil {
             let previousTab = VocelloiOSTab.allCases.first { element($0.identifier).isSelected }
             selectInterfaceLanguageForTest(original)
             if let previousTab { select(tab: previousTab) }
@@ -147,13 +158,11 @@ class VocelloiOSUITestCase: XCTestCase {
 
     func selectInterfaceLanguageForTest(_ language: String) {
         openAppLanguageSettings()
-        let identifiers = ["system", "en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"]
-        let selected = identifiers.filter {
-            let option = element("iosSettings_appLanguageOption_\($0)")
-            return option.exists && option.isSelected
-        }
+        // The page lists every option at once, so one snapshot reads them all.
+        let prefix = "iosSettings_appLanguageOption_"
+        let selected = Set(buttonSnapshots(prefix: prefix).filter(\.isSelected).map(\.identifier))
         XCTAssertEqual(selected.count, 1, "Must observe exactly one original interface language before mutation")
-        guard let original = selected.first else { return }
+        guard let original = selected.first.map({ String($0.dropFirst(prefix.count)) }) else { return }
         if pendingInterfaceLanguageRestore == nil {
             pendingInterfaceLanguageRestore = original
             let attachment = XCTAttachment(string: "Original App Language: \(original)")
@@ -163,6 +172,8 @@ class VocelloiOSUITestCase: XCTestCase {
         }
         let option = element("iosSettings_appLanguageOption_\(language)")
         XCTAssertTrue(VocelloUIWait.exists(option, timeout: 20))
+        // Until the new choice is confirmed, the session's restore must not be skipped.
+        selectedInterfaceLanguage = nil
         if !option.isSelected {
             XCTAssertTrue(revealSettingsElement(option, swipingUp: true))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
@@ -170,10 +181,48 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.condition("interface language selected", timeout: 10) {
             option.exists && option.isSelected
         })
+        selectedInterfaceLanguage = language
         let back = element("iosSettings_appLanguageBackButton")
         XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(element("screen_settings_appLanguage"), timeout: 20))
+    }
+
+    struct ElementSnapshot {
+        let identifier: String
+        let isSelected: Bool
+        let frame: CGRect
+    }
+
+    /// The elements `include` accepts, read from one accessibility snapshot instead of an
+    /// `exists` and an attribute query per control. A snapshot taken mid-animation can
+    /// fail, so it is retried briefly.
+    func elementSnapshots(where include: (XCUIElementSnapshot) -> Bool) -> [ElementSnapshot] {
+        var root: XCUIElementSnapshot?
+        _ = VocelloUIWait.settles("an accessibility snapshot", timeout: 5) {
+            root = try? self.app.snapshot()
+            return root != nil
+        }
+        var found: [ElementSnapshot] = []
+        func walk(_ node: XCUIElementSnapshot) {
+            if include(node) {
+                found.append(ElementSnapshot(identifier: node.identifier, isSelected: node.isSelected, frame: node.frame))
+            }
+            node.children.forEach(walk)
+        }
+        guard let root else {
+            VocelloUIFailureEvidence.capture(reason: "no accessibility snapshot of the app")
+            return []
+        }
+        walk(root)
+        return found
+    }
+
+    /// The buttons whose identifier starts with `prefix`, from one snapshot.
+    func buttonSnapshots(prefix: String, excluding excluded: Set<String> = []) -> [ElementSnapshot] {
+        elementSnapshots {
+            $0.elementType == .button && $0.identifier.hasPrefix(prefix) && !excluded.contains($0.identifier)
+        }
     }
 
     /// Launches the production UI. First-run onboarding is completed through
@@ -206,6 +255,7 @@ class VocelloiOSUITestCase: XCTestCase {
     /// knob), so the journey starts on the startup failure screen, not the Studio.
     func beginSessionAtForcedStartupFailure() {
         continueAfterFailure = false
+        VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
         pendingVariationRestore = nil
@@ -331,10 +381,19 @@ class VocelloiOSUITestCase: XCTestCase {
     /// Follow genuine Settings navigation, including the tab's retained destination.
     func openSettingsRoot() {
         select(tab: .settings)
+        let backIDs = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
+            + ["audio", "appLanguage", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
         for _ in 0..<3 {
-            let backIDs = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
-                + ["audio", "appLanguage", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
-            guard let back = backIDs.map({ element($0) }).first(where: { $0.exists }) else { break }
+            // A snapshot finds the retained pages' Back controls, the deepest page's first,
+            // once the tab shows either a pushed page or its own root.
+            var showing = Set<String>()
+            _ = VocelloUIWait.settles("Settings to show a page", timeout: 10) {
+                showing = Set(self.elementSnapshots { backIDs.contains($0.identifier) }.map(\.identifier))
+                let root = self.element("screen_settings")
+                return !showing.isEmpty || (root.exists && root.isHittable)
+            }
+            guard let backID = backIDs.first(where: showing.contains) else { break }
+            let back = element(backID)
             XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
             XCTAssertTrue(VocelloUIWait.disappears(back, timeout: 20))
@@ -951,23 +1010,26 @@ class VocelloiOSUITestCase: XCTestCase {
             XCTAssertFalse(generationError.exists, "Generate must not begin from an error state")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 20))
         }
-        XCTAssertTrue(
-            VocelloUIWait.condition("generation to visibly start", timeout: 30) {
-                cancel.exists || livePlayer.exists || !generate.exists || !generate.isEnabled
-            }
-        )
-        if replacesCompletedPlayer {
+        // The take is the measured window of the benchmark lanes: keep its wait cadence.
+        VocelloUIWait.withSteadyCadence {
             XCTAssertTrue(
-                VocelloUIWait.condition("previous completed player to enter the next generation", timeout: 30) {
-                    !completedPlayer.exists
+                VocelloUIWait.condition("generation to visibly start", timeout: 30) {
+                    cancel.exists || livePlayer.exists || !generate.exists || !generate.isEnabled
+                }
+            )
+            if replacesCompletedPlayer {
+                XCTAssertTrue(
+                    VocelloUIWait.condition("previous completed player to enter the next generation", timeout: 30) {
+                        !completedPlayer.exists
+                    }
+                )
+            }
+            XCTAssertTrue(
+                VocelloUIWait.condition("generation to finish or expose an error", timeout: timeout) {
+                    completedPlayer.exists || generationError.exists
                 }
             )
         }
-        XCTAssertTrue(
-            VocelloUIWait.condition("generation to finish or expose an error", timeout: timeout) {
-                completedPlayer.exists || generationError.exists
-            }
-        )
         if generationError.exists {
             // Preserve the genuine visible terminal state before the assertion
             // unwinds the test session. XCTest's automatic hierarchy snapshots

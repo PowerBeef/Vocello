@@ -310,20 +310,20 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
 
     /// The language Studio's picker shows selected for the current mode. The picker
     /// is an in-app panel whose list scrolls both ways (only its grabber and header
-    /// drag it closed), and a detected language is repeated above "All languages",
-    /// so every row is read top to bottom and exactly one language must be selected.
+    /// drag it closed), and a detected language moves above "All languages", so every
+    /// row is read top to bottom and exactly one language must be selected.
     private func selectedStudioLanguage() -> String? {
         openLanguagePicker()
         scrollLanguagePickerToTop()
         var selected = Set<String>()
         var lastSignature = ""
         for _ in 0..<12 {
-            let rows = visibleLanguageRows()
-            selected.formUnion(rows.filter(\.isSelected).map(\.identifier))
-            let signature = rows.map(\.identifier).joined(separator: ",")
+            let visible = visibleLanguageRows()
+            selected.formUnion(visible.selected)
+            let signature = visible.rows.map(\.identifier).joined(separator: ",")
             if signature == lastSignature { break }
             lastSignature = signature
-            rows.last?.swipeUp()
+            swipeTarget(visible.rows, last: true)?.swipeUp()
         }
         closeLanguagePicker()
         guard selected.count == 1, let row = selected.first else { return nil }
@@ -333,10 +333,14 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
     /// Chooses the take language through Studio's chip and picker.
     private func chooseStudioLanguage(_ language: String) {
         openLanguagePicker()
-        scrollLanguagePickerToTop()
         let option = element("languagePicker_\(language)")
-        for _ in 0..<12 where !(option.exists && option.isHittable) {
-            visibleLanguageRows().last?.swipeUp()
+        // The picker opens at its top, where most languages already show: scroll only
+        // when the row is out of view.
+        if !(option.exists && option.isHittable) {
+            scrollLanguagePickerToTop()
+            for _ in 0..<12 where !(option.exists && option.isHittable) {
+                swipeTarget(visibleLanguageRows().rows, last: true)?.swipeUp()
+            }
         }
         XCTAssertTrue(option.exists && option.isHittable, "The picker must list \(language)")
         if !option.isSelected {
@@ -348,20 +352,35 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
         closeLanguagePicker()
     }
 
-    private func visibleLanguageRows() -> [XCUIElement] {
-        app.buttons.matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND identifier != %@", "languagePicker_", "languagePicker_confirm"
-        )).allElementsBoundByIndex.filter { $0.exists && $0.isHittable }
+    /// The picker's language rows in view, top to bottom, from one snapshot: those wholly
+    /// inside the window below the panel's header. Querying `exists` and `isHittable`
+    /// row by row cost dozens of queries, several seconds, per look. `selected` reads every
+    /// row the list has realized, in view or not, so a swipe cannot carry the selected
+    /// row past a look.
+    private func visibleLanguageRows() -> (rows: [ElementSnapshot], selected: Set<String>) {
+        let snapshots = elementSnapshots { $0.elementType == .button && $0.identifier.hasPrefix("languagePicker_") }
+        guard let header = snapshots.first(where: { $0.identifier == "languagePicker_confirm" })?.frame else { return ([], []) }
+        let languages = snapshots.filter { $0.identifier != "languagePicker_confirm" }
+        let window = app.windows.firstMatch.frame
+        let rows = languages
+            .filter { !$0.frame.isEmpty && $0.frame.minY >= header.maxY && window.contains($0.frame) }
+            .sorted { $0.frame.minY < $1.frame.minY }
+        return (rows, Set(languages.filter(\.isSelected).map(\.identifier)))
+    }
+
+    /// The row in view nearest the requested end, to swipe the list by.
+    private func swipeTarget(_ rows: [ElementSnapshot], last: Bool) -> XCUIElement? {
+        (last ? rows.last : rows.first).map { app.buttons[$0.identifier].firstMatch }
     }
 
     private func scrollLanguagePickerToTop() {
         var lastSignature = ""
         for _ in 0..<12 {
-            let rows = visibleLanguageRows()
-            let signature = rows.map(\.identifier).joined(separator: ",")
+            let visible = visibleLanguageRows()
+            let signature = visible.rows.map(\.identifier).joined(separator: ",")
             if signature == lastSignature { return }
             lastSignature = signature
-            rows.first?.swipeDown()
+            swipeTarget(visible.rows, last: false)?.swipeDown()
         }
     }
 

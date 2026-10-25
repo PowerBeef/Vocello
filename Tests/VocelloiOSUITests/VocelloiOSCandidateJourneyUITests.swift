@@ -74,11 +74,14 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
         for modelID in models {
             let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
-            XCTAssertTrue(revealSettingsElement(status, swipingUp: modelID == "pro_clone"))
-            // Download for a model never fetched; Retry for one whose transfer was cut
-            // off, such as when an earlier run's teardown force-quit the app mid-download.
+            // Download (Install) for a model never fetched; Retry for one whose transfer was
+            // cut off, such as when an earlier run's teardown force-quit the app mid-download.
             let start = ["Download", "Retry"].map { element("iosModel\($0)_\(modelID)") }.first { $0.exists }
             guard let start else { continue }
+            // Only the control the row taps is revealed: at the end of the scroll the last
+            // row's status line ends at the dock's edge, so revealing it is a sub-point race.
+            XCTAssertTrue(VocelloUISettingsReveal.perform(
+                start, in: app, swipingUp: modelID == "pro_clone", requirement: .navigation))
             started.append(modelID)
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: start, timeout: 20))
             XCTAssertTrue(VocelloUIWait.condition("\(modelID) to start or queue", timeout: 120) {

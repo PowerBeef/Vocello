@@ -42,7 +42,10 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 - **Next window:** the long-form scenario and a candidate row on build 25 to prove the iOS suite
   changes; RF-35's attended cellular check; the first-window Mirroring probes (start, input incl.
   typing, handoff lock state, window capture).
-- **Unpushed:** `bc3d07e7` through this checkpoint.
+- **UI-test documentation scan:** [`docs/audits/2026-10-25-ui-test-documentation-scan.md`](audits/2026-10-25-ui-test-documentation-scan.md)
+  lists outdated and contradictory statements and four code risks; nothing fixed until the
+  maintainer picks.
+- **Pushed:** through `6f9fe5ff` (CI passed).
 
 ### October 24, evening: RF-15 on build 24
 

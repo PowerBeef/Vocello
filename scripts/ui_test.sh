@@ -643,6 +643,29 @@ ensure_mac_runner_signature() {
   fi
 }
 
+# Xcode's incremental build-for-testing can relink and re-sign the candidate test
+# bundle without re-sealing the XCTRunner wrapper around it (2026-10-25, run
+# ios-xcui-candidate-smoke-20261025-170520-043a66ef: "a sealed resource is missing
+# or invalid"), and devicectl would then refuse the runner. A wrapper that fails
+# verification is re-sealed the way Xcode's own CodeSign step seals it: the
+# certificate that signed the bundle inside it, the test target's entitlements.
+ensure_ios_candidate_runner_signature() {
+  local runner="$1"
+  codesign --verify --deep --strict "$runner" && return 0
+  local plugin="$runner/PlugIns/VocelloiOSCandidateUITests.xctest"
+  local xcent="$IOS_DERIVED/Build/Intermediates.noindex/QwenVoice.build/Release-iphoneos/VocelloiOSCandidateUITests.build/VocelloiOSCandidateUITests.xctest.xcent"
+  local certs identity
+  certs="$(mktemp -d)"
+  (cd "$certs" && codesign -d --extract-certificates "$plugin") >/dev/null 2>&1
+  identity="$(openssl x509 -inform DER -in "$certs/codesign0" -noout -fingerprint -sha1 2>/dev/null \
+    | sed 's/.*=//; s/://g')"
+  rm -rf "$certs"
+  [[ -n "$identity" && -f "$xcent" ]] || { echo "cannot re-seal: no signing certificate or entitlements"; return 1; }
+  echo "re-sealing the runner wrapper with the test bundle's certificate $identity"
+  codesign --force --sign "$identity" --entitlements "$xcent" --timestamp=none \
+    --generate-entitlement-der "$runner" && codesign --verify --deep --strict "$runner"
+}
+
 mac_ui_preflight() {
   local tcc_db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
   local svc rows automation console
@@ -1445,7 +1468,7 @@ PY
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" prepare-runner \
       --xctestrun "$xctestrun" --runner "$runner" --identity "$out/candidate-identity.json" \
       --scenario "$scenario_argument" --output "$out/candidate.xctestrun" || return 1
-  codesign --verify --deep --strict "$runner" >"$out/candidate-runner-signature.log" 2>&1 || return 1
+  ensure_ios_candidate_runner_signature "$runner" >"$out/candidate-runner-signature.log" 2>&1 || return 1
   required_step_run "$step_ledger" candidate-runner-install \
     xcrun devicectl device install app --device "$device" "$runner" \
       --timeout 120 --quiet >"$out/candidate-runner-install.log" 2>&1 || return 1

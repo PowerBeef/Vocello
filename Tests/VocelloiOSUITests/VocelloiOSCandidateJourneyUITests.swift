@@ -71,10 +71,12 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
             let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
             XCTAssertTrue(revealSettingsElement(status, swipingUp: modelID == "pro_clone"))
-            let download = element("iosModelDownload_\(modelID)")
-            guard download.exists else { continue }
+            // Download for a model never fetched; Retry for one whose transfer was cut
+            // off, such as when an earlier run's teardown force-quit the app mid-download.
+            let start = ["Download", "Retry"].map { element("iosModel\($0)_\(modelID)") }.first { $0.exists }
+            guard let start else { continue }
             started.append(modelID)
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: download, timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: start, timeout: 20))
             XCTAssertTrue(VocelloUIWait.condition("\(modelID) to start or queue", timeout: 120) {
                 self.element("iosModelProgress_\(modelID)").exists
                     || self.element("iosModelPhaseActivity_\(modelID)").exists

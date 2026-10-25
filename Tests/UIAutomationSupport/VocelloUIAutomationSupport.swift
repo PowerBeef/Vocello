@@ -16,6 +16,22 @@ enum VocelloUISettingsReveal {
             statusBar: statusBar.exists ? statusBar.frame : nil, dock: dock.frame)
     }
 
+    /// The target's frame once two reads 0.15 s apart agree, or the last read after about
+    /// 1.8 s. A control whose layout is still moving (the rows below a model download that
+    /// just started) reports a new frame on every read, and the containment check below
+    /// compares two reads. The pause is fixed, not the shared wait cadence, so measured
+    /// lanes and eager journeys settle alike.
+    private static func settledFrame(of target: XCUIElement) -> CGRect? {
+        var previous: CGRect? = target.exists ? target.frame : nil
+        for _ in 0..<12 {
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.15))
+            let current: CGRect? = target.exists ? target.frame : nil
+            if current == previous { return current }
+            previous = current
+        }
+        return previous
+    }
+
     static func perform(_ target: XCUIElement, in app: XCUIApplication, swipingUp: Bool,
                         requirement: VocelloUIRevealRequirement = .fullVisibility) -> Bool {
         var search = VocelloUIRevealSearch(preferred: swipingUp ? .up : .down)
@@ -46,7 +62,7 @@ enum VocelloUISettingsReveal {
                 observations.append("viewport unavailable")
                 return false
             }
-            let frame = target.exists ? target.frame : nil
+            let frame = settledFrame(of: target)
             let hittable = frame != nil && target.isHittable
             let required = frame.map { requirement.requiredFrame($0, visible: visible) }
             let geometrySatisfied = frame.map { requirement.satisfied(by: $0, visible: visible) } ?? false

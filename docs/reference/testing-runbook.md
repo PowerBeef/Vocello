@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-22
+reviewed: 2026-10-25
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -26,7 +26,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Task | Authoritative procedure | Boundary |
 | --- | --- | --- |
 | Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, scoped commit on `main`; push on explicit request; targeted acceptance at checkpoints |
-| macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes only when requested |
+| macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes at coherent checkpoints; computer use only between lanes |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |
@@ -40,9 +40,9 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 
 ## Claude Code QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. Six thin repository skills under
+Routine edits use `scripts/dev.sh`; no skill is required. Seven thin repository skills under
 `.claude/skills` (`/vocello-*`) select the existing iOS, macOS UI, device diagnostics, benchmark,
-debugging and read-only release-readiness procedures. See
+debugging, computer-use (`vocello-ui-autonomy`) and read-only release-readiness procedures. See
 [tool routing](development-workflow.md#claude-code-setup-and-tool-routing).
 Local targeted validation is authorized at coherent checkpoints. Full matrices are task/release-specific;
 publication and external writes require specific authorization. Hook guards are supplementary,

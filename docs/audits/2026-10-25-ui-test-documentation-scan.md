@@ -21,6 +21,10 @@ have updated.
 
 ## A. Wrong instructions (a reader following them does the wrong thing)
 
+**Fixed 2026-10-25** at the maintainer's request, with four more instances the scan missed
+(`macos-testing.md:27`, `macos-release-qa.md:28`, `telemetry-and-benchmarking.md:62,83`). Benchmark
+lines now say full matrices are task- or release-specific rather than "explicitly requested".
+
 1. **UI lanes "only when requested".** `testing-runbook.md:29`, `macos-testing.md:136`,
    `ios-appstore-submission.md:36,429`, `ARCHITECTURE.md:150-151`. These contradict `CLAUDE.md:101-102`,
    `testing-runbook.md:47`, `tooling-and-evidence.md` ("Targeted local acceptance") and

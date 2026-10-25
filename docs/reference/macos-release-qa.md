@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-21
+reviewed: 2026-10-25
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -24,8 +24,8 @@ sourceOfTruth:
 
 The standing pre-release procedure for a macOS (Vocello.app / DMG) release. First executed in full
 for v2.1.0 (2026-06-09); rerun the deterministic gates for every release, run the standing
-release-candidate smoke lane and record its verdict (step 2b), and use the benchmark UI lane only
-when frontend acceptance is explicitly requested. If this doc disagrees with the code,
+release-candidate smoke lane and record its verdict (step 2b), and run the benchmark UI lane when the
+release or task calls for its full matrix. If this doc disagrees with the code,
 the code wins.
 
 This is a release-only gate, not a commit, push or push-CI check. Missing model or XCUITest
@@ -71,7 +71,8 @@ release-readiness and artifact checks.
    silent.
    If the visible Settings state is incomplete, run `scripts/macos_test.sh models ensure` only as
    an explicit repair/bootstrap action, then start a fresh smoke run.
-   XCUITest is the sole autonomous macOS app UI driver and targets its configured native test host.
+   XCUITest is the only automated UI evidence and targets its configured native test host; computer
+   use, between lanes, covers what it cannot (`/vocello-ui-autonomy`).
    Smoke covers sidebar navigation, visible model and clone-reference readiness, one real Custom
    generation, the completed player, and History. Benchmark owns the configurable
    Custom/Design/Clone matrix and defaults to exactly 29 takes. Both lanes fail on a new crash;

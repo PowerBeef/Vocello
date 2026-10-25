@@ -549,9 +549,10 @@ UI, performance or memory measurements.
 
 Claude Code reads `CLAUDE.md` at the repository root and `website/CLAUDE.md` once website files are
 touched. `.claude/rules/native.md` and `.claude/rules/tooling.md` are symlinks to the two reference
-rules above. Six thin skills live in `.claude/skills` and run as `/vocello-*`:
+rules above. Seven thin skills live in `.claude/skills` and run as `/vocello-*`:
 `vocello-ios-validation`, `vocello-macos-ui`, `vocello-device-diagnostics`, `vocello-benchmark`,
-`vocello-debug` and read-only `vocello-release-readiness`. They may also be selected for authorized local
+`vocello-debug`, `vocello-ui-autonomy` (computer use for what XCUITest cannot cover) and read-only
+`vocello-release-readiness`. They may also be selected for authorized local
 work; they grant no external-write authority. Read-only agents live in `.claude/agents`:
 `vocello-swift-review` and `vocello-xcresult-triage`, both `model: inherit`.
 
@@ -630,7 +631,7 @@ project hooks), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SE
 `python3 scripts/active_workers.py status` reporting `trackingAvailable: true`, a trivial subagent moving
 `activeWorkers` to 1 and back, harmless guard fixtures refused (`git switch -c smoke`, an Edit of a
 generated file), no unsupported-destination MobileBuildMCP tools offered, a rule loading when a matching
-file is read, and the six skills and two agents listed. Record the client version and anything
+file is read, and the seven skills and two agents listed. Record the client version and anything
 unavailable. Without restarting the interactive session (for example when working remotely), a headless
 `claude -p '<prompt>' --model haiku --max-turns 4 --allowedTools 'Bash(echo *)'
 'Bash(python3 scripts/active_workers.py status)' --output-format stream-json --verbose < /dev/null`
@@ -647,7 +648,7 @@ app's `claude` process as owner, and the `website` preview.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
-| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; computer use to explore, never for evidence ([The Claude desktop app](#the-claude-desktop-app)) |
+| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; computer use for what XCUITest cannot cover, never as automated evidence ([The Claude desktop app](#the-claude-desktop-app)) |
 | Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Axiom skills and read-only auditor agents; sosumi; Xcode's bundled documentation |
 | Libraries | Pinned versions in `config/toolchain.json` and package manifests | Context7 |
 | MLX runtime | Owned facade, exact pins and mlx-guide.md | Installed swift-mlx / swift-mlx-lm skills |

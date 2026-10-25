@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -33,7 +33,7 @@ offline manual signing if no Apple ID is in Xcode). The development provisioning
 `increased-memory-limit`, and that dated run passed its generation and audio-QC checks. Current performance
 and memory truth comes from the tracked records in `benchmarks/HISTORY.md` (`rtf` = synthesis wall ÷ audio,
 lower is faster), not these historical figures.
-Physical-device XCUITest can be run independently when explicit frontend acceptance is requested;
+Physical-device XCUITest runs separately, at coherent checkpoints;
 ordinary GitHub CI and archive packaging are deterministic-only — see
 [`testing-runbook.md`](testing-runbook.md); and the UI holds with no clipping at the largest
 accessibility Dynamic Type size. A read-only 2026-09-04 inspection found usable local Development,
@@ -426,8 +426,8 @@ does not replace the mandatory archive/IPA contract above and does not gate pack
 ./scripts/verify_ios_release_archive.sh build/dist/ios/Vocello.xcarchive build/dist/ios/export release_metadata.txt
 ```
 
-When frontend acceptance is explicitly requested, run `scripts/ui_test.sh ios smoke` and
-`scripts/ui_test.sh ios benchmark` separately; their result bundles do not gate the archive.
+For frontend acceptance, run `scripts/ui_test.sh ios smoke` and `scripts/ui_test.sh ios benchmark`
+separately at a coherent checkpoint; their result bundles do not gate the archive.
 
 Upload the IPA via Transporter or `xcrun altool --upload-app -f build/dist/ios/export/Vocello.ipa -t ios \
   --apiKey <KEY_ID> --apiIssuer <ISSUER_ID>` (with `AuthKey_<KEY_ID>.p8` in `~/.appstoreconnect/private_keys/`).

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -147,7 +147,7 @@ for the exact link graph.)
 | **UI evidence** | Named XCTest attachments from the native app | Named XCTest attachments from the physical iPhone | Independent explicit-acceptance artifacts |
 
 Release packaging is deterministic and does not consume UI results. Frontend evidence remains
-platform-specific and is created only when explicitly requested.
+platform-specific and comes from the UI lanes run at coherent checkpoints, never from packaging.
 
 The loop around this table is short. `scripts/dev.sh check` runs lint, contracts, the selected
 tests and the native lanes the dirty tree touches, and is advisory. `check --dry-run --json`

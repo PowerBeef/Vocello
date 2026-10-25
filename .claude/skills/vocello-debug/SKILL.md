@@ -15,7 +15,9 @@ Classify product failure, infrastructure failure, interruption or incomplete evi
 Load applicable Axiom build/concurrency/performance guidance, swift-mlx/swift-mlx-lm skills for runtime
 issues and Sosumi/Context7 for authoritative API research. Hand a finished native run to the read-only
 `vocello-xcresult-triage` agent when a second reading helps. Detect optional MobileBuildMCP/LLDB
-capabilities in this session; do not assume a device/LLDB route exists. Keep native serialization and XCUITest-only UI driving.
+capabilities in this session; do not assume a device/LLDB route exists. Keep native serialization;
+XCUITest is the only automated UI evidence, and computer use may reproduce a report between lanes
+(`/vocello-ui-autonomy`).
 Use verified Axiom xcsym for symbolication and xcprof for existing traces as appropriate; locate
 helpers under the Claude plugin cache (`scripts/dev.sh doctor --json` lists them), check executability
 and non-mutating help before use. Never xcui or simulator agents.

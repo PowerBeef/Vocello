@@ -66,7 +66,7 @@ coverage-gap finding; "not applicable" needs a reason.
     output changes? Silent seeded-output drift, no fixture or canary, or a tolerance loosened until the
     test passes is a finding.
 
-Preserve the physical-iPhone-only and XCUITest-only rules. Distinguish a demonstrated defect from a
+Preserve the physical-iPhone-only rule and XCUITest as the only automated UI evidence. Distinguish a demonstrated defect from a
 coverage gap and do not invent requirements. Reply with findings ordered by severity (blocking, should
 fix, note), each as `path:line — rule — evidence — impact — suggested change`, then the test-adequacy
 answers (9–13, one line per test), then a one-line verdict. If nothing is actionable, say so and state

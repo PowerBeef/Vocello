@@ -199,8 +199,9 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   and notifications carry no raw diagnostics, private paths, prompts, transcripts, reference audio or
   credentials, and an artifact is published only on request.
 - **Skills** (`.claude/skills`, invoked as `/vocello-*`): `vocello-ios-validation`, `vocello-macos-ui`,
-  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, read-only
-  `vocello-release-readiness`. They wrap the scripts and add no gate or permission.
+  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, `vocello-ui-autonomy` (computer
+  use for what XCUITest cannot cover), read-only `vocello-release-readiness`. They wrap the scripts and
+  add no gate or permission.
 - **Agents** (`.claude/agents`, read-only): `vocello-swift-review` for Swift diffs and
   `vocello-xcresult-triage` for a finished run directory. Explore/Plan and the Axiom auditor agents
   research and audit; editing agents are general-purpose agents with worktree isolation.

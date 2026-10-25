@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface — plus macOS permissions (TCC), code signing and the dev loop, the UI test runner's grants, and permissions_doctor.sh diagnosis (§7).
 sourceOfTruth:
   - Sources/Views
@@ -321,7 +321,8 @@ higher-fidelity output.
 
 ### Test infrastructure (XCUITest)
 
-`VocelloMacUITests` is the sole autonomous macOS frontend driver. It launches its configured
+`VocelloMacUITests` is the only automated macOS frontend evidence (computer use covers, between
+lanes, what it cannot: `/vocello-ui-autonomy`). It launches its configured
 Vocello test host, uses the shared UI automation support, and re-queries stable accessibility state
 before and after each logical action. There is no hidden test-marker surface.
 
@@ -476,9 +477,8 @@ the recurring permission pain.
   Recognition has no such fixture: on 2026-10-18 the smoke journey `test08` asked for it at its
   save-voice step after a lane rebuild, and the unanswered dialog covered the window, so `test12`,
   `test13` and `test14` failed on controls that were not hittable until a human answered it
-  (BKL-19, parked). The lane's
-  advisory `ui-preflight` checks TCC row existence per bundle id and cannot see this identity
-  mismatch.
+  (BKL-19, parked). The TCC part of the lane's `ui-preflight` is advisory: it checks TCC row
+  existence per bundle id and cannot see this identity mismatch.
 
 ### Permission map (which process touches what)
 

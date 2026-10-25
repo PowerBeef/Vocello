@@ -105,8 +105,8 @@ initialize on the iOS Simulator.
 > tone/delivery prompt-writing in [`../qwen_tone.md`](../qwen_tone.md).
 > String Catalog ownership, typed presentation text, and pseudo-localization acceptance are in
 > [`localization.md`](localization.md).
-> The compact UI state map is [§7](#7-compact-ui-state-map). XCUITest is the only
-> autonomous iOS app UI driver.
+> The compact UI state map is [§7](#7-compact-ui-state-map). XCUITest is the only automated UI
+> evidence; computer use through iPhone Mirroring covers what it cannot (`/vocello-ui-autonomy`).
 
 ---
 
@@ -719,7 +719,7 @@ constants — a refactor, not a behavior change.
 ## 7. Compact UI state map
 
 This is the compact screen and accessibility map for physical-device Vocello UI tests. XCUITest is
-the sole autonomous driver and runs on a paired physical iPhone; the iOS Simulator is unsupported.
+the only automated UI evidence and runs on a paired physical iPhone; the iOS Simulator is unsupported.
 
 ### Navigation hierarchy
 
@@ -893,6 +893,6 @@ product accessibility requirements, but are not claimed as coverage of the minim
 | UI frame-health scenarios | `scripts/ui_test.sh ios perf` |
 | Physical-device deterministic/runtime diagnostic | `scripts/ios_device.sh gate` |
 
-Never validate with an iOS Simulator, Simulator Browser, alternate desktop/mobile UI driver, or
+Never validate with an iOS Simulator, Simulator Browser, a third-party UI-automation driver, or a
 committed coordinate table. Computer use through iPhone Mirroring covers what XCUITest cannot, and its
 records close an attended row only on the maintainer's confirmation (`CLAUDE.md`, `/vocello-ui-autonomy`).

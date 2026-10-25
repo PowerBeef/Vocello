@@ -229,9 +229,10 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   capturing a non-Sendable closure across a `Task { @MainActor }` hop (precompute it first); forgetting
   that a parent's `accessibilityIdentifier` reaches every descendant outside an
   `.accessibilityElement(children: .contain)` container.
-- In UI tests: probing an optional element with `VocelloUIWait` (it records `XCTFail` on timeout; use
-  `XCTWaiter.wait(for: [XCTNSPredicateExpectation])`); matching visible labels instead of identifiers
-  (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build;
+- In UI tests: probing an optional element with `VocelloUIWait.exists` or `condition` (they record
+  `XCTFail` on timeout; use `VocelloUIWait.settles`, which answers without failing and polls eagerly,
+  never a bare `XCTNSPredicateExpectation`, which polls once a second); matching visible labels
+  instead of identifiers (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build;
   replacing existing text in an iOS `UITextView` with `VocelloUITextEntry.replace` and trusting it
   (the tap can leave the caret at the start, where its backspaces delete nothing: select the text
   first and assert the resulting value, as the purchase lane's brief restore does; BKL-16);

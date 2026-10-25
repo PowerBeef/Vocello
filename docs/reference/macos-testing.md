@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -16,14 +16,15 @@ sourceOfTruth:
 # macOS testing
 
 Vocello separates routine deterministic development verification from explicit native-app UI
-acceptance. XCUITest is the sole autonomous macOS app UI driver.
+acceptance. XCUITest is the only automated UI evidence; computer use, between lanes, is the default
+route for checks it cannot cover (`/vocello-ui-autonomy`).
 
 Clone/enrollment parity is part of ordinary deterministic verification. The core suite exercises
 the shared transcription-review/evidence policy and the pure macOS Design/Clone request factory,
 including manual-edit precedence, stale-result rejection, explicit audio-only enrollment,
 reference-language metadata, target-text Auto routing, explicit-language precedence, and exact
 reference/prompt/seed/variation identity. These tests guard the request boundary; native visual and
-interaction acceptance remains the explicitly requested XCUITest lane below.
+interaction acceptance remains the XCUITest lanes below.
 
 ## Ordinary development
 
@@ -133,7 +134,8 @@ with the XPC service on 2026-09-15; the lane is core-only since).
 
 ## Explicit XCUITest lanes
 
-Run only when frontend acceptance is explicitly requested. `test01_NavigationAndReadiness` (the whole
+Run them at a coherent checkpoint, the smallest lane that covers the change (local validation lanes
+are authorized; `CLAUDE.md`). `test01_NavigationAndReadiness` (the whole
 `localization` lane, and the second journey of the full `smoke` lane, after
 `test00_WindowSizesAndSettingsScene`) launches the app with Foundation's
 `-NSDoubleLocalizedStrings YES -NSShowNonLocalizedStrings YES`, so doubled text (menus included) and
@@ -330,8 +332,9 @@ Every wait/action failure automatically attaches a full-desktop screenshot (whic
 system dialogs the app screenshot cannot see) plus a bounded accessibility-tree dump; each launch
 fails fast with the same evidence when the app window is obscured, and an interruption-monitor
 sentinel names any unrelated modal that blocks an interaction (it never answers TCC dialogs —
-those stay human-answered). The macOS lanes run an advisory `ui-preflight` step that warns when
-the app's microphone or speech-recognition TCC grant is undecided, execute in two phases
+those stay human-answered). The macOS lanes run a `ui-preflight` step that refuses a locked session
+or an Automation Mode that needs a password, and only warns when the app's microphone or
+speech-recognition TCC grant is undecided; they execute in two phases
 (a skippable `build-for-testing` keyed to the build inputs' content fingerprint,
 `tree_fingerprint.py --build-inputs`, then `test-without-building`, so repeat runs skip the rebuild
 while no build input changed; a commit that only publishes records or touches docs, the website or

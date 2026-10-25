@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-20
+reviewed: 2026-10-25
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -59,7 +59,8 @@ peaks**, **first-chunk latency**, or **audio quality**:
 
 Benchmarks that require models, a device, or XCUITest are not prerequisites for a
 commit, push, pull request, ordinary merge, ordinary CI run, or release package. They remain useful
-promotion and release-QA evidence when explicitly requested.
+promotion and release-QA evidence at the checkpoints a task or release names (full matrices are
+task- or release-specific).
 
 ### What “good” means
 
@@ -80,7 +81,7 @@ the summarizer's `xRT` column.
 1. **The primary backend driver is headless.** `vocello bench` drives the matrix in-process with
    exact cold/warm control; `scripts/ui_test.sh macos benchmark` is the supplementary UI
    integration net ([§4.10](#410-macos-ui-benchmark-supplementary-integration-net)). XCUITest is
-   the sole autonomous app UI driver; deterministic history/WAV/backend probes validate its smoke
+   the only automated UI evidence; deterministic history/WAV/backend probes validate its smoke
    and benchmark results. iOS UI tests and real-engine generation run **on-device only**, on a
    paired physical iPhone (see [`testing-runbook.md`](testing-runbook.md) and
    [`ios-device-testing.md`](ios-device-testing.md)).

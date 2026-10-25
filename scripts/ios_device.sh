@@ -567,9 +567,10 @@ pull_speech_asset_run() {
 # Explicit, non-generation Speech bootstrap for the physical iPhone. AssetInventory's combined
 # request installs only the four language-output locales and automatically manages this app's
 # reservations. The result is local diagnostic evidence, never benchmark history.
-# Headless benchmark clone-fixture enrollment. Replaces the retired Files-import UI
-# path (the iPhone app deliberately ships no file import; users record with the
-# microphone or reuse a Voice Design voice). Stages the exact reference WAV plus the
+
+# Headless benchmark clone-fixture enrollment: the wipe-recovery route, with no UI and a
+# hash-pinned reference, beside the genuine Files-import lane
+# (`scripts/ui_test.sh ios enroll-clone-fixture`). Stages the exact reference WAV plus the
 # mandatory transcript sidecar into the app's Documents, launches the app with
 # QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME, polls the enrollment sentinel, and reports the
 # artifact identity. The runner deletes the staged inputs after a clean enrollment.

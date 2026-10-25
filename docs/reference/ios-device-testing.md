@@ -17,7 +17,8 @@ sourceOfTruth:
 # iOS physical-device testing
 
 Vocello's iOS runtime and UI acceptance run on a paired physical iPhone. Simulator build, launch,
-and UI automation are unsupported. XCUITest is the sole autonomous iOS app UI driver.
+and UI automation are unsupported. XCUITest is the only automated UI evidence; computer use through
+iPhone Mirroring is the default route for checks it cannot cover ([below](#checks-xcuitest-does-not-cover)).
 
 ## Ordinary development
 

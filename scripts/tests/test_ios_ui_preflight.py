@@ -18,10 +18,13 @@ def probe(**fields: object) -> dict[str, object]:
 
 
 class IOSUIPreflightTests(unittest.TestCase):
-    def run_preflight(self, reported: dict[str, object], team: str = "TEAMFIXTURE"):
+    def run_preflight(self, reported: dict[str, object], team: str = "TEAMFIXTURE",
+                      mirroring: bool = False):
         shell = UIFunctionShell(self)
+        # Always stubbed: the real check would read this Mac's process list.
         body = (
-            f"ios_probe() {{ printf '%s' {quote(json.dumps(reported))}; }}\n"
+            f"ios_mirroring_running() {{ return {0 if mirroring else 1}; }}\n"
+            f"ios_probe() {{ echo probed >&2; printf '%s' {quote(json.dumps(reported))}; }}\n"
             f"derive_team() {{ printf '%s' {quote(team)}; [[ -n {quote(team)} ]]; }}\n"
             "device='' team=''\n"
             'ios_ui_preflight\n'
@@ -33,6 +36,14 @@ class IOSUIPreflightTests(unittest.TestCase):
         completed = self.run_preflight(probe())
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("device=fixture-device team=TEAMFIXTURE", completed.stdout)
+
+    def test_open_iphone_mirroring_refuses_before_the_probe(self) -> None:
+        # The phone reports unlocked, as it did under Mirroring in runs 221807-222344.
+        completed = self.run_preflight(probe(), mirroring=True)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("iPhone Mirroring is open", completed.stderr)
+        self.assertNotIn("probed", completed.stderr)
+        self.assertNotIn("device=", completed.stdout)
 
     def test_each_unready_state_fails_before_the_lane_goes_on(self) -> None:
         cases = {

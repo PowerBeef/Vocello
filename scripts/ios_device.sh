@@ -54,6 +54,9 @@
 #   scripts/ios_device.sh preflight                # paired-device, signing, build, and dSYM readiness
 #   scripts/ios_device.sh device-state [--json|--json-v2] [watch [--interval N] [--count N]]
 #                                                 # paired-device reachability and lock state
+#   scripts/ios_device.sh mirroring status|session LABEL|capture LABEL --step TEXT [--observed TEXT]|stop
+#                                                 # iPhone Mirroring sessions for computer use: state,
+#                                                 # local step+screenshot records, quit before lanes
 #   scripts/ios_device.sh gate                 # explicit device gate: preflight → generation → crashes → verdict
 #                                              # (generation needs Speed on device; QVOICE_GATE_SKIP_GENERATION=1 to skip)
 #
@@ -3241,6 +3244,8 @@ main() {
     launch)  cmd_launch "$@" ;;
     console) cmd_console "$@" ;;
     device-state) cmd_device_state "$@" ;;
+    mirroring) QVOICE_MIRRORING_ROOT="$QVOICE_ARTIFACTS_IOS/mirroring" \
+      python3 "$ROOT_DIR/scripts/lib/iphone_mirroring.py" "$@" ;;
     pull)    cmd_pull "$@" ;;
     bench)
       require_build_free_space memory-qualification || die "iOS benchmark storage preflight failed"
@@ -3288,7 +3293,7 @@ main() {
       ;;
     help|-h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2 ;;
-    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|pull|bench|lang-bench|delivery-reliability|voice-reliability|voice-reliability-export|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
+    *) die "unknown subcommand '$sub' (try: doctor|build|install|launch|console|device-state|mirroring|pull|bench|lang-bench|delivery-reliability|voice-reliability|voice-reliability-export|speech-assets|enroll-clone-fixture|crashes|debug|logs|profile|memory|clone-conditioning|memory-field-report|preflight|gate|help)" ;;
   esac
 }
 

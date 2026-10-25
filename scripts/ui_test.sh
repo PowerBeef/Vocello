@@ -880,13 +880,24 @@ ios_probe() {
   python3 "$ROOT_DIR/scripts/lib/ios_coredevice_probe.py" probe
 }
 
+# iPhone Mirroring on this Mac breaks XCUITest on the phone even while CoreDevice
+# reports it unlocked: black screenshots, a keyboard that never dismisses, no playback
+# (RF-15 runs 221807, 222059 and 222344, 2026-10-24).
+ios_mirroring_running() {
+  pgrep -xq "iPhone Mirroring"
+}
+
 # The iPhone half of the UI readiness preflight (audit P1-2), recorded as the
-# `ui-preflight` step before any crash snapshot or build: the paired phone must
-# be reachable, in Developer Mode and unlocked, and a development team must
+# `ui-preflight` step before any crash snapshot or build: iPhone Mirroring must be
+# closed, the paired phone reachable, in Developer Mode and unlocked, and a development team must
 # sign the runner. Sets `device` and `team` for the lane. The Xcode iOS platform
 # component is checked earlier, with the other host checks.
 ios_ui_preflight() {
   local probe verdict
+  if ios_mirroring_running; then
+    warn "ui-preflight: iPhone Mirroring is open on this Mac; XCUITest fails under it even when the iPhone reports unlocked; quit it (scripts/ios_device.sh mirroring stop) and unlock the iPhone"
+    return 1
+  fi
   probe="$(ios_probe)" || { warn "ui-preflight: the CoreDevice probe failed"; return 1; }
   verdict="$(python3 -c '
 import json, sys

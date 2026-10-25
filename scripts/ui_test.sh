@@ -530,6 +530,9 @@ export_attachments() {
   local export_status=0
   if python3 "$UI_LANE_DATA" export-attachments "$result" "$out/attachments" >"$out/attachments.log" 2>&1
   then
+    # Readable-named images and an index for review; never fails the run.
+    python3 "$UI_LANE_DATA" index-screenshots "$out/attachments" "$out/screenshots" \
+      >>"$out/attachments.log" 2>&1 || warn "could not index screenshots (see $out/attachments.log)"
     return 0
   else
     export_status=$?
@@ -1167,6 +1170,68 @@ summarize_long_form_project_if_present() {
   python3 "$UI_LANE_DATA" long-form-summary "$wall" "$out_dir/long-form-project-summary.txt" "$out_dir"
 }
 
+# The development iPhone lanes build once per source tree. `xcb_run test` rebuilt on
+# every run (median 87 s, whole package graphs when ios_device.sh's -Onone build had
+# used the same DerivedData since). The marker binds the build inputs' fingerprint, the
+# team and the digests of the app, the test bundle and the .xctestrun, so a product that
+# another build overwrote is rebuilt, never tested. Both halves run inside the lane's
+# `xcuitest` step, so a build failure still fails that step.
+ios_ui_find_xctestrun() {
+  local found
+  found="$(find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSUI_*.xctestrun' -print 2>/dev/null)"
+  [[ -n "$found" && "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" == 1 ]] || return 1
+  ios_ui_xctestrun="$found"
+}
+
+# Digests of the .xctestrun, the app and the test bundle; fails unless all three exist.
+ios_ui_products_digest() {
+  local products="$IOS_DERIVED/Build/Products/Release-iphoneos" digests
+  digests="$(shasum -a 256 "$ios_ui_xctestrun" "$products/Vocello.app/Vocello" \
+    "$products/VocelloiOSUITests-Runner.app/PlugIns/VocelloiOSUITests.xctest/VocelloiOSUITests" \
+    2>/dev/null | awk '{print $1}')" || return 1
+  [[ "$(printf '%s\n' "$digests" | grep -c .)" == 3 ]] || return 1
+  printf '%s\n' "$digests" | paste -sd, -
+}
+
+ios_ui_build_for_testing() {
+  local marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint" fingerprint products="" status=0
+  fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)" || return 1
+  if ios_ui_find_xctestrun; then products="$(ios_ui_products_digest || true)"; fi
+  if [[ -n "$products" && -f "$marker" \
+      && "$(cat "$marker" 2>/dev/null)" == "$fingerprint|$team|$products" ]]; then
+    note "build-for-testing skipped — source fingerprint and products unchanged"
+    return 0
+  fi
+  rm -f "$marker"
+  xcb_run build-for-testing \
+    -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
+    -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
+    -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
+    -disableAutomaticPackageResolution \
+    -onlyUsePackageVersionsFromResolvedFile \
+    -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+    ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+    QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
+    SWIFT_OPTIMIZATION_LEVEL=-O >"$out/xcodebuild-build.log" 2>&1 || status=$?
+  if (( status != 0 )); then
+    ui_primary_native_exit_code="$status"
+    warn "iPhone UI build-for-testing failed (see $out/xcodebuild-build.log)"
+    tail -n 40 "$out/xcodebuild-build.log" >&2 || true
+    return "$status"
+  fi
+  if ! ios_ui_find_xctestrun || ! products="$(ios_ui_products_digest)"; then
+    warn "build-for-testing left no single VocelloiOSUI .xctestrun and its products"
+    return 1
+  fi
+  printf '%s\n' "$fingerprint|$team|$products" >"$marker"
+}
+
+ios_ui_build_and_test() {
+  ios_ui_build_for_testing || return $?
+  run_xcodebuild xcb_run test-without-building -xctestrun "$ios_ui_xctestrun" \
+    -destination "id=$device" "$@"
+}
+
 run_xcodebuild() {
   local -a command=("$@")
   local log_path="$out/xcodebuild.log"
@@ -1444,17 +1509,27 @@ run_preinstalled_candidate() {
   local team runner xctestrun
   required_step_run "$step_ledger" ui-preflight ios_ui_preflight || return 1
   required_step_run "$step_ledger" candidate-before candidate_inventory before || return 1
-  required_step_run "$step_ledger" candidate-crash-baseline \
-    python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
-      --device "$device" --output "$out/system-crashes-before" || return 1
-  candidate_collection_needed=1
+  # The crash baseline needs only the phone and the runner build only the Mac, so the
+  # copy of the phone's crash folder (~7 s) runs while the runner builds. Only the copy
+  # is in the background: both ledger records are written here, one after the other.
+  local baseline_started baseline_pid baseline_status=0 build_status=0
+  baseline_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
+    --device "$device" --output "$out/system-crashes-before" &
+  baseline_pid=$!
   required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
     -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
     -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
     DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-    >"$out/candidate-runner-build.log" 2>&1 || return 1
+    >"$out/candidate-runner-build.log" 2>&1 || build_status=$?
+  wait "$baseline_pid" || baseline_status=$?
+  required_step_record "$step_ledger" candidate-crash-baseline "$baseline_status" "$baseline_started" \
+    || return 1
+  (( baseline_status == 0 )) || return 1
+  candidate_collection_needed=1
+  (( build_status == 0 )) || return 1
   runner="$IOS_DERIVED/Build/Products/Release-iphoneos/VocelloiOSCandidateUITests-Runner.app"
   xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
 import pathlib, sys
@@ -1805,18 +1880,9 @@ else
   note "physical-iPhone XCUITest $lane on $device → $out"
   xcuitest_status=0
   ui_test_attempted=1
-  if required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
-      -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
-      -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
-      -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
-      -disableAutomaticPackageResolution \
-      -onlyUsePackageVersionsFromResolvedFile \
+  if required_step_run "$step_ledger" xcuitest ios_ui_build_and_test \
       -resultBundlePath "$result" -collect-test-diagnostics never \
-      "${test_selection_args[@]}" -parallel-testing-enabled NO \
-      -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-      ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-      QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-      SWIFT_OPTIMIZATION_LEVEL=-O; then
+      "${test_selection_args[@]}" -parallel-testing-enabled NO; then
     xcuitest_status=0
   else
     xcuitest_status=$?
@@ -2106,7 +2172,7 @@ fi
 retention_status=0
 if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "retained correctly classified diagnostic failure evidence"
-elif "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 \
+elif "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 --quick \
     >"$out/result-retention.log" 2>&1; then
   note "pruned superseded XCUITest results (latest passing result retained per platform/lane)"
 else

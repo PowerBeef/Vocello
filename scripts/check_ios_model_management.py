@@ -115,7 +115,8 @@ def xcodebuild_failed(log_path: pathlib.Path) -> bool:
     if not log_path.is_file():
         return False
     text = log_path.read_text(encoding="utf-8", errors="replace")
-    return "** TEST FAILED **" in text or bool(
+    # `test` ends with TEST FAILED, `test-without-building` with TEST EXECUTE FAILED.
+    return "** TEST FAILED **" in text or "** TEST EXECUTE FAILED **" in text or bool(
         re.search(r"Executed\s+\d+\s+tests?,\s+with\s+[1-9]\d*\s+failures?", text)
     )
 

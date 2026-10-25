@@ -57,6 +57,15 @@ def observation(**overrides):
 
 
 class ModelManagementDiagnosisTests(unittest.TestCase):
+    def test_both_xcodebuild_failure_banners_count_as_a_failed_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = pathlib.Path(directory) / "xcodebuild.log"
+            for banner, failed in (("** TEST FAILED **", True), ("** TEST EXECUTE FAILED **", True),
+                                   ("** TEST EXECUTE SUCCEEDED **", False)):
+                with self.subTest(banner=banner):
+                    log.write_text(f"Executed 0 tests, with 0 failures\n{banner}\n")
+                    self.assertEqual(MODULE.xcodebuild_failed(log), failed)
+
     def test_rejects_missing_trace(self):
         findings = MODULE.diagnose([], [observation()])
         self.assertEqual([finding.code for finding in findings], ["missing-trace"])

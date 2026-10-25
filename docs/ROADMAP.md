@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/37 (35%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/38 (34%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -549,6 +549,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-34` | parked | The CLI installer round-trip test fails on a macOS 27 host | — |
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
 | `BKL-36` | parked | A short drag that starts on an iPhone Settings toggle row can flip the switch | — |
+| `BKL-37` | parked | Mac History shows the Built-in speaker in lowercase | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -644,6 +645,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-36`** (parked) — A short drag that starts on an iPhone Settings toggle row can flip the switch.
   gate: A drag that starts on a Settings toggle row's label never changes the switch, at any scroll position, while a tap on the row still does.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-37`** (parked) — Mac History shows the Built-in speaker in lowercase.
+  gate: Every History row names its Built-in Voice speaker as Studio does (Aiden, not aiden), on the Mac and the iPhone.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

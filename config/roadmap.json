@@ -1865,6 +1865,20 @@
       "notes": "Seen 2026-10-25 on build 25 in XCUITest run 20261025-173415-0398b5f1: the whole IOSSettingsCompactToggleStyle row is a Button and IOSScrollView turns bounce off, so near the end of Voice Models a slow upward swipe on the Download over cellular caption landed as a tap and flipped the switch on each of 20 swipes (the network note above switched between its two copies). The same style serves Auto-play, Clone consent and the Accessibility toggles. Not investigated (focus rules)."
     },
     {
+      "id": "BKL-37",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Mac History shows the Built-in speaker in lowercase",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Every History row names its Built-in Voice speaker as Studio does (Aiden, not aiden), on the Mac and the iPhone.",
+      "sourceOfTruth": [
+        "Sources/Views/History/MacHistoryItemCard.swift"
+      ],
+      "updated": "2026-10-25",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Seen 2026-10-25 in the visual review of macOS smoke run 20261025-221609-c2191179 (screenshot 043-mac-smoke-history-completed): the History metadata line reads \"aiden · Built-in Voice\" while Studio's chip and player read \"Aiden\". iPhone not checked. Not investigated (focus rules)."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

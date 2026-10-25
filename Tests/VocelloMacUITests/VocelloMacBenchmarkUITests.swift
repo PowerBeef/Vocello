@@ -5,6 +5,8 @@ import XCTest
 
 @MainActor
 final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
+    override class var keepsSteadyWaitCadence: Bool { true }
+
     private static let takeFile = URL(fileURLWithPath: "/tmp/vocello-bench-current-take.json")
     /// Registered diagnostics scripts/ui_test.sh hands through for the emulated
     /// 8 GB floor (audit #11 option b); absent, the app runs on the real machine.

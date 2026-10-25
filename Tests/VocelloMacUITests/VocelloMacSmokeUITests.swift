@@ -121,7 +121,9 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
 
         replaceScript(with: "First batch line.\nSecond batch line.")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_batchButton"), timeout: 30))
-        XCTAssertTrue(button("textInput_batchButton").isSelected)
+        XCTAssertTrue(VocelloUIWait.condition("batch toggle to read selected", timeout: 10) {
+            self.button("textInput_batchButton").isSelected
+        })
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 30))
         let editor = element("batch_textEditor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 30))
@@ -216,7 +218,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         generateAndWaitForCompletion(mode: .design, timeout: 300)
 
         XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
-        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+        assertStaysAbsent(element("sidebarPlayer_bar"), "Studio owns playback of its own completed take")
         pinToNarrowestWindow()
         VocelloUILayoutAssert.assertFullyWithinWindow(button("voiceDesign_saveVoiceButton"), of: app)
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
@@ -255,7 +257,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("cloneReference_confirm"), timeout: 20))
 
         generateAndWaitForCompletion(mode: .clone, timeout: 300)
-        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+        assertStaysAbsent(element("sidebarPlayer_bar"), "Studio owns playback of its own completed take")
         pinToNarrowestWindow()
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_retry"), of: app)
@@ -265,7 +267,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_bar"), timeout: 20))
         navigate(to: .voiceCloning)
         XCTAssertTrue(VocelloUIWait.exists(button("studio_inlinePlayer_playPause"), timeout: 20))
-        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+        assertStaysAbsent(element("sidebarPlayer_bar"), "Returning to Studio hands transport back to it")
     }
 
     func test01_NavigationAndReadiness() {
@@ -282,17 +284,19 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             "-NSDoubleLocalizedStrings", "YES",
             "-NSShowNonLocalizedStrings", "YES",
         ])
+        // The one journey that clicks every sidebar row; the others use ⌘1–⌘6.
         for screen in VocelloMacScreen.allCases {
-            navigate(to: screen)
+            navigate(to: screen, viaSidebar: true)
         }
         // The four-destination shell returns to the last Studio mode without
         // restoring a different draft or requiring a second navigation click.
-        navigate(to: .voiceDesign)
-        navigate(to: .voices)
+        navigate(to: .voiceDesign, viaSidebar: true)
+        navigate(to: .voices, viaSidebar: true)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebar_studio"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceDesign"), timeout: 20))
-        XCTAssertTrue(button("sidebar_voiceDesign").isSelected)
-        XCTAssertTrue(button("sidebar_studio").isSelected)
+        XCTAssertTrue(VocelloUIWait.condition("Studio and Voice Design to read selected", timeout: 10) {
+            self.button("sidebar_voiceDesign").isSelected && self.button("sidebar_studio").isSelected
+        })
         XCTAssertTrue(element("studio_modePicker").exists)
 
         assertVisibleSpeedModelReadiness()
@@ -353,7 +357,14 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(heading, timeout: 20))
         VocelloUILayoutAssert.assertFullyWithinWindow(heading, of: app)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-history-transparent-heading")
-        assertAllInterfaceLanguages()
+        // The ten-language walk (about 21 minutes) belongs to the localization lane. Smoke
+        // skips it with a flag only smoke sets, so a lost flag slows smoke down rather
+        // than letting the localization lane pass without the walk.
+        if ProcessInfo.processInfo.environment["QVOICE_MAC_SKIP_LANGUAGE_WALK"] == "1" {
+            XCTContext.runActivity(named: "Ten-language walk skipped: the localization lane runs it") { _ in }
+        } else {
+            assertAllInterfaceLanguages()
+        }
     }
 
     private func assertAllInterfaceLanguages() {
@@ -456,7 +467,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             capture?.endTake(playbackEnded: false)
         }
         XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
-        XCTAssertFalse(element("sidebarPlayer_bar").exists, "Studio owns the active take's transport")
+        assertStaysAbsent(element("sidebarPlayer_bar"), "Studio owns the active take's transport")
         VocelloUIScreenshot.attach(app, named: "mac-smoke-custom-complete")
 
         // The tallest the Studio column ever gets: a finished take turns the
@@ -496,19 +507,20 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
 
         navigate(to: .customVoice)
         XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
-        XCTAssertFalse(element("sidebarPlayer_bar").exists, "Returning to Studio restores one inline transport")
+        assertStaysAbsent(element("sidebarPlayer_bar"), "Returning to Studio restores one inline transport")
 
         navigate(to: .voices)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(
             on: button("voicesRow_play_\(VocelloUIBenchMatrix.cloneVoiceID)"), timeout: 20))
         navigate(to: .customVoice)
-        XCTAssertEqual(button("studio_inlinePlayer_playPause").label, "Play",
-                       "The old result must offer replay rather than pausing the other clip")
+        XCTAssertTrue(VocelloUIWait.condition("the old result to offer replay", timeout: 10) {
+            self.button("studio_inlinePlayer_playPause").label == "Play"
+        }, "The old result must offer replay rather than pausing the other clip")
         XCTAssertTrue(button("sidebarPlayer_playPause").exists,
                       "The newly selected reference clip keeps its own transport")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studio_inlinePlayer_playPause"), timeout: 20))
-        XCTAssertFalse(element("sidebarPlayer_bar").exists,
-                       "Replaying the result returns transport ownership to Studio")
+        assertStaysAbsent(element("sidebarPlayer_bar"),
+                          "Replaying the result returns transport ownership to Studio")
     }
 
     func test03_GenerationCancellation() {
@@ -532,8 +544,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_liveBadge"), timeout: 15))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 15))
         navigate(to: .customVoice)
-        XCTAssertFalse(button("studio_livePreview_playPause").exists,
-                       "A dismissed stream must not retake playback ownership")
+        assertStaysAbsent(button("studio_livePreview_playPause"),
+                          "A dismissed stream must not retake playback ownership")
         XCTAssertTrue(button("textInput_cancelButton").exists,
                       "Dismissing playback must leave generation under the Cancel control")
         // Stop (⌘.) follows the running take, not only the player (MAC-23): with the

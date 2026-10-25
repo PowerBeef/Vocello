@@ -65,7 +65,8 @@ The iOS destination is the paired physical iPhone only. Simulator destinations a
 `marketing` captures authored Mac product images, generates two demo takes, and saves one designed
 voice through visible controls. It is an asset workflow, not an acceptance or benchmark verdict.
 `localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
-without generating audio or changing installed model state.
+without generating audio or changing installed model state; on macOS it also owns the ten-interface-
+language switch and relaunch walk, which smoke's navigation journey skips.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
 `control-audit` is a source-bound, physical-iPhone-only campaign. Its untracked plan, observations,
 screenshots, xcresult, diagnostics, and restoration proof are retained under the run artifact.
@@ -1579,9 +1580,9 @@ elif [[ "$platform" == "macos" ]]; then
     export TEST_RUNNER_QVOICE_MARKETING_CAPTURE=1
   elif [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
-    # Smoke runs test01 without its ten-language walk; this lane runs it.
-    export TEST_RUNNER_QVOICE_MAC_LANGUAGE_WALK=1
   elif [[ "$lane" == "smoke" ]]; then
+    # test01's ten-interface-language walk (~21 min) is the localization lane's.
+    export TEST_RUNNER_QVOICE_MAC_SKIP_LANGUAGE_WALK=1
     # The smoke class runs its fifteen ordered journeys (test00-test14: window
     # sizes + Settings scene, navigation/readiness, completed generation +
     # History, mid-generation cancellation, virtual-mic recording, library

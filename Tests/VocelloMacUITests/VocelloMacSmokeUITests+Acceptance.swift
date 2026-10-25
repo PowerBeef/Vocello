@@ -31,14 +31,17 @@ extension VocelloMacSmokeUITests {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 20))
             let error = button("textInput_generationError")
             XCTAssertTrue(VocelloUIWait.exists(error, timeout: 180), "An unwritable destination must expose a retryable error")
-            XCTAssertFalse(button("studio_inlinePlayer_playPause").exists, "A failed attempt must not publish a result")
-            XCTAssertFalse(button("textInput_generateButton").exists, "An idle failure has one retry action, matching iOS")
-            XCTAssertFalse(button("textInput_cancelButton").exists)
+            assertStaysAbsent(button("studio_inlinePlayer_playPause"), "A failed attempt must not publish a result",
+                              settle: 1.5)
+            assertStaysAbsent(button("textInput_generateButton"), "An idle failure has one retry action, matching iOS")
+            assertStaysAbsent(button("textInput_cancelButton"), "A failed attempt leaves no Cancel control")
             assertStudioSizeMatrix("\(mode.rawValue)-write-error", failed: true)
             replaceScript(with: "")
-            XCTAssertFalse(error.isEnabled, "Retry follows the same empty-input rule as Generate")
+            XCTAssertTrue(VocelloUIWait.condition("Retry to disable on empty input", timeout: 10) {
+                !error.isEnabled
+            }, "Retry follows the same empty-input rule as Generate")
             replaceScript(with: script)
-            XCTAssertTrue(error.isEnabled)
+            XCTAssertTrue(VocelloUIWait.enabled(error, timeout: 10))
             assertHistoryRows(matching: script, expected: 0)
             let screen: VocelloMacScreen = mode == .custom ? .customVoice : mode == .design ? .voiceDesign : .voiceCloning
             navigate(to: screen)
@@ -123,11 +126,15 @@ extension VocelloMacSmokeUITests {
         VocelloUILayoutAssert.assertFullyWithinWindow(retry, of: app)
         XCTAssertTrue(retry.isHittable, "Retry must be reachable at the minimum window")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: retry, timeout: 20))
-        // Retry's own listing passes too quickly to observe; the store still
-        // fails, so the screen must settle on the error again.
+        // Retry's own listing passes too quickly to observe; the store still fails, so
+        // the screen must settle on the error again and hold it, not merely still show
+        // the error it had before the click.
         XCTAssertTrue(VocelloUIWait.condition("Saved Voices to settle on its error after Retry", timeout: 30) {
             self.savedVoicesSettled(showingError: true)
         })
+        XCTAssertFalse(VocelloUIWait.settles("Saved Voices to leave its error after Retry", timeout: 2) {
+            !self.savedVoicesSettled(showingError: true)
+        }, "After Retry the failing store must keep showing its error")
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-error-retried")
     }
 
@@ -302,7 +309,9 @@ extension VocelloMacSmokeUITests {
             for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
                 openSettingsOverview()
                 VocelloUILayoutAssert.assertFullyWithinWindow(button("settings_category_\(category)"), of: app)
-                openSettingsCategory(category)
+                // Straight from the overview just checked, not through a second overview trip.
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_category_\(category)"), timeout: 20))
+                XCTAssertTrue(VocelloUIWait.exists(element("settings_detail_\(category)"), timeout: 20))
                 VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-\(category)-\(name)")
             }
         }
@@ -319,6 +328,8 @@ extension VocelloMacSmokeUITests {
 /// engine's request receipt. It saves no voice and records nothing (BKL-19).
 @MainActor
 final class VocelloMacAutoLanguageUITests: VocelloMacUITestCase {
+    override class var keepsClickAndTypePaths: Bool { true }
+
     private struct Plan: Decodable {
         let planDigest: String
         let takes: [Take]

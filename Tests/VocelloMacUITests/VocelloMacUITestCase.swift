@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import XCTest
@@ -20,6 +21,9 @@ class VocelloMacUITestCase: XCTestCase {
     private(set) var session: VocelloUIApplicationSession!
     private var pendingAutoplayPreferenceRestore: Bool?
     private var pendingInterfaceLanguageRestore: String?
+    /// The interface language the session last confirmed, so an unchanged one is not
+    /// restored at teardown (a Settings round trip per test).
+    private var currentInterfaceLanguage: String?
     /// Studio modes whose visible variant the benchmark switched to Speed, with
     /// the variant kind to restore.
     private var pendingVariantRestore: [VocelloMacScreen: String] = [:]
@@ -33,8 +37,20 @@ class VocelloMacUITestCase: XCTestCase {
 
     var additionalLaunchEnvironment: [String: String] { [:] }
 
+    /// A measured lane (benchmark, perf) keeps XCTest's one-second wait cadence for its
+    /// whole run, so the pauses around each take or window, and the records taken under
+    /// them, stay comparable with earlier baselines.
+    class var keepsSteadyWaitCadence: Bool { false }
+
+    /// Lanes whose evidence depends on the click and typing paths keep them: the measured
+    /// lanes time those paths, marketing captures the sidebar as a click leaves it, and
+    /// the auto-language lane types its tracked sentence. Everyone else navigates with
+    /// ⌘1–⌘6 and pastes scripts.
+    class var keepsClickAndTypePaths: Bool { keepsSteadyWaitCadence }
+
     func beginSession(additionalArguments: [String] = [], englishInterface: Bool = true) {
         continueAfterFailure = false
+        VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         session = VocelloUIApplicationSession()
         VocelloUIInterruptionSentinel.install(on: self)
         launchApp(
@@ -43,7 +59,7 @@ class VocelloMacUITestCase: XCTestCase {
         )
         if englishInterface {
             preserveInterfaceLanguage()
-            if pendingInterfaceLanguageRestore != "en" { selectInterfaceLanguage("en") }
+            if currentInterfaceLanguage != "en" { selectInterfaceLanguage("en") }
             navigate(to: .customVoice)
         }
     }
@@ -58,6 +74,7 @@ class VocelloMacUITestCase: XCTestCase {
     /// journeys end their session. Releasing it here (idempotent) restores the
     /// visible Auto-play preference and terminates the app on every exit path.
     override func tearDown() async throws {
+        attachFailureScreenshotIfFailed()
         endSession()
         try await super.tearDown()
     }
@@ -70,7 +87,7 @@ class VocelloMacUITestCase: XCTestCase {
         }
         if let original = pendingInterfaceLanguageRestore, session != nil {
             pendingInterfaceLanguageRestore = nil
-            selectInterfaceLanguage(original)
+            if original != currentInterfaceLanguage { selectInterfaceLanguage(original) }
         }
         restorePendingAutoplayPreference()
         restorePendingVariantChoices()
@@ -78,6 +95,8 @@ class VocelloMacUITestCase: XCTestCase {
 
     /// Selects a genuine menu item by its stable identifier, then reads its visible value.
     func selectInterfaceLanguage(_ identifier: String) {
+        // Until the new choice is confirmed, teardown must not skip its restore.
+        currentInterfaceLanguage = nil
         openSettingsCategory("appLanguage")
         let picker = element("settings_appLanguage")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
@@ -95,7 +114,9 @@ class VocelloMacUITestCase: XCTestCase {
             }
         }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: choice, timeout: 10))
-        XCTAssertTrue(VocelloUIWait.value(picker, contains: Self.interfaceLanguageNames[identifier]!, timeout: 10))
+        if VocelloUIWait.value(picker, contains: Self.interfaceLanguageNames[identifier]!, timeout: 10) {
+            currentInterfaceLanguage = identifier
+        }
     }
 
     func preserveInterfaceLanguage() {
@@ -107,6 +128,7 @@ class VocelloMacUITestCase: XCTestCase {
             return
         }
         pendingInterfaceLanguageRestore = identifier
+        currentInterfaceLanguage = identifier
         // Explicit recovery after an interrupted prior journey. The runner
         // still restores through the real Settings picker, never defaults writes.
         if let recovery = ProcessInfo.processInfo.environment["QVOICE_MAC_RESTORE_INTERFACE_LANGUAGE"] {
@@ -207,13 +229,36 @@ class VocelloMacUITestCase: XCTestCase {
         )).firstMatch
     }
 
-    func navigate(to screen: VocelloMacScreen) {
-        if [.customVoice, .voiceDesign, .voiceCloning].contains(screen) {
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebar_studio"), timeout: 20))
-        }
+    /// The Navigate menu's shortcut for each destination (`QwenVoiceApp.swift`).
+    private static let navigationKeys: [VocelloMacScreen: String] = [
+        .customVoice: "1", .voiceDesign: "2", .voiceCloning: "3", .history: "4", .voices: "5", .settings: "6",
+    ]
+
+    /// Goes to `screen` with its ⌘1–⌘6 Navigate command, which a user reaches the same
+    /// way, falling back to the sidebar when the command is unavailable (navigation is
+    /// locked while a batch runs, or a sheet holds the window). `viaSidebar` clicks the
+    /// sidebar rows themselves; the navigation journey keeps that path covered, and the
+    /// measured lanes always click, since their windows time the sidebar path.
+    func navigate(to screen: VocelloMacScreen, viaSidebar: Bool = false) {
         let sidebar = button(screen.sidebarID)
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: sidebar, timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(element(screen.screenID), timeout: 20))
+        let destination = element(screen.screenID)
+        var arrived = false
+        if !viaSidebar, !Self.keepsClickAndTypePaths, let key = Self.navigationKeys[screen] {
+            app.typeKey(key, modifierFlags: .command)
+            arrived = VocelloUIWait.settles("\(screen.rawValue) to open from its shortcut", timeout: 3) {
+                destination.exists && sidebar.isSelected
+            }
+        }
+        if !arrived {
+            if !viaSidebar, !Self.keepsClickAndTypePaths {
+                XCTContext.runActivity(named: "⌘ shortcut for \(screen.rawValue) unavailable; using the sidebar") { _ in }
+            }
+            if [.customVoice, .voiceDesign, .voiceCloning].contains(screen) {
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebar_studio"), timeout: 20))
+            }
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: sidebar, timeout: 20))
+        }
+        XCTAssertTrue(VocelloUIWait.exists(destination, timeout: 20))
         XCTAssertTrue(
             // The trait, which the app now sets instead of spelling the word
             // out in an accessibility value a French user would hear in
@@ -605,13 +650,16 @@ class VocelloMacUITestCase: XCTestCase {
     /// opposite of what the untyped query's behaviour suggested, and the
     /// reason `historyRow_title_<id>` and `historyRow_meta_<id>` exist.
     func assertHistoryRowsLayoutIntact(filteredTo text: String) {
-        navigate(to: .history)
         let search = element("history_searchField", type: .searchField)
-        XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: text, timeout: 20))
-        XCTAssertTrue(
-            VocelloUIWait.value(search, contains: text, timeout: 10),
-            "typed history filter text must land in the search field"
-        )
+        // Usually called right after `assertHistoryRows` with the same filter: keep it.
+        if !(element("screen_history").exists && (search.value as? String) == text) {
+            navigate(to: .history)
+            XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: text, timeout: 20))
+            XCTAssertTrue(
+                VocelloUIWait.value(search, contains: text, timeout: 10),
+                "typed history filter text must land in the search field"
+            )
+        }
 
         let playButtons = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "historyRow_play_")
@@ -720,7 +768,11 @@ class VocelloMacUITestCase: XCTestCase {
     func replaceScript(with text: String) {
         let editor = element("textInput_textEditor")
         if (editor.value as? String) != text {
-            XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
+            if Self.keepsClickAndTypePaths {
+                XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
+            } else {
+                pasteIntoEditor(editor, text)
+            }
         }
         XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10, onTimeout: {
             let observed = editor.value as? String
@@ -743,6 +795,82 @@ class VocelloMacUITestCase: XCTestCase {
         }) {
             editor.value as? String == text
         })
+    }
+
+    /// Replaces the editor's text with a paste, which lands in one step where typing a
+    /// script cost about 391 s per smoke run. The general pasteboard's previous items,
+    /// every type of each, are put back afterwards unless something else wrote it
+    /// meanwhile; items marked concealed or transient are never put back. Empty text is
+    /// select-all and delete.
+    func pasteIntoEditor(_ editor: XCUIElement, _ text: String) {
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: editor, timeout: 20))
+        editor.typeKey("a", modifierFlags: .command)
+        guard !text.isEmpty else {
+            editor.typeKey(.delete, modifierFlags: [])
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+        let unrestorable: Set<NSPasteboard.PasteboardType> = [
+            NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"), transient,
+        ]
+        // Reading another app's pasteboard can raise a system prompt that would stop an
+        // unattended lane, so the previous contents are kept only when access is allowed.
+        let saved: [NSPasteboardItem] = pasteboard.accessBehavior != .alwaysAllow ? [] :
+            (pasteboard.pasteboardItems ?? []).compactMap { item in
+                guard unrestorable.isDisjoint(with: item.types) else { return nil }
+                let copy = NSPasteboardItem()
+                for type in item.types {
+                    if let data = item.data(forType: type) { copy.setData(data, forType: type) }
+                }
+                return copy
+            }
+        // This host only, marked transient, so Universal Clipboard and clipboard managers
+        // skip the test text.
+        pasteboard.prepareForNewContents(with: .currentHostOnly)
+        let written = pasteboard.setString(text, forType: .string)
+            && pasteboard.setData(Data(), forType: transient)
+        let pastedChangeCount = pasteboard.changeCount
+        defer {
+            if pasteboard.changeCount == pastedChangeCount {
+                pasteboard.clearContents()
+                if !saved.isEmpty { pasteboard.writeObjects(saved) }
+            }
+        }
+        // Never paste what is not the script: a failed write, or a copy made meanwhile.
+        guard written, pasteboard.changeCount == pastedChangeCount else {
+            XCTFail("Could not stage the script on the pasteboard")
+            return
+        }
+        editor.typeKey("v", modifierFlags: .command)
+        _ = VocelloUIWait.settles("pasted script to land", timeout: 10) { editor.value as? String == text }
+    }
+
+    /// Asserts `element` is absent now or within `settle` seconds and stays absent for
+    /// `hold` seconds. A single read right after an action passed only because the old
+    /// one-second waits let animations finish first.
+    func assertStaysAbsent(
+        _ element: XCUIElement, _ message: String, settle: TimeInterval = 5, hold: TimeInterval = 1,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        let absent = VocelloUIWait.settles("absence of \(element)", timeout: settle) { !element.exists }
+        let reappeared = absent && VocelloUIWait.settles("\(element) to reappear", timeout: hold) { element.exists }
+        XCTAssertTrue(absent && !reappeared, message, file: file, line: line)
+    }
+
+    /// Unique identifiers under `root` whose identifier starts with `prefix`, from one
+    /// accessibility snapshot rather than one request per element.
+    /// Nil when no snapshot could be taken, which must never read as an empty list.
+    func uniqueIdentifiers(under root: XCUIElement, prefix: String, excluding fragments: [String] = []) -> Set<String>? {
+        guard let snapshot = try? root.snapshot() else { return nil }
+        var found = Set<String>()
+        func walk(_ node: XCUIElementSnapshot) {
+            let id = node.identifier
+            if id.hasPrefix(prefix), !fragments.contains(where: { id.contains($0) }) { found.insert(id) }
+            node.children.forEach(walk)
+        }
+        walk(snapshot)
+        return found
     }
 
     func assertReadyToGenerate(mode: VocelloUIBenchMatrix.Mode) {
@@ -810,26 +938,32 @@ class VocelloMacUITestCase: XCTestCase {
             VocelloUIWait.value(search, contains: text, timeout: 10),
             "typed history filter text must land in the search field"
         )
-        let rowPredicate = NSPredicate(
-            format: "identifier BEGINSWITH 'historyRow_' AND NOT ("
-                + "identifier CONTAINS '_saveVoice_' OR identifier CONTAINS '_saveAs_' "
-                + "OR identifier CONTAINS '_delete_' OR identifier CONTAINS '_play_' "
-                + "OR identifier CONTAINS '_title_' OR identifier CONTAINS '_meta_')"
-        )
-        let rows = app.descendants(matching: .any).matching(rowPredicate)
+        let history = element("screen_history")
         // SwiftUI propagates each row's identifier onto every child element
         // (play button, text fields, trailing group), so the raw match count
         // is a multiple of the visible rows. Count unique identifiers — one
-        // per logical row. The zero case needs no empty-state probe: the
-        // "No results found" unavailable view exposes no row identifiers.
+        // per logical row — from one snapshot of the filtered screen per poll.
+        // The zero case needs no empty-state probe: the "No results found"
+        // unavailable view exposes no row identifiers.
+        let excluded = ["_saveVoice_", "_saveAs_", "_delete_", "_play_", "_title_", "_meta_"]
+        let count = { () -> Int? in
+            guard history.exists else { return nil }
+            return self.uniqueIdentifiers(under: history, prefix: "historyRow_", excluding: excluded)?.count
+        }
         XCTAssertTrue(
             VocelloUIWait.condition(
                 "history to show exactly \(expected) row(s) for '\(text)'",
                 timeout: 30
-            ) {
-                Set(rows.allElementsBoundByIndex.map { $0.identifier }).count == expected
-            }
+            ) { count() == expected }
         )
+        // Rows load asynchronously, so zero rows must hold, not be read once (a cancelled
+        // or failed take must not land in History a moment later).
+        if expected == 0 {
+            XCTAssertFalse(
+                VocelloUIWait.settles("a row to appear for '\(text)'", timeout: 2.5) { (count() ?? 0) > 0 },
+                "History must stay empty for '\(text)'"
+            )
+        }
     }
 
     /// Player visibility is first-chunk proof; the re-enabled Generate control
@@ -890,17 +1024,25 @@ class VocelloMacUITestCase: XCTestCase {
                 mouseButton: .left
             )?.post(tap: .cghidEventTap)
         }
+        // Completion is this take's own card, not any player: an earlier take's card,
+        // or the retryable error button that shares Generate's slot, cannot pass for it.
+        // The new checks sit behind the old gate, so polls during the take query what
+        // they always did; measured lanes keep the old predicate exactly.
+        let generationError = button("textInput_generationError")
+        let measured = Self.keepsSteadyWaitCadence
         XCTAssertTrue(
             VocelloUIWait.condition(
                 "generation to complete with Generate enabled and the player visible",
                 timeout: timeout
             ) {
-                generate.exists
-                    && generate.isEnabled
-                    && !cancel.exists
-                    && player.exists
-                    && !backendError.exists
-                    && !backendCrash.exists
+                guard generate.exists && generate.isEnabled && !cancel.exists else { return false }
+                if measured {
+                    return player.exists && !backendError.exists && !backendCrash.exists
+                }
+                if generationError.exists || backendError.exists || backendCrash.exists { return true }
+                return player.exists
+                    && !Set(completedCards.allElementsBoundByIndex.map(\.identifier))
+                        .subtracting(cardsBeforeClick).isEmpty
             }
         )
         if hideDuringTake {
@@ -911,6 +1053,9 @@ class VocelloMacUITestCase: XCTestCase {
         }
         XCTAssertFalse(backendError.exists, "Generation must not expose a backend error")
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
+        if !measured {
+            XCTAssertFalse(generationError.exists, "Generation must not end on its retryable error")
+        }
     }
 
     /// Waits until the visible Studio or sidebar player stops playing. The control
@@ -921,9 +1066,26 @@ class VocelloMacUITestCase: XCTestCase {
     func waitForPlaybackToFinish(timeout: TimeInterval) -> Bool {
         let inline = button("studio_inlinePlayer_playPause")
         let control = inline.exists ? inline : button("sidebarPlayer_playPause")
+        if !Self.keepsSteadyWaitCadence {
+            // Autoplay starts a moment after completion; the label reads "Play" until then.
+            _ = VocelloUIWait.settles("playback to start", timeout: 3) {
+                control.exists && control.label != "Play"
+            }
+        }
         return VocelloUIWait.condition("playback to finish", timeout: timeout) {
             !control.exists || control.label == "Play"
         }
+    }
+
+    /// A failed test keeps a named screenshot of the window as it was when it stopped
+    /// (stop-on-failure leaves the app untouched until teardown), for review.
+    func attachFailureScreenshotIfFailed() {
+        guard let run = testRun, run.failureCount + run.unexpectedExceptionCount > 0,
+              let window = session?.app.windows.firstMatch, window.exists else { return }
+        let attachment = XCTAttachment(screenshot: window.screenshot())
+        attachment.name = "failure-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func timeout(for take: VocelloUIBenchMatrix.Take) -> TimeInterval {

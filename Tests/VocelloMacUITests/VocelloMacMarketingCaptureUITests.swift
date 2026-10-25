@@ -14,6 +14,8 @@ import XCTest
 /// nothing. Script copy must follow website/PRODUCT.md rules: local not
 /// offline, no em dashes, current preset names only.
 final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
+    override class var keepsClickAndTypePaths: Bool { true }
+
     /// A whole-bundle run must not turn asset captures into acceptance evidence.
     override func setUpWithError() throws {
         try super.setUpWithError()

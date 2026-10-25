@@ -286,20 +286,20 @@ public enum VocelloUIWait {
         return try body()
     }
 
-    /// Sets the cadence at a session's start: steady for a whole measured lane, eager
+    /// Sets the cadence at a session's start: steady for a whole measured lane (iPhone or
+    /// Mac benchmark, perf, delivery cohort), eager
     /// otherwise. Stop-on-failure skips `withSteadyCadence`'s `defer`, so this also clears
     /// a window an earlier test left open.
     public static func resetCadence(steady: Bool) {
         steadyCadenceDepth = steady ? 1 : 0
     }
 
-    /// Polls `evaluate` until it holds or `timeout` passes. On the iPhone it checks at
-    /// once, then backs off from 0.1 s to XCTest's one second: `XCTNSPredicateExpectation`
-    /// and `waitForExistence` poll about once a second, so a wait for a control that is
-    /// already on screen cost a full second, which added minutes to every journey.
-    /// macOS and steady-cadence windows keep XCTest's own waiter.
+    /// Polls `evaluate` until it holds or `timeout` passes. It checks at once, then backs
+    /// off from 0.1 s to XCTest's one second: `XCTNSPredicateExpectation` and
+    /// `waitForExistence` poll about once a second, so a wait for a control that is already
+    /// on screen cost a full second (on the iPhone) or two (on the Mac, 778 waits in one
+    /// smoke run). Steady-cadence windows keep XCTest's own waiter.
     private static func poll(timeout: TimeInterval, evaluate: @escaping () -> Bool) -> Bool {
-        #if os(iOS)
         if steadyCadenceDepth == 0 {
             let deadline = Date(timeIntervalSinceNow: timeout)
             var interval: TimeInterval = 0.1
@@ -311,7 +311,6 @@ public enum VocelloUIWait {
                 interval = min(interval * 2, 1.0)
             }
         }
-        #endif
         let predicate = NSPredicate { _, _ in evaluate() }
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: NSObject())
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
@@ -367,13 +366,9 @@ public enum VocelloUIWait {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> Bool {
-        #if os(iOS)
         let result = steadyCadenceDepth == 0
             ? poll(timeout: timeout) { element.exists }
             : element.waitForExistence(timeout: timeout)
-        #else
-        let result = element.waitForExistence(timeout: timeout)
-        #endif
         if !result {
             VocelloUIFailureEvidence.capture(reason: "element never existed: \(element)")
             XCTFail("Expected element to exist within \(timeout)s: \(element)", file: file, line: line)
@@ -698,9 +693,12 @@ public enum VocelloUIPrimaryAction {
 @MainActor
 public enum VocelloUITextEntry {
     @discardableResult
+    /// `submit` types Return after the text in the same call, for a field whose Return
+    /// is Done or Search: one keyboard round trip instead of two.
     public static func replace(
         in element: XCUIElement,
         with text: String,
+        submit: Bool = false,
         timeout: TimeInterval = 15,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -722,7 +720,7 @@ public enum VocelloUITextEntry {
             element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
         }
         #endif
-        element.typeText(text)
+        element.typeText(submit ? text + "\n" : text)
         return true
     }
 }

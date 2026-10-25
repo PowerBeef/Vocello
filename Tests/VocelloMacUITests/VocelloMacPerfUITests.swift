@@ -26,6 +26,8 @@ import XCTest
 /// (`VOCELLO_UIPERF_SETUP=`, audit #82).
 @MainActor
 final class VocelloMacPerfUITests: VocelloMacUITestCase {
+    override class var keepsSteadyWaitCadence: Bool { true }
+
     private static let seededHistoryRows = 400
 
     override func setUp() {

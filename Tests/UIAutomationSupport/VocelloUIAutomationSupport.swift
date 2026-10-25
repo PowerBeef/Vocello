@@ -32,6 +32,21 @@ enum VocelloUISettingsReveal {
         return previous
     }
 
+    /// Frames of the activatable controls in `container`, from one snapshot.
+    private static func controlFrames(in container: XCUIElement) -> [CGRect] {
+        let types: Set<XCUIElement.ElementType> = [
+            .button, .switch, .toggle, .link, .textField, .textView, .slider, .stepper, .segmentedControl,
+        ]
+        guard let root = try? container.snapshot() else { return [] }
+        var frames: [CGRect] = []
+        func walk(_ node: XCUIElementSnapshot) {
+            if types.contains(node.elementType) { frames.append(node.frame) }
+            node.children.forEach(walk)
+        }
+        walk(root)
+        return frames
+    }
+
     static func perform(_ target: XCUIElement, in app: XCUIApplication, swipingUp: Bool,
                         requirement: VocelloUIRevealRequirement = .fullVisibility) -> Bool {
         var search = VocelloUIRevealSearch(preferred: swipingUp ? .up : .down)
@@ -105,11 +120,28 @@ enum VocelloUISettingsReveal {
             // Pointer scroll events compile for iOS but fail on touch-only iPhones.
             // Text descendants are genuine visible content, not hidden test anchors.
             // Their complete frames, not just centers/hittability, must clear the dock.
-            let anchors = container.staticTexts.allElementsBoundByIndex.filter {
+            let texts = container.staticTexts.allElementsBoundByIndex.filter {
                 $0.exists && $0.isHittable
             }
-            guard let index = VocelloUITouchScrollAnchor.index(
-                frames: anchors.map(\.frame), visible: visible, desiredDelta: delta) else {
+            // A swipe the scroll view cannot follow (near its end, with bounce off) lands
+            // as a tap on whatever control holds the anchor: on a toggle row's caption it
+            // flipped Download over cellular on every swipe (2026-10-25, run
+            // 20261025-173415-0398b5f1). Text outside every control goes first.
+            let controls = controlFrames(in: container)
+            let freeTexts = texts.filter { text in
+                let center = CGPoint(x: text.frame.midX, y: text.frame.midY)
+                return !controls.contains { $0.contains(center) }
+            }
+            var anchors = freeTexts
+            var chosen = VocelloUITouchScrollAnchor.index(
+                frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
+            if chosen == nil {
+                observations.append("no control-free touch anchor; falling back to text inside a control")
+                anchors = texts
+                chosen = VocelloUITouchScrollAnchor.index(
+                    frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
+            }
+            guard let index = chosen else {
                 observations.append("no fully visible bounded touch anchor in owning scroll view")
                 return false
             }

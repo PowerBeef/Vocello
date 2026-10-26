@@ -51,6 +51,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
     private let modelID = "pro_custom"
     private let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
     private var capturedProgressMilestones: [String: Set<Int>] = [:]
+    private var progressReveals: [String: Int] = [:]
     private var capturedPhases: [String: Set<String>] = [:]
 
     func testConfiguredModelManagementScenario() {
@@ -503,6 +504,19 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
                 && !capturedProgressMilestones[modelID, default: []].contains(threshold)
         }
         guard !crossedThresholds.isEmpty else { return sample.fraction }
+        // A bar out of view would be measured as whatever covers it: the bottom row's bar sat
+        // under the tab dock once the cellular switch lengthened Voice Models (2026-10-26, run
+        // ios-xcui-model-download-20261026-182637-177434c3). Reveal it and capture on a later
+        // poll, at most three reveals per model; a bar still out of view after that is
+        // captured as it is, so the visual check reports it. Every capture pairs a fresh
+        // sample with its own screenshot, so an attempted reveal never captures.
+        if let viewport = VocelloUISettingsReveal.viewport(in: app),
+           !VocelloUIRevealRequirement.fullVisibility.satisfied(by: sample.frame, visible: viewport),
+           progressReveals[modelID, default: 0] < 3 {
+            progressReveals[modelID, default: 0] += 1
+            _ = revealSettingsElement(progress, swipingUp: sample.frame.maxY > viewport.maxY)
+            return sample.fraction
+        }
         let screenshot = app.screenshot()
         for threshold in crossedThresholds {
             capturedProgressMilestones[modelID, default: []].insert(threshold)

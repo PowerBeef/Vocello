@@ -114,6 +114,11 @@ Between September 4 and October 12 the release did not move:
   A computer-use run saves a local step-and-screenshot record; an attended row closes only when the
   maintainer confirms that record. XCUITest stays the only automated evidence, and the iOS lanes
   refuse to start while iPhone Mirroring runs.
+- **2026-10-26.** Build 26 (`v3.0.0-ios.5` at `e0feaf2c`: build 25's product plus a test-only fix)
+  joined the Public Beta group without RF-17's exact-tag manifest, and its promotion lanes were
+  skipped. The waiver covers that Public Beta distribution only; RF-17 still gates the App Review
+  submission. The beta looks for the remaining bugs and for performance and stability on the
+  iPhone 15 Pro, the hardware floor.
 
 ## The path
 

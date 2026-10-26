@@ -293,8 +293,8 @@
         "scripts/verify_ios_release_artifacts.py",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-10-24",
-      "notes": "2026-10-24: the maintainer fast-tracked the 3.0 release candidate to TestFlight: the agent approves the release gate, then distributes when Apple ends processing; the Public Beta group waits for RF-17's exact-tag promotion, while the beta review submission goes in at once. iPhone candidates are cut by python3 scripts/ios_candidate_tag.py (fc8bb78e); a v<version>-ios.N push runs only the iPhone archive and upload. v3.0.0-ios.3 on 26995f71 ran release run 40103005257, which passed end to end; build 24 (e008a349) went VALID at 16:44 UTC. Distributed: What to Test notes (en-US), Internal testers through the group's access to all builds (IN_BETA_TESTING), beta review submitted (WAITING_FOR_REVIEW), no external group. Still open in this gate: the processed build installed on the iPhone over the development build, keeping data, and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). Earlier history: git log -p -- config/roadmap.json."
+      "updated": "2026-10-26",
+      "notes": "2026-10-24: the maintainer fast-tracked the 3.0 candidate to TestFlight: the agent approves the release gate and distributes once Apple ends processing. Candidates are cut by python3 scripts/ios_candidate_tag.py; a v<version>-ios.N push runs only the iPhone archive and upload. Builds: 24 (v3.0.0-ios.3, run 40103005257); 25 (v3.0.0-ios.4 at 3f1d2bda, run 40146203055, beta review APPROVED 2026-10-26); 26 (v3.0.0-ios.5 at e0feaf2c, build 25's product plus a test-only fix, run 40391931937, VALID 2026-10-26, en-US What to Test notes, beta review APPROVED, Internal and Public Beta IN_BETA_TESTING under the maintainer's RF-17 waiver of 2026-10-26). Still open in this gate: the processed build installed on the iPhone over the development build, keeping data (since 2026-10-26 the phone carries the model-download lane's development build, so TestFlight build 26 goes back on first), and the owned-export Airplane Mode row, which waits for the Paid Apps agreement (RF-02). Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "RF-15",
@@ -328,8 +328,8 @@
         "config/quality-promotion-contract.json",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-10-12",
-      "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate. 2026-10-24 (maintainer): build 24 joins the Public Beta group only after this promotion validates; its beta review submission does not wait."
+      "updated": "2026-10-26",
+      "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate. 2026-10-24 (maintainer): build 24 joins the Public Beta group only after this promotion validates; its beta review submission does not wait. 2026-10-26 (maintainer): the promotion lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26, build 25's product plus a test-only fix), and build 26 joined the Public Beta group without a validated manifest. The waiver covers that Public Beta distribution only; this promotion still gates the App Review submission (RF-16). The model-download lane's dock fix (398709b8) is on that tag; classify the submitted tag before the next window to run only the classes it routes to."
     },
     {
       "id": "RF-35",

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-25
+reviewed: 2026-10-26
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,29 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 
 ## Resume now
 
-### October 25: build 25, faster UI lanes, computer use as the default route (resume here)
+### October 26: build 26 in Public Beta (resume here)
+
+- **Build 26** (3.0.0, `v3.0.0-ios.5` at `e0feaf2c`): build 25's product plus a test-only fix
+  (`398709b8`) and the build number. Release run 40391931937 passed and the build processed VALID;
+  en-US What to Test notes, beta review APPROVED, Internal and Public Beta IN_BETA_TESTING (public
+  link and feedback on). Build 25's beta review was also approved; it never joined Public Beta.
+  Build 23 (2.4.0) stays in the group until it expires on October 30.
+- **RF-17 waived for this Public Beta only (maintainer, 2026-10-26):** the promotion lanes were
+  skipped on `v3.0.0-ios.5`; RF-17 still gates the App Review submission. The beta looks for the
+  remaining bugs and for performance and stability on the iPhone 15 Pro floor.
+- **Model-download lane:** the bottom row's progress bar sat under the tab dock once the cellular
+  switch lengthened Voice Models (`ios-xcui-model-download-20261026-182637-177434c3`, retained, ten
+  findings on pro_clone). The test now reveals the bar before capturing it (`398709b8`); the proof
+  run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
+- **Phone state:** the model-download lane's development build replaced TestFlight build 25, data
+  kept. Reinstall build 26 from TestFlight before the next candidate row.
+- **Next:** triage Public Beta feedback and crashes as they arrive. The next window runs RF-17's
+  lanes (classify the submitted tag first), RF-35's attended cellular check and RF-15's remaining
+  rows. The maintainer can do RF-02 (Paid Apps agreement, banking, tax, DSA), ASR-05's listing
+  review and ASR-04's attestations remotely.
+- **Pushed:** through `e0feaf2c` (CI passed).
+
+### October 25: build 25, faster UI lanes, computer use as the default route
 
 - **Build 25** (3.0.0, `v3.0.0-ios.4` at `3f1d2bda`, RF-35 cellular opt-in plus RF-36 translations)
   passed release run 40146203055 and processed VALID; internal testers have it; no beta review
@@ -169,72 +191,3 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   is pushed. The agent worktrees `wf_9f99b8e0-4f2-1`..`4` are integrated and can be removed.
 - **Next:** the iPhone submission from the same `v3.0.0` tag in the coming days (RF-10's packaged-app
   checks stay open); RF-30 and RF-31 after it.
-
-### October 22, night — the Mac and CLI 3.0 release starts from the release commit
-
-- **Maintainer decision:** release the Mac app and the CLI 3.0 first; submit the iPhone app a few days later
-  from the same `v3.0.0` tag. Recorded in `focusLock` (maxInFlight 3); RF-10 joins the release plan in
-  flight; RF-32 (README and website) follows publication.
-- **Release pipeline repaired on CI's Xcode 26.6 and Linux:** `0ffe6fa3` (event-stream test), `6f3efa57`
-  (macOS-only package tests), `f9326d16` (`release.sh` otool SIGPIPE), `8b0ee46b` (the package smoke
-  read the CLI's Info.plist only at lengths divisible by four). CI is green from `f9326d16`.
-- **Tag signing:** `~/.ssh/vocello_tag_signing` signs tags for this repository only (local git config);
-  the maintainer registers it on GitHub (`gh auth refresh -s admin:ssh_signing_key`, then
-  `gh ssh-key add --type signing`).
-- **Still the maintainer's:** the Developer ID Installer certificate and its two `release` secrets, the
-  signed `v3.0.0` tag, the `release` environment approvals, and the publication route.
-- **Promotion evidence:** an audit of the eight macOS lanes found the language lane unsatisfiable (six of
-  the ten required languages); this commit adds the other four as pinned cells. Lanes run with HEAD on
-  this exact commit and a clean tree; their records move to `build/artifacts/quality-promotion/` before
-  the managed download capture, which needs the tag. No edit or commit until `create` and `validate`
-  pass. Risks: Fast QC warnings, `custom-ja-auto`, Portuguese.
-
-### October 22, later — RF-29 closes: `vocello mcp` serves agents
-
-- **RF-29 done** (`bd045167`): `vocello mcp` is an in-house stdio MCP server.
-  - It serves the stateless 2026-07-28 revision and the `initialize`-era ones.
-  - Its 17 tools run the CLI's own commands, on one warm engine behind a FIFO gate.
-  - Consent is checked per request, and paths are confined: reads come from `<data>/outputs`, writes go
-    to `<data>/outputs/cli`, and `--allow-dir` adds folders for both.
-  - It reports progress and handles cancellation.
-  - `--print-config` and `--self-test` help with setup.
-  - It was proven over stdio with a real take, a cancelled take and a take after it, and a headless
-    Claude Code session (`claude -p --mcp-config`) generated a real take through it.
-  - It had two Swift reviews, with every finding fixed.
-- **Fixed on the way:**
-  - `generate` never replaces a History take's audio.
-  - RF-08: through any link (the installer's `/usr/local/bin/vocello`, `build/vocello` outside the
-    checkout), MLX could not find its metallib, so every take failed. `vocello` now execs its real path.
-- **Moved on:**
-  - To RF-31: the interactive Claude Code cancel (Esc), and the server holding the engine lease for its
-    whole life.
-  - To RF-30: MCP History rows and `delete_history_item`.
-- **CLI work before the submission is complete** (RF-25 to RF-29). RF-30 and RF-31 follow the iOS
-  submission.
-- **RF-08 in flight:** the maintainer still needs the Developer ID Installer certificate, its two
-  `release` secrets and the first rehearsal.
-- **Release items waiting:** RF-09's freeze checks are due 2026-10-23.
-- **Not pushed:** local commits are unpushed; the iPhone candidate stays at `0919e998`.
-
-### October 22 — RF-28 closes; RF-29 (the MCP server) starts
-
-- **RF-28 done:**
-  - `settings set`, `models use` and `models prefer-lower-memory` write the app's preferences as its
-    Settings do; turning `prefer-lower-memory` on clears the per-mode choices.
-  - `models install-recommended` (with `--plan`) and `models remove`. Removal reconciles a package
-    choice that named the model, refuses mode aliases, and is refused beside a running engine.
-  - `voices enroll`, `replace`, `save-take` and `delete` save voices as the app's voice sheet does.
-    `--transcribe auto` never prompts; `--on-warnings` chooses keep, discard or fail; a signal discards
-    the candidate.
-  - Each write posts `com.qwenvoice.shared.*DidChange`, and the Mac app reloads its saved voices or its
-    model manager (`8cf6d4b7`; a Mac-only app edit).
-
-  It had two Swift reviews, with every finding fixed (`b1160e36`, `213ded27`). Commits run from
-  `d364f073` to `213ded27`. Enrollment, replace and delete ran for real in a scratch data folder;
-  `save-take` has run only in tests, because the maintainer's History is empty.
-- **RF-29 in flight:** the in-house stdio MCP server (`vocello mcp`), per the plan in
-  `docs/audits/2026-10-21-cli-overhaul-plan.md` (tools, safety, the warm engine, setup helpers).
-- **RF-08 in flight:** the maintainer still needs the Developer ID Installer certificate, its two
-  `release` secrets and the first rehearsal.
-- **Release items waiting:** RF-09's freeze checks are due 2026-10-23.
-- **Not pushed:** local commits are unpushed; the iPhone candidate stays at `0919e998`.

@@ -33,6 +33,15 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
 - **Phone state:** the model-download lane's development build replaced TestFlight build 25, data
   kept. Reinstall build 26 from TestFlight before the next candidate row.
+- **RF-17 needs seven iOS records, not five:** `classify` against `v3.0.0` or `v3.0.0-ios.4` adds
+  `ios-language-benchmark` (lang-bench) and `ios-delivery-benchmark`. No iOS lane or history record
+  produces the delivery record yet, so no iOS manifest can validate until a lane or a recorded
+  contract decision covers it.
+- **RF-36 closed:** all ten languages, the dialog in the String Catalog, contract PASS, shipped in
+  builds 25 and 26.
+- **First beta report (build 23, no crash submissions):** a tester typed a voice description into
+  Design's script field and Generate never ran; 3.0 still dims Generate without a visible reason
+  (BKL-38, parked). The App Review notes draft now explains Design's voice description chip (ASR-05).
 - **Next:** triage Public Beta feedback and crashes as they arrive. The next window runs RF-17's
   lanes (classify the submitted tag first), RF-35's attended cellular check and RF-15's remaining
   rows. The maintainer can do RF-02 (Paid Apps agreement, banking, tax, DSA), ASR-05's listing

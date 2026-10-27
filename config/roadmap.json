@@ -329,7 +329,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-10-26",
-      "notes": "Opened 2026-10-12: the promotion contract stays authoritative under the risk-based device gate. 2026-10-24 (maintainer): build 24 joins the Public Beta group only after this promotion validates; its beta review submission does not wait. 2026-10-26 (maintainer): the promotion lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26, build 25's product plus a test-only fix), and build 26 joined the Public Beta group without a validated manifest. The waiver covers that Public Beta distribution only; this promotion still gates the App Review submission (RF-16). The model-download lane's dock fix (398709b8) is on that tag; classify the submitted tag before the next window to run only the classes it routes to."
+      "notes": "Opened 2026-10-12. 2026-10-26 (maintainer): the lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26) and build 26 joined the Public Beta group without a manifest; the waiver covers that distribution only, and this promotion still gates App Review (RF-16). 2026-10-26 classify (base v3.0.0 or v3.0.0-ios.4, same result): seven iOS records, not five: ios-ui-benchmark, ios-engine-benchmark, ios-retained-memory, ios-ui-performance and ios-model-download-lifecycle, plus ios-language-benchmark (lang-bench; earlier iOS records exist) and ios-delivery-benchmark (an engine-generation record with *#delivery-* cells and deliveryPairedProsodyEffect), both added by the multilingual-output and delivery-evaluation capabilities. A search found no iOS lane or iOS history record that produces the delivery record (the iOS bench spec carries no delivery cells), so no iOS manifest can validate until a lane or a recorded contract decision covers it."
     },
     {
       "id": "RF-35",
@@ -346,22 +346,6 @@
       ],
       "updated": "2026-10-25",
       "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off. 2026-10-25 on build 25: the navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, first-launch, modelsDownloaded pro_design, switch off), after five retained harness failures, each fixed. Open: the attended cellular check; with Wi-Fi off and the switch off the maintainer saw 682 MB, then No progress, and whether those bytes came over cellular is unanswered."
-    },
-    {
-      "id": "RF-36",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog",
-      "status": "in-flight",
-      "blockedBy": [],
-      "due": "2026-10-27",
-      "gate": "Maintainer report 2026-10-24 (Japanese Mac screenshots): Studio (the iPhone tab and the Mac sidebar) was English in every language, the Speed, Quality, Lite and Lite+ variant names in all but French, and the iPhone pinned-seed dialog title was a hard-coded English literal. Done when each has a translation in all ten interface languages (Studio stays Studio where the language uses it: French, German, Italian), the dialog reads from the String Catalog, the localization contract passes with the literal baseline shrunk by one, and the routed check passes. Proportionate (maintainer 2026-10-24): it ships in the RF-35 candidate, whose navigation row covers the tabs; no separate device run.",
-      "sourceOfTruth": [
-        "Sources/Resources/Localizable.xcstrings",
-        "Sources/iOS/IOSDesignSystemPrimitives.swift",
-        "config/localization-unlocalized-baseline.json"
-      ],
-      "updated": "2026-10-24",
-      "notes": "A census of strings identical to English across the nine other languages found these as the only gaps: the remaining matches are correct cognates (Audio, Normal, Pause, Version and the like) or brand names (Vocello, GitHub, AI·TTS). The iPhone app's other baselined literals are formatting, the brand name and OK buttons."
     },
     {
       "id": "RF-16",
@@ -775,8 +759,8 @@
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-10-12",
-      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-24 read-only live check (asc validate on version 3.0.0, PREPARE_FOR_SUBMISSION): name, privacy URL and the en-US Support URL match config/support-contact.json; the review notes' three byte totals match the shipped catalog. Not yet in App Store Connect: description, keywords, subtitle, What's New, review details and notes, screenshots, an attached build, and the export purchase's metadata (MISSING_METADATA, with RF-02). The repository drafts no description, keywords or subtitle yet. Writing any of it is an App Store Connect write that needs the maintainer's request; screenshots come from the signed candidate on the iPhone. History: git log -p -- config/roadmap.json. 2026-10-24: the en-US listing draft (subtitle, promotional text, description, keywords, What's New, review notes) is in docs/reference/app-store-listing.md, validated offline with asc metadata validate, awaiting the maintainer's review."
+      "updated": "2026-10-26",
+      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-24 read-only live check (asc validate on version 3.0.0, PREPARE_FOR_SUBMISSION): name, privacy URL and the en-US Support URL match config/support-contact.json; the review notes' three byte totals match the shipped catalog. Not yet in App Store Connect: description, keywords, subtitle, What's New, review details and notes, screenshots, an attached build, and the export purchase's metadata (MISSING_METADATA, with RF-02); writing any of it needs the maintainer's request, and screenshots come from the signed candidate on the iPhone. The en-US listing draft is in docs/reference/app-store-listing.md (2026-10-24), awaiting the maintainer's review. 2026-10-26: review-notes step 3 now says Voice Design needs its voice description chip before Generate, which a Public Beta tester missed (BKL-38). History: git log -p -- config/roadmap.json."
     },
     {
       "id": "ASR-06",
@@ -1877,6 +1861,21 @@
       "updated": "2026-10-25",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Seen 2026-10-25 in the visual review of macOS smoke run 20261025-221609-c2191179 (screenshot 043-mac-smoke-history-completed): the History metadata line reads \"aiden · Built-in Voice\" while Studio's chip and player read \"Aiden\". iPhone not checked. Not investigated (focus rules)."
+    },
+    {
+      "id": "BKL-38",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "When Design's Generate is dimmed because the voice description is empty, Studio shows why: the empty voice brief chip reads as an action, or a visible hint names the missing description, in all ten interface languages, with the other modes unchanged.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "Sources/iOS/IOSDesignSystemPrimitives.swift"
+      ],
+      "updated": "2026-10-26",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Public Beta feedback 2026-10-26 on build 23 (2.4.0; es-MX, iPhone 16 Pro Max): the tester typed a voice description into the script field, left the voice brief chip empty, and Generate never ran. In 3.0 the empty chip still renders only a dimmed + (\"Describe the voice\" is VoiceOver-only), and Generate dims without a reason; the Design placeholder helps only until text is typed. The App Review notes draft now explains the chip (ASR-05). Not investigated further (focus rules)."
     },
     {
       "id": "ER-01",

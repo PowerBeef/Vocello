@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 36/59 (61%) |
+| `release-first-3-0-2026-09` | active | release-qa | 37/59 (63%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/38 (34%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/39 (33%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -67,7 +67,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
-| `RF-36` | in-flight | Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog | — |
 
 ### Open items in detail
 
@@ -144,9 +143,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-35`** (in-flight, due 2026-10-27) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
-
-- **`RF-36`** (in-flight, due 2026-10-27) — Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog.
-  gate: Maintainer report 2026-10-24 (Japanese Mac screenshots): Studio (the iPhone tab and the Mac sidebar) was English in every language, the Speed, Quality, Lite and Lite+ variant names in all but French, and the iPhone pinned-seed dialog title was a hard-coded English literal. Done when each has a translation in all ten interface languages (Studio stays Studio where the language uses it: French, German, Italian), the dialog reads from the String Catalog, the localization contract passes with the literal baseline shrunk by one, and the routed check passes. Proportionate (maintainer 2026-10-24): it ships in the RF-35 candidate, whose navigation row covers the tabs; no separate device run.
 
 ## Engine remediation programme (2026-10-16 audit)
 
@@ -550,6 +546,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
 | `BKL-36` | parked | A short drag that starts on an iPhone Settings toggle row can flip the switch | — |
 | `BKL-37` | parked | Mac History shows the Built-in speaker in lowercase | — |
+| `BKL-38` | parked | iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -649,6 +646,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-37`** (parked) — Mac History shows the Built-in speaker in lowercase.
   gate: Every History row names its Built-in Voice speaker as Studio does (Aiden, not aiden), on the Mac and the iPhone.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-38`** (parked) — iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description.
+  gate: When Design's Generate is dimmed because the voice description is empty, Studio shows why: the empty voice brief chip reads as an action, or a visible hint names the missing description, in all ten interface languages, with the other modes unchanged.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

@@ -5679,6 +5679,28 @@
         "run:ios-xcui-candidate-smoke-20261024-200402-db93f093",
         "run:macos-xcui-smoke-20261024-205357-0952e758"
       ]
+    },
+    {
+      "id": "RF-36",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Translate the interface strings that stayed English: Studio, the model variants and the iPhone pinned-seed dialog",
+      "status": "done",
+      "blockedBy": [],
+      "due": "2026-10-27",
+      "gate": "Maintainer report 2026-10-24 (Japanese Mac screenshots): Studio (the iPhone tab and the Mac sidebar) was English in every language, the Speed, Quality, Lite and Lite+ variant names in all but French, and the iPhone pinned-seed dialog title was a hard-coded English literal. Done when each has a translation in all ten interface languages (Studio stays Studio where the language uses it: French, German, Italian), the dialog reads from the String Catalog, the localization contract passes with the literal baseline shrunk by one, and the routed check passes. Proportionate (maintainer 2026-10-24): it ships in the RF-35 candidate, whose navigation row covers the tabs; no separate device run.",
+      "sourceOfTruth": [
+        "Sources/Resources/Localizable.xcstrings",
+        "Sources/iOS/IOSDesignSystemPrimitives.swift",
+        "config/localization-unlocalized-baseline.json"
+      ],
+      "updated": "2026-10-26",
+      "notes": "A census of strings identical to English across the nine other languages found these as the only gaps: the remaining matches are correct cognates (Audio, Normal, Pause, Version and the like) or brand names (Vocello, GitHub, AI·TTS). The iPhone app's other baselined literals are formatting, the brand name and OK buttons. Closed 2026-10-26: all seven changed keys (tabStudio, sectionStudio, the four variants, seedPinnedConfirmation) carry all ten interface languages; the pinned-seed dialog reads from the String Catalog and its confirmationDialog literal left the baseline; the localization contract passes. Shipped in builds 25 and 26 (v3.0.0-ios.4 and ios.5), whose navigation row on build 25 covers the tabs (proportionate, per the gate).",
+      "evidence": [
+        "commit:40f6a26f",
+        "file:Sources/Resources/Localizable.xcstrings",
+        "file:config/localization-unlocalized-baseline.json",
+        "run:ios-xcui-candidate-smoke-20261025-030310-db58b35b"
+      ]
     }
   ]
 }

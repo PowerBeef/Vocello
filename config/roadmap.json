@@ -344,8 +344,8 @@
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/iOS/Settings/VoiceModelsScreen.swift"
       ],
-      "updated": "2026-10-25",
-      "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off. 2026-10-25 on build 25: the navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, first-launch, modelsDownloaded pro_design, switch off), after five retained harness failures, each fixed. Open: the attended cellular check; with Wi-Fi off and the switch off the maintainer saw 682 MB, then No progress, and whether those bytes came over cellular is unanswered."
+      "updated": "2026-10-27",
+      "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off. 2026-10-25 on build 25: the navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, first-launch, modelsDownloaded pro_design, switch off), after five retained harness failures, each fixed. Open: the attended cellular check; with Wi-Fi off and the switch off the maintainer saw 682 MB, then No progress, and whether those bytes came over cellular is unanswered. 2026-10-27: the phone's download journal (copied with the maintainer's OK, kept untracked) holds only its newest 200 records. The two 2026-10-26 lane runs (178 transfers, 5.93 GB, none cellular, switch off) pushed out the 2026-10-25 attempt, so the journal cannot answer it; the attended check stays open."
     },
     {
       "id": "RF-16",

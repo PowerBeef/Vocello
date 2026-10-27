@@ -328,8 +328,8 @@
         "config/quality-promotion-contract.json",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-10-26",
-      "notes": "Opened 2026-10-12. 2026-10-26 (maintainer): the lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26) and build 26 joined the Public Beta group without a manifest; the waiver covers that distribution only, and this promotion still gates App Review (RF-16). 2026-10-26 classify (base v3.0.0 or v3.0.0-ios.4, same result): seven iOS records, not five: ios-ui-benchmark, ios-engine-benchmark, ios-retained-memory, ios-ui-performance and ios-model-download-lifecycle, plus ios-language-benchmark (lang-bench; earlier iOS records exist) and ios-delivery-benchmark (an engine-generation record with *#delivery-* cells and deliveryPairedProsodyEffect), both added by the multilingual-output and delivery-evaluation capabilities. A search found no iOS lane or iOS history record that produces the delivery record (the iOS bench spec carries no delivery cells), so no iOS manifest can validate until a lane or a recorded contract decision covers it."
+      "updated": "2026-10-27",
+      "notes": "Opened 2026-10-12. 2026-10-26 (maintainer): the lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26) for the Public Beta only; this promotion still gates App Review (RF-16). classify: seven iOS records, adding ios-language-benchmark and ios-delivery-benchmark; no iOS lane produces the delivery record, so no manifest validates until a lane or a recorded contract decision covers it. 2026-10-27 at the exact tag e0feaf2c, phone on iOS 27.0.1: ios-xcui-benchmark-20261027-175531-87319beb canonical PASS (29 takes, no memory warning); ios-memory-qualification-20261027-165940-7fcd6b35 PASS (no within-mode growth); ios-engine-20261027-170407-21f3baa4, -170807-4071a9aa and -171118-a127f66b PASS. Failed and retained: ios-xcui-benchmark-20261027-165442-4eb18883 (automation mode timed out until UI Automation was allowed again), ios-xcui-perf-20261027-171432-14604e88 (BKL-42; set App Language to System before a rerun) and ios-lang-bench-20261027-174956-780b53f1 (BKL-43). Still needed: ui-perf, lang-bench, model-download and the delivery decision."
     },
     {
       "id": "RF-35",
@@ -1922,6 +1922,35 @@
       "updated": "2026-10-27",
       "unparkWhen": "The maintainer has a public contact address to show in the EU and asks for the EU release.",
       "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now rather than show a home address on the EU product page. The 27 EU territories were removed from availability (148 of 175 remain) and the account and Vocello were declared non-trader with no EU distribution intended (RF-02). Adding the EU back needs trader status first, then an availability edit; no new build or review is needed for availability. Not a release blocker."
+    },
+    {
+      "id": "BKL-42",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "VocelloiOSPerfUITests.test06ComposerTyping passes, and its teardown restores a non-System App Language, with the composer keyboard up: the session dismisses the keyboard before navigating to Settings, as it already does for History search.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift"
+      ],
+      "updated": "2026-10-27",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "2026-10-27, ios-xcui-perf-20261027-171432-14604e88 at v3.0.0-ios.5: scenarios 1-5 passed and test06 recorded its typing window, then endSession could not tap rootTab_settings under the software keyboard to restore the phone's English App Language, failed after 20 s and hung in teardown until the lead stopped xcodebuild 21 minutes later. With App Language on System no restore runs. Not a release blocker: test harness only (RF-17)."
+    },
+    {
+      "id": "BKL-43",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone crash-baseline pull fails when a download journal is pruned mid-copy",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A lane's pre-run crash baseline on the iPhone survives a diagnostics file the app removes during the copy (a pruned model-download journal) without losing crash-delta coverage.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh"
+      ],
+      "updated": "2026-10-27",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "2026-10-27, ios-lang-bench-20261027-174956-780b53f1 at v3.0.0-ios.5: the pre-run crash baseline pull failed with CoreDevice error 7000 because diagnostics/model-downloads/attempt-*.json disappeared during the copy, so the lane stopped before any take. Not a release blocker: tooling only; a rerun is expected to pass (RF-17)."
     },
     {
       "id": "ER-01",

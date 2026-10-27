@@ -31,11 +31,21 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   switch lengthened Voice Models (`ios-xcui-model-download-20261026-182637-177434c3`, retained, ten
   findings on pro_clone). The test now reveals the bar before capturing it (`398709b8`); the proof
   run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
-- **Phone state (October 27):** TestFlight build 26 is installed over the development build, with
-  History and Saved Voices intact, which closes RF-12's install row. RF-15's navigation row PASS on
-  build 26 (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`) after four retained non-product
-  failures. A new TestFlight build's first launch shows TestFlight's What to Test sheet: tap
-  Continue before the first row.
+- **Phone state (October 27, after RF-17's lanes):** a development build of `e0feaf2c` is installed
+  over TestFlight build 26, with all three models ready and Vocello's App Language on System.
+  Reinstall build 26 from TestFlight before RF-15's or RF-12's remaining build 26 rows. Earlier the
+  same day build 26 was installed over the development build with History and Saved Voices intact,
+  which closed RF-12's install row, and RF-15's navigation row passed on it
+  (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`). A new TestFlight build's first launch shows
+  TestFlight's What to Test sheet: tap Continue before the first row.
+- **RF-17 at the exact tag (October 27, iOS 27.0.1):** the canonical UI benchmark
+  (`ios-xcui-benchmark-20261027-175531-87319beb`, 29 takes), retained memory and the three engine
+  runs PASS. Against 2.4 on the same iPhone 17 Pro: decode speed within ±5% in the UI matrix and
+  5–10% faster in the memory and engine lanes; first audio about 60 ms later for Built-in Voice and
+  Voice Design (the whole-script read), unchanged for Clone; memory held after a take 1–9% lower
+  with no within-mode growth; UI-matrix peaks mixed (−10% to +18%) under iOS 27's larger process
+  limit (8,192 MB against 6,144 MB). ui-perf (BKL-42) and lang-bench (BKL-43) failed on harness
+  issues and still need runs, with model-download.
 - **RF-35, attended (October 27):** on 5G with no Wi-Fi and the switch off, a Voice Design download
   waits (maintainer). It shows 682.3 MB (33%) from the start: the speech tokenizer, identical in
   every model, is reused from an installed model with no network transfer, which also explains the

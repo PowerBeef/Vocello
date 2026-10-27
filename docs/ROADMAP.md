@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/42 (31%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/44 (30%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -550,6 +550,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-39` | parked | iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33% | — |
 | `BKL-40` | parked | The session-start hook's free-space test flakes under parallel pytest | — |
 | `BKL-41` | parked | Release Vocello for iPhone in the EU with trader status | — |
+| `BKL-42` | parked | The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard | — |
+| `BKL-43` | parked | The iPhone crash-baseline pull fails when a download journal is pruned mid-copy | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -665,6 +667,14 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-41`** (parked) — Release Vocello for iPhone in the EU with trader status.
   gate: The maintainer declares EU trader status in App Store Connect (address, phone and email verified, proof-of-address document accepted), Vocello's Digital Services Act status reads trader, and the 27 EU territories are available again, verified with an asc read of the app's territory availability. No personal detail enters Git.
   unparkWhen: The maintainer has a public contact address to show in the EU and asks for the EU release.
+
+- **`BKL-42`** (parked) — The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard.
+  gate: VocelloiOSPerfUITests.test06ComposerTyping passes, and its teardown restores a non-System App Language, with the composer keyboard up: the session dismisses the keyboard before navigating to Settings, as it already does for History search.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-43`** (parked) — The iPhone crash-baseline pull fails when a download journal is pruned mid-copy.
+  gate: A lane's pre-run crash baseline on the iPhone survives a diagnostics file the app removes during the copy (a pruned model-download journal) without losing crash-delta coverage.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

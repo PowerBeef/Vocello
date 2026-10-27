@@ -345,7 +345,7 @@
         "Sources/iOS/Settings/VoiceModelsScreen.swift"
       ],
       "updated": "2026-10-27",
-      "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model. Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE at under 1 MB/s, which is why the session forbade cellular; per-request permission keeps that protection while the switch is off. 2026-10-25 on build 25: the navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, first-launch, modelsDownloaded pro_design, switch off), after five retained harness failures, each fixed. Open: the attended cellular check; with Wi-Fi off and the switch off the maintainer saw 682 MB, then No progress, and whether those bytes came over cellular is unanswered. 2026-10-27: the phone's download journal (copied with the maintainer's OK, kept untracked) holds only its newest 200 records. The two 2026-10-26 lane runs (178 transfers, 5.93 GB, none cellular, switch off) pushed out the 2026-10-25 attempt, so the journal cannot answer it; the attended check stays open."
+      "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model; Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE, so per-request permission keeps that protection while the switch is off. Build 25, 2026-10-25: navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, switch off). Attended, 2026-10-27 on build 26 (maintainer): on 5G with no Wi-Fi and the switch off, a Voice Design download waits. It shows 682.3 MB (33%) from the start because speech_tokenizer/model.safetensors (682,293,092 bytes, the same SHA-256 in every model) is reused from the shared component store when an installed model holds it; reuse counts as progress with no network transfer. That matches the 682 MB seen on 2026-10-25, so those bytes were not cellular. The display is parked as BKL-39. Open: with the switch on, a download started afterwards completes over cellular."
     },
     {
       "id": "RF-16",
@@ -1876,6 +1876,22 @@
       "updated": "2026-10-26",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "Public Beta feedback 2026-10-26 on build 23 (2.4.0; es-MX, iPhone 16 Pro Max): the tester typed a voice description into the script field, left the voice brief chip empty, and Generate never ran. In 3.0 the empty chip still renders only a dimmed + (\"Describe the voice\" is VoiceOver-only), and Generate dims without a reason; the Design placeholder helps only until text is typed. The App Review notes draft now explains the chip (ASR-05). Not investigated further (focus rules)."
+    },
+    {
+      "id": "BKL-39",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33%",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A model download that waits for a network says it is waiting, not Downloading, and the shared speech tokenizer reused from an installed model reads as already on the iPhone rather than as download progress, in all ten interface languages, with the byte accounting unchanged.",
+      "sourceOfTruth": [
+        "Sources/iOS/Settings/VoiceModelsScreen.swift",
+        "Sources/iOS/IOSModelInstallerViewModel.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift"
+      ],
+      "updated": "2026-10-27",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Maintainer, 2026-10-27 on build 26: on 5G with no Wi-Fi and the cellular switch off, Voice Design showed Downloading, 33% · 682.3 MB of 2.05 GB, with Cancel, and the maintainer asked why a download never starts at zero. The 682.3 MB is speech_tokenizer/model.safetensors reused from another installed model (preverified bytes), with no network transfer. Not a release blocker: the download waits as designed and no data or privacy is affected (RF-35)."
     },
     {
       "id": "ER-01",

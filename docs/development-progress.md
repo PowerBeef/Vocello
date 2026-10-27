@@ -32,13 +32,16 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   findings on pro_clone). The test now reveals the bar before capturing it (`398709b8`); the proof
   run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
 - **Phone state (October 27):** TestFlight build 26 is installed over the development build, with
-  History and Saved Voices intact, which closes RF-12's install row. The maintainer removed Voice
-  Design for RF-35's cellular check on October 25 and reinstalled it on October 27, so all three
-  models are back for the rows that need them. RF-15's navigation row PASS on build 26
-  (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`) after four retained non-product failures.
-  A new TestFlight build's first launch shows TestFlight's What to Test sheet: tap Continue before
-  the first row. The phone's download journal keeps only 200 records, so it no longer holds RF-35's
-  682 MB attempt; the attended cellular check stays open.
+  History and Saved Voices intact, which closes RF-12's install row. RF-15's navigation row PASS on
+  build 26 (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`) after four retained non-product
+  failures. A new TestFlight build's first launch shows TestFlight's What to Test sheet: tap
+  Continue before the first row.
+- **RF-35, attended (October 27):** on 5G with no Wi-Fi and the switch off, a Voice Design download
+  waits (maintainer). It shows 682.3 MB (33%) from the start: the speech tokenizer, identical in
+  every model, is reused from an installed model with no network transfer, which also explains the
+  682 MB seen on October 25. The display is parked as BKL-39. Left: with the switch on, a download
+  started afterwards completes over cellular. Voice Design was mid-check at 2 of 3 models ready;
+  reinstall it before the rows that need all three.
 - **RF-17 needs seven iOS records, not five:** `classify` against `v3.0.0` or `v3.0.0-ios.4` adds
   `ios-language-benchmark` (lang-bench) and `ios-delivery-benchmark`. No iOS lane or history record
   produces the delivery record yet, so no iOS manifest can validate until a lane or a recorded

@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/40 (32%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/41 (32%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -548,6 +548,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-37` | parked | Mac History shows the Built-in speaker in lowercase | — |
 | `BKL-38` | parked | iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description | — |
 | `BKL-39` | parked | iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33% | — |
+| `BKL-40` | parked | The session-start hook's free-space test flakes under parallel pytest | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -654,6 +655,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-39`** (parked) — iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33%.
   gate: A model download that waits for a network says it is waiting, not Downloading, and the shared speech tokenizer reused from an installed model reads as already on the iPhone rather than as download progress, in all ten interface languages, with the byte accounting unchanged.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-40`** (parked) — The session-start hook's free-space test flakes under parallel pytest.
+  gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes under the routed check's parallel pytest run without depending on the hook's 2-second df deadline, and the hook's real deadline is unchanged.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

@@ -1894,6 +1894,21 @@
       "notes": "Maintainer, 2026-10-27 on build 26: on 5G with no Wi-Fi and the cellular switch off, Voice Design showed Downloading, 33% · 682.3 MB of 2.05 GB, with Cancel, and the maintainer asked why a download never starts at zero. The 682.3 MB is speech_tokenizer/model.safetensors reused from another installed model (preverified bytes), with no network transfer. Not a release blocker: the download waits as designed and no data or privacy is affected (RF-35)."
     },
     {
+      "id": "BKL-40",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The session-start hook's free-space test flakes under parallel pytest",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes under the routed check's parallel pytest run without depending on the hook's 2-second df deadline, and the hook's real deadline is unchanged.",
+      "sourceOfTruth": [
+        "scripts/hooks/session_start.sh",
+        "scripts/tests/test_agent_hooks.py"
+      ],
+      "updated": "2026-10-27",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "2026-10-27: one routed check failed it with 'free space unknown': the fixture's fake df missed the hook's 2-second deadline under pytest -n auto load. Alone it passed three times out of three. Not a release blocker: test tooling only."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

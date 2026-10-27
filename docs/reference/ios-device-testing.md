@@ -190,7 +190,10 @@ Preconditions: onboarding done, the three models Ready, and the benchmark clone 
 Voices (only `clone-voice` creates it; XCTest runs a class's tests in name order, so inside `all` it
 runs before the rows that use the voice). The rows turn Clone consent on. On a fresh install the
 order is `first-launch`, `clone-voice`, then `all`; set Auto-Lock to Never first, since the app holds
-the screen awake only while it generates, not while models download.
+the screen awake only while it generates, not while models download. The first launch of a new
+TestFlight build shows TestFlight's What to Test sheet over the app, and no row dismisses it: open
+the app once and tap Continue before the first row (a row fails waiting for `rootTab_studio`,
+2026-10-27 on build 26).
 
 Permission prompts stay with the maintainer: no row answers one. A fresh install asks for Speech
 Recognition at the first Save as Voice (`clone-voice` and `voice-lifecycle`) and for the microphone at

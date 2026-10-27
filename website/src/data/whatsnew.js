@@ -24,9 +24,10 @@ export const MAC_HIGHLIGHTS = [
   },
 ];
 
-// The iPhone app's 3.0 timing, as the release notes' iPhone section gives it.
+// The iPhone app's 3.0 status. The release notes keep the timing they were published with;
+// since October 26, 2026 the public TestFlight beta runs 3.0.
 export const IPHONE_NOTE =
-  "The iPhone app's 3.0 version brings the same engine and these changes. It follows in the coming days through the public TestFlight beta and then the App Store; until then the beta runs version 2.4.";
+  "The iPhone app's 3.0 version brings the same engine and these changes. It is in the public TestFlight beta, and the App Store release follows.";
 
 // Shared changes, in both apps (on iPhone, with its 3.0 version).
 export const SHARED_HIGHLIGHTS = [

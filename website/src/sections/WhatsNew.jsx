@@ -18,7 +18,7 @@ export const WhatsNew = () => (
         <h2 id="whatsnew-title" className="section-title">What's new in {WHATS_NEW_VERSION}</h2>
         <p className="section-sub">
           A redesigned Mac app that updates itself, and a command line for scripts and AI agents.
-          The iPhone app's 3.0 version follows in the coming days.
+          The iPhone app's 3.0 version is in the public TestFlight beta.
         </p>
       </header>
       <ul className="whatsnew-grid" role="list">

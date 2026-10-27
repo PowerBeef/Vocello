@@ -67,7 +67,7 @@ The speed figures come from a Vocello 3.0 development build on the benchmark Mac
 ## Get Vocello
 
 **On a Mac:** [download Vocello](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26.dmg), drag it to Applications, then install a voice model from **Settings > Models & Files**.<br>
-**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). It runs version 2.4 until the 3.0 beta arrives in the coming days, and the App Store release follows.<br>
+**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta runs Vocello 3.0, on the same engine as the Mac app, and the App Store release follows.<br>
 **In Terminal:** see [Command line and AI agents](#command-line-and-ai-agents).
 
 | Platform | Requirements | Models |

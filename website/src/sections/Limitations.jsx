@@ -37,7 +37,7 @@ const LIMITATIONS = [
   },
   {
     k: "iPhone is in beta",
-    v: "The iPhone app is a public TestFlight beta that runs version 2.4. Its 3.0 version follows in the coming days through TestFlight and then the App Store. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
+    v: "The iPhone app is a public TestFlight beta that runs Vocello 3.0, and the App Store release follows. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
   },
   {
     k: "Cloning varies",

@@ -14,8 +14,8 @@ export const IphoneBeta = () => (
           memory-conscious Speed model, microphone recording and local history.
         </p>
         <p className="iphone-status">
-          The public beta runs version 2.4. Its 3.0 version, on the same engine as the Mac app,
-          follows in the coming days through TestFlight, then the App Store.
+          The public beta runs Vocello 3.0, on the same engine as the Mac app. The App Store
+          release follows.
         </p>
         <div className="hero-ctas iphone-ctas">
           <a className="btn btn-primary" href={TESTFLIGHT} target="_blank" rel="noreferrer">

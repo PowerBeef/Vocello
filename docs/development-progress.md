@@ -24,6 +24,13 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   en-US What to Test notes, beta review APPROVED, Internal and Public Beta IN_BETA_TESTING (public
   link and feedback on). Build 25's beta review was also approved; it never joined Public Beta.
   Build 23 (2.4.0) stays in the group until it expires on October 30.
+- **Build 27 is planned (RF-37, maintainer decision October 27):** build 26 shows the Game Mode
+  banner at every launch, because the iPhone 15 Pro gate (`iphone-performance-gaming-tier`) makes
+  iOS treat Vocello as a game. The Info.plist now sets `LSSupportsGameMode` to NO, pinned by the
+  eligibility contract and the archive verifier, and the build number is 27. Next: push, CI, the
+  candidate tag on the maintainer's request, TestFlight processing and beta review, then check the
+  banner is gone on the phone. RF-17's records and RF-15's launch and navigation rows rerun on
+  build 27's tag.
 - **RF-17 waived for this Public Beta only (maintainer, 2026-10-26):** the promotion lanes were
   skipped on `v3.0.0-ios.5`; RF-17 still gates the App Review submission. The beta looks for the
   remaining bugs and for performance and stability on the iPhone 15 Pro floor.

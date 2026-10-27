@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-25
+reviewed: 2026-10-27
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -88,8 +88,8 @@ download it automatically.
 Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
 implemented, and the local StoreKit exports scenario passed all 26 phases. The product has en-US,
 fr-CA and fr-FR names and descriptions. Still open:
-- the Paid Apps agreement and its banking, tax and EU trader (DSA) steps, which are the maintainer's
-  (RF-02);
+- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.0
+  ships outside the EU, so the EU trader step waits for the EU release (BKL-41);
 - the product's review screenshot and the purchase checks on the processed TestFlight build (RF-12);
 - review, which happens with the first submission.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
@@ -189,9 +189,10 @@ campaign; prepare the approved test purchase before freezing it.
       refund/revocation, including every output export surface and Built-in free-export controls,
       in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`).
 - [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
-- [ ] Accept the Paid Apps agreement and complete tax, banking and EU trader (DSA) status. The
-      agreement stopped at Apple's two-factor prompt on 2026-10-12; these steps are the maintainer's
-      (RF-02).
+- [ ] Accept the updated Apple Developer Program License Agreement (the Account Holder, at
+      developer.apple.com/account; it blocks new submissions), then the Paid Apps agreement, and
+      complete tax and banking. The Paid Apps agreement stopped at Apple's two-factor prompt on
+      2026-10-12; these steps are the maintainer's (RF-02).
 - [ ] Capture the IAP review screenshot from the processed TestFlight build at the live USD 19.99
       (decision 2026-10-13), and attach the first IAP to the app version for review. Explain the
       free/paid boundary and the restore path in the reviewer notes.
@@ -203,13 +204,15 @@ Apple references: [purchase types](https://developer.apple.com/help/app-store-co
 Current account state (2026-10-12, set in the web portal with the maintainer's approval; RF-02):
 - version 3.0.0, which replaced the unreleased 1.0 draft;
 - category Productivity, secondary Music;
-- free in all 175 territories, iPhone only (Apple-silicon Mac and Vision Pro availability off);
+- free and iPhone only (Apple-silicon Mac and Vision Pro availability off), in 148 territories
+  since 2026-10-27, when the 27 EU territories were removed (maintainer decision; BKL-41);
 - age rating 4+;
 - App Privacy published as Data Not Collected, with the privacy policy URL;
-- the export purchase entered as above.
+- the export purchase entered as above;
+- EU Digital Services Act: declared non-trader with no EU distribution intended (2026-10-27).
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
-- the Paid Apps agreement, banking, tax and EU trader status;
+- the updated Apple Developer Program License Agreement, the Paid Apps agreement, banking and tax;
 - the accessibility declaration;
 - the processed candidate's export-compliance check.
 
@@ -242,10 +245,12 @@ is complete.
 - [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
       from the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs.
-- [x] **Pricing and availability**: free in all 175 territories, iPhone only (2026-10-12, RF-02).
-      Review the release behavior and new-territory policy at submission.
+- [x] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), in 148 territories: the
+      27 EU territories were removed on 2026-10-27. Review the release behavior and new-territory
+      policy at submission.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
-- [ ] EU DSA trader status: complete if distributing in the EU.
+- [x] **EU DSA status**: declared non-trader with no EU distribution intended (2026-10-27), and the
+      EU territories are unavailable. An EU release needs trader status first (BKL-41).
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
       (AudioSeal watermark + WAV provenance chunk; the only off-switch is a registered debug knob).
       Review [`eu-ai-act-article50-assessment.md`](eu-ai-act-article50-assessment.md) for the

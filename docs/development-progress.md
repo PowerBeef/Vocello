@@ -43,6 +43,12 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   started afterwards progressed over cellular, then the maintainer stopped it before it finished
   because coverage there is weak, so a completion over cellular is not yet observed. Voice Design
   is not installed (2 of 3 models ready); reinstall it before the rows that need all three.
+- **3.0 ships outside the EU (maintainer decision, October 27):** rather than publish a home address
+  as an EU trader, the 27 EU territories were removed from availability (148 of 175 remain,
+  verified) and the account and Vocello are declared non-trader with no EU distribution intended;
+  App Store Connect reports the DSA requirements complete. The EU release is BKL-41. RF-02 keeps the
+  updated Apple Developer Program License Agreement (it blocks submissions), the Paid Apps
+  agreement, tax and banking, all the maintainer's.
 - **RF-17 needs seven iOS records, not five:** `classify` against `v3.0.0` or `v3.0.0-ios.4` adds
   `ios-language-benchmark` (lang-bench) and `ios-delivery-benchmark`. No iOS lane or history record
   produces the delivery record yet, so no iOS manifest can validate until a lane or a recorded
@@ -54,9 +60,9 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   (BKL-38, parked). The App Review notes draft now explains Design's voice description chip (ASR-05).
 - **Next:** triage Public Beta feedback and crashes as they arrive. The next window runs RF-17's
   lanes (classify the submitted tag first), RF-35's attended cellular check and RF-15's remaining
-  rows. The maintainer can do RF-02 (Paid Apps agreement, banking, tax, DSA), ASR-05's listing
-  review and ASR-04's attestations remotely.
-- **Pushed:** through `5d37846c` (CI passed); `dac6c023` and later are local.
+  rows. The maintainer can do RF-02 (the updated license agreement, the Paid Apps agreement, tax
+  and banking), ASR-05's listing review and ASR-04's attestations remotely.
+- **Pushed:** through `726935ea` (CI passed); `2ef22a88` and later are local.
 
 ### October 25: build 25, faster UI lanes, computer use as the default route
 

@@ -181,9 +181,9 @@
         "docs/reference/ios-appstore-submission.md",
         "docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-10-13",
-      "notes": "2026-10-12, in App Store Connect with the maintainer's approval (driven in the browser): version 3.0.0 replaces the unreleased 1.0 draft with its copyright line; category Productivity (secondary Music); the app is free in all 175 territories, with Apple-silicon Mac and Vision Pro availability turned off (iPhone only); age rating 4+; App Privacy published as Data Not Collected with the privacy policy URL; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR names and descriptions. Accepting the Paid Apps agreement stopped at Apple's two-factor prompt. Remaining for the maintainer: accept it, then banking, tax and EU trader (DSA) status; the purchase's review screenshot comes from RF-13's phone session. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks.",
-      "unparkWhen": "The maintainer resumes the App Store Connect account steps: the Paid Apps agreement (Apple's two-factor prompt), banking, tax and EU trader (DSA) status."
+      "updated": "2026-10-27",
+      "notes": "2026-10-12, in App Store Connect with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy published as Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-13: on hold by maintainer decision. 2026-10-27, maintainer decision: 3.0 ships outside the EU for now. The 27 EU territories were removed from availability with asc (148 of 175 remain, verified by a fresh read), and the account and Vocello are declared non-trader with no EU distribution intended (App Store Connect reports the DSA requirements complete); the EU release is BKL-41. Remaining for the maintainer: accept the updated Apple Developer Program License Agreement (it blocks submissions), then the Paid Apps agreement (Apple's two-factor prompt), tax and banking. The purchase's review screenshot comes from the phone (RF-12).",
+      "unparkWhen": "The maintainer resumes the App Store Connect account steps: the updated Apple Developer Program License Agreement, the Paid Apps agreement (Apple's two-factor prompt), tax and banking."
     },
     {
       "id": "RF-06",
@@ -1907,6 +1907,21 @@
       "updated": "2026-10-27",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "2026-10-27: one routed check failed it with 'free space unknown': the fixture's fake df missed the hook's 2-second deadline under pytest -n auto load. Alone it passed three times out of three. Not a release blocker: test tooling only."
+    },
+    {
+      "id": "BKL-41",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Release Vocello for iPhone in the EU with trader status",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The maintainer declares EU trader status in App Store Connect (address, phone and email verified, proof-of-address document accepted), Vocello's Digital Services Act status reads trader, and the 27 EU territories are available again, verified with an asc read of the app's territory availability. No personal detail enters Git.",
+      "sourceOfTruth": [
+        "docs/reference/ios-appstore-submission.md",
+        "docs/reference/content-rights-review.md"
+      ],
+      "updated": "2026-10-27",
+      "unparkWhen": "The maintainer has a public contact address to show in the EU and asks for the EU release.",
+      "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now rather than show a home address on the EU product page. The 27 EU territories were removed from availability (148 of 175 remain) and the account and Vocello were declared non-trader with no EU distribution intended (RF-02). Adding the EU back needs trader status first, then an availability edit; no new build or review is needed for availability. Not a release blocker."
     },
     {
       "id": "ER-01",

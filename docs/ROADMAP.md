@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/41 (32%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/42 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -112,7 +112,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-02`** (parked) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
-  unparkWhen: The maintainer resumes the App Store Connect account steps: the Paid Apps agreement (Apple's two-factor prompt), banking, tax and EU trader (DSA) status.
+  unparkWhen: The maintainer resumes the App Store Connect account steps: the updated Apple Developer Program License Agreement, the Paid Apps agreement (Apple's two-factor prompt), tax and banking.
 
 - **`RF-10`** (in-flight, due 2026-10-31) — independently qualify macOS and downloadable CLI.
   gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
@@ -549,6 +549,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-38` | parked | iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description | — |
 | `BKL-39` | parked | iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33% | — |
 | `BKL-40` | parked | The session-start hook's free-space test flakes under parallel pytest | — |
+| `BKL-41` | parked | Release Vocello for iPhone in the EU with trader status | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -660,6 +661,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-40`** (parked) — The session-start hook's free-space test flakes under parallel pytest.
   gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes under the routed check's parallel pytest run without depending on the hook's 2-second df deadline, and the hook's real deadline is unchanged.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-41`** (parked) — Release Vocello for iPhone in the EU with trader status.
+  gate: The maintainer declares EU trader status in App Store Connect (address, phone and email verified, proof-of-address document accepted), Vocello's Digital Services Act status reads trader, and the 27 EU territories are available again, verified with an asc read of the app's territory availability. No personal detail enters Git.
+  unparkWhen: The maintainer has a public contact address to show in the EU and asks for the EU release.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

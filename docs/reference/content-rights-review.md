@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-12
+reviewed: 2026-10-27
 summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.0 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -197,7 +197,7 @@ artifact directory.
 | Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
 | Distribution profile and entitlements — ASR-10 | Signing/release owner | Decode the exact profile, match private-key identity and entitlements, then verify the command-bound archive/IPA. Local identity availability and earlier remote capability reads are not archive evidence. |
 | Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02). Remaining: check the encryption declaration against the processed candidate. |
-| Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). Remaining: the Paid Apps agreement, banking, tax and DSA trader status, which are the account holder's. The agent cannot accept agreements, select trading status or provide legal clearance. |
+| Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). **Decided 2026-10-27:** 3.0 ships outside the EU for now rather than publish a home address; the 27 EU territories were removed (148 remain) and the account and Vocello are declared non-trader with no EU distribution intended, applied on the maintainer's explicit instruction. The EU release needs trader status first (BKL-41). Remaining: the updated Apple Developer Program License Agreement, the Paid Apps agreement, banking and tax, which are the account holder's. The agent cannot accept agreements or provide legal clearance. |
 
 Apple's [privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) require
 considering third-party practices and retention beyond real-time request service. Hugging Face's

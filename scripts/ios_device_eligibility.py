@@ -40,6 +40,10 @@ def validate(root: Path = ROOT) -> dict[str, object]:
         raise EligibilityError(
             "Info.plist must require exactly arm64 and iphone-performance-gaming-tier"
         )
+    # The gaming-tier capability makes iOS treat the app as a game and announce Game Mode at
+    # every launch; Vocello is not a game, so it opts out (RF-37).
+    if info.get("LSSupportsGameMode") is not False:
+        raise EligibilityError("Info.plist must set LSSupportsGameMode to NO")
 
     policy = _read(root / POLICY_SOURCE)
     for literal in EXPECTED_CAPABILITIES:
@@ -69,12 +73,15 @@ def validate(root: Path = ROOT) -> dict[str, object]:
     verifier = _read(root / RELEASE_VERIFIER)
     if "REQUIRED_DEVICE_CAPABILITIES" not in verifier or "UIRequiredDeviceCapabilities" not in verifier:
         raise EligibilityError("release verifier does not enforce archived device capabilities")
+    if "LSSupportsGameMode" not in verifier:
+        raise EligibilityError("release verifier does not enforce the archived Game Mode opt-out")
 
     return {
         "schemaVersion": 1,
         "status": "PASS",
         "minimumHardware": "iPhone 15 Pro or newer",
         "requiredCapabilities": list(EXPECTED_CAPABILITIES),
+        "gameMode": False,
         "runtimeGuard": True,
         "archiveVerification": True,
     }

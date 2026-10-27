@@ -80,6 +80,8 @@ download it automatically.
       public version. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
       newer. Deterministic source and archive/IPA verification reject future drift (ASR-01).
+      The bundle also sets `LSSupportsGameMode` to NO, because the gaming-tier capability otherwise
+      shows the Game Mode banner at every launch; build 27 is the first candidate with it (RF-37).
 
 ## 1. Privacy + compliance (App Store Connect)
 

@@ -48,6 +48,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "CFBundlePackageType": "APPL",
             "CFBundleSupportedPlatforms": ["iPhoneOS"],
             "UIRequiredDeviceCapabilities": ["arm64", "iphone-performance-gaming-tier"],
+            "LSSupportsGameMode": False,
         }
         self.entitlements = {
             "application-identifier": f"{self.PREFIX}.{self.BUNDLE}",
@@ -132,6 +133,13 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             with self.subTest(capabilities=capabilities):
                 info = dict(self.info, UIRequiredDeviceCapabilities=capabilities)
                 with self.assertRaisesRegex(module.VerificationError, "device capabilities"):
+                    self.snapshot(info=info)
+
+    def test_the_bundle_must_opt_out_of_game_mode(self) -> None:
+        missing = {key: value for key, value in self.info.items() if key != "LSSupportsGameMode"}
+        for info in [missing, dict(self.info, LSSupportsGameMode=True)]:
+            with self.subTest(gameMode=info.get("LSSupportsGameMode")):
+                with self.assertRaisesRegex(module.VerificationError, "Game Mode"):
                     self.snapshot(info=info)
 
     def test_archive_and_export_device_capabilities_must_match(self) -> None:

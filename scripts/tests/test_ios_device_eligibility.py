@@ -59,6 +59,30 @@ class IOSDeviceEligibilityTests(unittest.TestCase):
             with self.assertRaisesRegex(module.EligibilityError, "require exactly"):
                 module.validate(root)
 
+    def test_game_mode_opt_out_is_required(self) -> None:
+        for value in [None, True]:
+            temporary, root = self.fixture()
+            self.addCleanup(temporary.cleanup)
+            path = root / module.INFO_PLIST
+            payload = plistlib.loads(path.read_bytes())
+            if value is None:
+                payload.pop("LSSupportsGameMode", None)
+            else:
+                payload["LSSupportsGameMode"] = value
+            path.write_bytes(plistlib.dumps(payload))
+            with self.assertRaisesRegex(module.EligibilityError, "LSSupportsGameMode"):
+                module.validate(root)
+
+        temporary, root = self.fixture()
+        self.addCleanup(temporary.cleanup)
+        verifier = root / module.RELEASE_VERIFIER
+        verifier.write_text(
+            verifier.read_text(encoding="utf-8").replace("LSSupportsGameMode", "RemovedGameMode"),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(module.EligibilityError, "Game Mode opt-out"):
+            module.validate(root)
+
     def test_runtime_policy_drift_fails_closed(self) -> None:
         temporary, root = self.fixture()
         self.addCleanup(temporary.cleanup)

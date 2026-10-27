@@ -134,7 +134,9 @@ The UI is what this guide drives. Headless, non-UI device diagnostics are docume
 The App Store bundle requires `arm64` and Apple's `iphone-performance-gaming-tier`, aligning
 installation eligibility with Vocello's iPhone 15 Pro-or-newer runtime guard before the first
 public version. `IOSDeviceEligibilityPolicy` owns the source-level predicate and description;
-archive/IPA verification rejects any capability drift.
+archive/IPA verification rejects any capability drift. The gaming-tier capability also makes iOS
+treat the app as a game and show the Game Mode banner at launch, so the Info.plist sets
+`LSSupportsGameMode` to NO, and the same checks reject a missing or true value (RF-37).
 
 ---
 

@@ -549,6 +549,8 @@ def validate_bundle_contract(
         raise VerificationError(
             f"{label} device capabilities must be exactly arm64 and iphone-performance-gaming-tier"
         )
+    if info.get("LSSupportsGameMode") is not False:
+        raise VerificationError(f"{label} must opt out of Game Mode (LSSupportsGameMode = NO)")
     normalized_uuids = tuple(sorted(macho_uuids))
     if not normalized_uuids:
         raise VerificationError(f"{label} main executable has no Mach-O UUID")

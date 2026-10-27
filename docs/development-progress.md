@@ -39,9 +39,10 @@ the last copy with every earlier checkpoint is at commit a0597deb).
 - **RF-35, attended (October 27):** on 5G with no Wi-Fi and the switch off, a Voice Design download
   waits (maintainer). It shows 682.3 MB (33%) from the start: the speech tokenizer, identical in
   every model, is reused from an installed model with no network transfer, which also explains the
-  682 MB seen on October 25. The display is parked as BKL-39. Left: with the switch on, a download
-  started afterwards completes over cellular. Voice Design was mid-check at 2 of 3 models ready;
-  reinstall it before the rows that need all three.
+  682 MB seen on October 25. The display is parked as BKL-39. With the switch on, a download
+  started afterwards progressed over cellular, then the maintainer stopped it before it finished
+  because coverage there is weak, so a completion over cellular is not yet observed. Voice Design
+  is not installed (2 of 3 models ready); reinstall it before the rows that need all three.
 - **RF-17 needs seven iOS records, not five:** `classify` against `v3.0.0` or `v3.0.0-ios.4` adds
   `ios-language-benchmark` (lang-bench) and `ios-delivery-benchmark`. No iOS lane or history record
   produces the delivery record yet, so no iOS manifest can validate until a lane or a recorded

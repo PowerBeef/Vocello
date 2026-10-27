@@ -32,9 +32,9 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   findings on pro_clone). The test now reveals the bar before capturing it (`398709b8`); the proof
   run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
 - **Phone state (October 27):** TestFlight build 26 is installed over the development build, with
-  History and Saved Voices intact, which closes RF-12's install row. Voice Design shows Not Installed
-  because the maintainer removed it for RF-35's cellular check on October 25; reinstall it before
-  the rows that need all three models. RF-15's navigation row PASS on build 26
+  History and Saved Voices intact, which closes RF-12's install row. The maintainer removed Voice
+  Design for RF-35's cellular check on October 25 and reinstalled it on October 27, so all three
+  models are back for the rows that need them. RF-15's navigation row PASS on build 26
   (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`) after four retained non-product failures.
   A new TestFlight build's first launch shows TestFlight's What to Test sheet: tap Continue before
   the first row. The phone's download journal keeps only 200 records, so it no longer holds RF-35's

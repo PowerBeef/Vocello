@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-26
+reviewed: 2026-10-27
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -31,8 +31,13 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   switch lengthened Voice Models (`ios-xcui-model-download-20261026-182637-177434c3`, retained, ten
   findings on pro_clone). The test now reveals the bar before capturing it (`398709b8`); the proof
   run `ios-xcui-model-download-20261026-185315-4d030b9e` PASS, no findings.
-- **Phone state:** the model-download lane's development build replaced TestFlight build 25, data
-  kept. Reinstall build 26 from TestFlight before the next candidate row.
+- **Phone state (October 27):** TestFlight build 26 is installed over the development build, with
+  History and Saved Voices intact. Voice Design shows Not Installed; the maintainer is to say whether
+  it was removed for RF-35's cellular check (RF-12). RF-15's navigation row PASS on build 26
+  (`ios-xcui-candidate-smoke-20261027-135949-5fe567b6`) after four retained non-product failures.
+  A new TestFlight build's first launch shows TestFlight's What to Test sheet: tap Continue before
+  the first row. The phone's download journal keeps only 200 records, so it no longer holds RF-35's
+  682 MB attempt; the attended cellular check stays open.
 - **RF-17 needs seven iOS records, not five:** `classify` against `v3.0.0` or `v3.0.0-ios.4` adds
   `ios-language-benchmark` (lang-bench) and `ios-delivery-benchmark`. No iOS lane or history record
   produces the delivery record yet, so no iOS manifest can validate until a lane or a recorded
@@ -46,7 +51,7 @@ the last copy with every earlier checkpoint is at commit a0597deb).
   lanes (classify the submitted tag first), RF-35's attended cellular check and RF-15's remaining
   rows. The maintainer can do RF-02 (Paid Apps agreement, banking, tax, DSA), ASR-05's listing
   review and ASR-04's attestations remotely.
-- **Pushed:** through `e0feaf2c` (CI passed).
+- **Pushed:** through `5d37846c` (CI passed); `dac6c023` and later are local.
 
 ### October 25: build 25, faster UI lanes, computer use as the default route
 

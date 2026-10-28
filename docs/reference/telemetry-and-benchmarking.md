@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -141,8 +141,8 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
-| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Eleven scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](../audits/2026-08-04-macos-ui-refresh.md)) |
-| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [`ios-ui-refresh-2026-08.md`](../audits/2026-08-29-ios-ui-refresh.md)) |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Eleven scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [the 2026-08 iOS UI audit](../audits/2026-08-29-ios-ui-refresh.md)) |
 | **Language bench** | `scripts/macos_test.sh lang-bench` / `scripts/ios_device.sh lang-bench` | In-process | Language hint contract and spoken-output verification ([§5](#5-language-bench)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS UI numbers. Compare like with
@@ -916,12 +916,9 @@ decision 2026-09-25): a **provisional** limit reports only and never fails a run
 records `stallGate.enforced: false` and `stallGate.wouldFail` in the evidence manifest, and a run
 over the limit publishes with the run warning `stall.provisional.wouldfail(<takes above>/<gated
 takes>)`); a **calibrated** contract, which must name its calibrating run IDs in
-`calibrationRuns`, fails a run with a take above the limit. The committed contract
-(`macos-ui-stall-gate-m6-600ms`) is calibrated: no gated take's `maximumDelayedHeartbeatMS` may
-exceed 600 ms on `mac-mini-m6-16gb`. AV-17 step 2 set it on 2026-09-27 from the first canonical M6
-UI benchmark (`macos-xcui-benchmark-20260927-101957-c37aa311`, 29 gated takes: median 188 ms, p90
-259 ms, maximum 480 ms), as that maximum times the 1.25 floor the ui-perf ceilings use, replacing
-the provisional 250 ms limit. Apple's 250 ms hang threshold stays a report. The checker prints the
+`calibrationRuns`, fails a run with a take above the limit. The committed contract is calibrated on
+the canonical M6; its limit, calibrating run and derivation are in the contract's `maximumAllowed`,
+`calibrationRuns` and `basis`. Apple's 250 ms hang threshold stays a report. The checker prints the
 distribution to `benchmark-gate.txt` either way: the summary (median, p90, maximum, takes above the
 limit, would fail, censored heartbeats) and every gated take's `cell=value`. Recalibrate when the
 matrix, the watchdog definition or the host changes. A contract naming another profile than the
@@ -1062,10 +1059,9 @@ post-generation cache clear its end value includes the MLX cache. Each take now 
 when sampled, `graphicsFootprintEndMB`; v2's metric is each mode's growth of `mlxEndActiveMB` from
 the first retained take to the highest later one. It gates per mode only against a bound calibrated
 from a consented memory run on the platform's canonical host (`derive_memory_calibration.py`,
-[§6.10](#610-memory-qualification-contract)). macOS is calibrated at 16 MB per mode by the M6 run
-`mac-memory-qualification-20260926-011258-82f5f55c`. iOS stays `uncalibrated` until a maintainer
-records its bound and run ID: its record reports the growth with no bound and no verdict, and v1
-alone decides publication.
+[§6.10](#610-memory-qualification-contract)); `retainedMemoryV2.calibration` in the policy records
+each platform's status, bounds and run ID. An uncalibrated platform's record reports the growth with
+no bound and no verdict, and v1 alone decides publication.
 
 ### 4.12 Telemetry-overhead parity lane
 
@@ -1144,7 +1140,7 @@ and sampling policy; the shared resolved prompt digest proves that Auto resolves
 pinned hint. Since seed identity v2 (2026-09-25) the Auto cell draws its own seed, so its audio is an
 independent sample rather than a byte copy of the pinned take. Likewise, the three sequential Speech
 recognitions prove that the on-device recognizer reproduced one transcript for one WAV. They do not
-provide three statistically independent accuracy observations. The 18 positive output cells (plus
+provide three statistically independent accuracy observations. The 22 positive output cells (plus
 the expected-fail negative control) remain strict per-cell multilingual smoke acceptance, not a
 population estimate of language quality.
 
@@ -1238,11 +1234,8 @@ the v2 alignment credited) per family (`independent…` for the retired whisper-
 the same under both versions. Swift (`VoiceClipTranscriber.segmentationAwareWordMetrics`) and
 `scripts/lib/language_metrics.py` share the operation set and parity fixtures; the minimum is unique,
 so they agree exactly. Records published before carry `normalized-edit-rate-v1` and keep validating
-under it. Replayed offline over the 38 committed scored takes: the three German cells (WER 0.138,
-CER 0.0, 2 substitutions and 2 deletions, so two character-identical merges of at most four words)
-score 0.0 under v2; no passing take can change verdict because the v2 distance never exceeds the v1
-distance; the two macOS accuracy controls (WER 0.5625) need their transcripts, which are not
-committed, so the next lang-bench measures them under v2. The app's `languageASR` quality gate
+under it; the v2 distance never exceeds the v1 distance, so no passing take changes verdict. The
+app's `languageASR` quality gate
 reports the rate its outcome reads since gate composition 5 (the v2 word rate as `word_error_rate`,
 or the character rate as `character_error_rate`; through version 4 it reported the v1 word rate).
 
@@ -1270,17 +1263,6 @@ suite lints the tracked corpus. The in-app `languageASR` gate was composition 6 
 kinds' measurement version 4 under v3. v1 and v2 records keep validating and rescoring under their
 own normalization; filler counts are refused on them.
 
-Replayed offline over the 45 committed scored family-takes (5 of the 8 language records; no record
-is rewritten), 34 are determined by their published evidence and none changes verdict: 25 with no
-edit score 0; the 6 Chinese and Japanese Apple takes keep their character rate (the same NFKC code
-points); the 3 German Apple takes (CER 0) score 0 because their word errors are two-word merges.
-The other 11 need their untracked transcripts: the 2026-07-14 English Apple take (1 of 7 words,
-0.007 below the gate), its two French Apple takes (1 of 9 words; the v1-corpus script's l'aube
-joins, so 1 of 8, 0.125, when the transcript keeps the elision), five French whisper passes (1 or 2
-of 32 words) and three accuracy controls (0.56 to 1.09). Besides the new folds, which only merge
-spellings, only an apostrophe the recognizer wrote inside a word can move them, by at most one
-edit each, so a control would need at least 14 to pass. The next lang-bench measures them under v3.
-
 **Chinese fold (`normalization-v3-edit-rate-v4`, 2026-09-26).** AQ-02 phase P2b, first step; audit
 AQ-F22: the same rates under text normalization v3, which is v2 plus a Traditional-to-Simplified
 fold of Chinese on both sides, after case folding. whisper-small wrote a correct Mandarin take of
@@ -1303,9 +1285,7 @@ every case of `scripts/tests/fixtures/language_normalization.json` identically
 entry; the Chinese cases the fold changes also pin their normalization v2 count, which records
 declaring `normalization-v2-edit-rate-v3` keep rescoring under. The in-app `languageASR` gate is
 composition 7 and the language kinds' measurement version became 5 (6 since the QC v2 families,
-2026-10-01). Replayed over the same 45 committed scored family-takes, no verdict can change: 3 are
-Chinese (one Apple take with no edit and two passing Apple takes at CER 0.111, which the fold can
-only lower), and every other take scores as under v2.
+2026-10-01).
 
 **Deletion runs (warn-only).** Each family's alignment also yields `longestDeletionRun`, the longest
 run of consecutive reference units the recognizer deleted on the primary metric's units (a match,
@@ -1315,9 +1295,7 @@ the 15 % gate on the corpus's 17-32-unit scripts, so a run of two or more on a t
 publishes the take with `language.deletion_run:<family>` and never changes a verdict or the
 accuracy contract. Published as `longestDeletionRun` (Apple Speech, recomputed and checked against
 the app's value) and `qcQwen3AsrLongestDeletionRun`/`qcWhisperLongestDeletionRun`
-(`independentLongestDeletionRun` on whisper-small records through version 5). Replayed over the
-committed records, no passing take can carry a run of two: the only takes with two deletions are
-the German cells, whose zero CER makes every word error a two-word compound merge.
+(`independentLongestDeletionRun` on whisper-small records through version 5).
 
 **Outer-edge timing.** The host checker also enforces the app's existing outer-edge timing rule
 whenever the verification declares `sourceAudioDurationSeconds` or the record includes WAV
@@ -1529,43 +1507,6 @@ gates. The gate result is not part of the published record.
 
 Phase 1 unit tests run in `scripts/macos_test.sh core-test`; language semantics are in
 `docs/reference/qwen3-tts-guide.md` §7.
-
-### 5.8 Validation and diagnostic snapshot (through 2026-07-16)
-
-The table below is preserved as dated operational evidence; it is not the current acceptance
-state. Current PASS evidence must exist in `benchmarks/runs/language/` and appear in generated
-`benchmarks/HISTORY.md`, while the active resume status lives in
-[`../development-progress.md`](../development-progress.md). The current tracked registry contains
-a clean physical-iPhone quick PASS record covering the seven EN/FR cells, historical macOS
-hint-only records, the exploratory full PASS described below, and a later dirty-worktree macOS
-full run (`mac-lang-bench-20260902-024501-bd2df074`, partial, exploratory). Generated
-`benchmarks/HISTORY.md` is the authoritative list. Run
-`ios-speech-assets-20260716-164115-e8b16d82` resolved `de_DE`, `es_ES` (for requested `es_419`),
-`ja_JP`, and `zh_CN`; every DictationTranscriber asset and Vocello's legacy on-device recognition
-gate passed. That result establishes prerequisites only.
-
-| Run | Subset | Hint gate | Output gate | Notes |
-| --- | --- | --- | --- | --- |
-| `ios-lang-bench-20260706-110143` | quick | **7/7 PASS** | — | Hint only (pre–Phase 3 output) |
-| `ios-lang-bench-20260706-112319` | quick | **7/7 PASS** | **6/6 PASS** | Locale-locked ASR + stored `pass`; negative control hint-only |
-| `ios-lang-bench-20260706-135146` | full | **19/19 PASS** | **7/18 FAIL** | DE/ES/ZH/JA `transcription_failed` — Speech Wi‑Fi assets pending on device |
-| `ios-lang-bench-20260714-134925-3e73b43d` | full | **19/19 PASS** | **10/18 FAIL** | Assets ready; exposed an out-of-range language-score producer bug and genuine failures in the original short corpus. No history record was published. |
-| `ios-lang-cohort-20260714-143612-f5e99664` | bounded DE/ZH/JA diagnostic | **6/6 PASS** | **6/6 PASS** | Retry-free validator/corpus-v2 confirmation after adding CJK punctuation to the deterministic pause budget. Diagnostic only; no history record was published. |
-| `ios-lang-bench-20260714-145013-304721d6` | full | **19/19 PASS** | **13/18 FAIL** | Corpus-v2 evidence localized remaining fixed-seed failures to French Custom and all three German paths. No history record was published. |
-| `ios-lang-bench-20260714-153252-d2a3eea5` | full | **not evaluated** | **not evaluated** | Intentionally interrupted while take 7 was launching after six completed takes. No final gates or history record exist; this local partial run is not acceptance evidence. |
-| `ios-lang-bench-20260716-164248-1ecf8361` | full | **19/19 PASS** | **18/18 PASS** | Fresh physical-iPhone corpus-v2 acceptance with zero diagnostic failures and three-pass locale-locked ASR. `passedWithWarnings` for accepted Spanish Custom written-output/dropout evidence and soft memory trims; tracked as exploratory because the runtime worktree was dirty. |
-
-The version-2 corpus, explicit Design language, native-language Custom fixtures where available,
-stricter validator correlation, and CJK-aware punctuation pause accounting address the defects
-exposed by the July 14 attempts. The bounded DE/ZH/JA cohort confirms those paths. Four subsequent
-retry-free cohorts exercised the revised French and German scripts at the exact normal-matrix seeds:
-French Custom pinned/Auto and Design all passed strict QC with zero WER, while German Custom
-pinned/Auto and Design passed strict QC at approximately 0.138 WER. The later partial full run was
-intentionally stopped and cannot be resumed or promoted. The July 16 fresh full run reproduced
-those results inside the complete 19-cell matrix and passed every automated gate; because it was
-recorded from a dirty worktree, a future clean comparable baseline must start from a committed
-revision. A failed, incomplete, or diagnostic run correctly creates no tracked history and cannot
-be replaced by this dated table or a listening judgment.
 
 ---
 
@@ -1871,10 +1812,10 @@ signposts** ([§4.8](#48-macos-instruments-profile-signpost-validation)) for GPU
   peak.
 - **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim.
   They sit at stage edges, not at the allocation spike, so sampled peaks still miss allocations
-  shorter than the sampler tick ([§6.12](#612-overhead-and-observer-effect)): in committed records
-  2,035 of 3,634 takes sampled a Metal peak below the exact `mlxPeakMB` (the MLX allocator's own
-  per-request high-water mark), by a median of about 120-460 MB per record kind. Treat sampled
-  peaks as lower bounds and `mlxPeakMB` as the exact MLX figure. `benchmark_history.py validate`
+  shorter than the sampler tick ([§6.12](#612-overhead-and-observer-effect)): more than half of the
+  committed takes sampled a Metal peak below the exact `mlxPeakMB` (the MLX allocator's own
+  per-request high-water mark), typically by hundreds of MB. Treat sampled peaks as lower bounds
+  and `mlxPeakMB` as the exact MLX figure. `benchmark_history.py validate`
   and `record` warn (without failing) when a take's `peakGPUAllocatedMB` is below its `mlxPeakMB`,
   and `benchmark_history.py peak-miss-report [--json]` reports the count for every committed record
   without rewriting any.
@@ -1945,12 +1886,10 @@ samples (`samplerMaximumUnobservedGapMS`) may exceed the bound in
 interval, 500 ms), so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a
 take, or max(twice the interval, 1,000 ms) on the floor tiers (`floorTiers`: an iPhone, or a Mac
 whose engine row stamps `floor_8gb_mac`). A longer gap fails publication, and each take records the
-bound it met as `samplerUnobservedGapLimitMS`. The bound is calibrated: on 2026-09-25 the consented
-memory lane `mac-memory-qualification-20260926-011258-82f5f55c` on the canonical M6 (250 ms
-cadence) measured a longest gap of 274 ms over 11 takes, inside max(2 × cadence, 500 ms) with the
-1.25 margin, so both values stayed. The floor tiers moved from a 500 ms to a 250 ms cadence on the
-same day and keep a provisional 1,000 ms floor until an unforced iPhone or 8 GB Mac record
-calibrates it; an M6 record never moves it. Periodic coverage (`samplerCoverage`,
+bound it met as `samplerUnobservedGapLimitMS`. The policy records each bound's calibration status
+and run: the general bound is calibrated on the canonical M6, while the floor tiers' 1,000 ms floor
+stays provisional until an unforced iPhone or 8 GB Mac record calibrates it; an M6 record never
+moves it. Periodic coverage (`samplerCoverage`,
 `samplerMissedDeadlineCount`) is still published but no longer gates, because it counts deadlines
 honoured rather than whether the peak was seen.
 
@@ -2422,15 +2361,10 @@ promote. With `--require-baseline-identity` (the gate passes it) an identity mis
 the gate reports BASELINE INVALID with the exact seed command for that run's paths; the gate's
 preflight predicts the same mismatch from the live host and the gate matrix before any build.
 
-The committed baseline was re-pooled on 2026-10-16 (`20496dc4`, CONV-21) after a same-host A/B of
-the mlx-swift 0.32.3 repin: three seeded gate runs from commit `57196483` on `mac-mini-m6-16gb`
-(`mid_16gb_mac`, macOS 27.0.1 26A434, Xcode 27.1 27A9275, Swift 6.4 swiftlang-6.4.0.34.1). The warm
-cell's between-run ranges are at most 0.7% (RTF 0.5%, first chunk 0.6%, footprint 0.2%, tokens per
-second 0.4%), so every warm threshold sits at its floor. A new OS or Xcode build number changes the
-identity and needs a re-seed; the first M6 baseline (AV-17 step 1, 2026-09-25, commit 848e140a,
-macOS 27.0 and Xcode 27.0) and the retired M2 baseline stay in git history only.
-Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
-diff them with `git diff`, not `--compare-baseline`.
+The committed baseline's own identity and `seededRuns` record the commit, host, OS and toolchain it
+was pooled from (last re-pooled on 2026-10-16 for the mlx-swift 0.32.3 repin, CONV-21). A new OS or
+Xcode build number changes the identity and needs a re-seed; earlier baselines stay in git history
+only.
 
 **Between-run noise before the gate MAD changes (audit #106, 2026-09-25).** Three MADs of one
 run's five warm takes measure within-run noise; drift between runs of identical source is what a
@@ -2443,10 +2377,7 @@ relative range and MAD beside the median within-run 3-MAD threshold, and replays
 leave-one-run-out with the summarizer's own `pooled_cells` and `compare_summaries`, so a flagged
 metric is a false regression on identical source. It never edits a threshold; a gate-MAD change
 needs at least four identical-source runs on the canonical host (each left-out run then faces a
-pool of three, the gate's minimum). Replayed on the three seed runs of the first M6 baseline
-(848e140a, since re-pooled): between-run RTF range 0.46 % against 3 within-run MADs of 0.20 %,
-physical footprint 1.93 % against 0.69 %, `mlxPeakMB` 0.001 %; no false regression, because the
-floors (5 %, 30 %, 2 %) dominate; three runs are not enough to change the rule.
+pool of three, the gate's minimum).
 
 ---
 
@@ -2483,7 +2414,8 @@ publication needs (`GenerationTelemetrySidecarBudget`). No manual clearing is ne
 | `benchmarks/LEGACY_HISTORY.md` | Preserved incomplete manual history; never promoted to complete registry evidence |
 | `benchmarks/hardware-profiles.json`, `schema-v3.json`, `schema-v2.json` (both published today), `schema-v1.json` (read-only) | Canonical hardware identities plus the record contracts |
 | `benchmarks/baselines/mac-gate-bench.json` | The governed gate baseline ([§8](#baseline-comparison-json-machine-gated)) |
-| `benchmarks/baseline-*`, `OPTIMIZATION.md` | Existing reference snapshots and historical optimization narrative |
+| `benchmarks/qc/eval-v*.json` | QC v2 threshold evaluations ([`qc.md`](qc.md)) |
+| `benchmarks/OPTIMIZATION.md` | Historical optimization narrative |
 
 **Never commit raw JSONL, WAVs, screenshots, result bundles, or traces** under `benchmarks/`; the
 exporter's allowlist ([§8](#record-contents-and-privacy)) keeps identifiers and content out of
@@ -2530,6 +2462,6 @@ device or XCUITest.
 | [`qwen3-core-maintenance.md`](qwen3-core-maintenance.md) | Owned core runtime procedure and validation gates |
 | [`privacy-storage.md`](privacy-storage.md) | Where diagnostics live; deletion paths |
 | [`native-engineering.md`](native-engineering.md) | Telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory) |
-| `qwen3-tts-guide.md` §7 | Language semantics |
-| [`benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md) | Optimization program status |
+| [`qwen3-tts-guide.md` §7](qwen3-tts-guide.md#7-language-handling) | Language semantics |
+| [`benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md) | Historical optimization decision ledger (through 2026-08) |
 | [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md) | Generated benchmark registry index |

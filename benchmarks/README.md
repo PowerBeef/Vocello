@@ -28,12 +28,14 @@ default (`keptByDefault`), because the trace is its only allocation and VM evide
 - **`schema-v3.json`** — the record shape when every take carries the typed quality-registry identity
   (generation lanes since 2026-07-26); **`schema-v2.json`** is still published for records without it
   (`ui-perf`); **`schema-v1.json`** is read-only; `scripts/benchmark_history.py` is the executable validator.
+- **`baselines/`** — `mac-gate-bench.json`, the governed baseline the macOS gate bench compares
+  against, and older JSON baselines kept as reference artifacts. Baselines are never converted into
+  schema-v3 evidence; comparisons against them stay local model-dependent QA, never an ordinary CI or
+  packaging gate.
+- **`qc/`** — QC v2 threshold evaluations (`eval-v<N>.json`, aggregates only; see
+  [`docs/reference/qc.md`](../docs/reference/qc.md)).
 - **`OPTIMIZATION.md`** — a dated historical optimization decision ledger. Current performance truth
   comes from validated records in `runs/`, the generated `HISTORY.md`, and current telemetry documentation.
-- Existing dated Markdown/JSON snapshots and `benchmarks/baselines/` remain preserved reference
-  artifacts. They are not silently converted into complete schema-v3 evidence. New successful runs
-  use a kind directory under `runs/`; optional baseline comparisons remain local model-dependent QA and never an
-  ordinary CI or packaging gate.
 
 ## Registry commands
 
@@ -90,47 +92,15 @@ Instruments run is instrumented; and a hint-only language run is partial. Only c
 runs share a comparison key. Instrumented, exploratory, and partial records are never silently
 mixed into normal timing trends.
 
-Each record binds UTC timing, matrix/status, source and pre/post workspace fingerprints, hardware
-and toolchain/executable identity, project/harness/model/fixture hashes, selected-evidence and
-result digests, ordered per-take metrics, per-cell median/IQR/min/max and worst-state summaries,
-and an optional independent listening-annotation block. Its canonical SHA-256 is computed with the `digest` field
-omitted.
+A record's canonical SHA-256 is computed with its `digest` field omitted. The selected-evidence
+digest comes from the distilled take/output/QC payload and the raw/result/trace evidence identities,
+never from labels or wrapper metadata, so rewrapping the same evidence under another run ID is
+rejected. Corpus identity comes from the fixed harness sources and the ordered prompt digests;
+delivery and calibration records also bind the prosody-analysis profile, and no prompt text or
+profile path enters the registry. `annotate` is the only supported post-publication mutation.
 
-The executable validator independently rechecks kind-specific success semantics after publication:
-structured target-PID/CPU/signpost
-profile proof, complete prosody-calibration aggregates, full hardware context, and cell summaries
-recomputed from the ordered takes. A publisher PASS alone cannot make an incomplete tracked record
-valid.
-
-Corpus identity is derived from fixed harness sources and the ordered generation-time prompt
-digests. Delivery and calibration records also bind the exact prosody-analysis profile. Prompt
-text and profile source paths are never copied into telemetry or the registry.
-
-The selected-evidence digest is derived from the distilled take/output/QC payload and raw/result/
-trace evidence identities, not from mutable labels or wrapper metadata. Rewrapping the same
-underlying evidence under a different run ID is therefore rejected.
-
-Every validator selects one collision-resistant run ID and emits one atomic, untracked
-`benchmark-evidence.json`. History publication consumes only that manifest's ordered generation
-IDs, cells, layer verdicts, output/QC verdicts, and crash result; it never scans a historical
-diagnostics tree. A publication failure after a successful run leaves the local evidence intact
-and prints the idempotent `record --artifact-dir` repair command.
-
-Listening review is optional metadata and can be added later with `annotate`; it never establishes,
-clears, or blocks automated benchmark success. Promotion-quality audio requires the applicable
-fixed-seed PCM QC, exact-output identity, locale-locked ASR consensus, and prosody/delivery gates.
-`annotate` is the only supported post-publication mutation: it updates the listening block and
-recomputes the record digest without changing the captured run evidence.
-
-Comparison metadata is derived from all tracked records, not insertion order. `rebuild-index`
-reconciles each compatible clean run with its nearest earlier equivalent and updates the record
-digest when an earlier record arrives later through a merge; `rebuild-index --check` and ordinary CI
-reject stale comparison metadata. New records key on what their kind measures
-(`scripts/lib/lineage_identity.py`: the lane's project.yml build settings, the take topology and a
-reviewed per-kind measurement version); `lineage-replay` recomputes that identity for committed
-records from their own source commits without writing anything.
-
-See [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
-for the operator runbook (workflows, preflight, reading results) and
-[`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
-for the telemetry schema and knobs.
+What a record binds, how the validator rechecks it, how `rebuild-index` reconciles comparison
+metadata and lineage, and the listening-annotation rules are in
+[`docs/reference/telemetry-and-benchmarking.md` §8](../docs/reference/telemetry-and-benchmarking.md#8-publication-lineage-and-baselines),
+which is also the operator runbook (workflows, preflight, reading results, telemetry schema and
+knobs).

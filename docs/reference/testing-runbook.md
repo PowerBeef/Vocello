@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -41,13 +41,10 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 
 ## Claude Code QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. Seven thin repository skills under
-`.claude/skills` (`/vocello-*`) select the existing iOS, macOS UI, device diagnostics, benchmark,
-debugging, computer-use (`vocello-ui-autonomy`) and read-only release-readiness procedures. See
-[tool routing](development-workflow.md#claude-code-setup-and-tool-routing).
-Local targeted validation is authorized at coherent checkpoints. Full matrices are task/release-specific;
-publication and external writes require specific authorization. Hook guards are supplementary,
-not a substitute for review. MobileBuildMCP discovery and Axiom may assist diagnosis under native serialization.
+Routine edits use `scripts/dev.sh`; no skill is required. The seven `/vocello-*` skills select the
+existing iOS, macOS UI, device diagnostics, benchmark, debugging, computer-use
+(`vocello-ui-autonomy`) and read-only release-readiness procedures; they add no gate or authority
+([tool routing](development-workflow.md#claude-code-setup-and-tool-routing)).
 
 ### Read a finished run
 
@@ -86,9 +83,6 @@ cleanup and receipt writing; an earlier native failure retains precedence over a
 Read the collection receipt as well as the required-step ledger; neither a clean
 receipt nor passed test cases alone establishes successful run completion.
 
-For Swift review, the read-only `vocello-swift-review` subagent reads every Swift diff against the native
-domain rules, in parallel with the lead's verification; it adds no CI gate.
-
 ## Model readiness
 
 Generation UI tests require visible Settings readiness, Generate enabled, and the exact required
@@ -121,22 +115,18 @@ Native Xcode/SwiftPM commands are serialized by the host-wide native lock across
 agent worktree. Generation and heavy analyzers run in the lead session, and no evaluator runs beside
 a resident generator: neural evaluators start only after the TTS process exits, and the canonical
 Mac mini M6 runs QC v2's models one at a time under `build/cache/qc/run.lock` (the 8 GB Mac is a
-product floor, not an evaluator host); timing lanes refuse to start on a busy host. The busy-host rule is
-`require_quiet_host` in `scripts/lib/host_preflight.sh`: a one-minute load above twice the core
-count, a kernel memory-pressure level above normal, another holder of the native lock or a validated active-worker lease refuses the lane before any model loads (`qc-takes` passes `agents-allowed` and only
-records the agents).
-`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues for an explicitly exploratory run, which
-the publisher then classifies from the run's own load sample.
+product floor, not an evaluator host). Timing and memory lanes refuse to start on a busy host
+([host preflight](tooling-and-evidence.md)).
 
 ## CI and release
 
 Ordinary CI and `scripts/dev.sh check` are deterministic. Models, a phone and UI tests never block
-commits, pushes or candidate packaging. `scripts/dev.sh check` compiles the affected XCUITest bundles
-(`scripts/build_ui_test_bundles.sh`, build only) when `Tests/*UITests`, `Tests/UIAutomationSupport`
-or `project.yml` change; push CI compiles them in the `macos-tests` and `ios-compile` jobs but never
-runs them, and a change only to their own sources skips the deterministic suites and TSan. Public
-promotion separately requires all applicable exact-source acceptance lanes. Consult the platform release guide for command-bound evidence, signing
-and artifact verification; a development build is not a processed distribution candidate.
+commits, pushes or candidate packaging. Push CI, and `scripts/dev.sh check` when UI-test sources or
+`project.yml` change, compile the XCUITest bundles and never run them
+([Daily loop](development-workflow.md#daily-loop)). Public promotion separately requires all
+applicable exact-source acceptance lanes. Consult the platform release guide for command-bound
+evidence, signing and artifact verification; a development build is not a processed distribution
+candidate.
 
 ## Historical procedures
 

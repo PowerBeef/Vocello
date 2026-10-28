@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -37,7 +37,8 @@ cd Vocello
 - An Apple Silicon Mac on macOS 26 or newer with **full Xcode**; the Command Line Tools alone cannot
   build any product. CI pins the version in `config/toolchain.json` (`native.xcode`). A newer local
   Xcode (27) builds the project, but it accepts some code the pinned CI Xcode rejects, so push CI stays
-  the judge; the toolchain move is roadmap item CONV-21.
+  the judge; the report-only `xcode-preview.yml` shows the differences daily, and moving CI to Xcode
+  27 is part of roadmap item DW-04.
 - Select it and finish its first launch:
 
   ```sh
@@ -161,7 +162,7 @@ Open the clone with `claude` at the repository root and trust the workspace; Cla
 `CLAUDE.md`. The tracked `.claude/settings.json` holds the supplementary hooks, permissions and
 `worktree.baseRef`; skills live in `.claude/skills`, read-only agents in `.claude/agents` and the
 path-scoped rules in `.claude/rules`. Check `/hooks` and `/permissions` in the first session and follow
-the [fresh-session procedure](development-workflow.md#claude-code-setup-and-tool-routing).
+the [fresh-session procedure](#claude-code-setup-and-tool-routing).
 Personal overrides go in the untracked `.claude/settings.local.json`; do not change global trust or
 settings automatically. Agent worktrees under `.claude/worktrees` stay untracked. The Claude desktop
 app's Code tab runs the same Claude Code with the same hooks, permissions, skills and agents: open
@@ -259,10 +260,10 @@ be missed locally; the Linux CI job still runs the whole suite.
 ## The commit lint
 
 `scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires branch `main` in the main
-checkout or a `worktree-*` branch in a registered linked worktree (a Claude Code agent worktree), pushes
-only from `main`, a whitespace-clean
-staged diff (`git diff --cached --check`) and a clean `scripts/privacy_scan.py --staged` (no developer
-home path, no credential-shaped token, no key file). It never builds or tests. Its one advisory check
+checkout, or a `worktree-*` (agent) or `claude/*` (desktop side session) branch in a registered
+linked worktree; pushes only from `main` in the main checkout; a whitespace-clean staged diff
+(`git diff --cached --check`); and a clean `scripts/privacy_scan.py --staged` (no developer home path,
+no credential-shaped token, no key file). It never builds or tests. Its one advisory check
 returns a warning, not a block, when behaviour-bearing Swift is committed without the Swift review's
 trailer (see Operating defaults); a message it cannot read skips the check. Two more guards block
 Simulator destinations, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made
@@ -412,7 +413,13 @@ dispatch and on pushes that touch release inputs: without secrets it installs th
 through `.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized)
 and the packaged-DMG verification, and validates the release evidence locally; a failure keeps one
 issue labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and
-inside `release.yml` on the tagged commit.
+inside `release.yml` on the tagged commit. `xcode-preview.yml` (daily and on dispatch, report-only)
+runs the deterministic suites on GitHub's `xcode-27` preview image, so a difference between the two
+toolchains shows before a push meets it; it blocks nothing and files no issue.
+`swift-dependency-watch.yml` (weekly, read-only) compares the exact Swift pins with upstream releases
+and open Dependabot alerts ([`mlx-guide.md` §9.4](mlx-guide.md#94-scheduled-release-and-advisory-watch)).
+Jobs on the pinned toolchain install it through `.github/actions/native-toolchain`; the preview
+selects its image's newest Xcode 27 instead.
 
 ## Cache and generation policy
 
@@ -444,14 +451,12 @@ inside `release.yml` on the tagged commit.
 
 ## Operating defaults
 
-`CLAUDE.md` owns the working agreement. `native-engineering.md` (Swift/runtime) and
-`tooling-and-evidence.md` (contracts, CI, debugging, benchmarks, release) are path-scoped rules: their
-`paths:` front matter loads them through the `.claude/rules` symlinks when matching files are touched.
-Read them directly when planning.
+`CLAUDE.md` owns the working agreement: the edit-verify-commit loop, push and authorization rules and
+the review routing. `native-engineering.md` (Swift/runtime) and `tooling-and-evidence.md` (contracts,
+CI, debugging, benchmarks, release) are path-scoped rules: their `paths:` front matter loads them
+through the `.claude/rules` symlinks when matching files are touched. Read them directly when
+planning.
 
-Use targeted deterministic tests, changed-file lint and warm incremental builds while editing.
-Before committing run the routed checks and review the actual diff. Use independent Swift review
-for substantive Swift changes and focused review for persistence, privacy, hooks and release paths.
 The Swift review (`vocello-swift-review`) checks the policy boundaries, then test adequacy for every
 behavioural change: a test that fails when the fix is reverted, fakes that reach the changed code,
 assertions on what happened rather than on a state another path also publishes, cancellation and
@@ -461,100 +466,85 @@ completed review in the commit message with the trailer `Reviewed-by: vocello-sw
 integration, `git cherry-pick -n <sha>`, then `git commit -C <sha> --trailer '...'`. The commit lint
 warns, never blocks, when a commit of Swift under `Sources/QwenVoiceCore`, `Sources/iOS`,
 `Sources/Services`, `Sources/ViewModels` or `Packages/*/Sources` lacks it.
-At a coherent checkpoint run the smallest relevant existing model, UI, device or performance lane.
-Full matrices are task/release-specific. Local validation and scoped commits on `main` are authorized;
-pushes require an explicit request, including the existing unpushed commits. Do not reinterpret a
-script's structural permission to push `main` as conversational authorization.
 
-Reuse installed assets. New large downloads, model installs, dependency repins, global settings,
-release/signing/deployment/publication and external writes require specific authorization.
-Preserve the original failure. Investigate it before a rerun; record the reason and new run ID.
+A script's structural permission to push `main` is not conversational authorization: pushes still
+need the explicit request `CLAUDE.md` requires. Preserve the original failure and investigate it
+before a rerun; record the reason and the new run ID.
 
 ## Parallel agents and worktrees
 
 Use selective parallelism for disjoint editing, research, review or triage. At most four agents may be
-active including the lead, inheriting the selected model; desktop app side sessions count. This limit
-is an instruction: a hook cap would misread a subagent that died without SubagentStop as still active
-until its session ends.
-One full Python suite and one browser acceptance run at a time on the 16 GB development host.
-Agents doing native work remain code-only; the lead owns native builds and all measured lanes.
+active including the lead, inheriting the selected model; desktop app side sessions count. The limit
+is an instruction, not a hook cap: a cap would count a subagent that died without SubagentStop as
+active until its session ends. Run one full Python suite and one browser acceptance run at a time on
+the 16 GB development host. Agents stay code-only; the lead owns native builds and every measured
+lane.
 
-Create editing agents with the Agent tool and `isolation: "worktree"`. Claude Code creates
+**Agents.** Create editing agents with the Agent tool and `isolation: "worktree"`. Claude Code creates
 `.claude/worktrees/<name>` on branch `worktree-<name>` from local HEAD (`worktree.baseRef: head` in
-`.claude/settings.json`), so commit the lead checkpoint first: dirty files do not carry over. An unchanged
-agent worktree is removed automatically. Inspect Git metadata and commit identity; a directory name is not
-proof of repository identity. Give each worker a disjoint file set and clear validation limits; the
-SubagentStart hook repeats the agent rules to every subagent, and `agent_guard.py` enforces them: only a
-subagent's hook input carries `agent_id`, so it alone is refused pushes, commits in the main checkout,
-native builds and tests, device, model and measured-lane scripts (sourcing a lane script or a
-`scripts/lib` shell library included, since that leaves `build` or `xcb_run` callable by bare name) and
-edits of `config/roadmap.json` or `docs/development-progress.md`. Hand-made branches and worktrees stay
-denied.
+`.claude/settings.json`), so commit the lead checkpoint first: dirty files do not carry over. An
+unchanged agent worktree is removed automatically. Inspect Git metadata and commit identity; a
+directory name is not proof of repository identity. Give each worker a disjoint file set and clear
+validation limits. Agents make scoped commits on their `worktree-*` branch and never push, edit the
+roadmap or checkpoint, or run models, devices, native UI or native builds. Hand-made branches and
+worktrees stay denied.
 
-Agents make scoped commits on their `worktree-*` branch and never push, modify the roadmap/checkpoint or
-run models, devices, native UI or native builds. The lead reviews each commit, integrates with
-`git cherry-pick` or `git merge --ff-only`, and validates the combined result on the warm main cache. Do
-not edit scripts used by a running lane. Remove integrated worktrees with
-`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>`, preserving needed
-ignored evidence first; never discard unintegrated work to tidy the workspace (`--force` and
-`git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
-`git cherry main worktree-<name>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
-
-The Claude desktop app adds side sessions: separate sessions the lead starts (`start_session`) or the
-maintainer opens, each with its own transcript. They follow the agent rules, and the lead stays in the
-main checkout. A read-only side session (CI or release watching, triage, research) shares the main
+**Side sessions.** The Claude desktop app adds sessions the lead starts (`start_session`) or the
+maintainer opens, each with its own transcript. They follow the agent rules, and the lead stays in
+the main checkout. A read-only side session (CI or release watching, triage, research) shares the main
 checkout (`use_worktree: false`), often on a cheaper model, and its brief says it edits nothing. An
-editing side session gets the app's own worktree (`use_worktree: true`; omitted, a side session of a
-lead in a plain folder shares that folder, where no guard can tell it from the lead),
-`.claude/worktrees/<name>` on `claude/<name>` (the
-Code tab's default branch prefix `claude` and in-project worktree location; keep both), cut from local
-HEAD, so commit the checkpoint first. The SessionStart hook tells a session that starts in a linked
-worktree that it is a side session, and `agent_guard.py` screens every call made from a linked
-worktree as it screens a subagent's, `agent_id` or not; a lead that `cd`s into a worktree is screened
-the same way until it leaves. The commit lint accepts the `claude/*` branch there. The lead integrates
-it like an agent branch (`git cherry main claude/<name>`, then cherry-pick or `merge --ff-only`),
-archives the session in the app and removes any worktree and branch left behind.
+editing side session gets the app's own worktree (`use_worktree: true`): `.claude/worktrees/<name>`
+on `claude/<name>`, cut from local HEAD, so commit the checkpoint first. Keep the Code tab's default
+branch prefix `claude` and its in-project worktree location. Without `use_worktree`, a side session of
+a lead in a plain folder shares that folder, where no guard can tell it from the lead.
 
-Before source-bound measurements join or stop all delegated work. `scripts/active_workers.py`
-uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events, host-wide leases and the live
-start identity of the native `claude` process. Dead, reused-PID and non-Claude ownership records
-(including retired Codex leases and Node-hosted clients) cannot establish activity.
-Unknown ownership blocks measurements. A locked Git worktree may be idle and is never counted.
-Another live session in this repository (a desktop side session, a second terminal) counts like a
-worker: `active_workers.py check` reports `other-sessions(N)` and the lane waits until those sessions are
-stopped or archived; `--agents-allowed` lanes tolerate them.
-Root interruption/teardown does not prove workers stopped, so live worker leases remain conservative.
+**Guards.** The SubagentStart hook repeats the agent rules to every subagent, and the SessionStart
+hook tells a session that starts in a linked worktree that it is a side session. `agent_guard.py`
+screens every call whose hook input carries `agent_id` (only a subagent's does) or whose `cwd` is a
+linked worktree (a side session, or a lead that `cd`s into a worktree until it leaves). It refuses
+pushes, commits in the main checkout, native builds and tests, device, model and measured-lane
+scripts (sourcing a lane script or a `scripts/lib` shell library included, since that leaves `build`
+or `xcb_run` callable by bare name) and writes to the roadmap files or `docs/development-progress.md`
+through an edit tool, `roadmap.py`'s writing verbs or a recognisable shell or inline-script write. It
+is a guardrail, not a sandbox. The commit lint accepts the `worktree-*` and `claude/*` branches there.
+
+**Integration.** The lead reviews each commit, integrates with `git cherry-pick` or
+`git merge --ff-only`, and validates the combined result on the warm main cache. Do not edit scripts
+used by a running lane. Archive an integrated side session in the app. Remove an integrated worktree
+with `git worktree remove .claude/worktrees/<name>` and its branch with `git branch -d`, preserving
+needed ignored evidence first; never discard unintegrated work to tidy the workspace (`--force` and
+`git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
+`git cherry main <branch>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
+
+**Worker tracking.** Before source-bound measurements join or stop all delegated work.
+`scripts/active_workers.py` uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events,
+host-wide leases and the live start identity of the native `claude` process. Dead, reused-PID and
+non-Claude ownership records (including retired Codex leases and Node-hosted clients) cannot establish
+activity. Unknown ownership blocks measurements; a locked Git worktree may be idle and is never
+counted. Another live session in this repository (a desktop side session, a second terminal) counts
+like a worker: `active_workers.py check` reports `other-sessions(N)` and the lane waits until those
+sessions are stopped or archived; `--agents-allowed` lanes tolerate them. Root interruption or
+teardown does not prove workers stopped, so live worker leases remain conservative.
 
 The SessionStart hook exports the session's opaque `QVOICE_WORKER_SESSION` marker to later Bash calls
 through `CLAUDE_ENV_FILE` and names it in the session context; it establishes *this session's*
-registration. Another session's receipt cannot establish it.
-If hooks or ownership inventory are unavailable, join all known workers and explicitly use
-`QVOICE_LEAD_ONLY=1` for the lane. Never use that declaration to bypass a known active or unknown
-worker lease. Registration failures invalidate the session receipt and retain a conservative marker;
-inspect unresolved markers after joining work rather than blindly deleting them. Without the marker no
-session can be told from another, so the lead-only declaration also covers side sessions: stop or
-archive them first. Hooks cannot prove
-all clients on the host are instrumented, so the lead still checks its known workers and host posture.
-
-`require_quiet_host` also checks native-lock ownership, load and memory pressure. The existing
-`QVOICE_ALLOW_BUSY_HOST=1` path remains explicitly exploratory; it cannot override unknown worker
-ownership and cannot make a loaded measurement publishable. Only existing non-timing audio-QC
-model lanes may pass `agents-allowed`; they still respect host load/memory/native serialization.
-Cache-only audio rescoring uses `check_cache_only_host` instead: load and memory pressure are
-recorded without blocking. This deterministic analysis makes no latency or memory-qualification
-claim; worker ownership and native-lock checks remain. Do not use it for inference, generation,
-UI, performance or memory measurements.
+registration, and another session's receipt cannot. If hooks or ownership inventory are unavailable,
+join all known workers, stop or archive side sessions (without the marker no session can be told from
+another) and explicitly use `QVOICE_LEAD_ONLY=1` for the lane. Never use that declaration to bypass a
+known active or unknown worker lease. Registration failures invalidate the session receipt and retain
+a conservative marker; inspect unresolved markers after joining work rather than blindly deleting
+them. Hooks cannot prove all clients on the host are instrumented, so the lead still checks its known
+workers and host posture. The host checks a measured lane runs before any model loads
+(`require_quiet_host`, `check_cache_only_host`, `QVOICE_ALLOW_BUSY_HOST`) are in
+[`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
 
 ## Claude Code setup and tool routing
 
 Claude Code reads `CLAUDE.md` at the repository root and `website/CLAUDE.md` once website files are
 touched. `.claude/rules/native.md` and `.claude/rules/tooling.md` are symlinks to the two reference
-rules above. Seven thin skills live in `.claude/skills` and run as `/vocello-*`:
-`vocello-ios-validation`, `vocello-macos-ui`, `vocello-device-diagnostics`, `vocello-benchmark`,
-`vocello-debug`, `vocello-ui-autonomy` (computer use for what XCUITest cannot cover) and read-only
-`vocello-release-readiness`. They may also be selected for authorized local
-work; they grant no external-write authority. Read-only agents live in `.claude/agents`:
-`vocello-swift-review` and `vocello-xcresult-triage`, both `model: inherit`.
+rules above. The seven `/vocello-*` skills in `.claude/skills` and the two read-only agents in
+`.claude/agents` (both `model: inherit`) are listed in `CLAUDE.md`. The model may also select a skill
+for authorized local work; no skill grants external-write authority.
 
 `.claude/settings.json` is the sole hook and permission definition. Opening a session installs nothing
 and never builds or touches a phone.
@@ -594,7 +584,8 @@ External writes include GitHub, the Vercel CLI and App Store Connect. On Hugging
 `switch` and cache removal, and the MCP's Space-running tools (`dynamic_space`, `gr*`).
 
 `deny` covers force and non-main pushes, hand-made branches and worktrees, `update-ref`, stashing,
-broad staging, releases, `.xcodeproj` edits and `hf auth token`, which prints the stored credential. It
+broad staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
+`hf auth token`, which prints the stored credential. It
 also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
 desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
 simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the
@@ -636,15 +627,10 @@ unavailable. Without restarting the interactive session (for example when workin
 `claude -p '<prompt>' --model haiku --max-turns 4 --allowedTools 'Bash(echo *)'
 'Bash(python3 scripts/active_workers.py status)' --output-format stream-json --verbose < /dev/null`
 from the repository root exercises the same SessionStart and SessionEnd hooks in a fresh session; its
-init message lists the tools, agents and skills it received. The 2026-10-12 migration session already observed settings applying live, the wildcard
-deny rules removing those MCP tools and the three Axiom simulator/test agents, the tooling rule loading
-through its symlink, and a denied `git add -A` being refused. SessionStart, worker receipts and
-SubagentStart/Stop have since been observed in live sessions (a subagent receives the SubagentStart
-context from `worker_lifecycle.py`). In the desktop app, run the same check in a new session opened on
-the repository folder without a worktree, and confirm that `preview_start` with `website` serves the
-home page and that no `mcp__Claude_Code_iOS_Simulator__*` tool is offered. The first desktop session
-(2026-10-24) observed the SessionStart output, a non-empty marker, `trackingAvailable: true` with the
-app's `claude` process as owner, and the `website` preview.
+init message lists the tools, agents and skills it received. In the desktop app, run the same check in
+a new session opened on the repository folder without a worktree, and also confirm that
+`preview_start` with `website` serves the home page and that no `mcp__Claude_Code_iOS_Simulator__*`
+tool is offered.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
@@ -744,8 +730,8 @@ maintainer's: Claude proposes a change through the app and never changes one to 
 ### Host and release prerequisites
 
 The development host may use a newer Xcode than the exact CI/release pin. `doctor` reports this
-mismatch without changing the selected developer directory. CONV-21 retains the compiler
-qualification boundary: local success does not establish pinned-compiler acceptance. Release
+mismatch without changing the selected developer directory, and local success does not establish
+pinned-compiler acceptance (New Mac setup, section 1). Release
 checks consume exact tools from `config/toolchain.json`; select the existing pinned-tool bin
 directory when available and verify with `scripts/supply_chain_contract.py --installed release`.
 An ambient newer `gh` is fine for ordinary read-only inspection but cannot qualify a pinned release.
@@ -754,7 +740,6 @@ do not repin dependencies or change global settings to make the inventory green.
 
 For macOS XCUITest, keep one stable interactive desktop session and avoid simultaneous UI work.
 Check visible blocking dialogs and competing automation before starting (a computer-use screenshot may
-look; computer use stops before the lane starts), then leave the desktop
-available until collection finishes. Report XCTest display/screenshot errors from retained evidence;
-the earlier Unity modal and display-ID error do not establish a causal link. Do not automatically
+look; computer use stops before the lane starts), then leave the desktop available until collection
+finishes. Report XCTest display or screenshot errors from retained evidence. Do not automatically
 close unrelated apps or modify display settings. Failed UI runs retain their original identities.

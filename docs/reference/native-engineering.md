@@ -20,17 +20,17 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 `docs/reference/macos-app-guide.md`, `docs/reference/ios-app-guide.md`,
 `docs/reference/localization.md`, `docs/reference/qc.md` (audio QC), `docs/ARCHITECTURE.md`.
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
-(generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
-(`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
-`Tests/UIAutomationSupport` or `project.yml`; push CI compiles the three bundles (Mac, iOS, iOS candidate) in the `macos-tests` and
-`ios-compile` jobs (`--gate`) but never executes them; a change only under `Tests/Vocello*UITests`
-skips the deterministic suites and TSan. Use the smallest relevant physical-device or macOS XCUITest lane at a coherent checkpoint.
+(generic device-SDK compile). Push CI, and `dev.sh check` when UI-test sources or `project.yml`
+change, compile the XCUITest bundles but never run them (routing:
+`docs/reference/development-workflow.md`, Daily loop). Use the smallest relevant
+physical-device or macOS XCUITest lane at a coherent checkpoint.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
 
-- **MLX is the only backend.** No Core ML or other runtime. `mlx-swift` and `mlx-swift-lm` move
-  together, only with maintainer authorization and a benchmark-gated review; review the
-  `swift-transformers` pin in the same change.
+- **MLX is the only backend.** No Core ML or other runtime. The exact pins move only with maintainer
+  authorization and a benchmark-gated review: the mlx pair together, swift-huggingface with
+  swift-transformers, and the swift-transformers pin reviewed in every mlx move
+  (`docs/reference/mlx-guide.md` §9).
 - **Owned-package boundary.** Product code imports the `VocelloQwen3Core` facade, never MLXAudio
   implementation modules. MLX arrays stay inside their owning isolation domain; evaluate lazily built
   results before they cross an allowed boundary.
@@ -73,17 +73,22 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
 - **Telemetry semantics are typed.** Since telemetry schema v8 (records stay v8; the streaming v9
   projection is a digest-bound sidecar), frontend latency stops at playback scheduling; one process
-  has one memory series (the app layer is required for frontend timings; its samples of the hosting
-  process join that series, never a sum); a macOS UI benchmark is authoritative only when the app
-  and engine layers are complete (the merged record names its required layers).
+  has one memory series (the app layer is required for frontend timings; the app and engine samplers
+  of the hosting process merge by absolute uptime, never a sum, and a per-process maximum is not a
+  system peak); a macOS UI benchmark is authoritative only when the app and engine layers are
+  complete (the merged record names its required layers). Publication rules:
+  `docs/reference/tooling-and-evidence.md`, Memory-qualified publication.
 
 ## macOS app (`Sources/QwenVoiceApp.swift`, `Sources/Views`, `ViewModels`, `Services`)
 
 - **The engine runs in-process on the shared store.** `MacEngineBootstrap` builds `MLXTTSEngine` through
   `NativeRuntimeFactory` (bundled contract → macOS-expanded registry, floor-tier prewarm policy) and wraps
-  it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen except the shared consent admission, the PA-31 snapshot bridge and its typed admission refusals, A9-01, and F-01's discard of a closed review surface's candidate). No XPC service,
-  no service retirement, no wire protocol; a separate engine process must not be reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
-  `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
+  it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen except the
+  shared consent admission, the PA-31 snapshot bridge and its typed admission refusals, A9-01, and
+  F-01's discard of a closed review surface's candidate). No XPC service or wire protocol; a separate
+  engine process must not be reintroduced. Views inject the store as `@EnvironmentObject`; the root
+  shell subscribes to `snapshotChanges` with `onReceive` and never reads the store in `body`
+  (W1-D/W2-A).
 - **Memory relief is in-process.** The engine's own kernel-pressure responder trims caches and never
   unloads the weights; the store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working
   set and fully unloads at its critical band; idle unload follows
@@ -98,15 +103,16 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
-- **iOS is the UI reference.** The September 18 approved reset is
-  `docs/reference/macos-ios-ui-reset-2026-09.md`. Four sidebar destinations adapt the phone's tabs;
-  Studio modes use the shared capsule selector. `VocelloStudioLayout` owns composer/setup/dock
-  ordering on both platforms. Preserve the flexible borderless script and shared tinted pills;
-  platform wrappers own editors, safe areas, keyboard commands and file actions. Do not reimpose
-  superseded Mac pixel prescriptions. First prove Built-in Voice, then convert other screens after
-  maintainer review. All three Studio modes use the inline player; the sidebar carries playback on other
-  destinations, with a detail-footer fallback when the sidebar is hidden. Never operate unrelated audio from a stale result card. Keep iOS behavior and
-  identifiers stable, and update actual Mac test navigation when controls move.
+- **iOS is the UI reference.** The approved reset (`docs/reference/macos-ios-ui-reset-2026-09.md`)
+  converted every Mac screen to the shared composition on September 19 and 20. Four sidebar
+  destinations adapt the phone's tabs; Studio modes use the shared capsule selector.
+  `VocelloStudioLayout` owns composer/setup/dock ordering on both platforms. Preserve the flexible
+  borderless script and shared tinted pills; platform wrappers own editors, safe areas, keyboard
+  commands and file actions. Do not reimpose superseded Mac pixel prescriptions. All three Studio
+  modes use the inline player; the sidebar carries playback on other destinations, with a
+  detail-footer fallback when the sidebar is hidden. Never operate unrelated audio from a stale
+  result card. Keep iOS behavior and identifiers stable, and update actual Mac test navigation when
+  controls move.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and
@@ -123,8 +129,6 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`.
 - **Entitlements.** App sandbox stays off for MLX; the app is the only entitled Mach-O;
   `config/macos-entitlement-policy.json` changes need a security review.
-- **Memory evidence is one series per process**: the app and engine samplers of the one hosting
-  process merge by absolute uptime and are never summed; a per-process maximum is not a system peak.
 
 ## iOS app (`Sources/iOS`, `Sources/iOSSupport`, `Tests/VocelloiOSLogicTests`)
 
@@ -145,13 +149,13 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - **Resources are `sources:` entries with `buildPhase: resources`** in `project.yml` (XcodeGen 2.45+
   otherwise drops iOS resources); never a `resources:` key.
 - **UI conventions.** `IOSScrollView` for vertical scroll surfaces; mode color pairs with icon, label or
-  position; all glass routes through `IOSGatedGlassModifier` (system glass button styles through `IOSGlassGate`); Reduce Motion / Reduce Transparency honored;
-  identifiers stable and governed with `config/ios-control-audit.json`; no hidden test UI.
+  position; all glass routes through `IOSGatedGlassModifier` (system glass button styles through
+  `IOSGlassGate`); Reduce Motion / Reduce Transparency honored; identifiers stable and governed with
+  `config/ios-control-audit.json`; no hidden test UI.
 - **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile
-  follows the entitled limit. Publishable device evidence is memory-qualified (telemetry schema v8 or
-  newer, no unobserved sampler gap above the policy bound, sampled peaks measured against the exact
-  high-water marks, no critical pressure, warning, `hardTrim` or `fullUnload`).
+  follows the entitled limit. Publishable device evidence is memory-qualified
+  (`docs/reference/tooling-and-evidence.md`, Memory-qualified publication).
 - **Localization grows through typed catalog entries.** Dynamic copy belongs in `VocelloPresentationText`
   and `Localizable.xcstrings` with plural rules; formatted copy goes through `VocelloLocalization.format`
   or `IOSAppLanguage.format` so plural rules follow the interface language;
@@ -171,22 +175,21 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - **Strict memory safety is on** (`SWIFT_STRICT_MEMORY_SAFETY`):
   - Mark every unsafe construct with `unsafe`.
   - A `@preconcurrency import` needs `@unsafe` as well.
-  - Swift 6.4 marks five buffer and pointer calls `@safe` that CI's Swift 6.3 does not. For those,
-    use the toolchain-neutral forwards in
+  - Swift 6.4 (local Xcode 27) annotates `Array.withUnsafeBufferPointer`,
+    `withUnsafeMutableBufferPointer`, `withUnsafeBytes(of:)`, `withUnsafePointer(to:)` and
+    `withUnsafeMutablePointer(to:)` `@safe`, while CI's Swift 6.3 (Xcode 26.6) does not, so a marker
+    one compiler needs the other rejects. Call the toolchain-neutral forwards in
     `Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift` (`withBufferPointer`,
-    `withValueBytes(of:)` and the rest), so the code compiles on both without an `unsafe` the newer
-    compiler rejects.
+    `withMutableBufferPointer`, `withValueBytes(of:)`, `withValuePointer(to:)`,
+    `withMutableValuePointer(to:)`) until CI moves to Xcode 27.
 - **MemberImportVisibility is on:** import every module whose members a file uses; a transitive import
   no longer makes them visible.
-- **Flaky tests are quarantined, not deleted or retried.** List the test in `config/test-quarantine.json`
-  and call `try TestQuarantine.skipIfListed(self)`; push CI skips it, nightly still runs it, and the entry
-  expires after 30 days.
-- **SwiftLint is a CI gate against a baseline.** CI's `contracts` job runs the `.swiftlint.yml` rules
-  over every tracked Swift file outside `Packages/` (`python3 scripts/lint_baseline.py swiftlint`) and
-  fails on any finding absent from `config/lint-baseline/swiftlint.json`, which only shrinks and was
-  empty when the gate began (DW-03). `scripts/dev.sh lint` runs the same rules on changed files and
-  reports a missing or unpinned SwiftLint (`./scripts/install_pinned_tools.sh swiftlint`); formatting
-  stays Xcode's.
+- **Flaky tests are quarantined, not deleted or retried:** list the test in
+  `config/test-quarantine.json` and call `try TestQuarantine.skipIfListed(self)` (policy:
+  `docs/reference/development-workflow.md`, Lint and warnings).
+- **SwiftLint is a CI gate against a baseline** that only shrinks; `scripts/dev.sh lint` runs the same
+  `.swiftlint.yml` rules on changed files, and formatting stays Xcode's (detail:
+  `docs/reference/development-workflow.md`, Lint and warnings).
 
 ## Common mistakes
 
@@ -206,23 +209,17 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
   Mark the conformance and its witnesses `nonisolated` and hop to the main actor inside.
 - Using raw `ScrollView` on iOS; making color the only indicator; reintroducing a separate engine process.
 - Adding, moving or deleting a file under a globbed `Sources/`, `Tests/` or resource path without
-  `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit. The shared `scripts/project_generation.py` signature covers specifications, generators and
-  source/resource membership in regeneration, cache freshness and check planning. Content-only edits
-  do not invalidate generation; missing outputs always require it.
+  `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit
+  (the generation signature: `docs/reference/development-workflow.md`, Cache and generation policy).
 - Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
   not, so hop with `await MainActor.run`. A failed CI run names its failing tests or compile errors
   in the job summary (`scripts/ci/summarize_test_failures.py`); the full logs are in the run's
   `macos-deterministic-test-artifacts` artifact.
 - Trusting the local Xcode 27 compile for what CI's pinned Xcode 26.6 accepts: 26.6 flags a
-  `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), and
-  its region-isolation checker rejects a throwing `Task { … }` returning a value (return
-  `(any Error)?` from a non-throwing task, as the runtime tests do). Under strict memory safety, Swift
-  6.4 annotates `Array.withUnsafeBufferPointer`, `withUnsafeMutableBufferPointer`,
-  `withUnsafeBytes(of:)`, `withUnsafePointer(to:)` and `withUnsafeMutablePointer(to:)` `@safe`
-  while 26.6's Swift 6.3 does not, so a marker one needs the other rejects: call
-  `withBufferPointer`, `withMutableBufferPointer`, `withValueBytes(of:)`, `withValuePointer(to:)`
-  and `withMutableValuePointer(to:)` (`Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift`)
-  until CI moves to Xcode 27.
+  `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), its
+  region-isolation checker rejects a throwing `Task { … }` returning a value (return `(any Error)?`
+  from a non-throwing task, as the runtime tests do), and it disagrees on five `@safe` annotations
+  (Build hygiene, above).
 - AppKit/SwiftUI traps: an `NSScrollView` representable without `sizeThatFits` (it must answer an
   infinite proposal); two same-named files in one target (they collide on `.stringsdata`, which is why
   the macOS `AppPaths.swift`/`AppDefaults` cannot join `VocelloCoreTests`, which compiles the iOS copy);
@@ -232,7 +229,8 @@ skips the deterministic suites and TSan. Use the smallest relevant physical-devi
 - In UI tests: probing an optional element with `VocelloUIWait.exists` or `condition` (they record
   `XCTFail` on timeout; use `VocelloUIWait.settles`, which answers without failing and polls eagerly,
   never a bare `XCTNSPredicateExpectation`, which polls once a second); matching visible labels
-  instead of identifiers (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build;
+  instead of identifiers (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a
+  UI lane mid-build;
   replacing existing text in an iOS `UITextView` with `VocelloUITextEntry.replace` and trusting it
   (the tap can leave the caret at the start, where its backspaces delete nothing: select the text
   first and assert the resulting value, as the purchase lane's brief restore does; BKL-16);

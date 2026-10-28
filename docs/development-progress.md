@@ -34,7 +34,7 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      RF-38's BrowserStack trial (`scripts/farm_smoke.sh upload`, then `results`).
   4. Triage Public Beta feedback and crashes as they arrive.
 - **Git:** `origin/main` is `d53b30b4` (CI passed). `26b303ed` and later are local: build 27
-  (RF-37), RF-38's farm smoke test and script, and RF-39's review of the docs and roadmap.
+  (RF-37), RF-38's farm smoke test and script, and RF-39's review of the docs and roadmap (closed).
 - **Decisions waiting:** RF-12 and RF-35 passed their October 27 due dates. RF-12's last row (the
   owned export in Airplane Mode) waits on RF-02, and RF-35 on a download completing over cellular.
   Each needs a recorded decision: move the date, cut the row or close the item.

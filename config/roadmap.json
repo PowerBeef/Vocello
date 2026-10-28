@@ -329,7 +329,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-10-27",
-      "notes": "Opened 2026-10-12. 2026-10-26 (maintainer): the lanes were skipped on v3.0.0-ios.5 (e0feaf2c, build 26) for the Public Beta only; this promotion still gates App Review (RF-16). classify: seven iOS records, adding ios-language-benchmark and ios-delivery-benchmark; no iOS lane produces the delivery record, so no manifest validates until a lane or a recorded contract decision covers it. 2026-10-27 at the exact tag e0feaf2c, phone on iOS 27.0.1: ios-xcui-benchmark-20261027-175531-87319beb canonical PASS (29 takes, no memory warning); ios-memory-qualification-20261027-165940-7fcd6b35 PASS (no within-mode growth); ios-engine-20261027-170407-21f3baa4, -170807-4071a9aa and -171118-a127f66b PASS. Failed and retained: ios-xcui-benchmark-20261027-165442-4eb18883 (automation mode timed out until UI Automation was allowed again), ios-xcui-perf-20261027-171432-14604e88 (BKL-42; set App Language to System before a rerun) and ios-lang-bench-20261027-174956-780b53f1 (BKL-43). Still needed: ui-perf, lang-bench, model-download and the delivery decision."
+      "notes": "Opened 2026-10-12. 2026-10-26 (maintainer): skipped on v3.0.0-ios.5 (build 26) for the Public Beta only; this promotion still gates App Review (RF-16). classify needs seven iOS records, adding ios-language-benchmark and ios-delivery-benchmark; no iOS lane produces the delivery record, so no manifest validates until a lane or a recorded contract decision covers it. 2026-10-27 at e0feaf2c (iOS 27.0.1): ios-xcui-benchmark-20261027-175531-87319beb canonical PASS (29 takes); ios-memory-qualification-20261027-165940-7fcd6b35 PASS; ios-engine-20261027-170407-21f3baa4, -170807-4071a9aa and -171118-a127f66b PASS. Failed and retained: ios-xcui-benchmark-20261027-165442-4eb18883 (automation mode timed out), ios-xcui-perf-20261027-171432-14604e88 (BKL-42; set App Language to System first) and ios-lang-bench-20261027-174956-780b53f1 (BKL-43). The records rerun on build 27's tag (RF-37); still needed: ui-perf, lang-bench, model-download and the delivery decision. 2026-10-28: the lang-bench matrix has Russian, Portuguese, Italian and Korean cells, but scripts/ios_device.sh speech-assets installs only de_DE, es_419, ja_JP and zh_CN; check the phone's recognizer assets before the rerun."
     },
     {
       "id": "RF-35",
@@ -378,22 +378,6 @@
       ],
       "updated": "2026-10-28",
       "notes": "Opened 2026-10-28 at the maintainer's request after the device-farm research (a session report, not in Git): BrowserStack is the only farm publicly listing a real iPhone 15 Pro on iOS 26 or later; AWS's trial needs a payment method. A re-signed run still shows the hardware gate admitting iPhone16,1 and iPhone16,2 on real hardware, gives the first A17 Pro timings and is conservative for Built-in Voice and Voice Design memory; it cannot show cloning, the shipped memory ceiling, purchases or heat. 2026-10-28: VocelloiOSFarmSmokeUITests (the journey plus an XCTMemoryMetric peak over the first take) and scripts/farm_smoke.sh (package; maintainer-run upload and results, terminal-only with a confirmation, the account sent only to BrowserStack's API host) are committed. A package of the committed tree builds, both bundles verify after unzip and ditto, and the app binary carries no Mac paths. Nothing has run on a farm phone yet; next the maintainer creates the trial account and runs upload. Planned until an in-flight slot frees (cap 3)."
-    },
-    {
-      "id": "RF-39",
-      "plan": "release-first-3-0-2026-09",
-      "title": "The documentation, agent instructions and roadmap are clear, concise and current",
-      "status": "planned",
-      "blockedBy": [],
-      "due": "2026-10-29",
-      "gate": "Maintainer request 2026-10-28: review every tracked document, the agent instructions (CLAUDE.md, the rules, skills and agents) and the roadmap for statements the source or config contradicts, duplicated rules and poor organization. Doc-only: no product, test or lane change, so the iPhone candidate is untouched. Dated audits and release notes stay historical records. Done when wrong or stale statements are fixed against their owners, duplicated rules point to one owner, the checkpoint's Resume now matches the roadmap, the routed check passes, and any larger reorganization left is listed for the maintainer. Closed in the change that finishes it, so it never takes an in-flight slot.",
-      "sourceOfTruth": [
-        "CLAUDE.md",
-        "docs/reference/development-workflow.md",
-        "config/roadmap.json"
-      ],
-      "updated": "2026-10-28",
-      "notes": "Opened 2026-10-28 at the maintainer's request."
     },
     {
       "id": "RF-16",
@@ -857,7 +841,7 @@
         "commit:87636935"
       ],
       "updated": "2026-10-12",
-      "notes": "2026-10-12 maintainer decision: 3.0 is sold worldwide with North America as the verified download region (where App Review runs); Europe and East Asia stay unverified as a recorded residual risk (global CDN, support reports as the monitor, no paid hosts). The 2026-09-01 North America proof passed full digests for the three largest iOS files (4,024,541,635 bytes, no retry or rate limit). Reviewer notes already cover exact bytes, Wi-Fi, 4 GB free, cancellation/adoption, offline use and recovery. Remaining: a fresh full-artifact North America proof within 24 hours of submission, after the freeze (about 4 GB; the maintainer's go first). Due moved from 2026-10-16 to 2026-10-30 because the decision is recorded and only that proof remains."
+      "notes": "2026-10-12 maintainer decision: 3.0 is sold worldwide with North America as the verified download region (where App Review runs); Europe and East Asia stay unverified as a recorded residual risk (global CDN, support reports as the monitor, no paid hosts). Since 2026-10-27 the EU is excluded from 3.0's availability (148 territories, RF-02), which removes most of the European part of that risk. The 2026-09-01 North America proof passed full digests for the three largest iOS files (4,024,541,635 bytes, no retry or rate limit). Reviewer notes already cover exact bytes, Wi-Fi, 4 GB free, cancellation/adoption, offline use and recovery. Remaining: a fresh full-artifact North America proof within 24 hours of submission, after the freeze (about 4 GB; the maintainer's go first). Due moved from 2026-10-16 to 2026-10-30 because the decision is recorded and only that proof remains."
     },
     {
       "id": "ASR-11",
@@ -2318,7 +2302,7 @@
       ],
       "updated": "2026-10-20",
       "due": "2026-10-30",
-      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright, website type checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers (screened from a linked worktree, commit on claude/*, other live sessions hold measured lanes), computer use allowed except as evidence, browser-pane launch.json. Open: the iOS-only lane snippets and ios_device.sh in an iPhone window; CI on Xcode 27 when runners offer it. 2026-10-24: DW-02 shared derive_team with ios_device.sh; moving the iOS-only lane snippets into tested Python modules still needs an unlocked phone to prove the moved lanes end to end, so it waits for an attended window."
+      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright and website type checks approved; CI Xcode stays 26.6. Landed: P3-1 the Xcode 27 preview run; P3-4 the Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers, computer use allowed except as evidence, browser-pane launch.json; DW-02 shared derive_team with ios_device.sh. Open: moving the iOS-only lane snippets and ios_device.sh into tested Python modules needs an attended iPhone window to prove the moved lanes; CI on Xcode 27 when runners offer it. 2026-10-28: the report-only Xcode preview run (xcode-preview.yml) has failed every day since at least 2026-10-21; it blocks nothing, and nobody has investigated (focus rules)."
     }
   ]
 }

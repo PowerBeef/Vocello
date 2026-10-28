@@ -5716,6 +5716,30 @@
       "updated": "2026-10-28",
       "notes": "2026-10-28: seen in the full local Python suite during RF-38's routed check; it fails alone and deterministically with \"CLI installer Bom differs from the payload\" (scripts/cli_package.py). Unrelated to RF-38's files. Not a release blocker: the macOS CLI installer, not the iPhone app. Parked without investigation. Duplicate of BKL-34, opened by mistake on 2026-10-28: the same round-trip test fails with the same message on the same Mac.",
       "supersededBy": "BKL-34"
+    },
+    {
+      "id": "RF-39",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The documentation, agent instructions and roadmap are clear, concise and current",
+      "status": "done",
+      "blockedBy": [],
+      "due": "2026-10-29",
+      "gate": "Maintainer request 2026-10-28: review every tracked document, the agent instructions (CLAUDE.md, the rules, skills and agents) and the roadmap for statements the source or config contradicts, duplicated rules and poor organization. Doc-only: no product, test or lane change, so the iPhone candidate is untouched. Dated audits and release notes stay historical records. Done when wrong or stale statements are fixed against their owners, duplicated rules point to one owner, the checkpoint's Resume now matches the roadmap, the routed check passes, and any larger reorganization left is listed for the maintainer. Closed in the change that finishes it, so it never takes an in-flight slot.",
+      "sourceOfTruth": [
+        "CLAUDE.md",
+        "docs/reference/development-workflow.md",
+        "config/roadmap.json"
+      ],
+      "updated": "2026-10-28",
+      "notes": "Opened 2026-10-28 at the maintainer's request. 2026-10-28: three reviewers in worktrees and the lead checked every tracked doc, the agent instructions and the roadmap against source and config; the lead verified their claims, dropped one wrong change and integrated the rest. Fixed: stale facts (build numbers, availability, the schema-5 purchase lane, the Install label, the CLI command model, Fast QC flags, pins, consent flags, CI workflows); one owner per rule, with CLAUDE.md pointing to the rules files; the focus lock restated; the checkpoint led by next steps; nine parked or finished audits and decisions marked historical; the scan's untracked risks parked as BKL-45 to BKL-48. Left for the maintainer: split the telemetry guide into a runbook and a schema reference, drop the performance guide's generic Metal tutorial, fold docs/qwen_tone.md into the prompting guide, move ios-engine-optimization.md among the dated docs, replace about 100 drifting line references with symbol names, trim ios-device-testing.md's parked-plan detail, and decide whether CLI contract revision 1 is frozen now that 3.0.0 shipped it.",
+      "evidence": [
+        "commit:878a3e44",
+        "commit:d860fa85",
+        "commit:bb81eab4",
+        "commit:7929582b",
+        "commit:44731ac7",
+        "commit:071d1256"
+      ]
     }
   ]
 }

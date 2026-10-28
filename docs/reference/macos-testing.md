@@ -95,10 +95,9 @@ needs no model fixture and no UI evidence.
 The gate bench, `profile`, `telemetry-overhead`, `lang-bench`, `memory` and `qc-takes` (with
 `agents-allowed`) refuse to start on a busy host (the
 deterministic gate without a bench does not check, so it can run beside an agent or a native build):
-`require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
-core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
-or a validated active-worker lease before any model loads, and
-`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
+`require_quiet_host` refuses them before any model loads (its thresholds and the exploratory
+`QVOICE_ALLOW_BUSY_HOST=1` override: [`tooling-and-evidence.md`](tooling-and-evidence.md), Host
+preflight).
 Local targeted validation is authorized at coherent checkpoints; full matrices remain specific to
 the task or release. Join workers before measured lanes and use the session's worker registration,
 or the documented lead-only fallback when tracking is unavailable. Releases, publication and other

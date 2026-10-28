@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: release-qa
-reviewed: 2026-10-25
-summary: Read-only scan, at commit 6f9fe5ff, of the repository's documentation, rules, skills, script help texts and test comments for outdated or contradictory statements about the UI test suites and their procedures, after the 2026-10-25 UI-lane rework and computer-use decision. Sections A, B and C were fixed on 2026-10-25 at the maintainer's request; the code risks in D wait for separate decisions.
+reviewed: 2026-10-28
+summary: Read-only scan, at commit 6f9fe5ff, of the repository's documentation, rules, skills, script help texts and test comments for outdated or contradictory statements about the UI test suites and their procedures, after the 2026-10-25 UI-lane rework and computer-use decision. Sections A, B and C were fixed on 2026-10-25 at the maintainer's request; the code risks in D are parked on 2026-10-28 as BKL-45 to BKL-48, with item 24 on BKL-36.
 sourceOfTruth:
   - scripts/ui_test.sh
   - Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift
@@ -119,7 +119,8 @@ Settings root row's value.
 
 ## D. Code risks the scan surfaced (not documentation)
 
-Open: each waits for its own decision.
+Parked on 2026-10-28 (focus rules): 22 as BKL-45, 23 as BKL-46, 24 on BKL-36, 25 as BKL-47, 26 as
+BKL-48.
 
 22. **The routed check undoes the iPhone build skip.** `build_ui_test_bundles.sh:121-131` compiles the
     iOS UI bundles unsigned and generic into the same DerivedData the lanes use, so after every routed

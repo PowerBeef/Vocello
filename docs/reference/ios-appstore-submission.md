@@ -326,6 +326,27 @@ diff and rerun deterministic validation. Apple
 rejects a reused build number at the altool upload, so a missed check fails the upload; it cannot
 replace an existing build.
 
+**Distributing a processed candidate.** Each step is an App Store Connect or GitHub write, done by
+the maintainer or by Claude Code on the maintainer's request for that candidate.
+
+1. The run pauses for the `release` environment. Approve it in the Actions tab or with
+   `gh api -X POST repos/PowerBeef/Vocello/actions/runs/<run>/pending_deployments
+   -F 'environment_ids[]=22764362076' -f state=approved -f comment="<reason>"`.
+2. Wait until `asc builds list --app 6794692745 --platform IOS --build-number <N>
+   --processing-state all` shows the build VALID, and take its build id.
+3. `asc builds test-notes create --build-id <ID> --locale en-US --whats-new <TEXT>`, where TEXT is the
+   "TestFlight: what to test" section of `docs/releases/v<version>.md`
+   ([`macos-release-qa.md`](macos-release-qa.md) owns that section's rules).
+4. `asc testflight review submit --build-id <ID> --confirm` submits the build for beta review.
+   Internal testers get every build already: the Internal group has access to all builds, so adding
+   it by hand is refused.
+5. Add the Public Beta group (`asc builds add-groups --build-id <ID> --group
+   2375b641-4224-486c-8c0a-0fa326d7b641`) only with the exact-tag promotion or the maintainer's
+   explicit waiver for that build.
+
+A new TestFlight build's first launch shows TestFlight's What to Test sheet; tap Continue before a
+candidate row ([`ios-device-testing.md`](ios-device-testing.md)).
+
 ### B. Local (Xcode-logged-in maintainer)
 
 Do the same manual build-identity check in App Store Connect before resolving or archiving.

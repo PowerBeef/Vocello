@@ -332,7 +332,8 @@ command template, not by `cli-pkg-verification.json`, whose `installTest` stays 
 ID Installer certificate of the release team: `APPLE_DEV_ID_INSTALLER_P12_BASE64` (the certificate
 and its private key exported from Keychain Access as a `.p12`, then `base64 -i installer.p12`) and
 `APPLE_DEV_ID_INSTALLER_P12_PASSWORD`. `release.yml` imports it into the same temporary keychain as
-the Developer ID Application identity and removes both with that keychain.
+the Developer ID Application identity and removes both with that keychain. The current certificate
+was issued on 2026-10-23 and expires on 2027-11-22; renew it and replace both secrets before then.
 
 The copied-package verifier checks content digests, arm64-only architecture, system-only dynamic
 linkage, embedded version/build, JSON mode/speaker discovery, and invalid-command exit status

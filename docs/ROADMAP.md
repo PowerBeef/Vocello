@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 13/44 (30%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 13/45 (29%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -560,6 +560,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-41` | parked | Release Vocello for iPhone in the EU with trader status | — |
 | `BKL-42` | parked | The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard | — |
 | `BKL-43` | parked | The iPhone crash-baseline pull fails when a download journal is pruned mid-copy | — |
+| `BKL-44` | parked | The CLI installer round-trip test fails on this Mac: the package Bom differs from the payload | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -682,6 +683,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-43`** (parked) — The iPhone crash-baseline pull fails when a download journal is pruned mid-copy.
   gate: A lane's pre-run crash baseline on the iPhone survives a diagnostics file the app removes during the copy (a pruned model-download journal) without losing crash-delta coverage.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-44`** (parked) — The CLI installer round-trip test fails on this Mac: the package Bom differs from the payload.
+  gate: scripts/tests/test_cli_package.py's real-package round trip passes on the maintainer's Mac (macOS 27) as it does in CI, or the difference is explained and the check adjusted.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

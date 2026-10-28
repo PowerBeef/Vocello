@@ -377,7 +377,7 @@
         "Sources/iOS/IOSAppBootstrap.swift"
       ],
       "updated": "2026-10-28",
-      "notes": "Opened 2026-10-28 at the maintainer's request after the device-farm research (a session report, not in Git). BrowserStack is the only farm publicly listing a real iPhone 15 Pro on iOS 26 or later; AWS's 1,000 trial minutes need a payment method and show devices only after signup. A re-signed run still shows the hardware gate admitting iPhone16,1 and iPhone16,2 on real hardware, gives the first A17 Pro timings, and is conservative for Built-in Voice and Voice Design memory (a lower limit than the shipped build). It cannot show cloning, the shipped memory ceiling, purchases or heat. The existing iOS UI tests need the local harness (TEST_RUNNER_ run IDs, installed models, an enrolled clone voice), hence a new test. Planned until an in-flight slot frees (cap 3). 2026-10-28: VocelloiOSFarmSmokeUITests is committed (the journey and an XCTMemoryMetric peak over the first take), reviewed and compile-checked only; it has not run on any phone. The upload packaging script remains."
+      "notes": "Opened 2026-10-28 at the maintainer's request after the device-farm research (a session report, not in Git): BrowserStack is the only farm publicly listing a real iPhone 15 Pro on iOS 26 or later; AWS's trial needs a payment method. A re-signed run still shows the hardware gate admitting iPhone16,1 and iPhone16,2 on real hardware, gives the first A17 Pro timings and is conservative for Built-in Voice and Voice Design memory; it cannot show cloning, the shipped memory ceiling, purchases or heat. 2026-10-28: VocelloiOSFarmSmokeUITests (the journey plus an XCTMemoryMetric peak over the first take) and scripts/farm_smoke.sh (package; maintainer-run upload and results, terminal-only with a confirmation, the account sent only to BrowserStack's API host) are committed. A package of the committed tree builds, both bundles verify after unzip and ditto, and the app binary carries no Mac paths. Nothing has run on a farm phone yet; next the maintainer creates the trial account and runs upload. Planned until an in-flight slot frees (cap 3)."
     },
     {
       "id": "RF-16",
@@ -1983,6 +1983,21 @@
       "updated": "2026-10-27",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "2026-10-27, ios-lang-bench-20261027-174956-780b53f1 at v3.0.0-ios.5: the pre-run crash baseline pull failed with CoreDevice error 7000 because diagnostics/model-downloads/attempt-*.json disappeared during the copy, so the lane stopped before any take. Not a release blocker: tooling only; a rerun is expected to pass (RF-17)."
+    },
+    {
+      "id": "BKL-44",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer round-trip test fails on this Mac: the package Bom differs from the payload",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_cli_package.py's real-package round trip passes on the maintainer's Mac (macOS 27) as it does in CI, or the difference is explained and the check adjusted.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-10-28",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "2026-10-28: seen in the full local Python suite during RF-38's routed check; it fails alone and deterministically with \"CLI installer Bom differs from the payload\" (scripts/cli_package.py). Unrelated to RF-38's files. Not a release blocker: the macOS CLI installer, not the iPhone app. Parked without investigation."
     },
     {
       "id": "ER-01",

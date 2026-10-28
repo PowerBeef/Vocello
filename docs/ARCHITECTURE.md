@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -49,10 +49,10 @@ and local Xcode 27 also builds (roadmap CONV-21). Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retired Mac mini M2
 8 GB records stay history) and iPhone 17 Pro.
-Release identities live in [`project.yml`](../project.yml) (currently 3.0.0 / build 24); public
-facts live in `config/public-product-facts.json`: the stable macOS release is **Vocello 3.0.0**, the
-Mac app with the signed `vocello` CLI package, and iOS 2.4.0 is the live **public TestFlight beta**
-until the iPhone app's 3.0 follows.
+Release identities live in [`project.yml`](../project.yml) (`MARKETING_VERSION`,
+`CURRENT_PROJECT_VERSION`); public facts live in `config/public-product-facts.json`: the stable
+macOS release is **Vocello 3.0.0**, the Mac app with the signed `vocello` CLI package, and the iPhone
+app is a **public TestFlight beta** until its 3.0 App Store release.
 
 > For repo conventions,
 > build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
@@ -126,7 +126,7 @@ for the exact link graph.)
 | `VocelloiOS` | application | iOS | `QVoiceiOS` | `com.patricedery.vocello` | iOS SwiftUI app; engine runs in-process. App Group `group.com.patricedery.vocello.shared`. |
 | `VocelloCLI` | tool | macOS | `VocelloCLI` | `com.qwenvoice.cli` | Headless `vocello` binary; engine in-process. Its commands over `VocelloCLICore`. |
 | `VocelloCLICore` | framework.static | macOS | `VocelloCLICore` | `com.qwenvoice.cli.core` | The CLI's runtime, argument parsing and routing, consent, process supervision and batch execution: linked into `vocello` and imported `@testable` by `VocelloCoreTests` instead of compiled there by path (workflow audit P2-3). |
-| `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | (static) | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does and runs long-form projects through the apps' `IOSLongFormProjectRunner` (compiled by path) headless; read-only History, app settings (CFPreferences), model selection and inventory. |
+| `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | `com.qwenvoice.desktop.core` | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does and runs long-form projects through the apps' `IOSLongFormProjectRunner` (compiled by path) headless; read-only History, app settings (CFPreferences), model selection and inventory. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
@@ -215,6 +215,7 @@ Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 | **mlx-swift-lm** | `3.32.3` | LM utilities (through the owned Qwen3 core package). The 3.x major externalized the Hub/Tokenizers implementations, which is why swift-transformers is now a direct dependency. |
 | **VocelloQwen3Core** | owned package derived from `mlx-audio-swift` `v0.1.2` | Stable first-party `VocelloQwen3Core` facade for model-bundle, capability, sampling, memory, synthesis, terminal, cancellation, and diagnostic contracts. Compatibility-preserved `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` modules remain implementation surfaces for Qwen3-TTS load, tokenize, and decode. |
 | **GRDB.swift** | `7.10.0` | SQLite for local `history.sqlite`. |
+| **Sparkle** | `2.10.0` | The macOS app's updater (RF-23); only the macOS app links it, thinned to arm64 without its XPC services. |
 | **SwiftHuggingFace** | `1.0.0` | Hugging Face hub client, a dependency of the owned package; `project.yml` declares the same exact pin but links it to no product target. Owned product sources download through `HuggingFaceDownloader` (`URLSession`) and import no `HuggingFace` module. |
 | **swift-transformers** | `1.3.5` | Hub/Tokenizers implementation — a **direct**, exact-pinned dependency of `MLXAudioTTS`, which links only its `Hub` and `Tokenizers` products (F-11); the owned package manifest and resolved graph are authoritative. 1.3.5 is the first release that allows swift-huggingface 1.x (F-19). |
 | swift-jinja | `2.4.2` | Chat/template formatting (transitive via swift-transformers). |
@@ -380,7 +381,7 @@ flowchart TD
     Bind --> Open["5. open(reservation) → Qwen prompt + MLX inference"]
     Open --> Codec["6. Qwen3 speech-tokenizer decoder → materialized PCM<br/>(owned MLXAudioTTS)"]
     Codec --> Channel["7. frame-bounded suspending channel<br/>ordered, single consumer, lossless"]
-    Channel --> Lim["8. PCM16StreamLimiter + defect detection<br/>(clip/click/slew/dropout/nanInf)"]
+    Channel --> Lim["8. PCM16StreamLimiter + defect metrics<br/>(peaks, slew, non-finite scrub)"]
     Lim --> WAV["9. AtomicPCM16WAVWriter"]
     WAV --> Mark["9b. publication marking (Article 50)<br/>AudioSeal watermark + LIST/INFO provenance chunk<br/>on the staged WAV, then Fast QC"]
     Mark --> Out["10. product terminal + finalization acknowledgment<br/>GenerationResult"]
@@ -411,25 +412,15 @@ immutable request-owned values: sampling algorithm v2 gives every request an eff
 fresh `MLXRandom.RandomState`, while talker/subtalker stages and per-request cache/window policy
 travel with the request instead of mutating process-global generation state.
 
-**Sampling and text layout as shipped** (`Qwen3TalkerSamplingOverride.samplingConfiguration` in
-`UnsafeSpeechGenerationModel.swift`; the model facts are owned by
-[`qwen3-tts-guide.md`](reference/qwen3-tts-guide.md)):
-
-- **Talker.** The take variation sets the talker's values: Expressive 0.9 / top-p 1.0 / top-k 50,
-  the reference values; Balanced 0.8 / 0.95; Consistent 0.7 / 0.9.
-- **Subtalker.** It keeps the reference values for every variation, adopted by the RF-18 follow-up
-  screen on 2026-10-20.
-- **Reference-parity arms.** Production samples from float32 logits (D3), filters the talker's
-  EOS like any token (D2) and gives a single take its whole text (D1, RF-21). The arms reach the
-  runtime only as request-local `VocelloQwen3ReferenceParity` values: a long-form segment
-  (`GenerationRequest.longFormSegment`) turns D1 off, and registered internal-diagnostics knobs
-  turn any arm on or off. A request that departs from production names its arms on the engine row
-  (`reference_parity`).
-- **Text layout.** A Custom or Design single take, streamed or quality-first, lays the whole text
-  out up front (`text_conditioning_mode=full_text_non_streaming`). A long-form segment feeds its
-  script as trailing text, one text token per codec frame and then `tts_pad`
-  (`streaming_trailing_text`). A clone ignores the requested mode: in-context learning overlays the
-  full target text on the reference codes, and a speaker-only clone streams its trailing text.
+**Sampling and text layout.** `Qwen3TalkerSamplingOverride.samplingConfiguration`
+(`UnsafeSpeechGenerationModel.swift`) resolves each request's sampling: the take variation sets the
+talker only, and the subtalker keeps the reference values. The reference-parity arms (D1 full-text
+single takes, D2 EOS filtering, D3 float32 sampling) reach the runtime only as request-local
+`VocelloQwen3ReferenceParity` values: a long-form segment (`GenerationRequest.longFormSegment`)
+turns D1 off, registered internal-diagnostics knobs turn any arm on or off, and a request that
+departs from production names its arms on the engine row (`reference_parity`). The values, the
+arms and the text layouts per take kind are owned by
+[`qwen3-tts-guide.md` §9](reference/qwen3-tts-guide.md#9-generation-parameters).
 
 Explicit reserved/generating/aborting ownership prevents an
 abort-owned reservation from reopening generation and makes duplicate aborts join one finalization.
@@ -644,8 +635,9 @@ background starts without the permit (BG-01).
 
 `AudioPreparation.swift` normalizes reference audio to the canonical 24 kHz /
 1-channel / 16-bit little-endian PCM format and emits quality warnings.
-`PCM16StreamLimiter` applies lookahead limiting and flags defects
-(`clip`, `click`, `slew`, `dropout`, `nanInf`); the verdict + flags become an
+`PCM16StreamLimiter` applies lookahead and slew limiting and replaces non-finite samples with
+silence; Fast QC then flags defects in the written take (for example `nonfinite`, `clipping`,
+`clicks`, `dropout:…`, `near_silent`, `dc_offset`), and the split verdicts and flags become an
 `AudioQCReport` on the telemetry record.
 
 `GenerationQualityReport`, `QualityGateRegistry`, and `QualityReviewPolicy` now provide a typed,
@@ -845,9 +837,9 @@ concrete type. Key iOS behaviors:
 ## 7. CLI (`VocelloCLI`)
 
 `Sources/VocelloCLI/CLIRuntime.swift` (`@MainActor public struct CLIRuntime`, compiled into the
-`VocelloCLICore` framework with the argument parsing and routing, consent, process supervision,
-batch execution and the `generate` and `modes` commands; the `vocello` executable keeps
-`VocelloMain` and the other commands and links it) bootstraps
+`VocelloCLICore` framework with the command model and parser, consent, process supervision,
+batch execution, the `vocello mcp` server and the `generate`, `run` and `modes` commands; the
+`vocello` executable keeps `VocelloMain` and the other commands and links it) bootstraps
 the in-process engine the same way the apps do — `NativeRuntimeFactory.make`
 over a data directory — and reuses models already installed by the app. `generate`, `batch` and
 `run` pass `hostedLikeTheApp`, so takes go through `DesktopEngineHost` and the shared
@@ -863,11 +855,11 @@ benchmarks/quality gates (no Python, no bundled weights).
 searches in order: the bundled resource, the file next to the executable, then, only outside a
 sealed payload (no `package-manifest.json` beside the executable), the repository's
 `Sources/Resources/qwenvoice_contract.json` under the working directory or one of its parents
-(dev + benchmarks). Commands (`VocelloMain.swift`, routed by
-`CLICommandRoute` in `Support.swift`):
-`generate`, `custom`/`design`/`clone`, `batch`, `modes`, `deliveries`, `voices`, `speakers`,
-`models`, `bench`, `version`. stdout is machine-readable (a path, or JSON with `--json`); progress
-goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
+(dev + benchmarks). The command tree is declared once in `VocelloCommandTree`
+(`Sources/VocelloCLI/Core/CommandModel/`), from which the parser, help, shell completions,
+`vocello capabilities` and `config/cli-contract/v1/commands.json` derive. stdout is
+machine-readable (a path, or JSON with `--json`); progress goes to stderr. Full reference:
+[`reference/cli.md`](reference/cli.md).
 
 ---
 
@@ -907,7 +899,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `Generation`/`Voice` are the shared `Sources/iOSSupport/Models/` types compiled by path, and
   the generation drafts (`CustomVoiceDraft` / `VoiceDesignDraft` / `VoiceCloningDraft`) are the
   shared iOS ones (`Sources/iOSSupport/Models/GenerationDrafts.swift`, compiled
-  by path) with desktop conveniences in `MacGenerationDraftSupport`.
+  by path) with desktop conveniences in `MacGenerationDraftSupport.swift`.
 
 ### iOS app (`Sources/iOS/`, module `QVoiceiOS`)
 
@@ -1140,8 +1132,8 @@ retired v1 audio QC data goes through `--qc-v1`).
 The contract — `Sources/Resources/qwenvoice_contract.json` — is the canonical
 schema. It defines `defaultSpeaker`, `speakers` (+ `speakerMetadata`), and a
 `models[]` array. Each model entry carries: `id`, `name`, `tier`, `mode`,
-`folder`, `huggingFaceRepo`, `huggingFaceRevision`, `iosDownloadEligible`,
-`estimatedDownloadBytes`, `outputSubfolder`, `requiredRelativePaths[]`, and
+`folder`, `huggingFaceRepo`, `huggingFaceRevision`, `artifactVersion`, `iosDownloadEligible`,
+`estimatedDownloadBytes`, `outputSubfolder`, `requiredRelativePaths[]`, `qwen3Capabilities`, and
 `variants[]` (speed/quality with platforms + hardware recommendation).
 
 The generated cross-platform artifact contract is
@@ -1250,9 +1242,8 @@ values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
-substantive removal condition for every exception and caps unreviewed growth at the registered 28
-`@unchecked Sendable` and 2 `nonisolated(unsafe)` declarations (`budget` in
-`config/concurrency-safety.json`). The CPU-focused
+substantive removal condition for every exception and caps unreviewed growth of `@unchecked
+Sendable` and `nonisolated(unsafe)` declarations at its `budget`. The CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core
 while MLX/Metal runtime execution stays in its single-owner deterministic suite (the injectable XPC
 transport bundle left with the XPC service on 2026-09-15). Since 2026-09-14 it blocks push CI (`macos-tsan` inside `CI required`) after three
@@ -1290,9 +1281,8 @@ persisted-WAV written-output verdicts. Schema v8 adds absolute-uptime sample ali
 memory/thread/headroom/Metal capture success and coverage, total-RAM/implied-process-limit context,
 start/end/delta/peak memory fields, aligned extrema snapshots, and explicit app/engine lifecycle
 boundaries. Publishable benchmark-evidence v2 binds exact verbose sidecars under memory contract v2
-and rejects an unobserved sampler gap above the policy bound (twice the cadence, at least 500 ms,
-calibrated 2026-09-25 on the M6 by `mac-memory-qualification-20260926-011258-82f5f55c`; the floor
-tiers keep a provisional 1,000 ms), capture failures, critical
+and rejects an unobserved sampler gap above the bound in `config/memory-qualification-policy.json`,
+capture failures, critical
 pressure, memory warnings/exits, `hardTrim`, and `fullUnload`; each take publishes its sampled
 peaks' shortfall against the exact MLX (and, when sampled, kernel-ledger) high-water marks. One
 process has one memory series: the in-process macOS app and engine samplers merge by uptime and are
@@ -1333,8 +1323,8 @@ Retained-memory qualification is separate from Instruments profiling. The versio
 `retained-memory-v1` policy runs fixed Custom→Design→Clone Speed/medium sequences and limits
 within-mode first-to-last retained-take physical-footprint growth to 5% of physical RAM; the same run
 reports `retained-memory-v2`, within-mode growth of the end-of-take MLX active memory, which gates only
-once a consented run calibrates its per-mode bounds (macOS calibrated at 16 MB per mode by the same
-run; iOS still uncalibrated). Successful lanes
+on a platform whose per-mode bounds a consented run has calibrated (the policy records which).
+Successful lanes
 publish `memory-qualification`; `profile --kind memory` records an exact-PID CPU sampler (Time
 Profiler on the Mac since 2026-09-26, CPU Profiler on the iPhone), Allocations, VM Tracker, and
 signposts. iOS and macOS MetricKit daily aggregates are bounded, local-only field

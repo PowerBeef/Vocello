@@ -380,6 +380,22 @@
       "notes": "Opened 2026-10-28 at the maintainer's request after the device-farm research (a session report, not in Git): BrowserStack is the only farm publicly listing a real iPhone 15 Pro on iOS 26 or later; AWS's trial needs a payment method. A re-signed run still shows the hardware gate admitting iPhone16,1 and iPhone16,2 on real hardware, gives the first A17 Pro timings and is conservative for Built-in Voice and Voice Design memory; it cannot show cloning, the shipped memory ceiling, purchases or heat. 2026-10-28: VocelloiOSFarmSmokeUITests (the journey plus an XCTMemoryMetric peak over the first take) and scripts/farm_smoke.sh (package; maintainer-run upload and results, terminal-only with a confirmation, the account sent only to BrowserStack's API host) are committed. A package of the committed tree builds, both bundles verify after unzip and ditto, and the app binary carries no Mac paths. Nothing has run on a farm phone yet; next the maintainer creates the trial account and runs upload. Planned until an in-flight slot frees (cap 3)."
     },
     {
+      "id": "RF-39",
+      "plan": "release-first-3-0-2026-09",
+      "title": "The documentation, agent instructions and roadmap are clear, concise and current",
+      "status": "planned",
+      "blockedBy": [],
+      "due": "2026-10-29",
+      "gate": "Maintainer request 2026-10-28: review every tracked document, the agent instructions (CLAUDE.md, the rules, skills and agents) and the roadmap for statements the source or config contradicts, duplicated rules and poor organization. Doc-only: no product, test or lane change, so the iPhone candidate is untouched. Dated audits and release notes stay historical records. Done when wrong or stale statements are fixed against their owners, duplicated rules point to one owner, the checkpoint's Resume now matches the roadmap, the routed check passes, and any larger reorganization left is listed for the maintainer. Closed in the change that finishes it, so it never takes an in-flight slot.",
+      "sourceOfTruth": [
+        "CLAUDE.md",
+        "docs/reference/development-workflow.md",
+        "config/roadmap.json"
+      ],
+      "updated": "2026-10-28",
+      "notes": "Opened 2026-10-28 at the maintainer's request."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",

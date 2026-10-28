@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -35,9 +35,8 @@ scripts/dev.sh ci           # exactly what push CI runs, serially
 ```
 
 These are advisory; the commit lint is the only local block and CI on `main` is the gate (`main` is
-the only published branch; agent worktree branches are integrated into it by the lead, with no pull
-request). None of them needs UI
-execution, installed generation models, or release evidence.
+the only published branch; the lead integrates agent worktree branches into it, with no pull
+request). None of them needs UI execution, installed generation models, or release evidence.
 
 `scripts/macos_test.sh test` writes each bundle's raw log plus a structured summary next to it
 (`core.test-results.json`, `runtime.test-results.json`, produced by
@@ -128,9 +127,7 @@ that earned the promotion (three consecutive scheduled nightly passes, runs 3468
 34749309445 and 34829408217, zero race reports, only the two registered skips) and the dated
 maintainer decision; `scripts/runtime_security_contract.py` refuses a blocking status without the
 recorded passes, zero open confirmed races and that decision. Both workflows preserve every failed
-run and perform no automatic retry. The first corrected physical-host run on 2026-08-26 passed all
-460 core and 18 transport tests with no TSan warning or race summary (the transport bundle left
-with the XPC service on 2026-09-15; the lane is core-only since).
+run and perform no automatic retry.
 
 ## Explicit XCUITest lanes
 

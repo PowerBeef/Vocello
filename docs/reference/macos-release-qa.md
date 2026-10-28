@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -22,11 +22,10 @@ sourceOfTruth:
 > Before starting a release run, confirm the active acceptance state in
 > [`docs/development-progress.md`](../development-progress.md).
 
-The standing pre-release procedure for a macOS (Vocello.app / DMG) release. First executed in full
-for v2.1.0 (2026-06-09); rerun the deterministic gates for every release, run the standing
-release-candidate smoke lane and record its verdict (step 2b), and run the benchmark UI lane when the
-release or task calls for its full matrix. If this doc disagrees with the code,
-the code wins.
+The standing pre-release procedure for a macOS (Vocello.app / DMG) release. Rerun the deterministic
+gates for every release, run the standing release-candidate smoke lane and record its verdict (step
+2b), and run the benchmark UI lane when the release or task calls for its full matrix. If this doc
+disagrees with the code, the code wins.
 
 This is a release-only gate, not a commit, push or push-CI check. Missing model or XCUITest
 evidence never blocks a macOS package. Signing, notarization, and upload depend on deterministic
@@ -72,15 +71,11 @@ release-readiness and artifact checks.
    If the visible Settings state is incomplete, run `scripts/macos_test.sh models ensure` only as
    an explicit repair/bootstrap action, then start a fresh smoke run.
    XCUITest is the only automated UI evidence and targets its configured native test host; computer
-   use, between lanes, covers what it cannot (`/vocello-ui-autonomy`).
-   Smoke runs fifteen journeys in about 11 minutes: navigation, visible model and clone-reference
-   readiness, real Custom, Design and Clone takes with their players, History, cancellation,
-   recording, long-form and line-batch projects, and error, recovery and empty states (the
-   ten-language walk is the localization lane's). Benchmark owns the configurable
-   Custom/Design/Clone matrix and defaults to exactly 29 takes. Both lanes fail on a new crash;
-   benchmark additionally validates exact telemetry count/order, History, readable WAVs, and
-   audio-QC evidence for every take. On PASS, the benchmark automatically publishes one compact
-   `ui-generation` record; raw `.xcresult`, screenshots, telemetry, and WAVs stay untracked.
+   use, between lanes, covers what it cannot (`/vocello-ui-autonomy`). What smoke's fifteen
+   journeys (about 11 minutes) and the 29-take benchmark prove is in
+   [`macos-testing.md`](macos-testing.md#explicit-xcuitest-lanes). Both lanes fail on a new crash.
+   On PASS, the benchmark publishes one compact `ui-generation` record; raw `.xcresult`,
+   screenshots, telemetry, and WAVs stay untracked.
 3. **Engine regression net** (when any engine/Sources change since the last green bench):
    ```sh
    # Explicit model-dependent engine QA; repair fixtures only when this optional run is requested.
@@ -112,7 +107,7 @@ release-readiness and artifact checks.
    `CURRENT_PROJECT_VERSION` (the app's CFBundleVersion, Sparkle's `sparkle:version`) must be greater
    than at the previous `v*` tag in version order, or installed copies are never offered the update;
    `release.yml` checks it before signing (`scripts/release_build_number.py check --tag <tag>`). The
-   rule does not depend on Sparkle: v2.4.0 shipped build 23 without it, and 3.0.0 is build 24. With no
+   rule does not depend on Sparkle: v2.4.0 shipped build 23 without it, and 3.0.0 shipped build 24. With no
    earlier `v*` tag the check passes; an earlier tag whose `project.yml` cannot be read fails it.
 6. **Local package verification**:
    ```sh
@@ -189,7 +184,8 @@ release-readiness and artifact checks.
    the release evidence to name the checked-out commit and carry its contracts, and revalidates the
    promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
-   notarization, attestation, or draft upload.
+   notarization, attestation, or draft upload. The maintainer published Mac and CLI 3.0.0 on
+   2026-10-23 without a promotion record; RF-10 records that exception and its open lanes.
 
 ## Sparkle updates (RF-23)
 
@@ -344,11 +340,12 @@ from a working directory outside the checkout. Missing or newly dynamic non-syst
 fail closed and must be deliberately packaged and verified before release. No resource lookup
 rewrite was needed by the initial relocation proof.
 
-This deterministic smoke does not run synthesis. RF-10 (parked until the iOS submission path clears
-or the maintainer prioritizes desktop/CLI; RF-08, which packages the CLI, is in the release plan) additionally qualifies all three modes,
-French Design with a pinned seed, Clone, one two-item batch in a single process, cancellation, generation-error exit status, and resource
-loading during real inference on the copied **signed candidate**. Record those results separately;
-neither a development CLI smoke nor a valid manifest closes RF-08/RF-10 or authorizes publication.
+This deterministic smoke does not run synthesis. `cli_package.py qualify` additionally qualifies
+all three modes, French Design with a pinned seed, Clone, one two-item batch in a single process,
+cancellation, generation-error exit status, and resource loading during real inference on the
+copied **signed candidate** ([CLI reference](cli.md#build--run)); the shipped 3.0.0 CLI passed it
+(RF-10, still in flight for its remaining lanes). Record those results separately; neither a
+development CLI smoke nor a valid manifest closes RF-10 or authorizes publication.
 Cancellation qualification requires the command's cleanup acknowledgement, exit 130, and absence
 of both the cancelled destination and its UUID staging WAV. A forced exit or host-side deletion
 cannot produce PASS. Keep failed output and the partial report for investigation. Native signal
@@ -376,9 +373,8 @@ communication, written for both non-technical and technical readers:
   the build's Test Details in App Store Connect at distribution time. Automating that
   through the ASC API after upload is a recorded enhancement; until it lands, the
   paste is a required step of TestFlight distribution, not an optional nicety.
-- The unpublished 3.0.0 notes explain the delivery-roster change and preserved raw
-  instructions. Keep that explanation when preparing the final release body; the
-  shipped v2.4.0 notes remain immutable historical copy.
+- Published notes (v3.0.0 and earlier) stay as published; a later release writes its own
+  file.
 - Write dual-audience: lead each item with the user-visible change in plain language,
   then the technical grounding. The 2.2.0 notes are the reference standard; the
   v2.3.0 auto-generated stub (caught and fixed post-publication 2026-07-31) is the

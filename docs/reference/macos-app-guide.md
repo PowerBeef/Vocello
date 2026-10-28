@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface — plus macOS permissions (TCC), code signing and the dev loop, the UI test runner's grants, and permissions_doctor.sh diagnosis (§7).
 sourceOfTruth:
   - Sources/Views
@@ -326,15 +326,18 @@ lanes, what it cannot: `/vocello-ui-autonomy`). It launches its configured
 Vocello test host, uses the shared UI automation support, and re-queries stable accessibility state
 before and after each logical action. There is no hidden test-marker surface.
 
-The shell harness owns deterministic proof and evidence:
+The shell harness owns deterministic proof and evidence; [`macos-testing.md`](macos-testing.md)
+owns each lane's journeys, flags and evidence:
 
 | Lane | Purpose |
 |------|---------|
 | `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
-| `scripts/ui_test.sh macos smoke` | Fifteen ordered focused journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension (window sizes + Cmd+, Settings scene, navigation/readiness, completed generation + History with played-audio capture, mid-generation cancellation, virtual-mic recording, library surfaces, long-form project (a ~1,900-character script sized for about two segments; the planner sets the count and the summary reports it; `--long-form-segments 2`–`12` scales it for local evidence), two-line batch, Design brief + completed player, Clone reference + completed player, missing-model Studio install links, generation error + recovery, cross-language Studio content, long-form recovery Discard, Saved Voices empty and error states; `--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states` runs one) with named screenshots and automatic on-failure desktop + element-tree evidence |
+| `scripts/ui_test.sh macos smoke` | Fifteen journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension, with named screenshots and on-failure desktop and element-tree evidence; `--scenario` runs one |
+| `scripts/ui_test.sh macos localization` | `test01` with the ten-language walk |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
-| `scripts/ui_test.sh macos perf` | Eleven scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](../audits/2026-08-04-macos-ui-refresh.md)) |
-| `scripts/ui_test.sh macos marketing` | Product image refresh (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`, `--scenario models` for the Model Downloads image): two demo takes and one saved designed voice through visible controls at a 1040×680 window, captures attached for export; `evidenceClass: marketing-assets`, never acceptance or benchmark evidence |
+| `scripts/ui_test.sh macos perf` | Eleven frame-health scenarios (`VocelloMacPerfUITests`) against warn-only ceilings |
+| `scripts/ui_test.sh macos marketing` | Product image refresh; never acceptance or benchmark evidence |
+| `scripts/ui_test.sh macos auto-language` | Studio's Auto language reaches the engine |
 
 ### macOS-specific patterns (vs iOS)
 
@@ -396,11 +399,10 @@ label-only or coordinate-based selectors.
 
 ## 7. macOS permissions (TCC)
 
-How Vocello meets macOS privacy permissions: why the project used to fight TCC constantly, how
-stable signing fixed it, what end users experience, and how to diagnose problems. Diagnose anything
-permission-related with **`scripts/permissions_doctor.sh`**.
+How Vocello meets macOS privacy permissions: signing and TCC, what end users see, and how to
+diagnose problems. Diagnose anything permission-related with **`scripts/permissions_doctor.sh`**.
 
-### The TCC model (why this was ever a problem)
+### The TCC model
 
 macOS TCC (Transparency, Consent & Control) keys every permission grant to the
 app's **bundle ID + code-signing identity** (designated requirement). Two
@@ -416,14 +418,11 @@ identities matter:
   designated requirement to the *certificate*, which is stable across
   rebuilds. Grant once, keep forever.
 
-This project's local builds were ad-hoc for a long time — the root cause of
-the recurring permission pain.
-
 ### How each build flavor is signed
 
 | Build | Identity | Hardened runtime | TCC stability |
 |---|---|---|---|
-| `build.sh build`/`run` (dev) | auto-detected **Apple Development** cert (fallback: ad-hoc + warning) | OFF (lldb-friendly; matches old ad-hoc behavior) | **Stable** — grants survive rebuilds |
+| `build.sh build`/`run` (dev) | auto-detected **Apple Development** cert (fallback: ad-hoc + warning) | OFF (lldb-friendly) | **Stable** — grants survive rebuilds |
 | `release.sh` (default) | ad-hoc, re-signed from scratch | ON (`--options runtime`) | n/a (packaging check only) |
 | `release.sh --signing-mode developer-id` / CI | **Developer ID Application** | ON | **Stable** for end users |
 

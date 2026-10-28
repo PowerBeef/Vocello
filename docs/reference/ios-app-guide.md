@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -12,86 +12,6 @@ sourceOfTruth:
   - Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift
 ---
 # Vocello for iPhone — app guide + test-driving reference
-
-## iOS export purchase
-
-Generation, listening, internal History and voice enrollment remain free. One iOS non-consumable
-unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
-The product exists in App Store Connect with its USD 19.99 US base and automatic regional prices,
-and its en-US, fr-CA and fr-FR names and descriptions (RF-02, 2026-10-12). The local StoreKit
-acceptance passed (RF-13, closed 2026-10-16). The Paid Apps agreement (RF-02) and the
-processed-build purchase checks (RF-12) remain, so this is not yet an available or reviewed
-purchase.
-
-This is the official iOS app's export purchase, not a restriction on the MIT-licensed source.
-Self-built forks may change the checks; they do not acquire an official Apple entitlement by doing
-so. No licensing server or obfuscation is planned to prevent source modification. Keep public product
-configuration separate from private developer credentials as described in the
-[security boundary](../../SECURITY.md#open-source-purchase-boundary). Unmodified self-builds are not
-promised live purchase support under a different signing identity; use the isolated test fixture only
-through the governed test route, never a shipping unlock or production credential copied from the maintainer.
-
-- Studio Save/Download, expanded-player Share, History/segment export and optional Files folder
-  copying use the **finished output's mode**, never the current Studio selection. Unknown generated
-  modes require unlock. Internal storage and playback never consult the entitlement.
-- Settings → **Design & Clone Export** (`iosSettings_exportPurchaseRow`) opens purchase options.
-  `exportPurchase_buy` displays the StoreKit-localized one-time price; `exportPurchase_reload` handles
-  product unavailability; `exportPurchase_restore` explicitly syncs. Pending, cancellation and
-  verification failures have visible status; dismissing the Apple Account prompt during Restore is a
-  cancelled restore, not an App Store failure (A4-02). `exportPurchase_close` dismisses without export.
-  Close and request export again after purchase: it never silently shares a previously selected clip.
-- Automatic folder copying never starts a purchase or changes the folder. Without verified access,
-  paid-mode clips remain in History for manual export afterward. The folder explanation states this
-  behavior. A paid-mode clip that finishes during startup checking waits for that entitlement scan
-  (a local StoreKit read) and is copied if it verifies the unlock; until then the Saved outputs row
-  reports that the take stayed in History (A4-01). The copy stages its bytes beside the destination
-  and replaces a same-named file only once complete (A3-01).
-- New Design-generated Saved Voices retain `generatedSourceMode` in existing enrollment metadata
-  through candidate commit and reference playback. Imported/recorded originals remain recoverable
-  for free. Legacy Saved Voices lack origin metadata and stay exportable without retrospective
-  inference, rewriting or deletion. When a voice's metadata exists but cannot be read (damaged, or
-  written by a newer build), the voice's audio decides: Design and Clone publications embed their
-  mode as Vocello provenance and stay locked, while a recording carries none and stays free.
-  Existing History entries already record their generation mode.
-- Actual failed-storage recovery audio/journals remain freely exportable. Only the existing enqueue/
-  outbox recovery surfaces provide this exception; ordinary History/player/folder exports do not.
-  This preserves the rule against making data recovery a payment demand.
-- Refund/revocation removes paid export access, **never clips, voices, drafts, History or playback**.
-  Access uses verified StoreKit entitlements and its offline cache, not a local paid flag. No app
-  server, cloud inference, login, diagnostics bypass or receipt logging was introduced.
-
-### Outward export inventory (audited 2026-09-14, source-side)
-
-Every path that lets audio leave the iOS app, its provenance source, and the boundary it crosses.
-`scripts/repo_invariants.sh` keeps the inventory honest: an activity or share surface may exist only
-in `IOSExportGate` across `Sources/iOS`, `Sources/iOSSupport` and the shared views (a shared view
-sharing audio must carry an `#if os(iOS)` branch through the gate), and nothing but the two import
-pickers' default folder and the headless enrollment staging path touches the Files-visible
-Documents directory (`UIFileSharingEnabled`); generated output lives in the App Group container.
-
-| Surface | Source | Provenance | Boundary |
-| --- | --- | --- | --- |
-| Studio inline player Save / Download | `IOSStudioInlinePlayerCard` | finished output's mode | `IOSExportGate.perform` / `.share` |
-| Expanded player Save / Share (Studio, History, Saved Voices, previews) | `IOSPlayerSheet` | item's recorded mode; saved voice `generatedSourceMode`, or with unreadable metadata the audio's own Vocello provenance, else `.originalReference`; bundled previews `.builtIn` | `IOSExportGate` |
-| History row export | `HistoryScreen` | row's recorded mode | `IOSExportGate.share` |
-| History failed-storage recovery files | `HistoryScreen` | `.recoveryRecord` (free by policy) | `IOSExportGate.share` |
-| Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
-| Saved-outputs folder copy after generation (single take and long-form joined output) | `IOSSavedOutputsDestination.exportIfConfigured` | generation mode of the saved row | `IOSExportCommerce.permits` before any copy; never starts a purchase |
-| Inbound `onOpenURL` audio (received in `QVoiceiOSApp`), Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
-| Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` | reads a staged reference from Documents, deletes it after enrollment | not an export |
-
-No App Intent, Shortcut, URL scheme, drag, pasteboard, Quick Look or document-browser route exists on
-iOS. Long-form projects export only through their joined History row and the folder copy above.
-
-The existing stateful control audit owns options-sheet reachability/dismissal and explicitly blocks
-purchase actions pending an approved StoreKit/sandbox session. It never buys or invokes Restore.
-The opt-in `scripts/ui_test.sh ios purchase --retain-result` lane uses Apple StoreKitTest and a
-fixture bundled **only in the UI-test target**. It attempts the local transaction lifecycle through
-the real purchase sheet, never live purchases. The fixture price and native Xcode environment must
-match before Buy; the test refuses preexisting local transactions and removes only its own afterward.
-This is separate from sandbox/TestFlight, offline and complete paid/free export-route acceptance.
-The [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect) owns
-focused physical purchase acceptance and the remaining product metadata/account work.
 
 A consolidated map of the Vocello iOS app: what every screen/element/option does (user
 view) and how XCUITest drives it (stable identifier → action → expected). Use this to understand the
@@ -105,8 +25,9 @@ initialize on the iOS Simulator.
 > tone/delivery prompt-writing in [`../qwen_tone.md`](../qwen_tone.md).
 > String Catalog ownership, typed presentation text, and pseudo-localization acceptance are in
 > [`localization.md`](localization.md).
-> The compact UI state map is [§7](#7-compact-ui-state-map). XCUITest is the only automated UI
-> evidence; computer use through iPhone Mirroring covers what it cannot (`/vocello-ui-autonomy`).
+> The compact UI state map and lane assumptions are [§7](#7-compact-ui-state-map); the export
+> purchase is [last](#ios-export-purchase). XCUITest is the only automated UI evidence; computer use
+> through iPhone Mirroring covers what it cannot (`/vocello-ui-autonomy`).
 
 ---
 
@@ -177,8 +98,8 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 | Element | Identifier | Notes |
 |---|---|---|
 | Mode segment | `generateSection_custom\|design\|clone` | Tap to switch mode (keeps its id — not shadowed) |
-| Script composer | `textInput_textEditor` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold (a Han, kana or Hangul character counts three, `SingleTakeScriptBudget`) and is absent for shorter scripts. Editor retains the shared 30,000-character ceiling. |
-| **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed |
+| Script composer | `textInput_textEditor`, count `textInput_lengthCount` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold (a Han, kana or Hangul character counts three, `SingleTakeScriptBudget`) and is absent for shorter scripts. Editor retains the shared 30,000-character ceiling. |
+| **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed; enabled once the script is ready (Design also needs a brief, Clone a reference and consent) |
 | **Install CTA** | `textInput_installModelButton` | Shown instead of Generate when the model is **missing** (see §3) |
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |
 | Error retry | `textInput_generationError` | Retry bar on a failed generation |
@@ -242,6 +163,14 @@ timeline submission/terminal recording, engine invocation, materialized-output c
 cleanup, playback handoff, History outbox persistence, and optional Files export. Successful
 inline-card publication remains attempt-scoped in the view after the shared boundary returns.
 
+Scripts above the single-take limit route to a long-form project in all three modes
+([long-form-generation.md](long-form-generation.md)): the helper line narrates per-segment
+progress, the dock's Cancel stops the whole run, a stopped project with reusable takes exposes
+`longform_resumeChip`, and a completed in-session project exposes `iosLongForm_segmentsChip`, a
+setup-row chip whose confirmation-dialog items (`iosLongForm_regenerateSegment_<index>`) regenerate
+one segment with a fresh recorded seed and reassemble the joined output. The completed project
+surfaces the joined output as the inline player item.
+
 ### Bottom sheets — `Sources/iOS/Sheets/IOSBottomSheets.swift`
 
 Sheets are separate overlays, so **inside-sheet elements keep their own identifiers**
@@ -268,6 +197,7 @@ delivery's verified reference). Selecting applies the concrete member voice thro
 `applySavedVoice` path and dismisses.
 
 **Voice brief editor** (Design only) — `voiceBrief_editor` (multi-line) + `voiceBrief_confirm`.
+Design needs a brief, typed or taken from a starter, before Generate.
 
 ### Voices tab — `Sources/iOS/IOSVoicesView.swift`
 
@@ -290,7 +220,8 @@ before presenting Files and never creates a session-only reference. The enrollme
 voice-cloning consent is off, `saveVoice_consentRequired` (and `iosRecord_consentRequired` on the
 recorder) names Settings → Privacy and Save stays disabled (PA-17). A
 matching `.txt` sidecar is preferred;
-otherwise `VoiceClipTranscriber` starts automatically on device, keeps Save disabled until the
+otherwise `VoiceClipTranscriber` starts automatically on device (status in
+`saveVoice_transcriptionStatus`), keeps Save disabled until the
 result is reviewable, and cannot replace a manual edit with a delayed result. If recognition cannot
 produce text, the user must enter text or explicitly choose Use audio only. A transcript whose
 language remains inconclusive also requires an explicit Reference language selection. The app
@@ -302,8 +233,9 @@ Save prepares an opaque
 candidate that does not enter the catalog until any quality warning is explicitly kept. Cancel, Discard, and
 outside dismissal discard the candidate, however the flow closes (a host dismissal or a Studio mode
 switch included) and even while a save is still staging it; a candidate an app session that ended
-mid-review left behind goes at the next review save (F-01). A successful commit creates `voicesRow_saved_<id>` and
-hands the reference to Studio Clone. Each saved row exposes `voicesRowMenu_<id>` with
+mid-review left behind goes at the next review save (F-01). A successful commit creates
+`voicesRow_saved_<id>`, hands the reference to Studio Clone, selects it in `studioChip_reference`
+and starts ordinary Clone priming. Each saved row exposes `voicesRowMenu_<id>` with
 `voicesDelete_<id>`; confirmation `voicesDeleteConfirm_<id>` names the exact voice and explains
 that deleting one voice-bank member leaves the others. Delete waits while a take or a long-form
 project runs, since a long-form Clone project reads the voice again for every segment, and a retained
@@ -337,9 +269,11 @@ offered once for a confirmed removal in Settings → Models & Files (PA-30). Mod
 (Play / Save audio / Pin seed / Delete — the pin item `historyRowPinSeed_<id>` appears only for
 takes with a recorded seed and lands in that take's Studio mode with `studioChip_seedPin`
 visible), delete-confirm `historyRowDeleteConfirm_<id>`. Grouped by Today /
-Yesterday / Previous 7/30 Days / Earlier. The list loads bounded pages of 500 entries (a long-form
-project counts once and brings all its segments); `historyShowMoreButton` loads the next page
-(AUD-05). While the whole archive fits in what is loaded, search and filters run in memory as
+Yesterday / Previous 7/30 Days / Earlier. A long-form project is one joined row plus a per-segment
+disclosure (`history_longFormSegmentsToggle_<digest8>`); search flattens the grouping, and orphan
+segments (no joined output yet) stay visible as ordinary rows. The list loads bounded pages of 500
+entries (a long-form project counts once and brings all its segments); `historyShowMoreButton`
+loads the next page (AUD-05). While the whole archive fits in what is loaded, search and filters run in memory as
 before; otherwise `GenerationHistoryPageQuery` answers them in SQL with the list's own predicate,
 so a match is never hidden beyond the loaded page. Reads take no SQLite write transaction unless a
 long-form journal is pending.
@@ -387,18 +321,19 @@ Design & Clone Export; Privacy & Permissions, Accessibility, and About. The shar
 unchanged. Six `iosSettings_<category>Row` links push into the existing Settings navigation stack;
 categories are `audio`, `appLanguage`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
 Each has `screen_settings_<category>` and a 44-point `iosSettings_<category>BackButton`.
-The hub now uses the shared Settings group and destination-row presentation with macOS.
+The hub uses the shared Settings group and destination-row presentation with macOS. The tab dock
+keeps its identifiers and layout, but its Dynamic Type growth is capped at the first accessibility
+size (ISU-5) so Settings rows stay reachable at AX-XXXL; its icon is hidden from VoiceOver.
 Its secondary lines show current variation, interface language, model readiness and app version;
 full explanations remain in the detail pages and accessibility hints. Values wrap below titles
 instead of competing for a narrow trailing column.
 No nested navigation stack is introduced. App Language adds a UI-only persisted preference,
-defaulting to System Default, then native-name choices from complete bundled translations
-(currently ten: English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified
-Chinese, Japanese, Korean and Russian). It does not select the language of generated speech. The
-observable app-lifetime owner updates typed display copy without replacing runtime dependencies;
-system dialogs may retain the OS language. English/French switching, relaunch and draft checks have
-partial physical evidence that predates the eight catalogs added 2026-09-21; full AX-XXXL/pseudo
-layout and physical acceptance of all ten languages remain pending under ASR-12/ISU-4.
+defaulting to System Default, then native-name choices from complete bundled translations (ten:
+English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified Chinese, Japanese,
+Korean and Russian; RF-36 completed the last strings in builds 25 and 26). It does not select the
+language of generated speech. The observable app-lifetime owner updates typed display copy without
+replacing runtime dependencies; system dialogs may retain the OS language. The localization lane's
+ten-language walk and full AX-XXXL/pseudo layout have not yet run on the phone (ASR-12/ISU-4).
 
 Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
 `iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and
@@ -440,9 +375,10 @@ variation raw values, model IDs, installation behavior and purchase policy remai
 The existing Settings localization walk includes a French-Default pass alongside the four
 English layout configurations. Shared lifecycle tests explicitly select English in the app's
 process-local launch arguments; localization walks may override it, and the phone's persisted
-language is untouched. Compilation alone does not qualify that physical-device journey.
-Current-source physical visual, accessibility and purchase acceptance require separate authorization;
-historical Settings and local StoreKit passes are not proof for the refined layout.
+language is untouched. Compilation alone does not qualify that physical-device journey. The
+accessibility row on TestFlight build 24 found partial Dynamic Type support on Studio and the
+purchase sheet, purchase-sheet contrast, and clipped text in Design and Clone at AX-XXXL; the
+maintainer accepted these as a 3.0 known limitation (BKL-31).
 
 `iosSettings_openSourceRow` pushes `screen_openSourceLicenses`. The offline browser is generated from
 the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the six
@@ -531,7 +467,8 @@ waits for Wi-Fi. The control audit turns the switch on and back off (`voice-mode
 exact `durable logical catalog bytes / catalog bytes` while transfer is incomplete. The visible
 detail derives its percentage and byte counts from that same presentation value, alongside
 smoothed speed, ETA, retry reason, and verified-file reuse. Transfer completion replaces the
-determinate bar with `Download complete — finishing setup`; verification and installation use
+determinate bar, which keeps a visible trailing rail segment so a rounded 99% capsule cannot look
+finished, with `Download complete — finishing setup`; verification and installation use
 indeterminate `Checking downloaded files` and `Making the model available offline` activity.
 Only terminal `Ready` is complete. MD-3's physical-device closure proved this UI truth remains
 correlated with authenticated publication across cancellation, adoption, shared-component reuse,
@@ -550,7 +487,7 @@ test-owned root through visible Cancel/Retry/Remove controls, verifies the `Not 
 `Downloading` → `Ready` action contract, confirms one real cancellation and restart, adopts the
 restarted Custom transfer across termination/relaunch, installs Design and Clone, removes all three
 through their named confirmations, and finally proves the canonical snapshot is unchanged. A
-five-minute no-advance watchdog now distinguishes an advancing slow transfer from a stuck adopted
+five-minute no-advance watchdog distinguishes an advancing slow transfer from a stuck adopted
 request, captures the stalled row, and drives isolated visible cleanup before restoring the
 canonical snapshot.
 
@@ -674,7 +611,7 @@ final model language, think/no-think token mode, and conditioning mode separatel
 `VocelloiOSUITests` uses stable accessibility identifiers, condition-based waits, and shared test
 support. Coordinates, OCR taps, and label-only fallback tables are not accepted test selectors.
 
-Canonical flows remain:
+Canonical flows:
 
 - Onboarding → Studio: advance or skip until the Studio tabs and composer are visible.
 - Custom: select Custom, confirm model readiness, configure voice/delivery/language, compose,
@@ -692,10 +629,8 @@ Gotchas:
 2. Dismiss the keyboard before Generate when it obscures the button.
 3. Wait for cold model loading rather than repeating a click.
 4. Attach named screenshots at important semantic states and failures.
-5. Destructive model lifecycle actions are outside smoke and benchmark, and smoke records only in its
-   record-then-play journey (AUD-02), which saves nothing. The isolated
-   physical-device model-delivery proof is selected explicitly with
-   `scripts/ui_test.sh ios model-download` and cleans up through visible Settings controls.
+5. Destructive model lifecycle actions belong only to `scripts/ui_test.sh ios model-download`,
+   which cleans up through visible Settings controls ([§7](#what-the-lanes-assume)).
 6. Settings clearance uses the genuine `rootTabDock` container, not a single tab button (the dock
    has two rows at accessibility sizes). Production bottom padding follows the measured dock
    height rather than a fixed Dynamic Type estimate. Layout assertions require the entire element within the
@@ -710,7 +645,6 @@ Most interactive controls now carry an `accessibilityIdentifier`. If a future sc
 control without one, add a stable identifier before automating it; label-only and coordinate
 fallbacks are not supported.
 
-- ~~Player sheet scrubber + transcript~~ — **closed 2026-07-02**: the scrubber is an adjustable VoiceOver element (`iosPlayer_scrubber`, "Playback position" + value) and the karaoke transcript reads as one prose element (`iosPlayer_transcript`).
 - **Mode meta labels** ("Built-in voice" / "Designed voice"), section headings, empty-state cards,
   and sheet titles are currently descriptive rather than test-driving targets.
 - **Lifecycle toasts** — transient, but labeled with `engineLifecycleToast_<id>`.
@@ -719,14 +653,13 @@ A separate, optional follow-up is consolidating **all** ids (most are inline str
 literals today) into `Sources/iOS/IOSAccessibilityIdentifiers.swift` so they're grep-able
 constants — a refactor, not a behavior change.
 
+---
+
 ## 7. Compact UI state map
 
-This is the compact screen and accessibility map for physical-device Vocello UI tests. XCUITest is
-the only automated UI evidence and runs on a paired physical iPhone; the iOS Simulator is unsupported.
-
-### Navigation hierarchy
-
-Vocello opens on the Studio tab in Custom mode. The root tabs are:
+XCUITest is the only automated UI evidence and runs on a paired physical iPhone; the iOS Simulator
+is unsupported. Vocello opens on the Studio tab in Custom mode; explicit handoffs may change the
+in-session Studio mode, and the Studio selector changes the composer in place.
 
 | Surface | Purpose | Stable identifier family |
 | --- | --- | --- |
@@ -736,156 +669,23 @@ Vocello opens on the Studio tab in Custom mode. The root tabs are:
 | Player sheet | Full-screen playback with karaoke transcript and scrubber (opens from a History row) | `iosPlayer_*` (`_close`, `_playPause`, `_scrubber`, `_download` — labeled "Share"; `_save` renders only when a caller supplies a distinct save handler, and `_transcript`) |
 | Settings | Models, preferences, clone consent, storage, permissions, About | `rootTab_settings`, `iosSettings_*`, `iosModel*`, `voiceCloning_consentAcknowledgment` |
 
-The Studio selector changes the composer in place. Cold launch selects Custom mode; explicit
-handoffs may change the in-session Studio mode.
+### What the lanes assume
 
-### Studio states
-
-#### Built-in Voice
-
-- Script editor and count: `textInput_textEditor`, `textInput_lengthCount`.
-- Voice, delivery and language chips (`studioChip_*`); variation is the Settings → Audio preference
-  (`iosSettings_variationRow`).
-- Generate: `textInput_generateButton`.
-- Inline progress and completed player.
-
-Generate remains unavailable until the script and Custom model are ready. Smoke requires the
-completed player and matching History row; the benchmark validator adds readable-audio and exact
-telemetry evidence per take.
-
-Scripts above the 900-character single-take limit (a Han, kana or Hangul character counts three)
-route to a long-form project (all three modes):
-the helper line narrates per-segment progress, the dock's Cancel stops the whole run, and a
-stopped project with reusable takes exposes `longform_resumeChip`, and a completed in-session
-project exposes `iosLongForm_segmentsChip` (a setup-row chip whose confirmation-dialog items,
-`iosLongForm_regenerateSegment_<index>`, regenerate one segment with a fresh recorded seed and
-reassemble the joined output; device acceptance pending). The completed project surfaces
-the joined output as the inline player item.
-
-#### Voice Design
-
-Design requires a voice brief, entered directly or from a starter, before generation. The benchmark
-lane exercises Design when that mode is selected; smoke prepares Design in its dock-layout journey
-without generating, and its takes are Custom. A missing Design model must present the
-install state instead of Generate.
-
-#### Voice Cloning
-
-Clone requires a reference clip from a saved voice, the physical-device recording flow
-(`referenceClip_recordNewClip`), or direct Files import (`referenceClip_importAudioFile`) of WAV,
-MP3, AIFF, or M4A. Direct import always enters the permanent Saved Voice enrollment pipeline; it
-does not create a session-only reference. A neighboring `.txt` sidecar wins, otherwise the existing
-on-device transcriber runs automatically and reports through `saveVoice_transcriptionStatus`.
-Save stays disabled until editable text exists or the user explicitly selects
-`saveVoice_useAudioOnlyButton`; a delayed recognizer result cannot overwrite a manual edit.
-Successful enrollment selects the exact new voice in `studioChip_reference` and begins ordinary
-Clone priming. Automated smoke and benchmark tests use a prepared non-PII saved reference.
-Smoke records only in its record-then-play journey (AUD-02), which saves nothing and leaves the
-permission prompts to the maintainer; Files-picker import and enrollment are separate explicit
-product-acceptance scenarios. The genuine visible
-`voiceCloning_consentAcknowledgment` control lives in Settings; Clone reads that persistent choice
-and keeps Generate disabled until it is enabled. A transcript is optional: supplied text selects
-transcript-backed conditioning, while an empty transcript selects the distinct audio-only x-vector
-path.
-
-Emotion reference banks (DP-16) surface in Clone as a persona with a delivery choice: when the
-selected saved voice belongs to a bank, the reference chip shows the persona name and a Delivery
-chip appears (`studioChip_bankDelivery`) opening a member sheet whose rows are
-`bankDeliveryRow_<voiceID>` (Neutral is the persona's base; each emotion row is that delivery's
-verified reference voice). Selection applies the concrete member voice through the ordinary
-saved-voice path. The delivery preset sheet elsewhere in Studio is sectioned per DP-14 (Distinct
-deliveries / Directional hints) with the hints advisory as its footer
-(`deliveryPickerSheet_hintAdvisory`). While a sampling seed is pinned (DP-15), every Studio mode
-shows a Seed chip (`studioChip_seedPin`) whose tap offers the unpin confirmation.
-
-### Voices and History
-
-Voices exposes saved rows (`voicesRow_saved_*`; a bank member's caption reads
-"Voice bank · <Delivery>" while standalone voices read "Cloned reference"), built-in speakers,
-separate row and preview actions, search, filters, and one visible Save a New Voice action: `voices_saveNewVoice` records a
-reference with the microphone, or imports one from Files ("Import audio file",
-`voices_importAudioFile`, restored 2026-08-15 — WAV/MP3/AIFF/M4A; audio files opened from the
-Files app are received at the app root and route through the same flow once onboarding is gone,
-AUD-01).
-`saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`, the conditional
-`saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton` complete enrollment. A saved voice hands off to Studio Clone; a built-in speaker hands off to Studio
-Custom. Benchmark-fixture enrollment is script-owned via
-`scripts/ios_device.sh enroll-clone-fixture`.
-
-History supports search, mode filtering, newest-first date grouping, playback, export, seed pinning
-and deletion. A row whose take recorded a sampling seed offers "Pin seed N for new takes" in its
-overflow menu (`historyRowPinSeed_<id>`, DP-15): pinning lands in that take's Studio mode with the
-Seed chip visible. Long-form projects group as one joined row plus a per-segment disclosure
-(`history_longFormSegmentsToggle_<digest8>`); search flattens the grouping, and orphan segments
-(no joined output yet) stay visible as ordinary rows. A typed database failure presents
-`historyRetryButton` rather than an empty list and keeps destructive actions disabled until a
-successful read. Destructive History actions are outside the minimal smoke and benchmark lanes.
-
-### Settings
-
-iOS Settings has a compact localized heading (`iosSettings_title`) above its six-entry hub
-(`screen_settings`) in three flat groups: Audio, App Language and
-Models & Files; the restrained gold Design & Clone Export entry; Privacy & Permissions,
-Accessibility, and About. Six detail pages use the existing tab navigation stack and compact
-44-point Back headers. Root links are `iosSettings_<category>Row`, headers are
-`screen_settings_<category>`, and Back is `iosSettings_<category>BackButton`, for categories
-`audio`, `appLanguage`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
-Preference keys/defaults, model operations and outward export policy are unchanged. The tab dock keeps
-its identifiers and layout but its Dynamic Type growth is capped at the first accessibility size
-(ISU-5) so Settings rows stay reachable at AX-XXXL; its icon is hidden from VoiceOver.
-Decorative symbols replace utility tiles; labels wrap and short values align to the trailing side,
-reflowing below labels at accessibility sizes. Audio owns the original autoplay Toggle and localized
-Take variation menu. Models &
-Files owns actual model readiness and the existing saved-output folder workflow. Accessibility
-owns the two existing reduction preferences. Privacy & Permissions owns the exact consent,
-disclosure, policy and system-permission controls. About owns Help & Support, licenses, Source
-Code and a compact identity block with the dynamic read-only version/build label; there is no
-branding footer. Models & Files and Accessibility use short contextual introductions, while the
-unchanged cloning disclosure sits between the consent card and the policy/permissions group.
-Back controls retain 44-point touch targets with a softer muted fill. French model presentation
-uses localized display names/actions/statuses without changing catalog or preference identities.
-See the [app guide](ios-app-guide.md#settings-tab--sourcesiossettingssettingsscreenswift) for
-retained control IDs and purchase-sheet behavior. Open Source & Licenses pushes
-`screen_openSourceLicenses`, with stable component/model rows and a 44-point
-`iosSettings_openSourceBackButton` returning to About; attribution details expose their complete bundled license text
-and governed source link without requiring network access.
-
-Studio's missing-model `textInput_installModelButton` opens the complete Settings → Models & Files
-→ Voice Models path and starts the selected mode's installation without another tap. Returning
-preserves the Studio draft; ordinary navigation and Back never initiate another installation.
-
-`iosSettings_voiceModelsRow` pushes `screen_voiceModels`, whose compact
-`iosSettings_voiceModelsBackButton` returns to Models & Files. iOS has one
-Speed model for each generation mode. The destination combines `N of 3 ready` with managed model
-bytes in `iosSettings_storageRow`, then gives every model one non-color-dependent text-and-symbol
-status and only the lifecycle actions valid for its current state. At ordinary text sizes a sole
-Install, Retry, Cancel, or Remove action sits beside the compact model summary; Update/Remove,
-Repair/Remove, and accessibility sizes reflow below it with 44-point targets. Installed and
-update-available models expose `iosModelDelete_<id>` without an overflow-menu discovery step and
-retain the named confirmation. `iosModelStatus_<id>` reads `Ready` when usable. The installation
-bar renders exact durable logical catalog-byte progress while transfer is incomplete, reserving a
-visible trailing rail segment so a 99% rounded capsule cannot look finished. Transfer completion,
-verification, and installation replace the bar with named indeterminate activity; only `Ready` is
-terminal. Restored percentage, bytes, speed, and ETA are reconciled from the same presentation
-value. Normal smoke and benchmark lanes do not install or delete models; they visibly assert that
-Custom, Design, and Clone Speed are ready before generation.
-
-Settings also owns the persistent Clone consent row
-`voiceCloning_consentAcknowledgment` under Settings → Privacy & Permissions. Smoke and benchmark enable it through that visible row when
-needed so Clone acceptance starts from an explicit consent state; this preference intentionally
-remains enabled for later testing. The benchmark may temporarily enable Auto-play and restores its
-prior value. System permission enrollment is attended setup.
-
-### Sheets and accessibility
-
-Important transient surfaces include voice and clone-reference pickers, the Design brief editor,
-delivery/language controls, the player, History actions, model confirmations, and system pickers.
-
-All controls used by autonomous tests retain stable `accessibilityIdentifier` values. Tests use
-condition-based waits and assert the visible enabled/readiness/completion state needed by the active
-scenario. Named screenshots are attached at important states and failures; labels and coordinates
-are not selector fallbacks. VoiceOver, Dynamic Type, Reduce Motion, and Reduce Transparency remain
-product accessibility requirements, but are not claimed as coverage of the minimal lanes.
+- Smoke and benchmark never install or delete models: they visibly assert that Custom, Design and
+  Clone Speed are Ready before generating. Only `scripts/ui_test.sh ios model-download` changes
+  model state (§3).
+- They use a prepared non-PII benchmark clone voice and enable the persistent
+  `voiceCloning_consentAcknowledgment` through its visible Settings row when needed; the choice
+  intentionally stays on for later testing. The benchmark may enable Auto-play for a run and
+  restores its prior value. System permission enrollment is attended setup.
+- Smoke requires the completed player and the matching History row; the benchmark validator adds
+  readable audio and exact telemetry evidence per take. Smoke prepares Design in its dock-layout
+  journey without generating, so its takes are Custom. It records only in its record-then-play
+  journey (AUD-02), which saves nothing and leaves the permission prompts to the maintainer; Files
+  import and enrollment are separate explicit scenarios.
+- Destructive History actions are outside the smoke and benchmark lanes.
+- VoiceOver, Dynamic Type, Reduce Motion and Reduce Transparency remain product requirements, but
+  the minimal lanes do not claim them as coverage.
 
 ### Test routing
 
@@ -900,3 +700,81 @@ product accessibility requirements, but are not claimed as coverage of the minim
 Never validate with an iOS Simulator, Simulator Browser, a third-party UI-automation driver, or a
 committed coordinate table. Computer use through iPhone Mirroring covers what XCUITest cannot, and its
 records close an attended row only on the maintainer's confirmation (`CLAUDE.md`, `/vocello-ui-autonomy`).
+
+---
+
+## iOS export purchase
+
+Generation, listening, internal History and voice enrollment remain free. One iOS non-consumable
+unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
+The product exists in App Store Connect with its USD 19.99 US base and automatic regional prices,
+and its en-US, fr-CA and fr-FR names and descriptions (RF-02, 2026-10-12). The local StoreKit
+acceptance passed (RF-13, closed 2026-10-16). The Paid Apps agreement (RF-02) and the
+processed-build purchase checks (RF-12) remain, so this is not yet an available or reviewed
+purchase.
+
+This is the official iOS app's export purchase, not a restriction on the MIT-licensed source.
+Self-built forks may change the checks; they do not acquire an official Apple entitlement by doing
+so. No licensing server or obfuscation is planned to prevent source modification. Keep public product
+configuration separate from private developer credentials as described in the
+[security boundary](../../SECURITY.md#open-source-purchase-boundary). Unmodified self-builds are not
+promised live purchase support under a different signing identity; use the isolated test fixture only
+through the governed test route, never a shipping unlock or production credential copied from the maintainer.
+
+- Studio Save/Download, expanded-player Share, History/segment export and optional Files folder
+  copying use the **finished output's mode**, never the current Studio selection. Unknown generated
+  modes require unlock. Internal storage and playback never consult the entitlement.
+- Settings → **Design & Clone Export** (`iosSettings_exportPurchaseRow`) opens purchase options.
+  `exportPurchase_buy` displays the StoreKit-localized one-time price; `exportPurchase_reload` handles
+  product unavailability; `exportPurchase_restore` explicitly syncs. Pending, cancellation and
+  verification failures have visible status; dismissing the Apple Account prompt during Restore is a
+  cancelled restore, not an App Store failure (A4-02). `exportPurchase_close` dismisses without export.
+  Close and request export again after purchase: it never silently shares a previously selected clip.
+- Automatic folder copying never starts a purchase or changes the folder. Without verified access,
+  paid-mode clips remain in History for manual export afterward. The folder explanation states this
+  behavior. A paid-mode clip that finishes during startup checking waits for that entitlement scan
+  (a local StoreKit read) and is copied if it verifies the unlock; until then the Saved outputs row
+  reports that the take stayed in History (A4-01). The copy stages its bytes beside the destination
+  and replaces a same-named file only once complete (A3-01).
+- New Design-generated Saved Voices retain `generatedSourceMode` in existing enrollment metadata
+  through candidate commit and reference playback. Imported/recorded originals remain recoverable
+  for free. Legacy Saved Voices lack origin metadata and stay exportable without retrospective
+  inference, rewriting or deletion. When a voice's metadata exists but cannot be read (damaged, or
+  written by a newer build), the voice's audio decides: Design and Clone publications embed their
+  mode as Vocello provenance and stay locked, while a recording carries none and stays free.
+  Existing History entries already record their generation mode.
+- Actual failed-storage recovery audio/journals remain freely exportable. Only the existing enqueue/
+  outbox recovery surfaces provide this exception; ordinary History/player/folder exports do not.
+  This preserves the rule against making data recovery a payment demand.
+- Refund/revocation removes paid export access, **never clips, voices, drafts, History or playback**.
+  Access uses verified StoreKit entitlements and its offline cache, not a local paid flag. No app
+  server, cloud inference, login, diagnostics bypass or receipt logging was introduced.
+
+### Outward export inventory (audited 2026-09-14, source-side)
+
+Every path that lets audio leave the iOS app, its provenance source, and the boundary it crosses.
+`scripts/repo_invariants.sh` keeps the inventory honest: an activity or share surface may exist only
+in `IOSExportGate` across `Sources/iOS`, `Sources/iOSSupport` and the shared views (a shared view
+sharing audio must carry an `#if os(iOS)` branch through the gate), and nothing but the two import
+pickers' default folder and the headless enrollment staging path touches the Files-visible
+Documents directory (`UIFileSharingEnabled`); generated output lives in the App Group container.
+
+| Surface | Source | Provenance | Boundary |
+| --- | --- | --- | --- |
+| Studio inline player Save / Download | `IOSStudioInlinePlayerCard` | finished output's mode | `IOSExportGate.perform` / `.share` |
+| Expanded player Save / Share (Studio, History, Saved Voices, previews) | `IOSPlayerSheet` | item's recorded mode; saved voice `generatedSourceMode`, or with unreadable metadata the audio's own Vocello provenance, else `.originalReference`; bundled previews `.builtIn` | `IOSExportGate` |
+| History row export | `HistoryScreen` | row's recorded mode | `IOSExportGate.share` |
+| History failed-storage recovery files | `HistoryScreen` | `.recoveryRecord` (free by policy) | `IOSExportGate.share` |
+| Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
+| Saved-outputs folder copy after generation (single take and long-form joined output) | `IOSSavedOutputsDestination.exportIfConfigured` | generation mode of the saved row | `IOSExportCommerce.permits` before any copy; never starts a purchase |
+| Inbound `onOpenURL` audio (received in `QVoiceiOSApp`), Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
+| Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` | reads a staged reference from Documents, deletes it after enrollment | not an export |
+
+No App Intent, Shortcut, URL scheme, drag, pasteboard, Quick Look or document-browser route exists on
+iOS. Long-form projects export only through their joined History row and the folder copy above.
+
+The stateful control audit reaches and dismisses the purchase sheet but never buys or restores.
+The local StoreKit lane (`scripts/ui_test.sh ios purchase`) drives the real sheet against a
+UI-test-only fixture; the [device-testing guide](ios-device-testing.md#local-storekit-purchase-lane)
+describes it, and the [submission procedure](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)
+owns the processed-build purchase checks and the account work.

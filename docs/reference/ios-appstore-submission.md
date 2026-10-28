@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-27
+reviewed: 2026-10-28
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -13,10 +13,9 @@ sourceOfTruth:
 ---
 # iOS App Store submission runbook
 
-The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight / the App Store. The generic Release target, assets, privacy manifest, entitlement sources, in-app privacy link, and signed-archive CI lane are in place. That is not yet submission readiness: the August 2026 readiness audit found source,
-privacy/legal, support, licensing, metadata, signing/account, hosting, and physical-device gaps, and
-`config/roadmap.json` owns their live `ASR-*` status. This document is the operator checklist after
-those gates are closed.
+The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight and
+the App Store. `config/roadmap.json` owns the live status of every gate below (the release-first
+plan's `RF-*` items and the remaining `ASR-*` items); this document is the operator checklist.
 
 Source-of-truth rule: if this disagrees with the code, the code wins.
 
@@ -26,22 +25,14 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Historical device checkpoint (2026-06-13, iPhone 17 Pro):** the development build signed, installed, and ran
-end-to-end. `scripts/ios_device.sh` now **auto-derives the signing team** from the keychain's Apple
-Development certificate (no `QWENVOICE_DEVELOPMENT_TEAM` needed for local dev builds; it also falls back to
-offline manual signing if no Apple ID is in Xcode). The development provisioning profile already carries
-`increased-memory-limit`, and that dated run passed its generation and audio-QC checks. Current performance
-and memory truth comes from the tracked records in `benchmarks/HISTORY.md` (`rtf` = synthesis wall ÷ audio,
-lower is faster), not these historical figures.
-Physical-device XCUITest runs separately, at coherent checkpoints;
-ordinary GitHub CI and archive packaging are deterministic-only — see
-[`testing-runbook.md`](testing-runbook.md); and the UI holds with no clipping at the largest
-accessibility Dynamic Type size. A read-only 2026-09-04 inspection found usable local Development,
-Distribution, and Developer ID identities, one active matching App Store profile, and the exact App
-ID's registered App Group and Increased Memory Limit capabilities. The profile payload has not yet
-been downloaded and decoded, and no signed archive/IPA exists. **Still maintainer-authorized below:**
-select the unused 3.0.0 build identity at freeze, verify the profile's emitted entitlements through
-the exact archive/export, and authorize any ASC metadata change, upload, or submission separately.
+**Current state (2026-10-28):** `release.yml` has archived, verified and uploaded 3.0.0 builds 24,
+25 and 26 (ASR-10 closed on build 24's release run 40103005257). Build 26 is in the TestFlight
+Public Beta; build 27 (RF-37, the Game Mode opt-out) is the next candidate. The App Review
+submission waits for the exact-tag iOS promotion (RF-17) and the maintainer's go (RF-16). Any App
+Store Connect metadata change, upload or submission still needs its own authorization.
+Physical-device XCUITest runs separately at coherent checkpoints; CI and archive packaging are
+deterministic-only ([`testing-runbook.md`](testing-runbook.md)). Local development builds derive the
+signing team from the keychain's Apple Development certificate (`scripts/ios_device.sh`).
 
 Before any local generic-device compile or archive, verify the selected Xcode installation:
 
@@ -57,25 +48,22 @@ download it automatically.
 ## 0. One-time account prerequisites
 
 - [ ] Apple Developer Program membership active; latest Program License Agreement accepted.
-- [x] **iOS Distribution certificate** installed with its private key. Read-only Keychain inspection
-      found one usable Apple Distribution identity on 2026-09-01; exact archive verification remains
-      required and this checkbox does not authorize signing or upload.
+- [x] **iOS Distribution certificate** with its private key, held as the `IOS_DIST_CERT_P12` CI
+      secret (§4). This checkbox does not authorize signing or upload.
 - [x] App ID `com.patricedery.vocello` has **App Groups** + **Increased Memory Limit** capabilities enabled.
       The `increased-memory-limit` capability is self-serve (no Apple review). It MUST be on the App Store
       provisioning profile or the multi-gigabyte model load is Jetsam-killed on a signed build. The
       exact remote App ID reported both capabilities on 2026-09-04; archive verification remains the
       authority for what the signed candidate actually receives.
-- [ ] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store), regenerated
-      after enabling the capabilities so it carries `increased-memory-limit` + the App Group. The
-      2026-09-04 read-only account inventory found one active matching `IOS_APP_STORE` profile with a
-      2027-07-25 expiry. Keep this row open until its payload or the exported IPA proves both required
-      entitlements and the exact signing identity; an active account record alone is insufficient.
-- [x] App record exists in App Store Connect for `com.patricedery.vocello`; exact CLI resolution on
-      2026-09-04 found configured 2.4.0/build 23 state and one `en-US` localization. The 3.0.0 account
-      version exists (Prepare for Submission), and a read-only check on 2026-10-14 found build 24
-      unused, with no build in the 3.0.0 train (ASR-08); the check repeats right before archiving.
-      On 2026-10-12 version 3.0.0 replaced the unreleased 1.0 draft, and the category became
-      Productivity (secondary Music) (RF-02).
+- [x] **App Store provisioning profile** for `com.patricedery.vocello` (Distribution → App Store),
+      carrying `increased-memory-limit` and the App Group; it expires 2027-07-25. Every candidate's
+      exported IPA proves both entitlements and the signing identity through
+      `verify_ios_release_artifacts.py` (first on build 24, ASR-10). Regenerate the profile after
+      any capability change.
+- [x] App record exists in App Store Connect for `com.patricedery.vocello`, with one `en-US`
+      localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
+      2026-10-12, in category Productivity (secondary Music) (RF-02). Its train holds builds 24 to
+      26; every candidate needs an unused build number (§4, ASR-08).
 - [x] App Store installation eligibility matches the app's runtime hardware floor before the first
       public version. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
@@ -88,7 +76,7 @@ download it automatically.
 **Implemented and locally accepted (RF-13, closed 2026-10-16); live product entered (RF-02,
 2026-10-12):** the iOS app remains free to generate and listen in all three modes, with free
 Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
-implemented, and the local StoreKit exports scenario passed all 26 phases. The product has en-US,
+implemented, and the local StoreKit exports scenario passed (RF-13). The product has en-US,
 fr-CA and fr-FR names and descriptions. Still open:
 - the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.0
   ships outside the EU, so the EU trader step waits for the EU release (BKL-41);
@@ -103,10 +91,9 @@ pricing and no manual regional overrides. Readback confirmed USA/USD, one manual
 automatic schedules for 174 other territories. Family Sharing was not enabled during creation;
 the API readback omits that flag; it was confirmed off in the web portal on 2026-10-12, when the
 localized names and descriptions were entered (RF-02). Review remains pending until submission.
-The rejected earlier hyphenated identifier created no product. The local-only
-`Tests/Fixtures/VocelloExports.storekit` uses a TEST product and arbitrary fixture price, not an
-approved live offer. It is not bundled in the app or activated in shipping schemes. RF-02 owns the
-remaining account and product metadata work. Settings → Design & Clone Export
+The local-only `Tests/Fixtures/VocelloExports.storekit` fixture carries an arbitrary price, is not
+an approved live offer and is never bundled in the app or activated in shipping schemes. RF-02 owns
+the remaining account and product metadata work. Settings → Design & Clone Export
 provides the StoreKit-localized price, Restore, status, privacy/support links and dismissal.
 See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
 
@@ -117,79 +104,35 @@ locked Design/Clone clip; `scripts/repo_invariants.sh` (run by `scripts/dev.sh c
 holds the one-StoreKit-owner grep, the one-export-boundary grep over every source root the iOS app
 compiles, the Files-visible-Documents rule and the fixture-ownership greps. The audited surface list
 is the [outward export inventory](ios-app-guide.md#outward-export-inventory-audited-2026-09-14-source-side).
-These **do not execute an Apple transaction**. Generic iOS compilation checks the real adapter/UI.
-For explicitly authorized **local** physical-device transaction testing, run:
+These **do not execute an Apple transaction**; generic iOS compilation checks the real adapter and
+UI.
 
-```sh
-scripts/ios_device.sh preflight
-scripts/ui_test.sh ios purchase --retain-result
-# Extend the same local session with offline owned access and every export surface:
-scripts/ui_test.sh ios purchase --scenario exports --retain-result
-```
+On the phone, `scripts/ui_test.sh ios purchase --retain-result` (and `--scenario exports`) drives the
+local StoreKit lifecycle and every export surface through the real sheet against a UI-test-only
+fixture; the [device-testing guide](ios-device-testing.md#local-storekit-purchase-lane) owns the
+lane. RF-13 closed on the exports scenario's 26-phase pass
+(`ios-xcui-purchase-20261016-175234-5cbdbead`). The other export routes have no paid device path to
+drive: failed-storage recovery exports are always free, long-form segments have no export of their
+own (a project leaves as its History row or through the automatic folder copy, whose purchase
+gating `IOSSavedOutputsDestinationTests` cover), and saved-voice provenance is covered by
+`IOSExportPurchaseTests`.
 
-The existing runner builds the UI-test target with `VocelloExports.storekit`; shipping targets and
-schemes never activate or bundle it. `SKTestSession` owns a serial local session: native Xcode
-transaction environment and the fixture's $0.99 price must be proven before visible Buy/Restore.
-The lane covers initial lock, restore without ownership, simulated cancellation, purchase, relaunch,
-restore, revocation, pending approval and approval delivery.
-The cancellation arm reads back cleared error injection and resets session options before the
-positive purchase: on the canonical phone, clearing the error alone left the next transaction failing.
-Keep the original failed evidence; do not replace this isolation with retries or a production bypass.
-Standard process-local Apple language
-arguments make assertions English without changing the phone's French settings. No live Apple
-Account, charge, account edits, app-data deletion or production entitlement override is authorized.
-Preexisting local test transactions block execution; test-owned transactions are deleted on normal
-failure/success and the app is terminated. Cleanup failure blocks acceptance. A runner crash can
-prevent teardown; retain evidence and resolve the local session before another attempt.
-`local-purchase-summary.json` requires every ordered phase, exact run/fixture identity and cleanup;
-the `.xcresult`, screenshots, source receipt and crash delta remain untracked. Zero-test bootstrap
-failures remain failed infrastructure runs, never retries or purchase passes.
-The optional `exports` scenario requires an existing accessible History clip in each mode and the
-installed Design model. It selects one visible-provenance row per mode and reuses its exact identity
-for the revoked comparison; no existing row is edited, pinned or deleted. It generates one short
-Design take, which stays in History, so the Studio inline card's export is tested too. History-menu,
-full-player and Studio inline sharing are tested while owned and revoked, with free Built-in controls
-and internal playback/pause. System sharing is cancelled, never sent or saved. The owned half runs
-with StoreKit offline as the app sees it: Apple's fault injection fails product loading, purchase
-and App Store sync (the device stays connected), and the unlock must survive a relaunch and a failed
-Restore. The test restores the History filter, the Studio mode, Design brief and Design script, and
-verifies the original tab after dismissing any modal, then stops the app. Current schema 4 records
-the scenario and separate transaction, tab, History-filter, Studio and app-stop restoration
-observations. The exports scenario requires all 26 phases; lifecycle requires ten.
-The test snapshots the selected History filter before changing it and restores that filter, not an
-assumed All selection. Background interruption never triggers foreground takeover during cleanup:
-skipped or unobserved restoration fails qualification even if transactions were cleared and the app
-stopped. `--require-restoration` is mandatory in the current runner. Historical schemas 1/2 remain
-readable without that option but cannot establish current restoration proof (schema 3 is readable
-with its own restoration fields, but cannot qualify the current runner either). Cross-scenario
-qualification is rejected. The French system share sheet is queried by its stable
-`header.closeButton`, not the English app locale's Close label.
-
-RF-13 closed on the exports scenario's 26-phase pass (`ios-xcui-purchase-20261016-175234-5cbdbead`).
-The other export routes have no paid device path to drive: failed-storage recovery exports are
-always free, long-form segments have no export of their own (a project leaves as its History row or
-through the automatic folder copy, whose purchase gating `IOSSavedOutputsDestinationTests` cover),
-and saved-voice provenance is covered by `IOSExportPurchaseTests`. Neither scenario qualifies the
-live App Store's own offline cache, App Store sandbox, or the processed TestFlight candidate: RF-12
-checks owned exports in Airplane Mode on the processed TestFlight build. Sandbox needs a confirmed
-test account and available configured product; processed proof additionally needs the separately
-authorized command-bound archive/IPA and TestFlight upload, not a development build substituted in
-place.
-
-The existing stateful control audit inspects/dismisses purchase options but blocks transaction actions.
-A separately authorized physical StoreKit/sandbox session must qualify purchase/restore/pending/
-cancel/refund and all paid/free export paths, followed by processed-candidate checks. Do not fake
-entitlements for the release acceptance (RF-15, risk-based since 2026-10-12) or the later 201-take
-campaign; prepare the approved test purchase before freezing it.
+The local lane does not qualify the live App Store's offline cache, the App Store sandbox or the
+processed TestFlight candidate. RF-12 checks owned exports in Airplane Mode on the processed
+TestFlight build, and RF-15's with-purchase export, Restore and Cancel rows wait for RF-02; a
+sandbox session needs a confirmed test account and an available configured product. The stateful
+control audit reaches and dismisses the purchase options but never buys. Never fake entitlements
+for the release acceptance (RF-15) or the 201-take campaign.
 
 - [x] Approve product identifier/reference name, USD 19.99 and automatic regional pricing; create
       the non-consumable and price schedule under explicit authorization, leaving Family Sharing off.
-- [x] Complete localized product details (en-US, fr-CA, fr-FR) and territory availability (free in
-      175 territories, iPhone only); Family Sharing confirmed off (2026-10-12, RF-02). No submission
-      is authorized.
+- [x] Complete localized product details (en-US, fr-CA, fr-FR) and territory availability (free
+      and iPhone only; 148 territories since the EU removal of 2026-10-27); Family Sharing confirmed
+      off (2026-10-12, RF-02). No submission is authorized.
 - [x] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
       refund/revocation, including every output export surface and Built-in free-export controls,
-      in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`).
+      in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`; the
+      lane has since added AUD-07's unverified purchase).
 - [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
 - [ ] Accept the updated Apple Developer Program License Agreement (the Account Holder, at
       developer.apple.com/account; it blocks new submissions), then the Paid Apps agreement, and
@@ -321,7 +264,7 @@ classes.
 
 Two paths produce the same App-Store-uploadable IPA.
 
-### A. CI (recommended once secrets are set)
+### A. CI (the candidate route)
 
 Add these repo **Secrets** (Settings → Secrets and variables → Actions):
 
@@ -370,13 +313,16 @@ The optional upload is an internal candidate step. Before assigning that build t
 submitting it for App Review, or releasing it publicly, produce and validate the iOS
 `quality-promotion.json` against this exact release evidence. This preserves TestFlight as a useful
 validation environment without allowing a source-stale phone verdict to authorize public promotion.
+Build 26 joined the Public Beta under the maintainer's one-time RF-17 waiver of 2026-10-26; App
+Review still requires the manifest.
 
-The workflow does not query App Store Connect for an existing build, and it never invents or
-increments a build number. Before archiving, on CI or locally, confirm read-only in App Store Connect
-(the web portal or the asc-* skills) that the exact bundle/version/build identity
-(`com.patricedery.vocello` with `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from `project.yml`)
-is unused. When it is not, bump `CURRENT_PROJECT_VERSION` in `project.yml`, run
-`./scripts/regenerate_project.sh --fast`, review the diff and rerun deterministic validation. Apple
+`release.yml` does not query App Store Connect for an existing build, and it never invents or
+increments a build number. The candidate-tag script checks it before tagging; for a dispatch rebuild
+or the local route, confirm read-only in App Store Connect (the web portal or the asc-* skills) that
+the exact bundle/version/build identity (`com.patricedery.vocello` with `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION` from `project.yml`) is unused. When it is not, bump
+`CURRENT_PROJECT_VERSION` in `project.yml`, run `./scripts/regenerate_project.sh --fast`, review the
+diff and rerun deterministic validation. Apple
 rejects a reused build number at the altool upload, so a missed check fails the upload; it cannot
 replace an existing build.
 

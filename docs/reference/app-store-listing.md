@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-24
+reviewed: 2026-10-28
 summary: Draft App Store listing for Vocello for iPhone 3.0.0 (en-US), awaiting the maintainer's review. It covers the subtitle, promotional text, description, keywords, What's New, URLs and the App Review notes. Nothing here is written to App Store Connect without a separate request.
 sourceOfTruth:
   - config/public-product-facts.json
@@ -109,7 +109,7 @@ spelled out so the app is not judged non-functional under Guideline 2.1.
 Vocello generates speech locally on the iPhone. It ships with no bundled model weights, to keep the app small, and needs no account or login.
 
 1. On first launch, go through the three onboarding pages.
-2. Open Settings → Models & Files → Voice Models and tap Download for the mode you want to review. Built-in Voice is 2,049,696,897 bytes, Voice Design 2,049,696,404 bytes and Voice Cloning 2,073,713,977 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on, and they need at least 4.5 GB of free space before each one, and they can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.
+2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review. Built-in Voice is 2,049,696,897 bytes, Voice Design 2,049,696,404 bytes and Voice Cloning 2,073,713,977 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on, and they need at least 4.5 GB of free space before each one, and they can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.
 3. In Studio, type a short line, choose a speaker where the mode has one, and tap Generate. Voice Design also needs a voice description first: tap the speech-bubble chip marked + above Generate and describe the voice, for example "a warm, deep narrator". Generate stays dimmed until the description and the line are both filled.
 4. Voice Cloning needs the switch "I own or have permission to clone the voices I use" in Settings → Privacy & Permissions. Its reference is recorded with the microphone or imported from an audio file the user has rights to. Microphone and Speech Recognition are requested only to record a reference and transcribe it locally.
 5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio through the share sheet. Generation, listening, History and Built-in Voice export are free. Restore Purchases is in Settings → Design & Clone Export.
@@ -136,6 +136,7 @@ fresh North America download proof (see [`ios-appstore-submission.md`](ios-appst
 
 - Screenshots: ASR-05 takes them from the signed candidate on the iPhone, as one 6.9-inch set (or
   the 6.5-inch fallback). See [`ios-appstore-submission.md`](ios-appstore-submission.md) §3.
-- Category, age rating and the copyright line.
+- The copyright line. Category and age rating are already set in App Store Connect (RF-02,
+  2026-10-12).
 - Other localizations. The listing is en-US only so far; the export purchase already has en-US,
   fr-CA and fr-FR names and descriptions.

@@ -1,8 +1,8 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-25
-summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
+reviewed: 2026-10-28
+summary: iOS physical-device testing — deterministic compile lanes, device preparation, explicit XCUITest lanes (smoke, candidate rows, purchase, control audit, perf), pause and resume, headless diagnostics and retained evidence.
 sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
@@ -34,6 +34,12 @@ standalone `VocelloiOSLogicTests` policy bundle without executing that iOS bundl
 requires a connected phone, and together they are what routine commits, pushes and push CI rely on
 (push CI's `ios-compile` lane runs the same incremental compile). Missing models, a phone, or UI
 results must not block preserving and sharing development work.
+
+These shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
+cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode
+26 (the pinned CI toolchain) reports tool-hosted testing as unavailable for physical-device destinations, so the repository
+does not expose a device execution command for this target. Physical runtime assurance remains in
+the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
 
 Targeted physical-device validation is authorized at coherent checkpoints. Select the smallest relevant
 existing lane; full matrices remain task/release-specific. Timing verbs (`ios_device.sh gate`, `bench`,
@@ -69,18 +75,230 @@ with "Timed out while enabling automation mode" before any test starts is fixed 
 its prompt, or turn on Settings → Developer → Enable UI Automation), not by a retry of the same
 build (observed after the Xcode 27.1 update, October 16).
 
-Those shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
-cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode
-26 (the pinned CI toolchain) reports tool-hosted testing as unavailable for physical-device destinations, so the repository
-does not expose a device execution command for this target. Physical runtime assurance remains in
-the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
-
 ## Device preparation
 
-### Inspect a retained long-form transcript without regenerating
+### Development-device preflight
 
-For the deterministic harbor smoke fixture, first resolve the exact test-owned History ID from
-the retained run, then use the existing smoke runner's focused observation scenario:
+```sh
+scripts/ios_device.sh preflight
+scripts/ios_device.sh device-state
+```
+
+`preflight` and `device-state` verify the paired CoreDevice identity and reachability; preflight
+also checks the selected Xcode's iOS Platform Support, signing, and the existing app-build and dSYM
+readiness. Signing readiness means a currently valid **Apple Development certificate and its
+private key** for the selected team—not merely a team environment value, an expired certificate,
+or an Apple Distribution identity. The privacy-safe
+`scripts/lib/ios_signing_identity.py` helper distinguishes expiration, a missing private key,
+team mismatch, and a missing certificate before package resolution or compilation. Repair an
+expired/missing identity in Xcode → Settings → Accounts → Manage Certificates; do not revoke or
+regenerate unrelated distribution identities. `device-state` treats reachability as its only
+blocker and also reports the current lock state. The XCUITest runner independently rejects a phone
+that CoreDevice reports as locked before invoking `xcodebuild`. Install or repair iOS models through the
+visible Settings → Voice models section; neither device scripts nor normal UI tests install them.
+The sole exception is the separately selected `scripts/ui_test.sh ios model-download` lifecycle
+diagnostic, which uses an isolated app-support root and is never part of smoke or benchmark.
+
+The remaining plain verbs are the pieces the lanes below compose: `doctor` is the environment and
+device preflight, `build` the signed device build (`-Onone`; `--optimized` is the shipped topology),
+`install` installs that build, `launch [spec]` starts it (with the diagnostics runner when a spec is
+given), `console [spec]` is an attached launch streaming the diagnostics stdout live, `logs [spec]`
+tees the same stream to `build/artifacts/diagnostics/ios/logs/<run>.log`, `debug [spec]` is an
+attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [dest]` copies the
+app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
+[--count N]]` emits machine-readable reachability and lock state, optionally polling. A diagnostics spec is
+`<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
+`mirroring status [--json]|session LABEL|capture LABEL --step TEXT [--observed TEXT]|stop` runs
+the computer-use records ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)):
+`status` says whether iPhone Mirroring runs and whether the phone is reachable and locked,
+`session` starts a record bound to the source commit and the installed version and build,
+`capture` saves the Mirroring window with one step line, and `stop` quits iPhone Mirroring, which
+`ui-preflight` requires before any XCUITest lane. Records stay untracked under
+`build/artifacts/ios/mirroring` and are never lane evidence.
+
+### Explicit screen protection after device work
+
+When the maintainer authorizes Auto-Lock restoration, use the existing physical-device XCUITest
+runner to inspect the real Settings route before unattended work, then enable the timer after
+all device work and collection have ended:
+
+```sh
+scripts/ui_test.sh ios screen-protection --scenario inspect --retain-result
+scripts/ui_test.sh ios screen-protection --scenario enable --retain-result
+```
+
+The default is read-only `inspect`. Only explicit `enable` chooses **3 minutes** and verifies the
+persisted value on the parent Settings row. English and French Settings are supported, including
+**Luminosité et affichage → Verrouillage automatique**; an unknown, restricted, or unavailable
+control fails rather than claiming protection. No other setting or Vocello data is changed.
+The test returns to Home; its retained `screen-protection.json` and screenshots distinguish
+route inspection from a verified timer change. It never runs implicitly during another lane.
+Auto-Lock readback is not proof the screen is already locked or that Always-On Display is off.
+Confirm the eventual lock with `scripts/ios_device.sh device-state --json-v2`: its
+`signals.coredevice.lock.deviceLocked` comes only from CoreDevice's current `passcodeRequired`
+value (`unlockedSinceBoot` describes historical unlocking), and a missing or malformed value stays
+unknown. Retain raw readbacks privately. Do not start another device lane after final protection.
+If this route fails, stop unattended device work and report that protection still requires
+operator action.
+
+### Restoring Take variation
+
+A journey that pins Take variation (the long-form journey pins Expressive) restores the original
+on exit. When that cleanup cannot run, as when an interruption left the History search keyboard
+covering the tab dock on 2026-10-20, restore it explicitly:
+
+```sh
+scripts/ui_test.sh ios take-variation --scenario inspect
+scripts/ui_test.sh ios take-variation --scenario consistent
+```
+
+The default `inspect` reads the selection through the visible Settings control and changes
+nothing. A named value (`expressive`, `balanced` or `consistent`) selects it through the same
+control and verifies the readback; the retained `take-variation.json` records the value before
+and after. It never runs as part of another lane.
+
+## Explicit XCUITest lanes
+
+Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
+exact model-status assertions do not depend on the phone's language. They read the saved App
+Language choice from the Settings root row's value, open the genuine picker only to change it,
+temporarily select System Default, and restore the original choice during session cleanup. They never write global `AppleLanguages` preferences.
+The Settings `localization` walk explicitly overrides the process language for French-Default
+(including translated title and variation-value assertions), in addition to Default, AX-L,
+AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
+neither a default-language pass nor a compile substitutes for bilingual device acceptance.
+
+The development lanes build once per source tree: `build-for-testing` writes its log to
+`<run>/xcodebuild-build.log` (copied to `xcodebuild.log` on failure, so signing and provisioning
+failures still classify as infrastructure), then `test-without-building` runs the `.xctestrun`.
+A marker in the iOS DerivedData binds the build inputs' fingerprint (`tree_fingerprint.py
+--build-inputs`), the Xcode version, the phone, the team and the digests of the app, the test
+bundle and the `.xctestrun`; while all of them match, the lane prints `build-for-testing skipped`
+and tests the existing products. A product another build overwrote (a routed check that compiled
+the UI bundles, `ios_device.sh build`) changes a digest and is rebuilt, never tested. Both halves
+run inside the `xcuitest` step.
+
+Smoke diagnostics are collected before the aggregate failure exit, including when XCTest fails.
+A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
+If an older runner omitted collection, preserve its failed ledger and put any recovered telemetry
+in a separate supplemental bundle with original run identity and digests; never rewrite the run
+as PASS.
+
+Serialize macOS and iOS `xcodebuild` commands: the host-wide native lock is held throughout XCTest,
+not just build/package resolution, across every checkout and agent worktree. A concurrent native
+command waits for it (and names the holder each minute). Run read-only analysis or Python fixtures alongside a device lane instead;
+do not bypass the lock or clear a cache to resolve legitimate contention.
+
+After adding, moving or deleting files under a globbed Xcode target, regenerate the project with
+`./scripts/regenerate_project.sh` in the same commit (see
+[development-workflow.md](development-workflow.md)).
+
+```sh
+scripts/ui_test.sh ios smoke
+scripts/ui_test.sh ios localization
+scripts/ui_test.sh ios benchmark
+# Filtered benchmark example:
+scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
+
+# Source-bound exhaustive control and pairwise-generation audit:
+scripts/ui_test.sh ios control-audit --scenario inventory --retain-result
+scripts/ui_test.sh ios control-audit --scenario stateful --retain-result
+scripts/ui_test.sh ios control-audit --scenario external --retain-result
+scripts/ui_test.sh ios control-audit --scenario accessibility --retain-result
+scripts/ui_test.sh ios control-audit --scenario generation --take-limit 5 --retain-result
+scripts/ui_test.sh ios control-audit --scenario all --retain-result
+scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID --retain-result
+
+# UI-performance frame-health lane (ios-ui-2026-08):
+scripts/ui_test.sh ios perf [--label RUN_ID]
+
+# Explicit isolated background-transfer diagnostics, not a normal UI lane:
+scripts/ui_test.sh ios model-download --scenario diagnose
+scripts/ui_test.sh ios model-download --scenario queue
+scripts/ui_test.sh ios model-download --scenario acceptance
+scripts/ui_test.sh ios model-download --scenario soak --iterations 3
+scripts/ui_test.sh ios model-download --scenario recover
+scripts/ui_test.sh ios model-download --scenario acceptance --engine-profile legacy|chunked|chunked-multisession|chunked-bounded
+
+# Opt-in diagnostic and acceptance lanes that never run in smoke, benchmark, CI, or release:
+scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
+scripts/ui_test.sh ios purchase [--scenario lifecycle|exports] --retain-result
+```
+
+`--engine-profile` selects the download engine the lifecycle proof exercises; `delivery-cohort`
+runs N identical Neutral Custom takes through the production UI as a delivery-consistency
+diagnostic and never publishes benchmark history; `purchase` is the
+[local StoreKit purchase lane](#local-storekit-purchase-lane).
+
+`--retain-result` on any lane writes an untracked `retention-pin.json`
+into the run artifact so routine UI-result pruning keeps it; remove the pin only after the
+evidence set is retired.
+
+The iPhone matrix keeps the shared short/medium/long ordering; its long script is the historical
+150-character text from the era of the 150-character limit, kept fixed for benchmark-history
+comparability (the shipping single-take limit is 900, memory-qualified 2026-07-24). macOS retains
+the extended >220-character long corpus; the iPhone lane never bypasses the user-facing limit.
+
+| Lane | Scope |
+| --- | --- |
+| Smoke | Four journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map. Record then play (AUD-02): a clip recorded from Clone's reference plays to its end in the save sheet's review, and the sheet closes without saving. Dock layout (RF-24): each Studio mode, prepared with its benchmark setup, keeps an idle Generate just above the tab dock; nothing is generated |
+| Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
+| Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
+| Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
+| Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
+
+Smoke explicitly selects those four journeys; the class's other tests run only in their own lane or
+named scenario. The Settings layout walk is selected only by
+the separate `localization` lane; running smoke does not repeat it. Model-dependent journeys require
+the current catalog's Ready state: an installed model showing Update Available is not readiness proof.
+
+The control-audit accessibility lane checks targets and `.textClipped` at Default, AX-L,
+AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a forced size. The system
+clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
+retained screenshots as well; automatic PASS alone does not establish untruncated visual reflow.
+
+The stateful lane registers observed original toggle/variation values before mutation and awaits
+its session cleanup through XCTest teardown, including after assertion aborts. Failed or skipped
+restoration remains failure; never replace an unknown original value with a default. The inventory
+and simple saved-voice enrollment journeys still need equivalent preservation of Studio selections,
+draft and consent before use against personal state; do not infer that protection from the stateful
+lane. See the current checkpoint for this explicit acceptance limitation.
+
+Settings reveal uses the shared test-only `VocelloUISettingsReveal` helper. It preserves full
+visibility and whole-dock clearance while issuing slow native touch swipes on wholly visible
+static-text descendants of one genuine containing scroll view, never full-window or coordinate
+gestures. Anchors are bounded to half the safe viewport, independent of the remaining reveal delta,
+so expanded descriptions can remain usable when there are no short labels. Missing/ambiguous
+containers, an unsafe container center or no wholly visible bounded text anchor fail closed.
+Pointer-based `scroll(byDeltaX:deltaY:)` is not supported on the touch-only iPhone. Native swipe
+distance is not controlled by the requested reveal delta or velocity. Each gesture is followed by
+a fresh geometry sample; direction reversal reduces the search step limit, unchanged frames stop
+the search, and oversized full-visibility requirements remain failures. The separate navigation-only
+band is not layout acceptance. Retained pre-gesture and failure attachments include sampled frames
+and desired movement. Host geometry tests do not prove actual UIKit scrolling; new physical
+AX-XXXL/pseudo acceptance is required after changes.
+
+Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
+condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,
+OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf scenario file is the
+one recorded exemption (`scripts/repo_invariants.sh`): its paced sleeps ARE the measured
+workload, and its sweep gestures anchor on the application root so deep per-event accessibility
+re-queries stay out of the measured windows.
+
+Lane qualification is deliberately stricter than the XCTest counter. The `ui_test.sh` terminal
+status is authoritative because it also owns post-test diagnostics, crash deltas, artifact
+composition, policy validators, and cleanup. If those required phases are stopped after all XCTest
+cases pass, the `.xcresult` remains useful partial evidence but the lane remains failed and must be
+rerun with a new ID. Never relabel the retained bundle or cite its test count as a complete PASS.
+
+### Focused smoke scenarios
+
+`--scenario` runs one journey alone. `record-then-play`, `studio-layout` and `long-form` are also
+part of full smoke; the others run only when named. `startup-retry` is described in the
+[app guide](ios-app-guide.md#startup--sourcesiosiosappbootstrapswift).
+
+**A retained long-form transcript, without regenerating.** For the deterministic harbor smoke
+fixture, first resolve the exact test-owned History ID from the retained run, then run:
 
 ```sh
 scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N --retain-result
@@ -93,9 +311,9 @@ It neither generates audio nor deletes/pins History. The private attachment rema
 missing, duplicate, malformed or cross-run attachments. Its result is **observed**, not full smoke,
 audio-quality, restoration or candidate acceptance. The separate required-step workflow preserves
 source identity, XCUITest status and crash collection without requiring a fabricated pressure event.
-It is unavailable in preinstalled-candidate mode. Normal smoke remains unchanged.
+It is unavailable in preinstalled-candidate mode.
 
-The PA-15 foreground-exit proof is a second focused smoke scenario:
+**Foreground exit (PA-15):**
 
 ```sh
 scripts/ui_test.sh ios smoke --scenario foreground-exit
@@ -109,14 +327,14 @@ reason `shutdown`, no `*_cancel_failed` event, exactly one cancelled app generat
 one, and a successful generation after the barrier (`check_ios_smoke_acceptance.py --scenario
 foreground-exit`).
 
-The record-then-play journey (AUD-02) also runs alone; a first run waits for the human-answered
-microphone and speech prompts:
+**Record then play (AUD-02).** A first run waits for the human-answered microphone and speech
+prompts:
 
 ```sh
 scripts/ui_test.sh ios smoke --scenario record-then-play
 ```
 
-The Studio layout check (RF-24) also runs alone, in a few minutes, and generates nothing. With the
+**Studio layout (RF-24).** It takes a few minutes and generates nothing. With the
 default text size pinned, each mode is prepared with its benchmark setup and an idle Generate must
 sit within 48 pt above the tab dock; Clone's canvas must carry no reference transcript, and its
 Reference panel must review it and follow an edit:
@@ -125,7 +343,7 @@ Reference panel must review it and follow an edit:
 scripts/ui_test.sh ios smoke --scenario studio-layout
 ```
 
-The long-form project journey (RF-18) also runs alone, in about 15 minutes. It pins Take
+**Long-form project (RF-18).** It takes about 15 minutes. It pins Take
 variation to Expressive through Settings and restores the original afterwards, so a persisted
 Consistent setting no longer decides the outcome (Consistent's long-form stalls are a 3.0 known
 limitation). It has no memory-pressure gate, because only the full smoke forces that event:
@@ -134,7 +352,7 @@ limitation). It has no memory-pressure gate, because only the full smoke forces 
 scripts/ui_test.sh ios smoke --scenario long-form
 ```
 
-The background warm-up check (BG-01) is another focused scenario:
+**Background warm-up (BG-01):**
 
 ```sh
 scripts/ui_test.sh ios smoke --scenario background-warmup
@@ -156,6 +374,57 @@ The long-form acceptance fixture removes its final separator space before entry 
 History comparisons use canonical input. Do not normalize the observed player value or ignore
 missing words/punctuation. On mismatch, the shared verifier retains the actual value before dismissal;
 keep the original failure and compare it with planner behavior before regenerating any output.
+
+### Local StoreKit purchase lane
+
+```sh
+scripts/ui_test.sh ios purchase --retain-result
+scripts/ui_test.sh ios purchase --scenario exports --retain-result
+```
+
+`VocelloiOSPurchaseUITests` drives the real purchase sheet over an `SKTestSession` on
+`Tests/Fixtures/VocelloExports.storekit`, a local fixture with an arbitrary $0.99 price that only
+the UI-test target bundles; shipping targets and schemes never activate it. No live Apple Account,
+charge, account edit, app-data deletion or production entitlement override is used. The native Xcode
+transaction environment and the fixture price must be proven before Buy or Restore. Preexisting
+local transactions block the run; test-owned transactions are deleted after success or failure and
+the app is terminated. A cleanup failure blocks acceptance, and a runner crash that prevents
+teardown needs the local session resolved before another attempt. Always pass `--retain-result`
+(the script does not refuse a run without it).
+
+- **`lifecycle`** (default, 13 phases): initial lock, restore without ownership, simulated
+  cancellation, purchase, relaunch, restore, revocation, an unverified purchase that stays locked
+  with its notice until Restore grants it once StoreKit verifies it (AUD-07), pending approval and
+  approval delivery. The cancellation arm reads back cleared error injection and resets session
+  options before the positive purchase: on the canonical phone, clearing the error alone left the
+  next transaction failing. Never replace that isolation with retries or a production bypass.
+- **`exports`** (29 phases): needs an accessible History clip in each mode and the installed Design
+  model. It takes StoreKit offline as the app sees it (Apple's fault injection fails product
+  loading, purchase and App Store sync while the phone stays connected) and checks that the unlock
+  survives a relaunch and a failed Restore. History-menu, full-player and Studio inline sharing are
+  checked while owned and revoked, with free Built-in controls and internal playback; it reuses one
+  visible-provenance row per mode and edits, pins or deletes none. It generates one short Design
+  take, which stays in History, for the inline card. System sharing is cancelled, never sent or
+  saved.
+
+The fixture observes the in-app interface language, selects English through Settings for its
+English assertions and restores the observed choice, also after a failure; process launch language
+alone does not override a saved in-app choice. The French system share sheet is closed by its stable
+`header.closeButton`. The test restores the History filter it snapshotted (not an assumed All), the
+Studio mode, Design brief and Design script, returns to the original tab after dismissing any modal
+and stops the app; background interruption never triggers foreground takeover during cleanup.
+
+`scripts/ios_purchase_acceptance.py --require-restoration` (the lane always passes it) writes
+`local-purchase-summary.json`. It accepts only the current result schema 5 with every ordered phase,
+the exact run and fixture identity and the transaction, tab, History-filter, Studio and app-stop
+restoration observations; older schemas stay readable but cannot qualify, and cross-scenario
+qualification is rejected. Zero-test bootstrap failures stay failed infrastructure runs, never
+retries or purchase passes. The `.xcresult`, screenshots, source receipt and crash delta stay
+untracked.
+
+Neither scenario qualifies the live App Store's offline cache, the App Store sandbox or the
+processed TestFlight candidate; the [submission runbook](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)
+owns those checks (RF-12).
 
 ### Already installed distribution candidate
 
@@ -179,7 +448,7 @@ These are **black-box journeys** on the installed candidate, not the instrumente
 | `long-form` | a long-form project, then one segment regenerated |
 | `accessibility` | XCTest's audit on Studio, Settings and the purchase sheet; clipping at AX-XXXL |
 | `all` | every row above, in one run |
-| `first-launch` | onboarding when it shows, then every shipping model that is not installed, started from its Download or Retry control bottom row first (`pro_clone`, `pro_design`, `pro_custom`) in Voice Models; run it first on a fresh install, never inside `all`. On a set-up phone it reinstalls only the missing models, which is how RF-35's Wi-Fi reinstall runs. Its kept `first-launch-outcome` attachment says whether it walked onboarding and which models it downloaded, and only a run that walked onboarding is first-launch evidence |
+| `first-launch` | onboarding when it shows, then every shipping model that is not installed, started from its Install or Retry control, bottom row first (`pro_clone`, `pro_design`, `pro_custom`) in Voice Models; run it first on a fresh install, never inside `all`. On a set-up phone it reinstalls only the missing models, which is how RF-35's Wi-Fi reinstall runs. Its kept `first-launch-outcome` attachment says whether it walked onboarding and which models it downloaded, and only a run that walked onboarding is first-launch evidence |
 
 The journeys share `VocelloiOSUITestCase` and `VocelloiOSSharedJourneys.swift` with the development
 lanes. In a candidate session the app gets no environment, and launch arguments only for standard
@@ -265,246 +534,7 @@ maintainer's. A computer-use record closes a row only when the maintainer confir
 After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the
 test, time and failure flag), report-only.
 
-### Development-device preflight
-
-```sh
-scripts/ios_device.sh preflight
-scripts/ios_device.sh device-state
-```
-
-`preflight` and `device-state` verify the paired CoreDevice identity and reachability; preflight
-also checks the selected Xcode's iOS Platform Support, signing, and the existing app-build and dSYM
-readiness. Signing readiness means a currently valid **Apple Development certificate and its
-private key** for the selected team—not merely a team environment value, an expired certificate,
-or an Apple Distribution identity. The privacy-safe
-`scripts/lib/ios_signing_identity.py` helper distinguishes expiration, a missing private key,
-team mismatch, and a missing certificate before package resolution or compilation. Repair an
-expired/missing identity in Xcode → Settings → Accounts → Manage Certificates; do not revoke or
-regenerate unrelated distribution identities. `device-state` treats
-reachability as its only blocker. The XCUITest runner independently rejects a phone that
-CoreDevice reports as locked before invoking `xcodebuild`. Install or repair iOS models through the
-visible Settings → Voice models section; neither device scripts nor normal UI tests install them.
-The sole exception is the separately selected `scripts/ui_test.sh ios model-download` lifecycle
-diagnostic, which uses an isolated app-support root and is never part of smoke or benchmark.
-
-The remaining plain verbs are the pieces the lanes above compose: `doctor` is the environment and
-device preflight, `build` the signed device build (`-Onone`; `--optimized` is the shipped topology),
-`install` installs that build, `launch [spec]` starts it (with the diagnostics runner when a spec is
-given), `console [spec]` is an attached launch streaming the diagnostics stdout live, `logs [spec]`
-tees the same stream to `build/artifacts/diagnostics/ios/logs/<run>.log`, `debug [spec]` is an
-attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [dest]` copies the
-app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
-[--count N]]` emits machine-readable reachability, optionally polling. A diagnostics spec is
-`<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
-`mirroring status [--json]|session LABEL|capture LABEL --step TEXT [--observed TEXT]|stop` runs
-the computer-use records ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)):
-`status` says whether iPhone Mirroring runs and whether the phone is reachable and locked,
-`session` starts a record bound to the source commit and the installed version and build,
-`capture` saves the Mirroring window with one step line, and `stop` quits iPhone Mirroring, which
-`ui-preflight` requires before any XCUITest lane. Records stay untracked under
-`build/artifacts/ios/mirroring` and are never lane evidence.
-
-### Device gate (`scripts/ios_device.sh gate`)
-
-```sh
-scripts/ios_device.sh gate                            # project inputs → device preflight → headless generation → crashes → verdict
-QVOICE_GATE_SKIP_GENERATION=1 scripts/ios_device.sh gate   # same gate without the generation step or history publication
-```
-
-The gate is the explicit physical-device deterministic/runtime diagnostic, not part of `scripts/dev.sh
-check` or push CI. Its required steps are `project-inputs` (`check_project_inputs.sh`),
-`device-preflight` (the `preflight` verb above), `generation` (a fresh `build` and `install` of the
-exact local binary, then one headless Speed take through the diagnostics runner; it needs the Speed
-model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
-generation take; every step lands in a required-step ledger with the verdict under
-`build/artifacts/ios/gates/<run>/`. It requires 15 GiB of host free space and a quiet
-host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint policy above.
-
-### Explicit screen protection after device work
-
-When the maintainer authorizes Auto-Lock restoration, use the existing physical-device XCUITest
-runner to inspect the real Settings route before unattended work, then enable the timer after
-all device work and collection have ended:
-
-```sh
-scripts/ui_test.sh ios screen-protection --scenario inspect --retain-result
-scripts/ui_test.sh ios screen-protection --scenario enable --retain-result
-```
-
-The default is read-only `inspect`. Only explicit `enable` chooses **3 minutes** and verifies the
-persisted value on the parent Settings row. English and French Settings are supported, including
-**Luminosité et affichage → Verrouillage automatique**; an unknown, restricted, or unavailable
-control fails rather than claiming protection. No other setting or Vocello data is changed.
-The test returns to Home; its retained `screen-protection.json` and screenshots distinguish
-route inspection from a verified timer change. It never runs implicitly during another lane.
-Auto-Lock readback is not proof the screen is already locked or that Always-On Display is off.
-Confirm the eventual lock separately with the read-only CoreDevice `device info lockState`
-command using the device identifier resolved by preflight and an untracked JSON output file.
-Use the raw current `passcodeRequired` field; `unlockedSinceBoot` describes historical unlocking,
-not whether the device is currently unlocked. The corrected probe derives `deviceLocked` only
-from a typed current `passcodeRequired` value; missing or malformed values stay unknown. Older
-probe outputs using historical unlock state are not protection evidence. Retain raw readbacks
-privately. `scripts/ios_device.sh device-state` proves reachability, not lock state. Do not start
-another device lane after final protection. If this route fails, stop unattended device work and
-report that protection still requires operator action.
-
-### Restoring Take variation
-
-A journey that pins Take variation (the long-form journey pins Expressive) restores the original
-on exit. When that cleanup cannot run, as when an interruption left the History search keyboard
-covering the tab dock on 2026-10-20, restore it explicitly:
-
-```sh
-scripts/ui_test.sh ios take-variation --scenario inspect
-scripts/ui_test.sh ios take-variation --scenario consistent
-```
-
-The default `inspect` reads the selection through the visible Settings control and changes
-nothing. A named value (`expressive`, `balanced` or `consistent`) selects it through the same
-control and verifies the readback; the retained `take-variation.json` records the value before
-and after. It never runs as part of another lane.
-
-## Explicit XCUITest lanes
-
-Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
-exact model-status assertions do not depend on the phone's language. They read the saved App
-Language choice from the Settings root row's value, open the genuine picker only to change it,
-temporarily select System Default, and restore the original choice during session cleanup. They never write global `AppleLanguages` preferences.
-The Settings `localization` walk explicitly overrides the process language for French-Default
-(including translated title and variation-value assertions), in addition to Default, AX-L,
-AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
-neither a default-language pass nor a compile substitutes for bilingual device acceptance.
-
-The development lanes build once per source tree: `build-for-testing` writes its log to
-`<run>/xcodebuild-build.log` (copied to `xcodebuild.log` on failure, so signing and provisioning
-failures still classify as infrastructure), then `test-without-building` runs the `.xctestrun`.
-A marker in the iOS DerivedData binds the build inputs' fingerprint (`tree_fingerprint.py
---build-inputs`), the Xcode version, the phone, the team and the digests of the app, the test
-bundle and the `.xctestrun`; while all of them match, the lane prints `build-for-testing skipped`
-and tests the existing products. A product another build overwrote (a routed check that compiled
-the UI bundles, `ios_device.sh build`) changes a digest and is rebuilt, never tested. Both halves
-run inside the `xcuitest` step.
-
-Smoke diagnostics are collected before the aggregate failure exit, including when XCTest fails.
-A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
-If an older runner omitted collection, preserve its failed ledger and put any recovered telemetry
-in a separate supplemental bundle with original run identity and digests; never rewrite the run
-as PASS. Collection ordering is owned by `scripts/ui_test.sh` itself; the 2026-09-05 shell fixture
-that reproduced the missing-collection failure was a source-text test and was removed on
-2026-09-12.
-
-Serialize macOS and iOS `xcodebuild` commands: the host-wide native lock is held throughout XCTest,
-not just build/package resolution, across every checkout and agent worktree. A concurrent native
-command waits for it (and names the holder each minute). Run read-only analysis or Python fixtures alongside a device lane instead;
-do not bypass the lock or clear a cache to resolve legitimate contention.
-
-After adding, moving or deleting files under a globbed Xcode target, regenerate the project with
-`./scripts/regenerate_project.sh` in the same commit (see
-[development-workflow.md](development-workflow.md)).
-
-```sh
-scripts/ui_test.sh ios smoke
-scripts/ui_test.sh ios localization
-scripts/ui_test.sh ios benchmark
-# Filtered benchmark example:
-scripts/ui_test.sh ios benchmark --modes custom --lengths short --warm 1 --label "focused"
-
-# Source-bound exhaustive control and pairwise-generation audit:
-scripts/ui_test.sh ios control-audit --scenario inventory --retain-result
-scripts/ui_test.sh ios control-audit --scenario stateful --retain-result
-scripts/ui_test.sh ios control-audit --scenario external --retain-result
-scripts/ui_test.sh ios control-audit --scenario accessibility --retain-result
-scripts/ui_test.sh ios control-audit --scenario generation --take-limit 5 --retain-result
-scripts/ui_test.sh ios control-audit --scenario all --retain-result
-scripts/ui_test.sh ios control-audit --scenario all --resume RUN_ID --retain-result
-
-# UI-performance frame-health lane (ios-ui-2026-08):
-scripts/ui_test.sh ios perf [--label RUN_ID]
-
-# Explicit isolated background-transfer diagnostics, not a normal UI lane:
-scripts/ui_test.sh ios model-download --scenario diagnose
-scripts/ui_test.sh ios model-download --scenario queue
-scripts/ui_test.sh ios model-download --scenario acceptance
-scripts/ui_test.sh ios model-download --scenario soak --iterations 3
-scripts/ui_test.sh ios model-download --scenario recover
-scripts/ui_test.sh ios model-download --scenario acceptance --engine-profile legacy|chunked|chunked-multisession|chunked-bounded
-
-# Opt-in diagnostic and acceptance lanes that never run in smoke, benchmark, CI, or release:
-scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
-scripts/ui_test.sh ios purchase [--scenario lifecycle|exports] --retain-result
-```
-
-`--engine-profile` selects the download engine the lifecycle proof exercises; `delivery-cohort`
-runs N identical Neutral Custom takes through the production UI as a delivery-consistency
-diagnostic and never publishes benchmark history; `purchase` is the focused local StoreKit lane
-(`VocelloiOSPurchaseUITests` over an `SKTestSession` on the bundled test fixture, never a live
-account; `--scenario exports` additionally exercises the export surfaces) and its documented
-invocation always passes `--retain-result` (the script does not refuse a run without it).
-`--scenario exports` takes StoreKit offline as the app sees it (Apple's fault injection fails
-product loading, purchase and App Store sync while the phone stays connected to the Mac), then
-checks that the unlock survives a relaunch and a failed Restore and that every owned export goes
-through; it checks existing History rows and the full player for every mode, owned and revoked, and
-generates one short Design take (the Design model must be installed; the take stays in History like
-any smoke take) so the Studio inline card is checked on each side of the refund; it puts back the
-Studio mode, Design brief and Design script it changed, and reports that restoration (result schema
-4).
-The purchase fixture observes the in-app interface language, selects English through Settings for
-its English notice assertions, and restores the observed choice during cleanup, including after
-failure. Process launch language alone does not override a saved in-app language preference.
-`--retain-result` on any lane writes an untracked `retention-pin.json`
-into the run artifact so routine UI-result pruning keeps it; remove the pin only after the
-evidence set is retired.
-
-The iPhone matrix keeps the shared short/medium/long ordering; its long script is the historical
-150-character text from the era of the 150-character limit, kept fixed for benchmark-history
-comparability (the shipping single-take limit is 900, memory-qualified 2026-07-24). macOS retains
-the extended >220-character long corpus; the iPhone lane never bypasses the user-facing limit.
-
-| Lane | Scope |
-| --- | --- |
-| Smoke | Four journeys. Standard: exact app launch, Studio mode and tab navigation, visible model and clone-reference readiness, one visible user cancellation, one run-scoped critical-memory cancellation with cancel-before-unload diagnostics, post-pressure engine reuse, no cancelled History rows, and one real completed Custom History row. Long-form: a >2,000-character script routes to a project, streams every segment with live narration, surfaces the joined output in the inline player, and History shows search-flattened rows plus the grouped project with its expandable per-segment map. Record then play (AUD-02): a clip recorded from Clone's reference plays to its end in the save sheet's review, and the sheet closes without saving. Dock layout (RF-24): each Studio mode, prepared with its benchmark setup, keeps an idle Generate just above the tab dock; nothing is generated |
-| Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
-| Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
-| Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
-| Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
-
-Smoke explicitly selects those four journeys; the class's other tests run only in their own lane or
-named scenario. The Settings layout walk is selected only by
-the separate `localization` lane; running smoke does not repeat it. Model-dependent journeys require
-the current catalog's Ready state: an installed model showing Update Available is not readiness proof.
-
-The control-audit accessibility lane checks targets and `.textClipped` at Default, AX-L,
-AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a forced size. The system
-clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
-retained screenshots as well; automatic PASS alone does not establish untruncated visual reflow.
-
-The stateful lane registers observed original toggle/variation values before mutation and awaits
-its session cleanup through XCTest teardown, including after assertion aborts. Failed or skipped
-restoration remains failure; never replace an unknown original value with a default. The inventory
-and simple saved-voice enrollment journeys still need equivalent preservation of Studio selections,
-draft and consent before use against personal state; do not infer that protection from the stateful
-lane. See the current checkpoint for this explicit acceptance limitation.
-
-Settings reveal uses the shared test-only `VocelloUISettingsReveal` helper. It preserves full
-visibility and whole-dock clearance while issuing slow native touch swipes on wholly visible
-static-text descendants of one genuine containing scroll view, never full-window or coordinate
-gestures. Anchors are bounded to half the safe viewport, independent of the remaining reveal delta,
-so expanded descriptions can remain usable when there are no short labels. Missing/ambiguous
-containers, an unsafe container center or no wholly visible bounded text anchor fail closed.
-Pointer-based `scroll(byDeltaX:deltaY:)` is not supported on the touch-only iPhone. Native swipe
-distance is not controlled by the requested reveal delta or velocity. Each gesture is followed by
-a fresh geometry sample; direction reversal reduces the search step limit, unchanged frames stop
-the search, and oversized full-visibility requirements remain failures. The separate navigation-only
-band is not layout acceptance. Retained pre-gesture and failure attachments include sampled frames
-and desired movement. Host geometry tests do not prove actual UIKit scrolling; new physical
-AX-XXXL/pseudo acceptance is required after changes.
-
-Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
-condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,
-OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf scenario file is the
-one recorded exemption (`scripts/repo_invariants.sh`): its paced sleeps ARE the measured
-workload, and its sweep gestures anchor on the application root so deep per-event accessibility
-re-queries stay out of the measured windows.
+### Control audit
 
 The control-audit plan is generated before Xcode contacts the phone:
 
@@ -524,27 +554,6 @@ source identity and assigns only the terminal vocabulary in
 [current checkpoint](../development-progress.md) routes to the primary roadmap.
 Do not repeat completed phases merely for a green aggregate or reuse a token after source changes.
 `--retain-result` pins the bundle before Xcode starts, including legacy-shaped metadata.
-
-## Pause and resume
-
-1. Set the phone deadline before starting; reserve at least 20 minutes for collection/restoration.
-   The release-first campaign starts with five takes, then may use up to 20 per invocation only
-   after correlation and preservation succeed, splitting at mode boundaries and deadlines.
-2. Stop between terminal, fully collected shards. If interruption is necessary, stop only the
-   exact owned process and preserve the failed/partial run; never convert it to PASS.
-3. Verify diagnostics, crash delta, observations, artifact digests, cleanup/restoration, and
-   test-owned app termination. Run `scripts/clean_build_caches.sh --prune-ui-results --dry-run`
-   and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
-4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
-   rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
-5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
-   and the current narrative. A changed full-tree identity requires new acceptance identity;
-   previous results remain history, never merged current-source PASS.
-6. Before resume, use the runner's schema/identity/artifact validation. Never guess a cursor,
-   retry a failed cell, replace a seed, or infer restoration from a green XCTest counter.
-7. If authorized, finish with the screen-protection procedure and independent lock readback.
-   No further device UI follows final protection.
 
 The RF-07 runner defaults generation/all to **five takes per invocation**; `--take-limit 1..201`
 sets an explicit bounded shard and `--resume` selects its source-bound start. The immutable plan
@@ -568,10 +577,6 @@ History text entry waits for the real field and keyboard before one replacement,
 value. No automatic test/generation retry is added. These source repairs require a physical pilot.
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
 
-Historical pilot failures, including missing warm/capture evidence, are in git
-history. Never infer a PASS from an
-optional ledger subtotal when mandatory correlation or artifact evidence fails.
-
 New generation/all runs declare `controlEvidenceVersion: 2`. Their dedicated
 `ui-ios-control-audit-generation` required-step workflow makes device correlation mandatory.
 Correlation schema v2 overrides UI-only row PASS on missing or divergent evidence; missing
@@ -589,20 +594,6 @@ purgeable Caches diagnostics root and the ignored, pinned host run bundle; captu
 host qualification rather than synthesis. Retain failed/warning evidence for investigation.
 Resume validates correlation/observation digests and all retained artifact bytes before selecting
 the next row. Original schema-v1 reports remain historical evidence; do not upgrade or rewrite them.
-
-For a time-limited phone window, set the stop deadline before launching a lane and reserve time
-for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.
-Finish device collection and confirm test-owned app termination before releasing the phone;
-documentation, deterministic checks, and publication can continue on the host afterward. If work
-must be interrupted, stop only the exact owned process, preserve its failure/partial evidence,
-and record the last terminal observation plus unattempted work. A passing XCTest counter alone
-cannot authorize a passing lane or a resume token.
-
-Lane qualification is deliberately stricter than the XCTest counter. The `ui_test.sh` terminal
-status is authoritative because it also owns post-test diagnostics, crash deltas, artifact
-composition, policy validators, and cleanup. If those required phases are stopped after all XCTest
-cases pass, the `.xcresult` remains useful partial evidence but the lane remains failed and must be
-rerun with a new ID. Never relabel the retained bundle or cite its test count as a complete PASS.
 
 Generation resume state is schema-versioned and fail-closed. A failed take that already emitted a
 terminal `PRODUCT_FAIL`, `HARNESS_FAIL`, or `INFRASTRUCTURE_FAIL` observation remains represented,
@@ -684,9 +675,54 @@ record. Warn-only ceilings live in
 sessions; a breach marks the scenario and run `passedWithWarnings`, never
 failed), and on the canonical iPhone profile a PASS emits registry evidence
 and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
-([`ios-ui-refresh-2026-08.md`](../audits/2026-08-29-ios-ui-refresh.md)).
+([iOS UI refresh audit](../audits/2026-08-29-ios-ui-refresh.md)).
+
+## Pause and resume
+
+1. Set the phone deadline before starting; reserve at least 20 minutes for collection/restoration.
+   The release-first campaign starts with five takes, then may use up to 20 per invocation only
+   after correlation and preservation succeed, splitting at mode boundaries and deadlines.
+2. Stop between terminal, fully collected shards. If interruption is necessary, stop only the
+   exact owned process and preserve the failed/partial run; never convert it to PASS.
+3. Verify diagnostics, crash delta, observations, artifact digests, cleanup/restoration, and
+   test-owned app termination. Run `scripts/clean_build_caches.sh --prune-ui-results --dry-run`
+   and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
+4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
+   rows and the validated next command in the existing untracked run checkpoints. Do not edit
+   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
+5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
+   and the current narrative. A changed full-tree identity requires new acceptance identity;
+   previous results remain history, never merged current-source PASS.
+6. Before resume, use the runner's schema/identity/artifact validation. Never guess a cursor,
+   retry a failed cell, replace a seed, or infer restoration from a green XCTest counter.
+7. If authorized, finish with the screen-protection procedure and independent lock readback.
+   No further device UI follows final protection.
+
+For a time-limited phone window, set the stop deadline before launching a lane and reserve time
+for its diagnostics and teardown. Do not launch work that cannot fit the remaining window.
+Finish device collection and confirm test-owned app termination before releasing the phone;
+documentation, deterministic checks, and publication can continue on the host afterward. If work
+must be interrupted, stop only the exact owned process, preserve its failure/partial evidence,
+and record the last terminal observation plus unattempted work. A passing XCTest counter alone
+cannot authorize a passing lane or a resume token.
 
 ## Headless device diagnostics
+
+### Device gate (`scripts/ios_device.sh gate`)
+
+```sh
+scripts/ios_device.sh gate                            # project inputs → device preflight → headless generation → crashes → verdict
+QVOICE_GATE_SKIP_GENERATION=1 scripts/ios_device.sh gate   # same gate without the generation step or history publication
+```
+
+The gate is the explicit physical-device deterministic/runtime diagnostic, not part of `scripts/dev.sh
+check` or push CI. Its required steps are `project-inputs` (`check_project_inputs.sh`),
+`device-preflight` (the `preflight` verb above), `generation` (a fresh `build` and `install` of the
+exact local binary, then one headless Speed take through the diagnostics runner; it needs the Speed
+model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
+generation take; every step lands in a required-step ledger with the verdict under
+`build/artifacts/ios/gates/<run>/`. It requires 15 GiB of host free space and a quiet
+host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint policy above.
 
 `bench`, `lang-bench`, `speech-assets`, `profile`, `memory`, and the deliberate crash diagnostic launch
 `IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts. `bench`
@@ -764,6 +800,8 @@ Privacy). Headless lanes cannot record it: `enroll-clone-fixture`, clone diagnos
 `memory` and `clone-conditioning` then fail with the named reason `clone-consent-not-recorded`, and
 `scripts/ios_device.sh` prints the fix. Turn the toggle on once on the phone, or run a UI lane
 that calls `ensureCloneConsentEnabled()` (for example `scripts/ui_test.sh ios enroll-clone-fixture`).
+
+## Voice identity and language reliability diagnostic
 
 Clone identity, enrollment-transcription, and French Voice Design reliability use a separate
 source-bound diagnostic that extends the same headless runner. It is read-only with respect to the
@@ -900,6 +938,8 @@ duration, lower is faster; the older inverted figure is `decodeSpeedupX`) and bi
 validate` rejects a newer record without the definition, and pre-cutover records never share a
 comparison key with a new one.
 
+### Instruments profiles
+
 Profile commands launch or attach to the exact target PID, record CPU Profiler and `os_signpost`
 rows in one trace, require a successful tracer exit, and verify the trace using exported
 table-of-contents data plus non-empty performance-row and correlated-signpost exports. Traces remain local; a successful profile
@@ -958,6 +998,8 @@ its separate tracer-stage 5/15 GiB CPU/memory check. Because every profile rebui
 the full CPU-profile command is also subject to the 10 GiB device-build floor; memory remains
 15 GiB.
 
+### Retained-memory qualification
+
 Retained-memory qualification is separate from Instruments:
 
 ```sh
@@ -1003,10 +1045,11 @@ generation IDs/cells and verdicts. A PASS publishes one privacy-safe record unde
 `benchmarks/runs/ui-generation/` and regenerates `benchmarks/HISTORY.md`. Raw pulled JSONL, WAVs,
 screenshots, traces, and `.xcresult` stay untracked; publication never stages, commits, or pushes.
 
-Physical-iPhone acceptance of telemetry v8/evidence v2 is complete for the clean canonical
-[29-take UI matrix](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json),
-[retained-memory qualification](../../benchmarks/runs/memory-qualification/ios-memory-qualification-20260714-112536-32554d95.json),
-and the exact-PID [memory profile](../../benchmarks/runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json).
+Physical-iPhone acceptance of telemetry v8/evidence v2 was first completed in July 2026 (the
+exact-PID [memory profile](../../benchmarks/runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json)
+is still the latest). The newest canonical records are RF-17's at build 26's tag on 2026-10-27: the
+[29-take UI matrix](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20261027-175531-87319beb.json)
+and the [retained-memory qualification](../../benchmarks/runs/memory-qualification/ios-memory-qualification-20261027-165940-7fcd6b35.json).
 Each record proves only its exact source, toolchain, model, and hardware identities; repository
 contract tests and Simulator results never substitute for fresh physical-device evidence after a
 relevant change.
@@ -1030,8 +1073,3 @@ and never an archive, upload, or Git-publishing prerequisite.
 
 See also [`testing-runbook.md`](testing-runbook.md) and
 [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).
-
-## Historical checkpoint references
-
-Dated run logs, through the 2026-09-02 control-audit continuation, live in git history. They are
-evidence, not the next commands to execute.

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-27
+reviewed: 2026-10-28
 summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.0 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -64,7 +64,8 @@ code, an SDK, an account, analytics, or a non-Apple purchase path.
 
 ### ASR-09: model downloads are verified for North America only
 
-3.0 is sold worldwide, but download verification covers North America only, where App Review runs.
+3.0 is available in 148 territories outside the EU (since 2026-10-27), but download verification
+covers North America only, where App Review runs.
 - **Existing evidence:** the North America proof of 2026-09-01 (full digests of the three largest
   iOS files) is the evidence class.
 - **Before submission:** one fresh full-artifact North America proof runs within its 24-hour
@@ -166,36 +167,26 @@ A qualified decision is complete only when it records:
 ASR-04 may move to `done` only after all rows have an affirmative qualified decision or the affected
 asset/surface has been removed and the removal is verified in source and the release artifact.
 
-Currency review (2026-09-04, status reconciled 2026-09-26): the roadmap has kept ASR-04 `parked`
-since 2026-09-26 — source remediation is shipped, and only the qualified counsel decisions above remain open. A fresh authenticated,
-read-only App Store Connect inventory again found the third-party-content declaration; it proves only
-the account field and does not replace the qualified model-redistribution, voice/publicity,
-cloned-reference consent, marketing-audio, or artwork decisions above. The exact source-bound bundled
-attribution implementation remains complete. ASR-11 separately owns pricing/availability,
-accessibility, privacy, financial, and regional account fields.
+ASR-04 stays `parked`: source remediation and the bundled attribution are shipped, and only the
+decisions above remain open. The third-party-content declaration proves only the account field; it
+does not replace the model-redistribution, voice/publicity, cloned-reference consent,
+marketing-audio or artwork decisions. ASR-11 separately owns pricing/availability, accessibility,
+privacy, financial and regional account fields.
 
 ## Consolidated RF-02 decision checkpoint
 
-The September 5 read-only inventory again confirms `USES_THIRD_PARTY_CONTENT`, the configured
-Support URL, and no existing App Store build for source 3.0.0/build 24. The current iOS version
-record does not match 3.0.0; pricing/availability and configured-version readiness remain
-unavailable. **Superseded on 2026-10-12 (RF-02):**
-- version 3.0.0 replaced the 1.0 draft;
-- the app is free in 175 territories, iPhone only;
-- the age rating is 4+;
-- App Privacy is published as Data Not Collected.
-
-The rows below record what each decision needed, with the outcome where it is decided. This
-packet groups the outstanding decisions without creating another status ledger
-or authorizing account changes. Retained summaries live in the ignored `rf02-20260905-readonly`
-artifact directory.
+On 2026-10-12 (RF-02) version 3.0.0 replaced the 1.0 draft, the app became free and iPhone only,
+the age rating became 4+, and App Privacy was published as Data Not Collected; the account keeps
+`USES_THIRD_PARTY_CONTENT` and the configured Support URL. The rows below record what each decision
+needed, with the outcome where it is decided. This packet groups the decisions without creating
+another status ledger or authorizing account changes.
 
 | Decision and authority | Owner class | Evidence needed to close |
 | --- | --- | --- |
 | Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels. **Decided 2026-10-12:** Data Not Collected, on the facts recorded under ASR-02 above, and published the same day. |
 | Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. |
 | Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
-| Distribution profile and entitlements — ASR-10 | Signing/release owner | Decode the exact profile, match private-key identity and entitlements, then verify the command-bound archive/IPA. Local identity availability and earlier remote capability reads are not archive evidence. |
+| Distribution profile and entitlements — ASR-10 | Signing/release owner | **Done 2026-10-24:** release run 40103005257 archived, exported and verified build 24's IPA (entitlements, signing identity, profiles); every later candidate repeats the verification. |
 | Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02). Remaining: check the encryption declaration against the processed candidate. |
 | Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). **Decided 2026-10-27:** 3.0 ships outside the EU for now rather than publish a home address; the 27 EU territories were removed (148 remain) and the account and Vocello are declared non-trader with no EU distribution intended, applied on the maintainer's explicit instruction. The EU release needs trader status first (BKL-41). Remaining: the updated Apple Developer Program License Agreement, the Paid Apps agreement, banking and tax, which are the account holder's. The agent cannot accept agreements or provide legal clearance. |
 
@@ -212,14 +203,14 @@ Keep any vendor inquiry or private legal correspondence untracked and send it on
 authorization. One consolidated private review can resolve these rows; a missing decision remains
 an external dependency, not an inferred approval. Publication/submission stays separately gated.
 
-### September 6 owner checkpoint and timing
+### Owner checkpoint and timing
 
-Use the six decision rows above as one maintainer checkpoint, not repeated account polling.
-Since 2026-10-12 the maintainer records these decisions directly; no paid reviewer is engaged. The account holder supplies pricing,
-territories, review contact and applicable agreement/regional decisions. The signing owner supplies
-the approved profile/private-key match and authorizes candidate operations separately. Record only
-sanitized decision, date, scope and evidence digest in the repository; private correspondence stays
-untracked. Missing responses keep ASR-02/04/08/10/11 blocked, not implicitly approved.
+Use the decision rows above as one maintainer checkpoint, not repeated account polling. Since
+2026-10-12 the maintainer records these decisions directly; no paid reviewer is engaged. The account
+holder supplies pricing, territories, review contact and applicable agreement/regional decisions;
+the signing owner authorizes candidate operations separately. Record only sanitized decision, date,
+scope and evidence digest in the repository; private correspondence stays untracked. A missing
+response keeps its item (ASR-04, ASR-11) blocked, not implicitly approved.
 
 ASR-09 verifies North America only for 3.0 (see the 2026-10-12 decisions above). Run its
 full-artifact host proof only near submission: its freshness window is **24 hours**. Do not purchase

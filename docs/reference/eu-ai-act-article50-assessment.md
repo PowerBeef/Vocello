@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-10-28
 summary: Point-in-time research assessment (2026-08-06) of the EU AI Act's Article 50 synthetic-content marking obligations — what the law requires, whether and how it applies to Vocello, the gap at assessment time (since closed by the CP-2 marking seam; see the status updates), and maintainer decision points. Not legal advice.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -13,6 +13,11 @@ sourceOfTruth:
 > **It is not legal advice**; the applicability questions below include genuine legal gray
 > zones that only a qualified adviser (or, eventually, regulators and courts) can settle.
 > Sources are linked at the end; all were retrieved 2026-08-06.
+>
+> **Since then (2026-10-28):** every 3.0.0 take carries the marking (§2 and §5 status updates):
+> the Mac app and CLI are public, and the iPhone app is in its TestFlight beta; its App Store
+> availability excludes the 27 EU territories (BKL-41). Options B and E and a legal review stay
+> gated as CP-1 recorded.
 
 ## 1. The law, precisely
 
@@ -78,8 +83,8 @@ Verified against the tree at this assessment's date:
 So if Article 50(2) applies, Vocello at this assessment's date satisfied none of it: outputs
 were indistinguishable, by bytes, from any other 24 kHz mono PCM WAV.
 
-> **Status update (CP-2, 2026-08).** The gap above is being closed in the tree: every
-> published WAV now passes a publication-marking seam in `GenerationOutputAdapter`
+> **Status update (CP-2, 2026-08).** The gap above was closed in the tree and ships in 3.0.0: every
+> published WAV passes a publication-marking seam in `GenerationOutputAdapter`
 > (`Sources/QwenVoiceCore/AudioPublicationMarking.swift`) that embeds an imperceptible
 > AudioSeal watermark with a fixed Vocello payload (owned MLX port,
 > `Packages/VocelloQwen3Core/Sources/MLXAudioMark/`, parity-proven against the PyTorch

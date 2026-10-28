@@ -1,8 +1,8 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-25
-summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
+reviewed: 2026-10-28
+summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, deletion semantics, diagnostics, and the repository's build-output ownership.
 sourceOfTruth:
   - Sources/SharedSupport
   - Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
@@ -10,7 +10,7 @@ sourceOfTruth:
 ---
 # Privacy And Local Storage
 
-QwenVoice/Vocello performs generation and reference transcription locally; the app does not upload
+Vocello performs generation and reference transcription locally; the app does not upload
 prompts, reference clips, transcripts, saved voices, generated audio, or History for inference.
 Users can explicitly export or share their content. Separately, operating-system backups may
 include user data: the iOS storage policy includes voices, outputs, History, and its outbox in
@@ -137,8 +137,6 @@ group.com.patricedery.vocello.shared
 
 Its shared container is rooted under the app-owned `Vocello` subtree and is managed by `Sources/iOSSupport/Services/AppPaths.swift`.
 
-The May 2026 iOS identity rename moved pre-release storage from the old QVoice App Group to this Vocello App Group without migration, so device builds after the rename start with fresh iPhone data.
-
 Repository-built internal diagnostics binaries honor this hermetic iPhone override only with the
 `QWENVOICE_DEBUG` master gate enabled; distributed builds cannot enable it:
 
@@ -255,15 +253,14 @@ Backup behavior is intentional rather than inherited:
   and its WAL/SHM sidecars, so a prior file cannot keep stale attributes indefinitely.
 
 Catalog-v2 shared model blobs are deliberately published with mode `0444` and hard-linked into
-each installed model. On 2026-09-02 a signed-device launch proved that recursively applying backup
-and data-protection metadata could fail on one of those immutable links before the app finished
-initializing. Bootstrap now opens an owner-write-only metadata window for an existing read-only
-regular file, applies the governed attributes, and restores the exact original mode even when the
-metadata operation throws. This does not weaken the protection class, make model content
+each installed model, and applying backup and data-protection metadata to one of those immutable
+links can fail (seen on a signed device on 2026-09-02). Bootstrap therefore opens an
+owner-write-only metadata window for an existing read-only regular file, applies the governed
+attributes, and restores the exact original mode even when the metadata operation throws. This does not weaken the protection class, make model content
 persistently writable, or create another model owner; policy application still completes before
 the engine and background delivery coordinator are created.
 
-Since PA-21 (audit IOS-06) the pass runs off the main actor while the launch mark shows, and the
+The pass runs off the main actor while the launch mark shows (PA-21, IOS-06), and the
 dependencies are built on the main actor only after it returns. The root and every governed
 directory must take the policy, or startup shows the failure with Retry. A single descendant file
 that cannot be updated is counted and retried on the next launch instead of stopping startup. The
@@ -368,6 +365,8 @@ generation mode, text length, streaming flag, timestamp, and privacy-safe reques
 identities. It never stores prompts, transcripts, delivery copy, voice descriptions, paths, URLs,
 reflected/localized errors, stack symbols, credentials, email addresses, or arbitrary metadata.
 The logger exposes a local clear operation; it never uploads the file.
+
+## Repository build output
 
 Repository-local build and QA state lives under the ignored `build/` tree. Its machine-readable
 contract is `config/build-output-policy.json`; `scripts/build_output_policy.py validate` rejects an

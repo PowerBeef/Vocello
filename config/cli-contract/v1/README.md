@@ -68,8 +68,8 @@ v1 changes only by addition.
 
 `cli_contract.py validate` fails when the tables, schemas or examples disagree, when anything in
 `baseline.json` was removed or reclassified, when something new is not recorded there, and when the
-exit-code table of `docs/reference/cli.md` (once it has one: a table whose header starts with "Exit" and
-has a "Category" column) differs from `exit-codes.json`.
+exit-code table of `docs/reference/cli.md` (the table whose header starts with "Exit" and has a
+"Category" column) differs from `exit-codes.json`.
 
 ## Reading the output from Python
 

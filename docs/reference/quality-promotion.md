@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-10-28
 summary: Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.
 sourceOfTruth:
   - config/quality-promotion-contract.json
@@ -18,6 +18,12 @@ only GitHub publication route and requires `quality-promotion.json` for the exac
 The same boundary applies to iOS: archive/export and internal TestFlight upload remain useful
 candidate-validation steps; external TestFlight distribution, App Review submission, and public
 App Store release require a validated iOS promotion manifest.
+
+Two recorded maintainer exceptions sit outside this route. The Mac app and CLI 3.0.0 were
+published on 2026-10-23 without a promotion record (RF-10 records it and keeps the canonical
+benchmark and promotion lanes open), and iPhone build 26 joined the TestFlight Public Beta under a
+one-time RF-17 waiver of 2026-10-26. Neither changes the rule: App Review still requires the
+validated iOS manifest (RF-17), and a later public Mac release goes through `promote-release.yml`.
 
 Before either platform can promote, release-source authority also requires the exact candidate
 commit to be contained in `origin/main`, an annotated GitHub-verified tag, and a successful latest

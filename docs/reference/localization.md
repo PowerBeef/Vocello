@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-25
+reviewed: 2026-10-28
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml
@@ -56,7 +56,7 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 
 - `IOSAppLanguage.shared` is the observable, app-lifetime iOS interface-language owner.
   Settings → App Language stores `vocello.ios.interfaceLanguage`; absence or an unsupported value
-  means System Default. Choices are filtered against compiled bundle localizations; both apps now compile all ten
+  means System Default. Choices are filtered against compiled bundle localizations; both apps compile all ten
   complete locales listed above.
   System Default uses OS language preferences and bundle matching, with English fallback.
   No `AppleLanguages` preference mutation, bundle swizzling, or root identity reset is used.
@@ -150,12 +150,13 @@ copy.
 
 ## Acceptance scope and routes
 
-The September 21 assignment completes all eight additional UI catalogs for both apps, with
-macOS UI validation and phone-free iOS compilation. Physical-iPhone acceptance is deferred until
-the phone is available. Website and App Store metadata are separate work. Catalog completeness
-and a successful compile do not qualify a ten-language release or prove native-speaker review.
-`config/roadmap.json` remains the work authority: ASR-12 owns signed-candidate device acceptance;
-ISU-4 owns the remaining Settings/accessibility and purchase qualification.
+Both apps carry all ten UI catalogs (the eight added on September 21, plus RF-36's last strings in
+builds 25 and 26), proven by macOS UI validation and phone-free iOS compilation; the iPhone
+ten-language walk has not run yet. Website and App Store metadata are separate work. Catalog
+completeness and a successful compile do not qualify a ten-language release or prove
+native-speaker review. `config/roadmap.json` remains the work authority: ASR-12 owns
+signed-candidate device acceptance; ISU-4 owns the remaining Settings/accessibility and purchase
+qualification.
 
 - `scripts/localization_contract.py validate` requires every locale in every entry, matching format
   arguments and locale-specific plurals. Its Python fixtures reject missing locales/categories,
@@ -174,44 +175,21 @@ ISU-4 owns the remaining Settings/accessibility and purchase qualification.
   `-ApplePersistenceIgnoreState YES` only in its launch argument domain to isolate saved window
   state; it does not clear stored preferences or drafts. Apple documents this option for automated
   tests in its [AppKit notes](https://developer.apple.com/library/archive/releasenotes/AppKit/RN-AppKitOlderNotes/index.html).
-- `scripts/ui_test.sh ios localization` now prepares all ten explicit language selections in its
+- `scripts/ui_test.sh ios localization` prepares all ten explicit language selections in its
   Default arm, checking Settings copy, persisted choice and unchanged Studio text. The existing
   French, AX-L, AX-XXXL and pseudo-AX-XXXL arms remain. Every run observes and restores the original
   interface preference through genuine controls. This expanded journey has not yet run on a phone.
 
-## September 21 Mac evidence
+## Evidence
 
-`macos-xcui-localization-20260922-004619-79391bc0` passed the complete ten-language journey in
-1,807 seconds on source `25f27b62` plus the unchanged paused marketing-test edit. All required
-steps, including crash delta, passed; the original development-profile language was restored.
-The production preference suite was untouched. Representative Russian, Japanese, Korean and
-German screenshots were visually reviewed. Evidence remains untracked under `build/artifacts/ui-tests/macos`.
-The actual compact outer window was 780x612 pt. The September 22 follow-up corrected the initial
-interpretation: its 52-point toolbar leaves the declared 780x560 content area. Strict content/viewport
-assertions now prove that minimum. The complete ten-language journey also passed inside smoke run
-`macos-xcui-smoke-20260922-041322-1258c968` on `d7058ea6`, before smoke stopped running the walk
-(2026-10-25; the localization lane now owns it); see the
-[Mac acceptance scope and limits](macos-ios-ui-reset-2026-09.md#mac-acceptance-september-22).
-This is local UI evidence, not signed-candidate, VoiceOver or native-speaker acceptance.
-
-Earlier attempts remain separate failures, never combined into this PASS:
-
-| Run | Finding and correction |
-| --- | --- |
-| `macos-xcui-localization-20260921-230026-368d03bf` | Restored app launch exposed no window; isolate saved window state with Apple's launch-only option. |
-| `macos-xcui-localization-20260921-230850-985cf668` | Picker announced App Language twice; remove its redundant accessibility label. |
-| `macos-xcui-localization-20260921-232214-16021619` | English width assumption rejected a readable Chinese badge. |
-| `macos-xcui-localization-20260921-235914-d88393d2` | Fixed 20 pt floor rejected a readable 19.5 pt Korean badge; use a glyph-sized floor for localized labels. |
-| `macos-xcui-localization-20260922-002001-fbdd0a9d` | English was above the display in AppKit's scrolling menu after selecting Russian; reveal offscreen choices with real keyboard navigation. Cleanup encountered the same issue in this failed run. |
-
-The application/catalog commit `4ed9d357` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35669981154),
-including the generic iOS compile. Final UI-test source `25f27b62` passed
-[CI](https://github.com/PowerBeef/Vocello/actions/runs/35673303543), including deterministic Mac tests
-and TSan. Local Xcode 27/Swift 6.4 results are separate from the pinned CI toolchain.
-
-The September 21 physical run `ios-xcui-localization-20260921-054309-966a91d7` passed its then-current
-EN/FR and text-size walk. The later variation-label fix passed the accessibility control audit
-`ios-xcui-control-audit-20260921-064147-ef16ae49`. These precede the eight new catalogs and cannot
-qualify them. Full French accessibility-size coverage, spoken VoiceOver, the remaining purchase
-lifecycle and broader signed-candidate scenarios remain open under ISU-4/ASR-12. Earlier September
-10 partial evidence and failed navigation attempts remain historical; see the roadmap and Git history.
+`macos-xcui-localization-20260922-004619-79391bc0` passed the complete ten-language Mac journey on
+source `25f27b62` (September 22) in 1,807 seconds, with every required step, crash delta and
+language restoration; representative Russian, Japanese, Korean and German screenshots were
+reviewed. Since 2026-10-25 only the macOS localization lane runs that walk; smoke skips it. On the
+iPhone, `ios-xcui-localization-20260921-054309-966a91d7` passed the then-current EN/FR and text-size
+walk, and the variation-label fix passed the accessibility control audit
+`ios-xcui-control-audit-20260921-064147-ef16ae49`; both precede the eight added catalogs and cannot
+qualify them. Full French accessibility-size coverage, spoken VoiceOver, the ten-language phone walk
+and broader signed-candidate scenarios remain open under ISU-4 and ASR-12. Local UI evidence is not
+signed-candidate, VoiceOver or native-speaker acceptance. Earlier failed attempts and their
+corrections are in the repository history.

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-22
+reviewed: 2026-10-28
 summary: The vocello CLI, the user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
@@ -127,8 +127,9 @@ each attempt. Timeouts terminate and await the process group before any next mod
 progress detection handles output without a newline. This is package execution/QC proof, not a
 perceptual Clone-fidelity or multilingual accuracy claim.
 
-RF-10 runs this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
-the packaging contract but cannot substitute for Developer ID, notarization, or candidate evidence.
+RF-10 ran it on the shipped Developer ID 3.0.0 CLI. Development or ad-hoc qualification can
+diagnose the packaging contract but cannot substitute for Developer ID, notarization, or candidate
+evidence.
 The existing two-argument app-only verifier remains available for historical candidates; the current
 release workflow requires both DMGs.
 
@@ -279,7 +280,7 @@ engine is refused (`engine_busy`, exit 75); pass `--wait-for-engine` to wait for
 with the warning `concurrent_engine`. Lanes that drive the CLI on an 8 GB Mac therefore need the app
 closed.
 
-Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
+Streaming is the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates: there is no live preview player; `--play` plays the completed file.
 Streaming and non-streaming are separately qualified paths; identical sampling settings do not
@@ -549,9 +550,9 @@ referenceLanguage, automaticTranscription}`.
 The apps record voice-cloning consent once, through the visible Settings acknowledgment. The CLI has
 no Settings screen and does not read the apps' preference, so every invocation that clones or saves a
 voice records consent explicitly with the bare `--confirm-consent` flag: `generate`/`batch` in clone
-mode (including the `vocello clone …` shortcut), `voices enroll`, and `bench` whenever `clone` is in
-`--modes` (the default matrix includes it). Without the flag the command refuses before booting the
-engine, and `CLIRuntime` applies the same `VoiceCloningConsentPolicy` again at the engine call, so no
+mode (including the `vocello clone …` shortcut), `voices enroll`, `replace` and `save-take`, and
+`bench` whenever `clone` is in `--modes` (the default matrix includes it). Without the flag the
+command refuses before booting the engine, and `CLIRuntime` applies the same `VoiceCloningConsentPolicy` again at the engine call, so no
 clone request or enrollment reaches the engine unconfirmed. The flag is accepted and ignored on other
 runs, so scripts may pass it uniformly. Pass it only for voices you own or have permission to clone.
 

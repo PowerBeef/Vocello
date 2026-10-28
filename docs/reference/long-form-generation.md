@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-10-28
 summary: The shipping long-form v4 path on both platforms — planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History — and what remains open.
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
@@ -15,12 +15,6 @@ sourceOfTruth:
 This reference describes the shipping long-form v4 path — macOS since 2026-07-23 (stages A–E),
 iOS since 2026-07-24 — and what remains open. Source and `config/runtime-refactor-contract.json`
 (`longForm`, `longFormV4`) remain higher authority.
-
-Currency review (2026-09-04): the release-first F-16/F-06 amendment retains each completed initial
-segment through the shared History outbox before continuing. Whole-project acceptance uses a
-bounded journal, atomic manifest replacement and a transactional History commit. The old accepted
-project survives ordinary failure; ambiguous recovery blocks project writes without hiding unrelated
-standalone History. These source corrections still require corrected-candidate acceptance.
 
 ## Shipping path (macOS)
 
@@ -149,16 +143,19 @@ Device acceptance passed 2026-07-24 on the paired iPhone 17 Pro (smoke run
 `ios-xcui-smoke-20260724-183626-f9961535`): a >2,000-character script planned three segments,
 streamed them sequentially (55.0 s + 45.4 s + 26.6 s), joined 127.2 s of audio through the
 per-segment and joined QC gates, and grouped as a History project with a working per-segment
-disclosure. The iOS smoke lane now runs both journeys (standard + long-form).
+disclosure. Full iOS smoke runs the long-form journey; `--scenario long-form` runs it alone.
 
 ## Remaining work
 
 - **Segment-count scaling evidence at audiobook scale** — the 12-segment run above proves flat
   steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
   remains open, and the scaled smoke journey currently caps at 12 segments per run.
-- **Corrected-candidate acceptance** — exercise long-form, segment replacement, interruption,
-  recovery export and retained-output deletion on the RF-10 desktop and RF-12 iPhone
-  candidates. Older measured runs above are historical, not evidence for changed source.
+- **Candidate acceptance.** RF-15's long-form row (a project, then one segment regenerated)
+  passed on TestFlight build 24 (`ios-xcui-candidate-smoke-20261024-200402-db93f093`), and the
+  full Mac smoke on the published 3.0.0 source passed long-form and its recovery Discard
+  (`macos-xcui-smoke-20261024-205357-0952e758`, RF-10). Interruption, recovery export and
+  retained-output deletion have no recorded candidate run yet. Older measured runs above are
+  historical, not evidence for changed source.
 
 Single-take spoken-text normalization is already implemented at the shared generation entry;
 it is not an outstanding long-form task.

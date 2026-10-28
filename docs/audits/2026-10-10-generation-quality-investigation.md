@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-10
+reviewed: 2026-10-28
 summary: End-to-end generation investigation, implemented input/provenance/QC safeguards, installed-model observations and remaining qualification boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationSemantics.swift

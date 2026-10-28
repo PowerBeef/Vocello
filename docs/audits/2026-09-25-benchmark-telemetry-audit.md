@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-09-25
+reviewed: 2026-10-28
 summary: Verified audit of the benchmarking harnesses and telemetry probes (106 findings) with the recommended sequence and the roadmap plan benchmark-telemetry-audit-2026-09.
 ---
 # Benchmark and telemetry audit (2026-09-25)

@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-10
+reviewed: 2026-10-28
 summary: Broad primary-source research on automatic detection of clone register, French pronunciation and accent, local phonation, disfluency and delivery-intent errors; practical experiments and qualification requirements.
 sourceOfTruth:
   - scripts/qc/features.py

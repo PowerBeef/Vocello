@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-21
+reviewed: 2026-10-28
 summary: The approved plan for overhauling the vocello CLI (parity with the Mac app, an agent contract and a vocello mcp stdio server, a signed .pkg installer, shared History and settings) and its roadmap items RF-08 and RF-25 to RF-31.
 sourceOfTruth:
   - config/roadmap.json

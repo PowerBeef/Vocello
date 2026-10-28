@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-06
+reviewed: 2026-10-28
 summary: Deep whole-project audit of Vocello at 66ecb85b — 30 read-only auditors, every finding re-verified by two blind refuters; ranked confirmed defects, refuted candidates and test gaps.
 sourceOfTruth:
   - config/roadmap.json

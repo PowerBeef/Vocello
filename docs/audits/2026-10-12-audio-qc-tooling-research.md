@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-12
+reviewed: 2026-10-28
 summary: Survey of tools, models, dependencies, MCP servers, plugins and skills for catching the voice-clip defects the QC harness keeps missing; root causes, verified generator divergences, a layered strategy and a phased recommendation. Research only, no implementation.
 sourceOfTruth:
   - docs/reference/qc.md

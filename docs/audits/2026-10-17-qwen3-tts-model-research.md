@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: backend-mlx
-reviewed: 2026-10-16
+reviewed: 2026-10-28
 summary: Sourced research on the Qwen3-TTS checkpoints Vocello ships and their upstream family — releases and provenance, the architecture as implemented upstream, official defaults, known failure modes, ports since the fork and Vocello's artifact recipe — with a parity ledger and the reference-documentation gap analysis that drives ER-13's overhaul.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift

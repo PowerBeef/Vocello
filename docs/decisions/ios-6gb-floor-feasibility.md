@@ -1,7 +1,7 @@
 ---
-status: active
+status: historical
 owner: ios
-reviewed: 2026-09-12
+reviewed: 2026-10-28
 summary: Staged evidence plan for whether the iPhone hardware floor can drop to 6 GB devices — kill-cheap steps, step-1 clamp result (2026-08-02), and the gates any floor move must pass.
 sourceOfTruth:
   - Sources/iOS/IOSAppBootstrap.swift

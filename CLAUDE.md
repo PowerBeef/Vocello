@@ -118,7 +118,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
     or a privacy or metadata mismatch on iOS.
   - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
   - **Ask the maintainer** before starting work outside the plan, and open no new plans or audits.
-  - **The freeze is recorded** (`focusLock.freeze`): every commit names a release item in its subject.
+  - **The freeze is recorded** (`focusLock.freeze`): every commit after it names a release item in its
+    subject.
 
   Path, decisions and rules: `docs/reference/release-first-execution-2026-09.md`.
 - **Main is the only published branch:** commit on local `main`; push only `main`, fast-forward, on

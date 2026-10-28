@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for subagents and side sessions (CLAUDE.md: Agents).
+"""Claude Code PreToolUse guard for subagents and side sessions (CLAUDE.md: Agents and side
+sessions).
 
 Only a subagent's hook input carries `agent_id`; the lead's never does. A call made from a
 linked worktree, such as a desktop app side session's, is screened the same way; the lead works
@@ -59,7 +60,7 @@ XCODEBUILD_REPORT_VALUES = {"-sdk"}
 QC_MODEL_VERBS = {"run", "language-bench"}
 CLI_MODEL_VERBS = {"generate", "gen", "custom", "design", "clone", "batch", "bench", "benchmark"}
 PYTHONS = re.compile(r"^python(3(\.\d+)?)?$")
-RULE = "CLAUDE.md: Agents"
+RULE = "CLAUDE.md: Agents and side sessions"
 
 
 def _script(word: str) -> str:

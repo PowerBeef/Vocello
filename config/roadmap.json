@@ -364,6 +364,22 @@
       "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag."
     },
     {
+      "id": "RF-38",
+      "plan": "release-first-3-0-2026-09",
+      "title": "A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max",
+      "status": "planned",
+      "blockedBy": [],
+      "due": "2026-11-03",
+      "gate": "Maintainer decision 2026-10-28: no iPhone 15 Pro has run Vocello yet, and BrowserStack App Automate's trial (100 free minutes) offers a real iPhone 15 Pro on iOS 27 and a 15 Pro Max on iOS 26. Public farm devices re-sign the app, which drops increased-memory-limit and the App Group, so these runs take the clone-off path under the default memory limit and count only as exploratory smoke evidence, never as floor-device or promotion evidence. Done when a self-contained XCUITest (fresh install: download one Built-in Voice model through Settings, generate a short take, find it in History, attach its timings) that no existing lane selects, and a script that packages the app and its test runner for upload, are committed with the routed check and the iOS compile passing, and the maintainer-run upload passes on both devices with the results summarised in the notes. The maintainer creates the trial account and runs the upload; Claude creates no account and handles no access key.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
+        "Sources/iOS/IOSAppBootstrap.swift"
+      ],
+      "updated": "2026-10-28",
+      "notes": "Opened 2026-10-28 at the maintainer's request after the device-farm research (a session report, not in Git). BrowserStack is the only farm publicly listing a real iPhone 15 Pro on iOS 26 or later; AWS's 1,000 trial minutes need a payment method and show devices only after signup. A re-signed run still shows the hardware gate admitting iPhone16,1 and iPhone16,2 on real hardware, gives the first A17 Pro timings, and is conservative for Built-in Voice and Voice Design memory (a lower limit than the shipped build). It cannot show cloning, the shipped memory ceiling, purchases or heat. The existing iOS UI tests need the local harness (TEST_RUNNER_ run IDs, installed models, an enrolled clone voice), hence a new test. Planned until an in-flight slot frees (cap 3)."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",

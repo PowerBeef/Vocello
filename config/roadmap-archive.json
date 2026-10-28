@@ -5701,6 +5701,21 @@
         "file:config/localization-unlocalized-baseline.json",
         "run:ios-xcui-candidate-smoke-20261025-030310-db58b35b"
       ]
+    },
+    {
+      "id": "BKL-44",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer round-trip test fails on this Mac: the package Bom differs from the payload",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_cli_package.py's real-package round trip passes on the maintainer's Mac (macOS 27) as it does in CI, or the difference is explained and the check adjusted.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-10-28",
+      "notes": "2026-10-28: seen in the full local Python suite during RF-38's routed check; it fails alone and deterministically with \"CLI installer Bom differs from the payload\" (scripts/cli_package.py). Unrelated to RF-38's files. Not a release blocker: the macOS CLI installer, not the iPhone app. Parked without investigation. Duplicate of BKL-34, opened by mistake on 2026-10-28: the same round-trip test fails with the same message on the same Mac.",
+      "supersededBy": "BKL-34"
     }
   ]
 }

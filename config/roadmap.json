@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-23",
-    "decision": "The iOS 3.0 App Store submission remains the release goal and the RF-09 freeze stays 2026-10-23. On the 2026-10-16 engine audit (docs/audits/2026-10-16-engine-runtime-audit.md) the maintainer added RF-18 (long-form pacing), RF-19 (iPhone install dead ends), BG-01 hardened per the audit and the MLX refresh (CONV-21, authorized) before the freeze, and started the engine-remediation-2026-10 programme: until the freeze an identity-safe, test-only or doc-only programme item is re-homed into this plan while it is worked; at the freeze unfinished programme items return parked until the submission, then resume. maxInFlight is 4 until the freeze and 2 after it. The iPhone is used only in windows the maintainer announces. Earlier rules stand: no listening (machine screens), risk-based acceptance of the processed candidate, and a new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Later on 2026-10-16 the maintainer kept the iPhone proofs of BG-01, CONV-21 and RF-18 before the freeze, so the freeze needs an iPhone window the maintainer announces, and authorized the post-3-0-backlog items that need no iPhone: each is closed in the change that fixes it, so it never takes an in-flight slot. On 2026-10-18 the maintainer started the development-workflow programme from docs/audits/2026-10-18-dev-workflow-audit.md alongside the release, product-side phases included: DW-01 to DW-04 join this plan, the freeze does not wait on them, and maxInFlight is 6 until the freeze. Later on 2026-10-18 the maintainer raised maxInFlight to 8 until the freeze so DW-03 and DW-04 can be worked in flight, one refactor at a time, beside the release items. On 2026-10-20 the maintainer froze the iPhone 3.0.0 candidate at 029427c9, once the redesigned export sheet (RF-22) was approved, and maxInFlight is 2 after the freeze. Mac-only user requests follow as items of this plan without changing the iPhone candidate, starting with Sparkle updates for the Mac app (RF-23). On 2026-10-21 the freeze moved to 0919e998: the maintainer reported a release-blocking iPhone Clone layout bug after the first freeze, and its fix (RF-24) passed on the iPhone and the freeze checks reran there; the maintainer approved the push and holds the release. On 2026-10-21 the maintainer started the CLI overhaul (parity with the Mac app, an agent contract and a vocello mcp server, a signed .pkg installer, History and settings shared with the app; docs/audits/2026-10-21-cli-overhaul-plan.md) as items of this plan: RF-08 re-gated and RF-25 to RF-31. None changes the iPhone candidate; work that touches iPhone-compiled files (RF-30) and the publication (RF-31) wait for the submission. On 2026-10-22 the maintainer chose to release the Mac app and the CLI 3.0 as soon as possible and to submit the iPhone app a few days later, all three from one v3.0.0 tag so every platform ships the same fixes: the tag goes on the release commit that carries RF-08's packaging fixes, and the iPhone archive (ASR-10) is made from that same tag. No iPhone-compiled file has changed since 0919e998, so the iPhone candidate's code is unchanged; focusLock.freeze moves to the tagged commit once its evidence is captured. RF-10 (Mac and CLI qualification and publication) joins this plan in flight, RF-32 announces the release in the README and on the website after publication, and maxInFlight is 3 while they run. RF-30 and RF-31's parity record and extended qualification still wait for the iPhone submission; the CLI 3.0 reads History but does not write it. 2026-10-23: the Mac app and CLI 3.0.0 are public; the maintainer added RF-33 (the website layout overhaul for phone, tablet and desktop) to this plan in flight. It touches only website/, so the iPhone candidate is unaffected. 2026-10-23: RF-09 closes and the freeze moves to e7a8e2ae, the signed v3.0.0 commit: its iPhone-compiled sources and the VocelloiOS target equal 0919e998's, so the iPhone candidate proven there is unchanged, and the iPhone app ships from the same tag.",
+    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume. Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json.",
     "maxInFlight": 3,
     "freeze": {
       "commit": "e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
@@ -28,7 +28,7 @@
       "owner": "release-qa",
       "adopted": "2026-09-04",
       "rebaselined": "2026-10-12",
-      "goal": "October 12 rebaseline (focusLock): submit Vocello 3.0 for iPhone through eight ordered steps. (1) Maintainer decisions: account prerequisites, privacy answers, content rights and region scope (RF-02, ASR-02, ASR-04, ASR-09). (2) Before the freeze: the timeboxed quality A/B (RF-14) and the confirmed blockers' code fixes (AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04). (3) The export purchase on the phone (RF-13). (4) Build-number check and freeze (ASR-08, RF-09). (5) Signed archive, IPA verification and internal TestFlight through the release workflow's archive-ios dispatch (ASR-10, ASR-07, RF-12). (6) Risk-based acceptance of the processed candidate and the exact-tag quality promotion (RF-15, ASR-06, RF-17). (7) Screenshots, metadata and the App Store Connect check (ASR-05, ASR-11). (8) Submission on the maintainer's explicit go (RF-16). macOS, the CLI, the full 201-take campaign and the QC detector programme follow the submission.",
+      "goal": "October 12 rebaseline (focusLock): submit Vocello 3.0 for iPhone through eight ordered steps. (1) Maintainer decisions: account prerequisites, privacy answers, content rights and region scope (RF-02, ASR-02, ASR-04, ASR-09). (2) Before the freeze: the timeboxed quality A/B (RF-14) and the confirmed blockers' code fixes (AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04). (3) The export purchase on the phone (RF-13). (4) Build-number check and freeze (ASR-08, RF-09). (5) Signed archive, IPA verification and internal TestFlight: each candidate is a v<version>-ios.N tag cut by scripts/ios_candidate_tag.py (ASR-10, ASR-07, RF-12). (6) Risk-based acceptance of the processed candidate and the exact-tag quality promotion (RF-15, ASR-06, RF-17). (7) Screenshots, metadata and the App Store Connect check (ASR-05, ASR-11). (8) Submission on the maintainer's explicit go (RF-16). The Mac app and the CLI 3.0.0 shipped first (2026-10-23; RF-10 finishes their qualification); the full 201-take campaign, the QC detector programme and the CLI's History and parity work (RF-30, RF-31) follow the submission.",
       "authority": "docs/reference/release-first-execution-2026-09.md"
     },
     {
@@ -1865,7 +1865,10 @@
       ],
       "updated": "2026-10-24",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-24 on the maintainer's Mac (macOS 27.0.1) in a routed check's full Python run: cli_package.py raises \"CLI installer Bom differs from the payload\", twice in a row. The shipped 3.0.0 package was built and verified on the macos-26 release runner (CLI package smoke PASS, run 40020993733). Not investigated (focus rules); installing the shipped package on macOS 27 is not shown to be affected."
+      "notes": "Found 2026-10-24 on the maintainer's Mac (macOS 27.0.1) in a routed check's full Python run: cli_package.py raises \"CLI installer Bom differs from the payload\", twice in a row. The shipped 3.0.0 package was built and verified on the macos-26 release runner (CLI package smoke PASS, run 40020993733). Not investigated (focus rules); installing the shipped package on macOS 27 is not shown to be affected. 2026-10-28: still fails alone and deterministically with the same message during RF-38's routed check (BKL-44, closed as its duplicate).",
+      "legacyIds": [
+        "BKL-44"
+      ]
     },
     {
       "id": "BKL-35",
@@ -1894,7 +1897,7 @@
       ],
       "updated": "2026-10-25",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "Seen 2026-10-25 on build 25 in XCUITest run 20261025-173415-0398b5f1: the whole IOSSettingsCompactToggleStyle row is a Button and IOSScrollView turns bounce off, so near the end of Voice Models a slow upward swipe on the Download over cellular caption landed as a tap and flipped the switch on each of 20 swipes (the network note above switched between its two copies). The same style serves Auto-play, Clone consent and the Accessibility toggles. Not investigated (focus rules)."
+      "notes": "Seen 2026-10-25 on build 25 in XCUITest run 20261025-173415-0398b5f1: the whole IOSSettingsCompactToggleStyle row is a Button and IOSScrollView turns bounce off, so near the end of Voice Models a slow upward swipe on the Download over cellular caption landed as a tap and flipped the switch on each of 20 swipes (the network note above switched between its two copies). The same style serves Auto-play, Clone consent and the Accessibility toggles. Not investigated (focus rules). 2026-10-28: the candidate navigation row still swipes Settings natively (VocelloiOSCandidateAcceptanceUITests, app.swipeDown and VocelloUIScroll.reveal), the gesture that tapped the cellular switch; RF-35's gate depends on that row (item 24 of docs/audits/2026-10-25-ui-test-documentation-scan.md)."
     },
     {
       "id": "BKL-37",
@@ -2001,19 +2004,64 @@
       "notes": "2026-10-27, ios-lang-bench-20261027-174956-780b53f1 at v3.0.0-ios.5: the pre-run crash baseline pull failed with CoreDevice error 7000 because diagnostics/model-downloads/attempt-*.json disappeared during the copy, so the lane stopped before any take. Not a release blocker: tooling only; a rerun is expected to pass (RF-17)."
     },
     {
-      "id": "BKL-44",
+      "id": "BKL-45",
       "plan": "post-3-0-backlog-2026-10",
-      "title": "The CLI installer round-trip test fails on this Mac: the package Bom differs from the payload",
+      "title": "Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild",
       "status": "parked",
       "blockedBy": [],
-      "gate": "scripts/tests/test_cli_package.py's real-package round trip passes on the maintainer's Mac (macOS 27) as it does in CI, or the difference is explained and the check adjusted.",
+      "gate": "A routed check's unsigned generic compile of the iOS UI bundles (scripts/build_ui_test_bundles.sh) no longer overwrites the products an iPhone lane's build skip relies on, so a lane after a check that touched test code skips its build when nothing it ships changed.",
       "sourceOfTruth": [
-        "scripts/cli_package.py",
-        "scripts/tests/test_cli_package.py"
+        "scripts/build_ui_test_bundles.sh",
+        "scripts/ui_test.sh",
+        "config/build-output-policy.json"
       ],
       "updated": "2026-10-28",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "2026-10-28: seen in the full local Python suite during RF-38's routed check; it fails alone and deterministically with \"CLI installer Bom differs from the payload\" (scripts/cli_package.py). Unrelated to RF-38's files. Not a release blocker: the macOS CLI installer, not the iPhone app. Parked without investigation."
+      "notes": "Parked 2026-10-28 from item 22 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only. The same overwrite left the candidate runner unsealed on 2026-10-25 (repaired at lane time since); RF-38's scripts/farm_smoke.sh package shares that DerivedData the same way."
+    },
+    {
+      "id": "BKL-46",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "UI result retention never prunes three lanes' runs",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "config/build-output-policy.json's childRetention.uiResults.lanes covers delivery-cohort, enroll-clone-fixture and saved-voice-lifecycle (candidate-smoke stays pinned on purpose), and a passing focused smoke scenario no longer compacts the previous full-smoke pass.",
+      "sourceOfTruth": [
+        "config/build-output-policy.json",
+        "scripts/build_cleanup.py"
+      ],
+      "updated": "2026-10-28",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-28 from item 23 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only."
+    },
+    {
+      "id": "BKL-47",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac benchmark's script paste skips the pasteboard access check",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "VocelloMacBenchmarkUITests' pasteScript checks the general pasteboard's accessBehavior as the shared paste helper does before reading it.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift"
+      ],
+      "updated": "2026-10-28",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-28 from item 25 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only."
+    },
+    {
+      "id": "BKL-48",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Steps recorded without running carry no start time in the lane ledger",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Steps recorded with required_step_record (a skipped ui-build, result-retention) carry startedAt like the steps that run.",
+      "sourceOfTruth": [
+        "scripts/lib/required_steps.sh"
+      ],
+      "updated": "2026-10-28",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-28 from item 26 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only."
     },
     {
       "id": "ER-01",

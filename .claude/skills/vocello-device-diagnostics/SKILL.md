@@ -16,6 +16,6 @@ Use a quiet committed checkpoint for measured bench/lang-bench/memory/profile la
 workers. No new models/downloads, distribution-candidate install/launch or external publication
 without specific authorization. Candidate acceptance uses the documented preinstalled-candidate route.
 Print only privacy-safe summaries; retain raw artifacts untracked. Classify the result and crash
-delta accurately. Never retry silently or replace failed evidence. MobileBuildMCP discovery/debug, when
-its device workflows are enabled, can assist under native serialization; repository scripts own the
-final evidence.
+delta accurately. Never retry silently or replace failed evidence. MobileBuildMCP runs only its
+discovery and coverage workflows (its device and debugging workflows stay off); repository scripts own
+the final evidence.

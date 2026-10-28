@@ -9,10 +9,9 @@ integrated worktrees), follows [`CLAUDE.md`](CLAUDE.md) and the
 
 - Use an Apple Silicon Mac with full Xcode (CI pins the version in `config/toolchain.json`) and set
   it up with [New Mac setup](docs/reference/development-workflow.md#new-mac-setup): Xcode
-  components, the pinned command-line tools, Python and Node. The selected Xcode must expose usable
-  iOS Platform Support and a compatible iOS runtime component for the no-phone
-  `-destination generic/platform=iOS` compile; this toolchain prerequisite does not authorize
-  Simulator testing.
+  components, the pinned command-line tools, Python and Node. The no-phone
+  `-destination generic/platform=iOS` compile needs the selected Xcode's iOS platform component; it
+  never authorizes Simulator testing.
 - Read the current checkpoint in [`docs/development-progress.md`](docs/development-progress.md).
 - Check existing [issues](https://github.com/PowerBeef/Vocello/issues) and pull requests before starting overlapping work.
 - Keep changes focused. Do not mix unrelated refactors into a bug fix or feature.
@@ -70,7 +69,7 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 ## Pull request checklist
 
 - [ ] The change has one clear purpose.
-- [ ] `project.yml` was regenerated if needed.
+- [ ] The Xcode project was regenerated after a `project.yml` or file-membership change.
 - [ ] `scripts/dev.sh check` ran, and the pull request says what it skipped.
 - [ ] Public facts and active documentation match the implementation.
 - [ ] No generated build output or private evidence is tracked.

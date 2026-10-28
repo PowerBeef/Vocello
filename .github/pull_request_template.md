@@ -2,7 +2,9 @@
 
 Describe the user-visible or maintainer-visible outcome.
 
-`main` is the only published branch: `ci.yml` has no pull-request trigger, so the `CI required` verdict is produced by a maintainer's push to `main`; agent worktree branches are integrated into `main` locally.
+`main` is the only published branch. A pull request runs only `ci.yml`'s Linux jobs (contracts,
+Python, website) with a read-only token; the macOS lanes and the `CI required` verdict a release
+relies on come from the maintainer's push to `main`.
 
 ## Verification
 
@@ -13,7 +15,7 @@ Describe the user-visible or maintainer-visible outcome.
 ## Documentation impact
 
 - [ ] Active docs and role guidance still match source, `project.yml`, scripts, and machine-readable contracts.
-- [ ] Vendor-runtime changes update `RUNTIME_MANIFEST.json`, `SEMANTIC_DELTAS.json`, tests, and current guidance as applicable.
+- [ ] Owned-runtime changes (`Packages/VocelloQwen3Core`) update its `RUNTIME_MANIFEST.json`, `SEMANTIC_DELTAS.json`, tests, and current guidance as applicable.
 - [ ] Telemetry or benchmark schema changes received backend, affected-platform, and release/QA review.
 - [ ] Public product claims were checked against `config/public-product-facts.json`, the model contract, hardware profiles, and tracked benchmark evidence.
 - [ ] Historical snapshots remain clearly labelled and were not rewritten as active runbooks.

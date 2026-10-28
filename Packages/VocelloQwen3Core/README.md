@@ -28,7 +28,9 @@ and VoiceDesign families in 4-bit and 8-bit variants. The authoritative reposito
 Hugging Face revisions, artifact versions, required files, tokenizer profile, and platform eligibility
 live in:
 
-- [`Sources/Resources/qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json)
+- [`Sources/Resources/qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json),
+  with each file's exact size and SHA-256 in the generated production catalog
+  (`Sources/Resources/qwenvoice_production_model_catalog.json`)
 
 The local implementation and family-level API notes live in:
 

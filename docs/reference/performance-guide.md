@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-20
+reviewed: 2026-10-28
 summary: Swift 6 and Metal performance reference for the apps and CLI — build settings, isolation, value types, dispatch, allocation and ARC; profiling and GPU capture; how MLX drives Metal (command buffers, kernel caching, compile(), no MPS, unified memory, Metal memory telemetry); direct-Metal patterns for future custom kernels; iOS Metal limits, troubleshooting and the performance-change checklist.
 sourceOfTruth:
   - project.yml
@@ -92,7 +92,7 @@ All Swift targets use `SWIFT_VERSION: "6"`. App, engine and CLI targets rely on 
 
 ### 2.3 Compilation-condition switches
 
-- `QW_UI_LIQUID` is set in the `Release` config for the macOS app target (`project.yml:269`) to enable Liquid Glass surfaces. It has no performance effect.
+- `QW_UI_LIQUID` is set in the `Release` config for the macOS app target (`project.yml:280`) to enable Liquid Glass surfaces. It has no performance effect.
 - The project has no Debug configuration or generic `DEBUG` symbol. Runtime diagnostic behavior is
   gated by `DebugMode.isEnabled`. Compile-time test isolation belongs in test targets or behind a
   narrowly named compilation condition; do not add hidden app behavior through `#if DEBUG`.
@@ -272,7 +272,7 @@ For synchronous functions, local values that fit in the call frame are essential
 
 ### 6.3 Closures and context allocation
 
-Non-escaping closures are stack-allocated; escaping closures are heap-allocated and reference-counted. The long-form runner shows the pattern the codebase prefers: `IOSLongFormProjectRunner.run` (a `@MainActor` class in `Sources/iOS/Studio/IOSLongFormProject.swift`, compiled by both apps) takes its progress sinks as `@escaping @MainActor (IOSLongFormProgressSnapshot) -> Void` / `([IOSLongFormSegmentState]) -> Void` closures (`onProgress:` / `onSegmentsUpdated:`, `:825`), so every UI update is already isolated to the main actor and nothing needs an `@unchecked Sendable` relay object. Off-main work that must not block the actor (audio QC, duration probes) hops through `Task.detached(priority: .utility)` and returns a value (`IOSLongFormProject.swift:812-819`):
+Non-escaping closures are stack-allocated; escaping closures are heap-allocated and reference-counted. The long-form runner shows the pattern the codebase prefers: `IOSLongFormProjectRunner.run` (a `@MainActor` class in `Sources/iOS/Studio/IOSLongFormProject.swift`, compiled by both apps) takes its progress sinks as `@escaping @MainActor (IOSLongFormProgressSnapshot) -> Void` / `([IOSLongFormSegmentState]) -> Void` closures (`onProgress:` / `onSegmentsUpdated:`, `:826`), so every UI update is already isolated to the main actor and nothing needs an `@unchecked Sendable` relay object. Off-main work that must not block the actor (audio QC, duration probes) hops through `Task.detached(priority: .utility)` and returns a value (`IOSLongFormProject.swift:813-820`):
 
 ```swift
 private func evaluateQC(path: String, expectedPauseCount: Int) async -> AudioQualityGate.Report {

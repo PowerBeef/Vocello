@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-10-28
 summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
 sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
@@ -124,8 +124,8 @@ macOS, CLI, and iOS now resolve `ProductionModelCatalog.deliveryPlan(...)` rathe
 live repository. `validate --require-complete` proves this static contract. It does not replace the
 isolated Mac/iPhone lifecycle proofs, which must be refreshed after redirect, restoration,
 delivery-routing, or shared-component changes. The latest passing Mac proof is the 2026-08-08
-isolated `pro_custom_speed` install at the 2026.08.06.1 marking re-pin (currency note
-below); the latest passing iPhone acceptance is the 2026-08-29 run
+isolated `pro_custom_speed` install at the 2026.08.06.1 marking re-pin ("Shared component
+store"); the latest passing iPhone acceptance is the 2026-08-29 run
 `ios-xcui-model-download-20260829-182534-91d70526` ("Diagnostics and acceptance" below). Both
 predate the 2026.09.14.1 fp32-tokenizer re-pin; the 2026-09-23 PA-29 iPhone runs delivered the
 current artifacts but are not acceptance. The 2026-07-23 six-artifact Mac run and three-artifact iPhone run described below remain exact
@@ -186,26 +186,14 @@ delivered Custom full-wire (2,312,057,897 bytes) then Design and Clone with exac
 shared-component reuse (wire 1,629,761,538 and 1,653,779,429; zero duplicates, zero retries,
 nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catalog total.
 
-> **Currency note (2026-08-01):** artifactVersion **2026.08.01.1** halves the shared
-> speech tokenizer to f16 (341,179,884 bytes, digest `88f0a51a…`; OPTIMIZATION.md §R).
-> The live-validation record above remains exact history for the 2026.07.26.1
-> generation; fresh post-change delivery evidence rides the next release's battery per
-> the standing rule that static completeness never substitutes for live proof.
-
-> **Currency note (2026-08-08):** artifactVersion **2026.08.06.1** adds the required
-> Article 50 marking generator (`marking/audioseal_wm16_generator_fp16.safetensors`,
-> 29,360,042 bytes, digest `0e743d11…`) to every artifact. Fresh Mac delivery evidence
-> ran the same day: an isolated root installed `pro_custom_speed` at the new
-> 1,708,583,689-byte plan with the marking file arriving byte-exact against its pinned
-> digest, full verify + install clean, zero retries. iOS post-change delivery evidence: the
-> 2026-08-29 acceptance run `ios-xcui-model-download-20260829-182534-91d70526` (see
-> "Diagnostics and acceptance").
-
-> **Currency note (2026-09-14):** artifactVersion **2026.09.14.1** restores the fp32
-> speech tokenizer (682,293,092 bytes, digest `836b7b35…`, the 2.4.0 payload) in all six
-> artifacts; the f16 codec opened streamed clone takes with a burst (roadmap MV-07,
-> OPTIMIZATION.md §R). Nothing else in the artifacts changed. Fresh post-change delivery
-> evidence rides the next release's battery per the standing rule.
+> **Artifact generations since that proof.** 2026.08.01.1 halved the shared speech tokenizer to
+> f16. 2026.08.06.1 kept it and added the Article 50 marking generator to every artifact; its Mac proof ran on
+> 2026-08-08 (an isolated `pro_custom_speed` install at the new 1,708,583,689-byte plan, the marking
+> file byte-exact against its pinned digest, zero retries) and its iPhone acceptance is the
+> 2026-08-29 run in "Diagnostics and acceptance". The current 2026.09.14.1 restores the fp32 speech
+> tokenizer after the f16 codec opened streamed clone takes with a burst (roadmap MV-07,
+> OPTIMIZATION.md §R) and changes nothing else; its fresh delivery evidence rides the next
+> release's battery, since static completeness never substitutes for live proof.
 
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified

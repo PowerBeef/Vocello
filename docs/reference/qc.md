@@ -11,9 +11,6 @@ sourceOfTruth:
 ---
 # Audio QC v2
 
-The earlier human-review remediation plan (`audio-quality-remediation.md`) was retired on 2026-10-20:
-RF-14 closed and nobody listens to 3.0 takes (maintainer decision 2026-10-13). It is in git history.
-
 QC v2 is the local audio QC harness, rebuilt on 2026-10-01. It produces diagnostic evidence;
 calibration and qualification apply to individual dimensions and exact scoring identities:
 - a few strong specialist models score every take: two speech recognition (ASR) families, two phone recognizers and a G2P; for clones only, two pitch trackers and a speaker embedder;
@@ -81,7 +78,7 @@ not certify pronunciation or excuse a defect. Missing posteriors, unsupported ph
 impossible paths and work limits produce explicit unavailable evidence.
 
 `qc.acoustics` adds a NumPy-only autocorrelation pitch witness, spectral flatness, tilt,
-band ratios and `cepstralPeakContrast` on expected windows, recognized windows and a uniform
+band ratios and a cepstral peak contrast (`medianCepstralPeakContrast`) on expected windows, recognized windows and a uniform
 discovery grid. The cepstral statistic is a precisely defined descriptive contrast, **not
 calibrated CPP or a clinical/phonation score**. Full-frame crop support, silence, short
 intervals, bandwidth limits and reference compatibility are retained. A low periodicity

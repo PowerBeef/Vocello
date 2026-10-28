@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-20
+reviewed: 2026-10-28
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -163,7 +163,7 @@ not used.
   (group size and bits) and per-layer entries. Vocello's one per-layer entry is
   `model.text_embedding` at 8 bits, group 64, affine, in both tiers, written by
   `scripts/convert_text_embedding_8bit.py` (2026-07-26).
-- **What the loader does** (`Qwen3TTS.swift:5768-5781`). `quantize(model: talker)` runs a per-path
+- **What the loader does** (`Qwen3TTS.swift:5770-5783`). `quantize(model: talker)` runs a per-path
   closure that quantizes a module only when the checkpoint holds `<path>.scales`, and uses the
   per-layer entry when one names the path, the global entry otherwise. The artifact therefore decides
   which modules are quantized; the code holds no list.
@@ -173,7 +173,7 @@ not used.
   stays float, and the speech tokenizer is a separate fp32 file. The full map, the bytes and the
   artifact history are [`model-delivery.md`](model-delivery.md)'s (artifact provenance).
 - **Verification.** A trusted prepared checkpoint loads with `verify: .noUnusedKeys`, an untrusted
-  one with `.all` (`Qwen3TTS.swift:5797-5799`); a trusted load therefore checks only for unused keys
+  one with `.all` (`Qwen3TTS.swift:5799-5801`); a trusted load therefore checks only for unused keys
   (A-20).
 - **Batched materialization.** Weights are evaluated four talker or code-predictor layers at a time
   and eight speech-tokenizer parameter arrays at a time (`Qwen3TTS.swift:470-471`), which bounds the
@@ -271,7 +271,7 @@ Each frame builds one graph (talker forward, the 15 code-predictor passes, sampl
 step's input embedding) and submits it once. Production uses the `.pipelined` step policy
 (`Qwen3StreamStepEvalPolicy`, `Qwen3TTS.swift:432-445`):
 
-1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:4049-4052`);
+1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:4051-4054`);
 2. the previous chunk's materialization and channel sends run while it computes;
 3. the sampled-token `item` read is the step's first blocking read.
 
@@ -295,7 +295,7 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
 - **float32 logits.** Both stages sample from float32 logits whatever the model's precision, as
   Qwen's reference does (D3, production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` restores
   model-precision sampling). The cast is lazy inside the step graph (`Qwen3TTS.swift:5242-5244`).
-- **Order** (`sampleToken`, `Qwen3TTS.swift:5223`): token suppression, the repetition penalty (talker
+- **Order** (`sampleToken`, `Qwen3TTS.swift:5225`): token suppression, the repetition penalty (talker
   only), temperature, top-k, top-p, min-p, then MLX's categorical at temperature 1. Temperature
   comes before the truncation filters (ported from mlx-audio `a730a68`).
 - **EOS** is filtered like any token since 2026-10-20 (D2, the RF-18 follow-up screen);
@@ -362,7 +362,7 @@ so one generation cannot change another's.
 
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
 each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:3235-3305`), and
-every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:3494`). Outside that policy,
+every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:3496`). Outside that policy,
 marking clears the cache three times per take (B-09), and the code makes 16 direct
 `Memory.clearCache()` calls (B-22, E2-02).
 
@@ -545,8 +545,8 @@ The full schema and the benchmark recipes are in
 
 Both lock files resolve these versions: `Packages/VocelloQwen3Core/Package.resolved` and
 `QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
-`config/swift-dependency-update-policy.json` binds the five pins to their declarations and lock
-files, and §9.4 watches them.
+`config/swift-dependency-update-policy.json` binds these five pins, and the macOS app's Sparkle pin,
+to their declarations and lock files, and §9.4 watches them.
 
 Couplings:
 
@@ -612,7 +612,7 @@ Only when:
 ### 9.4 Scheduled release and advisory watch
 
 Dependabot cannot cover the root XcodeGen manifest, so
-`.github/workflows/swift-dependency-watch.yml` compares all five exact pins weekly, read-only,
+`.github/workflows/swift-dependency-watch.yml` compares every policy-bound exact pin weekly, read-only,
 against stable GitHub releases and the repository's open Dependabot alerts. It uploads a 14-day
 JSON/Markdown proposal and never edits a pin, opens a pull request or treats availability as
 compatibility. Validate the policy binding locally:

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-20
+reviewed: 2026-10-28
 summary: Maintaining the owned Qwen3 core package — first-party posture, the authority order of its contracts, the production contracts it must keep, the selective upstream-intake procedure (moved here from UPSTREAM.md) and the review checklist guarded by `scripts/qwen3_core_contract.py`.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -97,7 +97,9 @@ QwenLM reference ([`UPSTREAM.md`](../../Packages/VocelloQwen3Core/UPSTREAM.md)).
    preprocessing, or the MLX build) changes its version token, so stored clone artifacts rebuild
    fail-closed (`CLONE_ARTIFACT_FORMAT.md`). A dependency move follows
    [`mlx-guide.md` §9.3](mlx-guide.md#93-upgrade-procedure).
-5. Run `python3 scripts/qwen3_core_contract.py rebuild-current-inventory`.
+5. Run `scripts/dev.sh regen`, which rebuilds the current inventory and the facade API baseline
+   (`python3 scripts/qwen3_core_contract.py rebuild-current-inventory` and
+   `rebuild-facade-api-baseline`) with the other generated artifacts.
 6. Regenerate the Xcode project when products or dependencies change
    (`./scripts/regenerate_project.sh`; `--verify` also runs the contract gate).
 7. Run `scripts/dev.sh check` (its contract lane runs `python3 scripts/qwen3_core_contract.py

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-20
+reviewed: 2026-10-28
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -325,7 +325,7 @@ Two conditioning modes, chosen by whether a transcript resolves:
   falls back to Voice Design.
 
 A one-off reference uses only an inline transcript; a saved voice also reads its `.txt` sidecar
-(`NativeCloneSupport.swift:781-799`). The Base model does not support instructions (QwenLM#25), and
+(`NativeCloneSupport.swift:783-801`). The Base model does not support instructions (QwenLM#25), and
 Vocello's clone request has no field to carry one. Model-side conditioning details and Vocello's
 open clone gaps are in §8.
 
@@ -424,7 +424,7 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 
 Qwen advertises a "3-second rapid clone" (RM L77). Vocello's thresholds come from the hosted
 service's guidance, not from a documented limit of the open model
-(`NativeCloneSupport.swift:703-737`): under 10 s warns, 30–60 s warns, and over 60 s is the one
+(`NativeCloneSupport.swift:705-739`): under 10 s warns, 30–60 s warns, and over 60 s is the one
 hard block (`hardBlockingTokens`, `SemanticTypes.swift:862`), which stops a saved voice being kept.
 The audit found the policy weaker than it reads (G-08–G-11):
 
@@ -477,7 +477,7 @@ fallback (2,048; `model.generate` alone uses 4,096). Qwen's README examples and 
 ### 9.2 Take variations
 
 The user-facing **take variation** changes only the talker
-(`UnsafeSpeechGenerationModel.swift:95-131`):
+(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift:101-150`):
 
 | Variation | Talker temperature / top-p | Subtalker | Repetition penalty |
 | --- | --- | --- | --- |
@@ -493,11 +493,11 @@ either stage.
 
 ### 9.3 Decoding
 
-The talker's sampler (`Qwen3TTS.swift:5223-5422`, called at `:3895-3916`) runs in this order:
+The talker's sampler (`Qwen3TTS.swift:5225-5424`, called at `:3895-3916`) runs in this order:
 
 1. **Float32 logits.** Logits are cast to float32 before sampling, as the reference does (D3,
    production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` samples in the model's precision).
-2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:3567-3568`), and EOS stays
+2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:3569-3570`), and EOS stays
    suppressed until two frames exist (`productionMinimumGeneratedCodeTokensBeforeEOS`,
    `Qwen3TTS.swift:1440`), matching upstream's `min_new_tokens=2`.
 3. **Repetition penalty.** 1.05 over the talker's previously generated codebook-0 ids.
@@ -525,7 +525,7 @@ How the target text reaches the talker is generation semantics. The token-level 
   (`non_streaming_mode=True`, WM L642, L738), and stream only the audio. **D1 was adopted for them
   on 2026-10-20** (RF-21, §11.2, §12).
 - **Long-form segments and x-vector clones** use the streaming text layout: after the prefix, the
-  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:4023-4029`).
+  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:4025-4031`).
   Text enters at 12.5 tokens/s against about 4–5 spoken, so an ~860-character segment's text is
   used up after about 16 s and the talker sees only `tts_pad` for the remaining ~40 s (A-01). RF-18's
   screen kept this layout for long-form segments.
@@ -534,7 +534,7 @@ How the target text reaches the talker is generation semantics. The token-level 
 ### 9.5 Seeds and reproducibility
 
 Every request carries an effective seed (requested or random) and runs on its own MLX random state;
-the sampling algorithm version is 2 (`Generation.swift:74-84`). Seeded takes are deterministic on one
+the sampling algorithm version is 2 (`Generation.swift:79-90`). Seeded takes are deterministic on one
 build: a rerun of a fixed seed reproduced its PCM byte for byte in the RF-18 screens. A seed does not
 reproduce takes across these changes:
 

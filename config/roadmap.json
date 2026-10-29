@@ -360,8 +360,8 @@
         "scripts/ios_device_eligibility.py",
         "scripts/verify_ios_release_artifacts.py"
       ],
-      "updated": "2026-10-27",
-      "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag."
+      "updated": "2026-10-29",
+      "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag. 2026-10-29: build 27 is v3.0.0-ios.6 at d37583a3. Release run 40804330039 passed, and its IPA verification (verify_ios_release_artifacts.py, which requires LSSupportsGameMode = NO) passed on the exported Vocello.ipa. App Store Connect shows build 27 VALID and in Internal testing; external beta review is not submitted. Left: its launch on the phone shows no Game Mode banner."
     },
     {
       "id": "RF-38",

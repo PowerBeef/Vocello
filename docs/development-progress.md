@@ -17,13 +17,12 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 28: build 27 waits for the push (resume here)
+### October 29: build 27 is in TestFlight Internal (resume here)
 
 - **Next, in order:**
-  1. On the maintainer's request: push `main`, wait for CI, then cut build 27's candidate tag
-     (`python3 scripts/ios_candidate_tag.py`). Once it processes and passes beta review, distribute
-     it as build 26 was (Internal and Public Beta) and check on the phone that the Game Mode banner
-     is gone (RF-37).
+  1. Install build 27 from TestFlight and check that its launch shows no Game Mode banner (RF-37).
+     On the maintainer's request: What to Test notes, beta review and Public Beta, as for build 26
+     (`ios-appstore-submission.md`; Public Beta needs RF-17's promotion or a new waiver).
   2. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
      first; ui-perf with App Language on System, lang-bench and model-download are still missing),
      RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
@@ -33,13 +32,16 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      Paid Apps agreement, tax and banking), ASR-05's listing review, ASR-04's attestations and
      RF-38's BrowserStack trial (`scripts/farm_smoke.sh upload`, then `results`).
   4. Triage Public Beta feedback and crashes as they arrive.
-- **Git:** `origin/main` is `d53b30b4` (CI passed). `26b303ed` and later are local: build 27
-  (RF-37), RF-38's farm smoke test and script, and RF-39's review of the docs and roadmap (closed).
+- **Git:** `origin/main` is `d37583a3` (CI run 40792875949 passed): build 27 (RF-37), RF-38's farm
+  smoke test and script, and RF-39's review of the docs and roadmap (closed). Later checkpoint
+  commits are local.
 - **Decisions waiting:** RF-12 and RF-35 passed their October 27 due dates. RF-12's last row (the
   owned export in Airplane Mode) waits on RF-02, and RF-35 on a download completing over cellular.
   Each needs a recorded decision: move the date, cut the row or close the item.
-- **TestFlight:** build 26 (`v3.0.0-ios.5` at `e0feaf2c`) is in Internal and Public Beta with
-  beta review approved. RF-17 was waived for this Public Beta only (maintainer, October 26) and
+- **TestFlight:** build 27 (`v3.0.0-ios.6` at `d37583a3`, release run 40804330039 passed with the
+  IPA verifier requiring `LSSupportsGameMode` NO) is VALID and in Internal testing, not yet
+  submitted for beta review. Build 26 (`v3.0.0-ios.5` at `e0feaf2c`) is in Internal and Public Beta
+  with beta review approved. RF-17 was waived for this Public Beta only (maintainer, October 26) and
   still gates App Review. Build 23 (2.4.0) leaves the group when it expires on October 30.
 - **Phone (October 27, after RF-17's lanes):** a development build of `e0feaf2c` over TestFlight
   build 26, all three models ready, App Language on System. Reinstall the TestFlight build before a

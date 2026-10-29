@@ -17,12 +17,10 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 29: build 27 is in TestFlight Internal (resume here)
+### October 29: build 27 is in the Public Beta (resume here)
 
 - **Next, in order:**
   1. Install build 27 from TestFlight and check that its launch shows no Game Mode banner (RF-37).
-     On the maintainer's request: What to Test notes, beta review and Public Beta, as for build 26
-     (`ios-appstore-submission.md`; Public Beta needs RF-17's promotion or a new waiver).
   2. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
      first; ui-perf with App Language on System, lang-bench and model-download are still missing),
      RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
@@ -39,10 +37,10 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   owned export in Airplane Mode) waits on RF-02, and RF-35 on a download completing over cellular.
   Each needs a recorded decision: move the date, cut the row or close the item.
 - **TestFlight:** build 27 (`v3.0.0-ios.6` at `d37583a3`, release run 40804330039 passed with the
-  IPA verifier requiring `LSSupportsGameMode` NO) is VALID and in Internal testing, not yet
-  submitted for beta review. Build 26 (`v3.0.0-ios.5` at `e0feaf2c`) is in Internal and Public Beta
-  with beta review approved. RF-17 was waived for this Public Beta only (maintainer, October 26) and
-  still gates App Review. Build 23 (2.4.0) leaves the group when it expires on October 30.
+  IPA verifier requiring `LSSupportsGameMode` NO) is in Internal and Public Beta with beta review
+  approved on October 29; its What to Test notes are build 26's plus a Game Mode line. Build 26
+  (`v3.0.0-ios.5` at `e0feaf2c`) is still in both groups. RF-17 was waived for the Public Beta of
+  builds 26 and 27 only (maintainer, October 26 and 29) and still gates App Review. Build 23 (2.4.0) leaves the group when it expires on October 30.
 - **Phone (October 27, after RF-17's lanes):** a development build of `e0feaf2c` over TestFlight
   build 26, all three models ready, App Language on System. Reinstall the TestFlight build before a
   candidate row; a new TestFlight build's first launch shows the What to Test sheet, so tap

@@ -137,6 +137,9 @@ Between September 4 and October 12 the release did not move:
 - **2026-10-28.** A free BrowserStack trial runs a self-contained smoke test on a real iPhone 15 Pro
   and 15 Pro Max as exploratory evidence only (RF-38), and the documentation, agent instructions and
   roadmap are reviewed (RF-39).
+- **2026-10-29.** Build 27 (`v3.0.0-ios.6` at `d37583a3`: build 26's product plus the Game Mode
+  opt-out) joined the Public Beta group on the same terms as build 26: no RF-17 exact-tag manifest,
+  for the Public Beta only, and RF-17 still gates the App Review submission.
 
 ## The path
 

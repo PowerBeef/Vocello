@@ -360,8 +360,8 @@
         "scripts/ios_device_eligibility.py",
         "scripts/verify_ios_release_artifacts.py"
       ],
-      "updated": "2026-10-29",
-      "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag. 2026-10-29: build 27 is v3.0.0-ios.6 at d37583a3. Release run 40804330039 passed, and its IPA verification (verify_ios_release_artifacts.py, which requires LSSupportsGameMode = NO) passed on the exported Vocello.ipa. Build 27 passed beta review on 2026-10-29 and is in Internal and Public Beta testing. Left: its launch on the phone shows no Game Mode banner."
+      "updated": "2026-10-30",
+      "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag. 2026-10-29: build 27 is v3.0.0-ios.6 at d37583a3. Release run 40804330039 passed, and its IPA verification (verify_ios_release_artifacts.py, which requires LSSupportsGameMode = NO) passed on the exported Vocello.ipa. Build 27 passed beta review on 2026-10-29 and is in Internal and Public Beta testing. Left: its launch on the phone shows no Game Mode banner. 2026-10-30, computer use through iPhone Mirroring (record mirroring-20261030T121234Z-rf37-game-mode-banner, local): build 27's first launch from TestFlight and its return from the App Switcher showed no Game Mode banner. No control run: build 26 was not reinstalled, so it is not shown that Mirroring displays the banner. Closes on the maintainer's confirmation."
     },
     {
       "id": "RF-38",
@@ -2046,6 +2046,20 @@
       "updated": "2026-10-28",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "Parked 2026-10-28 from item 26 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only."
+    },
+    {
+      "id": "BKL-49",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mirroring capture helper finds no window on a non-English Mac",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/ios_device.sh mirroring capture finds the iPhone Mirroring window by bundle id or process, not by the English owner name, and a test covers a localized owner name.",
+      "sourceOfTruth": [
+        "scripts/lib/iphone_mirroring.py"
+      ],
+      "updated": "2026-10-30",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-30 from the RF-37 Mirroring check: on this Mac the window owner is \"Recopie de l'iPhone\", so capture refused every step and the record holds copied computer-use screenshots instead; not investigated (focus rules). Not a release blocker: test tooling only."
     },
     {
       "id": "ER-01",

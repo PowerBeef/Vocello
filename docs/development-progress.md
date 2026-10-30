@@ -17,10 +17,13 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 29: build 27 is in the Public Beta (resume here)
+### October 30: build 27 shows no Game Mode banner under Mirroring (resume here)
 
 - **Next, in order:**
-  1. Install build 27 from TestFlight and check that its launch shows no Game Mode banner (RF-37).
+  1. RF-37 closes on the maintainer's word: build 27 (installed from TestFlight) showed no Game
+     Mode banner at its first launch or on return from the App Switcher, through iPhone Mirroring
+     (local record `mirroring-20261030T121234Z-rf37-game-mode-banner`). There was no control run,
+     so a look at one launch on the phone itself settles it.
   2. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
      first; ui-perf with App Language on System, lang-bench and model-download are still missing),
      RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's

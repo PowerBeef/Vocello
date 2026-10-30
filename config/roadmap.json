@@ -348,22 +348,6 @@
       "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model; Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE, so per-request permission keeps that protection while the switch is off. Build 25, 2026-10-25: navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, switch off). Attended, 2026-10-27 on build 26 (maintainer): on 5G with no Wi-Fi and the switch off, a Voice Design download waits. It shows 682.3 MB (33%) from the start because speech_tokenizer/model.safetensors (682,293,092 bytes, the same SHA-256 in every model) is reused from the shared component store when an installed model holds it; reuse counts as progress with no network transfer. That matches the 682 MB seen on 2026-10-25, so those bytes were not cellular. The display is parked as BKL-39. With the switch on, a download started afterwards progressed over cellular (maintainer, 2026-10-27), then was stopped before it finished because coverage there is weak; a completion over cellular is not yet observed."
     },
     {
-      "id": "RF-37",
-      "plan": "release-first-3-0-2026-09",
-      "title": "The iPhone app opts out of Game Mode so no Game Mode banner shows at launch",
-      "status": "in-flight",
-      "blockedBy": [],
-      "due": "2026-10-29",
-      "gate": "Maintainer decision 2026-10-27: the iPhone 15 Pro gate (UIRequiredDeviceCapabilities iphone-performance-gaming-tier) makes iOS treat Vocello as a game and show the Game Mode banner at every launch. Sources/iOS/Info.plist sets LSSupportsGameMode to NO (Apple: turns Game Mode off for an app, iOS 18.6 and later) and the capabilities stay exactly arm64 and iphone-performance-gaming-tier. Done when scripts/ios_device_eligibility.py and the archive and IPA verifier reject a missing or true key, the routed check and the iOS compile pass, a new candidate (build 27) carries it, and its launch on the phone shows no Game Mode banner (the maintainer, or a computer-use record the maintainer confirms). RF-17's records and RF-15's launch and navigation rows move to that candidate.",
-      "sourceOfTruth": [
-        "Sources/iOS/Info.plist",
-        "scripts/ios_device_eligibility.py",
-        "scripts/verify_ios_release_artifacts.py"
-      ],
-      "updated": "2026-10-30",
-      "notes": "Opened 2026-10-27 at the maintainer's request after build 26 showed the Game Mode banner at every launch. Classified a release fix by the maintainer: every user sees it, and it presents Vocello as a game. Build 26's exact-tag RF-17 records (d53b30b4) stay as history; RF-17 reruns on build 27's tag. 2026-10-29: build 27 is v3.0.0-ios.6 at d37583a3. Release run 40804330039 passed, and its IPA verification (verify_ios_release_artifacts.py, which requires LSSupportsGameMode = NO) passed on the exported Vocello.ipa. Build 27 passed beta review on 2026-10-29 and is in Internal and Public Beta testing. Left: its launch on the phone shows no Game Mode banner. 2026-10-30, computer use through iPhone Mirroring (record mirroring-20261030T121234Z-rf37-game-mode-banner, local): build 27's first launch from TestFlight and its return from the App Switcher showed no Game Mode banner. No control run: build 26 was not reinstalled, so it is not shown that Mirroring displays the banner. Closes on the maintainer's confirmation."
-    },
-    {
       "id": "RF-38",
       "plan": "release-first-3-0-2026-09",
       "title": "A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max",

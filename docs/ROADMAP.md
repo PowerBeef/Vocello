@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 38/62 (61%) |
+| `release-first-3-0-2026-09` | active | release-qa | 39/62 (63%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -67,7 +67,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
-| `RF-37` | in-flight | The iPhone app opts out of Game Mode so no Game Mode banner shows at launch | — |
 | `RF-38` | planned | A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max | — |
 
 ### Open items in detail
@@ -145,9 +144,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-35`** (in-flight, due 2026-10-27) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
-
-- **`RF-37`** (in-flight, due 2026-10-29) — The iPhone app opts out of Game Mode so no Game Mode banner shows at launch.
-  gate: Maintainer decision 2026-10-27: the iPhone 15 Pro gate (UIRequiredDeviceCapabilities iphone-performance-gaming-tier) makes iOS treat Vocello as a game and show the Game Mode banner at every launch. Sources/iOS/Info.plist sets LSSupportsGameMode to NO (Apple: turns Game Mode off for an app, iOS 18.6 and later) and the capabilities stay exactly arm64 and iphone-performance-gaming-tier. Done when scripts/ios_device_eligibility.py and the archive and IPA verifier reject a missing or true key, the routed check and the iOS compile pass, a new candidate (build 27) carries it, and its launch on the phone shows no Game Mode banner (the maintainer, or a computer-use record the maintainer confirms). RF-17's records and RF-15's launch and navigation rows move to that candidate.
 
 - **`RF-38`** (planned, due 2026-11-03) — A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max.
   gate: Maintainer decision 2026-10-28: no iPhone 15 Pro has run Vocello yet, and BrowserStack App Automate's trial (100 free minutes) offers a real iPhone 15 Pro on iOS 27 and a 15 Pro Max on iOS 26. Public farm devices re-sign the app, which drops increased-memory-limit and the App Group, so these runs take the clone-off path under the default memory limit and count only as exploratory smoke evidence, never as floor-device or promotion evidence. Done when a self-contained XCUITest (fresh install: download one Built-in Voice model through Settings, generate a short take, find it in History, attach its timings) that no existing lane selects, and a script that packages the app and its test runner for upload, are committed with the routed check and the iOS compile passing, and the maintainer-run upload passes on both devices with the results summarised in the notes. The maintainer creates the trial account and runs the upload; Claude creates no account and handles no access key.

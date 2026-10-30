@@ -17,28 +17,26 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 30: build 27 shows no Game Mode banner under Mirroring (resume here)
+### October 30: RF-37 is closed; build 27 is the candidate (resume here)
 
 - **Next, in order:**
-  1. RF-37 closes on the maintainer's word: build 27 (installed from TestFlight) showed no Game
-     Mode banner at its first launch or on return from the App Switcher, through iPhone Mirroring
-     (local record `mirroring-20261030T121234Z-rf37-game-mode-banner`). There was no control run,
-     so a look at one launch on the phone itself settles it.
-  2. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
+  1. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
      first; ui-perf with App Language on System, lang-bench and model-download are still missing),
      RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
      attended rows (AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver, the offline
      relaunch).
-  3. The maintainer, any time: RF-02 (the updated license agreement, which blocks submissions, the
+  2. The maintainer, any time: RF-02 (the updated license agreement, which blocks submissions, the
      Paid Apps agreement, tax and banking), ASR-05's listing review, ASR-04's attestations and
      RF-38's BrowserStack trial (`scripts/farm_smoke.sh upload`, then `results`).
-  4. Triage Public Beta feedback and crashes as they arrive.
+  3. Triage Public Beta feedback and crashes as they arrive.
 - **Git:** `origin/main` is `d37583a3` (CI run 40792875949 passed): build 27 (RF-37), RF-38's farm
   smoke test and script, and RF-39's review of the docs and roadmap (closed). Later checkpoint
   commits are local.
-- **Decisions waiting:** RF-12 and RF-35 passed their October 27 due dates. RF-12's last row (the
-  owned export in Airplane Mode) waits on RF-02, and RF-35 on a download completing over cellular.
-  Each needs a recorded decision: move the date, cut the row or close the item.
+- **Decisions waiting:** RF-12 and RF-35 passed their October 27 due dates, and RF-15, RF-17 and
+  ASR-06 their October 29 ones. RF-12's last row (the owned export in Airplane Mode) waits on
+  RF-02, RF-35 on a download completing over cellular, and RF-15 and RF-17 on the next phone
+  window. Each needs a recorded decision: move the date, cut the row or close the item. With RF-37
+  closed, two items are in flight (RF-35, RF-10) under a cap of three.
 - **TestFlight:** build 27 (`v3.0.0-ios.6` at `d37583a3`, release run 40804330039 passed with the
   IPA verifier requiring `LSSupportsGameMode` NO) is in Internal and Public Beta with beta review
   approved on October 29; its What to Test notes are build 26's plus a Game Mode line. Build 26

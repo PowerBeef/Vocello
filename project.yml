@@ -6,6 +6,10 @@ options:
     iOS: "26.0"
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
+  # The macOS targets list Sources/iOS and Sources/iOSSupport files by path. Without
+  # intermediate groups, XcodeGen also places their folders (Models, Services, ViewModels,
+  # Studio) in the main group, and Xcode 27.2 refuses a group that has two parents.
+  createIntermediateGroups: true
 
 # Single shippable config. There is no separate Debug config / DEBUG symbol —
 # behavior-changing diagnostics require both the repository-owned

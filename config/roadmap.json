@@ -275,8 +275,8 @@
         "scripts/quality_promotion.py",
         "docs/reference/macos-release-qa.md"
       ],
-      "updated": "2026-10-22",
-      "notes": "2026-10-23: the Mac app and CLI 3.0.0 were published (latest) by the maintainer's route A, without a quality-promotion record. Verified before publication: SHA256SUMS, stapled tickets and Gatekeeper on both DMGs and the pkg, the pkg signature, build attestations, app 3.0.0 (24), the Sparkle appcast and the notes; the shipped Developer ID CLI passed cli_package.py qualify (three modes including French Design with a pinned seed, batch, cancellation). 2026-10-24: F-05 closed on release run 40020993733's hosted macos-26 packaged-app startup smoke (staged app and DMG app). Full Mac smoke on the published source (no Mac product input changed since e7a8e2ae) PASS 15/15, macos-xcui-smoke-20261024-205357-0952e758: Built-in, Design and Clone takes, recording, cancellation, long-form and its recovery, line batch, History, cross-language Studio, error recovery, Saved Voices states; it showed BKL-33 (write-error copy). Still open: the canonical benchmark and promotion lanes. Promotion-audit risks stay recorded (corpus v3 cells; Fast QC warnings make a record unpromotable; custom-ja-auto at 9cd075bd; Portuguese ~40 percent of an earlier screen). History: git log -p -- config/roadmap.json.",
+      "updated": "2026-10-30",
+      "notes": "2026-10-23: the Mac app and CLI 3.0.0 were published (latest) by the maintainer's route A, without a quality-promotion record, after SHA256SUMS, stapled tickets, Gatekeeper, the pkg signature, build attestations, the appcast and the notes were verified; the Developer ID CLI passed cli_package.py qualify. 2026-10-24: F-05 closed on release run 40020993733's packaged-app startup smoke; full Mac smoke on the published source PASS 15/15 (macos-xcui-smoke-20261024-205357-0952e758), showing BKL-33. Still open: the canonical benchmark and promotion lanes, now not buildable at v3.0.0 locally because Xcode 27.2 cannot open its project (fixed on main at 0f203210), so exact-tag v3.0.0 records need a maintainer decision. 2026-10-30, Mac smoke on main (db0afa2c, Xcode 27.2): 13 of 15 passed (macos-xcui-smoke-20261030-174603-220a2577); test12 and test13 were blocked by macOS's speech-recognition prompt for the freshly rebuilt ad-hoc test app (BKL-51); a rerun waits for the maintainer to allow it. Promotion-audit risks stay recorded. History: git log -p -- config/roadmap.json.",
       "due": "2026-10-31"
     },
     {
@@ -2058,6 +2058,20 @@
       "updated": "2026-10-30",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "Parked 2026-10-30: CI run 41074348103 on 7717b9ef failed only this test (subprocess.TimeoutExpired; 2,473 others passed), and it passes locally in under a second; not investigated (focus rules). Not a release blocker: test tooling only."
+    },
+    {
+      "id": "BKL-51",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The ad-hoc signed macOS UI-test build loses its speech-recognition permission on every clean rebuild",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The macOS XCUITest build carries a stable code-signing identity, so a granted macOS privacy permission survives a clean rebuild, or the smoke lane detects a pending permission prompt and stops with a clear message instead of timing out on covered elements.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh"
+      ],
+      "updated": "2026-10-30",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-30: macos-xcui-smoke-20261030-174603-220a2577 on db0afa2c passed 13 of 15; test12 and test13 timed out because macOS's speech-recognition prompt covered the window. The test app is ad-hoc signed (designated requirement is its cdhash), so the clean rebuild after the cache cleanup counted as a new app. Not investigated further (focus rules). Not a release blocker: test tooling only."
     },
     {
       "id": "ER-01",

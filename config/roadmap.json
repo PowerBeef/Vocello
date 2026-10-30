@@ -2046,6 +2046,20 @@
       "notes": "Parked 2026-10-30 from the RF-37 Mirroring check: on this Mac the window owner is \"Recopie de l'iPhone\", so capture refused every step and the record holds copied computer-use screenshots instead; not investigated (focus rules). Not a release blocker: test tooling only."
     },
     {
+      "id": "BKL-50",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI cancellation package test can time out on the Linux runner",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "CLIPackageTests.test_cancellation_observes_the_generation_started_event passes on the Linux CI runner without a subprocess timeout, or is quarantined with a recorded reason.",
+      "sourceOfTruth": [
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-10-30",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-10-30: CI run 41074348103 on 7717b9ef failed only this test (subprocess.TimeoutExpired; 2,473 others passed), and it passes locally in under a second; not investigated (focus rules). Not a release blocker: test tooling only."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

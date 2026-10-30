@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 14/50 (28%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 14/51 (27%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -561,6 +561,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-47` | parked | The Mac benchmark's script paste skips the pasteboard access check | — |
 | `BKL-48` | parked | Steps recorded without running carry no start time in the lane ledger | — |
 | `BKL-49` | parked | The Mirroring capture helper finds no window on a non-English Mac | — |
+| `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -703,6 +704,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-49`** (parked) — The Mirroring capture helper finds no window on a non-English Mac.
   gate: scripts/ios_device.sh mirroring capture finds the iPhone Mirroring window by bundle id or process, not by the English owner name, and a test covers a localized owner name.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-50`** (parked) — The CLI cancellation package test can time out on the Linux runner.
+  gate: CLIPackageTests.test_cancellation_observes_the_generation_started_event passes on the Linux CI runner without a subprocess timeout, or is quarantined with a recorded reason.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

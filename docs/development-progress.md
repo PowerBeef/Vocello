@@ -17,17 +17,19 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 30: build 28 is the candidate for RF-17 (resume here)
+### October 30: build 29 is the candidate for RF-17 (resume here)
 
-- **Xcode 27.2** (installed October 30) cannot open the project at build 27's tag, so RF-17's
-  records move to build 28: build 27's product plus intermediate groups in `project.yml`. The
-  iOS 27.2 platform component is installed; the macOS TSan and optimized caches were cleared to
-  make room. RF-17 needs seven records on build 28's tag: model download, retained memory, the
-  engine benchmark, UI performance, language, the UI benchmark and delivery, which no iPhone lane
-  produces (a maintainer decision).
+- **RF-17 moves to build 29.** Xcode 27.2 cannot open the project at build 27's tag (fixed with
+  intermediate groups); build 28's language lane then exposed a BT-06 regression (the lane never
+  pulled the shared engine and app telemetry; fixed), and iPhone delivery evaluation is declared not
+  applicable (maintainer, October 30). Build 28's UI benchmark, memory and engine records passed
+  but bind to its tag only. RF-17 needs six records on build 29's tag: model download, retained
+  memory, the engine benchmark, UI performance (App Language on System), language and the UI
+  benchmark, run when the maintainer says the Mac is quiet. UI Automation was re-enabled on the
+  phone after the Xcode update.
 - **Next, in order:**
-  1. The phone window of October 30, on build 28 (`v3.0.0-ios.7`): RF-17's six producible records
-     (App Language on System), then RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
+  1. On build 29's tag, once the Mac is quiet: RF-17's six records, then RF-15's launch and
+     navigation rows, RF-35's download completing over cellular, then RF-15's
      attended rows (AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver, the offline
      relaunch).
   2. The maintainer, any time: RF-02 (the updated license agreement, which blocks submissions, the

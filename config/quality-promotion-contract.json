@@ -334,13 +334,14 @@
       ]
     },
     "delivery-evaluation": {
+      "notApplicable": {
+        "ios": "Maintainer decision 2026-10-30 (RF-17): no iPhone lane produces delivery cells carrying deliveryPairedProsodyEffect, so iPhone delivery evaluation is unsupported for 3.0."
+      },
       "evidenceByPlatform": {
         "macos": [
           "macos-delivery-benchmark"
         ],
-        "ios": [
-          "ios-delivery-benchmark"
-        ]
+        "ios": []
       },
       "unsupportedDimensions": [
         "quality-tier",

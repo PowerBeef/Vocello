@@ -269,13 +269,55 @@ class QualityPromotionTests(unittest.TestCase):
         required = PROMOTION.required_evidence(contract, impact, "ios")
         self.assertNotIn("ios-quality-engine-benchmark", required)
         self.assertEqual(set(required), {
-            "ios-ui-benchmark", "ios-language-benchmark", "ios-delivery-benchmark",
+            "ios-ui-benchmark", "ios-language-benchmark",
             "ios-model-download-lifecycle", "ios-retained-memory", "ios-ui-performance",
         })
         coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "ios")
         self.assertEqual(coverage["quality-generation"]["platformApplicability"]["status"], "unsupported")
         self.assertIn("quality-generation:platform-ios", unsupported)
         self.assertEqual(coverage["speed-generation"]["platformApplicability"]["status"], "applicable")
+
+    def test_declared_not_applicable_platform_is_reported_unsupported_never_passed(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        PROMOTION.validate_contract(contract, root=self.root)
+        impact = {"promotionCapabilities": ["delivery-evaluation"]}
+        self.assertEqual(PROMOTION.required_evidence(contract, impact, "ios"),
+                         contract["platformMinimumEvidence"]["ios"])
+        self.assertIn("macos-delivery-benchmark", PROMOTION.required_evidence(contract, impact, "macos"))
+        coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "ios")
+        declared = coverage["delivery-evaluation"]["platformApplicability"]
+        self.assertEqual(declared["status"], "unsupported")
+        self.assertEqual(declared["reason"], "declared-not-applicable")
+        self.assertIn("RF-17", declared["decision"])
+        self.assertIn("delivery-evaluation:platform-ios", unsupported)
+        coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "macos")
+        self.assertNotIn("platformApplicability", coverage["delivery-evaluation"])
+        self.assertNotIn("delivery-evaluation:platform-macos", unsupported)
+
+    def test_not_applicable_needs_one_reasoned_platform_without_evidence(self) -> None:
+        for mutation in ("evidence-kept", "empty-reason", "both-platforms", "no-platform",
+                         "catalog-capability", "historical"):
+            with self.subTest(mutation=mutation):
+                contract = PROMOTION.load_contract(self.root)
+                delivery = contract["capabilities"]["delivery-evaluation"]
+                if mutation == "evidence-kept":
+                    delivery["evidenceByPlatform"]["ios"] = ["ios-delivery-benchmark"]
+                elif mutation == "empty-reason":
+                    delivery["notApplicable"]["ios"] = " "
+                elif mutation == "both-platforms":
+                    delivery["notApplicable"]["macos"] = "both"
+                    delivery["evidenceByPlatform"]["macos"] = []
+                elif mutation == "no-platform":
+                    delivery["notApplicable"] = {}
+                elif mutation == "catalog-capability":
+                    contract["capabilities"]["speed-generation"]["notApplicable"] = {"ios": "waived"}
+                else:
+                    contract["schemaVersion"] = 2
+                    del contract["modelApplicabilitySource"]
+                    for definition in contract["capabilities"].values():
+                        definition.pop("platformApplicability", None)
+                with self.assertRaises(PROMOTION.PromotionError):
+                    PROMOTION.validate_contract(contract, root=self.root)
 
     def test_applicability_cannot_waive_supported_platforms_or_claim_unsupported(self) -> None:
         for capability, platform in (("speed-generation", "ios"), ("quality-generation", "macos"),
@@ -343,7 +385,9 @@ class QualityPromotionTests(unittest.TestCase):
         del contract["modelApplicabilitySource"]
         for definition in contract["capabilities"].values():
             definition.pop("platformApplicability", None)
+            definition.pop("notApplicable", None)
         contract["capabilities"]["quality-generation"]["evidenceByPlatform"]["ios"] = ["ios-quality-engine-benchmark"]
+        contract["capabilities"]["delivery-evaluation"]["evidenceByPlatform"]["ios"] = ["ios-delivery-benchmark"]
         self.write_json(self.root / PROMOTION.CONTRACT_PATH, contract)
         PROMOTION.validate_contract(contract, root=self.root)
         impact = {"promotionCapabilities": ["quality-generation"]}

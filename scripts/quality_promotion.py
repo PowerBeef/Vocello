@@ -170,6 +170,8 @@ def validate_contract(contract: dict[str, Any], *, root: Path = ROOT) -> None:
         keys = {"evidenceByPlatform", "unsupportedDimensions"}
         if capability in applicability:
             keys.add("platformApplicability")
+        elif version == 3 and isinstance(definition, dict) and "notApplicable" in definition:
+            keys.add("notApplicable")
         if not isinstance(definition, dict) or set(definition) != keys:
             raise PromotionError(f"{capability} capability definition is malformed")
         if capability in applicability:
@@ -178,11 +180,21 @@ def validate_contract(contract: dict[str, Any], *, root: Path = ROOT) -> None:
                     or any(type(value) is not bool for value in declared.values())
                     or declared != applicability[capability]):
                 raise PromotionError(f"{capability} platform applicability disagrees with source")
+        # A capability the model catalog does not decide can be declared not applicable on one
+        # platform by a recorded decision; that platform then needs no evidence and the manifest
+        # reports the capability unsupported there, never passed.
+        not_applicable = definition.get("notApplicable", {})
+        if "notApplicable" in keys and (
+            not isinstance(not_applicable, dict) or len(not_applicable) != 1
+            or not set(not_applicable) <= {"macos", "ios"}
+            or any(not isinstance(reason, str) or not reason.strip() for reason in not_applicable.values())
+        ):
+            raise PromotionError(f"{capability} notApplicable must give one platform a recorded reason")
         by_platform = definition["evidenceByPlatform"]
         if not isinstance(by_platform, dict) or set(by_platform) != {"macos", "ios"}:
             raise PromotionError(f"{capability} must map evidence for macos and ios")
         for platform, identities in by_platform.items():
-            applies = applicability.get(capability, {}).get(platform, True)
+            applies = applicability.get(capability, {}).get(platform, platform not in not_applicable)
             if (not isinstance(identities, list)
                     or any(not isinstance(identity, str) for identity in identities)
                     or bool(identities) != applies or len(identities) != len(set(identities))):
@@ -449,6 +461,13 @@ def capability_coverage(
             }
             if not applies:
                 unsupported.add(f"{capability}:platform-{platform}")
+        elif platform in definition.get("notApplicable", {}):
+            result[capability]["platformApplicability"] = {
+                "status": "unsupported",
+                "reason": "declared-not-applicable",
+                "decision": definition["notApplicable"][platform],
+            }
+            unsupported.add(f"{capability}:platform-{platform}")
     return result, sorted(unsupported)
 
 

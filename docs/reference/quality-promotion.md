@@ -76,7 +76,8 @@ changes add the smallest platform-specific set declared by the contract: applica
 requires a Quality-tier engine record across Custom, Design, and Clone on macOS; the production
 model contract does not expose Quality on iOS. Multilingual changes require every
 declared language cell; delivery changes require delivery cells carrying the governed prosody
-metric; and model-catalog changes require the managed lifecycle receipt. Memory paths add
+metric on macOS (iPhone delivery is declared not applicable, below); and model-catalog changes
+require the managed lifecycle receipt. Memory paths add
 `memory-qualification`, and UI paths add `ui-perf`. `python3 scripts/quality_promotion.py
 classify --base <previous-tag>` shows the conditional evidence before capture; a path that matches
 no routing class adds nothing beyond the platform minimum.
@@ -89,8 +90,13 @@ items remain the authority for removing those labels.
 Contract schema v3 digest-binds platform applicability to
 `Sources/Resources/qwenvoice_contract.json`, validating every model's platform and iOS download
 eligibility. iOS Quality is explicitly `unsupported` in coverage, not passed or silently omitted.
-All iOS Speed/mode, language, delivery, lifecycle, memory and UI requirements still apply when
-selected by impact. macOS Quality cannot be substituted with a Speed record. Eligibility drift,
+A capability the catalog does not decide can be declared not applicable on one platform through
+its `notApplicable` entry, which carries the recorded decision: that platform lists no evidence and
+the manifest reports the capability `unsupported` there (`declared-not-applicable`, with the
+decision text). iPhone delivery evaluation is declared so (maintainer, 2026-10-30, RF-17): no
+iPhone lane produces delivery cells. All other iOS Speed/mode, language, lifecycle, memory and UI
+requirements still apply when selected by impact. macOS Quality cannot be substituted with a Speed
+record. Eligibility drift,
 partial-mode support, absent applicability or unsupported waivers fail closed and require review.
 Manifest schema v2 is unchanged. Historical contract-v2 manifests retain their original nonempty
 lane requirements and exact contract digest; they are not reinterpreted as current-source evidence.

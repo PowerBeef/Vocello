@@ -17,12 +17,17 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 30: RF-37 is closed; build 27 is the candidate (resume here)
+### October 30: build 28 is the candidate for RF-17 (resume here)
 
+- **Xcode 27.2** (installed October 30) cannot open the project at build 27's tag, so RF-17's
+  records move to build 28: build 27's product plus intermediate groups in `project.yml`. The
+  iOS 27.2 platform component is installed; the macOS TSan and optimized caches were cleared to
+  make room. RF-17 needs seven records on build 28's tag: model download, retained memory, the
+  engine benchmark, UI performance, language, the UI benchmark and delivery, which no iPhone lane
+  produces (a maintainer decision).
 - **Next, in order:**
-  1. The next announced phone window, on build 27: RF-17's records at its tag (classify the tag
-     first; ui-perf with App Language on System, lang-bench and model-download are still missing),
-     RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
+  1. The phone window of October 30, on build 28 (`v3.0.0-ios.7`): RF-17's six producible records
+     (App Language on System), then RF-15's launch and navigation rows, RF-35's download completing over cellular, then RF-15's
      attended rows (AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver, the offline
      relaunch).
   2. The maintainer, any time: RF-02 (the updated license agreement, which blocks submissions, the

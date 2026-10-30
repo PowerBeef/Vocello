@@ -164,6 +164,7 @@ class IOSLanguageBenchLaneTests(unittest.TestCase):
             shell.helper(helper, "exit 0")
         body = (
             "qv_stub require_team\nqv_stub cmd_build\nqv_stub cmd_install\nqv_stub capture_benchmark_source\n"
+            "qv_stub cmd_pull\n"
             "require_qc_python() { QC_PYTHON=python3; }\n"
             'cmd_launch() { qv_record cmd_launch "$@" "telemetry=${QWENVOICE_NATIVE_TELEMETRY_MODE:-}"; }\n'
             + SENTINEL_STAND_IN.replace("FAILED_TAKE", str(failed_take))
@@ -179,6 +180,13 @@ class IOSLanguageBenchLaneTests(unittest.TestCase):
         self.assertEqual({launch[-1] for launch in launches}, {"telemetry=verbose"})
         [collected] = shell.calls_to(LANGUAGE_EVIDENCE, "collect")
         self.assertNotIn("--cohort", collected)
+        # The per-take waits pull only each run folder; the collector needs the shared engine
+        # and app telemetry, pulled once after the last take and before collection.
+        [pulled] = shell.calls_to("cmd_pull")
+        self.assertEqual(pulled[1:], ["--subtree", "engine", "--subtree", "app"])
+        self.assertEqual(pulled[0], collected[collected.index("--source") + 1])
+        self.assertLess(shell.index("wait_device_diagnostics_sentinel", last=True), shell.index("cmd_pull"))
+        self.assertLess(shell.index("cmd_pull"), shell.index(LANGUAGE_EVIDENCE, "collect"))
         for gate in GATES:
             [arguments] = shell.calls_to(gate)
             self.assertNotIn("--cohort", arguments)

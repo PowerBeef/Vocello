@@ -1616,6 +1616,12 @@ PY
 
   [[ "$cell_count" -gt 0 ]] || die "lang-bench: no cells for subset=$subset"
 
+  # Each take's wait pulls only that take's run folder; the collector also reads the shared
+  # engine and app telemetry, which only these subtrees carry. A failed pull leaves the
+  # collector to report the missing telemetry, so the lane still writes its verdict.
+  ( cmd_pull "$dest" --subtree engine --subtree app ) >/dev/null \
+    || warn "lang-bench: could not pull the engine and app telemetry"
+
   note "lang-bench: pulled $cell_count takes ($cell_fail diagnostic failures) — selecting exact evidence"
   local diag="$artifacts/diagnostics" collect_st=0
   local -a cohort_args=()

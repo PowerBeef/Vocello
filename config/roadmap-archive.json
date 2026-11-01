@@ -5761,6 +5761,28 @@
         "run:github-actions-release-40804330039",
         "file:Sources/iOS/Info.plist"
       ]
+    },
+    {
+      "id": "RF-10",
+      "plan": "release-first-3-0-2026-09",
+      "title": "independently qualify macOS and downloadable CLI",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
+      "sourceOfTruth": [
+        "scripts/release.sh",
+        "scripts/macos_test.sh",
+        "scripts/quality_promotion.py",
+        "docs/reference/macos-release-qa.md"
+      ],
+      "updated": "2026-11-01",
+      "notes": "2026-10-23: Mac app and CLI 3.0.0 published (latest) by the maintainer's route A, without a quality-promotion record, after SHA256SUMS, stapled tickets, Gatekeeper, the pkg signature, build attestations, the appcast and the notes were verified; the Developer ID CLI passed cli_package.py qualify. 2026-10-24: F-05 closed on release run 40020993733's packaged-app startup smoke; full Mac smoke on the published source PASS 15/15 (macos-xcui-smoke-20261024-205357-0952e758). 2026-10-30, on main with Xcode 27.2: macos-xcui-smoke-20261030-183009-c21eb899 PASS 15/15 after a permission prompt blocked an earlier run (BKL-51). Exact-tag v3.0.0 records cannot be produced locally because Xcode 27.2 cannot open that tag's project. History: git log -p -- config/roadmap.json. 2026-11-01, maintainer decision: closed without the canonical benchmark and promotion lanes.",
+      "due": "2026-10-31",
+      "evidence": [
+        "run:macos-xcui-smoke-20261024-205357-0952e758",
+        "run:macos-xcui-smoke-20261030-183009-c21eb899",
+        "run:github-actions-release-40020993733"
+      ]
     }
   ]
 }

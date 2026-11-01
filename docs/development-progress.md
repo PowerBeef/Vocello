@@ -17,46 +17,40 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### October 30: build 29 is the candidate for RF-17 (resume here)
+### November 1: a dated path to App Review on November 12 (resume here)
 
-- **RF-17 moves to build 29.** Xcode 27.2 cannot open the project at build 27's tag (fixed with
-  intermediate groups); build 28's language lane then exposed a BT-06 regression (the lane never
-  pulled the shared engine and app telemetry; fixed), and iPhone delivery evaluation is declared not
-  applicable (maintainer, October 30). Build 28's UI benchmark, memory and engine records passed
-  but bind to its tag only. RF-17 needs six records on build 29's tag: model download, retained
-  memory, the engine benchmark, UI performance (App Language on System), language and the UI
-  benchmark, run when the maintainer says the Mac is quiet. UI Automation was re-enabled on the
-  phone after the Xcode update.
-- **Next, in order:**
-  1. On build 29's tag, once the Mac is quiet: RF-17's six records, then RF-15's launch and
-     navigation rows, RF-35's download completing over cellular, then RF-15's
-     attended rows (AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver, the offline
-     relaunch).
-  2. The maintainer, any time: RF-02 (the updated license agreement, which blocks submissions, the
-     Paid Apps agreement, tax and banking), ASR-05's listing review, ASR-04's attestations and
-     RF-38's BrowserStack trial (`scripts/farm_smoke.sh upload`, then `results`).
-  3. Triage Public Beta feedback and crashes as they arrive.
-- **Git:** `origin/main` is `d37583a3` (CI run 40792875949 passed): build 27 (RF-37), RF-38's farm
-  smoke test and script, and RF-39's review of the docs and roadmap (closed). Later checkpoint
-  commits are local.
-- **Decisions waiting:** RF-12 and RF-35 passed their October 27 due dates, and RF-15, RF-17 and
-  ASR-06 their October 29 ones. RF-12's last row (the owned export in Airplane Mode) waits on
-  RF-02, RF-35 on a download completing over cellular, and RF-15 and RF-17 on the next phone
-  window. Each needs a recorded decision: move the date, cut the row or close the item. With RF-37
-  closed, two items are in flight (RF-35, RF-10) under a cap of three.
-- **TestFlight:** build 27 (`v3.0.0-ios.6` at `d37583a3`, release run 40804330039 passed with the
-  IPA verifier requiring `LSSupportsGameMode` NO) is in Internal and Public Beta with beta review
-  approved on October 29; its What to Test notes are build 26's plus a Game Mode line. Build 26
-  (`v3.0.0-ios.5` at `e0feaf2c`) is still in both groups. RF-17 was waived for the Public Beta of
-  builds 26 and 27 only (maintainer, October 26 and 29) and still gates App Review. Build 23 (2.4.0) leaves the group when it expires on October 30.
-- **Phone (October 27, after RF-17's lanes):** a development build of `e0feaf2c` over TestFlight
-  build 26, all three models ready, App Language on System. Reinstall the TestFlight build before a
-  candidate row; a new TestFlight build's first launch shows the What to Test sheet, so tap
-  Continue first.
-- **In force:** 3.0 ships outside the EU (maintainer, October 27: the 27 EU territories are off,
-  the account and app are declared non-trader, and the EU release is BKL-41). Nobody listens for
-  3.0; machine screens catch gross failures only. RF-38's farm runs re-sign the app without
-  `increased-memory-limit`, so they are clone-off exploratory evidence only.
+- **Next, in order** (maintainer decision of November 1, recorded in the release plan):
+  1. The maintainer, by November 5 to 6: RF-02's GST/QST registration with Revenu Québec (saved
+     under the maintainer's temporary code, started October 30, valid 30 days), then Quebec form
+     FP-2506-V in App Store Connect, which activates the Paid Apps Agreement; ASR-04's
+     attestations; ASR-05's listing and review-notes review; ASR-02 and ASR-11's App Privacy
+     readback in the browser.
+  2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-17's six
+     records and its manifest, RF-15 including the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09,
+     ASR-06, RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots.
+     About 3 to 4 hours, mostly unattended; Mac quiet, phone unlocked with Auto-Lock off.
+  3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
+     Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
+- **Done since October 30:** the updated Program License Agreement and the Paid Apps Agreement
+  accepted; the W-8BEN and US Certificate of Foreign Status active; a Canadian bank account added.
+  RF-10 closed by decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
+  smoke on main passed 15/15 on Xcode 27.2. The App Store Connect audit (ASR-11) lists what
+  version 3.0.0 still lacks: listing text, screenshots, review details, an attached build and the
+  purchase's metadata.
+- **Build 29:** `v3.0.0-ios.8` at `a60dd204` is in TestFlight (release run 41079341984). Its
+  release evidence is kept in `build/artifacts/quality-promotion/release-v3.0.0-ios.8` (the GitHub
+  artifact expires November 13). Build 28's upload timed out in the archive step (45 minutes is
+  tight); build 29 replaces it. Its only RF-17 attempt so far, model download on October 30, failed
+  on a CoreDevice launch error; replug the phone if it repeats.
+- **Phone:** UI Automation re-enabled after the Xcode 27.2 update; development builds from the
+  October 30 lanes may be installed, so reinstall TestFlight build 29 before a candidate row and
+  tap Continue on its What to Test sheet.
+- **Mac:** Xcode 27.2 with the iOS 27.2 component. The ad-hoc test build asks for speech
+  recognition again after every clean rebuild (BKL-51); the maintainer clicks Autoriser.
+- **TestFlight:** builds 26 and 27 are in Internal and Public Beta under the RF-17 waiver for the
+  Public Beta only; RF-17 still gates App Review.
+- **In force:** 3.0 ships outside the EU (BKL-41 holds the EU release). Nobody listens for 3.0;
+  machine screens catch gross failures only. RF-38's farm runs are exploratory only.
 
 ### October 26 to 27: build 26 in Public Beta, RF-17 at its tag
 

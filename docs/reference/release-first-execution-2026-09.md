@@ -140,10 +140,21 @@ Between September 4 and October 12 the release did not move:
 - **2026-10-29.** Build 27 (`v3.0.0-ios.6` at `d37583a3`: build 26's product plus the Game Mode
   opt-out) joined the Public Beta group on the same terms as build 26: no RF-17 exact-tag manifest,
   for the Public Beta only, and RF-17 still gates the App Review submission.
+- **2026-10-30.** Xcode 27.2 cannot open the project at build 27's tag, so RF-17's records move to
+  build 29 (`v3.0.0-ios.8` at `a60dd204`: intermediate project groups, the language lane's
+  telemetry pull and the contract change). iPhone delivery evaluation is declared not applicable
+  in the promotion contract: no iPhone lane produces delivery cells.
+- **2026-11-01.** A new schedule replaces the passed dates. The maintainer's paperwork (RF-02's
+  GST/QST registration and Quebec form, ASR-04's attestations, ASR-05's listing review, ASR-02 and
+  ASR-11's privacy readback) is due November 5 to 6; one phone session on build 29 after RF-02
+  (RF-17, RF-15 with its purchase rows, the AUD items, ASR-06, RF-35, RF-12 and ASR-05's
+  screenshots) is due November 9; ASR-09 and the App Review submission (RF-16) are due
+  November 12. RF-10 closes without the Mac promotion lanes, which can no longer be built at
+  v3.0.0; RF-23, DW-04 and RF-38 park until after the submission.
 
 ## The path
 
-Dates are targets and the status is as of October 28; `config/roadmap.json` is current, and an
+Dates are targets and the status is as of November 1; `config/roadmap.json` is current, and an
 overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.
 
 | Step | Items | Exit | Who | Status |

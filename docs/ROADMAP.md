@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 39/62 (63%) |
+| `release-first-3-0-2026-09` | active | release-qa | 40/62 (65%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -45,94 +45,87 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `ASR-02` | parked | Resolve Hugging Face processing and App Privacy disclosure | — |
-| `ASR-04` | parked | Bundle complete attributions and record content rights | — |
+| `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | — |
+| `ASR-04` | planned | Bundle complete attributions and record content rights | — |
 | `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `RF-12` |
 | `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `RF-12` |
 | `ASR-09` | planned | Prove reviewer access to immutable model hosting | `RF-09` |
-| `ASR-11` | parked | Audit live App Store Connect and regional compliance read-only | `RF-02` |
+| `ASR-11` | planned | Audit live App Store Connect and regional compliance read-only | `RF-02` |
 | `AUD-01` | planned | iOS launch and deep-link dead ends | `RF-15` |
 | `AUD-02` | planned | One owner for the iOS audio session | — |
 | `AUD-07` | planned | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | `RF-15` |
 | `DW-03` | parked | Development workflow: product-side quality (audit Phase 2) | — |
-| `DW-04` | planned | Development workflow: longer-term modernization (audit Phase 3) | — |
-| `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-10` | in-flight | independently qualify macOS and downloadable CLI | — |
+| `DW-04` | parked | Development workflow: longer-term modernization (audit Phase 3) | — |
+| `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | parked | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
+| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
-| `RF-23` | planned | The Mac app offers new versions and installs them through Sparkle | — |
+| `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
-| `RF-38` | planned | A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max | — |
+| `RF-38` | parked | A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max | — |
 
 ### Open items in detail
 
-- **`ASR-02`** (parked) — Resolve Hugging Face processing and App Privacy disclosure.
+- **`ASR-02`** (planned, due 2026-11-05) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.
-  unparkWhen: ASR-11 unparks (RF-02's account steps are complete) and reads the published label back.
 
-- **`ASR-04`** (parked) — Bundle complete attributions and record content rights.
+- **`ASR-04`** (planned, due 2026-11-05) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
-  unparkWhen: The maintainer gives the per-asset attestations (groups 1-11 and confirmations 12-13 in docs/reference/content-rights-review.md), or approves replacing an asset that cannot be attested.
 
-- **`ASR-05`** (planned, due 2026-10-30) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
+- **`ASR-05`** (planned, due 2026-11-09) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
   gate: Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.
 
-- **`ASR-06`** (planned, due 2026-10-29) — Define and verify sensitive-file protection and backup policy.
+- **`ASR-06`** (planned, due 2026-11-09) — Define and verify sensitive-file protection and backup policy.
   gate: A machine-readable path contract must classify models, downloads, caches, imported/recorded references, prepared clone data, saved voices, generated audio, History, and diagnostics by backup and data-protection policy. Source must apply the intended protection without breaking background delivery, and signed-device evidence must verify file attributes, backup exclusion, deletion, and relaunch behavior.
 
-- **`ASR-09`** (planned, due 2026-10-30) — Prove reviewer access to immutable model hosting.
+- **`ASR-09`** (planned, due 2026-11-12) — Prove reviewer access to immutable model hosting.
   gate: The exact anonymous catalog URLs must be probed from each distribution region the maintainer records as in scope for 3.0 (a recorded North-America-only scope, with the residual risk for other regions noted, satisfies this) for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
 
-- **`ASR-11`** (parked) — Audit live App Store Connect and regional compliance read-only.
+- **`ASR-11`** (planned, due 2026-11-06) — Audit live App Store Connect and regional compliance read-only.
   gate: Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
-  unparkWhen: RF-02 unparks and the account steps are complete.
 
-- **`AUD-01`** (planned, due 2026-10-30) — iOS launch and deep-link dead ends.
+- **`AUD-01`** (planned, due 2026-11-09) — iOS launch and deep-link dead ends.
   gate: A dependency-bootstrap failure offers retry and restart rather than a terminal screen; opening a file during first run never presents the import cover over the onboarding cover; both proven on the phone by iOS smoke. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`AUD-02`** (planned, due 2026-10-30) — One owner for the iOS audio session.
+- **`AUD-02`** (planned, due 2026-11-09) — One owner for the iOS audio session.
   gate: Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`AUD-07`** (planned, due 2026-10-30) — Verify recovery from an unverified StoreKit purchase.
+- **`AUD-07`** (planned, due 2026-11-09) — Verify recovery from an unverified StoreKit purchase.
   gate: A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).
 
-- **`AUD-09`** (planned, due 2026-10-30) — Smoke test01 owns the fixture it depends on.
+- **`AUD-09`** (planned, due 2026-11-09) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).
 
 - **`DW-03`** (parked) — Development workflow: product-side quality (audit Phase 2).
   gate: Audit P2-1 to P2-7 land with the release candidate's evidence: target-scoped dev optimization so MLX and packages build at -O, dwarf test builds and a registered compilation cache, a shared framework instead of compiling app files into VocelloCoreTests by path, Swift Testing for new parametrized and property tests, test-adequacy work (fakes that reach the code, ground-truth assertions, load-coordinator and runtime seam tests, interleavings, a nightly shipped-configuration run), the strictness ratchet and the observability items; release build settings stay identical unless a change is reviewed as a release change.
   unparkWhen: The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.
 
-- **`DW-04`** (planned, due 2026-10-30) — Development workflow: longer-term modernization (audit Phase 3).
+- **`DW-04`** (parked) — Development workflow: longer-term modernization (audit Phase 3).
   gate: Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.
+  unparkWhen: After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.
 
-- **`RF-02`** (parked) — complete Apple prerequisites and the consolidated qualified-decision packet.
+- **`RF-02`** (planned, due 2026-11-06) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
-  unparkWhen: The maintainer resumes the App Store Connect account steps: the updated Apple Developer Program License Agreement, the Paid Apps agreement (Apple's two-factor prompt), tax and banking.
 
-- **`RF-10`** (in-flight, due 2026-10-31) — independently qualify macOS and downloadable CLI.
-  gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
-
-- **`RF-12`** (planned, due 2026-10-27) — Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate.
+- **`RF-12`** (planned, due 2026-11-09) — Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate.
   gate: After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate. On that build, an owned export unlock still saves and shares Design and Clone audio with the phone in Airplane Mode (moved from RF-13, 2026-10-16: only the live App Store's offline cache was left untested).
 
-- **`RF-15`** (planned, due 2026-10-29) — Risk-based acceptance of the processed 3.0.0 candidate on the iPhone.
+- **`RF-15`** (planned, due 2026-11-09) — Risk-based acceptance of the processed 3.0.0 candidate on the iPhone.
   gate: On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand, or a computer-use record the maintainer confirms; decision 2026-10-25) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.
 
-- **`RF-16`** (parked) — Submit 3.0.0 for App Review on the maintainer's explicit go.
+- **`RF-16`** (planned, due 2026-11-12) — Submit 3.0.0 for App Review on the maintainer's explicit go.
   gate: Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.
-  unparkWhen: RF-02, ASR-02 and ASR-04 unpark and every blocker is closed.
 
-- **`RF-17`** (planned, due 2026-10-29) — Exact-tag iOS quality promotion.
+- **`RF-17`** (planned, due 2026-11-09) — Exact-tag iOS quality promotion.
   gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
 
-- **`RF-23`** (planned, due 2026-10-30) — The Mac app offers new versions and installs them through Sparkle.
+- **`RF-23`** (parked) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.
+  unparkWhen: After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.
 
 - **`RF-30`** (parked) — Cross-process History for the app and the CLI.
   gate: A History process lock wraps every History mutation in the app and the CLI, with a macOS busy timeout, a schema-skew guard, change notifications the app observes and the engine lease in the app; CLI History on by default with delete, clear and recover; iOS behaviour identical; cross-process tests and the Mac smoke pass.
@@ -142,11 +135,12 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
   unparkWhen: The iOS 3.0 submission is done.
 
-- **`RF-35`** (in-flight, due 2026-10-27) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
+- **`RF-35`** (in-flight, due 2026-11-09) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
 
-- **`RF-38`** (planned, due 2026-11-03) — A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max.
+- **`RF-38`** (parked) — A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max.
   gate: Maintainer decision 2026-10-28: no iPhone 15 Pro has run Vocello yet, and BrowserStack App Automate's trial (100 free minutes) offers a real iPhone 15 Pro on iOS 27 and a 15 Pro Max on iOS 26. Public farm devices re-sign the app, which drops increased-memory-limit and the App Group, so these runs take the clone-off path under the default memory limit and count only as exploratory smoke evidence, never as floor-device or promotion evidence. Done when a self-contained XCUITest (fresh install: download one Built-in Voice model through Settings, generate a short take, find it in History, attach its timings) that no existing lane selects, and a script that packages the app and its test runner for upload, are committed with the routed check and the iOS compile passing, and the maintainer-run upload passes on both devices with the results summarised in the notes. The maintainer creates the trial account and runs the upload; Claude creates no account and handles no access key.
+  unparkWhen: After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.
 
 ## Engine remediation programme (2026-10-16 audit)
 

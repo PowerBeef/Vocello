@@ -40,6 +40,28 @@ cleanup() {
   [[ -z "$stage" ]] || rm -rf "$stage"
 }
 
+# Xcode's incremental build-for-testing can re-sign the test bundle without re-sealing the
+# XCTRunner wrapper around it ("a sealed resource is missing or invalid", 2026-11-01, as
+# ui_test.sh's ensure_ios_candidate_runner_signature records for the candidate runner). A staged
+# wrapper that fails verification is re-sealed the way Xcode's CodeSign step seals it: with the
+# certificate that signed the test bundle inside it and the test target's entitlements.
+reseal_staged_runner() {
+  local runner="$1" certs identity
+  local plugin="$runner/PlugIns/VocelloiOSUITests.xctest"
+  local xcent="$QVOICE_XCODE_IOS_DERIVED/Build/Intermediates.noindex/QwenVoice.build/Release-iphoneos/VocelloiOSUITests.build/VocelloiOSUITests.xctest.xcent"
+  codesign --verify --strict --deep "$runner" >/dev/null 2>&1 && return 0
+  codesign --verify --strict --deep "$plugin" >/dev/null 2>&1 || return 1
+  certs="$(mktemp -d)"
+  (cd "$certs" && codesign -d --extract-certificates "$plugin") >/dev/null 2>&1
+  identity="$(openssl x509 -inform DER -in "$certs/codesign0" -noout -fingerprint -sha1 2>/dev/null \
+    | sed 's/.*=//; s/://g')"
+  rm -rf "$certs"
+  [[ -n "$identity" && -f "$xcent" ]] || return 1
+  note "re-sealing the staged runner wrapper with its test bundle's certificate"
+  codesign --force --sign "$identity" --entitlements "$xcent" --timestamp=none \
+    --generate-entitlement-der "$runner" >/dev/null 2>&1
+}
+
 # The Release, internal-diagnostics, optimized build the development iPhone lanes test, for any
 # iPhone rather than the paired one, with this Mac's paths mapped out of C sources as every
 # shipped iPhone build does. It shares the iOS DerivedData: ui_test.sh's fingerprint marker binds
@@ -85,6 +107,10 @@ package() {
     if ! ditto "$products/Vocello.app" "$stage/Vocello.app" \
         || ! ditto "$products/VocelloiOSUITests-Runner.app" "$stage/VocelloiOSUITests-Runner.app"; then
       status=1
+    else
+      # A wrapper that still fails is reported by the signature check below.
+      reseal_staged_runner "$stage/VocelloiOSUITests-Runner.app" \
+        || warn "could not re-seal the staged runner wrapper"
     fi
   fi
   release_native_lock

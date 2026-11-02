@@ -53,15 +53,10 @@ ONLY_TESTING = (
 )
 # RF-40: the sustained-take soak on its own, for the hardware floor's performance and thermal course.
 SOAK_TESTING = ("VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmThermalSoak",)
-# BKL-53: the MLX cache-clearing A/B, four interleaved blocks run in name order.
-CLEAR_AB_TESTING = tuple(
-    f"VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmClearAB{block}"
-    for block in ("1IPhonePolicy", "2HighMemoryPolicy", "3IPhonePolicy", "4HighMemoryPolicy")
-)
-JOURNEYS = {"smoke": ONLY_TESTING, "soak": SOAK_TESTING, "clear-ab": CLEAR_AB_TESTING}
-BUILD_NAMES = {"smoke": "RF-38 farm smoke", "soak": "RF-40 farm soak", "clear-ab": "BKL-53 farm clear A-B"}
+JOURNEYS = {"smoke": ONLY_TESTING, "soak": SOAK_TESTING}
+BUILD_NAMES = {"smoke": "RF-38 farm smoke", "soak": "RF-40 farm soak"}
 RESULT_MARKERS = ("VOCELLO_FARM_SMOKE ", "VOCELLO_FARM_MEMORY ", "VOCELLO_FARM_SOAK ", "VOCELLO_FARM_SOAK_TAKE ",
-                  "VOCELLO_FARM_AB ", "measured [")
+                  "measured [")
 CAVEAT = "BrowserStack re-signs the app without increased-memory-limit: clone-off exploratory smoke only"
 CREDENTIAL = re.compile(r"^[A-Za-z0-9_.@+-]+$")
 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
@@ -369,8 +364,7 @@ def main(argv: list[str] | None = None) -> int:
     send.add_argument("--device", action="append", dest="devices")
     send.add_argument("--force", action="store_true")
     send.add_argument("--journey", choices=sorted(JOURNEYS), default="smoke",
-                      help="smoke (RF-38, the default), soak (RF-40, sustained takes) or clear-ab "
-                           "(BKL-53, cache-clearing A/B); name one --device for soak and clear-ab")
+                      help="smoke (RF-38, the default) or soak (RF-40, sustained takes; name one --device)")
     read = commands.add_parser("results")
     read.add_argument("package", type=Path)
     read.add_argument("--build", help="a farm build of this package other than the latest")

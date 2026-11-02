@@ -3,7 +3,7 @@
 # (Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift) on BrowserStack App Automate.
 #
 #   scripts/farm_smoke.sh package                    build Vocello and its UI-test runner, package both
-#   scripts/farm_smoke.sh upload [PACKAGE] [--device "iPhone 15 Pro-27"]... [--journey smoke|soak|clear-ab] [--force]
+#   scripts/farm_smoke.sh upload [PACKAGE] [--device "iPhone 15 Pro-27"]... [--journey smoke|soak] [--force]
 #   scripts/farm_smoke.sh results [PACKAGE] [--build ID] [--bundle]
 #
 # PACKAGE defaults to the newest directory under build/artifacts/ios/farm-smoke. `upload` and

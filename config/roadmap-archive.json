@@ -5846,6 +5846,20 @@
         "commit:115433fc",
         "run:browserstack-153a804514b9cecb46baae14f4ddcb868ccd9ee9"
       ]
+    },
+    {
+      "id": "BKL-53",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time",
+      "status": "declined",
+      "blockedBy": [],
+      "gate": "A decision, from evidence on the iPhone 15 Pro class, on whether sustained generation needs thermal-aware pacing, user messaging or a documented limitation, recorded with the measurements it rests on.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift"
+      ],
+      "updated": "2026-11-02",
+      "notes": "Parked 2026-11-02 from RF-40; investigated the same day at the maintainer's request. Farm evidence on the iPhone 15 Pro, engine RTF from signposts: 1.5 to 1.6 on a first warm take after rest, then a steady 2.2 for 40 takes at nominal or fair heat; RF-40's 3.1 to 3.3 plateau came only on a phone that ran serious. Memory flat at 2.5 GB. Below real time the live preview pauses to rebuffer (max(3.25 s, min(8 s, 0.35 x estimate)) before start and after an underrun) and never glitches; the final take is complete. The 17 Pro's take shows heavy kernel time, context switches and page faults consistent with the unmeasured MLX cache clears (ER-01); the forced high_memory_mac policy tripped the memory guard on the farm, and its A/B tests were reverted. Maintainer decision 2026-11-02: accept the preview pause when generation is slower than real time; 3.0 keeps the iPhone 15 Pro floor with honest listing text.",
+      "reason": "Maintainer decision 2026-11-02: the live preview's pause when generation is slower than real time is an accepted tradeoff on slower iPhones; no prebuffer or memory-policy change."
     }
   ]
 }

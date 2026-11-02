@@ -2029,20 +2029,6 @@
       "notes": "Parked 2026-11-01: GitHub reported the alert on the push of 6b6035a6 (advisory: denial of service through glob-pattern amplification). Not investigated (focus rules). Not a release blocker: website tooling, not the iOS app."
     },
     {
-      "id": "BKL-53",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "A decision, from evidence on the iPhone 15 Pro class, on whether sustained generation needs thermal-aware pacing, user messaging or a documented limitation, recorded with the measurements it rests on.",
-      "sourceOfTruth": [
-        "Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift"
-      ],
-      "updated": "2026-11-02",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "Parked 2026-11-02 from RF-40. Maintainer decision 2026-11-02: 3.0 keeps the iPhone 15 Pro floor with honest listing text. Live preview above RTF 1 pauses to rebuffer (max(3.25 s, min(8 s, 0.35 x estimate)) before start and after an underrun) and never glitches; candidate fix: size the prebuffer from the device's measured RTF, audio x (1 - 1/RTF). Farm evidence on the iPhone 15 Pro, engine RTF from signposts: a first warm take after rest runs 1.5 to 1.6, then a steady 2.2 for 40 takes while the OS reports nominal or fair (build 595b4673); RF-40's 3.1 to 3.3 plateau came only on a phone that reported serious from its second take. Memory flat at 2.5 GB. Every iPhone runs the same iPhonePro memory policy; the 17 Pro's take shows CPU 67% of wall (half kernel), 98,360 context switches and 121,175 page faults, consistent with the unmeasured MLX cache clears (ER-01). The forced high_memory_mac policy (no per-chunk clear, 1 GiB cache) could not be timed on the farm: without increased-memory-limit the memory guard stopped its first take in both blocks. Next: a diagnostic knob for the iPhone's per-chunk clear alone, measured on the paired 17 Pro."
-    },
-    {
       "id": "BKL-54",
       "plan": "post-3-0-backlog-2026-10",
       "title": "A farm runner restart drops the test filter and reruns the whole UI bundle",

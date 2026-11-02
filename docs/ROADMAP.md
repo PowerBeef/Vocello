@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 14/55 (25%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 15/55 (27%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -549,7 +549,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-51` | parked | The ad-hoc signed macOS UI-test build loses its speech-recognition permission on every clean rebuild | — |
 | `BKL-52` | parked | Dependabot alert 8: minimatch in the website's npm lockfile | — |
-| `BKL-53` | parked | Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time | — |
 | `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
@@ -705,10 +704,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-52`** (parked) — Dependabot alert 8: minimatch in the website's npm lockfile.
   gate: Dependabot alert 8 (minimatch, moderate, website/package-lock.json) is closed by a reviewed dependency update with npm --prefix website run check passing, or dismissed with a recorded reason.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-53`** (parked) — Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time.
-  gate: A decision, from evidence on the iPhone 15 Pro class, on whether sustained generation needs thermal-aware pacing, user messaging or a documented limitation, recorded with the measurements it rests on.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`BKL-54`** (parked) — A farm runner restart drops the test filter and reruns the whole UI bundle.

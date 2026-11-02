@@ -21,17 +21,19 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 - **Next, in order** (maintainer decision of November 1, recorded in the release plan):
   1. The maintainer, by November 5 to 6: RF-02's remaining account steps, which activate the Paid
-     Apps agreement (status and details in the maintainer's private record, never in Git); ASR-04's
-     attestations; ASR-05's listing and review-notes review; ASR-02 and ASR-11's App Privacy
-     readback in the browser.
+     Apps agreement (status and details in the maintainer's private record, never in Git); ASR-02
+     and ASR-11's App Privacy readback in the browser, which needs a fresh App Store Connect sign-in
+     in Chrome.
   2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-17's six
      records and its manifest, RF-15 including the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09,
      ASR-06, RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots.
      About 3 to 4 hours, mostly unattended; Mac quiet, phone unlocked with Auto-Lock off.
   3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
      Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
-- **Done since October 30:** most of RF-02's account steps (private record). RF-10 closed by
-  decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
+- **Done since October 30:** most of RF-02's account steps (private record). On November 1, ASR-04
+  attested and closed; ASR-05's en-US listing text and the App Review contact and notes entered in
+  App Store Connect and read back; build 29 attached to version 3.0.0, with no export-compliance
+  question left. RF-10 closed by decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
   smoke on main passed 15/15 on Xcode 27.2. The App Store Connect audit (ASR-11) lists what
   version 3.0.0 still lacks: listing text, screenshots, review details, an attached build and the
   purchase's metadata.

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 40/62 (65%) |
+| `release-first-3-0-2026-09` | active | release-qa | 41/62 (66%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -46,7 +46,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | — |
-| `ASR-04` | planned | Bundle complete attributions and record content rights | — |
 | `ASR-05` | planned | Refresh reviewer notes, metadata guidance, and App Store screenshots | `RF-12` |
 | `ASR-06` | planned | Define and verify sensitive-file protection and backup policy | `RF-12` |
 | `ASR-09` | planned | Prove reviewer access to immutable model hosting | `RF-09` |
@@ -72,9 +71,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`ASR-02`** (planned, due 2026-11-05) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.
-
-- **`ASR-04`** (planned, due 2026-11-05) — Bundle complete attributions and record content rights.
-  gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
 
 - **`ASR-05`** (planned, due 2026-11-09) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
   gate: Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.

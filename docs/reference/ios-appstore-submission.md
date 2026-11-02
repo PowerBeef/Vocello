@@ -181,10 +181,11 @@ is complete.
       during model downloads is its own processing as the host and is disclosed in the privacy
       policy. `PrivacyInfo.xcprivacy`, the policy and the review notes already agree; revisit the
       decision if the app adds network code, an SDK, an account, analytics or a non-Apple purchase path.
-- [ ] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
-      and the 2026-09-04 API read returned no separate encryption-declaration resource. Answer "No"
-      to non-exempt encryption (only HTTPS + CryptoKit SHA-256 for download integrity), then verify
-      that the processed 3.0.0 candidate does not request additional export-compliance information.
+- [x] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
+      and the 2026-09-04 API read returned no separate encryption-declaration resource (only HTTPS +
+      CryptoKit SHA-256 for download integrity). The processed build 29 reads back `VALID` with
+      `usesNonExemptEncryption` false and asks for no further export-compliance information
+      (2026-11-01). Repeat the read for any later candidate.
 - [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Revisit it if the
       product's content behavior changes.
 - [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
@@ -244,9 +245,9 @@ hours of submission remains (ASR-09).
       from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all six catalog-pinned model cards.
       Archive/IPA verification rejects a missing, malformed, duplicated, or byte-different manifest.
 - [x] App Store Connect declares `USES_THIRD_PARTY_CONTENT` and read it back on 2026-08-27.
-- [ ] Complete the remaining qualified ASR-04 rights decisions for model-license delivery/NOTICE/trademark
-      obligations, Qwen outputs and built-in speaker presentation, the voice-clone marketing source,
-      other marketing audio/scripts, and artwork. Use
+- [x] The maintainer's ASR-04 rights decisions for Qwen outputs and built-in speaker presentation,
+      marketing audio and scripts, and artwork are attested (`ASR04-2026-11-01`, 2026-11-01); the
+      voice-clone marketing sample was removed and the bundled attribution ships. See
       [`content-rights-review.md`](content-rights-review.md); the App Store checkbox is not legal clearance.
 
 ## 4. Build the signed IPA

@@ -76,29 +76,35 @@ covers North America only, where App Review runs.
 ### ASR-04: per-asset attestations from the maintainer
 
 The maintainer attests each shipped asset's provenance in a private record, using the inventory
-below. The product artwork is mixed: own work, stock and AI-assisted. The tracked record keeps only
-a decision ID and the evidence digest. Every asset is either attested or replaced before submission.
+below. The tracked record keeps only a decision ID and the evidence digest.
 
-For each group the maintainer answers who made it (self, another person, an AI tool and which one,
-or stock with its site and license) and roughly when. Each fingerprint is the first 12 hex characters
-of SHA-256 over the group's sorted `sha256  path` lines at `36236682`. A changed asset changes its
-fingerprint and needs a fresh answer.
+**Attested 2026-11-01** (decision `ASR04-2026-11-01`, maintainer as sole owner, scope: the apps,
+the website, the README and App Store marketing, worldwide). Every group below and confirmations 12
+and 13 are attested. The private record lists each file's SHA-256 at build 29 (`a60dd204`); its own
+SHA-256 is `0aacc904771e863bb56b35021557883be0d39599b34c39139ec587300c6322e1`. Groups 1 to 8 are
+AI-assisted original work, group 9 is captures of Vocello's own interface, and groups 10 and 11 are
+Vocello outputs from the maintainer's own scripts.
 
-| # | Asset group | Files | Fingerprint | What the repository knows |
+Each fingerprint is the first 12 hex characters of SHA-256 over the group's sorted `sha256  path`
+lines (joined by newlines, no trailing newline) at `a60dd204`. A changed asset changes its
+fingerprint and needs a fresh answer. No app asset changed between the October 12 inventory and
+build 29; group 9 gained the 1040-pixel AVIF variants and a new custom-voice capture.
+
+| # | Asset group | Files | Fingerprint | Paths |
 |---|---|---|---|---|
-| 1 | macOS app icon (`AppIcon.appiconset`) | 10 sizes | `1a43162c7cde` | Nothing |
-| 2 | iPhone app icon (`VocelloIOSIcon.appiconset`) | 9 sizes | `28f60184c798` | Nothing |
-| 3 | Website favicon and touch icon | 2 | `78b0860bb22e` | Brand art |
-| 4 | Header mark (app and website) | 4 | `386564067946` | Brand art |
-| 5 | Launch logo | 3 sizes | `b11af58e5a56` | Nothing |
-| 6 | Launch background | 3 sizes | `fcb8bc9835ee` | Nothing |
-| 7 | Website social preview | 1 | `125eba9aa004` | Brand art |
-| 8 | README banner | 1 | `9f202800a5fd` | Nothing |
-| 9 | Website app screenshots (PNG and AVIF) | 14 | `7c5615a0c52c` | Captures of Vocello's own UI; some are historical 2.x iPhone captures |
-| 10 | Website voice samples | 4 | `141776ca135c` | Vocello outputs (`website/src/data/samples.js`) |
-| 11 | In-app voice previews | 9 | `51dd17e72695` | Vocello outputs from documented neutral scripts (`Sources/Resources/voice-previews/README.md`) |
+| 1 | macOS app icon | 10 | `f80a3d65442a` | `Sources/Assets.xcassets/AppIcon.appiconset/*.png` |
+| 2 | iPhone app icon | 9 | `6e101f471202` | `Sources/Assets.xcassets/VocelloIOSIcon.appiconset/*.png` |
+| 3 | Website favicon and touch icon | 2 | `44367a6d13b2` | `website/public/assets/apple-touch-icon.png`, `favicon-32.png` |
+| 4 | Header mark (app and website) | 4 | `4a26c4871218` | `Sources/Assets.xcassets/VocelloHeaderMark.imageset/*.png`, `website/public/assets/vocello-header-mark.png` |
+| 5 | Launch logo | 3 | `f8e963075a0a` | `Sources/Assets.xcassets/VocelloLaunchLogo.imageset/*.png` |
+| 6 | Launch background | 3 | `fcb8bc9835ee` | `Sources/Assets.xcassets/VocelloLaunchBackground.imageset/*.png` |
+| 7 | Website social preview | 1 | `125eba9aa004` | `website/public/assets/social_preview.png` |
+| 8 | README banner | 1 | `9f202800a5fd` | `docs/readme_banner_vocello.png` |
+| 9 | Website app screenshots | 20 | `cd5489e7d394` | `website/public/assets/screens/*.png`, `*.avif` |
+| 10 | Website voice samples | 4 | `d7eefde05e19` | `website/public/assets/voice-samples/*.wav` |
+| 11 | In-app voice previews | 9 | `dccd9303c7fc` | `Sources/Resources/voice-previews/*.wav` |
 
-Two confirmations complete the record:
+Two confirmations complete the record, both given on 2026-11-01:
 - **12.** Qwen and Hugging Face names appear only descriptively, never as Vocello's own brand.
 - **13.** The maintainer wrote the scripts behind groups 10 and 11 and accepts presenting Qwen's
   built-in speaker names in the app.
@@ -167,8 +173,8 @@ A qualified decision is complete only when it records:
 ASR-04 may move to `done` only after all rows have an affirmative qualified decision or the affected
 asset/surface has been removed and the removal is verified in source and the release artifact.
 
-ASR-04 stays `parked`: source remediation and the bundled attribution are shipped, and only the
-decisions above remain open. The third-party-content declaration proves only the account field; it
+ASR-04 closed on 2026-11-01: source remediation and the bundled attribution are shipped, and the
+maintainer's attestation `ASR04-2026-11-01` covers every asset group and both confirmations. The third-party-content declaration proves only the account field; it
 does not replace the model-redistribution, voice/publicity, cloned-reference consent,
 marketing-audio or artwork decisions. ASR-11 separately owns pricing/availability, accessibility,
 privacy, financial and regional account fields.
@@ -184,7 +190,7 @@ another status ledger or authorizing account changes.
 | Decision and authority | Owner class | Evidence needed to close |
 | --- | --- | --- |
 | Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels. **Decided 2026-10-12:** Data Not Collected, on the facts recorded under ASR-02 above, and published the same day. |
-| Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. |
+| Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. **Done 2026-11-01:** attestation `ASR04-2026-11-01` (above). |
 | Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
 | Distribution profile and entitlements — ASR-10 | Signing/release owner | **Done 2026-10-24:** release run 40103005257 archived, exported and verified build 24's IPA (entitlements, signing identity, profiles); every later candidate repeats the verification. |
 | Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02). Remaining: check the encryption declaration against the processed candidate. |

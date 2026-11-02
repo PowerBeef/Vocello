@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-10-28
-summary: Draft App Store listing for Vocello for iPhone 3.0.0 (en-US), awaiting the maintainer's review. It covers the subtitle, promotional text, description, keywords, What's New, URLs and the App Review notes. Nothing here is written to App Store Connect without a separate request.
+summary: App Store listing for Vocello for iPhone 3.0.0 (en-US), entered in App Store Connect on 2026-11-01 at the maintainer's request. It covers the subtitle, promotional text, description, keywords, What's New, URLs and the App Review notes. Further changes to App Store Connect need a separate request.
 sourceOfTruth:
   - config/public-product-facts.json
   - Sources/Resources/qwenvoice_contract.json
@@ -14,10 +14,11 @@ sourceOfTruth:
 ---
 # App Store listing: Vocello for iPhone 3.0.0 (en-US)
 
-**Status: draft for the maintainer's review (ASR-05).** Writing any field to App Store Connect is a
-separate, explicit request. After approval, `asc metadata` can apply the app-information and
-version fields from canonical files (`asc metadata init`, then `validate`, `plan` and `apply`); the
-App Review notes are entered with the review details.
+**Status: entered in App Store Connect on 2026-11-01 (ASR-05).** At the maintainer's request, the
+subtitle "Local AI voice studio", the promotional text, description, keywords and marketing URL, and
+the App Review contact and notes were written as drafted below and read back byte-identical. What's
+New is not offered on a first App Store version and stays empty. Any later change to App Store
+Connect is a separate, explicit request; keep this file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
 - it says local, not on-device;
@@ -123,11 +124,12 @@ fresh North America download proof (see [`ios-appstore-submission.md`](ios-appst
 
 ## Choices for the maintainer
 
-- **Subtitle:** one of the three above, or your own.
-- **Naming the model:** the description does not mention Qwen3-TTS. A descriptive line such as
-  "Vocello runs the open-source Qwen3-TTS models with Apple's MLX" could be added once ASR-04's
-  confirmation 12 (Qwen and Hugging Face names used only descriptively) is recorded.
-- **Speaker names:** none appear here; ASR-04's confirmation 13 covers presenting them in the app.
+- **Subtitle:** "Local AI voice studio", chosen 2026-11-01.
+- **Naming the model:** the description does not mention Qwen3-TTS. ASR-04's confirmation 12 (Qwen
+  and Hugging Face names used only descriptively) is recorded since 2026-11-01, so a descriptive line
+  such as "Vocello runs the open-source Qwen3-TTS models with Apple's MLX" may be added on request.
+- **Speaker names:** none appear here; ASR-04's confirmation 13 (2026-11-01) covers presenting them
+  in the app.
 - **The purchase line:** it describes Design & Clone Export as offered, which holds only once
   RF-02's Paid Apps agreement is accepted and the product is submitted with the version.
 - **The limitations paragraph:** kept short, in line with the release notes' known limitations.

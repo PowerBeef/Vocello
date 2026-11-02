@@ -5783,6 +5783,32 @@
         "run:macos-xcui-smoke-20261030-183009-c21eb899",
         "run:github-actions-release-40020993733"
       ]
+    },
+    {
+      "id": "ASR-04",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Bundle complete attributions and record content rights",
+      "status": "done",
+      "due": "2026-11-05",
+      "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
+      "sourceOfTruth": [
+        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        "Packages/VocelloQwen3Core/NOTICES.md",
+        "config/third-party-attribution-policy.json",
+        "scripts/attribution_manifest.py",
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "Sources/Resources/third_party_attributions.json",
+        "Sources/Resources/voice-previews/README.md",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
+        "docs/reference/content-rights-review.md"
+      ],
+      "evidence": [
+        "commit:87636935",
+        "doc:docs/reference/content-rights-review.md"
+      ],
+      "updated": "2026-11-01",
+      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-11-01: the maintainer attested every asset group and confirmations 12 and 13 (decision ASR04-2026-11-01); the private record's SHA-256 is in the content-rights review."
     }
   ]
 }

@@ -715,32 +715,6 @@
       "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; pushed and deployed the same day; the live page carries it."
     },
     {
-      "id": "ASR-04",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Bundle complete attributions and record content rights",
-      "status": "planned",
-      "due": "2026-11-05",
-      "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. The maintainer's recorded decisions (2026-10-12: no paid counsel) must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
-      "sourceOfTruth": [
-        "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
-        "Packages/VocelloQwen3Core/NOTICES.md",
-        "config/third-party-attribution-policy.json",
-        "scripts/attribution_manifest.py",
-        "Sources/Resources/qwenvoice_production_model_catalog.json",
-        "Sources/Resources/third_party_attributions.json",
-        "Sources/Resources/voice-previews/README.md",
-        "Sources/iOS/Settings/SettingsScreen.swift",
-        "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
-        "docs/reference/content-rights-review.md"
-      ],
-      "evidence": [
-        "commit:87636935",
-        "doc:docs/reference/content-rights-review.md"
-      ],
-      "updated": "2026-11-01",
-      "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks."
-    },
-    {
       "id": "ASR-05",
       "plan": "release-first-3-0-2026-09",
       "title": "Refresh reviewer notes, metadata guidance, and App Store screenshots",
@@ -759,7 +733,7 @@
         "commit:87636935"
       ],
       "updated": "2026-11-01",
-      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-24 read-only live check (asc validate on version 3.0.0, PREPARE_FOR_SUBMISSION): name, privacy URL and the en-US Support URL match config/support-contact.json; the review notes' three byte totals match the shipped catalog. Not yet in App Store Connect: description, keywords, subtitle, What's New, review details and notes, screenshots, an attached build, and the export purchase's metadata (MISSING_METADATA, with RF-02); writing any of it needs the maintainer's request, and screenshots come from the signed candidate on the iPhone. The en-US listing draft is in docs/reference/app-store-listing.md (2026-10-24), awaiting the maintainer's review. 2026-10-26: review-notes step 3 now says Voice Design needs its voice description chip before Generate, which a Public Beta tester missed (BKL-38). History: git log -p -- config/roadmap.json."
+      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-26: review-notes step 3 says Voice Design needs its voice description chip before Generate, which a Public Beta tester missed (BKL-38). 2026-11-01, at the maintainer's request: the en-US listing in docs/reference/app-store-listing.md was entered as drafted in App Store Connect (subtitle Local AI voice studio, promotional text, description, keywords, marketing URL, and the App Review contact and notes with no demo account), and an asc readback matched every field byte for byte; the review notes' three byte totals match build 29's catalog. Build 29 is attached to version 3.0.0. What's New is not offered on a first version. Left: the App Store screenshots from the signed candidate on the iPhone, and the export purchase's metadata (MISSING_METADATA, with RF-02 and RF-12). History: git log -p -- config/roadmap.json."
     },
     {
       "id": "ASR-06",
@@ -829,7 +803,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-01",
-      "notes": "Read-only, recorded without payload values. 2026-09-22: the automated inventory was removed by maintainer decision; the audit is a manual read-only pass (web portal or asc). 2026-10-30, asc read-only on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; availability 148 of 175 territories (EU excluded, new territories on); support URL set; agreement, tax and banking states are kept in the maintainer's private record (RF-02). Missing before submission: the en-US description and keywords (ASR-05 draft awaits review), every App Store screenshot, the App Review contact and notes, a build attached to the version, and the purchase's metadata (state MISSING_METADATA: the review screenshot, plus an RF-02 account step). The App Privacy label needs a web session or the browser to read back (ASR-02). No metadata or build mutation is authorized."
+      "notes": "Read-only, recorded without payload values. 2026-09-22: the automated inventory was removed by maintainer decision; the audit is a manual read-only pass (web portal or asc). 2026-10-30, asc read-only on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; availability 148 of 175 territories (EU excluded, new territories on); support URL set; agreement, tax and banking states are kept in the maintainer's private record (RF-02). 2026-11-01: the listing text, the App Review contact and notes and build 29 were entered at the maintainer's request (ASR-05); build 29 reads back VALID with usesNonExemptEncryption false, so export compliance needs nothing more. Still missing before submission: every App Store screenshot, the purchase's metadata (state MISSING_METADATA: the review screenshot, plus an RF-02 account step) and the accessibility declaration. The App Privacy label needs a browser readback (ASR-02); on 2026-11-01 App Store Connect in Chrome needed a fresh sign-in, which is the maintainer's."
     },
     {
       "id": "ASR-12",

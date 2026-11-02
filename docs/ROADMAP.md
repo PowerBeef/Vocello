@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 42/63 (67%) |
+| `release-first-3-0-2026-09` | active | release-qa | 43/63 (68%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 14/53 (26%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 14/54 (26%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -65,7 +65,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
-| `RF-40` | in-flight | A BrowserStack soak measures the iPhone 15 Pro's engine RTF, memory and thermal course | — |
 
 ### Open items in detail
 
@@ -133,9 +132,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-35`** (in-flight, due 2026-11-09) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
-
-- **`RF-40`** (in-flight) — A BrowserStack soak measures the iPhone 15 Pro's engine RTF, memory and thermal course.
-  gate: Maintainer request 2026-11-02: sustained Built-in Voice takes on BrowserStack's real iPhone 15 Pro (iOS 27), which re-signs the app without increased-memory-limit or the App Group, measure the hardware floor's engine RTF ((Native Prepare Generation + Native Generation Stream signpost durations) / History audio length), memory, CPU and thermal course; the app is unchanged. Done when testFarmThermalSoak and scripts/farm_smoke.sh upload --journey soak are committed with the routed checks and the UI-bundle compile passing, and a maintainer-run soak on iPhone 15 Pro-27 completes with its per-take results summarised in the notes. Exploratory evidence only: never a benchmark-history record, floor-device qualification or promotion evidence.
 
 ## Engine remediation programme (2026-10-16 audit)
 
@@ -553,6 +549,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-51` | parked | The ad-hoc signed macOS UI-test build loses its speech-recognition permission on every clean rebuild | — |
 | `BKL-52` | parked | Dependabot alert 8: minimatch in the website's npm lockfile | — |
+| `BKL-53` | parked | Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -707,6 +704,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-52`** (parked) — Dependabot alert 8: minimatch in the website's npm lockfile.
   gate: Dependabot alert 8 (minimatch, moderate, website/package-lock.json) is closed by a reviewed dependency update with npm --prefix website run check passing, or dismissed with a recorded reason.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-53`** (parked) — Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time.
+  gate: A decision, from evidence on the iPhone 15 Pro class, on whether sustained generation needs thermal-aware pacing, user messaging or a documented limitation, recorded with the measurements it rests on.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

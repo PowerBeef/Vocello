@@ -5828,6 +5828,24 @@
         "commit:c878917a",
         "run:browserstack-d56f34310bfaae323cb70576649f1ce684c60000"
       ]
+    },
+    {
+      "id": "RF-40",
+      "plan": "release-first-3-0-2026-09",
+      "title": "A BrowserStack soak measures the iPhone 15 Pro's engine RTF, memory and thermal course",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Maintainer request 2026-11-02: sustained Built-in Voice takes on BrowserStack's real iPhone 15 Pro (iOS 27), which re-signs the app without increased-memory-limit or the App Group, measure the hardware floor's engine RTF ((Native Prepare Generation + Native Generation Stream signpost durations) / History audio length), memory, CPU and thermal course; the app is unchanged. Done when testFarmThermalSoak and scripts/farm_smoke.sh upload --journey soak are committed with the routed checks and the UI-bundle compile passing, and a maintainer-run soak on iPhone 15 Pro-27 completes with its per-take results summarised in the notes. Exploratory evidence only: never a benchmark-history record, floor-device qualification or promotion evidence.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift",
+        "scripts/lib/farm_smoke.py"
+      ],
+      "updated": "2026-11-02",
+      "notes": "Opened 2026-11-02 at the maintainer's request after RF-38: performance on the hardware floor. Farm build 153a8045 (package 20261102-051934-115433fc: build 29's product plus the App Group fix) on a real iPhone 15 Pro (iPhone16,1, iOS 27.0, 7.5 GB) PASSED: a cold take, then 40 warm takes of a 13 to 17 s script, 33 minutes of continuous generation. Engine RTF = (Native Prepare Generation + Native Generation Stream signpost durations) / History audio length, lower is faster: 1.63 on the first warm take (thermal fair), 2.26 by the third as the phone reported serious, median 2.80 over takes 6-20 and 3.19 over takes 21-40, a plateau about twice the fresh time; prepare stays near 20 ms. Thermal state serious from the second warm take to the end. Peak memory 2.52 GB on every take (2.54 max), no growth; app CPU time about 58% of each stream. Caveats: re-signed without increased-memory-limit and the App Group (Built-in Voice only); a farm phone on a charger in a rack, whose thermal course may differ from a phone in hand; exploratory evidence, never a benchmark record. The throttling is parked as BKL-53.",
+      "evidence": [
+        "commit:115433fc",
+        "run:browserstack-153a804514b9cecb46baae14f4ddcb868ccd9ee9"
+      ]
     }
   ]
 }

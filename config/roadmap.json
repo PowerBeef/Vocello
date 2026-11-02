@@ -2057,6 +2057,20 @@
       "notes": "Parked 2026-10-30: macos-xcui-smoke-20261030-174603-220a2577 on db0afa2c passed 13 of 15; test12 and test13 timed out because macOS's speech-recognition prompt covered the window. The test app is ad-hoc signed (designated requirement is its cdhash), so the clean rebuild after the cache cleanup counted as a new app. Not investigated further (focus rules). Not a release blocker: test tooling only."
     },
     {
+      "id": "BKL-52",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Dependabot alert 8: minimatch in the website's npm lockfile",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Dependabot alert 8 (minimatch, moderate, website/package-lock.json) is closed by a reviewed dependency update with npm --prefix website run check passing, or dismissed with a recorded reason.",
+      "sourceOfTruth": [
+        "website/package-lock.json"
+      ],
+      "updated": "2026-11-01",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
+      "notes": "Parked 2026-11-01: GitHub reported the alert on the push of 6b6035a6 (advisory: denial of service through glob-pattern amplification). Not investigated (focus rules). Not a release blocker: website tooling, not the iOS app."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

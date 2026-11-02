@@ -2040,7 +2040,21 @@
       ],
       "updated": "2026-11-02",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "Parked 2026-11-02 from RF-40's BrowserStack soak on a real iPhone 15 Pro: engine RTF 1.63 on the first warm take, a 3.1 to 3.3 plateau after about ten minutes at serious thermal state; memory flat at 2.5 GB (re-signed farm phone on a charger). Not a release blocker. Maintainer decision 2026-11-02: 3.0 keeps the 15 Pro floor with honest listing text. Live preview above RTF 1 pauses to rebuffer (max(3.25 s, min(8 s, 0.35 x estimate)) before start and after an underrun) and never glitches; candidate fix: size the prebuffer from the device's measured RTF, audio x (1 - 1/RTF). Investigation 2026-11-02 (maintainer request, no iPhone): every iPhone runs the same iPhonePro memory policy, so the gap is hardware plus overhead; the 17 Pro's take (ios-engine-20261030-135544) already spends CPU 67% of wall, half in the kernel, with 98,360 context switches and 121,175 page faults, consistent with the 113-126 MLX cache clears per take (mlx-guide 5.4, never measured: ER-01); a 3.4x gap against a ~1.5x memory-bandwidth gap points to overhead. Next: A/B the clearing policy (QWENVOICE_FORCE_MEMORY_CLASS) on the paired 17 Pro, then the 15 Pro."
+      "notes": "Parked 2026-11-02 from RF-40. Maintainer decision 2026-11-02: 3.0 keeps the iPhone 15 Pro floor with honest listing text. Live preview above RTF 1 pauses to rebuffer (max(3.25 s, min(8 s, 0.35 x estimate)) before start and after an underrun) and never glitches; candidate fix: size the prebuffer from the device's measured RTF, audio x (1 - 1/RTF). Farm evidence on the iPhone 15 Pro, engine RTF from signposts: a first warm take after rest runs 1.5 to 1.6, then a steady 2.2 for 40 takes while the OS reports nominal or fair (build 595b4673); RF-40's 3.1 to 3.3 plateau came only on a phone that reported serious from its second take. Memory flat at 2.5 GB. Every iPhone runs the same iPhonePro memory policy; the 17 Pro's take shows CPU 67% of wall (half kernel), 98,360 context switches and 121,175 page faults, consistent with the unmeasured MLX cache clears (ER-01). The forced high_memory_mac policy (no per-chunk clear, 1 GiB cache) could not be timed on the farm: without increased-memory-limit the memory guard stopped its first take in both blocks. Next: a diagnostic knob for the iPhone's per-chunk clear alone, measured on the paired 17 Pro."
+    },
+    {
+      "id": "BKL-54",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A farm runner restart drops the test filter and reruns the whole UI bundle",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A BrowserStack farm build whose selected test fails or exits early still runs only the selected tests, shown by a deliberately failing selected test in a farm build, with scripts/farm_smoke.py and its tests updated.",
+      "sourceOfTruth": [
+        "scripts/lib/farm_smoke.py"
+      ],
+      "updated": "2026-11-02",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or a farm run is planned before then.",
+      "notes": "Parked 2026-11-02: in farm build 595b4673 (clear-ab journey, singleRunnerInvocation) a selected test failed, xcodebuild reported \"Restarting after unexpected exit, crash, or test timeout\", and the restarted runner ran every UI test in the bundle, including the 40-take soak, so the build took about 55 minutes instead of about 25 and used the rest of the trial. Candidate fixes: also send skip-testing for the other classes, or one runner invocation per selected test. Not investigated further (focus rules)."
     },
     {
       "id": "ER-01",

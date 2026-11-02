@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 14/54 (26%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 14/55 (25%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -550,6 +550,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-51` | parked | The ad-hoc signed macOS UI-test build loses its speech-recognition permission on every clean rebuild | — |
 | `BKL-52` | parked | Dependabot alert 8: minimatch in the website's npm lockfile | — |
 | `BKL-53` | parked | Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time | — |
+| `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -709,6 +710,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-53`** (parked) — Sustained generation on the iPhone 15 Pro throttles to about twice the fresh time.
   gate: A decision, from evidence on the iPhone 15 Pro class, on whether sustained generation needs thermal-aware pacing, user messaging or a documented limitation, recorded with the measurements it rests on.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
+
+- **`BKL-54`** (parked) — A farm runner restart drops the test filter and reruns the whole UI bundle.
+  gate: A BrowserStack farm build whose selected test fails or exits early still runs only the selected tests, shown by a deliberately failing selected test in a farm build, with scripts/farm_smoke.py and its tests updated.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or a farm run is planned before then.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

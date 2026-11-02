@@ -191,10 +191,10 @@
       "Bash(hf cache list*)",
       "Bash(hf cache ls*)",
       "Bash(hf cache verify*)",
-      "mcp__hf-mcp-server__hf_fs",
-      "mcp__hf-mcp-server__hub_repo_search",
-      "mcp__hf-mcp-server__hub_repo_details",
-      "mcp__hf-mcp-server__hf_whoami"
+      "mcp__plugin_huggingface-skills_huggingface-skills__hf_fs",
+      "mcp__plugin_huggingface-skills_huggingface-skills__hub_repo_search",
+      "mcp__plugin_huggingface-skills_huggingface-skills__hub_repo_details",
+      "mcp__plugin_huggingface-skills_huggingface-skills__hf_whoami"
     ],
     "ask": [
       "Bash(git push)",
@@ -256,8 +256,8 @@
       "Bash(hf auth switch*)",
       "Bash(hf cache prune*)",
       "Bash(hf cache rm*)",
-      "mcp__hf-mcp-server__dynamic_space",
-      "mcp__hf-mcp-server__gr*",
+      "mcp__plugin_huggingface-skills_huggingface-skills__dynamic_space",
+      "mcp__plugin_huggingface-skills_huggingface-skills__gr*",
       "Bash(git config --global*)",
       "Bash(defaults write*)",
       "Bash(sudo *)",

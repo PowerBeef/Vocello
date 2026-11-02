@@ -619,12 +619,16 @@ class PermissionTests(unittest.TestCase):
                 self.assertTrue(matches(command, self.ask))
                 self.assertFalse(matches(command, self.allow))
         self.assertTrue(matches("hf auth token", self.deny))
-        server = "mcp__hf-mcp-server__"
+        # The huggingface-skills plugin's own MCP server (2026-11-02); the standalone
+        # hf-mcp-server is gone, so no rule may still name it.
+        server = "mcp__plugin_huggingface-skills_huggingface-skills__"
         for tool in ("hf_fs", "hub_repo_search", "hub_repo_details", "hf_whoami"):
             self.assertIn(server + tool, self.allow)
             self.assertFalse(matches(server + tool, self.ask, tool="mcp"))
         for tool in ("dynamic_space", "gr1_z_image_turbo_generate"):
             self.assertTrue(matches(server + tool, self.ask, tool="mcp"), tool)
+        for rules in (self.allow, self.ask, self.deny):
+            self.assertFalse([rule for rule in rules if rule.startswith("mcp__hf-mcp-server__")])
 
     def test_unsupported_destination_and_ui_driving_tools_are_denied_but_device_tools_are_not(self):
         server = "mcp__MobileBuildMCP__"

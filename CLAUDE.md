@@ -208,7 +208,8 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   tests and evidence. MobileBuildMCP runs only its discovery and coverage workflows and never persists
   session defaults; never use Axiom `xcui` or the simulator agents. Every optional tool (Axiom, sosumi,
   Context7, the browser pane, Claude in Chrome, chrome-devtools, `gh`, the GitHub connector, `hf` and
-  `hf-mcp-server`, `asc`, the Vercel CLI) stays read-only unless the user requests a write. Use the
+  the huggingface-skills plugin, `asc`, the Vercel CLI) stays read-only unless the user requests a
+  write. Use the
   Workflow tool only on explicit opt-in. Missing optional tools never block the script workflow, and
   CI never depends on personal plugins.
 - **Interactive or maintainer-run commands** (logins, model installs, publication): prepare them; the

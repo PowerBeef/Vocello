@@ -172,20 +172,21 @@ the lead session on the repository folder itself, without a worktree
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
 models or touching devices. Detect MCP tools in the live session.
 
-The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-10-24 it is:
+The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-11-02 it is:
 
 - **Plugins:** axiom, context7, swift-lsp, clangd-lsp, chrome-devtools-mcp, skill-creator,
-  claude-md-management and asc.
-- **MCP servers:** MobileBuildMCP, sosumi and `hf-mcp-server`.
+  claude-md-management, asc and huggingface-skills (25 skills and its own Hugging Face MCP server).
+- **MCP servers:** MobileBuildMCP and sosumi.
 - **Skills:** the swift-mlx skills.
 - **Desktop app:** the Claude desktop app's Code tab, with its browser pane, Terminal panel and
   computer use.
 - **Browser and connectors:** Claude in Chrome and the claude.ai GitHub connector.
 - **CLIs:** `hf`, `asc` and `gh`.
 
-The Vercel, Hugging Face skills, Unity and playground plugins are uninstalled. Hugging Face work goes
-through the `hf` CLI and `hf-mcp-server`. Use existing plugins when connected; no duplicate servers or
-automatic global installs. Uninstall an unwanted plugin rather than disabling it in settings.
+The Vercel, Unity and playground plugins are uninstalled, and the standalone `hf-mcp-server` and the
+claude.ai Hugging Face connector are removed (2026-11-02). Hugging Face work goes through the
+huggingface-skills plugin's skills and MCP tools and the `hf` CLI (signed in as the maintainer). Use
+existing plugins when connected; no duplicate servers or automatic global installs. Uninstall an unwanted plugin rather than disabling it in settings.
 `.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
 with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
 canonical builds and host serialization. Native UI evidence comes only from XCUITest.
@@ -572,7 +573,8 @@ the routine loop: read-only Git, scoped staging and commits, worktree integratio
 contract and privacy scripts, the website check and the local `macos_test.sh`, `ui_test.sh` and
 `ios_device.sh` lanes. It also covers read-only Hugging Face queries: the `hf` CLI's `version`,
 `auth whoami`, `models` and `datasets` card/info/list, `papers`, and `cache` list/verify, plus the
-`hf-mcp-server` read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`). No rule
+huggingface-skills plugin's MCP read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`,
+`hf_whoami`); its `dynamic_space` and `gr*` Space tools ask. No rule
 allows pytest by itself: run it through `scripts/dev.sh py` or
 `"$(python3 scripts/select_python.py)" -m pytest`.
 
@@ -644,7 +646,7 @@ tool is offered.
 | Website | `npm --prefix website run check` | The desktop app's browser pane (`.claude/launch.json`), Claude in Chrome or chrome-devtools for local rendered inspection; Vercel deploys from Git (no Vercel plugin; the `vercel` CLI asks) |
 | Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
-| Model research | Receipts, exact pins and maintenance contracts | The `hf` CLI and the `hf-mcp-server` MCP for hub search, cards, file sizes, licenses and papers; downloads, Space runs and Jobs need a specific request; no implied repin |
+| Model research | Receipts, exact pins and maintenance contracts | The huggingface-skills plugin's MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`) and its read-side skills (`hf-cli` reads, `hf-mem` weight-memory estimates, `huggingface-papers`, `huggingface-datasets`, `huggingface-best`) and the `hf` CLI for hub search, cards, file sizes, licenses and papers. Downloads, Space runs, Jobs, Inference Endpoints, SageMaker, training, uploads and publishing need a specific request, and the paid ones also go against the no-paid-services preference; no implied repin |
 | Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.0 (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
 | Code navigation | Source, tests and the reference rules | swift-lsp (clangd-lsp for C) through the LSP tool when a symbol server is configured (New Mac setup, above) |
 | Claude Code configuration | Tracked `.claude/`, `CLAUDE.md` and `scripts/tests/test_agent_hooks.py` | skill-creator for project skills; claude-md-management for `CLAUDE.md` upkeep; `/update-config` for settings |

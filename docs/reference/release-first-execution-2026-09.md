@@ -153,6 +153,10 @@ Between September 4 and October 12 the release did not move:
   unparked it the same evening; after a fix that lets diagnostics builds start without the App
   Group (`c878917a`), the farm smoke passed on both iPhone 15 models and RF-38 closed. `main` now
   carries that product change, so build 29's remaining rows run from the `v3.0.0-ios.8` checkout.
+- **2026-11-02.** RF-40's soak on a real iPhone 15 Pro measured engine RTF 1.63 fresh and about 3.2
+  once the phone ran hot (the paired iPhone 17 Pro: 0.47). 3.0 keeps the iPhone 15 Pro floor, with
+  listing text that says newer iPhones generate faster; live preview there pauses while it
+  rebuffers, and sizing its prebuffer from the device's speed is BKL-53, after the submission.
 
 ## The path
 

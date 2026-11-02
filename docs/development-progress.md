@@ -33,7 +33,7 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 - **Done since October 30:** most of RF-02's account steps (private record). On November 1, ASR-04
   attested and closed; ASR-05's en-US listing text and the App Review contact and notes entered in
   App Store Connect and read back; build 29 attached to version 3.0.0, with no export-compliance
-  question left. RF-10 closed by decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
+  question left. RF-10 closed by decision; RF-23 and DW-04 parked until after the submission; RF-38 unparked on November 1 to run while RF-02 waits. The Mac
   smoke on main passed 15/15 on Xcode 27.2. Version 3.0.0 in App Store Connect still lacks the
   screenshots, the purchase's metadata and the accessibility declaration (ASR-11).
 - **Build 29:** `v3.0.0-ios.8` at `a60dd204` is in TestFlight (release run 41079341984). Its

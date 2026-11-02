@@ -149,7 +149,8 @@ Between September 4 and October 12 the release did not move:
   (RF-17, RF-15 with its purchase rows, the AUD items, ASR-06, RF-35, RF-12 and ASR-05's
   screenshots) is due November 9; ASR-09 and the App Review submission (RF-16) are due
   November 12. RF-10 closes without the Mac promotion lanes, which can no longer be built at
-  v3.0.0; RF-23, DW-04 and RF-38 park until after the submission.
+  v3.0.0; RF-23 and DW-04 park until after the submission. RF-38 parked too, then the maintainer
+  unparked it the same evening to run while RF-02 waits.
 
 ## The path
 

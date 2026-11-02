@@ -32,6 +32,9 @@ from urllib.parse import urlsplit
 
 API_HOSTNAME = "api-cloud.browserstack.com"
 API_HOST = f"https://{API_HOSTNAME}"
+# BrowserStack's API hosts: the App Automate API, and the host its instrumentation-log links name
+# (farm build c660a27b, 2026-11-01). The account goes to these two exact names and no other.
+ACCOUNT_HOSTNAMES = frozenset({API_HOSTNAME, "api.browserstack.com"})
 API = f"{API_HOST}/app-automate/xcuitest/v2"
 APP = "Vocello.app"
 RUNNER = "VocelloiOSUITests-Runner.app"
@@ -176,10 +179,10 @@ def credentials(environment: Mapping[str, str], ask: Callable[[str], str] = inpu
 
 
 def api_url(url: str) -> str:
-    """The URL to call with the account: BrowserStack's API host over HTTPS, nothing else."""
+    """The URL to call with the account: one of BrowserStack's API hosts over HTTPS, nothing else."""
     absolute = API_HOST + url if url.startswith("/") else url
     parts = urlsplit(absolute)
-    if (parts.scheme != "https" or parts.hostname != API_HOSTNAME or parts.username is not None
+    if (parts.scheme != "https" or parts.hostname not in ACCOUNT_HOSTNAMES or parts.username is not None
             or parts.password is not None or parts.port not in (None, 443)):
         raise FarmError(f"refusing to send the BrowserStack account to {url[:120]!r}")
     return absolute

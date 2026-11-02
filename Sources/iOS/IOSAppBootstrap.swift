@@ -171,7 +171,10 @@ extension QVoiceiOSApp {
         // generation runs in-process here, wrapped in `TTSEngineStore`. The iOS
         // Simulator is intentionally unsupported (the project is on-device only).
 
-        guard AppPaths.isUsingSharedContainer else {
+        guard AppPaths.hasUsableStorageRoot(
+            environment: ProcessInfo.processInfo.environment,
+            sharedContainerAvailable: AppPaths.isUsingSharedContainer
+        ) else {
             throw IOSBackendBootstrapError.missingSharedContainer(
                 AppPaths.sharedAppGroupIdentifier
             )

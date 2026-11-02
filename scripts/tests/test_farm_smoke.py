@@ -159,7 +159,11 @@ class AccountTests(unittest.TestCase):
 
     def test_the_account_goes_only_to_the_api_host_over_https(self) -> None:
         self.assertEqual(farm_smoke.api_url("/app-automate/x"), "https://api-cloud.browserstack.com/app-automate/x")
+        log = "https://api.browserstack.com/app-automate/xcuitest/builds/b/sessions/s/instrumentationlogs"
+        self.assertEqual(farm_smoke.api_url(log), log)
         for url in ("http://api-cloud.browserstack.com/x", "https://evil.example/x",
+                    "http://api.browserstack.com/x", "https://api.browserstack.com.evil.example/x",
+                    "https://browserstack.com/x", "https://www.browserstack.com/x",
                     "https://api-cloud.browserstack.com.evil.example/x", "https://api-cloud.browserstack.com@evil.example/x",
                     "https://user:pass@api-cloud.browserstack.com/x", "https://api-cloud.browserstack.com:8443/x",
                     ".evil.example/x", "@evil.example/x"):
@@ -284,6 +288,12 @@ class ResultsTests(unittest.TestCase):
         self.assertEqual(self.read(FakeCurl(self.responses(case_status="failed")), [])[0], 1)
         self.assertEqual(self.read(FakeCurl(self.responses(build_status="running")), [])[0],
                          farm_smoke.STILL_RUNNING)
+
+    def test_results_reads_a_log_on_browserstacks_other_api_host(self) -> None:
+        url = "https://api.browserstack.com/app-automate/xcuitest/builds/b/sessions/s/instrumentationlogs"
+        curl = FakeCurl(self.responses(log_url=url))
+        self.read(curl, [])
+        self.assertTrue(any(argv[-1] == url for argv, _ in curl.calls))
 
     def test_results_refuses_a_log_url_on_another_host(self) -> None:
         curl = FakeCurl(self.responses(log_url="https://evil.example/instrumentationlogs"))

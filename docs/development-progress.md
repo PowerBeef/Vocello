@@ -47,7 +47,9 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   navigation and modes rows passed on it. UI Automation needed enabling again, and a notification
   banner took a tap, so turn on Do Not Disturb before a lane. RF-17's lanes install a development
   build of the tag: run the candidate rows (the purchase rows) before them, or reinstall TestFlight
-  build 29 afterwards.
+  build 29 afterwards. Since RF-38's fix (November 1) `main` carries a product change after build
+  29, so the candidate rows, like RF-17's records, run from a clean checkout of the tag
+  `v3.0.0-ios.8`; return to `main` afterwards.
 - **Mac:** Xcode 27.2 with the iOS 27.2 component. The ad-hoc test build asks for speech
   recognition again after every clean rebuild (BKL-51); the maintainer clicks Autoriser.
 - **TestFlight:** builds 26 and 27 are in Internal and Public Beta under the RF-17 waiver for the

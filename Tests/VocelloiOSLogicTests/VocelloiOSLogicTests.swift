@@ -402,6 +402,46 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
     }
 
+    // RF-38: a device farm re-signs the app without the App Group. Only a diagnostics support
+    // root the gate admits may replace it; every other launch still needs the App Group.
+    func testStorageRootNeedsTheAppGroupUnlessADiagnosticsRootReplacesIt() {
+        let farmRoot = [
+            "QWENVOICE_DEBUG": "1",
+            AppPaths.appSupportOverrideEnvironmentKey: "farm-smoke",
+        ]
+
+        XCTAssertTrue(AppPaths.hasUsableStorageRoot(environment: [:], sharedContainerAvailable: true))
+        XCTAssertTrue(AppPaths.hasUsableStorageRoot(environment: farmRoot, sharedContainerAvailable: true))
+        XCTAssertFalse(AppPaths.hasUsableStorageRoot(environment: [:], sharedContainerAvailable: false))
+        XCTAssertTrue(AppPaths.hasUsableStorageRoot(environment: farmRoot, sharedContainerAvailable: false))
+        XCTAssertEqual(
+            AppPaths.diagnosticSupportRoot(environment: farmRoot),
+            AppPaths.managedAppSupportDir
+                .appendingPathComponent("farm-smoke", isDirectory: true)
+                .standardizedFileURL
+        )
+        // Without the gate, with an absolute root, or with a value the resolver would not honor,
+        // the App Group stays required.
+        XCTAssertNil(AppPaths.diagnosticSupportRoot(environment: [:]))
+        XCTAssertFalse(AppPaths.hasUsableStorageRoot(
+            environment: [AppPaths.appSupportOverrideEnvironmentKey: "farm-smoke"],
+            sharedContainerAvailable: false
+        ))
+        XCTAssertFalse(AppPaths.hasUsableStorageRoot(
+            environment: [
+                "QWENVOICE_DEBUG": "1",
+                AppPaths.appSupportOverrideEnvironmentKey: FileManager.default.temporaryDirectory.path,
+            ],
+            sharedContainerAvailable: false
+        ))
+        for unsafeValue in ["../escape", ".", "nested/path", ""] {
+            XCTAssertFalse(AppPaths.hasUsableStorageRoot(
+                environment: ["QWENVOICE_DEBUG": "1", AppPaths.appSupportOverrideEnvironmentKey: unsafeValue],
+                sharedContainerAvailable: false
+            ), unsafeValue)
+        }
+    }
+
     func testStorageProtectionPolicyCoversEveryPersistentIOSDataClass() {
         XCTAssertEqual(
             IOSStorageProtectionPolicy.protectionClass,

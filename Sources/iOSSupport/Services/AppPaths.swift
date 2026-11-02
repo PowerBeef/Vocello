@@ -55,19 +55,35 @@ enum AppPaths {
     }
 
     static func resolvedAppSupportDir(environment: [String: String]) -> URL {
-        if let overridePath = debugAppSupportOverride(environment: environment) {
-            if NSString(string: overridePath).isAbsolutePath {
-                return URL(fileURLWithPath: overridePath, isDirectory: true)
-                    .standardizedFileURL
-            }
-            if isSafeManagedSupportChild(overridePath) {
-                return managedAppSupportDir
-                    .appendingPathComponent(overridePath, isDirectory: true)
-                    .standardizedFileURL
-            }
-        }
+        diagnosticSupportRoot(environment: environment) ?? sharedContainerDir ?? managedAppSupportDir
+    }
 
-        return sharedContainerDir ?? managedAppSupportDir
+    /// The root the registered `QVOICE_APP_SUPPORT_DIR` override selects (internal-diagnostics
+    /// build under `QWENVOICE_DEBUG`): an absolute path, or one safe component beneath the managed
+    /// root. Nil in distribution builds, without the gate, and for an unsafe relative value.
+    static func diagnosticSupportRoot(environment: [String: String]) -> URL? {
+        guard let overridePath = debugAppSupportOverride(environment: environment) else {
+            return nil
+        }
+        if NSString(string: overridePath).isAbsolutePath {
+            return URL(fileURLWithPath: overridePath, isDirectory: true)
+                .standardizedFileURL
+        }
+        guard isSafeManagedSupportChild(overridePath) else { return nil }
+        return managedAppSupportDir
+            .appendingPathComponent(overridePath, isDirectory: true)
+            .standardizedFileURL
+    }
+
+    /// Whether the app may open its stores. The App Group container is required, except where an
+    /// isolated diagnostics root (one safe component beneath the managed root) replaces it: a
+    /// device farm re-signs the app without the App Group (RF-38). An absolute diagnostics root
+    /// does not, and distribution builds compile the override out, so both still need the App Group.
+    static func hasUsableStorageRoot(
+        environment: [String: String],
+        sharedContainerAvailable: Bool
+    ) -> Bool {
+        sharedContainerAvailable || isolatedModelDeliverySupportRoot(environment: environment) != nil
     }
 
     /// Returns the only override shape that is safe to use as an isolated

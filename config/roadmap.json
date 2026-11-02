@@ -183,7 +183,7 @@
         "docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-01",
-      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27, maintainer decision: 3.0 ships outside the EU (148 of 175 territories), and the account and Vocello are declared non-trader (DSA complete); the EU release is BKL-41. 2026-10-30, the maintainer in App Store Connect with Claude guiding: the updated Program License Agreement and the Paid Apps Agreement accepted (Paid Apps waits on user information), the W-8BEN and the US Certificate of Foreign Status submitted (Active), and a Canadian bank account added (processing). Left: Quebec form FP-2506-V needs GST and QST registration numbers, and the maintainer is not registered yet (Revenu Quebec's start-up registration service). The purchase's review screenshot comes from the phone (RF-12). History: git log -p."
+      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: 3.0 ships outside the EU (148 of 175 territories); the EU release is BKL-41. Left: the maintainer's account steps that activate the Paid Apps agreement. Their status and details stay in the maintainer's private record outside the repository (maintainer decision 2026-11-01). The purchase's review screenshot comes from the phone (RF-12)."
     },
     {
       "id": "RF-06",
@@ -829,7 +829,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-01",
-      "notes": "Read-only, recorded without payload values. 2026-09-22: the automated inventory was removed by maintainer decision; the audit is a manual read-only pass (web portal or asc). 2026-10-30, asc read-only on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; availability 148 of 175 territories (EU excluded, new territories on); support URL set; Free Apps and Paid Apps agreements active and awaiting user information; W-8BEN and the US certificate active. Missing before submission: the en-US description and keywords (ASR-05 draft awaits review), every App Store screenshot, the App Review contact and notes, a build attached to the version, and the purchase's metadata (state MISSING_METADATA: the review screenshot, plus RF-02's QST form). The App Privacy label needs a web session or the browser to read back (ASR-02). No metadata or build mutation is authorized."
+      "notes": "Read-only, recorded without payload values. 2026-09-22: the automated inventory was removed by maintainer decision; the audit is a manual read-only pass (web portal or asc). 2026-10-30, asc read-only on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; availability 148 of 175 territories (EU excluded, new territories on); support URL set; agreement, tax and banking states are kept in the maintainer's private record (RF-02). Missing before submission: the en-US description and keywords (ASR-05 draft awaits review), every App Store screenshot, the App Review contact and notes, a build attached to the version, and the purchase's metadata (state MISSING_METADATA: the review screenshot, plus an RF-02 account step). The App Privacy label needs a web session or the browser to read back (ASR-02). No metadata or build mutation is authorized."
     },
     {
       "id": "ASR-12",
@@ -1923,7 +1923,7 @@
       ],
       "updated": "2026-10-27",
       "unparkWhen": "The maintainer has a public contact address to show in the EU and asks for the EU release.",
-      "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now rather than show a home address on the EU product page. The 27 EU territories were removed from availability (148 of 175 remain) and the account and Vocello were declared non-trader with no EU distribution intended (RF-02). Adding the EU back needs trader status first, then an availability edit; no new build or review is needed for availability. Not a release blocker."
+      "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now. The 27 EU territories were removed from availability (148 of 175 remain); the account's EU status is in the maintainer's private record (RF-02). Adding the EU back needs the trader step first, then an availability edit; no new build or review is needed for availability. Not a release blocker."
     },
     {
       "id": "BKL-42",

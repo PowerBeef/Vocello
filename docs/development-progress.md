@@ -20,9 +20,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 ### November 1: a dated path to App Review on November 12 (resume here)
 
 - **Next, in order** (maintainer decision of November 1, recorded in the release plan):
-  1. The maintainer, by November 5 to 6: RF-02's GST/QST registration with Revenu Québec (saved
-     under the maintainer's temporary code, started October 30, valid 30 days), then Quebec form
-     FP-2506-V in App Store Connect, which activates the Paid Apps Agreement; ASR-04's
+  1. The maintainer, by November 5 to 6: RF-02's remaining account steps, which activate the Paid
+     Apps agreement (status and details in the maintainer's private record, never in Git); ASR-04's
      attestations; ASR-05's listing and review-notes review; ASR-02 and ASR-11's App Privacy
      readback in the browser.
   2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-17's six
@@ -31,9 +30,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      About 3 to 4 hours, mostly unattended; Mac quiet, phone unlocked with Auto-Lock off.
   3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
      Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
-- **Done since October 30:** the updated Program License Agreement and the Paid Apps Agreement
-  accepted; the W-8BEN and US Certificate of Foreign Status active; a Canadian bank account added.
-  RF-10 closed by decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
+- **Done since October 30:** most of RF-02's account steps (private record). RF-10 closed by
+  decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
   smoke on main passed 15/15 on Xcode 27.2. The App Store Connect audit (ASR-11) lists what
   version 3.0.0 still lacks: listing text, screenshots, review details, an attached build and the
   purchase's metadata.

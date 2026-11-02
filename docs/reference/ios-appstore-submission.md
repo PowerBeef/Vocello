@@ -136,8 +136,8 @@ for the release acceptance (RF-15) or the 201-take campaign.
 - [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
 - [ ] Accept the updated Apple Developer Program License Agreement (the Account Holder, at
       developer.apple.com/account; it blocks new submissions), then the Paid Apps agreement, and
-      complete tax and banking. The Paid Apps agreement stopped at Apple's two-factor prompt on
-      2026-10-12; these steps are the maintainer's (RF-02).
+      complete tax and banking. These steps are the maintainer's (RF-02); their status stays in
+      the maintainer's private record, never in Git.
 - [ ] Capture the IAP review screenshot from the processed TestFlight build at the live USD 19.99
       (decision 2026-10-13), and attach the first IAP to the app version for review. Explain the
       free/paid boundary and the restore path in the reviewer notes.
@@ -154,10 +154,10 @@ Current account state (2026-10-12, set in the web portal with the maintainer's a
 - age rating 4+;
 - App Privacy published as Data Not Collected, with the privacy policy URL;
 - the export purchase entered as above;
-- EU Digital Services Act: declared non-trader with no EU distribution intended (2026-10-27).
+- EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record).
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
-- the updated Apple Developer Program License Agreement, the Paid Apps agreement, banking and tax;
+- RF-02's account steps (agreements, banking and tax; status in the maintainer's private record);
 - the accessibility declaration;
 - the processed candidate's export-compliance check.
 
@@ -194,8 +194,8 @@ is complete.
       27 EU territories were removed on 2026-10-27. Review the release behavior and new-territory
       policy at submission.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
-- [x] **EU DSA status**: declared non-trader with no EU distribution intended (2026-10-27), and the
-      EU territories are unavailable. An EU release needs trader status first (BKL-41).
+- [x] **EU DSA status**: set on 2026-10-27 (details in the maintainer's private record), and the
+      EU territories are unavailable. An EU release needs the trader step first (BKL-41).
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
       (AudioSeal watermark + WAV provenance chunk; the only off-switch is a registered debug knob).
       Review [`eu-ai-act-article50-assessment.md`](eu-ai-act-article50-assessment.md) for the

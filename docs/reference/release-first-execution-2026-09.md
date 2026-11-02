@@ -132,8 +132,7 @@ Between September 4 and October 12 the release did not move:
   iPhone 15 Pro, the hardware floor.
 - **2026-10-27.** Build 26 shows the Game Mode banner at every launch, so build 27 opts out of Game
   Mode (RF-37), and RF-17's records and RF-15's launch and navigation rows rerun on its tag. 3.0
-  ships outside the EU: the 27 EU territories left availability and the account is declared
-  non-trader (the EU release is BKL-41).
+  ships outside the EU: the 27 EU territories left availability (the EU release is BKL-41).
 - **2026-10-28.** A free BrowserStack trial runs a self-contained smoke test on a real iPhone 15 Pro
   and 15 Pro Max as exploratory evidence only (RF-38), and the documentation, agent instructions and
   roadmap are reviewed (RF-39).
@@ -145,7 +144,7 @@ Between September 4 and October 12 the release did not move:
   telemetry pull and the contract change). iPhone delivery evaluation is declared not applicable
   in the promotion contract: no iPhone lane produces delivery cells.
 - **2026-11-01.** A new schedule replaces the passed dates. The maintainer's paperwork (RF-02's
-  GST/QST registration and Quebec form, ASR-04's attestations, ASR-05's listing review, ASR-02 and
+  account steps, ASR-04's attestations, ASR-05's listing review, ASR-02 and
   ASR-11's privacy readback) is due November 5 to 6; one phone session on build 29 after RF-02
   (RF-17, RF-15 with its purchase rows, the AUD items, ASR-06, RF-35, RF-12 and ASR-05's
   screenshots) is due November 9; ASR-09 and the App Review submission (RF-16) are due

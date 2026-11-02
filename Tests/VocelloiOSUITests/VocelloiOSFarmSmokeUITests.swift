@@ -21,6 +21,8 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
     private static let takeTimeout: TimeInterval = 300
     /// RF-40: warm takes in the soak's one measurement, about 25 s each on an iPhone 15 Pro.
     private static let soakTakes = 40
+    /// BKL-53: warm takes per block of the cache-clearing A/B (four blocks in one session).
+    private static let abTakesPerBlock = 5
     /// About fifteen seconds of speech in dictionary words only, so a fresh farm keyboard has
     /// nothing to autocorrect before the composer's exact-text check.
     private static let script = """
@@ -79,6 +81,17 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         let thermalStateAfter: String
         /// From the take's History row (tenths of a second); nil when unread or unmatched.
         var audioSeconds: Double?
+    }
+
+    private struct ClearABBlock: Codable {
+        let schemaVersion: Int
+        let block: Int
+        /// `iphone_pro` (shipped) or the forced `high_memory_mac` policy.
+        let memoryPolicy: String
+        let deviceAtStart: DeviceFacts
+        let coldTake: Take
+        let takes: [SoakTake]
+        let thermalStateAtEnd: String
     }
 
     private struct Soak: Codable {
@@ -202,6 +215,64 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         beginSession(additionalEnvironment: environment)
         defer { endSession() }
         let model = ensureBuiltInVoiceModel(clock: clock)
+        let run = try measuredTakes(count: Self.soakTakes, clock: clock)
+        emit(marker: "VOCELLO_FARM_SOAK", name: "farm-soak-summary.json", Soak(
+            schemaVersion: 1,
+            journey: "farm-soak",
+            caveat: "Farm build re-signed without increased-memory-limit: clone-off exploratory evidence, "
+                + "not a benchmark record; engine timings are the measured signpost durations",
+            deviceAtStart: deviceAtStart,
+            model: model,
+            coldTake: run.cold,
+            takes: run.takes,
+            thermalStateAtEnd: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
+        ))
+    }
+
+    // BKL-53: interleaved blocks, so both clearing policies meet the same phone at the same heat.
+    // Methods run in name order: shipped iPhone policy, Mac high-memory policy, then both again.
+    func testFarmClearAB1IPhonePolicy() throws { try clearABBlock(1, forcedMemoryClass: nil) }
+    func testFarmClearAB2HighMemoryPolicy() throws { try clearABBlock(2, forcedMemoryClass: "high_memory_mac") }
+    func testFarmClearAB3IPhonePolicy() throws { try clearABBlock(3, forcedMemoryClass: nil) }
+    func testFarmClearAB4HighMemoryPolicy() throws { try clearABBlock(4, forcedMemoryClass: "high_memory_mac") }
+
+    /// BKL-53: one block of the MLX cache-clearing A/B. The shipped `iphone_pro` policy clears
+    /// MLX's buffer cache at every streamed chunk and every 50 tokens under a 128 MiB cache; the
+    /// registered `QWENVOICE_FORCE_MEMORY_CLASS` diagnostic switches the internal-diagnostics
+    /// build to `high_memory_mac`, which clears every 200 tokens under a 1 GiB cache, never per
+    /// chunk, and also streams 0.4 s chunks instead of 0.6 s (more decoder calls, against it).
+    /// `farm_smoke.sh upload --journey clear-ab` selects the four blocks; no lane does.
+    private func clearABBlock(_ block: Int, forcedMemoryClass: String?) throws {
+        executionTimeAllowance = 1_800
+        let clock = ContinuousClock()
+        let deviceAtStart = Self.deviceFacts()
+        var launchEnvironment = environment
+        if let forcedMemoryClass {
+            launchEnvironment["QWENVOICE_FORCE_MEMORY_CLASS"] = forcedMemoryClass
+        }
+        beginSession(additionalEnvironment: launchEnvironment)
+        defer { endSession() }
+        _ = ensureBuiltInVoiceModel(clock: clock)
+        let run = try measuredTakes(count: Self.abTakesPerBlock, clock: clock)
+        emit(marker: "VOCELLO_FARM_AB", name: "farm-clear-ab-\(block).json", ClearABBlock(
+            schemaVersion: 1,
+            block: block,
+            memoryPolicy: forcedMemoryClass ?? "iphone_pro",
+            deviceAtStart: deviceAtStart,
+            coldTake: run.cold,
+            takes: run.takes,
+            thermalStateAtEnd: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
+        ))
+    }
+
+    /// One cold take, which loads the model, then `count` warm takes of the same script inside
+    /// one XCTest measurement, which times the app's own engine intervals and samples its memory
+    /// and CPU per take; xcodebuild prints each metric's per-take values in order. Each take
+    /// prints its thermal state as it ends, and History supplies the audio lengths afterwards.
+    private func measuredTakes(
+        count: Int,
+        clock: ContinuousClock
+    ) throws -> (cold: Take, takes: [SoakTake]) {
         let rowsBefore = try XCTUnwrap(historyRowCensus(expectedScript: Self.script))
         prepare(mode: .custom)
         replaceScript(with: Self.script)
@@ -212,11 +283,11 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         dismissCompletedPlayerAndAssertGenerateReady()
 
         let options = XCTMeasureOptions()
-        options.iterationCount = Self.soakTakes
+        options.iterationCount = count
         options.invocationOptions = [.manuallyStop]
         var invocation = 0
         var takes: [SoakTake] = []
-        let soakStart = clock.now
+        let firstTakeStart = clock.now
         measure(metrics: Self.soakMetrics(app: app), options: options) {
             invocation += 1
             // XCTest discards the first run, so it generates nothing.
@@ -231,7 +302,7 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
                 index: takes.count + 1,
                 completed: !generationID.isEmpty,
                 harnessWallSeconds: Self.seconds(clock.now - start),
-                elapsedSeconds: Self.seconds(clock.now - soakStart),
+                elapsedSeconds: Self.seconds(clock.now - firstTakeStart),
                 thermalStateAfter: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
             )
             takes.append(take)
@@ -254,22 +325,8 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         } else {
             XCTFail("History gained \(added.count) rows for \(completed.count + 1) completed takes")
         }
-
-        emit(marker: "VOCELLO_FARM_SOAK", name: "farm-soak-summary.json", Soak(
-            schemaVersion: 1,
-            journey: "farm-soak",
-            caveat: "Farm build re-signed without increased-memory-limit: clone-off exploratory evidence, "
-                + "not a benchmark record; engine timings are the measured signpost durations",
-            deviceAtStart: deviceAtStart,
-            model: model,
-            coldTake: Take(
-                kind: "cold",
-                wallSeconds: coldWall,
-                audioSeconds: added.first.flatMap { audio[$0] }
-            ),
-            takes: takes,
-            thermalStateAtEnd: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
-        ))
+        let cold = Take(kind: "cold", wallSeconds: coldWall, audioSeconds: added.first.flatMap { audio[$0] })
+        return (cold, takes)
     }
 
     /// The soak's per-take metrics: the engine's own intervals for each take (preparation, then

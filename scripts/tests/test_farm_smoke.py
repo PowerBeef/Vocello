@@ -216,6 +216,19 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(body["only-testing"], ["VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmThermalSoak"])
         self.assertTrue(body["customBuildName"].startswith("RF-40 farm soak "))
 
+    def test_a_clear_ab_upload_runs_the_four_blocks_in_order(self) -> None:
+        curl = FakeCurl(BUILD_RESPONSES)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = make_package(temp)
+            farm_smoke.upload(directory, lambda: ACCOUNT, devices=["iPhone 15 Pro-27"],
+                              confirm=lambda _: True, run=curl, journey="clear-ab")
+        argv = curl.calls[2][0]
+        body = json.loads(argv[argv.index("--data-raw") + 1])
+        prefix = "VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmClearAB"
+        self.assertEqual(body["only-testing"], [prefix + "1IPhonePolicy", prefix + "2HighMemoryPolicy",
+                                                prefix + "3IPhonePolicy", prefix + "4HighMemoryPolicy"])
+        self.assertTrue(body["customBuildName"].startswith("BKL-53 farm clear A-B "))
+
     def test_an_unknown_journey_is_refused_before_anything_is_sent(self) -> None:
         curl = FakeCurl(BUILD_RESPONSES)
         with tempfile.TemporaryDirectory() as temp:

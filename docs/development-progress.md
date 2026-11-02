@@ -23,7 +23,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   1. The maintainer, by November 5 to 6: RF-02's remaining account steps, which activate the Paid
      Apps agreement (status and details in the maintainer's private record, never in Git); ASR-02
      and ASR-11's App Privacy readback in the browser, which needs a fresh App Store Connect sign-in
-     in Chrome.
+     in Chrome; approve ASR-05's drafted sentence that newer iPhones generate faster, for App
+     Store Connect.
   2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-17's six
      records and its manifest, RF-15 including the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09,
      ASR-06, RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots.

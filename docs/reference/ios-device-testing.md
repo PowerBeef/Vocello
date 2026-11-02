@@ -1,11 +1,12 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-28
+reviewed: 2026-11-02
 summary: iOS physical-device testing — deterministic compile lanes, device preparation, explicit XCUITest lanes (smoke, candidate rows, purchase, control audit, perf), pause and resume, headless diagnostics and retained evidence.
 sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
+  - scripts/farm_smoke.sh
   - scripts/ios_candidate_acceptance.py
   - scripts/ios_control_audit.py
   - config/ios-control-audit.json
@@ -1053,6 +1054,48 @@ and the [retained-memory qualification](../../benchmarks/runs/memory-qualificati
 Each record proves only its exact source, toolchain, model, and hardware identities; repository
 contract tests and Simulator results never substitute for fresh physical-device evidence after a
 relevant change.
+
+## Cloud device farm (iPhone 15 Pro class)
+
+No iPhone 15 Pro, the hardware floor, is paired with this Mac. BrowserStack App Automate's real
+iPhone 15 Pro (iOS 27) and 15 Pro Max (iOS 26) run the self-contained farm tests in
+`Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift`, which no lane selects:
+
+```sh
+scripts/farm_smoke.sh package                       # Release internal-diagnostics app and runner
+scripts/farm_smoke.sh upload [--journey smoke|soak] [--device "iPhone 15 Pro-27"]
+scripts/farm_smoke.sh results                       # status, per-test results, marker lines
+```
+
+- **Exploratory only.** The farm re-signs the app without `increased-memory-limit` or the App Group,
+  so the app keeps its stores in the diagnostics support root (`QVOICE_APP_SUPPORT_DIR=farm-smoke`),
+  Voice Cloning is off and nothing qualifies as floor-device, benchmark-history or promotion
+  evidence. Distribution builds still require the App Group (RF-38, `c878917a`).
+- **Maintainer-run.** `upload` and `results` read the maintainer's BrowserStack account from a
+  hidden prompt or the environment of their own terminal and send it only to BrowserStack's API
+  hosts; `upload` asks before it spends minutes. Raw logs stay untracked under
+  `build/artifacts/ios/farm-smoke/`.
+- **`smoke`** (RF-38) installs the Built-in Voice model, makes a cold and a warm take and finds both
+  in History, then measures the first take's memory peak. **`soak`** (RF-40) makes a cold take and
+  then 40 warm takes inside one XCTest measurement that times the app's own `Native Prepare
+  Generation` and `Native Generation Stream` signposts per take; RTF is their sum over the take's
+  audio length from History.
+- **Known trap (BKL-54).** If a selected test fails and the runner restarts, the farm drops the
+  test filter and runs the whole UI bundle, at the cost of many minutes.
+
+Results of 2026-11-01 and 2026-11-02, build 29's product plus the App Group fix (raw logs
+untracked; summaries on RF-38, RF-40 and BKL-53):
+
+| Run | Phone | Result |
+|---|---|---|
+| Smoke, farm build `d56f3431` | 15 Pro, iOS 27.0 | PASS; model 72 s; takes 15.8 s audio in 40.2 s cold, 13.8 s in 23.2 s warm (harness wall); first-take peak 2.64 GB |
+| Smoke, farm build `d56f3431` | 15 Pro Max, iOS 26.6.1 | PASS; model 79 s; 14.9 s in 30.9 s cold, 13.4 s in 17.9 s warm; peak 2.62 GB |
+| Soak, farm build `153a8045` | 15 Pro, iOS 27.0 | PASS; engine RTF 1.63 on the first warm take, median 2.80 over takes 6-20 and 3.19 over 21-40; thermal state serious from the second take; peak 2.52 GB on every take |
+| Shipped-policy blocks and a repeated soak, farm build `595b4673` | 15 Pro, iOS 27.0 | PASS; engine RTF 1.49 on a first take after rest, then a steady 2.2 (2.18-2.30) over 40 takes at nominal or fair heat; peak 2.5 GB |
+
+The paired iPhone 17 Pro measures RTF 0.47-0.48 in RF-17's engine records. On the iPhone 15 Pro
+generation is slower than real time, so the live preview pauses once to rebuffer; the maintainer
+accepted that tradeoff on 2026-11-02 (BKL-53 declined).
 
 ## Generated-output ownership
 

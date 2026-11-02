@@ -202,6 +202,29 @@ class UploadTests(unittest.TestCase):
         self.assertTrue(body["deviceLogs"])
         self.assertEqual(body["singleRunnerInvocation"], "true")
 
+    def test_a_soak_upload_runs_only_the_soak_on_the_named_device(self) -> None:
+        curl = FakeCurl(BUILD_RESPONSES)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = make_package(temp)
+            record = farm_smoke.upload(directory, lambda: ACCOUNT, devices=["iPhone 15 Pro-27"],
+                                       confirm=lambda _: True, run=curl, journey="soak")
+            assert record is not None
+            self.assertEqual(record["journey"], "soak")
+        argv = curl.calls[2][0]
+        body = json.loads(argv[argv.index("--data-raw") + 1])
+        self.assertEqual(body["devices"], ["iPhone 15 Pro-27"])
+        self.assertEqual(body["only-testing"], ["VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmThermalSoak"])
+        self.assertTrue(body["customBuildName"].startswith("RF-40 farm soak "))
+
+    def test_an_unknown_journey_is_refused_before_anything_is_sent(self) -> None:
+        curl = FakeCurl(BUILD_RESPONSES)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = make_package(temp)
+            with self.assertRaises(farm_smoke.FarmError):
+                farm_smoke.upload(directory, lambda: ACCOUNT, devices=["iPhone 15 Pro-27"],
+                                  confirm=lambda _: True, run=curl, journey="benchmark")
+        self.assertEqual(curl.calls, [])
+
     def test_a_declined_upload_asks_for_no_account_and_sends_nothing(self) -> None:
         curl = FakeCurl(BUILD_RESPONSES)
 

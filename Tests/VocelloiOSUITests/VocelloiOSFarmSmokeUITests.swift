@@ -19,6 +19,8 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
     private static let downloadTimeout: TimeInterval = 1_800
     private static let downloadStallBudget: TimeInterval = 300
     private static let takeTimeout: TimeInterval = 300
+    /// RF-40: warm takes in the soak's one measurement, about 25 s each on an iPhone 15 Pro.
+    private static let soakTakes = 40
     /// About fifteen seconds of speech in dictionary words only, so a fresh farm keyboard has
     /// nothing to autocorrect before the composer's exact-text check.
     private static let script = """
@@ -62,6 +64,31 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
 
     private struct MemoryRun: Codable {
         let deviceAtStart: DeviceFacts
+        let thermalStateAtEnd: String
+    }
+
+    private struct SoakTake: Codable {
+        /// 1-based; the n-th value of each `measured [...]` line belongs to this take.
+        let index: Int
+        let completed: Bool
+        /// Harness wall time from the Generate tap to the completed player; the engine's own
+        /// timing is the measured `Native Generation Stream` duration.
+        let harnessWallSeconds: Double
+        /// Seconds since the first measured take began, at this take's end.
+        let elapsedSeconds: Double
+        let thermalStateAfter: String
+        /// From the take's History row (tenths of a second); nil when unread or unmatched.
+        var audioSeconds: Double?
+    }
+
+    private struct Soak: Codable {
+        let schemaVersion: Int
+        let journey: String
+        let caveat: String
+        let deviceAtStart: DeviceFacts
+        let model: ModelDelivery
+        let coldTake: Take
+        let takes: [SoakTake]
         let thermalStateAtEnd: String
     }
 
@@ -160,6 +187,111 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         ))
     }
 
+    /// RF-40: the hardware floor's sustained performance. After one cold take loads the model,
+    /// `soakTakes` warm takes of the same script run back to back inside one XCTest measurement,
+    /// which times the app's own `Native Prepare Generation` and `Native Generation Stream`
+    /// signpost intervals and samples its memory and CPU per take; xcodebuild prints each as a
+    /// `measured [...]` line whose n-th value is take n. The test records each take's thermal
+    /// state and, from History, its audio length, so RTF is (prepare + stream) ÷ audio. The farm
+    /// re-signs the app without increased-memory-limit, so this is exploratory evidence, never a
+    /// benchmark record. `farm_smoke.sh upload --journey soak` selects it; no lane does.
+    func testFarmThermalSoak() throws {
+        executionTimeAllowance = 3_600
+        let clock = ContinuousClock()
+        let deviceAtStart = Self.deviceFacts()
+        beginSession(additionalEnvironment: environment)
+        defer { endSession() }
+        let model = ensureBuiltInVoiceModel(clock: clock)
+        let rowsBefore = try XCTUnwrap(historyRowCensus(expectedScript: Self.script))
+        prepare(mode: .custom)
+        replaceScript(with: Self.script)
+
+        let coldStart = clock.now
+        XCTAssertFalse(generateAndWaitForCompletedPlayer(timeout: Self.takeTimeout).isEmpty)
+        let coldWall = Self.seconds(clock.now - coldStart)
+        dismissCompletedPlayerAndAssertGenerateReady()
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = Self.soakTakes
+        options.invocationOptions = [.manuallyStop]
+        var invocation = 0
+        var takes: [SoakTake] = []
+        let soakStart = clock.now
+        measure(metrics: Self.soakMetrics(app: app), options: options) {
+            invocation += 1
+            // XCTest discards the first run, so it generates nothing.
+            guard invocation > 1 else {
+                stopMeasuring()
+                return
+            }
+            let start = clock.now
+            let generationID = generateAndWaitForCompletedPlayer(timeout: Self.takeTimeout)
+            stopMeasuring()
+            let take = SoakTake(
+                index: takes.count + 1,
+                completed: !generationID.isEmpty,
+                harnessWallSeconds: Self.seconds(clock.now - start),
+                elapsedSeconds: Self.seconds(clock.now - soakStart),
+                thermalStateAfter: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
+            )
+            takes.append(take)
+            // One line per take, so a session the farm ends early still keeps what ran.
+            printMarker("VOCELLO_FARM_SOAK_TAKE", take)
+            if take.completed { dismissCompletedPlayerAndAssertGenerateReady() }
+        }
+
+        let rowsAfter = try XCTUnwrap(historyRowCensus(expectedScript: Self.script))
+        // Persisted rows are `generation-<n>`, numbered in creation order: the cold take, then
+        // each completed measured take.
+        let added = Set(rowsAfter).subtracting(rowsBefore)
+            .sorted { Self.rowNumber($0) < Self.rowNumber($1) }
+        let audio = historyAudioSecondsByRow()
+        let completed = takes.indices.filter { takes[$0].completed }
+        if added.count == completed.count + 1 {
+            for (row, index) in zip(added.dropFirst(), completed) {
+                takes[index].audioSeconds = audio[row]
+            }
+        } else {
+            XCTFail("History gained \(added.count) rows for \(completed.count + 1) completed takes")
+        }
+
+        emit(marker: "VOCELLO_FARM_SOAK", name: "farm-soak-summary.json", Soak(
+            schemaVersion: 1,
+            journey: "farm-soak",
+            caveat: "Farm build re-signed without increased-memory-limit: clone-off exploratory evidence, "
+                + "not a benchmark record; engine timings are the measured signpost durations",
+            deviceAtStart: deviceAtStart,
+            model: model,
+            coldTake: Take(
+                kind: "cold",
+                wallSeconds: coldWall,
+                audioSeconds: added.first.flatMap { audio[$0] }
+            ),
+            takes: takes,
+            thermalStateAtEnd: Self.thermalStateName(ProcessInfo.processInfo.thermalState)
+        ))
+    }
+
+    /// The soak's per-take metrics: the engine's own intervals for each take (preparation, then
+    /// the stream through the published WAV), the app's memory and CPU, and the wall clock.
+    private static func soakMetrics(app: XCUIApplication) -> [any XCTMetric] {
+        [
+            XCTOSSignpostMetric(
+                subsystem: "com.qwenvoice.engine",
+                category: "runtime",
+                name: "Native Prepare Generation"
+            ),
+            XCTOSSignpostMetric(
+                subsystem: "com.qwenvoice.engine",
+                category: "generation",
+                name: "Native Generation Stream"
+            ),
+            XCTMemoryMetric(application: app),
+            XCTCPUMetric(application: app),
+            XCTClockMetric(),
+        ]
+    }
+
     /// Starts the Built-in Voice model through the Studio's own install action when the isolated
     /// root lacks it, and waits for Voice Models to show it Ready. A download that shows no
     /// change for five minutes fails rather than holding the farm session.
@@ -219,6 +351,44 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
     /// "voice, mode, date, 15.3s" (one snapshot of the identified row).
     private func historyAudioSeconds(rowID: String) -> Double? {
         guard let snapshot = try? element("historyRow_\(rowID)").snapshot() else { return nil }
+        return Self.audioSeconds(in: snapshot)
+    }
+
+    /// Every History row's audio length under the search the last census applied, read from each
+    /// row's own metadata while walking the lazy list from its top, one snapshot per viewport.
+    /// Rows whose length cannot be read are absent.
+    private func historyAudioSecondsByRow() -> [String: Double] {
+        let scroll = app.scrollViews.firstMatch
+        guard VocelloUIWait.exists(scroll, timeout: 10) else { return [:] }
+        for _ in 0..<64 {
+            let before = historyViewportSignature()
+            scroll.swipeDown()
+            if historyViewportSignature() == before { break }
+        }
+        let prefix = "historyRow_"
+        var seconds: [String: Double] = [:]
+        for _ in 0..<64 {
+            if let root = try? app.snapshot() {
+                var pending: [any XCUIElementSnapshot] = [root]
+                while let node = pending.popLast() {
+                    if node.identifier.hasPrefix(prefix) {
+                        if let value = Self.audioSeconds(in: node) {
+                            seconds[String(node.identifier.dropFirst(prefix.count))] = value
+                        }
+                    } else {
+                        pending.append(contentsOf: node.children)
+                    }
+                }
+            }
+            let before = historyViewportSignature()
+            scroll.swipeUp()
+            if historyViewportSignature() == before { break }
+        }
+        return seconds
+    }
+
+    /// The duration a History row's metadata ends with ("voice, mode, date, 15.3s").
+    private static func audioSeconds(in snapshot: any XCUIElementSnapshot) -> Double? {
         var pending: [any XCUIElementSnapshot] = [snapshot]
         while let node = pending.popLast() {
             if let last = node.label.split(separator: ",").last?.trimmingCharacters(in: .whitespaces),
@@ -232,14 +402,21 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
 
     /// Prints the marker line for the farm's console log and keeps the same JSON as an attachment.
     private func emit(marker: String, name: String, _ value: some Encodable) {
-        let line = Self.json(value)
-        print("\(marker) \(line)")
-        // stdout is fully buffered under the runner's pipe; flush before anything later can fail.
-        unsafe fflush(stdout)
+        let line = printMarker(marker, value)
         let attachment = XCTAttachment(string: line)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// Prints one marker line for the farm's console log and returns its JSON.
+    @discardableResult
+    private func printMarker(_ marker: String, _ value: some Encodable) -> String {
+        let line = Self.json(value)
+        print("\(marker) \(line)")
+        // stdout is fully buffered under the runner's pipe; flush before anything later can fail.
+        unsafe fflush(stdout)
+        return line
     }
 
     private static func json(_ value: some Encodable) -> String {

@@ -51,7 +51,12 @@ ONLY_TESTING = (
     "VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmSmokeJourney",
     "VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmTakeMemoryPeak",
 )
-RESULT_MARKERS = ("VOCELLO_FARM_SMOKE ", "VOCELLO_FARM_MEMORY ", "measured [")
+# RF-40: the sustained-take soak on its own, for the hardware floor's performance and thermal course.
+SOAK_TESTING = ("VocelloiOSUITests/VocelloiOSFarmSmokeUITests/testFarmThermalSoak",)
+JOURNEYS = {"smoke": ONLY_TESTING, "soak": SOAK_TESTING}
+BUILD_NAMES = {"smoke": "RF-38 farm smoke", "soak": "RF-40 farm soak"}
+RESULT_MARKERS = ("VOCELLO_FARM_SMOKE ", "VOCELLO_FARM_MEMORY ", "VOCELLO_FARM_SOAK ", "VOCELLO_FARM_SOAK_TAKE ",
+                  "measured [")
 CAVEAT = "BrowserStack re-signs the app without increased-memory-limit: clone-off exploratory smoke only"
 CREDENTIAL = re.compile(r"^[A-Za-z0-9_.@+-]+$")
 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
@@ -238,13 +243,17 @@ def check_package(directory: Path, *, force: bool) -> dict[str, Any]:
 
 def upload(directory: Path, account: Callable[[], tuple[str, str]], *, devices: list[str],
            confirm: Callable[[str], bool], run: Runner = run_command, force: bool = False,
-           now: Callable[[], float] = time.time) -> dict[str, Any] | None:
-    """Uploads the package and starts one farm build on `devices` once the maintainer confirms.
-    Records the build in uploads/<build id>.json and upload.json; None when declined."""
+           now: Callable[[], float] = time.time, journey: str = "smoke") -> dict[str, Any] | None:
+    """Uploads the package and starts one farm build of `journey`'s tests on `devices` once the
+    maintainer confirms. Records the build in uploads/<build id>.json and upload.json; None when
+    declined."""
+    if journey not in JOURNEYS:
+        raise FarmError(f"unknown farm journey {journey!r}; choose one of {', '.join(sorted(JOURNEYS))}")
+    tests = list(JOURNEYS[journey])
     manifest = check_package(directory, force=force)
     dirty = " from a tree with uncommitted changes" if manifest.get("dirtyTree") else ""
     if not confirm(f"Upload {directory.name} (commit {str(manifest.get('sourceCommit'))[:8]}{dirty}) and "
-                   f"start one farm build on {', '.join(devices)}? It spends BrowserStack minutes."):
+                   f"start one farm {journey} build on {', '.join(devices)}? It spends BrowserStack minutes."):
         return None
     login = account()
     app = _curl_json(run, login, f"{API}/app", "-X", "POST", "-F", f"file=@{directory / IPA}", max_time=900)
@@ -256,13 +265,13 @@ def upload(directory: Path, account: Callable[[], tuple[str, str]], *, devices: 
         "app": app["app_url"],
         "testSuite": suite["test_suite_url"],
         "devices": devices,
-        "only-testing": list(ONLY_TESTING),
+        "only-testing": tests,
         "deviceLogs": True,
         "enableResultBundle": True,
         # One runner invocation keeps the model the journey downloaded for the memory test.
         "singleRunnerInvocation": "true",
         "project": "Vocello",
-        "customBuildName": f"RF-38 farm smoke {directory.name}",
+        "customBuildName": f"{BUILD_NAMES[journey]} {directory.name}",
     }
     build = _curl_json(run, login, f"{API}/build", "-X", "POST", "-H", "Content-Type: application/json",
                        "--data-raw", json.dumps(request))
@@ -277,7 +286,8 @@ def upload(directory: Path, account: Callable[[], tuple[str, str]], *, devices: 
         "testSuiteUrl": suite["test_suite_url"],
         "buildId": build_id,
         "devices": devices,
-        "onlyTesting": list(ONLY_TESTING),
+        "journey": journey,
+        "onlyTesting": tests,
     }
     text = json.dumps(record, indent=2) + "\n"
     (directory / "uploads").mkdir(exist_ok=True)
@@ -353,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     send.add_argument("package", type=Path)
     send.add_argument("--device", action="append", dest="devices")
     send.add_argument("--force", action="store_true")
+    send.add_argument("--journey", choices=sorted(JOURNEYS), default="smoke",
+                      help="smoke (RF-38, the default) or soak (RF-40, sustained takes; name one --device)")
     read = commands.add_parser("results")
     read.add_argument("package", type=Path)
     read.add_argument("--build", help="a farm build of this package other than the latest")
@@ -369,7 +381,8 @@ def main(argv: list[str] | None = None) -> int:
                             "BrowserStack account")
         if args.command == "upload":
             record = upload(args.package, lambda: credentials(os.environ),
-                            devices=args.devices or list(DEFAULT_DEVICES), confirm=_ask_yes, force=args.force)
+                            devices=args.devices or list(DEFAULT_DEVICES), confirm=_ask_yes, force=args.force,
+                            journey=args.journey)
             if record is None:
                 print("nothing uploaded")
                 return 1

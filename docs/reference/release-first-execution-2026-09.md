@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-01
 summary: The iOS 3.0 App Store submission path rebaselined on October 12, the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
 sourceOfTruth:
   - config/roadmap.json
@@ -158,28 +158,27 @@ overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.
 
 | Step | Items | Exit | Who | Status |
 | --- | --- | --- | --- | --- |
-| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | On hold since Oct 13; ASR-09 due Oct 30 |
-| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Claude; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 (due Oct 30) |
+| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | Resumed Nov 1; ASR-04 closed Nov 1; RF-02's account steps (private record) and ASR-02's readback due Nov 5 to 6; ASR-09's fresh proof due Nov 12, within 24 hours of submission |
+| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Claude; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 (due Nov 9) |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Done Oct 16 |
 | 4 — freeze | ASR-08, RF-09 | Build unused; exact-SHA CI green; `focusLock.freeze` recorded; the `v3.0.0` tag | Maintainer pushes the tag | Done: frozen Oct 23 at `e7a8e2ae`, the signed `v3.0.0` commit |
-| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.0.0-ios.N` candidate tag (or an `archive_ios` dispatch) archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Claude installs | ASR-10 and ASR-07 done Oct 24; build 26 in Public Beta, build 27 next (RF-37); RF-12's owned-export row waits on RF-02 |
-| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | Due Oct 29; reruns on build 27's tag |
-| 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | ASR-05 due Oct 30; ASR-11 parked |
-| 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | Parked until step 1 resumes |
+| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.0.0-ios.N` candidate tag (or an `archive_ios` dispatch) archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Claude installs | ASR-10 and ASR-07 done Oct 24; build 29 (`v3.0.0-ios.8`) in TestFlight and attached to version 3.0.0 on Nov 1; RF-12's owned-export row waits on RF-02 |
+| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | Due Nov 9, in one phone session on build 29's tag after RF-02 |
+| 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | ASR-05's listing text and review details entered Nov 1, its screenshots due Nov 9; ASR-11 due Nov 6 |
+| 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | Due Nov 12, on the maintainer's go |
 
-The Mac and CLI items run beside the path without touching the iPhone candidate: RF-10 (qualification
-and publication, in flight) and RF-23 (Sparkle updates); RF-30 and RF-31 wait for the submission.
+No Mac or CLI item runs beside the path any more: RF-10 closed by decision on November 1, and RF-23
+(Sparkle updates), RF-30 and RF-31 wait for the submission.
 
-**Step 1 is on hold** (maintainer decision, October 13). The decisions are recorded, but the
-maintainer's own account steps, the ASR-04 attestations and the privacy-page push wait, so RF-02,
-ASR-02, ASR-04, ASR-11 and RF-16 are parked without dates. The other steps continue. The Paid Apps
-agreement can take days to activate, so the submission date is set again when step 1 resumes.
+**Step 1 resumed on November 1** (it was on hold from October 13). ASR-04 is attested and closed;
+RF-02's remaining account steps and ASR-02's App Privacy readback are left. The Paid Apps agreement
+can take days to activate after RF-02's last step, which is why RF-02 comes first.
 
 The blockers' device proof comes from RF-15, so they close after it and before RF-16. Group the phone
 work into as few windows as possible, and use the phone only in windows the maintainer announces. The
-next window serves build 27: the Game Mode check (RF-37), RF-17's remaining records, RF-35's attended
-cellular check and RF-15's remaining rows. DW-04 runs alongside the release; DW-03 is parked until
-the submission.
+next window is one session on build 29, after RF-02 and by November 9: RF-17's six records and its
+manifest, RF-15 with its purchase rows, the AUD items, ASR-06, RF-35's cellular download, RF-12's
+Airplane Mode export and ASR-05's screenshots. DW-03 and DW-04 are parked until the submission.
 
 ## Rules while the focus lock holds
 

@@ -5809,6 +5809,25 @@
       ],
       "updated": "2026-11-01",
       "notes": "Software and model attribution is shipped: the deterministic manifest, the in-app licenses screen and byte-identity archive verification; App Store Connect declares USES_THIRD_PARTY_CONTENT; the voice-cloning marketing sample was removed. 2026-10-12: the maintainer decides (no paid counsel). The product artwork is mixed (own, stock and AI-assisted), so each shipped asset gets a private attestation from the inventory in docs/reference/content-rights-review.md (11 groups with fingerprints): built-in previews and speaker names, website audio, app and website artwork, and descriptive Qwen/Hugging Face naming. Remaining: those attestations, or replacement of any asset that cannot be attested. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-11-01: the maintainer attested every asset group and confirmations 12 and 13 (decision ASR04-2026-11-01); the private record's SHA-256 is in the content-rights review."
+    },
+    {
+      "id": "RF-38",
+      "plan": "release-first-3-0-2026-09",
+      "title": "A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Maintainer decision 2026-10-28: no iPhone 15 Pro has run Vocello yet, and BrowserStack App Automate's trial (100 free minutes) offers a real iPhone 15 Pro on iOS 27 and a 15 Pro Max on iOS 26. Public farm devices re-sign the app, which drops increased-memory-limit and the App Group, so these runs take the clone-off path under the default memory limit and count only as exploratory smoke evidence, never as floor-device or promotion evidence. Done when a self-contained XCUITest (fresh install: download one Built-in Voice model through Settings, generate a short take, find it in History, attach its timings) that no existing lane selects, and a script that packages the app and its test runner for upload, are committed with the routed check and the iOS compile passing, and the maintainer-run upload passes on both devices with the results summarised in the notes. The maintainer creates the trial account and runs the upload; Claude creates no account and handles no access key.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
+        "Sources/iOS/IOSAppBootstrap.swift"
+      ],
+      "updated": "2026-11-01",
+      "notes": "Opened 2026-10-28 after the device-farm research: BrowserStack is the only farm listing a real iPhone 15 Pro on iOS 26 or later; its trial re-signs the app without increased-memory-limit or the App Group, so passes are clone-off exploratory smoke evidence only, never floor-device or promotion evidence. 2026-11-01: farm build c660a27b stopped on the app's App Group check; c878917a lets diagnostics builds start on an isolated support root without the App Group (distribution builds unchanged) and lets results read BrowserStack's log host. Farm build d56f3431 (package 20261102-044837-c878917a, build 29's product plus that fix) PASSED both tests on both phones, thermal nominal throughout. iPhone 15 Pro (iPhone16,1, iOS 27.0, 7.5 GB): Built-in Voice model downloaded in 72 s; a cold take of 15.8 s audio in 40.2 s and a warm take of 13.8 s in 23.2 s (harness wall time); both found in History; first-take memory peak 2.64 GB. iPhone 15 Pro Max (iPhone16,2, iOS 26.6.1): download 79 s; cold 14.9 s in 30.9 s, warm 13.4 s in 17.9 s; peak 2.62 GB. The hardware gate admits both.",
+      "evidence": [
+        "commit:c878917a",
+        "run:browserstack-d56f34310bfaae323cb70576649f1ce684c60000"
+      ]
     }
   ]
 }

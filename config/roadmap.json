@@ -331,21 +331,6 @@
       "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model; Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE, so per-request permission keeps that protection while the switch is off. Build 25, 2026-10-25: navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, switch off). Attended, 2026-10-27 on build 26 (maintainer): on 5G with no Wi-Fi and the switch off, a Voice Design download waits. It shows 682.3 MB (33%) from the start because speech_tokenizer/model.safetensors (682,293,092 bytes, the same SHA-256 in every model) is reused from the shared component store when an installed model holds it; reuse counts as progress with no network transfer. That matches the 682 MB seen on 2026-10-25, so those bytes were not cellular. The display is parked as BKL-39. With the switch on, a download started afterwards progressed over cellular (maintainer, 2026-10-27), then was stopped before it finished because coverage there is weak; a completion over cellular is not yet observed."
     },
     {
-      "id": "RF-38",
-      "plan": "release-first-3-0-2026-09",
-      "title": "A free BrowserStack trial runs a smoke test on a real iPhone 15 Pro and 15 Pro Max",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Maintainer decision 2026-10-28: no iPhone 15 Pro has run Vocello yet, and BrowserStack App Automate's trial (100 free minutes) offers a real iPhone 15 Pro on iOS 27 and a 15 Pro Max on iOS 26. Public farm devices re-sign the app, which drops increased-memory-limit and the App Group, so these runs take the clone-off path under the default memory limit and count only as exploratory smoke evidence, never as floor-device or promotion evidence. Done when a self-contained XCUITest (fresh install: download one Built-in Voice model through Settings, generate a short take, find it in History, attach its timings) that no existing lane selects, and a script that packages the app and its test runner for upload, are committed with the routed check and the iOS compile passing, and the maintainer-run upload passes on both devices with the results summarised in the notes. The maintainer creates the trial account and runs the upload; Claude creates no account and handles no access key.",
-      "sourceOfTruth": [
-        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
-        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
-        "Sources/iOS/IOSAppBootstrap.swift"
-      ],
-      "updated": "2026-11-01",
-      "notes": "Opened 2026-10-28 after the device-farm research: BrowserStack is the only farm listing a real iPhone 15 Pro on iOS 26 or later. 2026-10-28: VocelloiOSFarmSmokeUITests and scripts/farm_smoke.sh committed. 2026-11-01: fbb49d15 re-seals a stale runner wrapper; farm build c660a27b (package 20261102-041806-fbb49d15, build 29's product) installed and launched on the 15 Pro (iOS 27) and 15 Pro Max (iOS 26), then stopped on the app's App Initialization Failed screen: the farm's re-signing drops the App Group, and IOSAppBootstrap.makeBackend refused to start without it even under the diagnostics QVOICE_APP_SUPPORT_DIR override, so all four tests timed out waiting for onboarding. results could not fetch logs: farm_smoke.py trusted only api-cloud.browserstack.com and the logs come from api.browserstack.com. Not a release blocker: shipped builds keep the App Group. The maintainer chose to land the fix now; build 29's remaining RF-15 rows and RF-17's records run from the v3.0.0-ios.8 tag checkout."
-    },
-    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",

@@ -150,8 +150,9 @@ Between September 4 and October 12 the release did not move:
   screenshots) is due November 9; ASR-09 and the App Review submission (RF-16) are due
   November 12. RF-10 closes without the Mac promotion lanes, which can no longer be built at
   v3.0.0; RF-23 and DW-04 park until after the submission. RF-38 parked too, then the maintainer
-  unparked it the same evening; its first farm run stopped at the app's App Group check, so it
-  parks again until after the submission.
+  unparked it the same evening; after a fix that lets diagnostics builds start without the App
+  Group (`c878917a`), the farm smoke passed on both iPhone 15 models and RF-38 closed. `main` now
+  carries that product change, so build 29's remaining rows run from the `v3.0.0-ios.8` checkout.
 
 ## The path
 

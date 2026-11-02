@@ -34,17 +34,20 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   attested and closed; ASR-05's en-US listing text and the App Review contact and notes entered in
   App Store Connect and read back; build 29 attached to version 3.0.0, with no export-compliance
   question left. RF-10 closed by decision; RF-23, DW-04 and RF-38 parked until after the submission. The Mac
-  smoke on main passed 15/15 on Xcode 27.2. The App Store Connect audit (ASR-11) lists what
-  version 3.0.0 still lacks: listing text, screenshots, review details, an attached build and the
-  purchase's metadata.
+  smoke on main passed 15/15 on Xcode 27.2. Version 3.0.0 in App Store Connect still lacks the
+  screenshots, the purchase's metadata and the accessibility declaration (ASR-11).
 - **Build 29:** `v3.0.0-ios.8` at `a60dd204` is in TestFlight (release run 41079341984). Its
-  release evidence is kept in `build/artifacts/quality-promotion/release-v3.0.0-ios.8` (the GitHub
-  artifact expires November 13). Build 28's upload timed out in the archive step (45 minutes is
+  complete release artifact, IPA included, is kept in
+  `build/artifacts/quality-promotion/release-v3.0.0-ios.8-candidate` (the GitHub artifact expires
+  November 13); candidate rows need that folder, since `release-v3.0.0-ios.8` lacks the IPA. Build 28's upload timed out in the archive step (45 minutes is
   tight); build 29 replaces it. Its only RF-17 attempt so far, model download on October 30, failed
   on a CoreDevice launch error; replug the phone if it repeats.
-- **Phone:** UI Automation re-enabled after the Xcode 27.2 update; development builds from the
-  October 30 lanes may be installed, so reinstall TestFlight build 29 before a candidate row and
-  tap Continue on its What to Test sheet.
+- **Phone:** on November 1 TestFlight build 29 replaced the development copy, keeping its data
+  (onboarding done, 3 of 3 models Ready, the benchmark clone voice saved), and RF-15's clone-voice,
+  navigation and modes rows passed on it. UI Automation needed enabling again, and a notification
+  banner took a tap, so turn on Do Not Disturb before a lane. RF-17's lanes install a development
+  build of the tag: run the candidate rows (the purchase rows) before them, or reinstall TestFlight
+  build 29 afterwards.
 - **Mac:** Xcode 27.2 with the iOS 27.2 component. The ad-hoc test build asks for speech
   recognition again after every clean rebuild (BKL-51); the maintainer clicks Autoriser.
 - **TestFlight:** builds 26 and 27 are in Internal and Public Beta under the RF-17 waiver for the

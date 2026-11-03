@@ -707,7 +707,7 @@
       "blockedBy": [
         "RF-12"
       ],
-      "gate": "Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.",
+      "gate": "Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted size for the iPhone slot App Store Connect requires (the 6.3-inch Dynamic Island medium display per Apple's specifications on 2026-11-03, which the iPhone 17 Pro captures at 1206x2622), with no clipping, stale UI, diagnostics, personal data, or misleading claims.",
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md",
         "Sources/iOS/IOSSettingsViews.swift",
@@ -716,8 +716,8 @@
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-11-02",
-      "notes": "The runbook uses current Ready terminology, Apple's one highest-resolution iPhone set (6.9-inch preferred, 6.5-inch fallback), exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-26: review-notes step 3 says Voice Design needs its voice description chip before Generate (BKL-38). 2026-11-01, at the maintainer's request: the en-US listing in docs/reference/app-store-listing.md was entered as drafted (subtitle, promotional text, description, keywords, marketing URL, App Review contact and notes, no demo account) and an asc readback matched every field; build 29 is attached to version 3.0.0; What's New is not offered on a first version. 2026-11-02, maintainer-approved: the description says newer iPhones generate faster and that the live preview may pause on an iPhone 15 Pro, and review-notes step 3 tells App Review the same, with expected speeds; both fields read back byte-identical. Left: the App Store screenshots from the signed candidate on the iPhone, and the export purchase's metadata (MISSING_METADATA, with RF-02 and RF-12). History: git log -p -- config/roadmap.json."
+      "updated": "2026-11-03",
+      "notes": "The runbook uses current Ready terminology, Apple's required iPhone screenshot size, exact catalog byte totals, Wi-Fi and free-space guidance, cancellation, adoption, offline behavior and the host-outage posture. 2026-10-26: review-notes step 3 says Voice Design needs its voice description chip before Generate (BKL-38). 2026-11-01, at the maintainer's request: the en-US listing in docs/reference/app-store-listing.md was entered as drafted (every text field, the App Review contact and notes, no demo account) and read back matching; build 29 is attached to version 3.0.0; What's New is not offered on a first version. 2026-11-02, maintainer-approved: the description and review-notes step 3 say newer iPhones generate faster and the live preview may pause on an iPhone 15 Pro; both read back byte-identical. 2026-11-03: Apple's specifications require the 6.3-inch iPhone size, which the iPhone 17 Pro captures at 1206x2622, so no other device is needed; the media manager confirms the slot at upload. Left: those screenshots from the signed candidate, and the export purchase's metadata (MISSING_METADATA, with RF-02 and RF-12). History: git log -p -- config/roadmap.json."
     },
     {
       "id": "ASR-06",

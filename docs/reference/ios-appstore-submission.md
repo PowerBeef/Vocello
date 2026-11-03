@@ -223,9 +223,13 @@ hours of submission remains (ASR-09).
 
 ## 3. Screenshots + metadata
 
-- [ ] iPhone screenshots: Apple currently requires one highest-resolution iPhone set. Prefer an accepted
-      6.9-inch portrait size (1260×2736, 1290×2796, or 1320×2868); an accepted 6.5-inch set
-      (1284×2778 or 1242×2688) is the fallback when 6.9-inch screenshots are absent. Capture from the
+- [ ] iPhone screenshots: Apple's screenshot specifications (checked 2026-11-03) require at least one
+      screenshot for iPhone with Dynamic Island (medium display), the 6.3-inch size, and App Store
+      Connect scales it down for smaller iPhones. The iPhone 17 Pro captures 1206×2622, an accepted
+      portrait size for that slot (`APP_IPHONE_61` in the API); 6.9-inch (1260×2736, 1290×2796, or
+      1320×2868) and 6.5-inch sets are optional. The same page still calls the 6.5-inch size required
+      when no 6.9-inch set is present, so confirm which iPhone size App Store Connect's media manager
+      marks required before uploading. Capture from the
       exact signed candidate on the supported **physical device** for Studio, model installation,
       Voice Design, Voice Cloning, Voices, History, and Settings. Reject clipping, stale UI, diagnostic
       state, personal data, and misleading claims. Do not submit the tracked 780×1696 historical image

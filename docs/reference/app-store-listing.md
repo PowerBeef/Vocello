@@ -138,8 +138,9 @@ fresh North America download proof (see [`ios-appstore-submission.md`](ios-appst
 
 ## Not drafted here
 
-- Screenshots: ASR-05 takes them from the signed candidate on the iPhone, as one 6.9-inch set (or
-  the 6.5-inch fallback). See [`ios-appstore-submission.md`](ios-appstore-submission.md) §3.
+- Screenshots: ASR-05 takes them from the signed candidate on the iPhone 17 Pro, as one 6.3-inch set
+  (1206×2622), the iPhone size Apple's specifications require. See
+  [`ios-appstore-submission.md`](ios-appstore-submission.md) §3.
 - The copyright line. Category and age rating are already set in App Store Connect (RF-02,
   2026-10-12).
 - Other localizations. The listing is en-US only so far; the export purchase already has en-US,

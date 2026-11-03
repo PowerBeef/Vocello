@@ -62,6 +62,18 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-10-27 | [`ios-engine-20261027-171118-a127f66b`](runs/engine-generation/ios-engine-20261027-171118-a127f66b.json) | focused | focused | passed | qualified | 1 | 0.47 | `e0feaf2c836a` | `5687836fb1e7` | baseline | rf17-ios5-engine-clone |
 
+## engine-generation / ios / iphone-17-pro / config `59518c974f58`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-engine-20261103-184249-911ada42`](runs/engine-generation/ios-engine-20261103-184249-911ada42.json) | focused | focused | passed | qualified | 1 | 0.51 | `a60dd2040b2b` | `59518c974f58` | baseline | rf17-ios8-engine-custom |
+
+## engine-generation / ios / iphone-17-pro / config `9dc322201ff3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-engine-20261103-184628-6441faec`](runs/engine-generation/ios-engine-20261103-184628-6441faec.json) | focused | focused | passed | qualified | 1 | 0.48 | `a60dd2040b2b` | `9dc322201ff3` | baseline | rf17-ios8-engine-clone |
+
 ## engine-generation / ios / iphone-17-pro / config `a15ad30a4677`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -73,6 +85,12 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.54 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
+
+## engine-generation / ios / iphone-17-pro / config `be537b46f752`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-engine-20261103-184508-78f67527`](runs/engine-generation/ios-engine-20261103-184508-78f67527.json) | focused | focused | passed | qualified | 1 | 0.47 | `a60dd2040b2b` | `be537b46f752` | baseline | rf17-ios8-engine-design |
 
 ## engine-generation / ios / iphone-17-pro / config `bf0ff2ed5c05`
 
@@ -1145,6 +1163,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-10-30 | [`ios-memory-qualification-20261030-135055-aa867792`](runs/memory-qualification/ios-memory-qualification-20261030-135055-aa867792.json) | focused | focused | passed | qualified | 9 | 0.53 | `ccf3b2699dd7` | `998df4e26e20` | baseline | ios-memory-qualification-20261030-135055-aa867792 |
 
+## memory-qualification / ios / iphone-17-pro / config `b5ba83b875ad`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-memory-qualification-20261103-184038-a1004c76`](runs/memory-qualification/ios-memory-qualification-20261103-184038-a1004c76.json) | focused | focused | passed | qualified | 9 | 0.57 | `a60dd2040b2b` | `b5ba83b875ad` | baseline | ios-memory-qualification-20261103-184038-a1004c76 |
+
 ## memory-qualification / ios / iphone-17-pro / config `dcec19b63f13`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -1344,6 +1368,12 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-06 | [`ios-xcui-benchmark-20260806-135457-1d545686`](runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.61 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-ios-control-3 |
+
+## ui-generation / ios / iphone-17-pro / config `aa7af8ff16b8`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-xcui-benchmark-20261103-181710-c657e53a`](runs/ui-generation/ios-xcui-benchmark-20261103-181710-c657e53a.json) | canonical | canonical | passed | qualified | 29 | 0.53 | `a60dd2040b2b` | `aa7af8ff16b8` | baseline | rf17-ios8-ui-benchmark |
 
 ## ui-generation / ios / iphone-17-pro / config `b618272db7b3`
 
@@ -1729,6 +1759,12 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-28 | [`ios-xcui-perf-20260828-172155-32e5b71e`](runs/ui-perf/ios-xcui-perf-20260828-172155-32e5b71e.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `4c1e83720ee0` dirty | `excluded` | baseline | control-audit-20260828 |
+
+## ui-perf / ios / iphone-17-pro / config `55360e5dfbae`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-03 | [`ios-xcui-perf-20261103-184800-069eab23`](runs/ui-perf/ios-xcui-perf-20261103-184800-069eab23.json) | canonical | canonical | passed | not-applicable | 9 | — | `a60dd2040b2b` | `55360e5dfbae` | baseline | rf17-ios8-ui-perf-r2 |
 
 ## ui-perf / ios / iphone-17-pro / config `9a7f6e403e06`
 

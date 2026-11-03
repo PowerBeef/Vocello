@@ -24,10 +24,14 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      Apps agreement (status and details in the maintainer's private record, never in Git); ASR-02
      and ASR-11's App Privacy readback in the browser, which needs a fresh App Store Connect sign-in
      in Chrome.
-  2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-17's six
-     records and its manifest, RF-15 including the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09,
-     ASR-06, RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots.
-     About 3 to 4 hours, mostly unattended; Mac quiet, phone unlocked with Auto-Lock off.
+  2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-15 including
+     the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09, ASR-06, RF-35's cellular download, RF-12's
+     Airplane Mode export and ASR-05's screenshots, plus whatever RF-17 still needs. On November 3,
+     in an unattended window, five of RF-17's six records passed on the tag (details in RF-17's
+     notes); they expire on November 10. The language record failed: the phone lacks six dictation
+     languages, and three takes fail on fixed seeds, so it needs a maintainer decision. The phone
+     now runs a development build of the tag on System Default App Language: reinstall TestFlight
+     build 29 and set App Language back to English before the candidate rows.
   3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
      Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
 - **Done since October 30:** most of RF-02's account steps (private record). On November 1, ASR-04

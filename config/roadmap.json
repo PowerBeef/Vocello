@@ -312,7 +312,7 @@
         "scripts/quality_promotion.py"
       ],
       "updated": "2026-11-01",
-      "notes": "Opened 2026-10-12. 2026-10-26 and 10-29 (maintainer): skipped on builds 26 and 27 for the Public Beta only; this promotion still gates App Review (RF-16). 2026-10-30: Xcode 27.2 cannot open the project at build 27's tag (fixed 0f203210), so the records moved to build 28 (v3.0.0-ios.7, ccf3b269): ui-benchmark ios-xcui-benchmark-20261030-141923-7c4d0674, ios-memory-qualification-20261030-135055-aa867792 and three engine runs PASS (89658b37). lang-bench failed on missing engine and app telemetry, a BT-06 regression (fixed 854784a7); model-download failed while UI Automation was off after the Xcode update; ui-perf was refused on a busy host. Maintainer decision 2026-10-30: iPhone delivery evaluation is declared not applicable (e7377511), so classify needs six iOS records. Both fixes need a new tag: the records rerun on build 29 when the Mac is quiet. 2026-10-30: release-evidence.json for v3.0.0-ios.8 is kept locally (build/artifacts/quality-promotion/release-v3.0.0-ios.8; the GitHub artifact expires after 14 days) and release_identity accepts it (iOS 3.0.0 (29), a60dd204). The records must be at most 7 days old when the manifest is validated before App Review."
+      "notes": "Opened 2026-10-12. Skipped for the Public Beta on builds 26 and 27 (maintainer); still gates App Review (RF-16). iPhone delivery evaluation is declared not applicable (2026-10-30, e7377511): six iOS records. Build 28's attempt is in git log. 2026-11-03, build 29 (v3.0.0-ios.8, a60dd204), unattended: model download receipt PASS (ios-xcui-model-download-20261103-175437-7f3faed5); ui-benchmark 181710-c657e53a, memory 184038-a1004c76, engine 184249-911ada42 (Design and Clone passed too) and ui-perf 184800-069eab23 PASS and validate against the contract. ui-perf's first run (180207-ad49e02b) failed in teardown on a harness defect (BKL-55) and reran under a new ID. Language failed (ios-lang-bench-20261103-183237-3c5b79f2): hint gate PASS; on-device Speech is unavailable for es, ja, ru, pt, it and ko (their dictation languages are not on the phone); Apple Speech failed custom-fr-pinned (WER 0.22) and design-en-pinned (coverage), which both Mac ASR families pass; both families fail custom-ja-auto (CER about 0.45), a fixed seed. These records expire 2026-11-10."
     },
     {
       "id": "RF-35",
@@ -2041,6 +2041,20 @@
       "updated": "2026-11-02",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or a farm run is planned before then.",
       "notes": "Parked 2026-11-02: in farm build 595b4673 (clear-ab journey, singleRunnerInvocation) a selected test failed, xcodebuild reported \"Restarting after unexpected exit, crash, or test timeout\", and the restarted runner ran every UI test in the bundle, including the 40-take soak, so the build took about 55 minutes instead of about 25 and used the rest of the trial. Candidate fixes: also send skip-testing for the other classes, or one runner invocation per selected test. Not investigated further (focus rules)."
+    },
+    {
+      "id": "BKL-55",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone UI-perf teardown restores App Language while the composer keeps focus",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "On a phone whose App Language starts on a non-System value, scripts/ui_test.sh ios perf passes test06ComposerTyping and restores the original App Language: endSession ends the composer's focus before its restores, as it already does for the History search field.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ],
+      "updated": "2026-11-03",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or a ui-perf record is needed on a phone set to an explicit App Language.",
+      "notes": "Parked 2026-11-03 from RF-17's first ui-perf run on build 29 (ios-xcui-perf-20261103-180207-ad49e02b): every measured window finished, then test06's teardown opened Settings to restore English while the composer's keyboard still covered the tab dock, and XCTest found no hit point for rootTab_settings. The runner restarted and the phone was left on System Default. test01 failed the same run once with an XCTest NSInvalidArgumentException in its teardown. The rerun under a new ID passed 9 of 9."
     },
     {
       "id": "ER-01",

@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-04
-summary: Read-only assessment, on 2026-11-04, of how ready Vocello for iPhone 3.0 (build 29, v3.0.0-ios.8) is for App Review, using an external November 2026 App Review rules report as the reference and checking its claims against Apple's live guideline text and the repository. Verdict, gaps ranked by risk, tracked blockers and tiered recommendations; it changes no code, roadmap item or App Store Connect field. On 2026-11-04, at the maintainer's request, the doc drift in section 6 was fixed and the review-notes safeguards paragraph was entered in App Store Connect and read back.
+summary: Read-only assessment, on 2026-11-04, of how ready Vocello for iPhone 3.0 (build 29, v3.0.0-ios.8) is for App Review, using an external November 2026 App Review rules report as the reference and checking its claims against Apple's live guideline text and the repository. Verdict, gaps ranked by risk, tracked blockers and tiered recommendations; it changes no code, roadmap item or App Store Connect field. On 2026-11-04, at the maintainer's request, the doc drift in section 6 was fixed, the review-notes safeguards paragraph was entered in App Store Connect and read back, and the wording check in section 8 was done.
 sourceOfTruth:
   - docs/reference/ios-appstore-submission.md
   - docs/reference/app-store-listing.md
@@ -181,18 +181,19 @@ and the refusal.
 
 **Evidence:**
 - **Rating:** 4+, set on 2026-10-12 (RF-02) and read back on 2026-10-30 (ASR-11).
-- **Unrecorded answers:** the questionnaire answers behind it are not recorded in the
-  repository. The only reasoning recorded is to revisit if content behaviour changes
-  (`docs/reference/ios-appstore-submission.md:189-190`).
+- **Answers (read 2026-11-04):** every content answer is None and every capability answer is no,
+  including User-Generated Content. Apple defines that one as "the broad distribution of content
+  created by users", which Vocello doesn't do, so no is the correct answer.
 - **The report's suggestion:** 13+ for an unfiltered free-text generator, since 1.2 now frames
   AI generation as user content.
 
 **Risk:** low to moderate. Text-to-speech tools are commonly 4+. A reviewer applying 1.2's framing
 could still question 4+ for unfiltered output.
 
-**Fix:** recheck the answers in App Store Connect and record them in the runbook, then decide
-between keeping 4+ and moving to 13+. A rating change is a metadata edit, not a new build. If the
-new descriptors the report mentions appear, answer "no" to dating and companion content.
+**Result (2026-11-04):** the answers are recorded in the runbook and 4+ stays. Apple's definitions
+page names no AI or generative descriptor in the part read. A rating change is a metadata edit if a
+reviewer asks for one. If the new descriptors the report mentions appear, answer "no" to dating and
+companion content.
 
 ### G5. No demo video
 
@@ -271,7 +272,7 @@ Fixed on 2026-11-04 at the maintainer's request.
    write, made on the maintainer's go. Entered on 2026-11-04 and read back byte-identical
    ([`app-store-listing.md`](../reference/app-store-listing.md), the notes' last paragraph).
 2. **Demo video:** record it on the iPhone 17 Pro (G5) and link it in the review notes.
-3. **Age rating:** recheck the answers, record them, and decide between 4+ and 13+ (G4).
+3. **Age rating:** done on 2026-11-04; the answers are recorded and 4+ stays (G4).
 4. **Small Business Program:** confirm enrollment before the first sale. It sets the 15%
    commission; its status lives in the private record.
 5. **Tracked blockers:** close them in the planned phone session (section 5). Decide on RF-17's
@@ -281,8 +282,9 @@ Fixed on 2026-11-04 at the maintainer's request.
 ### The maintainer's decision: product safeguards before or after 3.0
 
 **Option A:** fix G1 to G3 in the product before submitting. That means a build 30 and a new tag,
-then all of RF-17's records and RF-15's rows again, which would likely move the submission past
-November 12.
+then all of RF-17's records and RF-15's rows again. Corrected on 2026-11-04: this first said the
+build would likely move the submission past November 12. The six lanes took about an hour on
+November 3 and the main phone session hasn't happened, so it fits, with little margin.
 
 **Option B:** submit build 29 with the stronger review notes, and prepare complete fixes for G1 to
 G3 for 3.0.1. If App Review cites 1.2, 4.2.3 or cloning consent, answer in Resolution Center with
@@ -290,7 +292,11 @@ a complete fix rather than a cosmetic one.
 
 **Recommendation: B.** The guidelines' examples target posting, services and concealment.
 Vocello's architecture (local, single-user, no remote switches) and its review notes answer them
-directly. A new candidate now costs the whole evidence set and the date.
+directly. A new candidate now costs the whole evidence set and most of the margin.
+
+**Maintainer decision (2026-11-04): B.** A real Download button, which would have copied takes to
+Files instead of opening the share sheet, was considered and cancelled with any build 30. Build 29
+stays the candidate.
 
 ### Account hygiene, from the report
 
@@ -299,3 +305,36 @@ directly. A new candidate now costs the whole evidence set and the date.
   RF-16's notes.
 - Plan for one to three weeks of review on a first app, and treat November 12 as the submission
   date, not the launch date.
+
+## 8. Wording check (2026-11-04)
+
+At the maintainer's request, everything live in App Store Connect was read and each claim checked
+against the app's source, labels, retained run evidence and public pages.
+
+**Confirmed, unchanged:**
+- **Listing:** the name, subtitle, description, keywords, URLs and copyright. The description's
+  claims hold: nine speakers, ten speech and ten interface languages, the delivery presets and custom
+  delivery, the reference file types, long-form projects, seed pinning, the iPhone 15 Pro minimum,
+  about 2 GB per model (the phone shows 2.05 GB), 4.5 GB of free space (the code needs up to about
+  4.15 GB), the free and paid boundary, the watermark, and rejected takes.
+- **Purchase text:** the name and description in en-US, fr-CA and fr-FR match the app's own terms.
+- **Age rating and content rights:** see G4; third-party content stays declared.
+- **Public pages:** the privacy policy and support page load and agree with the listing, and the
+  support page publishes an email address.
+
+**Corrected in App Store Connect, read back byte-identical:**
+- **Promotional text:** "one cloned from a clip you own" became "a clone of a voice you own or have
+  permission to use", matching the consent switch and the description.
+- **Review notes step 2:** one run-on sentence became two.
+- **Review notes step 3:** the iPhone 15 Pro range became "about one and a half to a little over two
+  times", since the measured steady rate is 2.2 (RF-40).
+- **Review notes step 5:** it now says where to open the purchase, not only where Restore is.
+
+**Left open:**
+- **Secondary category Music:** the maintainer's choice from 2026-10-12. Vocello makes speech, not
+  music, so Utilities or no secondary category may fit better. Guideline 2.3 asks for an honest
+  category.
+- **Website at launch:** the Marketing URL page calls the iPhone app a TestFlight beta, which stays
+  true until release. Its "Free" comparison is framed around the Mac and is accurate there, but the
+  iPhone line doesn't mention the optional purchase, so add it when that line changes at launch.
+- **Release type:** automatic on approval, so the app goes live as soon as App Review approves it.

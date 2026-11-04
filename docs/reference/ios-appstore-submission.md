@@ -190,8 +190,10 @@ is complete.
       CryptoKit SHA-256 for download integrity). The processed build 29 reads back `VALID` with
       `usesNonExemptEncryption` false and asks for no further export-compliance information
       (2026-11-01). Repeat the read for any later candidate.
-- [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Revisit it if the
-      product's content behavior changes.
+- [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Every content answer is
+      None and every capability answer is no (read 2026-11-04), including User-Generated Content,
+      which Apple defines as broad distribution of users' content. Revisit it if the product's
+      content behavior changes.
 - [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
       from the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs.

@@ -19,7 +19,10 @@ subtitle "Local AI voice studio", the promotional text, description, keywords an
 the App Review contact and notes were written as drafted below and read back byte-identical. What's
 New is not offered on a first App Store version and stays empty. On 2026-11-02, after the iPhone 15
 Pro farm runs and the decision to keep it as the floor, the description and the review notes gained
-the speed and live-preview sentences below, written and read back the same way. Any later change to App Store
+the speed and live-preview sentences below, written and read back the same way. On 2026-11-04, after the
+[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md), the notes' last paragraph
+became the Safeguards paragraph below (3,400 of 4,000 characters), answering Guideline 1.2's AI content
+wording, 4.2.3(ii) and cloning consent; it was written and read back the same way. Any later change to App Store
 Connect is a separate, explicit request; keep this file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
@@ -117,28 +120,12 @@ Vocello generates speech locally on the iPhone. It ships with no bundled model w
 4. Voice Cloning needs the switch "I own or have permission to clone the voices I use" in Settings → Privacy & Permissions. Its reference is recorded with the microphone or imported from an audio file the user has rights to. Microphone and Speech Recognition are requested only to record a reference and transcribe it locally.
 5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio through the share sheet. Generation, listening, History and Built-in Voice export are free. Restore Purchases is in Settings → Design & Clone Export.
 
-Every generated take carries an inaudible watermark and provenance metadata marking it as AI-generated. If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi or use the Support link in Settings; Vocello never substitutes a different model artifact.
+Safeguards. Vocello is a single-user tool that runs locally: it has no accounts, no feed, no posting and no messaging. Generated audio leaves the iPhone only when the user exports it, or in their own iPhone backups. A Voice Design description or Built-in Voice delivery instruction that explicitly requests celebrity imitation or voice impersonation is refused. The permission switch in step 4 gates clone generation and saving a cloned voice. Every generated take, including exported files, carries an inaudible watermark and provenance metadata marking it as AI-generated. The model list ships inside the app, every downloaded file is checked against a pinned SHA-256 checksum before use, and no feature is enabled remotely. Each model's download size is shown in Settings → Models & Files → Voice Models before Install is tapped. Contact: Settings → About → Help & Support opens https://vocello.vercel.app/support/, which lists an email address. If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi; Vocello never substitutes a different model artifact.
 ```
 
 Before pasting, recheck the three byte counts against the candidate's catalog, and close ASR-09's
 fresh North America download proof (see [`ios-appstore-submission.md`](ios-appstore-submission.md)
 §2 for the storage and region reasoning).
-
-### Safeguards paragraph (drafted 2026-11-04, not entered)
-
-Drafted after the
-[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md). It answers Guideline
-1.2, which now names AI content creation apps, plus 4.2.3(ii) and cloning consent, without a new
-build.
-
-**How to enter it:** it replaces the last paragraph of the notes above (the watermark and
-model-host sentences), which it keeps. The full notes come to 3,389 of 4,000 characters.
-Entering it is an App Store Connect write on the maintainer's go; afterwards, move it into the
-notes block above and read it back.
-
-```text
-Safeguards. Vocello is a single-user tool that runs locally: it has no accounts, no feed, no posting and no way to send content to other users, and generated audio leaves the iPhone only when the user shares their own file. A Voice Design description or Built-in Voice delivery instruction that asks for celebrity imitation or voice impersonation is refused. The permission switch in step 4 gates clone generation and saving a cloned voice. Every generated take, including exported files, carries an inaudible watermark and provenance metadata marking it as AI-generated. The model list ships inside the app, every downloaded file is checked against a pinned SHA-256 checksum before use, and no feature is enabled remotely. Each model's download size is shown in Settings → Models & Files → Voice Models before Install is tapped. Contact: Settings → Help & Support opens https://vocello.vercel.app/support/, which lists an email address. If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi; Vocello never substitutes a different model artifact.
-```
 
 ## Choices for the maintainer
 

@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-04
-summary: Read-only assessment, on 2026-11-04, of how ready Vocello for iPhone 3.0 (build 29, v3.0.0-ios.8) is for App Review, using an external November 2026 App Review rules report as the reference and checking its claims against Apple's live guideline text and the repository. Verdict, gaps ranked by risk, tracked blockers and tiered recommendations; it changes no code, roadmap item or App Store Connect field. On 2026-11-04, at the maintainer's request, the doc drift in section 6 was fixed and the review-notes safeguards paragraph was drafted, not entered.
+summary: Read-only assessment, on 2026-11-04, of how ready Vocello for iPhone 3.0 (build 29, v3.0.0-ios.8) is for App Review, using an external November 2026 App Review rules report as the reference and checking its claims against Apple's live guideline text and the repository. Verdict, gaps ranked by risk, tracked blockers and tiered recommendations; it changes no code, roadmap item or App Store Connect field. On 2026-11-04, at the maintainer's request, the doc drift in section 6 was fixed and the review-notes safeguards paragraph was entered in App Store Connect and read back.
 sourceOfTruth:
   - docs/reference/ios-appstore-submission.md
   - docs/reference/app-store-listing.md
@@ -268,9 +268,8 @@ Fixed on 2026-11-04 at the maintainer's request.
    posting or accounts, the published contact, the celebrity and impersonation refusal, the
    cloning consent switch, the watermark and provenance, a bundled hash-pinned catalog with no
    remote features, and that every install shows its size in Settings. It is an App Store Connect
-   write, made on the maintainer's go. Drafted on 2026-11-04 in
-   [`app-store-listing.md`](../reference/app-store-listing.md) (Safeguards paragraph); not yet
-   entered.
+   write, made on the maintainer's go. Entered on 2026-11-04 and read back byte-identical
+   ([`app-store-listing.md`](../reference/app-store-listing.md), the notes' last paragraph).
 2. **Demo video:** record it on the iPhone 17 Pro (G5) and link it in the review notes.
 3. **Age rating:** recheck the answers, record them, and decide between 4+ and 13+ (G4).
 4. **Small Business Program:** confirm enrollment before the first sale. It sets the 15%

@@ -361,7 +361,7 @@
         "docs/reference/ios-appstore-submission.md"
       ],
       "updated": "2026-11-01",
-      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks."
+      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-10-13: on hold by maintainer decision while development continued. 2026-11-01: the maintainer resumed it with a dated path (docs/reference/release-first-execution-2026-09.md): App Review by November 12, on the maintainer's go. 2026-11-04: the App Review readiness audit (docs/audits/2026-11-04-app-review-readiness.md) ranks the remaining review risks against Apple's current guidelines."
     },
     {
       "id": "DA-02",
@@ -696,7 +696,7 @@
         "commit:87636935"
       ],
       "updated": "2026-11-01",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. Remaining: ASR-11 reads the label back. 2026-10-13: on hold by maintainer decision while development continues; the date is dropped and returns with a recorded decision when this unparks. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; pushed and deployed the same day; the live page carries it."
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; deployed the same day. On hold from 2026-10-13, resumed 2026-11-01 with the release plan. Remaining: ASR-11 reads the label back."
     },
     {
       "id": "ASR-05",

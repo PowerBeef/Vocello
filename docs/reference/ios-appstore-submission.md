@@ -25,10 +25,13 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-10-28):** `release.yml` has archived, verified and uploaded 3.0.0 builds 24,
-25 and 26 (ASR-10 closed on build 24's release run 40103005257). Build 26 is in the TestFlight
-Public Beta; build 27 (RF-37, the Game Mode opt-out) is the next candidate. The App Review
-submission waits for the exact-tag iOS promotion (RF-17) and the maintainer's go (RF-16). Any App
+**Current state (2026-11-04):** `release.yml` has archived, verified and uploaded the 3.0.0
+candidates (ASR-10 closed on build 24's release run 40103005257). Builds 26 and 27 are in the
+TestFlight Public Beta under the maintainer's RF-17 waiver. Build 29 (`v3.0.0-ios.8`, `a60dd204`)
+is the App Review candidate, attached to version 3.0.0. The App Review submission waits for the
+exact-tag iOS promotion (RF-17), the open release items, and the maintainer's go (RF-16). The
+[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) ranks the remaining
+review risks. Any App
 Store Connect metadata change, upload or submission still needs its own authorization.
 Physical-device XCUITest runs separately at coherent checkpoints; CI and archive packaging are
 deterministic-only ([`testing-runbook.md`](testing-runbook.md)). Local development builds derive the
@@ -154,12 +157,13 @@ Current account state (2026-10-12, set in the web portal with the maintainer's a
 - age rating 4+;
 - App Privacy published as Data Not Collected, with the privacy policy URL;
 - the export purchase entered as above;
-- EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record).
+- EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record);
+- export compliance answered for build 29: it reads back VALID with `usesNonExemptEncryption`
+  false, and App Store Connect asked no further question (2026-11-01).
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
 - RF-02's account steps (agreements, banking and tax; status in the maintainer's private record);
-- the accessibility declaration;
-- the processed candidate's export-compliance check.
+- the accessibility declaration.
 
 App Store Connect readiness is a manual, read-only pass: review the live app identity, platforms,
 category, pricing/availability, metadata, localizations and URLs, screenshots, review contact,

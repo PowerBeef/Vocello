@@ -329,11 +329,10 @@ against the app's source, labels, retained run evidence and public pages.
 - **Review notes step 3:** the iPhone 15 Pro range became "about one and a half to a little over two
   times", since the measured steady rate is 2.2 (RF-40).
 - **Review notes step 5:** it now says where to open the purchase, not only where Restore is.
+- **Secondary category:** Music became Utilities at the maintainer's request, since Vocello makes
+  speech, not music. The primary category stays Productivity.
 
 **Left open:**
-- **Secondary category Music:** the maintainer's choice from 2026-10-12. Vocello makes speech, not
-  music, so Utilities or no secondary category may fit better. Guideline 2.3 asks for an honest
-  category.
 - **Website at launch:** the Marketing URL page calls the iPhone app a TestFlight beta, which stays
   true until release. Its "Free" comparison is framed around the Mac and is accurate there, but the
   iPhone line doesn't mention the optional purchase, so add it when that line changes at launch.

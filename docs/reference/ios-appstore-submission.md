@@ -65,7 +65,7 @@ download it automatically.
       any capability change.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`, with one `en-US`
       localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
-      2026-10-12, in category Productivity (secondary Music) (RF-02). Its train holds builds 24 to
+      2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02). Its train holds builds 24 to
       26; every candidate needs an unused build number (§4, ASR-08).
 - [x] App Store installation eligibility matches the app's runtime hardware floor before the first
       public version. The built bundle requires exactly `arm64` and Apple's
@@ -151,7 +151,7 @@ Apple references: [purchase types](https://developer.apple.com/help/app-store-co
 
 Current account state (2026-10-12, set in the web portal with the maintainer's approval; RF-02):
 - version 3.0.0, which replaced the unreleased 1.0 draft;
-- category Productivity, secondary Music;
+- category Productivity, secondary Utilities (changed from Music on 2026-11-04, maintainer decision);
 - free and iPhone only (Apple-silicon Mac and Vision Pro availability off), in 148 territories
   since 2026-10-27, when the 27 EU territories were removed (maintainer decision; BKL-41);
 - age rating 4+;

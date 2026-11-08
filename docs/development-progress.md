@@ -20,7 +20,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 ### November 1: a dated path to App Review on November 12 (resume here)
 
 - **Next, in order** (maintainer decision of November 1, recorded in the release plan):
-  1. The maintainer, by November 5 to 6: RF-02's remaining account steps, which activate the Paid
+  1. The maintainer, by November 9 (moved from November 5 and 6 on November 7): RF-02's remaining
+     account steps, which activate the Paid
      Apps agreement (status and details in the maintainer's private record, never in Git); ASR-02
      and ASR-11's App Privacy readback in the browser, which needs a fresh App Store Connect sign-in
      in Chrome.

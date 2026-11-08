@@ -173,7 +173,7 @@
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
       "status": "planned",
-      "due": "2026-11-06",
+      "due": "2026-11-09",
       "blockedBy": [
         "RF-01"
       ],
@@ -183,7 +183,7 @@
         "docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-01",
-      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: 3.0 ships outside the EU (148 of 175 territories); the EU release is BKL-41. Left: the maintainer's account steps that activate the Paid Apps agreement. Their status and details stay in the maintainer's private record outside the repository (maintainer decision 2026-11-01). The purchase's review screenshot comes from the phone (RF-12). 2026-11-04, maintainer decision: the secondary category changed from Music to Utilities."
+      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: 3.0 ships outside the EU (148 of 175 territories); the EU release is BKL-41. Left: the maintainer's account steps that activate the Paid Apps agreement. Their status and details stay in the maintainer's private record outside the repository (maintainer decision 2026-11-01). The purchase's review screenshot comes from the phone (RF-12). 2026-11-04, maintainer decision: the secondary category changed from Music to Utilities. 2026-11-07, maintainer decision: due moved from 2026-11-06 to 2026-11-09; the remaining account step waits on Revenu Québec."
     },
     {
       "id": "RF-06",
@@ -683,7 +683,7 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Resolve Hugging Face processing and App Privacy disclosure",
       "status": "planned",
-      "due": "2026-11-05",
+      "due": "2026-11-09",
       "gate": "Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.",
       "sourceOfTruth": [
         "Sources/PrivacyInfo.xcprivacy",
@@ -696,7 +696,7 @@
         "commit:87636935"
       ],
       "updated": "2026-11-01",
-      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; deployed the same day. On hold from 2026-10-13, resumed 2026-11-01 with the release plan. Remaining: ASR-11 reads the label back."
+      "notes": "2026-10-12 maintainer decision (no paid counsel): the label is Data Not Collected. Rationale and source facts verified at d1c5fb7b are in docs/reference/content-rights-review.md: the anonymous model download is the app's only own network path; Hugging Face's Swift libraries are compiled in but their downloading entry points are unreachable from the facade; reference transcription is on-device only; purchases go through StoreKit. The privacy page now discloses Hugging Face's own request logging and Apple-handled purchases. 2026-10-12: Data Not Collected is published in App Store Connect with the privacy policy URL. 2026-10-13: the maintainer authorized the push; Vercel deployed c08a1360 and the live vocello.vercel.app/privacy/ is byte-identical to website/public/privacy/index.html. 2026-10-13 (SEC-2, maintainer decision): the page now says iPhone backups include generated audio, saved voices and History; deployed the same day. On hold from 2026-10-13, resumed 2026-11-01 with the release plan. Remaining: ASR-11 reads the label back. 2026-11-07, maintainer decision: due moved from 2026-11-05 to 2026-11-09 for ASR-11's readback."
     },
     {
       "id": "ASR-05",
@@ -773,7 +773,7 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Audit live App Store Connect and regional compliance read-only",
       "status": "planned",
-      "due": "2026-11-06",
+      "due": "2026-11-09",
       "blockedBy": [
         "RF-02"
       ],
@@ -787,7 +787,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-01",
-      "notes": "Read-only, recorded without payload values. 2026-09-22: the automated inventory was removed by maintainer decision; the audit is a manual read-only pass (web portal or asc). 2026-10-30, asc read-only on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; availability 148 of 175 territories (EU excluded, new territories on); support URL set; agreement, tax and banking states are kept in the maintainer's private record (RF-02). 2026-11-01: the listing text, the App Review contact and notes and build 29 were entered at the maintainer's request (ASR-05); build 29 reads back VALID with usesNonExemptEncryption false, so export compliance needs nothing more. Still missing before submission: every App Store screenshot, the purchase's metadata (state MISSING_METADATA: the review screenshot, plus an RF-02 account step) and the accessibility declaration. The App Privacy label needs a browser readback (ASR-02); on 2026-11-01 App Store Connect in Chrome needed a fresh sign-in, which is the maintainer's."
+      "notes": "Read-only, recorded without payload values; a manual pass in the web portal or with asc (the automated inventory was removed on 2026-09-22). 2026-10-30, asc on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; 148 of 175 territories (EU excluded); support URL set; agreement, tax and banking states stay in the maintainer's private record (RF-02). 2026-11-01: listing, App Review contact and notes and build 29 entered (ASR-05); build 29 reads back VALID with usesNonExemptEncryption false. 2026-11-04: age-rating answers read (all None or no) and the secondary category changed to Utilities. Still missing before submission: every App Store screenshot, the purchase's metadata (MISSING_METADATA: the review screenshot, plus an RF-02 account step) and the accessibility declaration. The App Privacy label needs a browser readback (ASR-02) after a fresh App Store Connect sign-in in Chrome, which is the maintainer's. 2026-11-07, maintainer decision: due moved from 2026-11-06 to 2026-11-09."
     },
     {
       "id": "ASR-12",

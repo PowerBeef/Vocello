@@ -68,7 +68,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 ### Open items in detail
 
-- **`ASR-02`** (planned, due 2026-11-05) — Resolve Hugging Face processing and App Privacy disclosure.
+- **`ASR-02`** (planned, due 2026-11-09) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.
 
 - **`ASR-05`** (planned, due 2026-11-09) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
@@ -80,7 +80,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`ASR-09`** (planned, due 2026-11-12) — Prove reviewer access to immutable model hosting.
   gate: The exact anonymous catalog URLs must be probed from each distribution region the maintainer records as in scope for 3.0 (a recorded North-America-only scope, with the residual risk for other regions noted, satisfies this) for ownership, availability, range/download behavior, rate limits, and digest identity; a monitored outage response and digest-preserving fallback decision must be documented; and reviewer notes must state exact size, time, network/disk requirements, recovery, and offline behavior after installation.
 
-- **`ASR-11`** (planned, due 2026-11-06) — Audit live App Store Connect and regional compliance read-only.
+- **`ASR-11`** (planned, due 2026-11-09) — Audit live App Store Connect and regional compliance read-only.
   gate: Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
 
 - **`AUD-01`** (planned, due 2026-11-09) — iOS launch and deep-link dead ends.
@@ -103,7 +103,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Audit P3-1 to P3-5: CI on Xcode 27 with CONV-21 once runners offer it; @Observable, Mutex and fewer AnyView; NonisolatedNonsendingByDefault and strict memory safety behind the UI stall gate; Periphery, a Python type checker and website type checks (each new tool approved first); lane orchestration moved into tested Python modules.
   unparkWhen: After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.
 
-- **`RF-02`** (planned, due 2026-11-06) — complete Apple prerequisites and the consolidated qualified-decision packet.
+- **`RF-02`** (planned, due 2026-11-09) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
 
 - **`RF-12`** (planned, due 2026-11-09) — Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate.

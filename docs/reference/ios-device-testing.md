@@ -530,6 +530,7 @@ maintainer's. A computer-use record closes a row only when the maintainer confir
 | RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off ends Mirroring |
 | RF-35 navigation row and Wi-Fi reinstall, the ~30-take machine screen | XCUITest (`first-launch`, `navigation`, `modes`) |
 | Purchase rows | XCUITest; the purchase confirmation sheet is the maintainer's |
+| ASR-06 file protection and backup proof | [privacy-storage.md](privacy-storage.md), "Device proof on the signed candidate": the maintainer makes the backups, locks and restarts the phone; Claude reads the backup manifest and drives the app |
 | TestFlight installs, removing a model before a reinstall row, in-app settings, reproductions, visual inspection | Computer use |
 
 After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the

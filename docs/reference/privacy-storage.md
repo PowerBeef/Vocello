@@ -273,6 +273,99 @@ unclassified maintained subtree. ASR-06 remains open until an exact signed candi
 effective file attributes, backup exclusions, deletion behavior, and locked/relaunch behavior on a
 physical iPhone.
 
+### Device proof on the signed candidate (ASR-06)
+
+Written on 2026-11-07 for the phone session on build 29. Candidate runs never pull a distribution
+app's private data container ([ios-device-testing.md](ios-device-testing.md)), and a development or
+diagnostics build never stands in for the candidate. So the proof uses what the candidate exposes:
+- an iPhone backup made on the Mac, whose `Manifest.db` lists every backed-up file with its data
+  protection class;
+- the app's own screens;
+- Settings → General → iPhone Storage.
+
+**What each step proves:**
+
+| Step | Proves | Who |
+|---|---|---|
+| 1. Baseline storage | The starting size, to measure deletion against | Claude through iPhone Mirroring, or the maintainer |
+| 2. Backup read | Which governed paths are in the backup and which are left out, and the protection class of every backed-up file | The maintainer makes the backup; Claude reads it |
+| 3. Locked delivery | Downloads keep writing while the phone is locked, which the chosen class allows and `NSFileProtectionComplete` would not | The maintainer locks and unlocks the phone |
+| 4. Deletion | Deleting a model, a take and a saved voice frees and removes their files | Claude, with a second backup read |
+| 5. Relaunch and restart | Startup's protection pass succeeds again and nothing is lost after a relaunch and a restart | The maintainer restarts and enters the passcode |
+
+**Before starting:**
+- TestFlight build 29 is installed over the existing data, and the App Language is English.
+- Three models are Ready, History has at least one take, and the benchmark clone voice is saved.
+- The phone is unlocked, with Do Not Disturb on, and connected to the Mac by cable.
+- The Mac has free space for a full device backup; none had been made on this Mac as of
+  2026-11-07, so the first one is a full backup that can take half an hour or more.
+
+**1. Baseline.** In Settings → General → iPhone Storage → Vocello, record App Size and Documents &
+Data.
+
+**2. Backup read.** The maintainer chooses Back Up Now for the iPhone in Finder. Claude then reads
+the backup's `Manifest.plist` and `Manifest.db` read-only. The read takes only these rows:
+- domain `AppDomainGroup-group.com.patricedery.vocello.shared`, which holds the data root `Vocello/`;
+- domain `AppDomain-com.patricedery.vocello`, which holds the Studio drafts in preferences (SEC-4).
+
+It reads paths and metadata only, never file contents, and keeps no copy of the backup. Expected:
+- **Present:** `Vocello/outputs/`, `Vocello/voices/`, `Vocello/history.sqlite` with its sidecars,
+  and `Vocello/history-outbox/` or `Vocello/voice-transactions-quarantine/` when they hold anything.
+- **Absent:** anything under `Vocello/models/`, `Vocello/downloads/`, `Vocello/cache/`,
+  `Vocello/diagnostics/`, `Vocello/voice-candidates/` and `Vocello/voice-transactions/`.
+- **Protection:** every present file under `Vocello/` has class 3. Apple numbers its data
+  protection classes A to D as 1 to 4, and class C, 3, is
+  `NSFileProtectionCompleteUntilFirstUserAuthentication`.
+
+If something blocks the read:
+- **Encrypted backup:** reading it needs the backup password, which stays the maintainer's. Either
+  they type it at a hidden prompt for a local decryption step (a decryption tool needs their
+  approval to install), or the step falls back to the weaker check below.
+- **Shell can't read the backup folder:** if the shell is refused without Full Disk Access, the
+  maintainer copies `Manifest.plist` and `Manifest.db` from the backup folder in Finder to a folder
+  Claude can read, rather than granting access.
+- **Weaker fallback:** with iCloud Backup on, Settings → Apple Account → iCloud → Manage Account
+  Storage → Backups shows Vocello's backup size, which must be far below the 6 GB of installed
+  models. That proves the models are left out, and nothing about protection classes.
+
+**3. Locked delivery.** In Settings → Models & Files → Voice Models:
+1. Delete Voice Design. iPhone Storage should drop by about 1.4 GB, which is part of step 4. The
+   model's 682 MB speech tokenizer is shared with the other installed models, so it stays, and the
+   reinstall shows about a third done from the start (RF-35, BKL-39).
+2. Tap Install, lock the phone within 30 seconds, and leave it locked for 5 minutes.
+3. After unlocking, the download must have progressed or reached Ready.
+
+This step can double as RF-35's attended cellular check: run it with Wi-Fi off and Download over
+cellular on, so one download proves both.
+
+**4. Deletion.**
+- **Saved voice:** RF-15's `voice-lifecycle` row saves a designed voice and deletes it through the
+  app's own UI (`testDesignedVoiceSaveAndDelete`). Never delete the benchmark clone voice, which
+  the lanes need.
+- **Take:** delete one take made in this session from History.
+- **Second backup:** an incremental one, which is faster. Read it again: the deleted take's audio
+  and the throwaway voice's files must be gone, with everything else from step 2 unchanged.
+  iPhone Storage should match step 1, less what was deleted.
+
+**5. Relaunch and restart.**
+1. Quit Vocello from the App Switcher and reopen it: it reaches Studio with no startup Retry, and
+   History, Voices and the three Ready models are intact.
+2. The maintainer restarts the iPhone and unlocks it with the passcode. Open Vocello once more and
+   check the same things.
+
+**Record and limits.** Keep the record untracked under `build/artifacts/ios/asr06/<run-id>/`:
+- the backup read as path counts per governed class, with the protection classes seen;
+- the iPhone Storage values;
+- one line per step.
+
+ASR-06's roadmap notes get only that summary, with no file names, paths of user content or
+personal data.
+
+**Limit:** the excluded paths' own protection class can't be read on the candidate, because they
+aren't in the backup. For them the evidence is step 3's locked delivery, the deterministic policy
+validator, and the startup pass, which applies one class to every governed directory or stops
+with Retry.
+
 ## Voice Cloning Consent
 
 Voice cloning accepts user-provided reference audio — recorded in the app or imported through the

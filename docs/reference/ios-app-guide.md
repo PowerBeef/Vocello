@@ -446,7 +446,7 @@ comes from `qwenvoice_ios_model_catalog.json`.
 
 | State | Visible control | What it means |
 |---|---|---|
-| Not installed | `iosModelDownload_<id>` ("Install") | Default; nothing staged |
+| Not installed | `iosModelDownload_<id>` ("Install") | Default; nothing staged. Install asks first: "Download [mode]?" with the size and allowed networks (`iosModelDownloadConfirmButton`, RF-41) |
 | Queued / waiting / downloading / retrying | `iosModelCancel_<id>` (visible "Cancel"; VoiceOver "Cancel download") plus phase/progress detail | Durable request awaiting its turn or connectivity, actively transferring, or applying a typed retry |
 | Verifying / installing / cancelling / deleting | Text-and-symbol status plus phase detail | Hash/receipt validation, atomic install, cancellation barrier, or removal is in progress; no invalid competing action is shown |
 | Failed | `iosModelRetry_<id>` ("Retry") | Retry preserves verified files |
@@ -498,10 +498,13 @@ The composer's primary CTA reflects model readiness:
 - **Model missing → `textInput_installModelButton`** (Install CTA; `textInput_generateButton` absent).
 - **Model installed → `textInput_generateButton`** (Generate CTA).
 
-Tapping **Install [mode]** opens Settings → Models & Files → Voice Models and immediately
-requests that mode's model through the existing app-lifetime installer. There is no second Install
-tap. The selected descriptor is captured at the tap; Studio text, selections and references stay
-unchanged. Ordinary Settings navigation and Back do not start or replay downloads. Progress,
+Tapping **Install [mode]** opens Settings → Models & Files → Voice Models with that mode's download
+confirmation (RF-41, Guideline 4.2.3(ii)): "Download [mode]?", the model's size, and the networks
+the Download over cellular switch allows. Download (`iosModelDownloadConfirmButton`) requests the
+model through the existing app-lifetime installer; Cancel (`iosModelDownloadDismissButton`) starts
+nothing. A model already transferring, or offering Repair or Retry, just shows its row. The selected descriptor is captured at the tap and handed to Voice Models once; Studio
+text, selections and references stay unchanged. Ordinary Settings navigation and Back do not start
+or replay downloads or confirmations. Progress,
 queueing, cancellation, storage checks and errors remain owned by the normal model-delivery path;
 installation does not automatically start generation. The isolated model-download acceptance lane
 exercises this shortcut for Built-in, Design and Clone; no normal smoke lane downloads models.
@@ -516,8 +519,10 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
 
 ### Model lifecycle sequence
 
-- **Install:** Settings → Voice Models → `iosModelDownload_<id>`.tap() → (wait for complete → `iosModelStatus_<id>` = "Ready").
-- **Cancel:** `iosModelDownload_<id>`.tap() → `iosModelCancel_<id>`.tap() →
+- **Install:** Settings → Voice Models → `iosModelDownload_<id>`.tap() → `iosModelDownloadConfirmButton`.tap()
+  (`confirmModelDownload()`) → (wait for complete → `iosModelStatus_<id>` = "Ready"). Update asks the
+  same way; Repair and Retry continue a download already confirmed, without asking.
+- **Cancel:** `iosModelDownload_<id>`.tap() → `iosModelDownloadConfirmButton`.tap() → `iosModelCancel_<id>`.tap() →
   `VocelloUIWait.exists(element("iosModelCancelDownloadConfirmButton"))` → tap it → Install reappears.
 - **Retry/cancel:** Retry a failed request with `iosModelRetry_<id>` to reuse verified files. Cancel
   an active request with `iosModelCancel_<id>`, then confirm `iosModelCancelDownloadConfirmButton`;

@@ -310,6 +310,7 @@ final class VocelloiOSFarmSmokeUITests: VocelloiOSUITestCase {
         let start = clock.now
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 30))
+        confirmModelDownload()
         let installed = element("iosModelDelete_\(modelID)")
         let progress = element("iosModelProgress_\(modelID)")
         let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch

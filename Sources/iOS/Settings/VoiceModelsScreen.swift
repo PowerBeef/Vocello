@@ -11,6 +11,10 @@ struct VoiceModelsScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var modelPendingCancel: TTSModel?
+    /// Install, Update and Studio's install button ask first (RF-41, Guideline 4.2.3(ii)).
+    @State private var modelPendingDownload: TTSModel?
+    /// Kept apart from `modelPendingDownload` so the title does not empty while the dialog closes.
+    @State private var downloadDialogTitle = ""
     @AppStorage(IOSAppDefaults.cellularModelDownloadsKey) private var cellularDownloadsAllowed = false
 
     private var managedModelBytes: Int64 {
@@ -98,6 +102,7 @@ struct VoiceModelsScreen: View {
                                 status: effectiveStatus(for: model),
                                 operationState: modelInstaller.state(for: model),
                                 onInstall: { modelInstaller.install(model) },
+                                onRequestDownload: { presentDownloadConfirmation(for: model) },
                                 onRequestCancelOptions: { requestCancelOptions(for: model) },
                                 onDelete: { modelInstaller.delete(model) },
                                 cellularDownloadsAllowed: cellularDownloadsAllowed
@@ -108,6 +113,27 @@ struct VoiceModelsScreen: View {
                             }
                         }
                     }
+                    .confirmationDialog(
+                        downloadDialogTitle,
+                        isPresented: Binding(
+                            get: { modelPendingDownload != nil },
+                            set: { if !$0 { modelPendingDownload = nil } }
+                        ),
+                        titleVisibility: .visible,
+                        presenting: modelPendingDownload
+                    ) { model in
+                        Button(IOSInterfaceText.download) {
+                            modelPendingDownload = nil
+                            modelInstaller.install(model)
+                        }
+                        .accessibilityIdentifier("iosModelDownloadConfirmButton")
+                        Button(IOSSettingsText.cancel, role: .cancel) {
+                            modelPendingDownload = nil
+                        }
+                        .accessibilityIdentifier("iosModelDownloadDismissButton")
+                    } message: { model in
+                        Text(downloadDetail(for: model))
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.top, Theme.Spacing.sm)
@@ -117,6 +143,14 @@ struct VoiceModelsScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await modelManager.refresh()
+        }
+        // A Studio install request arrives here as a confirmation, never as a download. A model
+        // already transferring, or offering Repair or Retry, just shows its row.
+        .onChange(of: appModel.settingsModelNavigation.downloadAwaitingConfirmation, initial: true) {
+            if let model = appModel.settingsModelNavigation.takeDownloadAwaitingConfirmation(),
+               startsNewDownload(model) {
+                presentDownloadConfirmation(for: model)
+            }
         }
         .confirmationDialog(
             IOSSettingsText.cancelDownloadTitle,
@@ -188,6 +222,35 @@ struct VoiceModelsScreen: View {
 
     private func effectiveStatus(for model: TTSModel) -> ModelManagerViewModel.ModelStatus {
         modelManager.statuses[model.id] ?? .checking
+    }
+
+    private func presentDownloadConfirmation(for model: TTSModel) {
+        downloadDialogTitle = IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
+        modelPendingDownload = model
+    }
+
+    /// The states whose row offers Install or Update, the two actions that ask first.
+    private func startsNewDownload(_ model: TTSModel) -> Bool {
+        switch modelInstaller.state(for: model) {
+        case .available:
+            return true
+        case .idle:
+            switch effectiveStatus(for: model) {
+            case .notInstalled, .updateAvailable:
+                return true
+            case .checking, .installed, .incomplete, .error:
+                return false
+            }
+        default:
+            return false
+        }
+    }
+
+    private func downloadDetail(for model: TTSModel) -> String {
+        let size = model.estimatedDownloadBytes.map(IOSSettingsFormatters.fileSize) ?? IOSSettingsText.severalGB
+        return cellularDownloadsAllowed
+            ? IOSSettingsText.downloadModelDetailCellular(size)
+            : IOSSettingsText.downloadModelDetailWiFi(size)
     }
 
     private func requestCancelOptions(for model: TTSModel) {

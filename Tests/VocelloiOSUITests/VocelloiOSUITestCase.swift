@@ -463,6 +463,32 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_\(category)"), timeout: 20))
     }
 
+    /// Install, Update and Studio's install button ask before a model download starts (RF-41,
+    /// Guideline 4.2.3(ii)); this confirms the dialog the tap just presented.
+    func confirmModelDownload() {
+        let confirm = element("iosModelDownloadConfirmButton")
+        XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 30), "The download confirmation must appear")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+    }
+
+    /// Dismisses the download confirmation with its Cancel button (RF-41).
+    func dismissModelDownloadConfirmation() {
+        let dismiss = element("iosModelDownloadDismissButton")
+        XCTAssertTrue(VocelloUIWait.exists(dismiss, timeout: 30), "The download confirmation must appear")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: dismiss, timeout: 20))
+    }
+
+    /// RF-41: no transfer starts while the confirmation waits or after it is dismissed. Not
+    /// starting is the expected outcome, so a short settle window stands in for a wait.
+    func assertNoModelTransferStarts(_ modelID: String) {
+        let started = VocelloUIWait.settles("\(modelID) to start a download nobody confirmed", timeout: 3) {
+            self.element("iosModelProgress_\(modelID)").exists
+                || self.element("iosModelPhaseActivity_\(modelID)").exists
+                || self.element("iosModelCancel_\(modelID)").exists
+        }
+        XCTAssertFalse(started, "\(modelID) must not download before its confirmation")
+    }
+
     func openVoiceModels() {
         select(tab: .settings)
         if element("screen_voiceModels").exists { return }

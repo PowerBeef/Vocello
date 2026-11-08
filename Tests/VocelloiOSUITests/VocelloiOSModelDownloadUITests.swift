@@ -314,7 +314,12 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(install, timeout: 60))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 30))
-        XCTAssertTrue(VocelloUIWait.condition("Studio-selected model to start without another Install tap", timeout: 120) {
+        // RF-41: Studio's button opens Voice Models with the download confirmation, size shown.
+        XCTAssertTrue(VocelloUIWait.exists(element("iosModelDownloadConfirmButton"), timeout: 30))
+        VocelloUIScreenshot.attach(app, named: "ios-studio-install-confirmation-\(modelID)")
+        assertNoModelTransferStarts(modelID)
+        confirmModelDownload()
+        XCTAssertTrue(VocelloUIWait.condition("Studio-selected model to start once its download is confirmed", timeout: 120) {
             self.element("iosModelProgress_\(modelID)").exists
                 || self.element("iosModelPhaseActivity_\(modelID)").exists
                 || self.element("iosModelCancel_\(modelID)").exists
@@ -326,7 +331,14 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         let install = element("iosModelDownload_\(modelID)")
         XCTAssertTrue(VocelloUIWait.exists(install, timeout: 60))
         XCTAssertTrue(revealSettingsElement(install, swipingUp: modelID == "pro_clone"))
+        // RF-41: Cancel on the confirmation starts nothing and leaves Install in place.
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
+        dismissModelDownloadConfirmation()
+        assertNoModelTransferStarts(modelID)
+        XCTAssertTrue(VocelloUIWait.exists(install, timeout: 30))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
+        assertNoModelTransferStarts(modelID)
+        confirmModelDownload()
         XCTAssertTrue(VocelloUIWait.condition("\(modelID) to expose progress or queued state", timeout: 120) {
             self.element("iosModelProgress_\(modelID)").exists
                 || self.element("iosModelPhaseActivity_\(modelID)").exists

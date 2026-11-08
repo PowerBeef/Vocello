@@ -5629,6 +5629,204 @@
         }
       }
     },
+    "vocello.settings.downloadModelTitle": {
+      "comment": "Voice Models confirmation before a model download starts (RF-41); substitution is the localized model name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download %1$@?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger %1$@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Descargar %1$@?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ laden?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scaricare %1$@?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar %1$@?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载%1$@？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@をダウンロードしますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 모델을 다운로드할까요?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузить модель «%1$@»?"
+          }
+        }
+      }
+    },
+    "vocello.settings.downloadModelDetailWiFi": {
+      "comment": "Voice Models download confirmation while Download over cellular is off (RF-41); substitution is a formatted size such as 2.05 GB.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The download is up to %1$@ and uses Wi-Fi only."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le téléchargement fait jusqu’à %1$@ et utilise uniquement le Wi-Fi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La descarga ocupa hasta %1$@ y solo usa Wi-Fi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download umfasst bis zu %1$@ und nutzt nur WLAN."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il download occupa fino a %1$@ e usa solo il Wi-Fi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O download tem até %1$@ e usa somente Wi-Fi."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载大小最多为 %1$@，仅使用无线局域网。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロードサイズは最大%1$@で、Wi-Fiのみを使用します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다운로드 크기는 최대 %1$@이며 Wi-Fi만 사용합니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка займёт до %1$@ и использует только Wi-Fi."
+          }
+        }
+      }
+    },
+    "vocello.settings.downloadModelDetailCellular": {
+      "comment": "Voice Models download confirmation while Download over cellular is on (RF-41); substitution is a formatted size such as 2.05 GB.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The download is up to %1$@ and can use Wi-Fi or cellular data."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le téléchargement fait jusqu’à %1$@ et peut utiliser le Wi-Fi ou le réseau cellulaire."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La descarga ocupa hasta %1$@ y puede usar Wi-Fi o datos móviles."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download umfasst bis zu %1$@ und kann WLAN oder Mobilfunk nutzen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il download occupa fino a %1$@ e può usare il Wi-Fi o la rete cellulare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O download tem até %1$@ e pode usar Wi-Fi ou a rede celular."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载大小最多为 %1$@，可使用无线局域网或蜂窝网络。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロードサイズは最大%1$@で、Wi-Fiまたはモバイル通信を使用できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다운로드 크기는 최대 %1$@이며 Wi-Fi 또는 셀룰러를 사용할 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка займёт до %1$@ и может использовать Wi-Fi или сотовую сеть."
+          }
+        }
+      }
+    },
     "vocello.settings.polish.cancelDownloadDetail": {
       "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
       "extractionState": "manual",
@@ -18926,61 +19124,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download the 4-bit Speed model to start generating. Voice Design and Voice Cloning each have their own model; install them later in Settings."
+            "value": "Download the 4-bit Speed model, about 2 GB, to start generating. Voice Design and Voice Cloning each have their own model of about 2 GB; install them later in Settings."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Téléchargez le modèle Speed 4 bits pour commencer. La création et le clonage de voix ont chacun leur propre modèle, à installer ensuite dans Réglages."
+            "value": "Téléchargez le modèle Speed 4 bits, d’environ 2 Go, pour commencer. La création et le clonage de voix ont chacun leur propre modèle d’environ 2 Go, à installer ensuite dans Réglages."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descarga el modelo Speed de 4 bits para empezar a generar. Diseño de voz y Clonación de voz tienen sus propios modelos; puedes instalarlos después en Ajustes."
+            "value": "Descarga el modelo Speed de 4 bits, de unos 2 GB, para empezar a generar. Diseño de voz y Clonación de voz tienen sus propios modelos, de unos 2 GB cada uno; puedes instalarlos después en Ajustes."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lade das 4-Bit-Speed-Modell, um loszulegen. Stimmdesign und Stimmklonen haben jeweils ein eigenes Modell; installiere sie später in den Einstellungen."
+            "value": "Lade das 4-Bit-Speed-Modell mit etwa 2 GB, um loszulegen. Stimmdesign und Stimmklonen haben jeweils ein eigenes Modell mit etwa 2 GB; installiere sie später in den Einstellungen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scarica il modello Speed a 4 bit per iniziare. Design vocale e Clonazione vocale hanno ciascuno il proprio modello; potrai installarli in seguito in Impostazioni."
+            "value": "Scarica il modello Speed a 4 bit, di circa 2 GB, per iniziare. Design vocale e Clonazione vocale hanno ciascuno il proprio modello di circa 2 GB; potrai installarli in seguito in Impostazioni."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baixe o modelo Speed de 4 bits para começar. Criação de voz e Clonagem de voz têm seus próprios modelos; instale-os depois nos Ajustes."
+            "value": "Baixe o modelo Speed de 4 bits, com cerca de 2 GB, para começar. Criação de voz e Clonagem de voz têm seus próprios modelos, com cerca de 2 GB cada; instale-os depois nos Ajustes."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下载 4 位 Speed 模型即可开始生成。声音设计和声音克隆各有独立模型，可稍后在设置中安装。"
+            "value": "下载约 2 GB 的 4 位 Speed 模型即可开始生成。声音设计和声音克隆各有约 2 GB 的独立模型，可稍后在设置中安装。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "4ビットの Speed モデルをダウンロードして始めましょう。ボイスデザインとボイスクローンには専用モデルがあり、後で設定からインストールできます。"
+            "value": "約2 GBの4ビット Speed モデルをダウンロードして始めましょう。ボイスデザインとボイスクローンにはそれぞれ約2 GBの専用モデルがあり、後で設定からインストールできます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "4비트 Speed 모델을 다운로드해 시작하세요. 음성 디자인과 음성 복제는 각각 별도 모델이 있으며 나중에 설정에서 설치할 수 있습니다."
+            "value": "약 2GB인 4비트 Speed 모델을 다운로드해 시작하세요. 음성 디자인과 음성 복제는 각각 약 2GB의 별도 모델이 있으며 나중에 설정에서 설치할 수 있습니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Загрузите 4-битную модель Speed, чтобы начать генерацию. Дизайн и клонирование голоса используют отдельные модели; их можно установить позже в настройках."
+            "value": "Загрузите 4-битную модель Speed размером около 2 ГБ, чтобы начать генерацию. Дизайн и клонирование голоса используют отдельные модели, около 2 ГБ каждая; их можно установить позже в настройках."
           }
         }
       }

@@ -86,6 +86,18 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.keepDownload", defaultValue: "Keep Download",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
+    static func downloadModelTitle(_ name: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.downloadModelTitle", defaultValue: "Download %1$@?",
+               comment: "Voice Models confirmation before a model download starts (RF-41); substitution is the localized model name."), name)
+    }
+    static func downloadModelDetailWiFi(_ size: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.downloadModelDetailWiFi", defaultValue: "The download is up to %1$@ and uses Wi-Fi only.",
+               comment: "Voice Models download confirmation while Download over cellular is off (RF-41); substitution is a formatted size such as 2.05 GB."), size)
+    }
+    static func downloadModelDetailCellular(_ size: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.settings.downloadModelDetailCellular", defaultValue: "The download is up to %1$@ and can use Wi-Fi or cellular data.",
+               comment: "Voice Models download confirmation while Download over cellular is on (RF-41); substitution is a formatted size such as 2.05 GB."), size)
+    }
     static var cancelDownloadDetail: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.cancelDownloadDetail", defaultValue: "Canceling removes the downloaded data. You can download it again from scratch.",
                comment: "Settings and model management presentation; no change to stored identities.")

@@ -45,7 +45,6 @@ private enum IOSStudioChipAbbreviation {
 }
 
 struct IOSCustomVoiceView: View {
-    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @Environment(ModelManagerViewModel.self) private var modelManager
@@ -248,7 +247,7 @@ struct IOSCustomVoiceView: View {
             },
             onInstallModel: {
                 guard let model = activeModel else { return }
-                appModel.requestModelInstallation(model, using: modelInstaller)
+                appModel.requestModelInstallation(model)
             },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
@@ -553,7 +552,6 @@ private struct IOSDesignedVoiceSaveResult: Equatable {
 }
 
 struct IOSVoiceDesignView: View {
-    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @Environment(ModelManagerViewModel.self) private var modelManager
@@ -1150,7 +1148,7 @@ struct IOSVoiceDesignView: View {
             },
             onInstallModel: {
                 guard let model = activeModel else { return }
-                appModel.requestModelInstallation(model, using: modelInstaller)
+                appModel.requestModelInstallation(model)
             },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
@@ -1444,7 +1442,6 @@ struct IOSVoiceDesignView: View {
 }
 
 struct IOSVoiceCloningView: View {
-    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @Environment(AudioPlayerViewModel.self) private var audioPlayer
@@ -1805,7 +1802,7 @@ struct IOSVoiceCloningView: View {
                 },
                 onInstallModel: {
                     guard let model = cloneModel else { return }
-                    appModel.requestModelInstallation(model, using: modelInstaller)
+                    appModel.requestModelInstallation(model)
                 },
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() },
                 onPlayerExpand: expandInlinePlayer,

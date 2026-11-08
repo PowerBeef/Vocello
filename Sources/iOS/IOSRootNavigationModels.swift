@@ -1188,7 +1188,7 @@ import QwenVoiceCore
                comment: "Onboarding installation heading; this page does not initiate a download.")
     }
     static var installDetail: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.installDetail", defaultValue: "Download the 4-bit Speed model to start generating. Voice Design and Voice Cloning each have their own model; install them later in Settings.",
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.installDetail", defaultValue: "Download the 4-bit Speed model, about 2 GB, to start generating. Voice Design and Voice Cloning each have their own model of about 2 GB; install them later in Settings.",
                comment: "Onboarding explanation of separately downloaded models; Speed is the model-tier name.")
     }
     static var builtInDetail: String {

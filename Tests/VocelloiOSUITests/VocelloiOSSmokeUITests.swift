@@ -682,6 +682,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             guard update.waitForExistence(timeout: 10) else { continue }
             XCTAssertTrue(revealSettingsElement(update, swipingUp: true))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: update, timeout: 20))
+            confirmModelDownload()
             updated.append(modelID)
         }
         VocelloUIScreenshot.attach(app, named: "ios-update-models-started")

@@ -164,8 +164,8 @@
       "path": "Sources/iOS/Settings/VoiceModelsScreen.swift",
       "screen": "Voice Models",
       "scenario": "stateful",
-      "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls. A removal the busy engine refused raises its own alert (A5-01).",
-      "interactiveOccurrenceCount": 5
+      "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls. A removal the busy engine refused raises its own alert (A5-01). Install, Update and Studio's install button ask before a download starts, with Download and Cancel (RF-41).",
+      "interactiveOccurrenceCount": 8
     },
     {
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",

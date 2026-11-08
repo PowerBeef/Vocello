@@ -65,18 +65,15 @@ final class AppModel {
     var tab: IOSAppTab = .studio {
         didSet {
             IOSAppDefaults.lastTabRawValue = tab.rawValue
-            if tab != .settings { settingsModelNavigation.path = [] }
+            if tab != .settings { settingsModelNavigation.leaveSettings() }
         }
     }
 
     let settingsModelNavigation = IOSSettingsModelNavigation()
 
-    func requestModelInstallation(_ model: TTSModel, using installer: IOSModelInstallerViewModel) {
-        settingsModelNavigation.requestInstallation(
-            of: model,
-            selectSettings: { self.tab = .settings },
-            install: { installer.install($0) }
-        )
+    /// Opens Voice Models, which asks before the download starts (RF-41).
+    func requestModelInstallation(_ model: TTSModel) {
+        settingsModelNavigation.requestInstallation(of: model, selectSettings: { self.tab = .settings })
     }
 
     /// Which mode the unified Studio screen is currently editing.

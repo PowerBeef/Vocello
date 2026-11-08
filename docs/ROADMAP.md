@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 43/63 (68%) |
+| `release-first-3-0-2026-09` | active | release-qa | 43/64 (67%) |
 | `engine-remediation-2026-10` | active | backend-and-platform | 0/14 (0%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
@@ -59,12 +59,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
+| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
+| `RF-41` | in-flight | iPhone model downloads show their size and ask before they start | — |
 
 ### Open items in detail
 
@@ -132,6 +133,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-35`** (in-flight, due 2026-11-09) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
+
+- **`RF-41`** (in-flight, due 2026-11-09) — iPhone model downloads show their size and ask before they start.
+  gate: Guideline 4.2.3(ii): before a new model download starts, from a Voice Models row's Install or Update or from Studio's install button, the app shows the model's download size and the networks it may use, and asks for confirmation; Repair and Retry continue an already confirmed download without asking. Onboarding states that each model is about 2 GB. Done when deterministic tests cover the navigation change, the copy is in all ten interface languages, every UI test that starts a download confirms it, the routed check passes, the Swift review finds no blocker, and a new candidate carries it, with RF-17's records and RF-15's rows rerun on that candidate.
 
 ## Engine remediation programme (2026-10-16 audit)
 

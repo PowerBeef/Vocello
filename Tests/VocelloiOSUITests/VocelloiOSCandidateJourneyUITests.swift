@@ -83,7 +83,10 @@ final class VocelloiOSCandidateJourneyUITests: VocelloiOSUITestCase {
             XCTAssertTrue(VocelloUISettingsReveal.perform(
                 start, in: app, swipingUp: modelID == "pro_clone", requirement: .navigation))
             started.append(modelID)
+            let isNewDownload = start.identifier.hasPrefix("iosModelDownload_")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: start, timeout: 20))
+            // RF-41: Download asks first; Retry continues a download already confirmed.
+            if isNewDownload { confirmModelDownload() }
             XCTAssertTrue(VocelloUIWait.condition("\(modelID) to start or queue", timeout: 120) {
                 self.element("iosModelProgress_\(modelID)").exists
                     || self.element("iosModelPhaseActivity_\(modelID)").exists

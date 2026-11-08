@@ -430,6 +430,9 @@ struct IOSModelRow: View {
     let status: ModelManagerViewModel.ModelStatus
     let operationState: IOSModelInstallerViewModel.OperationState
     let onInstall: () -> Void
+    /// Install and Update start a new download, so they ask first (RF-41); Repair and Retry
+    /// continue one already confirmed.
+    let onRequestDownload: () -> Void
     let onRequestCancelOptions: () -> Void
     let onDelete: () -> Void
     /// The Download over cellular switch (RF-35), passed in so the waiting copy
@@ -511,7 +514,7 @@ struct IOSModelRow: View {
                     IOSSettingsText.update,
                     symbol: "arrow.triangle.2.circlepath",
                     id: "iosModelUpdate_\(model.id)",
-                    action: requestInstall
+                    action: requestDownload
                 )
                 removalAction
             case .checking:
@@ -521,7 +524,7 @@ struct IOSModelRow: View {
                     IOSSettingsText.install,
                     symbol: "arrow.down.circle.fill",
                     id: "iosModelDownload_\(model.id)",
-                    action: requestInstall
+                    action: requestDownload
                 )
             case .incomplete:
                 actionButton(
@@ -546,7 +549,7 @@ struct IOSModelRow: View {
                 IOSSettingsText.install,
                 symbol: "arrow.down.circle.fill",
                 id: "iosModelDownload_\(model.id)",
-                action: requestInstall
+                action: requestDownload
             )
         case .queued, .waitingForConnectivity, .downloading, .retrying:
             actionButton(
@@ -655,6 +658,11 @@ struct IOSModelRow: View {
     private func requestInstall() {
         IOSHaptics.selection()
         onInstall()
+    }
+
+    private func requestDownload() {
+        IOSHaptics.selection()
+        onRequestDownload()
     }
 
     private func requestCancelOptions() {

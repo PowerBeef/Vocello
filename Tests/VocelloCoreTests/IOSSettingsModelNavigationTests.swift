@@ -12,37 +12,49 @@ final class IOSSettingsModelNavigationTests: XCTestCase {
         return try XCTUnwrap(registry.model(for: mode))
     }
 
-    func testEveryModeRoutesBeforeInstallingTheExactSelectedDescriptor() throws {
+    /// RF-41: Studio's install button routes to Voice Models and leaves the exact selected
+    /// model waiting for the download confirmation there; nothing installs from the route.
+    func testEveryModeRoutesToAConfirmationForTheExactSelectedDescriptor() throws {
         for mode in [GenerationMode.custom, .design, .clone] {
             let model = try model(for: mode)
             let navigation = IOSSettingsModelNavigation()
-            var events: [String] = []
-            var installed: ModelDescriptor?
+            var selectedSettings = false
             navigation.requestInstallation(of: model, selectSettings: {
                 XCTAssertEqual(navigation.path, [.modelsAndFiles, .voiceModels])
-                events.append("settings")
-            }, install: { selected in
-                installed = selected
-                events.append("install")
+                XCTAssertNil(navigation.downloadAwaitingConfirmation)
+                selectedSettings = true
             })
-            XCTAssertEqual(installed, model)
-            XCTAssertEqual(events, ["settings", "install"])
+            XCTAssertTrue(selectedSettings)
+            XCTAssertEqual(navigation.downloadAwaitingConfirmation, model)
+            XCTAssertEqual(navigation.takeDownloadAwaitingConfirmation(), model)
+            XCTAssertNil(navigation.downloadAwaitingConfirmation)
         }
     }
 
-    func testNavigationAndBackDoNotReplayAnInstallation() throws {
+    func testNavigationAndBackDoNotReplayAConfirmation() throws {
         let navigation = IOSSettingsModelNavigation()
         let model = try model(for: .design)
-        var calls = 0
         XCTAssertTrue(navigation.path.isEmpty)
         navigation.path = [.modelsAndFiles]
-        navigation.requestInstallation(of: model, selectSettings: {}, install: { _ in calls += 1 })
+        navigation.requestInstallation(of: model, selectSettings: {})
         XCTAssertEqual(navigation.path, [.modelsAndFiles, .voiceModels])
+        XCTAssertEqual(navigation.takeDownloadAwaitingConfirmation(), model)
         navigation.path.removeLast()
         XCTAssertEqual(navigation.path, [.modelsAndFiles])
         navigation.path.removeLast()
         XCTAssertTrue(navigation.path.isEmpty)
         navigation.path = [.modelsAndFiles, .voiceModels]
-        XCTAssertEqual(calls, 1)
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation())
+    }
+
+    /// A request Voice Models never showed must not replay on a later visit to Settings.
+    func testLeavingSettingsDropsAConfirmationVoiceModelsNeverShowed() throws {
+        let navigation = IOSSettingsModelNavigation()
+        let model = try model(for: .clone)
+        navigation.requestInstallation(of: model, selectSettings: {})
+        navigation.leaveSettings()
+        XCTAssertTrue(navigation.path.isEmpty)
+        XCTAssertNil(navigation.downloadAwaitingConfirmation)
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation())
     }
 }

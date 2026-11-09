@@ -40,7 +40,7 @@ let package = Package(
         // bump carried the benchmark battery instead of the byte-identity A/B; 1.3.5 only
         // honors byte_fallback, which Qwen's byte-level BPE does not set. See
         // benchmarks/HISTORY.md and the pin-bump procedure in docs/reference/mlx-guide.md §9.
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.3.5")
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "1.4.0")
     ],
     targets: [
         // MARK: - VocelloQwen3Core

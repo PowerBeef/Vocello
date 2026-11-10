@@ -67,10 +67,13 @@ download it automatically.
       localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
       2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02). Its train holds builds 24 to
       26; every candidate needs an unused build number (§4, ASR-08).
-- [x] App Store installation eligibility matches the app's runtime hardware floor before the first
-      public version. The built bundle requires exactly `arm64` and Apple's
+- [x] App Store installation eligibility is as close to the app's runtime hardware floor as the
+      capability allows. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
-      newer. Deterministic source and archive/IPA verification reject future drift (ASR-01).
+      newer. Apple also lists 13 iPad models for that capability, so they can install the app; by
+      the maintainer's decision of 2026-11-10 (RF-42) Vocello does not run on iPad and shows a
+      localized unsupported-device screen there, and the App Review notes ask for review on an
+      iPhone 15 Pro or later. Deterministic source and archive/IPA verification reject future drift (ASR-01).
       The bundle also sets `LSSupportsGameMode` to NO, because the gaming-tier capability otherwise
       shows the Game Mode banner at every launch; build 27 is the first candidate with it (RF-37).
 

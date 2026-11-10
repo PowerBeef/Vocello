@@ -33997,6 +33997,72 @@
         }
       }
     },
+    "vocello.ui.unsupportedDeviceDetail": {
+      "comment": "Unsupported-device screen body (RF-42); substitution is the minimum iPhone model's product name, such as iPhone 15 Pro.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello requires %1$@ or later. It doesn't run on iPad or on earlier iPhone models."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello nécessite un %1$@ ou un modèle ultérieur. L’app ne fonctionne pas sur iPad ni sur les modèles d’iPhone antérieurs."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello requiere un %1$@ o posterior. No funciona en iPad ni en modelos de iPhone anteriores."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello benötigt ein %1$@ oder neuer. Die App läuft weder auf dem iPad noch auf älteren iPhone-Modellen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello richiede %1$@ o modelli successivi. Non funziona su iPad né sui modelli di iPhone precedenti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello requer um %1$@ ou posterior. Ele não funciona no iPad nem em modelos anteriores de iPhone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 需要 %1$@ 或更新机型，无法在 iPad 或更早的 iPhone 机型上运行。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello には %1$@ 以降が必要です。iPad やそれ以前の iPhone では動作しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello를 사용하려면 %1$@ 이상이 필요합니다. iPad나 이전 iPhone 모델에서는 실행되지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для Vocello требуется %1$@ или новее. Приложение не работает на iPad и на более ранних моделях iPhone."
+          }
+        }
+      }
+    },
     "vocello.ui.initializationFailed": {
       "comment": "iOS interface: App Initialization Failed. Presentation only.",
       "extractionState": "manual",

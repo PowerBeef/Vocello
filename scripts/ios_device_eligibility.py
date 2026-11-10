@@ -54,14 +54,14 @@ def validate(root: Path = ROOT) -> dict[str, object]:
         raise EligibilityError("Swift eligibility policy does not admit both iPhone 15 Pro identifiers")
     if '(majorVersion ?? 0) >= 17' not in policy:
         raise EligibilityError("Swift eligibility policy does not admit later iPhone generations")
-    if 'minimumHardwareDescription = "iPhone 15 Pro or newer"' not in policy:
-        raise EligibilityError("Swift hardware description differs from the governed floor")
+    if 'minimumHardwareModel = "iPhone 15 Pro"' not in policy:
+        raise EligibilityError("Swift minimum hardware model differs from the governed floor")
 
     bootstrap = _read(root / BOOTSTRAP_SOURCE)
     if "IOSDeviceEligibilityPolicy.isSupportedMachineIdentifier(machineIdentifier())" not in bootstrap:
         raise EligibilityError("runtime hardware guard does not delegate to the governed policy")
-    if "IOSDeviceEligibilityPolicy.minimumHardwareDescription" not in bootstrap:
-        raise EligibilityError("unsupported-device copy does not use the governed description")
+    if "IOSDeviceEligibilityPolicy.minimumHardwareModel" not in bootstrap:
+        raise EligibilityError("unsupported-device copy does not use the governed minimum model")
 
     project = _read(root / PROJECT)
     source_path = POLICY_SOURCE.as_posix()

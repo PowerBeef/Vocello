@@ -52,9 +52,12 @@ Three generation modes (Studio segmented control `generateSection_*`):
 The UI is what this guide drives. Headless, non-UI device diagnostics are documented in
 [`ios-device-testing.md`](ios-device-testing.md); that path is separate from XCUITest.
 
-The App Store bundle requires `arm64` and Apple's `iphone-performance-gaming-tier`, aligning
-installation eligibility with Vocello's iPhone 15 Pro-or-newer runtime guard before the first
-public version. `IOSDeviceEligibilityPolicy` owns the source-level predicate and description;
+The App Store bundle requires `arm64` and Apple's `iphone-performance-gaming-tier`, which limits
+installation to iPhone 15 Pro and later, and to the iPads Apple lists for the same capability
+(M1-or-later iPad Pro and iPad Air, and the iPad mini with A17 Pro). The runtime guard admits
+iPhones only, so those iPads see the localized unsupported-device screen (maintainer decision
+2026-11-10, RF-42). `IOSDeviceEligibilityPolicy` owns the source-level predicate and the minimum
+model's name;
 archive/IPA verification rejects any capability drift. The gaming-tier capability also makes iOS
 treat the app as a game and show the Game Mode banner at launch, so the Info.plist sets
 `LSSupportsGameMode` to NO, and the same checks reject a missing or true value (RF-37).

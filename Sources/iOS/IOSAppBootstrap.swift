@@ -243,9 +243,9 @@ enum IOSDeviceSupport {
         IOSDeviceEligibilityPolicy.isSupportedMachineIdentifier(machineIdentifier())
     }
 
-    static var unsupportedReason: String {
-        let identifier = machineIdentifier()
-        return "Vocello for iPhone currently requires \(IOSDeviceEligibilityPolicy.minimumHardwareDescription).\nCurrent device: \(identifier)"
+    /// Shown on hardware the guard refuses, including the iPads that can install the app (RF-42).
+    @MainActor static var unsupportedReason: String {
+        IOSInterfaceText.unsupportedDeviceDetail(IOSDeviceEligibilityPolicy.minimumHardwareModel)
     }
 
     private static func machineIdentifier() -> String {

@@ -350,7 +350,7 @@
       "id": "RF-42",
       "plan": "release-first-3-0-2026-09",
       "title": "Decide how Vocello behaves on the iPads that can install it",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "due": "2026-11-12",
       "gate": "The maintainer records a decision for the iPads that satisfy iphone-performance-gaming-tier: admit them in iPhone compatibility mode with device evidence for memory and layout, or keep the unsupported-device screen with its body line localized and without the raw machine identifier. Either way the App Review notes state the device requirement, and any code change rides on the candidate that carries RF-41.",
@@ -360,7 +360,7 @@
         "Sources/iOS/IOSAppBootstrap.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 from N-1 of docs/audits/2026-11-09-project-audit.md, a release blocker as an App Review rejection risk (Guideline 2.4.1). Apple's Required Device Capabilities data, read 2026-11-10, lists 13 iPad models for the capability: iPad Pro 11-inch (3rd generation) and 12.9-inch (5th generation) and later, iPad Air (5th generation) and later, and iPad mini (A17 Pro). IOSDeviceEligibilityPolicy rejects every identifier that does not start with iPhone, so those iPads show the unsupported-device screen: its title is localized in ten languages, and its body line (IOSDeviceSupport.unsupportedReason in IOSAppBootstrap.swift) is English and prints the raw machine identifier. No iPad has been tried."
+      "notes": "Opened 2026-11-10 from N-1 of docs/audits/2026-11-09-project-audit.md, a release blocker as an App Review rejection risk (Guideline 2.4.1). Apple's Required Device Capabilities data, read 2026-11-10, lists 13 iPad models for the capability: iPad Pro 11-inch (3rd generation) and 12.9-inch (5th generation) and later, iPad Air (5th generation) and later, and iPad mini (A17 Pro). IOSDeviceEligibilityPolicy rejects every identifier that does not start with iPhone, so those iPads show the unsupported-device screen: its title is localized in ten languages, and its body line (IOSDeviceSupport.unsupportedReason in IOSAppBootstrap.swift) is English and prints the raw machine identifier. No iPad has been tried. 2026-11-10, maintainer decision: keep the wall. The body line is now localized in ten languages, names the iPhone 15 Pro floor and iPad, and no longer prints the machine identifier; the App Review notes ask for review on an iPhone 15 Pro or later (read back byte-identical). The screen cannot be shown on the paired iPhone, so it is unseen on a device. Left: the candidate that carries it."
     },
     {
       "id": "RF-16",

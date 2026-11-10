@@ -23,8 +23,9 @@ the speed and live-preview sentences below, written and read back the same way. 
 [App Review readiness audit](../audits/2026-11-04-app-review-readiness.md), the notes' last paragraph
 became the Safeguards paragraph below, answering Guideline 1.2's AI content wording, 4.2.3(ii) and
 cloning consent. The same day every claim here was checked against the app, and the promotional text and
-review-notes steps 2, 3 and 5 were tightened (the notes are 3,476 of 4,000 characters); all of it was written
-and read back the same way. Any later change to App Store Connect is a separate, explicit request; keep this
+review-notes steps 2, 3 and 5 were tightened; all of it was written and read back the same way. On
+2026-11-10, with the decision to keep refusing iPad (RF-42), the notes gained a paragraph asking for
+review on an iPhone 15 Pro or later (3,684 of 4,000 characters), also read back byte-identical. Any later change to App Store Connect is a separate, explicit request; keep this
 file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
@@ -115,6 +116,8 @@ spelled out so the app is not judged non-functional under Guideline 2.1.
 
 ```text
 Vocello generates speech locally on the iPhone. It ships with no bundled model weights, to keep the app small, and needs no account or login.
+
+Please review on an iPhone 15 Pro or later. Recent iPad models meet the same hardware capability, so the app installs on them, but Vocello does not run on iPad: it shows an unsupported-device message there.
 
 1. On first launch, go through the three onboarding pages.
 2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review. Built-in Voice is 2,049,696,897 bytes, Voice Design 2,049,696,404 bytes and Voice Cloning 2,073,713,977 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on. Each one needs at least 4.5 GB of free space and can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.

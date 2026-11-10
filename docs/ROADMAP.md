@@ -66,7 +66,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
 | `RF-41` | in-flight | iPhone model downloads show their size and ask before they start | — |
-| `RF-42` | planned | Decide how Vocello behaves on the iPads that can install it | — |
+| `RF-42` | in-flight | Decide how Vocello behaves on the iPads that can install it | — |
 
 ### Open items in detail
 
@@ -138,7 +138,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-41`** (in-flight, due 2026-11-09) — iPhone model downloads show their size and ask before they start.
   gate: Guideline 4.2.3(ii): before a new model download starts, from a Voice Models row's Install or Update or from Studio's install button, the app shows the model's download size and the networks it may use, and asks for confirmation; Repair and Retry continue an already confirmed download without asking. Onboarding states that each model is about 2 GB. Done when deterministic tests cover the navigation change, the copy is in all ten interface languages, every UI test that starts a download confirms it, the routed check passes, the Swift review finds no blocker, and a new candidate carries it, with RF-17's records and RF-15's rows rerun on that candidate.
 
-- **`RF-42`** (planned, due 2026-11-12) — Decide how Vocello behaves on the iPads that can install it.
+- **`RF-42`** (in-flight, due 2026-11-12) — Decide how Vocello behaves on the iPads that can install it.
   gate: The maintainer records a decision for the iPads that satisfy iphone-performance-gaming-tier: admit them in iPhone compatibility mode with device evidence for memory and layout, or keep the unsupported-device screen with its body line localized and without the raw machine identifier. Either way the App Review notes state the device requirement, and any code change rides on the candidate that carries RF-41.
 
 ## Specialist-audit remediation

@@ -564,6 +564,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.clearSearch", defaultValue: "Clear search",
                comment: "iOS interface: Clear search. Presentation only.")
     }
+    static func unsupportedDeviceDetail(_ minimumModel: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDeviceDetail", defaultValue: "Vocello requires %1$@ or later. It doesn't run on iPad or on earlier iPhone models.",
+                   comment: "Unsupported-device screen body (RF-42); substitution is the minimum iPhone model's product name, such as iPhone 15 Pro."), minimumModel)
+    }
     static var unsupportedDevice: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDevice", defaultValue: "Unsupported Device",
                comment: "iOS interface: Unsupported Device. Presentation only.")

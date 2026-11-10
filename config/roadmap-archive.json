@@ -5949,6 +5949,23 @@
       "updated": "2026-11-10",
       "notes": "Parked 2026-10-30: macos-xcui-smoke-20261030-174603-220a2577 on db0afa2c passed 13 of 15; test12 and test13 timed out because macOS's speech-recognition prompt covered the window. The test app is ad-hoc signed (designated requirement is its cdhash), so the clean rebuild after the cache cleanup counted as a new app. Not investigated further (focus rules). Not a release blocker: test tooling only.",
       "supersededBy": "BKL-19"
+    },
+    {
+      "id": "BKL-56",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iOS archive job's time cap is below its steps' limits",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "release.yml's archive-ios job cap covers the sum of its steps' own limits, and a cold candidate archive finishes inside it.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-1. Measured on build 29's release run (41079341984): the archive job took 58.5 of its 60 minutes, and its readiness step 44.4 of its 45; the archive step itself took 7.9. Build 28 timed out here. 2026-11-10, at the maintainer's request: the job cap is 180 minutes (the steps' limits sum to 175), the readiness step's limit is 5,400 s, and the signing keychain's auto-lock is 9,000 s like the Mac job's. A tag runs its own copy of the workflow, so this must be on main before the tag. Left: the next candidate's archive job passing with these limits. 2026-11-10: build 30's release run (42872878302) passed with the new limits. The archive job took 79.7 of 180 minutes, its readiness step 61.8 of 90 and the archive step 11.0; the old limits (60 and 45) would have failed it.",
+      "evidence": [
+        "commit:d75e48b7",
+        "run:github-actions-release-42872878302"
+      ]
     }
   ]
 }

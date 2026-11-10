@@ -29,7 +29,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      November 7 and 10 and its phone lane passed. Done on November 10 for the tag: RF-42 is
      decided (Vocello stays iPhone-only, with a localized unsupported-device screen), the archive
      job's limits are raised (BKL-56) and the build number is 30. CI passed, and on the
-     maintainer's go `v3.0.0-ios.9` (build 30) was cut at `14c51659` (release run 42872878302).
+     maintainer's go `v3.0.0-ios.9` (build 30) was cut at `14c51659`; its release run passed and
+     build 30 is processed in TestFlight (see Build 30 below).
      On the processed build: RF-17's six records on the new tag (build 29's five expired on
      November 10, and the language record still needs a maintainer decision), RF-15's rows
      including the purchase rows (RF-02 first), AUD-01, AUD-02, AUD-07, AUD-09, ASR-06 (procedure
@@ -44,7 +45,16 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   App Store Connect and read back; build 29 attached to version 3.0.0, with no export-compliance
   question left. RF-10 closed by decision; RF-23 and DW-04 parked until after the submission. RF-38 closed on November 1: after `c878917a` let diagnostics builds start without the App Group the farm's re-signing drops, the BrowserStack smoke passed on a real iPhone 15 Pro (iOS 27) and 15 Pro Max (iOS 26) (clone-off exploratory evidence; first-take peak 2.6 GB). RF-40 and the follow-up farm runs on the iPhone 15 Pro (November 2): engine RTF 1.5 to 1.6 on a first take after rest, then a steady 2.2 at nominal heat (3.2 only on a phone that ran hot); memory flat at 2.5 GB. The live preview's pause below real time is an accepted tradeoff (BKL-53 declined). The Mac
   smoke on main passed 15/15 on Xcode 27.2. Version 3.0.0 in App Store Connect still lacks the
-  screenshots, the purchase's metadata and the accessibility declaration (ASR-11).
+  screenshots and the purchase's review screenshot. The accessibility declaration is voluntary
+  and cannot be published before a version is live; its approved draft is in the runbook (ASR-11).
+- **Build 30:** `v3.0.0-ios.9` at `14c51659` is in TestFlight, processed `VALID` on November 10
+  (release run 42872878302). The archive job took 80 of its 180 minutes and its readiness step 62
+  of 90; the old limits (60 and 45) would have failed it (BKL-56, closed). Its complete release
+  artifact, IPA included, is in `build/artifacts/quality-promotion/release-v3.0.0-ios.9-candidate`
+  with its checksums verified (the GitHub artifact expires November 24); candidate rows need
+  that folder. Version 3.0.0 still has build 29 attached: attaching build 30 and writing its What
+  to Test notes are App Store Connect writes on the maintainer's go. The phone still needs build
+  30 installed from TestFlight before its rows.
 - **Build 29:** `v3.0.0-ios.8` at `a60dd204` is in TestFlight (release run 41079341984). Its
   complete release artifact, IPA included, is kept in
   `build/artifacts/quality-promotion/release-v3.0.0-ios.8-candidate` (the GitHub artifact expires

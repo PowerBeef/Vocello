@@ -27,9 +27,10 @@ review-notes steps 2, 3 and 5 were tightened; all of it was written and read bac
 2026-11-10, with the decision to keep refusing iPad (RF-42), the notes gained a paragraph asking for
 review on an iPhone 15 Pro or later, and step 2 and the Safeguards paragraph gained the download
 confirmation that build 30 shows (RF-41). The notes are 3,802 of 4,000 characters and read back
-byte-identical. They describe build 30, the candidate that will be submitted; build 29, attached
-until build 30 is processed, has no confirmation. Any later change to App Store Connect is a separate, explicit request; keep this
-file and App Store Connect in step.
+byte-identical. They describe build 30, the candidate that will be submitted. Build 30 is processed
+in TestFlight since 2026-11-10; build 29, which has no confirmation, stays attached until the
+maintainer asks for build 30 to replace it. Any later change to App Store Connect is a separate,
+explicit request; keep this file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
 - it says local, not on-device;

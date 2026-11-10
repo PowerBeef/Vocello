@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 21/69 (30%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 22/69 (32%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -553,7 +553,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-49` | parked | The Mirroring capture helper finds no window on a non-English Mac | — |
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
-| `BKL-56` | parked | The iOS archive job's time cap is below its steps' limits | — |
 | `BKL-57` | parked | Every iPhone candidate waits on Swift CodeQL and a website npm audit | — |
 | `BKL-58` | parked | A dependency-graph POST is part of CI required | — |
 | `BKL-59` | parked | Three small iPhone UI defects from the November 9 audit | — |
@@ -705,10 +704,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-54`** (parked) — A farm runner restart drops the test filter and reruns the whole UI bundle.
   gate: A BrowserStack farm build whose selected test fails or exits early still runs only the selected tests, shown by a deliberately failing selected test in a farm build, with scripts/lib/farm_smoke.py and its tests updated.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or a farm run is planned before then.
-
-- **`BKL-56`** (parked) — The iOS archive job's time cap is below its steps' limits.
-  gate: release.yml's archive-ios job cap covers the sum of its steps' own limits, and a cold candidate archive finishes inside it.
-  unparkWhen: Before the next iPhone candidate tag is cut (it needs no iPhone), or when the maintainer picks the next plan.
 
 - **`BKL-57`** (parked) — Every iPhone candidate waits on Swift CodeQL and a website npm audit.
   gate: An -ios.N candidate's archive no longer waits on the full Security workflow, or the maintainer records that the exact-source rule keeps it.

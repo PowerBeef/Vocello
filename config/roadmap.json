@@ -344,7 +344,7 @@
         "Sources/iOS/IOSSettingsViews.swift"
       ],
       "updated": "2026-11-07",
-      "notes": "Opened 2026-11-07 at the maintainer's request, from G2 of docs/audits/2026-11-04-app-review-readiness.md: Studio's install button started a download of about 2 GB with no size and no prompt, and onboarding never stated the size. A release blocker as an App Review rejection risk. 2026-11-07: code, ten-language copy, deterministic tests and the UI-test confirmations landed (f3689d2a); the routed check passed and the Swift review found no blocker. 2026-11-10, iPhone: the first build showed the prompt as a popover with no Cancel (ios-xcui-model-download-20261110-143248-035dcccd, failed at the dismiss step), so it became an alert with Cancel and Download; the isolated model-download lane then passed (150336-4c1eddec, no new crash reports), proving the prompt from Studio and from a row, that Cancel starts nothing, and that nothing transfers before Download. Two earlier attempts were environmental: the Focus picker took a tap (142827-aa6b8f71) and iPhone Mirroring was open (150305-940411e3). Left: a new candidate carrying it, with RF-17's records and RF-15's rows rerun on it. 2026-11-10: candidate v3.0.0-ios.9 (build 30) cut at 14c51659; release run 42872878302."
+      "notes": "Opened 2026-11-07 at the maintainer's request, from G2 of docs/audits/2026-11-04-app-review-readiness.md: Studio's install button started a download of about 2 GB with no size and no prompt, and onboarding never stated the size. A release blocker as an App Review rejection risk. 2026-11-07: code, ten-language copy, deterministic tests and the UI-test confirmations landed (f3689d2a); the routed check passed and the Swift review found no blocker. 2026-11-10, iPhone: the first build showed the prompt as a popover with no Cancel (ios-xcui-model-download-20261110-143248-035dcccd, failed at the dismiss step), so it became an alert with Cancel and Download (37c16b91); the isolated model-download lane then passed (150336-4c1eddec, no new crash reports), proving the prompt from Studio and from a row, that Cancel starts nothing, and that nothing transfers before Download. 2026-11-10: candidate v3.0.0-ios.9 (build 30) cut at 14c51659; release run 42872878302 passed and build 30 is processed VALID in TestFlight. Left: RF-17's model-download record and RF-15's rows on build 30, in a phone window."
     },
     {
       "id": "RF-42",
@@ -2019,20 +2019,6 @@
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or a farm run is planned before then.",
       "notes": "Parked 2026-11-02: in farm build 595b4673 (clear-ab journey, singleRunnerInvocation) a selected test failed, xcodebuild reported \"Restarting after unexpected exit, crash, or test timeout\", and the restarted runner ran every UI test in the bundle, including the 40-take soak, so the build took about 55 minutes instead of about 25 and used the rest of the trial. Candidate fixes: also send skip-testing for the other classes, or one runner invocation per selected test. Not investigated further (focus rules). 2026-11-10 review: the clear-ab journey was removed in f7a5e6b0; the smoke and soak journeys remain."
-    },
-    {
-      "id": "BKL-56",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The iOS archive job's time cap is below its steps' limits",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "release.yml's archive-ios job cap covers the sum of its steps' own limits, and a cold candidate archive finishes inside it.",
-      "sourceOfTruth": [
-        ".github/workflows/release.yml"
-      ],
-      "updated": "2026-11-10",
-      "unparkWhen": "Before the next iPhone candidate tag is cut (it needs no iPhone), or when the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-1. Measured on build 29's release run (41079341984): the archive job took 58.5 of its 60 minutes, and its readiness step 44.4 of its 45; the archive step itself took 7.9. Build 28 timed out here. 2026-11-10, at the maintainer's request: the job cap is 180 minutes (the steps' limits sum to 175), the readiness step's limit is 5,400 s, and the signing keychain's auto-lock is 9,000 s like the Mac job's. A tag runs its own copy of the workflow, so this must be on main before the tag. Left: the next candidate's archive job passing with these limits."
     },
     {
       "id": "BKL-57",

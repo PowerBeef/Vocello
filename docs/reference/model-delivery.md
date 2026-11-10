@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
 sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
@@ -308,7 +308,11 @@ ranges (4.07 GB on the wire for a 2.05 GB file).
 ## States, cancellation, and retry
 
 Visible states are: queued, waiting for connectivity, downloading, retrying, verifying, installing,
-cancelling, installed, failed, deleting, and deleted. Speed and ETA are shown only during active
+cancelling, installed, failed, deleting, and deleted; a row can also read incomplete (Repair) or
+update available (Update). The iPhone's state table, its controls and the install flow are owned by
+[`ios-app-guide.md`](ios-app-guide.md#3-model-download-management--state-generation-precondition):
+there Install and Update ask for confirmation before a download starts (RF-41), and Repair and
+Retry continue without asking. Speed and ETA are shown only during active
 transfer. A separate no-progress message appears after 20 seconds in which no running task's
 byte count grows (a range retry refilling its slot counts as growth);
 waiting-for-connectivity comes from the URLSession delegate. On iPhone, the determinate bar means
@@ -440,9 +444,13 @@ scripts/ui_test.sh ios model-download
 The iPhone proof first snapshots the quiescent canonical model surface, then normalizes only the
 fixed `model-download-acceptance` root through the redesigned screen's visible Cancel, Retry, and
 Remove controls. This makes a failed prior run recoverable without creating an unbounded family of
-background-session identifiers or touching the user's canonical models. From the resulting fresh
-state it starts Custom, requires measurable progress, confirms Cancel Download, proves the row
-returns to `Not Installed` with Install as its sole action, and starts the transfer again. It then
+background-session identifiers or touching the user's canonical models. Every new download passes the
+download confirmation (RF-41, `confirmModelDownload()`), and the lane requires that no transfer
+begins before Download is tapped. From the resulting fresh state it starts Custom from Studio's
+install button, requires measurable progress, confirms Cancel
+Download, and proves the row returns to `Not Installed` with Install as its sole action. It then
+taps Install on the row, cancels the confirmation to prove that Cancel starts nothing and leaves
+Install in place, and starts the transfer again through the confirmation. It then
 backgrounds and terminates the app during transfer, relaunches it, requires non-regressing adopted
 progress, and waits for exact verified installation of Custom. With Custom retained in the
 isolated root it delivers Design and Clone, whose plans must reuse the

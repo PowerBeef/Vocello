@@ -76,7 +76,7 @@ The speed figures come from a Vocello 3.0 development build on the benchmark Mac
 | Command line | macOS 26.0 or newer, Apple Silicon | Shared with the Mac app |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) |
 
-Models download once from Hugging Face and are never bundled. Speed uses less memory and suits 8 GB Macs; Quality is a Mac option for 16 GB or more. → [What's new in 3.0.0](docs/releases/v3.0.0.md) · [All releases](https://github.com/PowerBeef/Vocello/releases)
+Models download once from Hugging Face and are never bundled. Speed uses less memory and suits 8 GB Macs; Quality is a Mac option, recommended with 16 GB or more. → [What's new in 3.0.0](docs/releases/v3.0.0.md) · [All releases](https://github.com/PowerBeef/Vocello/releases)
 
 <details>
 <summary><b>Upgrading, and older Macs</b></summary>

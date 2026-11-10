@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -9,7 +9,7 @@ sourceOfTruth:
   - Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
   - scripts/ios_device_eligibility.py
   - scripts/verify_ios_release_artifacts.py
-  - docs/reference/eu-ai-act-article50-assessment.md
+  - docs/reference/eu-ai-act-article50-assessment.md # historical, point-in-time assessment
 ---
 # iOS App Store submission runbook
 
@@ -25,11 +25,14 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-11-04):** `release.yml` has archived, verified and uploaded the 3.0.0
+**Current state (2026-11-10):** `release.yml` has archived, verified and uploaded the 3.0.0
 candidates (ASR-10 closed on build 24's release run 40103005257). Builds 26 and 27 are in the
-TestFlight Public Beta under the maintainer's RF-17 waiver. Build 29 (`v3.0.0-ios.8`, `a60dd204`)
-is the App Review candidate, attached to version 3.0.0. The App Review submission waits for the
-exact-tag iOS promotion (RF-17), the open release items, and the maintainer's go (RF-16). The
+TestFlight Public Beta under the maintainer's RF-17 waiver. Build 30 (`v3.0.0-ios.9`, `14c51659`)
+is the App Review candidate: it carries the download confirmation (RF-41) and the localized
+unsupported-device screen (RF-42). The checkpoint
+([`../development-progress.md`](../development-progress.md), Resume now) owns its live state. The
+App Review submission waits for the exact-tag iOS promotion (RF-17), the open release items, and
+the maintainer's go (RF-16). The
 [App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) ranks the remaining
 review risks. Any App
 Store Connect metadata change, upload or submission still needs its own authorization.
@@ -65,8 +68,9 @@ download it automatically.
       any capability change.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`, with one `en-US`
       localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
-      2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02). Its train holds builds 24 to
-      26; every candidate needs an unused build number (§4, ASR-08).
+      2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02). Its train
+      holds builds 24 to 27 and 29 (build 28's release run timed out before its upload), and build
+      30 is the candidate; every candidate needs an unused build number (§4, ASR-08).
 - [x] App Store installation eligibility is as close to the app's runtime hardware floor as the
       capability allows. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
@@ -209,7 +213,8 @@ is complete.
 - [ ] **EU AI Act Article 50**: published audio must ship with the built-in AI marking enabled
       (AudioSeal watermark + WAV provenance chunk; the only off-switch is a registered debug knob).
       Review [`eu-ai-act-article50-assessment.md`](eu-ai-act-article50-assessment.md) for the
-      posture and the paid-launch gates (C2PA, Code of Practice, legal review).
+      posture and the paid-launch gates (C2PA, Code of Practice, legal review). It is a
+      historical, point-in-time assessment (2026-08-06), not current guidance.
 
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
@@ -218,9 +223,11 @@ with the rest of the 3.0.0 listing draft. No demo account is needed (no login); 
 the model download requirement so the app is not judged non-functional under Guideline 2.1.
 
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
-`max(2 × catalog bytes, catalog bytes + 256 MiB)`. The coordinator supplies the full model
-catalog total, even when components can be reused. Current admission needs are approximately
-4.10–4.15 GB of available space; the 4.5 GB advice provides reviewer headroom, not a different
+`max(2 × bytes, bytes + 256 MiB)`. The coordinator supplies the bytes still to fetch, without
+shared components already installed or bytes already received;
+[`model-delivery.md`](model-delivery.md#shared-component-store) owns the rule. A first model on a
+fresh install needs approximately 4.10–4.15 GB of available space and later models need less; the
+4.5 GB advice provides reviewer headroom, not a different
 runtime policy or a guarantee against concurrent storage use. Recheck against the candidate
 catalog before pasting these notes into App Store Connect.
 
@@ -327,8 +334,8 @@ The optional upload is an internal candidate step. Before assigning that build t
 submitting it for App Review, or releasing it publicly, produce and validate the iOS
 `quality-promotion.json` against this exact release evidence. This preserves TestFlight as a useful
 validation environment without allowing a source-stale phone verdict to authorize public promotion.
-Build 26 joined the Public Beta under the maintainer's one-time RF-17 waiver of 2026-10-26; App
-Review still requires the manifest.
+Builds 26 and 27 joined the Public Beta under the maintainer's RF-17 waiver (2026-10-26 and
+2026-10-29), which covers that distribution only; App Review still requires the manifest.
 
 `release.yml` does not query App Store Connect for an existing build, and it never invents or
 increments a build number. The candidate-tag script checks it before tagging; for a dispatch rebuild
@@ -350,7 +357,9 @@ the maintainer or by Claude Code on the maintainer's request for that candidate.
    --processing-state all` shows the build VALID, and take its build id.
 3. `asc builds test-notes create --build-id <ID> --locale en-US --whats-new <TEXT>`, where TEXT is the
    "TestFlight: what to test" section of `docs/releases/v<version>.md`
-   ([`macos-release-qa.md`](macos-release-qa.md) owns that section's rules).
+   ([`macos-release-qa.md`](macos-release-qa.md) owns that section's rules). A published notes
+   file is frozen, so that section is the base text: update the build number and the lines
+   specific to the candidate when pasting, not in the file.
 4. `asc testflight review submit --build-id <ID> --confirm` submits the build for beta review.
    Internal testers get every build already: the Internal group has access to all builds, so adding
    it by hand is refused.

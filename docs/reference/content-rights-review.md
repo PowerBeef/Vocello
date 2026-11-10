@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.0 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -88,7 +88,10 @@ Vocello outputs from the maintainer's own scripts.
 Each fingerprint is the first 12 hex characters of SHA-256 over the group's sorted `sha256  path`
 lines (joined by newlines, no trailing newline) at `a60dd204`. A changed asset changes its
 fingerprint and needs a fresh answer. No app asset changed between the October 12 inventory and
-build 29; group 9 gained the 1040-pixel AVIF variants and a new custom-voice capture.
+build 29; group 9 gained the 1040-pixel AVIF variants and a new custom-voice capture. Build 29 was
+the candidate on the attestation date; the checkpoint
+([`../development-progress.md`](../development-progress.md), Resume now) owns the current
+candidate's state, and no inventoried path changed between `a60dd204` and build 30's `14c51659`.
 
 | # | Asset group | Files | Fingerprint | Paths |
 |---|---|---|---|---|
@@ -197,7 +200,7 @@ another status ledger or authorizing account changes.
 | Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. **Done 2026-11-01:** attestation `ASR04-2026-11-01` (above). |
 | Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
 | Distribution profile and entitlements — ASR-10 | Signing/release owner | **Done 2026-10-24:** release run 40103005257 archived, exported and verified build 24's IPA (entitlements, signing identity, profiles); every later candidate repeats the verification. |
-| Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02); `USES_THIRD_PARTY_CONTENT` declared. **Done 2026-11-01:** build 29 reads back VALID with `usesNonExemptEncryption` false, and App Store Connect asked no further export-compliance question. |
+| Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02); `USES_THIRD_PARTY_CONTENT` declared. **Done 2026-11-01:** build 29, the candidate on that date, reads back VALID with `usesNonExemptEncryption` false, and App Store Connect asked no further export-compliance question. Repeat the read on any later candidate ([runbook §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)); the checkpoint ([`../development-progress.md`](../development-progress.md), Resume now) owns the current candidate's state. |
 | Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). **Decided 2026-10-27:** 3.0 ships outside the EU for now; the 27 EU territories were removed (148 remain) on the maintainer's explicit instruction. The EU release needs the trader step first (BKL-41). Remaining: the account holder's agreement, banking and tax steps, whose status stays in the maintainer's private record, never in Git. The agent cannot accept agreements or provide legal clearance. |
 
 Apple's [privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) require

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -277,7 +277,9 @@ French once and to System Default once (Settings, `settings_appLanguage`); the a
 6. **History, Saved Voices, Settings**: sort and search in the toolbar, the long-form segments
    toggle, Save As and Reveal; the enroll and record sheets; the recommended-setup summary, the
    per-mode Speed and Quality rows with their actions, prefer-speed, variation, the output folder,
-   Application data and clone consent; Cmd+, opens the same screen in its own window.
+   Application data and clone consent; the Updates category's automatic-check toggle and its
+   Check for Updates button beside the app's name and version (`settings_checkForUpdates`, which
+   opens Sparkle's window); Cmd+, opens the same screen in its own window.
 
 Anything that reads wrong in French is a catalog fix (`MacInterfaceText` + `Localizable.xcstrings`),
 never a code-side literal; see [`localization.md`](localization.md).
@@ -370,8 +372,10 @@ communication, written for both non-technical and technical readers:
   Requirements, Install, and a TestFlight What-to-Test section), rejects placeholder
   tokens (PENDING/TBD/TODO/FIXME), and rejects relative markdown links: the file
   renders on the release page too, so links must be absolute.
-- The file's `## TestFlight — What to Test (build N)` section is the paste source for
-  the build's Test Details in App Store Connect at distribution time. Automating that
+- The file's `## TestFlight: what to test (build N)` section is the paste source for
+  the build's Test Details in App Store Connect at distribution time
+  (`check_release_notes.py` requires only a level-two heading that starts with "TestFlight",
+  in any case). Automating that
   through the ASC API after upload is a recorded enhancement; until it lands, the
   paste is a required step of TestFlight distribution, not an optional nicety.
 - Published notes (v3.0.0 and earlier) stay as published; a later release writes its own

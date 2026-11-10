@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, deletion semantics, diagnostics, and the repository's build-output ownership.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -275,8 +275,9 @@ physical iPhone.
 
 ### Device proof on the signed candidate (ASR-06)
 
-Written on 2026-11-07 for the phone session on build 29. Candidate runs never pull a distribution
-app's private data container ([ios-device-testing.md](ios-device-testing.md)), and a development or
+Written on 2026-11-07 for the phone session on the processed candidate, which is build 30 since
+2026-11-10. Candidate runs never pull a distribution app's private data container
+([ios-device-testing.md](ios-device-testing.md)), and a development or
 diagnostics build never stands in for the candidate. So the proof uses what the candidate exposes:
 - an iPhone backup made on the Mac, whose `Manifest.db` lists every backed-up file with its data
   protection class;
@@ -294,7 +295,8 @@ diagnostics build never stands in for the candidate. So the proof uses what the 
 | 5. Relaunch and restart | Startup's protection pass succeeds again and nothing is lost after a relaunch and a restart | The maintainer restarts and enters the passcode |
 
 **Before starting:**
-- TestFlight build 29 is installed over the existing data, and the App Language is English.
+- The processed candidate is installed from TestFlight over the existing data, and the App
+  Language is English.
 - Three models are Ready, History has at least one take, and the benchmark clone voice is saved.
 - The phone is unlocked, with Do Not Disturb on, and connected to the Mac by cable.
 - The Mac has free space for a full device backup; none had been made on this Mac as of
@@ -325,14 +327,18 @@ If something blocks the read:
   maintainer copies `Manifest.plist` and `Manifest.db` from the backup folder in Finder to a folder
   Claude can read, rather than granting access.
 - **Weaker fallback:** with iCloud Backup on, Settings → Apple Account → iCloud → Manage Account
-  Storage → Backups shows Vocello's backup size, which must be far below the 6 GB of installed
-  models. That proves the models are left out, and nothing about protection classes.
+  Storage → Backups shows Vocello's backup size, which must be far below the size of the
+  installed models: the three Speed models are about 6.17 GB in the catalog and about 4.8 GB on
+  disk, because the 682 MB speech tokenizer is stored once
+  ([`model-delivery.md`](model-delivery.md#shared-component-store)). That proves the models are
+  left out, and nothing about protection classes.
 
 **3. Locked delivery.** In Settings → Models & Files → Voice Models:
 1. Delete Voice Design. iPhone Storage should drop by about 1.4 GB, which is part of step 4. The
    model's 682 MB speech tokenizer is shared with the other installed models, so it stays, and the
    reinstall shows about a third done from the start (RF-35, BKL-39).
-2. Tap Install, lock the phone within 30 seconds, and leave it locked for 5 minutes.
+2. Tap Install, then Download in the confirmation (RF-41), lock the phone within 30 seconds, and
+   leave it locked for 5 minutes.
 3. After unlocking, the download must have progressed or reached Ready.
 
 This step can double as RF-35's attended cellular check: run it with Wi-Fi off and Download over

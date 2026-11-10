@@ -25,7 +25,7 @@ Warm, clear, confident, and human. Vocello explains local AI generation plainly.
 
 ## Copy Rules
 - Say local, not offline or on-device, unless the technical distinction matters.
-- Say generate, voice, script, Voice brief, Speed, Quality, Saved Voices, Generation History, and Models & Files (the Mac Settings category; Voice Models on iPhone) consistently.
+- Say generate, voice, script, Voice brief, Speed, Quality, Saved Voices, Generation History, and Models & Files (the Settings category in both apps; on iPhone it holds Voice Models) consistently.
 - Call the CLI "the command line" or "the `vocello` command line", and show commands exactly as `../docs/reference/cli.md` gives them.
 - Every copyable command block runs as written in Terminal on a fresh Mac: no `#` comments (zsh does not accept them when pasted), no placeholder files, and only models an earlier block installs. Explain the commands in the prose around the block.
 - Avoid celebration copy, emoji, hype claims, and first-person plural.

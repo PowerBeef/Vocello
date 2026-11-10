@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -187,7 +187,7 @@ tap Confirm to commit + dismiss. Preview plays audio without selecting/closing.
 `languagePicker_english`), confirm `languagePicker_confirm`.
 
 **Delivery picker** — confirm `deliveryPicker_confirm`; a 2-column preset grid in two labeled
-sections per the DP-14 measured split — "Distinct deliveries" (Neutral/Calm/Whisper/Sad) then
+sections per the DP-14 measured split — "Distinct deliveries" (Neutral/Sad/Calm/Whisper) then
 "Directional hints" (Happy/Angry/Fearful/Surprised) — with cells `deliveryPickerPreset_<presetID>`
 and the hints advisory as the section footer (`deliveryPickerSheet_hintAdvisory`); and a custom
 tone editor: `deliveryPickerSheet_customTone` (toggle in), `deliveryPickerSheet_customTone_editor`
@@ -571,7 +571,7 @@ delivery biases (e.g. Ryan is naturally expressive; start from Aiden/Serena for 
 
 8 presets: **Neutral** (a real instructed preset since 2026-08-01), plus
 **Happy, Sad, Angry, Fearful, Surprised, Calm, Whisper** — one instruction each. The picker is
-sectioned by the measured DP-12/DP-14 split: **Neutral, Calm, Whisper, Sad** are distinct
+sectioned by the measured DP-12/DP-14 split: **Neutral, Sad, Calm, Whisper** are distinct
 deliveries a listener identifies above chance (`EmotionPreset.distinctDeliveryIDs`); **Happy,
 Angry, Fearful, Surprised** are directional hints that move energy and pace reliably while the
 named emotion may not land on every take, and selecting one shows the shared advisory copy.
@@ -637,8 +637,10 @@ Gotchas:
 2. Dismiss the keyboard before Generate when it obscures the button.
 3. Wait for cold model loading rather than repeating a click.
 4. Attach named screenshots at important semantic states and failures.
-5. Destructive model lifecycle actions belong only to `scripts/ui_test.sh ios model-download`,
-   which cleans up through visible Settings controls ([§7](#what-the-lanes-assume)).
+5. Cancelling and removing models belong only to `scripts/ui_test.sh ios model-download`, which
+   cleans up through visible Settings controls. Two other routes install models and remove
+   nothing: `smoke --scenario update-models` and the candidate `first-launch` row
+   ([§7](#what-the-lanes-assume)).
 6. Settings clearance uses the genuine `rootTabDock` container, not a single tab button (the dock
    has two rows at accessibility sizes). Production bottom padding follows the measured dock
    height rather than a fixed Dynamic Type estimate. Layout assertions require the entire element within the
@@ -679,9 +681,13 @@ in-session Studio mode, and the Studio selector changes the composer in place.
 
 ### What the lanes assume
 
-- Smoke and benchmark never install or delete models: they visibly assert that Custom, Design and
-  Clone Speed are Ready before generating. Only `scripts/ui_test.sh ios model-download` changes
-  model state (§3).
+- Full smoke and the benchmark never install or delete models: they visibly assert that Custom,
+  Design and Clone Speed are Ready before generating. Three routes change model state (§3):
+  `scripts/ui_test.sh ios model-download`, the isolated lifecycle proof and the only one that
+  cancels and removes; `smoke --scenario update-models`, which on explicit request taps each
+  installed model's Update and waits for Ready; and the candidate `first-launch` row
+  (`smoke --preinstalled-candidate ... --scenario first-launch`), which installs the missing
+  shipping models on a fresh install.
 - They use a prepared non-PII benchmark clone voice and enable the persistent
   `voiceCloning_consentAcknowledgment` through its visible Settings row when needed; the choice
   intentionally stays on for later testing. The benchmark may enable Auto-play for a run and

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-11-02
+reviewed: 2026-11-10
 summary: iOS physical-device testing — deterministic compile lanes, device preparation, explicit XCUITest lanes (smoke, candidate rows, purchase, control audit, perf), pause and resume, headless diagnostics and retained evidence.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -1049,9 +1049,10 @@ screenshots, traces, and `.xcresult` stay untracked; publication never stages, c
 
 Physical-iPhone acceptance of telemetry v8/evidence v2 was first completed in July 2026 (the
 exact-PID [memory profile](../../benchmarks/runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json)
-is still the latest). The newest canonical records are RF-17's at build 26's tag on 2026-10-27: the
-[29-take UI matrix](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20261027-175531-87319beb.json)
-and the [retained-memory qualification](../../benchmarks/runs/memory-qualification/ios-memory-qualification-20261027-165940-7fcd6b35.json).
+is still the latest). RF-17 reruns the 29-take UI matrix and the retained-memory qualification
+at a candidate's tag, so no record is named here:
+[`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md) lists the newest of each under its
+`ui-generation / ios` and `memory-qualification / ios` headings.
 Each record proves only its exact source, toolchain, model, and hardware identities; repository
 contract tests and Simulator results never substitute for fresh physical-device evidence after a
 relevant change.

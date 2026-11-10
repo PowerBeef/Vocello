@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -24,14 +24,18 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      account steps, which activate the Paid Apps agreement (status and details in the maintainer's
      private record, never in Git); ASR-02 and ASR-11's App Privacy readback in the browser, which
      needs a fresh App Store Connect sign-in in Chrome.
-  2. One phone session on build 29 (`v3.0.0-ios.8`), after RF-02, by November 9: RF-15 including
-     the purchase rows, AUD-01, AUD-02, AUD-07, AUD-09, ASR-06, RF-35's cellular download, RF-12's
-     Airplane Mode export and ASR-05's screenshots, plus whatever RF-17 still needs. On November 3,
-     in an unattended window, five of RF-17's six records passed on the tag (details in RF-17's
-     notes); they expire on November 10. The language record failed: the phone lacks six dictation
-     languages, and three takes fail on fixed seeds, so it needs a maintainer decision. The phone
-     now runs a development build of the tag on System Default App Language: reinstall TestFlight
-     build 29 and set App Language back to English before the candidate rows.
+  2. A new candidate, then one phone session on it. Build 29 is no longer the submission
+     candidate: RF-41 (the download prompt, `f3689d2a` and `37c16b91`) landed on `main` on
+     November 7 and 10 and its phone lane passed. Before the tag: the maintainer's decision on
+     RF-42 (eligible iPads see the unsupported-device screen), the archive job's time cap (BKL-56),
+     the build number, a push of `main` and green CI; the tag itself is cut on the maintainer's go.
+     On the processed build: RF-17's six records on the new tag (build 29's five expired on
+     November 10, and the language record still needs a maintainer decision), RF-15's rows
+     including the purchase rows (RF-02 first), AUD-01, AUD-02, AUD-07, AUD-09, ASR-06 (procedure
+     in `docs/reference/privacy-storage.md`), RF-35's cellular download, RF-12's Airplane Mode
+     export and ASR-05's screenshots. The November 9 due dates have passed and new ones are the
+     maintainer's decision. The phone runs a development build of `main` on System Default App
+     Language: install the processed candidate and set App Language to English before its rows.
   3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
      Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
 - **Done since October 30:** most of RF-02's account steps (private record). On November 1, ASR-04
@@ -55,7 +59,7 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   29, so the candidate rows, like RF-17's records, run from a clean checkout of the tag
   `v3.0.0-ios.8`; return to `main` afterwards.
 - **Mac:** Xcode 27.2 with the iOS 27.2 component. The ad-hoc test build asks for speech
-  recognition again after every clean rebuild (BKL-51); the maintainer clicks Autoriser.
+  recognition again after every clean rebuild (BKL-19); the maintainer clicks Autoriser.
 - **TestFlight:** builds 26 and 27 are in Internal and Public Beta under the RF-17 waiver for the
   Public Beta only; RF-17 still gates App Review.
 - **In force:** 3.0 ships outside the EU (BKL-41 holds the EU release). Nobody listens for 3.0;

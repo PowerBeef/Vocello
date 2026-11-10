@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-09
-summary: Read-only audit of the whole project on 2026-11-09 at f3689d2a, three days before the planned App Review submission. Covers the release path, the engine and runtime, the iPhone and Mac apps, tooling, CI, guardrails, process and the website. It changes no code, roadmap item or App Store Connect field; every recommendation waits for the maintainer.
+summary: Read-only audit of the whole project on 2026-11-09 at f3689d2a, three days before the planned App Review submission. Covers the release path, the engine and runtime, the iPhone and Mac apps, tooling, CI, guardrails, process and the website. It changes no code, roadmap item or App Store Connect field; every recommendation waits for the maintainer. Section 10 records the 2026-11-10 verification of its findings and where each is now tracked.
 sourceOfTruth:
   - config/roadmap.json
   - docs/development-progress.md
@@ -414,3 +414,42 @@ Nothing below has been started. Each is the maintainer's call.
 13. Freeze or retire the QC v2 research tooling and the benchmark-publication block unless a 3.x
     goal needs them; stop opening broad audits until the parked remediation has run.
 14. Move the website to a custom domain before the listing URLs are widely indexed.
+
+## 10. Verification (2026-11-10)
+
+At the maintainer's request every finding above was checked against `main` at `37c16b91`, and the
+iPad fact against Apple's data. The findings hold. These details were wrong or have changed:
+
+- **N-1:** confirmed on Apple's Required Device Capabilities data: 13 iPad models satisfy
+  `iphone-performance-gaming-tier`. Two corrections. The English reason line is
+  `IOSDeviceSupport.unsupportedReason` in `Sources/iOS/IOSAppBootstrap.swift:246-249`, not in
+  `IOSDeviceEligibilityPolicy.swift`. And the screen's title is already localized in ten languages;
+  only that body line is English and prints the raw identifier. Now tracked as RF-42.
+- **R-1:** the checkpoint and the release-path document now plan the new candidate. Three product
+  commits follow the tag (`c878917a`, `f3689d2a`, `37c16b91`). RF-17's five records expired today.
+- **C-1:** the job has two more 600-second steps than listed, so its steps allow about 130 minutes
+  against the 60-minute cap. Tracked as BKL-56.
+- **C-2:** the npm command also passes `--package-lock-only`. Tracked as BKL-57; C-3 as BKL-58.
+- **E-1:** ER-02 covers making a running load cancellable, but not the proposed fix (a background-time
+  grant for a proactive load, awaited in the exit barrier). ER-02's notes now say so.
+- **E-5:** the strict `XCTExpectFailure` pins the prewarm-cancel unload (B-02), not the `.loaded`
+  publication at `MLXTTSEngine.swift:1546`, and line 1545 does check a captured runtime failure.
+  ER-06 still covers the finding.
+- **E-6:** already recorded as BKL-09's clock-rewind note.
+- **A-2:** a narrow keyword refusal for celebrity and impersonation requests exists on Voice Design
+  descriptions and delivery instructions; the script text is not screened.
+- **A-7:** still present, now at `VoiceModelsScreen.swift:150-155`. Tracked as BKL-60.
+- **RF-41's diff:** reading the source missed a defect the phone found on November 10. iOS showed
+  the confirmation dialog as a popover with no Cancel button, so the prompt became an alert
+  (`37c16b91`), and the device lane then passed. That also settles section 5's unconfirmed item
+  about the prompt during the Settings push.
+- **T-1:** of 19 loader definitions about 7 are real copies; 12 already delegate to
+  `scripts/lib/jsonio.py`. Tracked as BKL-64.
+- **G-4:** DA-12 records only `git remote`; the push to another remote or URL and the variable
+  spelling are in BKL-63 with G-2, G-3 and G-5.
+- **Already tracked before this audit:** A-1 is DA-07's A7-02, T-2 belongs to DA-12, and A-6 to
+  BKL-35.
+- **Newly tracked:** A-3 to A-5 (BKL-59), S-1 (BKL-61), G-1 (BKL-62), W-1 (BKL-65), the
+  `SECURITY.md` row from D-1 (BKL-66). `engine-remediation-2026-10` now reads `parked`.
+- **Not verifiable from source:** the second "latent trap" and the migration comment in section 4's
+  low findings carry no citation.

@@ -5860,6 +5860,95 @@
       "updated": "2026-11-02",
       "notes": "Parked 2026-11-02 from RF-40; investigated the same day at the maintainer's request. Farm evidence on the iPhone 15 Pro, engine RTF from signposts: 1.5 to 1.6 on a first warm take after rest, then a steady 2.2 for 40 takes at nominal or fair heat; RF-40's 3.1 to 3.3 plateau came only on a phone that ran serious. Memory flat at 2.5 GB. Below real time the live preview pauses to rebuffer (max(3.25 s, min(8 s, 0.35 x estimate)) before start and after an underrun) and never glitches; the final take is complete. The 17 Pro's take shows heavy kernel time, context switches and page faults consistent with the unmeasured MLX cache clears (ER-01); the forced high_memory_mac policy tripped the memory guard on the farm, and its A/B tests were reverted. Maintainer decision 2026-11-02: accept the preview pause when generation is slower than real time; 3.0 keeps the iPhone 15 Pro floor with honest listing text.",
       "reason": "Maintainer decision 2026-11-02: the live preview's pause when generation is slower than real time is an accepted tradeoff on slower iPhones; no prebuffer or memory-policy change."
+    },
+    {
+      "id": "BKL-12",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Release rehearsal's macOS DMG step runs out of runner disk",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The release rehearsal's macOS package job passes on GitHub's runner: the DMG step gets the disk it needs, by freeing runner space before packaging or staging the DMG on a larger volume, and the rehearsal is green on three consecutive pushes.",
+      "sourceOfTruth": [
+        ".github/workflows/release-rehearsal.yml",
+        "scripts/release.sh"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Failing since 2026-10-10 (8c71d64b); 86d910dd, c08a1360 and b5553ab5 failed the same way, a1efaf0f (2026-10-17) passed. Diagnosed 2026-10-16: not the runner disk but the DMG's own intermediate image, which hdiutil sized from a short estimate, so copying the app's Metal library into /Volumes/Vocello ran out of space. create_dmg.sh now sizes the image from the payload's logical and allocated size with headroom (verified locally on the app: 223 MB image, 31 MB compressed DMG, checksum valid). Closes after the rehearsal passes on three consecutive pushes; pushes wait for the maintainer. 2026-11-10: the release rehearsal's macOS package job passed on eight consecutive pushes from 2026-10-24 to 2026-10-30 (9ceaa98a to 7717b9ef) after the sizing fix; the gate asked for three.",
+      "evidence": [
+        "commit:4988c160"
+      ]
+    },
+    {
+      "id": "BKL-52",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Dependabot alert 8: minimatch in the website's npm lockfile",
+      "status": "declined",
+      "blockedBy": [],
+      "gate": "Dependabot alert 8 (minimatch, moderate, website/package-lock.json) is closed by a reviewed dependency update with npm --prefix website run check passing, or dismissed with a recorded reason.",
+      "sourceOfTruth": [
+        "website/package-lock.json"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Parked 2026-11-01: GitHub reported the alert on the push of 6b6035a6 (advisory: denial of service through glob-pattern amplification). Not investigated (focus rules). Not a release blocker: website tooling, not the iOS app.",
+      "reason": "Moot: GitHub withdrew Dependabot alert 8 (the API answers 410), and no Dependabot alert is open on 2026-11-10."
+    },
+    {
+      "id": "BKL-29",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer package's Bom check fails on a macOS 27 host",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as on macOS 26, with check_bom in scripts/cli_package.py still refusing a package whose Bom differs from its payload.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Found 2026-10-24 by the full local Python suite on macOS 27.0.1: check_bom raises 'CLI installer Bom differs from the payload' every time, in under a second, with no repository change to the package code. CI's Python job runs on Linux and the release jobs on macOS 26, so neither sees it. Not investigated (focus rules).",
+      "supersededBy": "BKL-34"
+    },
+    {
+      "id": "BKL-30",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The session-start cache-health test fails under parallel load",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_agent_hooks.py::SessionStartTests::test_cache_health_reports_dangling_public_links_and_low_free_space passes in the routed check's parallel run as it does alone.",
+      "sourceOfTruth": [
+        "scripts/tests/test_agent_hooks.py",
+        "scripts/hooks/session_start.sh"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Found 2026-10-24: failed once in a routed check (-n auto) and passed alone at once. Not investigated (focus rules).",
+      "supersededBy": "BKL-40"
+    },
+    {
+      "id": "BKL-55",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone UI-perf teardown restores App Language while the composer keeps focus",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "On a phone whose App Language starts on a non-System value, scripts/ui_test.sh ios perf passes test06ComposerTyping and restores the original App Language: endSession ends the composer's focus before its restores, as it already does for the History search field.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Parked 2026-11-03 from RF-17's first ui-perf run on build 29 (ios-xcui-perf-20261103-180207-ad49e02b): every measured window finished, then test06's teardown opened Settings to restore English while the composer's keyboard still covered the tab dock, and XCTest found no hit point for rootTab_settings. The runner restarted and the phone was left on System Default. test01 failed the same run once with an XCTest NSInvalidArgumentException in its teardown. The rerun under a new ID passed 9 of 9.",
+      "supersededBy": "BKL-42"
+    },
+    {
+      "id": "BKL-51",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The ad-hoc signed macOS UI-test build loses its speech-recognition permission on every clean rebuild",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "The macOS XCUITest build carries a stable code-signing identity, so a granted macOS privacy permission survives a clean rebuild, or the smoke lane detects a pending permission prompt and stops with a clear message instead of timing out on covered elements.",
+      "sourceOfTruth": [
+        "scripts/ui_test.sh"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Parked 2026-10-30: macos-xcui-smoke-20261030-174603-220a2577 on db0afa2c passed 13 of 15; test12 and test13 timed out because macOS's speech-recognition prompt covered the window. The test app is ad-hoc signed (designated requirement is its cdhash), so the clean rebuild after the cache cleanup counted as a new app. Not investigated further (focus rules). Not a release blocker: test tooling only.",
+      "supersededBy": "BKL-19"
     }
   ]
 }

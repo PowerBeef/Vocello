@@ -298,6 +298,10 @@ directly. A new candidate now costs the whole evidence set and most of the margi
 Files instead of opening the share sheet, was considered and cancelled with any build 30. Build 29
 stays the candidate.
 
+**Update (2026-11-07 to 10):** the maintainer then asked for G2's product fix, which landed as RF-41
+and passed on the phone. A new candidate carries it, so build 29 is no longer the candidate. G1 and
+G3 stay with option B.
+
 ### Account hygiene, from the report
 
 - Submit one candidate. Don't withdraw and resubmit to jump the queue, and don't rename the app.

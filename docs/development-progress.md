@@ -52,9 +52,10 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   of 90; the old limits (60 and 45) would have failed it (BKL-56, closed). Its complete release
   artifact, IPA included, is in `build/artifacts/quality-promotion/release-v3.0.0-ios.9-candidate`
   with its checksums verified (the GitHub artifact expires November 24); candidate rows need
-  that folder. Version 3.0.0 still has build 29 attached: attaching build 30 and writing its What
-  to Test notes are App Store Connect writes on the maintainer's go. The phone still needs build
-  30 installed from TestFlight before its rows.
+  that folder. On the maintainer's request the same day, build 30 replaced build 29 on version
+  3.0.0 and got its en-US What to Test notes (3,314 characters), both read back; export
+  compliance needs no answer. It is in internal testing only: no beta review submission and no
+  Public Beta group. The phone still needs build 30 installed from TestFlight before its rows.
 - **Build 29:** `v3.0.0-ios.8` at `a60dd204` is in TestFlight (release run 41079341984). Its
   complete release artifact, IPA included, is kept in
   `build/artifacts/quality-promotion/release-v3.0.0-ios.8-candidate` (the GitHub artifact expires

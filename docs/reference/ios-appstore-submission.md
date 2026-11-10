@@ -167,8 +167,9 @@ Current account state (2026-10-12, set in the web portal with the maintainer's a
 - App Privacy published as Data Not Collected, with the privacy policy URL;
 - the export purchase entered as above;
 - EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record);
-- export compliance answered for build 29: it reads back VALID with `usesNonExemptEncryption`
-  false, and App Store Connect asked no further question (2026-11-01).
+- export compliance answered: build 30, attached to version 3.0.0 since 2026-11-10, reads back
+  VALID with `usesNonExemptEncryption` false, as build 29 did on 2026-11-01, and App Store
+  Connect asked no further question.
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
 - RF-02's account steps (agreements, banking and tax; status in the maintainer's private record);
@@ -197,9 +198,9 @@ is complete.
       decision if the app adds network code, an SDK, an account, analytics or a non-Apple purchase path.
 - [x] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
       and the 2026-09-04 API read returned no separate encryption-declaration resource (only HTTPS +
-      CryptoKit SHA-256 for download integrity). The processed build 29 reads back `VALID` with
+      CryptoKit SHA-256 for download integrity). The processed build 30 reads back `VALID` with
       `usesNonExemptEncryption` false and asks for no further export-compliance information
-      (2026-11-01). Repeat the read for any later candidate.
+      (2026-11-10; build 29 read the same on 2026-11-01). Repeat the read for any later candidate.
 - [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Every content answer is
       None and every capability answer is no (read 2026-11-04), including User-Generated Content,
       which Apple defines as broad distribution of users' content. Revisit it if the product's

@@ -2,6 +2,7 @@
 status: active
 owner: release-qa
 summary: Tooling, CI, packaging, benchmark and evidence rule; Claude Code loads it through .claude/rules/tooling.md when matching files are touched.
+reviewed: 2026-11-10
 paths:
   - "scripts/**"
   - ".github/**"
@@ -195,7 +196,9 @@ rules they enforce:
   `supersededBy` on the loser and `legacyIds` on the winner. Park device-blocked work with a precise
   `unparkWhen`; change items with `roadmap.py set`, `note` and `close` (one validated call that also
   re-renders), and end any hand edit with `roadmap.py validate` and `render`.
-- Breaking a focus-lock rule: work outside the focus plan, `primaryPlan` moved without a new dated
-  `focusLock` decision, a commit after the freeze that names no item of the plan (accepted only
-  through `freeze.exceptions`, which maps its sha to a reason), or a passed `due` extended silently
-  instead of decided (rules: `docs/reference/release-first-execution-2026-09.md`).
+- Breaking a focus-lock rule: work outside the focus plan other than what `focusLock.decision`
+  authorizes (backlog items that need no iPhone, Mac-only requests as plan items), `primaryPlan`
+  moved without a new dated `focusLock` decision, a commit after the freeze that names no item of
+  the plan (accepted only through `freeze.exceptions`, which maps its sha to a reason), or a passed
+  `due` extended silently instead of decided (rules:
+  `docs/reference/release-first-execution-2026-09.md`).

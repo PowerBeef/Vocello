@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -103,7 +103,7 @@ venvs under `build/cache/qc/runtimes/`, never in this interpreter; see [`qc.md`]
 
 ```sh
 npm --prefix website ci
-npx --prefix website playwright install chromium webkit
+npx --prefix website playwright install --with-deps chromium webkit  # as CI and website/CLAUDE.md do
 npm --prefix website run check
 ```
 
@@ -172,7 +172,10 @@ the lead session on the repository folder itself, without a worktree
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
 models or touching devices. Detect MCP tools in the live session.
 
-The maintainer's toolset is optional assistance, never a CI dependency. As of 2026-11-02 it is:
+The maintainer's toolset is optional assistance, never a CI dependency. The list below is the
+repository-relevant part as of 2026-11-02; the desktop app and the maintainer's account add other
+plugins, connectors and skills that this workflow does not use, so detect tools in the live session
+rather than from this list:
 
 - **Plugins:** axiom, context7, swift-lsp, clangd-lsp, chrome-devtools-mcp, skill-creator,
   claude-md-management, asc and huggingface-skills (25 skills and its own Hugging Face MCP server).
@@ -214,6 +217,11 @@ scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test 
 scripts/dev.sh test --only FooTests --repeat 50  # flaky hunting: up to 50 runs, stops at the first failure
 scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
+scripts/dev.sh lint                  # changed-file advisory SwiftLint, shellcheck, privacy
+scripts/dev.sh build | run           # warm incremental macOS development build / launch
+./scripts/build.sh cli && build/vocello models list  # the development CLI
+npm --prefix website run check       # the website's lint, tests, build and browser tests
+scripts/hooks/commit_lint.sh --staged  # the commit safeguard, callable directly
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
 scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts, attributions
 scripts/dev.sh ci                    # every gate push CI runs, serially, when you want the push green first time
@@ -580,14 +588,18 @@ allows pytest by itself: run it through `scripts/dev.sh py` or
 
 `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
 installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
-External writes include GitHub, the Vercel CLI and App Store Connect. On Hugging Face they include
+External writes include GitHub, the Vercel CLI and App Store Connect. The GitHub connector's ask
+rules name the server `mcp__claude_ai_Github__*`; a connector that arrives under another server name
+is not matched by them (BKL-62), so a connector write still needs an explicit request. On Hugging Face they include
 `hf download`/`upload`, `repos`, `cp`/`sync`/`buckets`, `jobs`/`sandbox`/`endpoints`, `spaces`,
 `collections`, `discussions`, `webhooks`, CLI `extensions`/`skills`/`update`, `auth login`/`logout`/
 `switch` and cache removal, and the MCP's Space-running tools (`dynamic_space`, `gr*`).
 
-`deny` covers force and non-main pushes, hand-made branches and worktrees, `update-ref`, stashing,
-broad staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
-`hf auth token`, which prints the stored credential. It
+`deny` covers force pushes and the named non-main push forms (`origin HEAD`, `origin worktree-*`,
+`origin claude/*`), `checkout -b`, `switch -c` and `worktree add`, `update-ref`, stashing, broad
+staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
+`hf auth token`, which prints the stored credential. Any other non-main push and `git branch <name>`
+are refused by the `policy_guard.sh` hook, not by a permission rule. It
 also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
 desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
 simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the

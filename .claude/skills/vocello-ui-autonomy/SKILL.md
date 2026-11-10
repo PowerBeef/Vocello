@@ -8,8 +8,9 @@ argument-hint: "<RF row, check or exploration goal> [iphone|mac]"
 
 Goal: $ARGUMENTS
 
-Read docs/reference/development-workflow.md (Computer use) and the routing table in
-docs/reference/ios-device-testing.md. Maintainer decisions of 2026-10-25: XCUITest stays the only
+Read docs/reference/development-workflow.md ("The Claude desktop app", the Computer use bullet) and
+the routing table in docs/reference/ios-device-testing.md. Maintainer decisions of 2026-10-24 and
+2026-10-25: XCUITest stays the only
 automated evidence; computer use is the default route for everything it cannot cover; a computer-use
 record closes an attended row only when the maintainer confirms it; phone work happens only in a
 window the maintainer announced; Claude never changes a system or security setting, grants a
@@ -47,8 +48,9 @@ Never drive the phone or the Mac while a native, device or measured lane runs.
 - Tap: a click on the element. Scroll: scroll events over the Mirroring window, never a drag (a drag
   registers as a long press and opens Home Screen edit mode).
 - Cmd-1 Home Screen, Cmd-2 App Switcher, Cmd-3 Spotlight, Cmd-4 Control Center (macOS 27).
-- Typing has not reached the phone so far; until the first-window probe settles a method, avoid
-  steps that need typed text or use the app's own paste from the Mac clipboard.
+- Typing through Mirroring is unproven: no window has recorded a method that works (checked
+  2026-11-10). Avoid steps that need typed text or use the app's own paste from the Mac clipboard,
+  and record the result in docs/reference/ios-device-testing.md the first time typing is tried.
 - A Mac authentication prompt for Mirroring, or any phone system sheet, is the maintainer's.
 
 ## Mac

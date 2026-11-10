@@ -29,6 +29,7 @@ Read in this order and stop when the verdict is clear:
    failure, and the attachments manifest for control observations.
 
 Reply with the verdict class (PASS, product failure, infrastructure failure, external interruption,
-restoration gap or incomplete evidence), the one test or step that decides it, the evidence path for each
+restoration gap or incomplete evidence; `docs/reference/testing-runbook.md`, "Read a finished run",
+owns the list), the one test or step that decides it, the evidence path for each
 claim, contradictions you preserved, and what a human should open. Never convert a failure into a pass or
 recommend an automatic retry; a justified rerun is a new run ID decided by the lead.

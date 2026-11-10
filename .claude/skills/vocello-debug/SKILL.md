@@ -11,7 +11,8 @@ Arguments: $ARGUMENTS
 Read docs/reference/testing-runbook.md and the relevant docs/reference/native-engineering.md or
 tooling-and-evidence.md sections. Begin with `scripts/dev.sh triage <run-directory> --json` when
 artifacts exist. Inspect the deciding ledger/test, first raw-log failure, crash delta and attachments.
-Classify product failure, infrastructure failure, interruption or incomplete evidence before action.
+Classify the run with the runbook's verdict classes (PASS, product failure, infrastructure failure,
+external interruption, restoration gap or incomplete evidence) before action.
 Load applicable Axiom build/concurrency/performance guidance, swift-mlx/swift-mlx-lm skills for runtime
 issues and Sosumi/Context7 for authoritative API research. Hand a finished native run to the read-only
 `vocello-xcresult-triage` agent when a second reading helps. Detect optional MobileBuildMCP/LLDB

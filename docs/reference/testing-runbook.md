@@ -64,8 +64,9 @@ subagent, and stops when the deciding evidence is clear:
 4. Review `screenshots/index.json` (readable names, test, time, failure flag): open every failure frame
    and the key states for clipping, overlap, a wrong state or an unexpected dialog. Report-only; each
    finding is classified as a release blocker or a backlog line.
-5. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
-   deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
+5. Report run id, verdict, deciding step and artifact paths. The verdict classes are PASS, product
+   failure, infrastructure failure, external interruption, restoration gap and incomplete evidence;
+   this list is the one the triage agent and the debug skill use. Never turn a failed run into a pass or silently rerun it.
 
 The SwiftPM runtime lane keeps XCTest stdout in `runtime.log` and diagnostic stderr in
 `runtime.stderr.log`, without merging concurrent writes. macOS test verdicts record native statuses

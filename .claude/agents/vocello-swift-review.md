@@ -15,7 +15,8 @@ lead owns integration and validation.
 
 Check, and cite the rule for each finding:
 1. Release-only: no `#if DEBUG`, no Debug-only behavior; diagnostics gated by
-   `VOCELLO_INTERNAL_DIAGNOSTICS` and a knob registered in `config/runtime-debug-knobs.json`.
+   `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG` and a knob registered in
+   `config/runtime-debug-knobs.json`.
 2. Concurrency: every new `@unchecked Sendable` or `nonisolated(unsafe)` is registered in
    `config/concurrency-safety.json`; no MLX array crosses an isolation boundary; actor-owned
    reservations and typed cancellation barriers hold, and every acquired slot or reservation is

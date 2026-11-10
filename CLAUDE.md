@@ -91,15 +91,14 @@ scripts/dev.sh check --paths <p...>   # plan, lint and gate only these paths whi
 scripts/dev.sh test --only Class      # targeted XCTest (also Class/testMethod and A,B); --repeat N hunts flakes
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
 "$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
-scripts/dev.sh lint                   # changed-file advisory SwiftLint, shellcheck, privacy
 scripts/dev.sh build | run            # warm incremental macOS development build / launch
 scripts/dev.sh ios                    # generic device-SDK compile; no phone involved
 scripts/dev.sh regen                  # derived artifacts, and the project when its inputs changed
 scripts/dev.sh triage <run-dir> --json  # summarize retained evidence without rerunning
-./scripts/build.sh cli && build/vocello models list
-npm --prefix website run check
-scripts/hooks/commit_lint.sh --staged  # the commit safeguard, callable directly
 ```
+
+The rest of the loop (lint, the CLI build, the website check, the commit lint called directly) is in
+`docs/reference/development-workflow.md`, "Daily loop".
 
 Edit while running targeted deterministic tests; run the routed `check` before committing; at a coherent
 checkpoint run the smallest relevant existing model, UI, device or performance lane. Adding, moving or
@@ -112,12 +111,14 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 - **Release focus (until the 3.0 iOS submission):** the `focusLock` in `config/roadmap.json` makes
   `release-first-3-0-2026-09` the only plan with live work, at most `focusLock.maxInFlight` items in
-  flight (`roadmap.py validate` enforces it; the lock's dated decision records the current cap).
+  flight (`roadmap.py validate` enforces it). `focusLock.decision` is the authority; in summary:
   - **Classify every new finding.** A release blocker joins that plan with a due date. A release
     blocker is an App Review rejection risk, a crash or hang, data loss, a broken purchase or restore,
     or a privacy or metadata mismatch on iOS.
   - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
-  - **Ask the maintainer** before starting work outside the plan, and open no new plans or audits.
+  - **Backlog items that need no iPhone stay authorized** (decision of 2026-10-16): each is closed in
+    the change that fixes it, and a Mac-only request joins the plan as an item. Ask the maintainer
+    before any other work outside the plan, and open no new plans or audits.
   - **The freeze is recorded** (`focusLock.freeze`): every commit after it names a release item in its
     subject.
 
@@ -128,17 +129,15 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   pushed and its CI passed, `python3 scripts/ios_candidate_tag.py` signs and pushes the next
   `v<version>-ios.N` tag, whose push archives the app and uploads it to TestFlight.
 - **Agents and side sessions:** at most four active including the lead, inheriting its model; Claude
-  desktop app side sessions count. The lead works in the main checkout, never in a worktree. Editing
-  agents run through the Agent tool with `isolation: "worktree"` (`.claude/worktrees/<name>` on
-  `worktree-<name>`); an editing side session runs in the app's worktree (`use_worktree: true`;
-  `.claude/worktrees/<name>` on `claude/<name>`; keep the app's default branch prefix). Both start
-  from local HEAD, so commit the checkpoint first because uncommitted files do not carry over. A
-  read-only side session shares the main checkout, and its brief says it edits nothing. Give each a
-  disjoint file set. Agents and side sessions commit only on their branch, never push, never run
-  native builds, devices, models or measured lanes, and never edit the roadmap or checkpoint;
-  `agent_guard.py` screens them (a guardrail, not a sandbox). The lead integrates with
-  `git cherry-pick` or `git merge --ff-only`, validates warm on `main`, then archives the side session
-  or removes the worktree and branch. Never discard unintegrated work. Procedure:
+  desktop app side sessions count. The lead works in the main checkout, never in a worktree. An
+  editing agent (Agent tool, `isolation: "worktree"`) or editing side session (`use_worktree: true`)
+  works in its own worktree from a committed checkpoint, on a disjoint file set. Agents and side
+  sessions commit only on their branch, never push, never run native builds, devices, models or
+  measured lanes, and never edit the roadmap or checkpoint. `agent_guard.py` screens subagents and
+  linked-worktree sessions (a guardrail, not a sandbox); a read-only side session shares the main
+  checkout unscreened, so its brief must say it edits nothing. The lead integrates with
+  `git cherry-pick` or `git merge --ff-only`, validates warm on `main`, then removes the worktree
+  and branch. Never discard unintegrated work. Paths, branch names and procedure:
   `docs/reference/development-workflow.md`, "Parallel agents and worktrees".
 - **Native execution:** every Xcode/SwiftPM build and test goes through the repository scripts and the
   host-wide native lock and owned caches. Join or stop agents before measurements.
@@ -149,12 +148,12 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   allowed again ("Timed out while enabling automation mode").
 - **Native UI evidence comes only from XCUITest** via `scripts/ui_test.sh`: genuine shipped controls,
   no hidden test UI or committed coordinates. Computer use (maintainer decisions 2026-10-24 and
-  2026-10-25) is the default route for what XCUITest cannot cover: it drives the Mac app, Xcode,
-  Device Hub and the paired iPhone through iPhone Mirroring (`/vocello-ui-autonomy`), from the lead
-  only, never while a native lane or measurement runs, and the iPhone only in an announced window.
-  It is never a lane verdict or automated evidence; an attended row closes only when the maintainer
-  confirms its local record. iPhone system settings, permissions, passcodes and purchases stay the
-  maintainer's, and the iOS `ui-preflight` refuses a lane while iPhone Mirroring runs.
+  2026-10-25) is the default route for what XCUITest cannot cover (`/vocello-ui-autonomy`): from the
+  lead only, never while a native lane or measurement runs, and the iPhone only in an announced
+  window. It is never a lane verdict or automated evidence; an attended row closes only when the
+  maintainer confirms its local record. iPhone system settings, permissions, passcodes and purchases
+  stay the maintainer's. Scope, the Mirroring order and limits:
+  `docs/reference/development-workflow.md`, "The Claude desktop app".
 - **Runtime:** MLX only, in-process, actor-owned lifecycle, typed cancellation barrier, serialized
   prewarm, request-local sampling and memory, suspending bounded audio. Register unsafe concurrency in
   `config/concurrency-safety.json`.
@@ -179,24 +178,25 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 ## Claude Code harness
 
-- **`.claude/settings.json`** wires the guards in `scripts/hooks/` (`session_start.sh`,
-  `worker_lifecycle.py`, `commit_lint.sh`, `policy_guard.sh`, `agent_guard.py`,
-  `generated_file_guard.sh`, `simulator_tool_guard.py`, `project_yml_reminder.sh`) and the
-  permissions. Permissions allow the routine loop, local lanes and the candidate tag script; ask before
-  pushes, destructive git, model installs, cache cleanup, installers, benchmark publication, global
-  settings and external writes; deny force or non-main pushes, branch/worktree creation by hand, broad
-  staging, stashing, whole-cache deletion, releases, `.xcodeproj` edits and unsupported-destination MCP
-  tools. Hooks and permissions are guardrails, not authorization; personal overrides go in the
-  untracked `.claude/settings.local.json`. `scripts/tests/test_agent_hooks.py` pins the wiring; the
-  event table and the full rules are in `docs/reference/development-workflow.md`.
+- **`.claude/settings.json`** wires the guards in `scripts/hooks/` and the permissions. Permissions
+  allow the routine loop, local lanes and the candidate tag script, and ask before pushes, destructive
+  git, model installs, cache cleanup, installers, benchmark publication, global settings and external
+  writes. Deny rules and the `policy_guard.sh` hook together refuse force and non-main pushes,
+  hand-made branches and worktrees, broad staging, stashing, whole-cache deletion, releases,
+  `.xcodeproj` edits and unsupported-destination MCP tools; a non-main push and `git branch` are
+  refused by the hook alone. The GitHub connector's ask rules name one server and may not match the
+  connector in use (BKL-62), so treat every connector write as needing an explicit request. Hooks and
+  permissions are guardrails, not authorization; personal overrides go in the untracked
+  `.claude/settings.local.json`. `scripts/tests/test_agent_hooks.py` pins the wiring; the hook list,
+  the event table and the full rules are in `docs/reference/development-workflow.md`, "Claude Code
+  setup and tool routing".
 - **Worker tracking:** the SessionStart hook exports `QVOICE_WORKER_SESSION` to Bash; measured lanes
   refuse unknown or active agent leases and other live sessions in this repository. If tracking is
   unavailable, join every agent and side session, then run the lane with `QVOICE_LEAD_ONLY=1`.
-- **Claude desktop app** (`docs/reference/development-workflow.md`, "The Claude desktop app"): waits
-  that outlast a turn run as background Bash under `request_keep_awake`; notify the maintainer only for
-  something to act on now. Artifacts, file cards and notifications carry no raw diagnostics, private
+- **Claude desktop app:** artifacts, file cards and notifications carry no raw diagnostics, private
   paths, prompts, transcripts, reference audio or credentials, and an artifact is published only on
-  request. `.claude/launch.json` serves the website to the browser pane.
+  request. Waits, notifications, the browser pane and side sessions:
+  `docs/reference/development-workflow.md`, "The Claude desktop app".
 - **Skills** (`.claude/skills`, invoked as `/vocello-*`): `vocello-ios-validation`, `vocello-macos-ui`,
   `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, `vocello-ui-autonomy` (computer
   use for what XCUITest cannot cover), read-only `vocello-release-readiness`. They wrap the scripts and
@@ -204,14 +204,12 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 - **Agents** (`.claude/agents`, read-only): `vocello-swift-review` for Swift diffs and
   `vocello-xcresult-triage` for a finished run directory. Explore/Plan and the Axiom auditor agents
   research and audit; editing agents are general-purpose agents with worktree isolation.
-- **Tool routing** (table: `docs/reference/development-workflow.md`): repository scripts own builds,
-  tests and evidence. MobileBuildMCP runs only its discovery and coverage workflows and never persists
-  session defaults; never use Axiom `xcui` or the simulator agents. Every optional tool (Axiom, sosumi,
-  Context7, the browser pane, Claude in Chrome, chrome-devtools, `gh`, the GitHub connector, `hf` and
-  the huggingface-skills plugin, `asc`, the Vercel CLI) stays read-only unless the user requests a
-  write. Use the
-  Workflow tool only on explicit opt-in. Missing optional tools never block the script workflow, and
-  CI never depends on personal plugins.
+- **Tool routing** (table: `docs/reference/development-workflow.md`, "Claude Code setup and tool
+  routing"): repository scripts own builds, tests and evidence. MobileBuildMCP runs only its
+  discovery and coverage workflows; never use Axiom `xcui` or the simulator agents. Every optional
+  tool (plugins, MCP servers, connectors, the browsers, `gh`, `hf`, `asc`, the Vercel CLI) stays
+  read-only unless the user requests a write. Use the Workflow tool only on explicit opt-in. Missing
+  optional tools never block the script workflow, and CI never depends on personal plugins.
 - **Interactive or maintainer-run commands** (logins, model installs, publication): prepare them; the
   user runs them with the `!` prefix in the CLI, or in the desktop app from a `bash` block's Run button
   or a Terminal panel tab, where any secret is typed, never in chat.

@@ -61,7 +61,7 @@
     <main class="wrap">
       <a class="back" href="/">&larr; Vocello</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: October 22, 2026</p>
+      <p class="updated">Last updated: November 10, 2026</p>
       <p class="lede">
         Vocello is a local, on-device voice studio for Apple Silicon: a Mac app, an iPhone app,
         and the <code>vocello</code> command line. It is built so your work stays on your
@@ -144,14 +144,15 @@
 
       <h2>Marking on generated audio</h2>
       <p>
-        Every WAV file Vocello 3.0 generates, in the Mac app and the command line, carries an inaudible
+        Every WAV file Vocello 3.0 generates, in the Mac app, the iPhone app and the command line,
+        carries an inaudible
         AudioSeal watermark with a fixed Vocello payload and a short provenance note naming the
         generator, its version, the engine, the model, the mode, and the creation time, so the
         file can be identified as AI-generated. The marking is the same for everyone: it holds
         no account, device, or personal identifier, and nothing about it is sent anywhere. Only
         generated takes are marked: reference clips you record or import are not, and neither
-        is live preview audio heard before the file is written. The iPhone app adds this marking
-        with its 3.0 version; the 2.4 public beta does not mark its files.
+        is live preview audio heard before the file is written. Files made with versions before
+        3.0 are not marked.
       </p>
 
       <h2>The vocello command line</h2>

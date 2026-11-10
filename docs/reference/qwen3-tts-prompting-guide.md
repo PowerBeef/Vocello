@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-20
+reviewed: 2026-11-10
 summary: Sourced reference for everything Qwen3-TTS reads as text — the ChatML wire format and prefill layouts, the script, the delivery instruction, the voice description, the presets, and the transcript and reference rules for clones — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -51,10 +51,9 @@ or the [native engineering rules](native-engineering.md) only after they are val
 against our own model, because the alternative — shipping unvalidated guidance — is how the current
 preset copy came to be.
 
-**Seeds moved.** The CONV-21 repin (mlx-swift 0.32.3) changed MLX's categorical sampler, and RF-18
-changed the subtalker's sampling for Balanced and Consistent (§7), so a seed no longer reproduces a
-take recorded before them. The DP measurements below stand as recorded; a rerun is a new
-measurement, not a reproduction.
+**Seeds moved.** A seed no longer reproduces a take recorded before the sampling and text-layout
+changes listed in [`qwen3-tts-guide.md` §9.5](qwen3-tts-guide.md#95-seeds-and-reproducibility).
+The DP measurements below stand as recorded; a rerun is a new measurement, not a reproduction.
 
 ---
 

@@ -190,13 +190,16 @@ major line unless a feature specifically requires it.
 
 ## F — iPhone 1.7B 4-bit optimization program (2026-06-01)
 
-> **Superseded for the *current* iOS state — see [`../docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md).**
+> **Superseded.** The historical record of the iPhone engine work that followed is
+> [`../docs/reference/ios-engine-optimization.md`](../docs/reference/ios-engine-optimization.md) (June to August 2026,
+> iOS 26; no longer maintained as current guidance). Current measured budgets are in section D of the
+> [engine audit](../docs/audits/2026-10-16-engine-runtime-audit.md) and current records in [`HISTORY.md`](HISTORY.md).
 > §F below is the original backend-feasibility study (its decode-loop + RAM-lever findings are still valid and
 > shared by both platforms). But its **process model is out of date**: the engine no longer runs in an
 > ExtensionKit extension — it runs **in-process in the app** (`7822a8a`; the extension was removed in
 > `aed617c` because a non-UI extension's Jetsam cap can't be raised by the entitlement). On-device generation
-> now works (iPhone 17 Pro, RTF ~1.6–1.9, ~3 GB streaming peak, 0 trims). The iOS-engine doc is the live iOS
-> progress + roadmap record.
+> worked at that point (iPhone 17 Pro, RTF ~1.6–1.9, ~3 GB streaming peak, 0 trims); the iOS-engine doc
+> records that progress.
 
 Goal: get Speed (4-bit) Qwen3-TTS running on iPhone 15 Pro (8 GB). Full plan + the 57-agent verified lever
 inventory live in the session plan; this records the standing findings. (Historical note: this study assumed

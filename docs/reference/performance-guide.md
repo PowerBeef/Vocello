@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Swift 6 and Metal performance reference for the apps and CLI — build settings, isolation, value types, dispatch, allocation and ARC; profiling and GPU capture; how MLX drives Metal (command buffers, kernel caching, compile(), no MPS, unified memory, Metal memory telemetry); direct-Metal patterns for future custom kernels; iOS Metal limits, troubleshooting and the performance-change checklist.
 sourceOfTruth:
   - project.yml
@@ -11,7 +11,7 @@ sourceOfTruth:
 # Swift and Metal performance guide
 
 > **Living document.** When this guide disagrees with the code, the code wins: fix this file.
-> Language mode Swift 6 (`SWIFT_VERSION: "6"`, `project.yml:33`); CI's compiler is Swift 6.3.3 with
+> Language mode Swift 6 (`SWIFT_VERSION: "6"` in `project.yml`); CI's compiler is Swift 6.3.3 with
 > Xcode 26.6 (`config/toolchain.json`). The MLX pins are
 > [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins)'s.
 
@@ -84,15 +84,15 @@ these areas in `Sources/`, update this guide with the new rationale and measured
 | `scripts/release.sh` | Xcode Release defaults (`-O`, whole-module) | Signed/notarized DMG. |
 | `scripts/build.sh release` | runs `scripts/release.sh` | The same DMG build through the shared regeneration and SwiftPM caches. |
 
-`project.yml` sets `SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_COMPILATION_MODE`, `GCC_OPTIMIZATION_LEVEL` and `ENABLE_TESTABILITY` at project level to `QVOICE_OWNED_*` variables whose defaults are the Release values (`-O`, whole-module, `s`, no testability; `project.yml:54-61`), so the release path compiles exactly as Xcode's Release defaults did. Project-level settings reach only this project's targets, never the Swift packages. The development and test builds of the shared `-Onone` arena (`build.sh build` and `cli`, `macos_test.sh test` and `tsan`, the macOS XCUITest `--gate` compile) pass `QVOICE_OWNED_DEV_SETTINGS` (`scripts/lib/build_cache.sh:642-647`), which makes owned code `-Onone`, incremental and testable while MLX and the other packages keep their optimized builds. Builds that pass `SWIFT_OPTIMIZATION_LEVEL` on the command line (the optimized CLI, the release scripts, the device lanes and the foundation compiles) still set it for every target, packages included.
+`project.yml` sets `SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_COMPILATION_MODE`, `GCC_OPTIMIZATION_LEVEL` and `ENABLE_TESTABILITY` at project level to `QVOICE_OWNED_*` variables whose defaults are the Release values (`-O`, whole-module, `s`, no testability), so the release path compiles exactly as Xcode's Release defaults did. Project-level settings reach only this project's targets, never the Swift packages. The development and test builds of the shared `-Onone` arena (`build.sh build` and `cli`, `macos_test.sh test` and `tsan`, the macOS XCUITest `--gate` compile) pass `QVOICE_OWNED_DEV_SETTINGS` (`scripts/lib/build_cache.sh:642-647`), which makes owned code `-Onone`, incremental and testable while MLX and the other packages keep their optimized builds. Builds that pass `SWIFT_OPTIMIZATION_LEVEL` on the command line (the optimized CLI, the release scripts, the device lanes and the foundation compiles) still set it for every target, packages included.
 
 ### 2.2 Swift 6 language mode
 
-All Swift targets use `SWIFT_VERSION: "6"`. App, engine and CLI targets rely on the Swift 6 language mode alone for data-race safety (`Sendable`, `actor`, `@MainActor`); only the three XCUITest bundles (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSCandidateUITests`) set `SWIFT_STRICT_CONCURRENCY: complete` explicitly in `project.yml`.
+All Swift targets use `SWIFT_VERSION: "6"`, whose language mode gives data-race safety (`Sendable`, `actor`, `@MainActor`). `project.yml` also turns on, at project level, strict memory safety (`SWIFT_STRICT_MEMORY_SAFETY`) and the upcoming features NonisolatedNonsendingByDefault, InferIsolatedConformances and MemberImportVisibility. Under NonisolatedNonsendingByDefault a nonisolated async function runs on its caller's actor unless it is marked `@concurrent` ([§3.5](#35-task-and-taskdetached)). Only the three XCUITest bundles (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSCandidateUITests`) also set `SWIFT_STRICT_CONCURRENCY: complete` explicitly in `project.yml`.
 
 ### 2.3 Compilation-condition switches
 
-- `QW_UI_LIQUID` is set in the `Release` config for the macOS app target (`project.yml:280`) to enable Liquid Glass surfaces. It has no performance effect.
+- `QW_UI_LIQUID` is set in the `Release` config for the macOS app target (`SWIFT_ACTIVE_COMPILATION_CONDITIONS` in `project.yml`) to enable Liquid Glass surfaces. It has no performance effect.
 - The project has no Debug configuration or generic `DEBUG` symbol. Runtime diagnostic behavior is
   gated by `DebugMode.isEnabled`. Compile-time test isolation belongs in test targets or behind a
   narrowly named compilation condition; do not add hidden app behavior through `#if DEBUG`.
@@ -169,7 +169,7 @@ matching registry entry. Prefer `actor`, `Mutex` (Swift 6), immutable adapters, 
 
 ### 3.5 `Task` and `Task.detached`
 
-- Use `Task { ... }` from `@MainActor` contexts when the work must hop off the main thread and you want structured concurrency.
+- A `Task { ... }` started from a `@MainActor` context inherits the main actor, and with NonisolatedNonsendingByDefault on, a nonisolated async function it calls also runs on the caller's actor. Work that must leave the main actor says so with `@concurrent`: a `@concurrent` function (`IOSReferenceAudioImportPolicy.importReference`) or a `Task { @concurrent in ... }` closure (`QwenVoiceApp.reconcilePendingHistory`), which returns to the UI through `MainActor.run`.
 - Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as the telemetry merge after a generation completes.
 - Avoid `Task.sleep` busy-waiting on the hot path. The telemetry sampler uses `try? await Task.sleep(nanoseconds:)` with a device-tiered cadence: 100 ms on the high-memory Mac, 250 ms on the 16 GB and 8 GB Macs and the iPhone (`SemanticTypes.swift:1045-1057`); periodic ticks skip `task_threads`.
 

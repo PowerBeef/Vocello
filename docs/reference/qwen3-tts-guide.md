@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -536,13 +536,17 @@ How the target text reaches the talker is generation semantics. The token-level 
 Every request carries an effective seed (requested or random) and runs on its own MLX random state;
 the sampling algorithm version is 2 (`Generation.swift:79-90`). Seeded takes are deterministic on one
 build: a rerun of a fixed seed reproduced its PCM byte for byte in the RF-18 screens. A seed does not
-reproduce takes across these changes:
+reproduce takes across these changes (this list is the one the other guides link to):
 
-- D3 float32 sampling (2026-10-13);
-- the CONV-21 refresh to mlx-swift 0.32.3 (2026-10-16), whose inverse-CDF categorical draws
-  differently for Vocello's `[1, V]` logits (ml-explore/mlx#4177; F-02, accepted with a release-note
-  line);
-- RF-18's subtalker and EOS changes (2026-10-20), which change Balanced and Consistent takes most.
+- D3 float32 sampling (`c62390d6`, 2026-10-13, RF-14);
+- the CONV-21 refresh to mlx-swift 0.32.3 (`57196483`, 2026-10-16), whose inverse-CDF categorical
+  draws differently for Vocello's `[1, V]` logits (ml-explore/mlx#4177; F-02, accepted with a
+  release-note line);
+- RF-18's subtalker and EOS changes (`7a125aaf`, 2026-10-20), which change Balanced and Consistent
+  takes most;
+- RF-21's whole-script text layout for single streamed takes (`9cd075bd`, 2026-10-20, §9.4), which
+  changes every streamed Built-in Voice and Voice Design take; long-form segments keep the
+  trailing-text layout.
 
 The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and swift-huggingface to
 1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in

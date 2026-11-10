@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including typed request receipts, startup boundaries, physical-device plans, and closure requirements.
 sourceOfTruth:
   - config/roadmap.json
@@ -20,6 +20,13 @@ sourceOfTruth:
 > **Status (2026-10-28):** ISR-05's two source fixes are closed. The staged exact-request
 > characterization and the exact-script closure (ISR-04, ISR-06) stay parked with their plan,
 > blocked on the original script bytes.
+
+> **Seeds no longer reproduce (2026-11-10).** The fixed seeds in this document (`38112001` through
+> `38112008`) and their recorded outcomes predate the four sampling and text-layout changes listed
+> in [`qwen3-tts-guide.md` §9.5](qwen3-tts-guide.md#95-seeds-and-reproducibility) (float32
+> sampling, the mlx-swift 0.32.3 sampler, RF-18 and RF-21), so they no longer reproduce those
+> takes. Roadmap item ISR-04 requires a fresh baseline on current source before the seed matrix
+> counts.
 
 This investigation covers the reported `vivian × calm.strong × english` Built-in Voice startup
 failure with a 285-character script.

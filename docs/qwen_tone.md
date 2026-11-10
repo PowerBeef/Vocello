@@ -1,14 +1,14 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-21
+reviewed: 2026-11-10
 summary: App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.
 sourceOfTruth:
   - Sources/QwenVoiceCore/EmotionPreset.swift
 ---
 # Tone and Emotion in Vocello
 
-_Last reviewed: 2026-09-21. Provenance pass 2026-08-02; instruction-language correction 2026-09-21._
+_Last reviewed: 2026-11-10. Provenance pass 2026-08-02; instruction-language correction 2026-09-21._
 
 `angry.normal` now has one governed bilingual variant: English remains canonical, while Mandarin is
 selected only for CustomVoice when both the catalog speaker is Chinese-native and output language
@@ -48,7 +48,7 @@ Current app behavior:
 - **Voice Design** has its own generation screen and prompt flow using a natural-language voice/design instruction
 - **Voice Cloning** uses reference audio and can optionally use a transcript for better preparation quality, but it does not expose a separate instruction-only tone surface
 - single generations produce a complete final take, and the app does not expose temperature or max-token controls
-- **Neutral** is a real instructed preset since 2026-08-01 (`EmotionPreset.neutralPresetInstruction`), not an absent instruction — see the sourced guide's §6.3. Only the typed-synonym path ("neutral", "default") drops the instruction entirely. Built-in Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
+- **Neutral** is a real instructed preset since 2026-08-01 (`EmotionPreset.neutralPresetInstruction`), not an absent instruction — see the sourced guide's §6.3. Only the typed-synonym path (an empty instruction, "normal tone", "neutral" or "neutral tone"; `DeliveryProfile.isNeutralInstruction`) drops the instruction entirely. Built-in Voice and Voice Design prompts use direct natural language rather than `Delivery style:` fields.
 
 Useful instruction patterns:
 

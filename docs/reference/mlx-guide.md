@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -306,8 +306,9 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
 - **Seeds (F-02, accepted).** MLX #4177's inverse-CDF categorical applies to `[1, V]` logits, which
   is every Vocello draw, so a seed from mlx-swift 0.31.x does not reproduce its take; the release
   notes say so. `testSeededSamplerGoldenTokens` pins the 0.32.3 draws; re-record it only with a
-  reviewed pin move. Takes for one seed also differ across the float32 change and the 2026-10-20
-  subtalker and EOS changes, so reproducibility holds within one source identity.
+  reviewed pin move. Reproducibility holds within one source identity: every change after which a
+  pinned seed no longer reproduces its take is listed in
+  [`qwen3-tts-guide.md` §9.5](qwen3-tts-guide.md#95-seeds-and-reproducibility).
 - **Cost (F-04).** The new sampler path adds about 80 kernel launches per frame (16 draws × 5); the
   M6's warm first chunk rose from 146 to 155 ms (§9.5).
 - **Prewarm draws through the production sampler** (`productionSamplerWarmDraws`,
@@ -363,8 +364,9 @@ so one generation cannot change another's.
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
 each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:3235-3305`), and
 every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:3496`). Outside that policy,
-marking clears the cache three times per take (B-09), and the code makes 16 direct
-`Memory.clearCache()` calls (B-22, E2-02).
+marking clears the cache three times per take (B-09), and the sources hold 30
+`Memory.clearCache()` call sites in all, the policy sites included (counted 2026-11-10; B-22,
+E2-02).
 
 Clearing is not free: freed buffers are re-created on the next allocation.
 
@@ -385,7 +387,9 @@ The engine runs in-process, so the app and the engine share one Jetsam budget. T
   diagnostics (D-06). Peak use there was 2.1–2.6 GB on Speed, 32% of the limit (audit D).
 - **iOS 26:** about 6 GB on the same phone (the historical figure in
   [`ios-engine-optimization.md`](ios-engine-optimization.md)).
-- **8 GB phones under iOS 27:** unmeasured (research open question 9).
+- **8 GB phones under iOS 27:** the entitled limit is unmeasured (research open question 9).
+  Without the entitlement, a farm iPhone 15 Pro on iOS 27.0 ran 41 Built-in Voice takes at a
+  2.52 GB peak (RF-40, exploratory evidence).
 
 The shipping policy still assumes the older budget: the fixed 4,500 / 5,200 MiB footprint bands
 (`IOSMemoryBudgetPolicy.ShippingBandMiB`) trip at about 55% and 63% of the measured limit, and

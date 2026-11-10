@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-11-10
 summary: The offline, report-only audio QC v2 harness — its models, detectors, norms, calibration, levels, lanes, labels and data layout, and the coverage and qualification contract behind the strict gate's exit codes.
 sourceOfTruth:
   - scripts/qc.py

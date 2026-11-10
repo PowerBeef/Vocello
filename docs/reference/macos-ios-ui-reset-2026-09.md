@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-10-28
-summary: Replace the unsuccessful Mac presentation with the approved iOS design, sharing composition and retaining small desktop adapters.
+reviewed: 2026-11-10
+summary: Historical record of the September 2026 reset that replaced the unsuccessful Mac presentation with the approved iOS design, sharing composition and retaining small desktop adapters; the plan finished on September 22 and only UIF-08 stays parked.
 sourceOfTruth:
   - config/roadmap.json
   - Sources/iOS/IOSStudioCanvas.swift
@@ -10,6 +10,11 @@ sourceOfTruth:
   - Sources/SharedSupport/Views
 ---
 # iOS-derived macOS UI reset
+
+> **Historical record.** The reset finished on September 22: UIF-01 to UIF-07 are done in
+> `config/roadmap-archive.json`. What remains is UIF-08, native acceptance of the converted screens
+> on current source, parked in `config/roadmap.json` until the 3.0 iOS submission lifts the focus
+> lock.
 
 ## Reference and scope
 

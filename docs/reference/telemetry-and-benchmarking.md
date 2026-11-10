@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -2146,9 +2146,14 @@ summaries and baselines remain permitted.
    plosive-onset cluster 150 to 250 ms in is recorded as `stepBurstPeakCount` / `stepBurstPeakStartMS`
    and not judged), and `speaking_rate_slow` (v8). Surfaced as the summarizer's **`QC`** column.
    Thresholds are conservative + tunable (`makeAudioQCReport`).
-   **Dropout is punctuation-aware.** Long interior pauses (≥350 ms) count against the text's
-   punctuation pause budget; an excess (flag `dropout:excessN`, followed by the long-pause count over the budget in parentheses; ≥2 fail, 1 warn) or a
-   single egregious gap (≥1200 ms fail, ≥900 ms warn) flags. The regimes and their calibration
+   **Dropout is punctuation-aware.** The text's punctuation sets a pause budget. A single interior
+   gap fails as `dropout:<N>ms` at 1,200 ms when the text declares no pause and the take is under
+   45 s, and at 2,000 ms otherwise. Below that, only suspicious-scale pauses count toward
+   `dropout:excessN` (N over the budget, then the pause count and the budget in parentheses): 900 ms
+   without a declared pause, 1,200 ms with one, 1,500 ms for long content. Two or more over the
+   budget fail, and otherwise one gap at that scale warns as `dropout:<N>ms`. Pauses at the cadence
+   scale (350 ms, or 600 ms for long content) beyond the budget only warn, as `cadence:excessN`.
+   Long content is a take of 45 s or more. The regimes and their calibration
    history live in `makeAudioQCReport`; a threshold changes only on labelled evidence (QC v2 owns
    the maintainer's labels and confirmations and their evaluation, [`qc.md`](qc.md)), and a warning is
    never cleared by a subjective waiver.

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-10
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -201,8 +201,12 @@ synthesis, streaming, and codecs. Every host reaches the engine in-process throu
 
 ## 2. Technology stack & SPM dependencies
 
-SPM dependencies are declared in `project.yml` and **pinned to exact versions**
-for backend determinism. `mlx-swift` and `mlx-swift-lm` must move **in lockstep**
+SPM dependencies are **pinned to exact versions** for backend determinism. `project.yml`
+declares GRDB, the local `MLXAudio` package (`Packages/VocelloQwen3Core`), MLXSwift, Sparkle and
+SwiftHuggingFace; `mlx-swift-lm` and `swift-transformers` are declared only in
+`Packages/VocelloQwen3Core/Package.swift`, which also repeats the mlx-swift and swift-huggingface
+pins. [`reference/mlx-guide.md`](reference/mlx-guide.md) §9 owns the pin list and where each pin
+is declared. `mlx-swift` and `mlx-swift-lm` must move **in lockstep**
 (never one alone); don't float pins without a benchmark-gated review. The Qwen3 runtime
 is an **owned monorepo core package** under `Packages/VocelloQwen3Core/` (see
 [`reference/qwen3-core-maintenance.md`](reference/qwen3-core-maintenance.md)).
@@ -324,7 +328,8 @@ actors that own the heavy, isolated work:
   `streamingInterval`, `languageHint`, `payload`, `generationID`, `seed`,
   `variation`, plus batch (`batchIndex`/`batchTotal`), `streamingTitle`,
   `suppressStreamingPreview` (request-local silent generation), `captureCodecTrace`
-  (diagnostics only) and `deliveryInstructionCellID`.
+  (diagnostics only), `deliveryInstructionCellID` and `longFormSegment` (one segment of a
+  long-form project, which keeps the streaming trailing-text layout).
   - `GenerationRequest.Payload`:
     - `.custom(speakerID:deliveryStyle:)`
     - `.design(voiceDescription:deliveryStyle:)`
@@ -337,7 +342,8 @@ actors that own the heavy, isolated work:
   Cancellation is a typed terminal lifecycle outcome, not a failure string.
 - `GenerationResult { audioPath, durationSeconds, finishReason, telemetrySummary }`
 - `EngineLoadState { idle, starting, loaded(modelID), running(modelID: String?, label: String?, fraction: Double?), failed(message: String) }`
-- `ClonePreparationState { idle, preparing(...), primed(...), failed(...) }`
+- `ClonePreparationState { phase, identityKey, message }`, a struct whose
+  `ClonePreparationPhase` is `idle`, `preparing`, `primed` or `failed`
 
 `EmotionPreset.swift` defines the delivery/tone presets (`neutral`, `happy`,
 `sad`, `angry`, `fearful`, `surprised`, `calm`, `whisper`).
@@ -1460,7 +1466,7 @@ Most-frequent imports across `Sources/**/*.swift`:
   [`qwen3-tts-guide.md`](reference/qwen3-tts-guide.md),
   [`mimi-codec-guide.md`](reference/mimi-codec-guide.md),
   [`performance-guide.md`](reference/performance-guide.md) (Swift and Metal),
-  [`ios-engine-optimization.md`](reference/ios-engine-optimization.md),
+  [`ios-engine-optimization.md`](reference/ios-engine-optimization.md) (historical record),
   [`telemetry-and-benchmarking.md`](reference/telemetry-and-benchmarking.md),
   [`cli.md`](reference/cli.md),
   [`macos-release-qa.md`](reference/macos-release-qa.md),

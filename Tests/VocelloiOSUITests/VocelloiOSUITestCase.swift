@@ -464,7 +464,7 @@ class VocelloiOSUITestCase: XCTestCase {
     }
 
     /// Install, Update and Studio's install button ask before a model download starts (RF-41,
-    /// Guideline 4.2.3(ii)); this confirms the dialog the tap just presented.
+    /// Guideline 4.2.3(ii)); this confirms the alert the tap just presented.
     func confirmModelDownload() {
         let confirm = element("iosModelDownloadConfirmButton")
         XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 30), "The download confirmation must appear")

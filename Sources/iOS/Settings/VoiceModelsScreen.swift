@@ -13,8 +13,8 @@ struct VoiceModelsScreen: View {
     @State private var modelPendingCancel: TTSModel?
     /// Install, Update and Studio's install button ask first (RF-41, Guideline 4.2.3(ii)).
     @State private var modelPendingDownload: TTSModel?
-    /// Kept apart from `modelPendingDownload` so the title does not empty while the dialog closes.
-    @State private var downloadDialogTitle = ""
+    /// Kept apart from `modelPendingDownload` so the title does not empty while the alert closes.
+    @State private var downloadPromptTitle = ""
     @AppStorage(IOSAppDefaults.cellularModelDownloadsKey) private var cellularDownloadsAllowed = false
 
     private var managedModelBytes: Int64 {
@@ -113,13 +113,14 @@ struct VoiceModelsScreen: View {
                             }
                         }
                     }
-                    .confirmationDialog(
-                        downloadDialogTitle,
+                    // An alert, not a confirmation dialog: iOS presents a dialog as a popover
+                    // without its Cancel button, and this decision should show both choices.
+                    .alert(
+                        downloadPromptTitle,
                         isPresented: Binding(
                             get: { modelPendingDownload != nil },
                             set: { if !$0 { modelPendingDownload = nil } }
                         ),
-                        titleVisibility: .visible,
                         presenting: modelPendingDownload
                     ) { model in
                         Button(IOSInterfaceText.download) {
@@ -225,7 +226,7 @@ struct VoiceModelsScreen: View {
     }
 
     private func presentDownloadConfirmation(for model: TTSModel) {
-        downloadDialogTitle = IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
+        downloadPromptTitle = IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
         modelPendingDownload = model
     }
 

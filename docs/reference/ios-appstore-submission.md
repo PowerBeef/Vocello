@@ -9,7 +9,7 @@ sourceOfTruth:
   - Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
   - scripts/ios_device_eligibility.py
   - scripts/verify_ios_release_artifacts.py
-  - docs/reference/eu-ai-act-article50-assessment.md # historical, point-in-time assessment
+  - docs/reference/eu-ai-act-article50-assessment.md
 ---
 # iOS App Store submission runbook
 

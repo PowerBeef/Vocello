@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-10
-summary: Read-only audit, on 2026-11-10 at 232a0bcb, of the README, CLAUDE.md, the agent skills and agents, CONTRIBUTING, SECURITY and every active document under docs/ for inaccurate, stale and duplicated statements, each checked against source. It changes no document; every fix waits for the maintainer.
+summary: Read-only audit, on 2026-11-10 at 232a0bcb, of the README, CLAUDE.md, the agent skills and agents, CONTRIBUTING, SECURITY and every active document under docs/ for inaccurate, stale and duplicated statements, each checked against source. The audit itself changed no document; on the maintainer's request the fixes were made the same day, and section 7 records them and what was left.
 sourceOfTruth:
   - CLAUDE.md
   - README.md
@@ -14,7 +14,8 @@ sourceOfTruth:
 # Documentation audit (2026-11-10)
 
 Source: `main` at `232a0bcb`. The maintainer asked for an audit of the README, the documentation,
-the instructions and `CLAUDE.md` for inaccurate, stale or duplicated content. Nothing was changed.
+the instructions and `CLAUDE.md` for inaccurate, stale or duplicated content. The audit changed
+nothing; [section 7](#7-remediation-2026-11-10) records the fixes that followed.
 
 ## 1. Verdict
 
@@ -141,7 +142,7 @@ today; each is a place the next change must be made several times.
 
 ## 6. Recommendations
 
-Nothing below has been started.
+None of this had been started when the audit was written. Section 7 records what was then done.
 
 ### Before build 30 is submitted
 
@@ -181,3 +182,49 @@ Nothing below has been started.
     rule in `model-delivery.md`, the candidate's state in the checkpoint.
 15. Add `reviewed:` to the three documents without it, and refresh the dates that trail their
     content when each document is next corrected.
+
+## 7. Remediation (2026-11-10)
+
+The maintainer asked for every item above to be fixed. Each correction was checked against source
+before it was written. Three commits carry the fixes, and a fourth adds this section:
+
+- `69a74fdd`: the instructions, the workflow documents, the agents and skills, and the listing.
+- `dabdf336`: the engine and measurement documents.
+- `f80e2f57`: the product and platform documents, the README and `website/PRODUCT.md`.
+
+| Recommendation | Outcome |
+|---|---|
+| 1, 5 | Done. The runbook names build 30 (`v3.0.0-ios.9`) and points to the checkpoint for live state. The train reads builds 24 to 27 and 29: App Store Connect lists no build 28, whose release run timed out before its upload, so section 3's "27, 28 and 29 were uploaded" was itself wrong about 28. The free-space sentence uses the bytes still to fetch, and the waiver covers builds 26 and 27. |
+| 2 | Done, on the maintainer's go. Review notes step 2 and the Safeguards paragraph describe the download confirmation, and a new paragraph asks for review on an iPhone (RF-42). The notes are 3,802 of 4,000 characters, written to App Store Connect and read back byte-identical. |
+| 3 | Done. ASR-06's procedure names the processed candidate and the confirmation. |
+| 4 | Not changed, by rule: `macos-release-qa.md` says published notes stay as published. The runbook now says the What to Test section is the base text and that the build number and candidate lines change when it is pasted. The file's two stale iPhone statements remain (see below). |
+| 6, 7 | Done. `CLAUDE.md`'s release-focus bullets follow `focusLock.decision`; the cap is cited as `focusLock.maxInFlight`; the guard is described as screening subagents and linked-worktree sessions; the deny rules and the `policy_guard.sh` hook are credited with what each refuses. |
+| 8 | Done. `testing-runbook.md` owns the six verdict classes; the triage agent and the debug skill point to it. |
+| 9 | Done. The skill points to the right section and carries one date pair for the decision. No typing method has been proven through Mirroring, and the skill now says so plainly. |
+| 10 | Done. The Fast QC dropout paragraph was rewritten from `makeAudioQCReport` and reviewed against the source lines. |
+| 11 | Done. `ARCHITECTURE.md` (declaration sites of the pins, `ClonePreparationState`, `longFormSegment`), `performance-guide.md`, `qwen_tone.md`; one seed list lives in `qwen3-tts-guide.md` §9.5 and the other two guides link to it. |
+| 12 | Done. The startup-reliability document warns that its seeds no longer reproduce its takes, the two historical documents are marked where they are linked, and `macos-ios-ui-reset-2026-09.md` is `historical`. |
+| 13 | Partly. Computer use, tool routing and the command list were cut to a rule and a pointer, and the missing commands were added to the workflow document's "Daily loop". The hard boundaries were kept in full, since they are the rules a session must see without opening a second file, so the file shrank far less than the third the audit estimated. |
+| 14 | Done. `ios-app-guide.md` owns the iPhone install flow, `model-delivery.md` the storage rule, and the checkpoint the candidate's state; the other copies link to them. |
+| 15 | Done. `native-engineering.md`, `tooling-and-evidence.md` and `qc.md` have review dates, and every document corrected here carries 2026-11-10. |
+
+Section 3's and section 5's other rows were fixed with these: the Mac Updates category, the lanes
+that install models, the README's Quality sentence, the Models & Files wording, the What to Test
+heading, the model states, the Playwright install, the diagnostics gating and the screenshot size.
+
+**Left on purpose:**
+
+- **`docs/releases/v3.0.0.md`.** It still says the iPhone's 3.0 "follows in the coming days" and
+  carries build 24's What to Test text. Amending published notes is the maintainer's decision.
+- **The App Store description's delivery examples** ("such as Neutral, Calm, Whisper or Sad").
+  They are examples, not the picker's order, and changing them is an App Store Connect write.
+- **The GitHub connector's ask rules (BKL-62).** The prose now says the rules may not match the
+  connector in use; the rules themselves are that backlog item.
+- **The copies that agree today,** other than the three `CLAUDE.md` blocks above: the Fast QC
+  against QC v2 distinction, the CLI's History statement, and the sampling and memory-policy
+  copies. They are correct, and merging them is a restructuring with no error to fix.
+
+**For the maintainer to read:** `ios-increased-memory-entitlement-request.md` is paste-ready text
+for Apple's request form. Its two statements about critically low headroom were softened to match
+RF-40's evidence (41 takes at a 2.52 GB peak on an iPhone 15 Pro without the entitlement), which
+changes the case the request makes.

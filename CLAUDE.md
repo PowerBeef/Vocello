@@ -112,9 +112,12 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 - **Release focus (until the 3.0 iOS submission):** the `focusLock` in `config/roadmap.json` makes
   `release-first-3-0-2026-09` the only plan with live work, at most `focusLock.maxInFlight` items in
   flight (`roadmap.py validate` enforces it). `focusLock.decision` is the authority; in summary:
-  - **Classify every new finding.** A release blocker joins that plan with a due date. A release
+  - **Classify every new finding.** A release blocker joins that plan with a gate. A release
     blocker is an App Review rejection risk, a crash or hang, data loss, a broken purchase or restore,
     or a privacy or metadata mismatch on iOS.
+  - **No target dates; the core overhaul comes first** (decisions of 2026-11-10): no item carries a
+    due date and gates set the order. The runtime's core overhaul is performed before the iOS
+    submission, and the result must be fully App Store compliant.
   - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
   - **Backlog items that need no iPhone stay authorized** (decision of 2026-10-16): each is closed in
     the change that fixes it, and a Mac-only request joins the plan as an item. Ask the maintainer

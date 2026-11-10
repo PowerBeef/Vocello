@@ -165,11 +165,19 @@ Between September 4 and October 12 the release did not move:
   that extent. The November 9 project audit found that eligible iPads install the app and see only
   the unsupported-device screen (RF-42, awaiting a decision). The November 9 due dates passed while
   RF-02 still waits; new dates are the maintainer's decision.
+- **2026-11-10.** The maintainer removes the target dates from the roadmap and the release: no item
+  carries a due date, and gates set the order of work. The core overhaul of the runtime (speed and
+  memory on Apple silicon; its stages come from the research requested that day) is performed
+  before the iOS App Store submission, and the result must be fully App Store compliant. Build 30
+  stays in TestFlight; the submission candidate will be the build that carries the overhaul, so
+  RF-17's records and RF-15's rows run on that build. The repository's rules are open to change
+  where that makes the project better.
 
 ## The path
 
-Dates are targets and the status is as of November 10; `config/roadmap.json` is current, and an
-overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.
+The status is as of November 10 and `config/roadmap.json` is current. The path carries no dates
+since the maintainer removed them on November 10: each step ends at its exit, and the core overhaul
+precedes the candidate that steps 5 to 8 run on.
 
 | Step | Items | Exit | Who | Status |
 | --- | --- | --- | --- | --- |
@@ -178,9 +186,9 @@ overdue item is surfaced by `roadmap.py validate` and `scripts/dev.sh status`.
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Done Oct 16 |
 | 4 — freeze | ASR-08, RF-09 | Build unused; exact-SHA CI green; `focusLock.freeze` recorded; the `v3.0.0` tag | Maintainer pushes the tag | Done: frozen Oct 23 at `e7a8e2ae`, the signed `v3.0.0` commit |
 | 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.0.0-ios.N` candidate tag (or an `archive_ios` dispatch) archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Claude installs | ASR-10 and ASR-07 done Oct 24; build 29 (`v3.0.0-ios.8`) in TestFlight and attached to version 3.0.0 on Nov 1, superseded by the candidate that carries RF-41, not yet cut; RF-12's owned-export row waits on RF-02 |
-| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | Was due Nov 9 on build 29; now on the candidate that carries RF-41, after RF-02, on dates the maintainer sets |
+| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | On the candidate that carries the core overhaul (builds 29 and 30 are superseded for the submission), after RF-02, on dates the maintainer sets |
 | 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | ASR-05's listing text and review details entered Nov 1, its review notes and category updated Nov 4, its screenshots and ASR-11 overdue since Nov 9 |
-| 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | Due Nov 12, on the maintainer's go |
+| 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | On the maintainer's go, after the core overhaul; no date |
 
 No Mac or CLI item runs beside the path any more: RF-10 closed by decision on November 1, and RF-23
 (Sparkle updates), RF-30 and RF-31 wait for the submission.
@@ -191,8 +199,8 @@ can take days to activate after RF-02's last step, which is why RF-02 comes firs
 
 The blockers' device proof comes from RF-15, so they close after it and before RF-16. Group the phone
 work into as few windows as possible, and use the phone only in windows the maintainer announces. The
-next window is one session on the candidate that carries RF-41 (build 29 is superseded), after
-RF-02: RF-17's six records and its manifest, RF-15 with its purchase rows, the AUD items, ASR-06,
+next window is one session on the candidate that carries the core overhaul (builds 29 and 30 are
+superseded for the submission), after RF-02: RF-17's six records and its manifest, RF-15 with its purchase rows, the AUD items, ASR-06,
 RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots. DW-03 and DW-04 are parked until the submission.
 
 ## Rules while the focus lock holds
@@ -202,18 +210,20 @@ RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots
   fails otherwise.
 - **Blocker definition.** A new finding joins this plan only if it risks App Review rejection, a crash
   or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS. It joins
-  with a due date and a gate.
+  with a gate; due dates were removed on 2026-11-10.
 - **Intake for everything else.** Any other finding becomes one parked line in
   `post-3-0-backlog-2026-10`, without investigation. A backlog item that needs no iPhone may be fixed
   before the submission (2026-10-16); it closes in the change that fixes it and takes no in-flight
   slot.
-- **No new plans, audits or research programmes.**
+- **No new plans, audits or research programmes** except by the maintainer's decision. The core
+  overhaul joined this plan that way on 2026-11-10.
 - **Moving the primary plan means rewriting `focusLock`** with a new dated maintainer decision.
 - **After the freeze, every commit names an item of this plan in its subject.**
   `focusLock.freeze.commit` records the freeze commit and the validator checks every later commit. A
   commit that slipped through is accepted only through `freeze.exceptions`, with its reason; history
   is never rewritten.
-- **A missed date is a decision, never a silent extension.** Cut scope, move the date with a recorded
+- **Gates, not dates.** No item carries a due date (2026-11-10). If one is given a date again, a
+  missed date is a decision, never a silent extension: cut scope, move the date with a recorded
   reason, or close the item.
 - **Maintainer-only actions.** Pushing the tag, dispatching the release workflow and approving its
   environment, the TestFlight upload, App Store Connect edits and the submission. Neither this

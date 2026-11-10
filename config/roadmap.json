@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-23",
-    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume. Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json.",
+    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items join this plan when its research report is recorded.",
     "maxInFlight": 3,
     "freeze": {
       "commit": "e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
@@ -173,7 +173,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "complete Apple prerequisites and the consolidated qualified-decision packet",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-01"
       ],
@@ -267,7 +266,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "ASR-07"
       ],
@@ -284,7 +282,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Risk-based acceptance of the processed 3.0.0 candidate on the iPhone",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-12"
       ],
@@ -302,7 +299,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Exact-tag iOS quality promotion",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-09"
       ],
@@ -320,7 +316,6 @@
       "title": "iPhone model downloads may use cellular data, off by default with an opt-in switch",
       "status": "in-flight",
       "blockedBy": [],
-      "due": "2026-11-09",
       "gate": "Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.",
       "sourceOfTruth": [
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
@@ -336,7 +331,6 @@
       "title": "iPhone model downloads show their size and ask before they start",
       "status": "in-flight",
       "blockedBy": [],
-      "due": "2026-11-09",
       "gate": "Guideline 4.2.3(ii): before a new model download starts, from a Voice Models row's Install or Update or from Studio's install button, the app shows the model's download size and the networks it may use, and asks for confirmation; Repair and Retry continue an already confirmed download without asking. Onboarding states that each model is about 2 GB. Done when deterministic tests cover the navigation change, the copy is in all ten interface languages, every UI test that starts a download confirms it, the routed check passes, the Swift review finds no blocker, and a new candidate carries it, with RF-17's records and RF-15's rows rerun on that candidate.",
       "sourceOfTruth": [
         "Sources/iOS/Settings/VoiceModelsScreen.swift",
@@ -352,7 +346,6 @@
       "title": "Decide how Vocello behaves on the iPads that can install it",
       "status": "in-flight",
       "blockedBy": [],
-      "due": "2026-11-12",
       "gate": "The maintainer records a decision for the iPads that satisfy iphone-performance-gaming-tier: admit them in iPhone compatibility mode with device evidence for memory and layout, or keep the unsupported-device screen with its body line localized and without the raw machine identifier. Either way the App Review notes state the device requirement, and any code change rides on the candidate that carries RF-41.",
       "sourceOfTruth": [
         "Sources/iOS/Info.plist",
@@ -367,7 +360,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
       "status": "planned",
-      "due": "2026-11-12",
       "blockedBy": [
         "RF-15",
         "RF-17",
@@ -718,7 +710,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Resolve Hugging Face processing and App Privacy disclosure",
       "status": "planned",
-      "due": "2026-11-09",
       "gate": "Maintainer decision 2026-10-12, no paid counsel: the maintainer records the App Privacy answers for the model-download flow, from Hugging Face's published privacy policy and the request fields the downloader sends, with the rationale in docs/reference/content-rights-review.md; then PrivacyInfo.xcprivacy, the website and in-app policy, the App Store privacy answers and the reviewer notes are made mutually consistent. The current Data Not Collected assertion survives only if that recorded rationale supports it under Apple's third-party-partner and retention definitions.",
       "sourceOfTruth": [
         "Sources/PrivacyInfo.xcprivacy",
@@ -738,7 +729,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Refresh reviewer notes, metadata guidance, and App Store screenshots",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-12"
       ],
@@ -759,7 +749,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Define and verify sensitive-file protection and backup policy",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-12"
       ],
@@ -784,7 +773,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Prove reviewer access to immutable model hosting",
       "status": "planned",
-      "due": "2026-11-12",
       "blockedBy": [
         "RF-09"
       ],
@@ -808,7 +796,6 @@
       "plan": "release-first-3-0-2026-09",
       "title": "Audit live App Store Connect and regional compliance read-only",
       "status": "planned",
-      "due": "2026-11-09",
       "blockedBy": [
         "RF-02"
       ],
@@ -1059,7 +1046,6 @@
       "id": "AUD-01",
       "title": "iOS launch and deep-link dead ends",
       "status": "planned",
-      "due": "2026-11-09",
       "gate": "A dependency-bootstrap failure offers retry and restart rather than a terminal screen; opening a file during first run never presents the import cover over the onboarding cover; both proven on the phone by iOS smoke. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Sources/iOS/QVoiceiOSApp.swift",
@@ -1077,7 +1063,6 @@
       "id": "AUD-02",
       "title": "One owner for the iOS audio session",
       "status": "planned",
-      "due": "2026-11-09",
       "gate": "Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
@@ -1141,7 +1126,6 @@
       "id": "AUD-07",
       "title": "Verify recovery from an unverified StoreKit purchase",
       "status": "planned",
-      "due": "2026-11-09",
       "gate": "A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence. Code fix and deterministic tests land before the RF-09 freeze; the device proof comes from RF-15's acceptance of the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Sources/iOS/Commerce/IOSStoreKitClient.swift",
@@ -1156,7 +1140,6 @@
       "id": "AUD-09",
       "title": "Smoke test01 owns the fixture it depends on",
       "status": "planned",
-      "due": "2026-11-09",
       "gate": "Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome. Needed before RF-15 runs smoke on the processed candidate (2026-10-12 rebaseline).",
       "sourceOfTruth": [
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",

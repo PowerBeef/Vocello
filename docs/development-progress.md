@@ -17,10 +17,26 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 1: a dated path to App Review on November 12 (resume here)
+### November 10: no target dates, and the core overhaul comes before the submission (resume here)
+
+- **Maintainer decisions of November 10** (recorded in `focusLock.decision`):
+  - The target dates are removed from the roadmap and the release. No item carries a due date;
+    gates set the order of work.
+  - The core overhaul of the runtime (speed and memory on Apple silicon) is performed before the
+    iOS App Store submission.
+  - The result must be fully App Store compliant.
+  - The repository's rules are open to change where that makes the project better.
+- **What that changes below.** Build 30 stays in TestFlight, but the submission candidate will be
+  the build that carries the overhaul: the candidate-bound work in step 2 (RF-17's records, RF-15's
+  rows and the items that ride on them) runs on that build. Step 1 (the maintainer's account steps
+  and the App Privacy readback) is unaffected.
+- **The overhaul's stages and gates** come from the research report requested on November 10; its
+  items join the release plan when the report is recorded.
+
+### November 1: the path to App Review (its dates were removed on November 10)
 
 - **Next, in order** (maintainer decision of November 1, recorded in the release plan):
-  1. The maintainer, by November 9 (moved from November 5 and 6 on November 7): RF-02's remaining
+  1. The maintainer: RF-02's remaining
      account steps, which activate the Paid Apps agreement (status and details in the maintainer's
      private record, never in Git); ASR-02 and ASR-11's App Privacy readback in the browser, which
      needs a fresh App Store Connect sign-in in Chrome.
@@ -35,11 +51,10 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      November 10, and the language record still needs a maintainer decision), RF-15's rows
      including the purchase rows (RF-02 first), AUD-01, AUD-02, AUD-07, AUD-09, ASR-06 (procedure
      in `docs/reference/privacy-storage.md`), RF-35's cellular download, RF-12's Airplane Mode
-     export and ASR-05's screenshots. The November 9 due dates have passed and new ones are the
-     maintainer's decision. The phone runs a development build of `main` on System Default App
+     export and ASR-05's screenshots. The due dates were removed on November 10. The phone runs a development build of `main` on System Default App
      Language: install the processed candidate and set App Language to English before its rows.
-  3. By November 12, on the maintainer's go: ASR-09's North America download proof, then the App
-     Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
+  3. On the maintainer's go, after the core overhaul: ASR-09's North America download proof, then
+     the App Review submission (RF-16). RF-17's records must be at most 7 days old at validation.
 - **Done since October 30:** most of RF-02's account steps (private record). On November 1, ASR-04
   attested and closed; ASR-05's en-US listing text and the App Review contact and notes entered in
   App Store Connect and read back; build 29 attached to version 3.0.0, with no export-compliance

@@ -210,8 +210,10 @@ is complete.
       version, so before 3.0 is live the most that can exist is a saved draft. Complete it only from
       the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs. Apple's test is that every common task (first launch, purchase and
-      settings included) can be completed with the feature. Draft for iPhone, 2026-11-10, awaiting
-      the maintainer's approval and build 30's evidence:
+      settings included) can be completed with the feature. Draft for iPhone, approved by
+      the maintainer on 2026-11-10. Save it in App Store Connect after RF-15's rows on build 30
+      confirm Dark Interface from their screenshots, and publish it once 3.0 is live; each is an
+      App Store Connect write on the maintainer's go:
 
       | Feature | Draft answer | Basis |
       |---|---|---|

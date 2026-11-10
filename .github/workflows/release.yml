@@ -1041,7 +1041,8 @@ jobs:
     needs: [release-trigger, source-authority]
     if: ${{ (github.event_name == 'workflow_dispatch' && inputs.archive_ios) || (github.event_name == 'push' && needs.release-trigger.outputs.ios_candidate == 'true') }}
     runs-on: macos-26
-    timeout-minutes: 60
+    # A backstop above the sum of the steps' own limits (175 minutes); each step stops itself.
+    timeout-minutes: 180
     environment: release
     permissions:
       contents: read
@@ -1108,7 +1109,7 @@ jobs:
           set -euo pipefail
           python3 scripts/required_step_ledger.py run \
             --ledger "$RELEASE_STEP_LEDGER" --step platform-readiness \
-            --timeout-seconds 2700 -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'
+            --timeout-seconds 5400 -- bash -euo pipefail -c 'scripts/macos_test.sh gate && ./scripts/build_foundation_targets.sh ios'
 
       - name: Import signing assets
         env:
@@ -1151,7 +1152,7 @@ jobs:
           echo "IOS_API_KEY_COPY_PATH=$KEY_COPY_PATH" >> "$GITHUB_ENV"
           KEYCHAIN_PW="$(uuidgen)"
           security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
-          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security set-keychain-settings -lut 9000 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 

@@ -2032,7 +2032,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Before the next iPhone candidate tag is cut (it needs no iPhone), or when the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-1: the job allows 60 minutes while its steps allow 2,700 s, 2,700 s, 1,200 s and two of 600 s; build 28's upload timed out here. Not a release blocker by the lock's definition, but it decides whether a candidate tag succeeds, and a tag runs its own copy of the workflow."
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-1. Measured on build 29's release run (41079341984): the archive job took 58.5 of its 60 minutes, and its readiness step 44.4 of its 45; the archive step itself took 7.9. Build 28 timed out here. 2026-11-10, at the maintainer's request: the job cap is 180 minutes (the steps' limits sum to 175), the readiness step's limit is 5,400 s, and the signing keychain's auto-lock is 9,000 s like the Mac job's. A tag runs its own copy of the workflow, so this must be on main before the tag. Left: the next candidate's archive job passing with these limits."
     },
     {
       "id": "BKL-57",

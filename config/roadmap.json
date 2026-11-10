@@ -821,8 +821,8 @@
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-11-01",
-      "notes": "Read-only, recorded without payload values; a manual pass in the web portal or with asc (the automated inventory was removed on 2026-09-22). 2026-10-30, asc on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; 148 of 175 territories (EU excluded); support URL set; agreement, tax and banking states stay in the maintainer's private record (RF-02). 2026-11-01: listing, App Review contact and notes and build 29 entered (ASR-05); build 29 reads back VALID with usesNonExemptEncryption false. 2026-11-04: age-rating answers read (all None or no) and the secondary category changed to Utilities. Still missing before submission: every App Store screenshot, the purchase's metadata (MISSING_METADATA: the review screenshot, plus an RF-02 account step) and the accessibility declaration. The App Privacy label needs a browser readback (ASR-02) after a fresh App Store Connect sign-in in Chrome, which is the maintainer's. 2026-11-07, maintainer decision: due moved from 2026-11-06 to 2026-11-09."
+      "updated": "2026-11-10",
+      "notes": "Read-only, without payload values; a manual pass in the web portal or with asc. 2026-10-30, asc on version 3.0.0 (PREPARE_FOR_SUBMISSION): identity and bundle match; content rights USES_THIRD_PARTY_CONTENT; age rating 4+; copyright set; release after approval; 148 of 175 territories (EU excluded); support URL set; agreement, tax and banking states stay in the maintainer's private record (RF-02). 2026-11-01: listing, review contact and notes and build 29 entered (ASR-05); build 29 reads VALID, usesNonExemptEncryption false. 2026-11-04: age-rating answers read (all None or no); secondary category Utilities. 2026-11-10, at the maintainer's request: the purchase's availability set to the app's 148 territories (it had none) and its review note entered, both read back. The accessibility declaration is voluntary and publishable only once a version is live (Apple's help, read 2026-11-10), so it does not block; a draft is in the runbook. Still missing: every screenshot, and the purchase's review screenshot and RF-02 account step (MISSING_METADATA). The App Privacy label needs a browser readback (ASR-02) after the maintainer's fresh sign-in in Chrome. Due moved to 2026-11-09 on 2026-11-07."
     },
     {
       "id": "ASR-12",
@@ -1884,7 +1884,7 @@
       ],
       "updated": "2026-10-27",
       "unparkWhen": "The maintainer has a public contact address to show in the EU and asks for the EU release.",
-      "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now. The 27 EU territories were removed from availability (148 of 175 remain); the account's EU status is in the maintainer's private record (RF-02). Adding the EU back needs the trader step first, then an availability edit; no new build or review is needed for availability. Not a release blocker."
+      "notes": "Maintainer decision, 2026-10-27: 3.0 ships outside the EU for now. The 27 EU territories were removed from availability (148 of 175 remain); the account's EU status is in the maintainer's private record (RF-02). Adding the EU back needs the trader step first, then an availability edit; no new build or review is needed for availability. Not a release blocker. 2026-11-10: the export purchase's availability now lists the same 148 territories, so the EU territories must be added to the purchase as well as to the app."
     },
     {
       "id": "BKL-42",

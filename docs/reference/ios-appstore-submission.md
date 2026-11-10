@@ -103,7 +103,9 @@ the API readback omits that flag; it was confirmed off in the web portal on 2026
 localized names and descriptions were entered (RF-02). Review remains pending until submission.
 The local-only `Tests/Fixtures/VocelloExports.storekit` fixture carries an arbitrary price, is not
 an approved live offer and is never bundled in the app or activated in shipping schemes. RF-02 owns
-the remaining account and product metadata work. Settings → Design & Clone Export
+the remaining account and product metadata work. On 2026-11-10 the purchase's availability was set to
+the app's 148 territories and its review note was entered
+([`app-store-listing.md`](app-store-listing.md) carries both). Settings → Design & Clone Export
 provides the StoreKit-localized price, Restore, status, privacy/support links and dismissal.
 See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
 
@@ -170,7 +172,8 @@ Current account state (2026-10-12, set in the web portal with the maintainer's a
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
 - RF-02's account steps (agreements, banking and tax; status in the maintainer's private record);
-- the accessibility declaration.
+- the accessibility declaration, which is voluntary and cannot be published before a version is
+  live (see the row below).
 
 App Store Connect readiness is a manual, read-only pass: review the live app identity, platforms,
 category, pricing/availability, metadata, localizations and URLs, screenshots, review contact,
@@ -201,9 +204,26 @@ is complete.
       None and every capability answer is no (read 2026-11-04), including User-Generated Content,
       which Apple defines as broad distribution of users' content. Revisit it if the product's
       content behavior changes.
-- [ ] **Accessibility declaration**: the 2026-09-04 API read returned no declaration. Complete it only
-      from the exact-candidate accessibility evidence; do not infer supported features from source or
-      historical device runs.
+- [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
+      block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
+      voluntary for now, and that support can be published only for a device with a live App Store
+      version, so before 3.0 is live the most that can exist is a saved draft. Complete it only from
+      the exact-candidate accessibility evidence; do not infer supported features from source or
+      historical device runs. Apple's test is that every common task (first launch, purchase and
+      settings included) can be completed with the feature. Draft for iPhone, 2026-11-10, awaiting
+      the maintainer's approval and build 30's evidence:
+
+      | Feature | Draft answer | Basis |
+      |---|---|---|
+      | VoiceOver | Not claimed | Only XCTest's automated audit has run; the hand VoiceOver pass is open (RF-15), as are AUD-06 and BKL-59 |
+      | Voice Control | Not claimed | Never evaluated |
+      | Larger Text | Not claimed | Maintainer decision of 2026-10-24 until BKL-31 is fixed |
+      | Dark Interface | Claim, once build 30's lane screenshots confirm it | The app is dark only: `UIUserInterfaceStyle` is Dark and the window forces the dark scheme |
+      | Differentiate Without Color Alone | Not claimed | No grayscale walk has been done |
+      | Sufficient Contrast | Not claimed | Same decision; the purchase sheet failed the contrast audit on build 24 |
+      | Reduced Motion | Not claimed | Source honors the setting in two places; never checked on a device |
+      | Captions | Not claimed | A take's script is shown, but not as time-synchronized text |
+      | Audio Descriptions | Not claimed | The app has no video |
 - [x] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), in 148 territories: the
       27 EU territories were removed on 2026-10-27. Review the release behavior and new-territory
       policy at submission.

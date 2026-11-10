@@ -135,6 +135,26 @@ Before pasting, recheck the three byte counts against the candidate's catalog, a
 fresh North America download proof (see [`ios-appstore-submission.md`](ios-appstore-submission.md)
 §2 for the storage and region reasoning).
 
+## Export purchase: Design & Clone Export
+
+Entered in App Store Connect on 2026-11-10 at the maintainer's request and read back:
+
+- **Availability:** the same 148 territories as the app, with new territories included
+  automatically, as the app has it. The purchase had no availability record before. When the EU
+  territories return to the app (BKL-41), add them to the purchase too.
+- **Review note (4000):** read back byte-identical (689 characters).
+
+```text
+Design & Clone Export is a one-time, non-consumable purchase. It unlocks exporting audio made with Voice Design and Voice Cloning through the share sheet. Generation, listening, History and exporting Built-in Voice takes are free and need no purchase.
+
+To reach it: open Settings → Design & Clone Export. It also appears when you tap Share or Download on a Voice Design or Voice Cloning take. To make such a take, install the Voice Design model first (Settings → Models & Files → Voice Models → Install, then Download; about 2 GB), then in Studio choose Voice Design, describe a voice, type a line and tap Generate.
+
+Restore Purchases is on the same sheet. No account or sign-in is needed.
+```
+
+The purchase still reads `MISSING_METADATA`: its review screenshot comes from the signed candidate
+on the phone (RF-12), and one account step is RF-02's.
+
 ## Choices for the maintainer
 
 - **Subtitle:** "Local AI voice studio", chosen 2026-11-01.

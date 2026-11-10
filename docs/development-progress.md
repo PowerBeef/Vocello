@@ -28,8 +28,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
      candidate: RF-41 (the download prompt, `f3689d2a` and `37c16b91`) landed on `main` on
      November 7 and 10 and its phone lane passed. Done on November 10 for the tag: RF-42 is
      decided (Vocello stays iPhone-only, with a localized unsupported-device screen), the archive
-     job's limits are raised (BKL-56) and the build number is 30. Left before the tag: green CI
-     on the pushed `main`, then `v3.0.0-ios.9` on the maintainer's go.
+     job's limits are raised (BKL-56) and the build number is 30. CI passed, and on the
+     maintainer's go `v3.0.0-ios.9` (build 30) was cut at `14c51659` (release run 42872878302).
      On the processed build: RF-17's six records on the new tag (build 29's five expired on
      November 10, and the language record still needs a maintainer decision), RF-15's rows
      including the purchase rows (RF-02 first), AUD-01, AUD-02, AUD-07, AUD-09, ASR-06 (procedure

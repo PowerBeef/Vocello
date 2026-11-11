@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "kind": "quality-remediation-screens",
+  "description": "The paired machine screens of the quality remediation (RF-50), read by scripts/quality_screen.py. A screen names its population; a rule is added here, with the date it was recorded, before any take it will judge is generated.",
+  "screens": {
+    "clone": {
+      "version": 1,
+      "kind": "clone",
+      "mode": "clone",
+      "variant": "speed",
+      "description": "Voice Clone through saved voices, the path both apps use: each reference is a human clip of a pinned, licensed corpus (config/audio-qc-corpora.json), enrolled with its corpus transcript, then asked for scripts of the committed CC0 pool in its own language and one in another language.",
+      "languages": {
+        "english": ["libritts-r"],
+        "french": ["mls"],
+        "german": ["mls"],
+        "spanish": ["mls"],
+        "chinese": ["aishell3-subset"],
+        "korean": ["zeroth-korean"]
+      },
+      "referencesPerLanguage": 8,
+      "referenceSeconds": [5.0, 10.0, 20.0],
+      "scriptSplit": "calibration",
+      "scriptsPerReference": 3,
+      "crossLanguageScripts": 1,
+      "crossLanguage": {"english": "french", "default": "english"},
+      "rules": {}
+    }
+  }
+}

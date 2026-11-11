@@ -25,6 +25,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import resource
 import statistics
 import subprocess
 import sys
@@ -104,9 +105,12 @@ def prepare_data_dir(data_dir: Path, modes: list[str]) -> None:
 def capture(args: argparse.Namespace) -> Path:
     modes = [mode for mode in args.modes.split(",") if mode]
     overrides = parse_overrides(args.set_env)
-    vocello = managed_output_path("QVOICE_BUILD_ROOT") / "vocello"
+    # `--vocello` names a preserved build (the executable with its resource
+    # bundles beside it), so a change and its baseline can be captured in
+    # alternation and host drift cancels out of the comparison.
+    vocello = Path(args.vocello) if args.vocello else managed_output_path("QVOICE_BUILD_ROOT") / "vocello"
     if not vocello.exists():
-        raise RuntimeError("build/vocello is missing; run scripts/build.sh cli-optimized")
+        raise RuntimeError(f"{vocello} is missing; run scripts/build.sh cli-optimized")
     run_dir = (
         managed_output_path("QVOICE_ARTIFACTS_MACOS") / "pcm-identity" / f"{args.label}-{utc_stamp()}"
     )
@@ -123,9 +127,21 @@ def capture(args: argparse.Namespace) -> Path:
     if "clone" in modes:
         # The fixture is a Voice Design reference the repository generated itself.
         command += ["--voice", CLONE_VOICE, "--confirm-consent"]
+    if args.clamp:
+        # `taskpolicy -c` clamps the whole process to that QoS. `background`
+        # keeps it on the efficiency cores, where the host, not the GPU, bounds
+        # a frame: the regime a slower phone may be in, reproduced on a Mac.
+        command = ["/usr/sbin/taskpolicy", "-c", args.clamp, *command]
     environment = dict(os.environ)
     environment.update(overrides)
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
     completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, env=environment)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    # The bench process's user plus system CPU time, model loads included. The
+    # host builds and encodes every frame's graph, so for two captures of the
+    # same takes this is how much host work the change added or removed,
+    # whatever the GPU did meanwhile.
+    bench_cpu_seconds = (after.ru_utime - before.ru_utime) + (after.ru_stime - before.ru_stime)
     (run_dir / "bench.stdout.log").write_text(completed.stdout, encoding="utf-8")
     (run_dir / "bench.stderr.log").write_text(completed.stderr, encoding="utf-8")
     if completed.returncode:
@@ -162,11 +178,13 @@ def capture(args: argparse.Namespace) -> Path:
         "lengths": args.lengths.split(","),
         "warm": args.warm,
         "environmentOverrides": overrides,
+        "qosClamp": args.clamp,
         "source": {
             "commit": git_value("rev-parse", "HEAD"),
             "dirtyPaths": len([line for line in git_value("status", "--porcelain").splitlines() if line]),
         },
         "executableSHA256": file_sha256(vocello.resolve()),
+        "benchCPUSeconds": bench_cpu_seconds,
         "takes": takes,
     }
     manifest_path = run_dir / "manifest.json"
@@ -185,6 +203,8 @@ def identity_report(baseline: dict, candidate: dict) -> dict:
     """Compare two manifests take by take. Pure, so the tests can pin it."""
     if baseline["seed"] != candidate["seed"]:
         raise RuntimeError("the two captures used different seeds")
+    if baseline.get("qosClamp") != candidate.get("qosClamp"):
+        raise RuntimeError("the two captures ran under different QoS clamps")
     reference = {take["key"]: take for take in baseline["takes"]}
     observed = {take["key"]: take for take in candidate["takes"]}
     missing = sorted(set(reference) - set(observed))
@@ -219,7 +239,7 @@ def identity_report(baseline: dict, candidate: dict) -> dict:
             entry["medianFirstChunkMSBefore"] = statistics.median(cell["firstBefore"])
             entry["medianFirstChunkMSAfter"] = statistics.median(cell["firstAfter"])
         speed[name] = entry
-    return {
+    report = {
         "identical": not (missing or extra or differing),
         "comparedTakes": len(set(reference) & set(observed)),
         "differing": differing,
@@ -227,6 +247,16 @@ def identity_report(baseline: dict, candidate: dict) -> dict:
         "extra": extra,
         "warmSpeed": speed,
     }
+    cpu_before, cpu_after = baseline.get("benchCPUSeconds"), candidate.get("benchCPUSeconds")
+    # Host CPU compares only over the same takes: a different take set does
+    # different work.
+    if report["identical"] and cpu_before and cpu_after:
+        report["hostCPU"] = {
+            "secondsBefore": cpu_before,
+            "secondsAfter": cpu_after,
+            "changePercent": (cpu_after / cpu_before - 1.0) * 100.0,
+        }
+    return report
 
 
 def compare(args: argparse.Namespace) -> int:
@@ -246,6 +276,14 @@ def main() -> int:
     capture_parser.add_argument("--modes", default="custom,design,clone")
     capture_parser.add_argument("--lengths", default="short,medium")
     capture_parser.add_argument("--warm", type=int, default=2)
+    capture_parser.add_argument(
+        "--vocello", metavar="PATH",
+        help="capture with this executable instead of build/vocello (a preserved baseline build)",
+    )
+    capture_parser.add_argument(
+        "--clamp", choices=("utility", "background"),
+        help="clamp the bench to this QoS; background is the host-bound proxy (efficiency cores)",
+    )
     capture_parser.add_argument(
         "--set-env", action="append", default=[], metavar="KEY=VALUE",
         help="pass one environment override to the bench and record it (repeatable)",

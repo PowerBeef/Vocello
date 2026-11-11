@@ -54,6 +54,17 @@ class IdentityReportTests(unittest.TestCase):
         self.assertAlmostEqual(cell["medianRTFBefore"], 0.31)
         self.assertAlmostEqual(cell["medianRTFAfter"], 0.28)
         self.assertLess(cell["rtfChangePercent"], 0)
+        self.assertNotIn("hostCPU", report)
+
+    def test_host_cpu_is_compared_only_over_identical_takes(self) -> None:
+        takes = [take("custom/speed/medium/warm#0", "a" * 64, wall=3.0)]
+        before = manifest(takes) | {"benchCPUSeconds": 20.0}
+        after = manifest(takes) | {"benchCPUSeconds": 18.0}
+        report = identity.identity_report(before, after)
+        self.assertAlmostEqual(report["hostCPU"]["changePercent"], -10.0)
+        changed = manifest([take("custom/speed/medium/warm#0", "f" * 64, wall=3.0)])
+        changed["benchCPUSeconds"] = 18.0
+        self.assertNotIn("hostCPU", identity.identity_report(before, changed))
 
     def test_one_changed_sample_stream_is_named(self) -> None:
         before = manifest([take("design/speed/short/warm#0", "a" * 64, wall=1.0)])
@@ -79,6 +90,12 @@ class IdentityReportTests(unittest.TestCase):
     def test_different_seeds_are_refused(self) -> None:
         with self.assertRaises(RuntimeError):
             identity.identity_report(manifest([], seed=1), manifest([], seed=2))
+
+    def test_different_qos_clamps_are_refused(self) -> None:
+        clamped = manifest([]) | {"qosClamp": "background"}
+        with self.assertRaises(RuntimeError):
+            identity.identity_report(manifest([]), clamped)
+        self.assertTrue(identity.identity_report(clamped, dict(clamped))["identical"])
 
 
 class OverrideParsingTests(unittest.TestCase):

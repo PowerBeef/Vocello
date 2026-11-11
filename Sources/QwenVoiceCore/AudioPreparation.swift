@@ -210,11 +210,12 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     ///
     /// - 1: the asset reader resamples (`Resampling.assetReader`).
     /// - 2: one converter call resamples (`Resampling.singleCall`).
+    /// - 3: as 2, with two channels averaged (`Resampling.singleCallAveraged`).
     ///
     /// `PreparedVoiceRepository.removeDerivedCloneReferences` removes a
     /// deleted voice's prepared copies under every version up to the newest.
     public static var cloneReferencePreparationVersion: Int { Resampling.current.preparationVersion }
-    public static let newestCloneReferencePreparationVersion = 2
+    public static let newestCloneReferencePreparationVersion = 3
 
     /// How a reference that is not already 24 kHz is brought to it.
     public enum Resampling: String, Hashable, Sendable {
@@ -231,15 +232,30 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         /// 2026-11-11): one AAC file decoded to three different sample
         /// sequences over twelve runs, and a FLAC file came out 1,332 frames
         /// longer than it is. It decodes here only what the audio file
-        /// reader cannot open.
+        /// reader cannot open. Two channels are mixed as the asset reader
+        /// mixes them, the sum over the square root of two.
         case singleCall
+        /// As `singleCall`, with two channels averaged, as upstream Qwen3-TTS
+        /// (`librosa.load(mono=True)`, then `np.mean` over channels) and the
+        /// Python port (`ffmpeg -ac 1`) mix them. The sum over the square
+        /// root of two makes a voice recorded on both channels 3 dB hotter
+        /// than its source and clips it where it peaked above -3 dBFS.
+        case singleCallAveraged
 
         var preparationVersion: Int {
             switch self {
             case .assetReader: 1
             case .singleCall: 2
+            case .singleCallAveraged: 3
             }
         }
+
+        /// The audio file reader decodes and one converter call resamples.
+        var usesSingleCall: Bool { self != .assetReader }
+
+        /// How the single-call paths make one channel of two. The asset
+        /// reader's own path mixes inside the reader.
+        var mixdown: Mixdown { self == .singleCallAveraged ? .average : .sumOverRootTwo }
 
         static let environmentKey = "QWENVOICE_REFERENCE_PREPARATION"
 
@@ -258,8 +274,9 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         )
 
         /// `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the earlier
-        /// path (or `single-call` names this one), honoured only in an
-        /// internal-diagnostics build with the master gate on. Any other
+        /// path, `single-call-average` selects version 3 and `single-call`
+        /// names the shipped one, honoured only in an internal-diagnostics
+        /// build with the master gate on. Any other
         /// value is the production path: a screen arm
         /// proves which path it ran from each take's prepared-reference
         /// digest, not from the key having been set.
@@ -278,10 +295,19 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         init?(diagnosticValue: String) {
             switch diagnosticValue {
             case "single-call": self = .singleCall
+            case "single-call-average": self = .singleCallAveraged
             case "asset-reader": self = .assetReader
             default: return nil
             }
         }
+    }
+
+    /// One channel from several.
+    public enum Mixdown: Hashable, Sendable {
+        /// Two channels summed and scaled by 1/sqrt(2), the asset reader's law.
+        case sumOverRootTwo
+        /// The mean of the channels, upstream's law.
+        case average
     }
 
     public static let canonicalSampleRate: Double = 24_000
@@ -558,9 +584,10 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             AVLinearPCMIsNonInterleaved: false,
         ]
 
-        if resampling == .singleCall,
+        if resampling.usesSingleCall,
            let decoded = try decodedMonoSamples(
                fromAudioFileAt: inputURL,
+               mixdown: resampling.mixdown,
                maxDecodedDurationSeconds: limits.maxDecodedDurationSeconds,
                deadline: deadline
            ) {
@@ -625,7 +652,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             throw AudioPreparationError.conversionFailed("Couldn't create the native audio reader.")
         }
 
-        // `singleCall` asks the reader for the track's own rate and channels
+        // The single-call paths ask the reader for the track's own rate and channels
         // as float samples, so it decodes and does nothing else.
         let decodedSettings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,
@@ -636,7 +663,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         ]
         let readerOutput = AVAssetReaderTrackOutput(
             track: track,
-            outputSettings: resampling == .singleCall ? decodedSettings : outputSettings
+            outputSettings: resampling.usesSingleCall ? decodedSettings : outputSettings
         )
         readerOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(readerOutput) else {
@@ -681,9 +708,10 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         do {
             try await testingHooks.beforeConversionLoop?()
             try deadline.check()
-            if resampling == .singleCall {
+            if resampling.usesSingleCall {
                 let decoded = try decodedMonoSamples(
                     from: readerOutput,
+                    mixdown: resampling.mixdown,
                     maxDecodedDurationSeconds: limits.maxDecodedDurationSeconds,
                     deadline: deadline
                 )
@@ -786,6 +814,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     /// file, which then goes to the asset reader's decode below.
     private static func decodedMonoSamples(
         fromAudioFileAt url: URL,
+        mixdown: Mixdown,
         maxDecodedDurationSeconds: Double,
         deadline: AudioPreparationDeadline
     ) throws -> (samples: [Float], sampleRate: Double)? {
@@ -837,7 +866,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
                         interleaved[frame * channels + channel] = unsafe samples[frame]
                     }
                 }
-                mono.append(contentsOf: downmixed(interleaved, channels: channels))
+                mono.append(contentsOf: downmixed(interleaved, channels: channels, mixdown: mixdown))
             }
             try requireWithinLimit(frames: mono.count)
         }
@@ -849,6 +878,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     /// open. Its decode of a compressed track is not reproducible.
     private static func decodedMonoSamples(
         from readerOutput: AVAssetReaderTrackOutput,
+        mixdown: Mixdown,
         maxDecodedDurationSeconds: Double,
         deadline: AudioPreparationDeadline
     ) throws -> (samples: [Float], sampleRate: Double) {
@@ -882,7 +912,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             guard status == noErr else {
                 throw AudioPreparationError.conversionFailed("Decoded audio bytes could not be copied.")
             }
-            mono.append(contentsOf: downmixed(interleaved, channels: channels))
+            mono.append(contentsOf: downmixed(interleaved, channels: channels, mixdown: mixdown))
             let decodedSeconds = Double(mono.count) / sampleRate
             if maxDecodedDurationSeconds > 0, decodedSeconds > maxDecodedDurationSeconds {
                 throw AudioPreparationError.inputDurationTooLong(
@@ -906,17 +936,17 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             && stream.mChannelsPerFrame > 0
     }
 
-    /// One channel from the reader's interleaved frames. Two channels are
-    /// summed and scaled by 1/sqrt(2), which is what the asset reader does
-    /// when it is asked for one channel (measured: a tone on both channels
-    /// comes out 3 dB hotter, a tone on one channel 3 dB quieter), so this
-    /// path changes the resampling and nothing else. That law clips a loud
-    /// voice recorded on both channels; the average would not, and choosing
-    /// it is a separate, screened change (RF-52). More than two channels,
-    /// which a voice reference almost never has, are averaged.
-    static func downmixed(_ interleaved: [Float], channels: Int) -> [Float] {
+    /// One channel from the reader's interleaved frames. `sumOverRootTwo`
+    /// sums two channels and scales by 1/sqrt(2), which is what the asset
+    /// reader does when it is asked for one channel (measured: a tone on both
+    /// channels comes out 3 dB hotter, a tone on one channel 3 dB quieter).
+    /// `average` takes their mean, as upstream does. More than two channels,
+    /// which a voice reference almost never has, are averaged either way.
+    static func downmixed(_ interleaved: [Float], channels: Int, mixdown: Mixdown) -> [Float] {
         guard channels > 1 else { return interleaved }
-        let scale: Float = channels == 2 ? Float(0.5.squareRoot()) : 1 / Float(channels)
+        let scale: Float = channels == 2 && mixdown == .sumOverRootTwo
+            ? Float(0.5.squareRoot())
+            : 1 / Float(channels)
         return stride(from: 0, to: interleaved.count - channels + 1, by: channels).map { start in
             var sum: Float = 0
             for channel in 0..<channels {

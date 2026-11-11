@@ -45,6 +45,7 @@ import random
 import subprocess
 import sys
 import unicodedata
+import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -118,6 +119,70 @@ def corpus_clips(source: str) -> tuple[Path, list[dict]]:
     return manifests[0].parent, read_json(manifests[0])["clips"]
 
 
+def population(screen: dict) -> str:
+    """The name references and scripts are drawn under: a screen that varies
+    another screen's references (`population`) draws the same ones."""
+    return screen.get("population") or screen["name"]
+
+
+# ---------------------------------------------------------------- channel layouts
+
+CHANNEL_LAYOUTS = ("duplicate", "left-only")
+STEREO_REFERENCES = "quality-screen-references"
+
+
+def stereo_frames(mono: bytes, layout: str) -> bytes:
+    """Two-channel 16-bit frames from one channel: the same signal on both
+    (a mono recording saved as stereo, the common case), or the signal on the
+    left with silence on the right (a microphone on one input). Sample
+    values are copied, never recomputed."""
+    if layout not in CHANNEL_LAYOUTS:
+        raise ScreenError(f"unknown channel layout '{layout}'")
+    if len(mono) % 2:
+        raise ScreenError("a 16-bit clip has an odd byte count")
+    silence = b"\x00\x00"
+    out = bytearray()
+    for index in range(0, len(mono), 2):
+        sample = mono[index:index + 2]
+        out += sample + (sample if layout == "duplicate" else silence)
+    return bytes(out)
+
+
+def layout_for(screen: dict, index: int) -> str | None:
+    """The channel layout of a screen's index-th reference of a language
+    (1-based): alternating, so each language has both."""
+    if screen.get("referenceChannels") != "alternate-duplicate-left-only":
+        return None
+    return CHANNEL_LAYOUTS[(index - 1) % 2]
+
+
+def two_channel_reference(source: Path, layout: str) -> tuple[Path, str]:
+    """The reference as a two-channel WAV, stored by its content digest under
+    the managed artifacts, so every plan that asks for it shares one file."""
+    with wave.open(str(source), "rb") as handle:
+        if handle.getnchannels() != 1 or handle.getsampwidth() != 2:
+            raise ScreenError(f"{source.name}: a two-channel layout needs a mono 16-bit source")
+        rate = handle.getframerate()
+        frames = handle.readframes(handle.getnframes())
+    stereo = stereo_frames(frames, layout)
+    directory = managed_output_path("QVOICE_ARTIFACTS_MACOS") / STEREO_REFERENCES
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = directory / f".partial-{os.getpid()}.wav"
+    try:
+        with wave.open(str(temporary), "wb") as handle:
+            handle.setnchannels(2)
+            handle.setsampwidth(2)
+            handle.setframerate(rate)
+            handle.writeframes(stereo)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    digest = sha256_file(temporary)
+    target = directory / f"{digest}.wav"
+    os.replace(temporary, target)
+    return target, digest
+
+
 def select_references(screen: dict, language: str, clips_by_source: dict[str, tuple[Path, list[dict]]]) -> list[dict]:
     """One clip per speaker, speakers and clips in hash order; clips at or
     above the preferred length first, so short ones fill in only where a
@@ -137,8 +202,8 @@ def select_references(screen: dict, language: str, clips_by_source: dict[str, tu
         by_speaker.setdefault(f"{clip['source']}/{clip['speaker']}", []).append(clip)
     chosen = []
     for speaker, clips in by_speaker.items():
-        clips.sort(key=lambda clip: (clip["durationSeconds"] < preferred, rank(f"{screen['name']}|clip|{clip['clipID']}")))
-        chosen.append((clips[0]["durationSeconds"] < preferred, rank(f"{screen['name']}|speaker|{speaker}"), clips[0]))
+        clips.sort(key=lambda clip: (clip["durationSeconds"] < preferred, rank(f"{population(screen)}|clip|{clip['clipID']}")))
+        chosen.append((clips[0]["durationSeconds"] < preferred, rank(f"{population(screen)}|speaker|{speaker}"), clips[0]))
     chosen.sort(key=lambda item: item[:2])
     references = [item[2] for item in chosen[: screen["referencesPerLanguage"]]]
     if len(references) < screen["referencesPerLanguage"]:
@@ -148,7 +213,7 @@ def select_references(screen: dict, language: str, clips_by_source: dict[str, tu
 
 def select_scripts(screen: dict, pool: list[dict], language: str, reference_key: str, count: int) -> list[dict]:
     entries = [entry for entry in pool if entry["language"] == language and entry["split"] == screen["scriptSplit"]]
-    entries.sort(key=lambda entry: rank(f"{screen['name']}|script|{reference_key}|{entry['id']}"))
+    entries.sort(key=lambda entry: rank(f"{population(screen)}|script|{reference_key}|{entry['id']}"))
     if len(entries) < count:
         raise ScreenError(f"{language}: the script pool holds fewer than {count} scripts")
     return entries[:count]
@@ -169,9 +234,15 @@ def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) 
         for index, clip in enumerate(select_references(screen, language, clips_by_source), start=1):
             voice = f"screen-{language}-{index:02d}"
             transcript = " ".join(unicodedata.normalize("NFC", clip["text"]).split())
-            voices.append({"voice": voice, "language": language, "clipID": clip["clipID"], "source": clip["source"],
-                           "audio": clip["path"], "audioSHA256": clip["wavSHA256"],
-                           "seconds": clip["durationSeconds"], "sampleRate": clip["sampleRate"], "transcript": transcript})
+            entry = {"voice": voice, "language": language, "clipID": clip["clipID"], "source": clip["source"],
+                     "audio": clip["path"], "audioSHA256": clip["wavSHA256"],
+                     "seconds": clip["durationSeconds"], "sampleRate": clip["sampleRate"], "transcript": transcript}
+            layout = layout_for(screen, index)
+            if layout:
+                path, digest = two_channel_reference(Path(clip["path"]), layout)
+                entry.update(audio=str(path), audioSHA256=digest, channelLayout=layout,
+                             monoAudio=clip["path"], monoAudioSHA256=clip["wavSHA256"])
+            voices.append(entry)
             other = screen["crossLanguage"].get(language, screen["crossLanguage"]["default"])
             scripts = [(language, script) for script in
                        select_scripts(screen, pool, language, clip["clipID"], screen["scriptsPerReference"])]
@@ -255,6 +326,11 @@ def run_arm(args: argparse.Namespace) -> Path:
     write_json(arm_dir / "arm.json", arm)
     common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input"]
 
+    # A reference that is not the file the plan was made from would fail or
+    # change its voice's takes, and the arm would carry the blame.
+    for voice in plan["voices"]:
+        if not Path(voice["audio"]).is_file() or sha256_file(Path(voice["audio"])) != voice["audioSHA256"]:
+            raise ScreenError(f"{voice['voice']}: the reference is missing or not the one the plan names; plan again")
     enrolled: dict[str, str | None] = {}
     for voice in plan["voices"]:
         code, document = invoke([
@@ -509,8 +585,8 @@ def bootstrap_interval(clusters: dict[str, list[float]], generator: random.Rando
     return means[int(0.025 * len(means))], means[int(0.975 * len(means)) - 1]
 
 
-def summarize(plan: dict, a: dict, b: dict) -> dict:
-    takes = plan["takes"]
+def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> dict:
+    takes = plan["takes"] if takes is None else takes
     generator = random.Random(20_261_111)
     outcomes = {name: {kind: sum(view["rows"][take["takeID"]]["outcome"] == kind for take in takes)
                        for kind in ("generated", "refused", "failed")} for name, view in (("a", a), ("b", b))}
@@ -556,7 +632,29 @@ def summarize(plan: dict, a: dict, b: dict) -> dict:
             "scored": bool(a["scores"]) and bool(b["scores"]), "metrics": metrics}
 
 
-def decide(summary: dict, rule: dict) -> dict:
+def floor_violations(rule: dict, floor: dict | None) -> list[str]:
+    """A rule may require the screen's own noise floor to sit well inside its
+    margins: a floor report (compare --expect noise of the same population
+    under two seed sets) whose bound on a guard exceeds the given share of
+    that guard's margin makes the screen unable to decide."""
+    share = rule.get("maximumFloorShareOfMargin")
+    if share is None:
+        return []
+    if floor is None:
+        return ["the rule needs this screen's noise floor (--floor)"]
+    reasons = []
+    for metric, guard in rule["guards"].items():
+        measured = (floor.get("metrics") or {}).get(metric)
+        if not measured:
+            reasons.append(f"the noise floor did not measure {metric}")
+            continue
+        bound = max(abs(value) for value in measured["interval95"])
+        if bound > share * guard["margin"]:
+            reasons.append(f"the noise floor of {metric} ({bound:.4g}) exceeds {share} of its margin")
+    return reasons
+
+
+def decide(summary: dict, rule: dict, floor: dict | None = None) -> dict:
     """ADOPT when arm B fails no more takes than arm A (within the allowance)
     and is not worse on any guarded metric beyond its margin; REJECT when it is
     worse beyond a margin with the interval excluding zero harm; otherwise
@@ -578,6 +676,7 @@ def decide(summary: dict, rule: dict) -> dict:
             harms.append(f"{metric} is worse by more than {guard['margin']}")
         elif worst > guard["margin"]:
             reasons.append(f"{metric}: the interval reaches past the margin of {guard['margin']}")
+    reasons += floor_violations(rule, floor)
     verdict = "REJECT" if harms else ("INCONCLUSIVE" if reasons else "ADOPT")
     return {"verdict": verdict, "harms": harms, "open": reasons}
 
@@ -597,6 +696,12 @@ def compare_arms(args: argparse.Namespace) -> int:
     else:
         b = arm_view(run_dir, args.b, plan)
     summary = summarize(plan, a, b)
+    # Report-only strata: a decision reads the whole population.
+    layouts = {voice["voice"]: voice.get("channelLayout") for voice in plan["voices"]}
+    if any(layouts.values()):
+        summary["strata"] = {
+            layout: summarize(plan, a, b, [take for take in plan["takes"] if layouts[take["voice"]] == layout])
+            for layout in sorted({value for value in layouts.values() if value})}
     same_arm = (a["arm"]["environment"] == b["arm"]["environment"]
                 and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"])
     report = {"schemaVersion": SCHEMA_VERSION, "screen": plan["screen"], "planSHA256": plan["planSHA256"],
@@ -625,7 +730,14 @@ def compare_arms(args: argparse.Namespace) -> int:
             report.update(verdict="INERT", decision={"verdict": "INERT", "harms": [], "open": []})
             code = 1
         else:
-            decision = decide(summary, rule)
+            floor = None
+            if args.floor:
+                floor_report = read_json(Path(args.floor))
+                if floor_report.get("verdict") != "NOISE-FLOOR" or floor_report.get("screen") != plan["screen"]:
+                    raise ScreenError("--floor takes this screen's noise-floor report (compare --expect noise)")
+                floor = floor_report["summary"]
+                report["floor"] = {"report": Path(args.floor).name, "a": floor_report["a"]["arm"], "b": floor_report["b"]["arm"]}
+            decision = decide(summary, rule, floor)
             report.update(verdict=decision["verdict"], decision=decision, rule={"name": args.rule, **rule})
             code = 0 if decision["verdict"] == "ADOPT" else 1
     out = run_dir / f"compare-{args.a}-vs-{args.b}.json"
@@ -684,6 +796,7 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("--a", required=True)
     compare.add_argument("--b", required=True)
     compare.add_argument("--b-run", help="arm B's run directory when it is the same plan under another seed set")
+    compare.add_argument("--floor", help="with --rule: this screen's noise-floor report, when the rule requires one")
     mode = compare.add_mutually_exclusive_group(required=True)
     mode.add_argument("--expect", choices=("identical", "noise"))
     mode.add_argument("--rule")

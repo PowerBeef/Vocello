@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import random
+import struct
 import sys
 import tempfile
 import unittest
@@ -110,6 +111,29 @@ class PlanTests(unittest.TestCase):
         for bad in ("PATH=/tmp", "QWENVOICE_X", "=on"):
             with self.assertRaises(screen.ScreenError):
                 screen.parse_overrides([bad])
+
+
+class ChannelLayoutTests(unittest.TestCase):
+    def test_a_layout_copies_samples_and_never_recomputes_them(self):
+        mono = struct.pack("<4h", 1, -2, 32767, -32768)
+        self.assertEqual(screen.stereo_frames(mono, "duplicate"),
+                         struct.pack("<8h", 1, 1, -2, -2, 32767, 32767, -32768, -32768))
+        self.assertEqual(screen.stereo_frames(mono, "left-only"),
+                         struct.pack("<8h", 1, 0, -2, 0, 32767, 0, -32768, 0))
+        with self.assertRaises(screen.ScreenError):
+            screen.stereo_frames(mono, "right-only")
+        with self.assertRaises(screen.ScreenError):
+            screen.stereo_frames(b"\x01", "duplicate")
+
+    def test_layouts_alternate_so_each_language_has_both(self):
+        definition = {"referenceChannels": "alternate-duplicate-left-only"}
+        self.assertEqual([screen.layout_for(definition, index) for index in range(1, 5)],
+                         ["duplicate", "left-only", "duplicate", "left-only"])
+        self.assertIsNone(screen.layout_for({}, 1))
+
+    def test_a_variant_draws_its_populations_references(self):
+        self.assertEqual(screen.population({"name": "clone-stereo", "population": "clone"}), "clone")
+        self.assertEqual(screen.population({"name": "clone"}), "clone")
 
 
 class OutcomeTests(unittest.TestCase):
@@ -247,6 +271,34 @@ class DecisionTests(unittest.TestCase):
         missing = self.summary((-0.01, 0.01), (0.0, 0.0))
         del missing["metrics"]["errorRateBetterFamily"]
         self.assertEqual(screen.decide(missing, self.RULE)["verdict"], "INCONCLUSIVE")
+
+
+class FloorTests(unittest.TestCase):
+    RULE = {"maximumFloorShareOfMargin": 0.71, "guards": {
+        "speakerSimilarity": {"higherIsBetter": True, "margin": 0.05},
+        "errorRateBetterFamily": {"higherIsBetter": False, "margin": 0.04}}}
+
+    def floor(self, similarity, error) -> dict:
+        return {"metrics": {"speakerSimilarity": {"interval95": list(similarity)},
+                            "errorRateBetterFamily": {"interval95": list(error)}}}
+
+    def test_a_floor_inside_the_share_of_every_margin_lets_the_rule_decide(self):
+        self.assertEqual(screen.floor_violations(self.RULE, self.floor((-0.035, 0.005), (0.0, 0.027))), [])
+        self.assertEqual(screen.floor_violations({"guards": {}}, None), [], "a rule without the condition needs no floor")
+
+    def test_a_wide_or_missing_floor_makes_the_screen_unable_to_decide(self):
+        wide = screen.floor_violations(self.RULE, self.floor((-0.04, 0.0), (0.0, 0.027)))
+        self.assertEqual(len(wide), 1)
+        self.assertIn("speakerSimilarity", wide[0])
+        self.assertEqual(len(screen.floor_violations(self.RULE, None)), 1)
+        missing = {"metrics": {"speakerSimilarity": {"interval95": [0.0, 0.0]}}}
+        self.assertIn("errorRateBetterFamily", screen.floor_violations(self.RULE, missing)[0])
+        summary = {"grossFailures": {"a": 0, "b": 0}, "metrics": {
+            "speakerSimilarity": {"interval95": [0.0, 0.01]}, "errorRateBetterFamily": {"interval95": [-0.01, 0.0]}}}
+        rule = dict(self.RULE, maximumExtraGrossFailures=4)
+        self.assertEqual(screen.decide(summary, rule, self.floor((-0.01, 0.01), (0.0, 0.01)))["verdict"], "ADOPT")
+        self.assertEqual(screen.decide(summary, rule, self.floor((-0.04, 0.01), (0.0, 0.01)))["verdict"], "INCONCLUSIVE")
+        self.assertEqual(screen.decide(summary, rule, None)["verdict"], "INCONCLUSIVE")
 
 
 class ArmTests(unittest.TestCase):

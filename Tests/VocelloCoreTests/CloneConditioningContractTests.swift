@@ -338,10 +338,11 @@ final class CloneConditioningContractTests: XCTestCase {
             Cache.preparationFingerprint(contentDigest: contentDigest, version: Service.cloneReferencePreparationVersion))
         XCTAssertEqual(Service.Resampling.assetReader.preparationVersion, 1)
         XCTAssertEqual(Service.Resampling.singleCall.preparationVersion, 2)
-        XCTAssertEqual(Service.newestCloneReferencePreparationVersion, 2)
+        XCTAssertEqual(Service.Resampling.singleCallAveraged.preparationVersion, 3)
+        XCTAssertEqual(Service.newestCloneReferencePreparationVersion, 3)
         XCTAssertEqual(
             try Cache.cloneReferenceFingerprintsOfEveryPreparationVersion(for: file),
-            [contentDigest, Cache.preparationFingerprint(contentDigest: contentDigest, version: 2)])
+            [contentDigest] + [2, 3].map { Cache.preparationFingerprint(contentDigest: contentDigest, version: $0) })
         XCTAssertEqual(Cache.preparationFingerprint(contentDigest: contentDigest, version: 1), contentDigest)
         let second = Cache.preparationFingerprint(contentDigest: contentDigest, version: 2)
         XCTAssertNotEqual(second, contentDigest)
@@ -389,9 +390,18 @@ final class CloneConditioningContractTests: XCTestCase {
     func testResamplingKeepsALevelAndMixesChannelsDown() throws {
         typealias Service = NativeAudioPreparationService
         let half = Float(0.5.squareRoot())
-        XCTAssertEqual(Service.downmixed([0.2, 0.4, -1, 1, 0.5, 0.5], channels: 2), [0.6 * half, 0, half])
-        XCTAssertEqual(Service.downmixed([0.75, 0.75, 0.75, 0.0, 0.0, 0.375], channels: 3), [0.75, 0.125])
-        XCTAssertEqual(Service.downmixed([0.1, 0.2, 0.3], channels: 1), [0.1, 0.2, 0.3])
+        XCTAssertEqual(Service.downmixed([0.2, 0.4, -1, 1, 0.5, 0.5], channels: 2, mixdown: .sumOverRootTwo),
+                       [0.6 * half, 0, half])
+        XCTAssertEqual(Service.downmixed([0.25, 0.75, -1, 1, 0.5, 0.5], channels: 2, mixdown: .average), [0.5, 0, 0.5])
+        for mixdown in [Service.Mixdown.sumOverRootTwo, .average] {
+            XCTAssertEqual(Service.downmixed([0.75, 0.75, 0.75, 0.0, 0.0, 0.375], channels: 3, mixdown: mixdown),
+                           [0.75, 0.125])
+            XCTAssertEqual(Service.downmixed([0.1, 0.2, 0.3], channels: 1, mixdown: mixdown), [0.1, 0.2, 0.3])
+        }
+        // A voice on both channels peaking at -1 dBFS clips under the sum
+        // over the square root of two, and keeps its level under the average.
+        XCTAssertGreaterThan(Service.downmixed([0.9, 0.9], channels: 2, mixdown: .sumOverRootTwo)[0], 1)
+        XCTAssertEqual(Service.downmixed([0.9, 0.9], channels: 2, mixdown: .average), [0.9])
         // Already at the model's rate: the samples are not touched.
         let tone = (0..<4_800).map { Float(0.25 * sin(2.0 * .pi * 440.0 * Double($0) / 24_000)) }
         XCTAssertEqual(try Service.resampledToCanonicalRate(tone, sourceSampleRate: 24_000), tone)
@@ -415,7 +425,7 @@ final class CloneConditioningContractTests: XCTestCase {
     /// prepared reference that is not already canonical and every saved
     /// voice's prompt, so it is pinned here. The key acts only in an
     /// internal-diagnostics build with the master gate on.
-    func testTheResamplingPathIsTheSingleCallUnlessTheGatedKeySelectsTheOther() {
+    func testTheResamplingPathIsTheSingleCallUnlessTheGatedKeySelectsAnother() {
         typealias Resampling = NativeAudioPreparationService.Resampling
         let key = Resampling.environmentKey
         func resolved(_ environment: [String: String], diagnostics: Bool = true) -> Resampling {
@@ -429,6 +439,8 @@ final class CloneConditioningContractTests: XCTestCase {
                        "not in a build without internal diagnostics")
         XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "asset-reader"]), .assetReader)
         XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call"]), .singleCall)
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call-average"]), .singleCallAveraged)
+        XCTAssertEqual(resolved([key: "single-call-average"]), .singleCall, "not without the master gate")
         for mistyped in ["assetreader", "off", "1", ""] {
             XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: mistyped]), .singleCall, mistyped)
         }
@@ -476,23 +488,28 @@ final class CloneConditioningContractTests: XCTestCase {
             let source = root.appendingPathComponent("\(name).wav")
             try Self.writeStereoPCM16WAV(left: left, right: right, sampleRate: 24_000, to: source)
             var prepared: [NativeAudioPreparationService.Resampling: [Int16]] = [:]
-            for path in [NativeAudioPreparationService.Resampling.assetReader, .singleCall] {
+            for path in [NativeAudioPreparationService.Resampling.assetReader, .singleCall, .singleCallAveraged] {
                 let result = try await NativeAudioPreparationService(resampling: path).normalizeAudio(
                     AudioPreparationRequest(inputURL: source, outputURL: root.appendingPathComponent("\(name)-\(path.rawValue).wav")))
                 XCTAssertEqual(result.channelCount, 1)
                 XCTAssertEqual(result.frameCount, Int64(frames), "\(name) \(path): no resampling, no lost frames")
                 prepared[path] = try Self.readPCM16(result.normalizedURL)
             }
+            // Nothing is resampled at 24 kHz, so every sample is arithmetic:
+            // the mix of the two decoded samples, scaled back to 16 bits.
+            typealias Service = NativeAudioPreparationService
+            func expected(_ weight: Float) -> [Int16] {
+                zip(left, right).map { Service.canonicalSample((Float($0) / 32_768 + Float($1) / 32_768) * weight) }
+            }
             let single = try XCTUnwrap(prepared[.singleCall])
+            XCTAssertEqual(single, expected(Float(0.5.squareRoot())), "\(name): version 2, the sum over the square root of two")
             let reader = try XCTUnwrap(prepared[.assetReader])
-            let expected = zip(left, right).map { Int16((Double(Int($0) + Int($1)) * 0.5.squareRoot()).rounded()) }
-            XCTAssertLessThanOrEqual(
-                zip(single, expected).map { abs(Int($0) - Int($1)) }.max() ?? 0, 1,
-                "\(name): the sum over the square root of two")
             XCTAssertEqual(reader.count, single.count)
             XCTAssertLessThanOrEqual(
                 zip(reader, single).map { abs(Int($0) - Int($1)) }.max() ?? 0, 1,
-                "\(name): the two paths give the same samples when nothing is resampled")
+                "\(name): the asset reader mixes the same way, within its own rounding")
+            let averaged = try XCTUnwrap(prepared[.singleCallAveraged])
+            XCTAssertEqual(averaged, expected(0.5), "\(name): version 3, the mean of the two channels")
         }
     }
 

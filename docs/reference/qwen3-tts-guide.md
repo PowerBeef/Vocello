@@ -512,9 +512,11 @@ an artifact built on an earlier MLX is rejected at load and rebuilt once from it
   voice's prompt rebuilds once. `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the old
   path in a diagnostics build.
 - **Two channels are mixed as the sum over the square root of two**, as the asset reader mixed
-  them: version 2 changed one thing. A voice recorded on both channels comes out
-  3 dB hotter and clips if it peaked above -3 dBFS. Mixing by the average would not; that is a
-  separate change with its own screen (RF-52).
+  them: version 2 changed one thing. A voice recorded on both channels then comes out 3 dB hotter
+  than its source and clips where it peaked above -3 dBFS. Upstream Qwen3-TTS averages the channels
+  (`librosa.load(mono=True)`, then `np.mean`), as does the Python port (`ffmpeg -ac 1`). Version 3
+  (`QWENVOICE_REFERENCE_PREPARATION=single-call-average`) averages them; the `clone-stereo` screen's
+  rule `reference-mixdown-average` decides whether it becomes the default.
 - **The codec encoder's implementation is still unversioned**, so the A-02 fix must add a version or
   saved voices keep their old reference codes (G-03, RF-52).
 

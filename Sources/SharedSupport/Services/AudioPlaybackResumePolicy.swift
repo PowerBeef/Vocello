@@ -75,7 +75,10 @@ enum PlaybackTransportPlacement: Equatable {
 /// 1. **Smooth-first estimate**: production generation passes an estimated
 ///    audio duration before streaming begins. The preview waits for a
 ///    conservative queue depth, `max(3.25 s, min(8 s, estimate * 0.35))`,
-///    capped by the estimate for short clips.
+///    capped by the estimate for short clips. A take measured as arriving
+///    faster than it plays (`LivePreviewPace`) needs less, down to a jitter
+///    buffer; after an underrun the measurement is ignored and the
+///    conservative depth applies again.
 /// 2. **Adaptive fallback**: with no estimate, each underrun raises the
 ///    prebuffer requirement by 75 % up to a 4x cap, trading fast first audio
 ///    for pauses that grow further apart.
@@ -97,14 +100,17 @@ enum LivePreviewStartPolicy {
         minimumBufferedDuration: TimeInterval,
         finalFileAvailable: Bool,
         underrunCount: Int = 0,
-        estimate: LivePreviewEstimate? = nil
+        estimate: LivePreviewEstimate? = nil,
+        pace: Double? = nil
     ) -> Decision {
         guard autoplayEnabled else { return .rejectAutoplay }
         guard !finalFileAvailable else { return .start }
 
         if let estimate {
             let requiredBuffer = estimate.requiredBufferDuration(
-                minimumBufferedDuration: minimumBufferedDuration
+                minimumBufferedDuration: minimumBufferedDuration,
+                // An underrun proved the pace wrong for this take.
+                pace: underrunCount == 0 ? pace : nil
             )
             return queuedDuration >= requiredBuffer ? .start : .rejectBuffer
         }

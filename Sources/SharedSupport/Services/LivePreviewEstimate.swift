@@ -13,17 +13,34 @@ struct LivePreviewEstimate: Equatable, Sendable {
         estimatedAudioDuration = estimate
     }
 
+    /// The audio the preview queues before it starts.
+    ///
+    /// Without a measured `pace` this is the smooth-first buffer:
+    /// `max(minimum, min(maximum, estimate * fraction))`, capped by the
+    /// estimate. With one, a take that is arriving faster than it plays needs
+    /// less (RF-48): once the pace, less a safety margin, is at or above
+    /// `LivePreviewPace.comfortablePace` the buffer only has to cover the
+    /// spacing of the chunks, and between real time and that pace the two
+    /// buffers are blended. A take at or below real time keeps the
+    /// smooth-first buffer, so a slow device waits no longer than before.
     func requiredBufferDuration(
         minimumBufferedDuration: TimeInterval,
         maximumBufferedDuration: TimeInterval = 8,
-        fraction: Double = 0.35
+        fraction: Double = 0.35,
+        pace: Double? = nil
     ) -> TimeInterval {
         guard estimatedAudioDuration > 0 else { return 0 }
         let smoothBuffer = max(
             minimumBufferedDuration,
             min(maximumBufferedDuration, estimatedAudioDuration * fraction)
         )
-        return min(estimatedAudioDuration, smoothBuffer)
+        let conservative = min(estimatedAudioDuration, smoothBuffer)
+        guard let pace, pace.isFinite else { return conservative }
+        let safePace = pace * LivePreviewPace.safetyFactor
+        guard safePace > 1 else { return conservative }
+        let jitterBuffer = min(conservative, LivePreviewPace.jitterBufferDuration)
+        let headroom = min(1, (safePace - 1) / (LivePreviewPace.comfortablePace - 1))
+        return conservative + (jitterBuffer - conservative) * headroom
     }
 
     private static func estimatedAudioDuration(for text: String) -> TimeInterval {
@@ -104,5 +121,72 @@ private struct CJKScriptCount {
         let japaneseSecondsPerCharacter = 0.22
         let hanSeconds = kana > 0 ? japaneseSecondsPerCharacter : chineseSecondsPerCharacter
         return Double(han) * hanSeconds + Double(kana + hangul) * japaneseSecondsPerCharacter
+    }
+}
+
+/// How fast a take's audio is arriving at the player, measured from the take's
+/// own chunks (RF-48): audio seconds received per second of wall time since
+/// its first chunk. The first chunk's own audio is left out, because the time
+/// before it (prompt and prefill) is not part of the steady rate.
+///
+/// The preview uses it to stop waiting for a buffer it does not need. On a
+/// Mac or an iPhone that generates two to four times faster than playback,
+/// the fixed 3.25-second buffer delayed the first sound by most of a second
+/// for no gain; a device at or below real time keeps that buffer.
+struct LivePreviewPace: Equatable, Sendable {
+    /// Chunks after the first before the pace is trusted.
+    static let minimumChunks = 2
+    /// Wall time after the first chunk before the pace is trusted.
+    static let minimumSpan: TimeInterval = 0.25
+    /// The measured pace is discounted by this much: generation slows as a
+    /// device warms, and an early measurement is the fastest it will be.
+    static let safetyFactor = 0.8
+    /// At this discounted pace and above, only the jitter buffer is kept.
+    static let comfortablePace = 1.5
+    /// The least queued audio a fast take starts from. The pace is trusted
+    /// only after two chunks follow the first, so three chunks (1.2 s or more
+    /// at the engine's chunk sizes) are queued by then and this floor rarely
+    /// binds; it is what a resumed or re-evaluated start is held to.
+    static let jitterBufferDuration: TimeInterval = 0.8
+
+    private var firstChunkAt: TimeInterval?
+    private var latestChunkAt: TimeInterval = 0
+    private var audioAfterFirstChunk: TimeInterval = 0
+    private var chunksAfterFirst = 0
+    private var unmeasurable = false
+
+    /// Records one chunk received from the engine at `now` (monotonic
+    /// seconds). A time that runs backwards makes the take unmeasurable.
+    mutating func record(chunkAudioSeconds: TimeInterval, at now: TimeInterval) {
+        guard !unmeasurable else { return }
+        guard let firstChunkAt else {
+            self.firstChunkAt = now
+            latestChunkAt = now
+            return
+        }
+        guard now >= latestChunkAt, now >= firstChunkAt, chunkAudioSeconds >= 0 else {
+            unmeasurable = true
+            return
+        }
+        latestChunkAt = now
+        audioAfterFirstChunk += chunkAudioSeconds
+        chunksAfterFirst += 1
+    }
+
+    /// A take promoted from the queue behind another take has no pace, with
+    /// or without stored chunks: the chunks it replays did not reach the
+    /// player as they were generated, so their arrival times say nothing
+    /// about how fast it is generated.
+    mutating func markUnmeasurable() {
+        unmeasurable = true
+    }
+
+    /// Audio seconds received per wall second since the first chunk; nil
+    /// until enough chunks and time have passed to trust it.
+    var audioSecondsPerSecond: Double? {
+        guard !unmeasurable, let firstChunkAt, chunksAfterFirst >= Self.minimumChunks else { return nil }
+        let span = latestChunkAt - firstChunkAt
+        guard span >= Self.minimumSpan else { return nil }
+        return audioAfterFirstChunk / span
     }
 }

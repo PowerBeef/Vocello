@@ -142,7 +142,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         minimumBufferedDuration: TimeInterval,
         finalFileAvailable: Bool,
         underrunCount: Int = 0,
-        estimate: LivePreviewEstimate? = nil
+        estimate: LivePreviewEstimate? = nil,
+        pace: Double? = nil
     ) -> Bool {
         switch LivePreviewStartPolicy.decide(
             autoplayEnabled: autoplayEnabled,
@@ -152,7 +153,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             minimumBufferedDuration: minimumBufferedDuration,
             finalFileAvailable: finalFileAvailable,
             underrunCount: underrunCount,
-            estimate: estimate
+            estimate: estimate,
+            pace: pace
         ) {
         case .start:
             return true
@@ -216,6 +218,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     @ObservationIgnored private var livePreviewDuration: TimeInterval = 0
     @ObservationIgnored private var livePlaybackTimeOffset: TimeInterval = 0
     @ObservationIgnored private var liveUnderrunCount = 0
+    /// How fast the current take's audio is arriving (RF-48); reset with the
+    /// underrun count, wherever a take's live state starts over.
+    @ObservationIgnored private var livePreviewPace = LivePreviewPace()
     @ObservationIgnored private var completedLiveSessionIDs: Set<String> = []
     @ObservationIgnored private var completedLiveSessionOrder: [String] = []
     private let livePreviewConfiguration: LivePreviewConfiguration
@@ -727,6 +732,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
+        livePreviewPace = LivePreviewPace()
         livePreviewEstimate = sessionEstimate
         pendingLivePreviewEstimate = nil
         liveExpectedFrameOffset = 0
@@ -995,6 +1001,10 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     }
 
     private func handleGenerationChunk(_ chunk: ChunkInfo) {
+        // Read before the session starts, the graph is configured or a chunk
+        // file is decoded: a delay here on the first chunk would otherwise
+        // shorten the span the pace is measured over and inflate it (RF-48).
+        let receivedAt = ProcessInfo.processInfo.systemUptime
         #if os(macOS)
         guard generationPlaybackOwnership.acceptsChunk(chunk.generationID) else { return }
         #endif
@@ -1044,12 +1054,14 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         if let previewAudio = chunk.previewAudio {
             appendLiveChunk(
                 previewAudio,
-                cumulativeDuration: cumulativeDuration
+                cumulativeDuration: cumulativeDuration,
+                receivedAt: receivedAt
             )
         } else if let chunkPath = chunk.chunkPath {
             appendLiveChunk(
                 from: URL(fileURLWithPath: chunkPath),
-                cumulativeDuration: cumulativeDuration
+                cumulativeDuration: cumulativeDuration,
+                receivedAt: receivedAt
             )
         }
     }
@@ -1116,6 +1128,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
+        livePreviewPace = LivePreviewPace()
         // Smooth-first prebuffer estimate handoff: pending values
         // captured pre-generation become the active session's
         // estimate, then are cleared (above, by the teardown) so a future
@@ -1325,6 +1338,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             queuedGenerationMode: next.details.generationMode,
             isQueuedTake: true
         )
+        // These chunks waited behind another take: their arrival here says
+        // nothing about how fast the take is generated.
+        livePreviewPace.markUnmeasurable()
         for chunk in next.chunks {
             guard livePreviewDisabledSessionID != liveSessionID else {
                 if case .file(let url, cumulativeDuration: _) = chunk {
@@ -1404,7 +1420,11 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         promoteQueuedLiveSession()
     }
 
-    private func appendLiveChunk(from url: URL, cumulativeDuration: TimeInterval?) {
+    /// `receivedAt` is when the chunk reached the player from the engine
+    /// (monotonic seconds), nil for a chunk replayed from the take queue.
+    private func appendLiveChunk(
+        from url: URL, cumulativeDuration: TimeInterval?, receivedAt: TimeInterval? = nil
+    ) {
         LivePreviewDiagnostics.logChunkEvent(
             "appendLiveChunk.enter",
             viewModel: self,
@@ -1426,6 +1446,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
 
         AppPerformanceSignposts.emit("Chunk Decoded")
         let chunkAudioSeconds = TimeInterval(buffer.frameLength) / fileFormat.sampleRate
+        if let receivedAt {
+            livePreviewPace.record(chunkAudioSeconds: chunkAudioSeconds, at: receivedAt)
+        }
         enqueueLiveBuffer(buffer, chunkAudioSeconds: chunkAudioSeconds)
         AppGenerationTimeline.shared.recordPlaybackChunk(
             id: liveSessionID,
@@ -1450,7 +1473,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             minimumBufferedDuration: livePreviewConfiguration.minimumBufferedDuration,
             finalFileAvailable: liveFinalFilePath != nil,
             underrunCount: liveUnderrunCount,
-            estimate: livePreviewEstimate
+            estimate: livePreviewEstimate,
+            pace: livePreviewPace.audioSecondsPerSecond
         ) {
             attemptLivePlay()
         } else {
@@ -1501,12 +1525,17 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
+        livePreviewPace = LivePreviewPace()
         liveExpectedFrameOffset = nil
         setLivePreviewQueueDepth(0)
         setLivePreviewPhase(.buffering)
     }
 
-    private func appendLiveChunk(_ previewAudio: StreamingAudioChunk, cumulativeDuration: TimeInterval?) {
+    /// `receivedAt` is when the chunk reached the player from the engine
+    /// (monotonic seconds), nil for a chunk replayed from the take queue.
+    private func appendLiveChunk(
+        _ previewAudio: StreamingAudioChunk, cumulativeDuration: TimeInterval?, receivedAt: TimeInterval? = nil
+    ) {
         guard validatePreviewAudioChunk(previewAudio) else { return }
         guard let (buffer, format) = makePCMBuffer(from: previewAudio) else {
             stopLivePreviewForChunkContinuityFailure()
@@ -1520,6 +1549,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
 
         AppPerformanceSignposts.emit("Chunk Decoded")
         let chunkAudioSeconds = TimeInterval(buffer.frameLength) / format.sampleRate
+        if let receivedAt {
+            livePreviewPace.record(chunkAudioSeconds: chunkAudioSeconds, at: receivedAt)
+        }
         enqueueLiveBuffer(buffer, chunkAudioSeconds: chunkAudioSeconds)
         AppGenerationTimeline.shared.recordPlaybackChunk(
             id: liveSessionID,
@@ -1544,7 +1576,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             minimumBufferedDuration: livePreviewConfiguration.minimumBufferedDuration,
             finalFileAvailable: liveFinalFilePath != nil,
             underrunCount: liveUnderrunCount,
-            estimate: livePreviewEstimate
+            estimate: livePreviewEstimate,
+            pace: livePreviewPace.audioSecondsPerSecond
         ) {
             attemptLivePlay()
         } else {
@@ -1730,6 +1763,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDuration = 0
         livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
+        livePreviewPace = LivePreviewPace()
         livePlayback.clearFormat()
         livePreviewEstimate = nil
         liveExpectedFrameOffset = nil
@@ -1868,6 +1902,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             livePreviewDuration = 0
             livePlaybackTimeOffset = 0
             liveUnderrunCount = 0
+            livePreviewPace = LivePreviewPace()
             livePlayback.clearFormat()
             livePreviewEstimate = nil
             liveExpectedFrameOffset = nil

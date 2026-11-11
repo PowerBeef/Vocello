@@ -355,6 +355,86 @@ final class LivePreviewStartPolicyTests: XCTestCase {
         ), .start)
     }
 
+    // MARK: - Pace-aware prebuffer (RF-48)
+
+    private func pace(chunks: [(audio: TimeInterval, at: TimeInterval)]) -> LivePreviewPace {
+        var pace = LivePreviewPace()
+        for chunk in chunks { pace.record(chunkAudioSeconds: chunk.audio, at: chunk.at) }
+        return pace
+    }
+
+    func testPaceIsAudioPerWallSecondAfterTheFirstChunk() {
+        // The first chunk's audio and the wait before it are left out.
+        let measured = pace(chunks: [(0.32, 10.0), (0.32, 10.1), (0.64, 10.3), (0.64, 10.5)])
+        XCTAssertEqual(try XCTUnwrap(measured.audioSecondsPerSecond), 1.6 / 0.5, accuracy: 1e-9)
+
+        XCTAssertNil(pace(chunks: [(0.32, 10.0)]).audioSecondsPerSecond, "one chunk is no pace")
+        XCTAssertNil(
+            pace(chunks: [(0.32, 10.0), (0.32, 10.2)]).audioSecondsPerSecond,
+            "one interval is too few"
+        )
+        XCTAssertNil(
+            pace(chunks: [(0.32, 10.0), (0.32, 10.05), (0.32, 10.1)]).audioSecondsPerSecond,
+            "a burst shorter than the minimum span is no pace"
+        )
+        XCTAssertNil(
+            pace(chunks: [(0.32, 10.0), (0.32, 10.4), (0.32, 10.2)]).audioSecondsPerSecond,
+            "a clock that runs backwards makes the take unmeasurable"
+        )
+        var queued = pace(chunks: [(0.32, 10.0), (0.32, 10.3), (0.32, 10.6)])
+        XCTAssertNotNil(queued.audioSecondsPerSecond)
+        queued.markUnmeasurable()
+        queued.record(chunkAudioSeconds: 0.32, at: 10.9)
+        XCTAssertNil(queued.audioSecondsPerSecond, "a take replayed from the queue has no pace")
+    }
+
+    func testAFastTakeNeedsOnlyTheJitterBufferAndASlowOneKeepsTheSmoothBuffer() throws {
+        let estimate = try XCTUnwrap(LivePreviewEstimate(text: String(repeating: "word ", count: 80)))
+        let smooth = estimate.requiredBufferDuration(minimumBufferedDuration: 3.25)
+        XCTAssertGreaterThanOrEqual(smooth, 3.25)
+
+        func required(_ pace: Double?) -> TimeInterval {
+            estimate.requiredBufferDuration(minimumBufferedDuration: 3.25, pace: pace)
+        }
+        XCTAssertEqual(required(nil), smooth)
+        // At or below real time, and inside the safety margin above it.
+        for slow in [0.5, 1.0, 1.25] {
+            XCTAssertEqual(required(slow), smooth, "pace \(slow)")
+        }
+        // Three to four times real time (a Mac), and twice (a recent iPhone).
+        for fast in [3.6, 2.0, 1.875] {
+            XCTAssertEqual(required(fast), LivePreviewPace.jitterBufferDuration, accuracy: 1e-9, "pace \(fast)")
+        }
+        // Between the two the buffer shrinks steadily.
+        let middle = required(1.5625)
+        XCTAssertEqual(middle, (smooth + LivePreviewPace.jitterBufferDuration) / 2, accuracy: 1e-9)
+        XCTAssertEqual(required(.infinity), smooth, "a pace that is not a number is ignored")
+
+        // A clip shorter than the jitter buffer still waits for no more than itself.
+        let short = try XCTUnwrap(LivePreviewEstimate(text: "Hi"))
+        XCTAssertLessThanOrEqual(
+            short.requiredBufferDuration(minimumBufferedDuration: 3.25, pace: 4),
+            short.estimatedAudioDuration
+        )
+    }
+
+    func testThePaceLowersTheStartThresholdUntilAnUnderrunDisprovesIt() throws {
+        let estimate = try XCTUnwrap(LivePreviewEstimate(text: String(repeating: "word ", count: 80)))
+        func decide(queued: TimeInterval, pace: Double?, underruns: Int = 0) -> LivePreviewStartPolicy.Decision {
+            LivePreviewStartPolicy.decide(
+                autoplayEnabled: true, queuedChunks: 3, queuedDuration: queued,
+                prebufferThreshold: 3, minimumBufferedDuration: 3.25, finalFileAvailable: false,
+                underrunCount: underruns, estimate: estimate, pace: pace
+            )
+        }
+        XCTAssertEqual(decide(queued: 1.0, pace: nil), .rejectBuffer)
+        XCTAssertEqual(decide(queued: 1.0, pace: 3.6), .start)
+        XCTAssertEqual(decide(queued: 0.5, pace: 3.6), .rejectBuffer, "less than the jitter buffer")
+        XCTAssertEqual(decide(queued: 1.0, pace: 0.5), .rejectBuffer, "a slow device keeps the smooth buffer")
+        XCTAssertEqual(decide(queued: 1.0, pace: 3.6, underruns: 1), .rejectBuffer, "an underrun disproved the pace")
+        XCTAssertEqual(decide(queued: 8.0, pace: 3.6, underruns: 1), .start)
+    }
+
     func testAdaptiveFallbackGrowsWithUnderruns() {
         XCTAssertEqual(LivePreviewStartPolicy.decide(
             autoplayEnabled: true, queuedChunks: 3, queuedDuration: 3.25,

@@ -103,6 +103,16 @@ task-local state and never advance the process-global RNG.
   They pay where the host bounds a frame: 4.0% on the M6 with the process clamped to the efficiency
   cores, and nothing measurable unclamped, where the GPU bounds it (the host waits on the GPU for
   over half of a take there). No iPhone measurement exists yet.
+- **The code predictor samples inside its compiled passes** (RF-46, DECODE-005). When the subtalker
+  stage is the plain temperature and top-k sampler, which production uses, each pass returns its
+  sampled code instead of its logits: one compiled call where there were a compiled pass and an
+  eager sampler, with the sampler's elementwise chains fused. The random key is an input the loop
+  resolves from the request's random state where the eager sampler resolved it, so a seed draws the
+  same keys in the same order. Any other stage, and a take with a sampler observer, keeps the eager
+  sampler. On the M6: PCM-identical on 39 fixed-seed takes (Speed, Quality, instruct-bearing and
+  long), 6.3% faster host-bound, 0.5% faster GPU-bound with 5.3% less host CPU. The identity is
+  measured, not proven: a fused kernel may round differently on another MLX or GPU, and the digests
+  are the guard.
 
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Seeded takes reproduce within one source identity

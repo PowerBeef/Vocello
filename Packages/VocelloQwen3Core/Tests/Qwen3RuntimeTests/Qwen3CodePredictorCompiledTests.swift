@@ -135,6 +135,110 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
         }
     }
 
+    // MARK: - Sampling inside a pass (RF-46)
+
+    /// A plan whose passes sample must draw exactly the codes the eager
+    /// sampler draws from the same passes' logits under the same random
+    /// state: same keys, in the same order, frame after frame.
+    func testPassesThatSampleDrawTheEagerSamplersCodes() throws {
+        let config = try makeConfig(numCodeGroups: 16, hidden: 16)
+        let passCount = config.numCodeGroups - 1
+        let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 8, minP: 0)
+        let sampling = try XCTUnwrap(CompiledPassSampling.eligible(
+            stage: stage, castsLogitsToFloat32: true, vocabSize: config.vocabSize
+        ))
+
+        for dtype in [DType.float32, .bfloat16] {
+            // The predictor's own weights take the dtype, as a shipped
+            // checkpoint's do, so the bf16 leg samples from bf16 logits and
+            // runs the float32 cast production runs.
+            MLXRandom.seed(0x5A3D_0046)
+            let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: 16)
+            predictor.update(parameters: predictor.parameters().mapValues { $0.asType(dtype) })
+            eval(predictor)
+            let probe = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype).run(
+                pass: 0,
+                codeHidden: MLXArray.zeros([1, 1, 16], dtype: dtype),
+                code0Embed: MLXArray.zeros([1, 1, 16], dtype: dtype),
+                token: nil
+            )
+            XCTAssertEqual(probe.dtype, dtype, "the pass's logits carry the model's dtype")
+            func frameInputs(_ frame: Int) -> (hidden: MLXArray, embed: MLXArray) {
+                let keys = MLXRandom.split(key: MLXRandom.key(UInt64(31_000 + frame)), into: 2)
+                return (
+                    MLXRandom.normal([1, 1, 16], key: keys[0]).asType(dtype),
+                    MLXRandom.normal([1, 1, 16], key: keys[1]).asType(dtype)
+                )
+            }
+
+            // Reference: logits from a plan that does not sample, then the eager sampler.
+            let logitsPlan = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype)
+            let scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: config.vocabSize)
+            var expected: [[UInt32]] = []
+            withRandomState(MLXRandom.RandomState(seed: 20_261_111)) {
+                for frame in 0 ..< 3 {
+                    let inputs = frameInputs(frame)
+                    var codes: [MLXArray] = []
+                    for pass in 0 ..< passCount {
+                        let logits = pass == 0
+                            ? logitsPlan.run(pass: 0, codeHidden: inputs.hidden, code0Embed: inputs.embed, token: nil)
+                            : logitsPlan.run(pass: pass, codeHidden: nil, code0Embed: nil, token: codes[pass - 1])
+                        codes.append(Qwen3TTSModel.sampleToken(
+                            logits, temperature: stage.temperature, topP: stage.topP, topK: stage.topK,
+                            minP: stage.minP, scratch: scratch, castsLogitsToFloat32: true
+                        ))
+                    }
+                    eval(codes)
+                    expected.append(codes.map { $0.asType(.uint32).item(UInt32.self) })
+                }
+            }
+
+            // The plan under test: each pass samples on a key resolved where
+            // the eager sampler resolves its own.
+            let samplingPlan = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype, sampling: sampling)
+            var drawn: [[UInt32]] = []
+            withRandomState(MLXRandom.RandomState(seed: 20_261_111)) {
+                for frame in 0 ..< 3 {
+                    let inputs = frameInputs(frame)
+                    var codes: [MLXArray] = []
+                    for pass in 0 ..< passCount {
+                        let key = resolve(key: MLXArray?.none)
+                        codes.append(pass == 0
+                            ? samplingPlan.run(
+                                pass: 0, codeHidden: inputs.hidden, code0Embed: inputs.embed, token: nil, key: key)
+                            : samplingPlan.run(
+                                pass: pass, codeHidden: nil, code0Embed: nil, token: codes[pass - 1], key: key))
+                    }
+                    eval(codes)
+                    XCTAssertTrue(codes.allSatisfy { $0.shape == [1, 1] })
+                    drawn.append(codes.map { $0.asType(.uint32).item(UInt32.self) })
+                }
+            }
+
+            XCTAssertEqual(drawn, expected, "\(dtype)")
+            XCTAssertGreaterThan(Set(drawn.flatMap { $0 }).count, 3, "the draws are not degenerate")
+        }
+    }
+
+    /// Only the plain temperature and top-k stage samples inside a pass; any
+    /// other stage keeps the eager sampler, which implements all of them.
+    func testOnlyThePlainTopKStageSamplesInsideAPass() {
+        func eligible(_ temperature: Float, _ topP: Float, _ topK: Int, _ minP: Float) -> Bool {
+            CompiledPassSampling.eligible(
+                stage: Qwen3SamplingStage(temperature: temperature, topP: topP, topK: topK, minP: minP),
+                castsLogitsToFloat32: true, vocabSize: 2_048
+            ) != nil
+        }
+        XCTAssertTrue(eligible(0.9, 1, 50, 0), "the production subtalker stage")
+        XCTAssertTrue(eligible(1, 1, 50, 0))
+        XCTAssertTrue(eligible(0.9, 0, 50, 0), "top-p of 0 is off in the eager sampler too")
+        XCTAssertFalse(eligible(0, 1, 50, 0), "greedy")
+        XCTAssertFalse(eligible(0.9, 0.95, 50, 0), "nucleus")
+        XCTAssertFalse(eligible(0.9, 1, 50, 0.05), "min-p")
+        XCTAssertFalse(eligible(0.9, 1, 0, 0), "no top-k")
+        XCTAssertFalse(eligible(0.9, 1, 2_048, 0), "a top-k that keeps everything")
+    }
+
     func testCompiledPlanMatchesEagerPathWithoutProjection() throws {
         try assertFramesMatch(talkerHidden: 16, cpHidden: 16)
     }

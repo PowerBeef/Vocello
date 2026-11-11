@@ -511,6 +511,30 @@
       "removalCriteria": "Remove if MLX's one-row quantized kernel stops computing each output row independently of the output width (the fixed-seed PCM digests would then differ), or if the pinned MLX gains a fused multi-projection product."
     },
     {
+      "id": "DECODE-005",
+      "title": "The code predictor's sampler runs inside each compiled pass, on keys the request resolves",
+      "category": "decoding",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3CodePredictorCompiledTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "diagnostic",
+      "benchmarkEvidenceReason": "Local fixed-seed A/B on the M6 against the optimized CLI of 6ddfa629 (scripts/pcm_identity.py, seed 19790615; no published record): PCM-identical on 39 takes (14 Speed, 14 Quality, 8 with instruct-bearing deliveries, 3 long). With the bench clamped to the efficiency cores, where the host bounds a frame: 6.3% faster (three paired rounds: -6.6%, -6.1%, -5.9%; baseline spread 1.6%). Unclamped, where the GPU bounds a frame: 0.5% faster (-0.6%, -0.4%, -0.3%; spread 0.2%) with 5.3% less host CPU. Identity is measured, not proven: MLX fuses the sampler's elementwise chains into one kernel, which could round differently on another MLX or GPU; the digests are the guard. No iPhone measurement exists yet.",
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove if the fixed-seed PCM digests differ from the eager sampler's on a supported device or after an MLX move, or if the subtalker stage stops being the plain temperature and top-k sampler."
+    },
+    {
       "id": "MARK-001",
       "title": "AudioSeal watermark generator port (EU AI Act Article 50 marking)",
       "category": "architecture",

@@ -3970,9 +3970,19 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // the eager codeCache is neither written nor trimmed here.
             var codeTokens = [nextToken]
             let codeHidden = hidden[0..., (-1)..., 0...]
+            // RF-46: when the subtalker stage is the plain temperature and
+            // top-k sampler, each pass samples inside its compiled function.
+            // A sampler observer needs the logits, so it keeps the eager one.
             let codePredictorPlan = codePredictorStepConstants.compiledPlan(
                 for: talker.codePredictor,
-                dtype: codeHidden.dtype
+                dtype: codeHidden.dtype,
+                sampling: samplerObserver == nil
+                    ? CompiledPassSampling.eligible(
+                        stage: subtalkerSampling,
+                        castsLogitsToFloat32: referenceParity.float32Sampling,
+                        vocabSize: talker.codePredictor.config.vocabSize
+                    )
+                    : nil
             )
 
             let codePredictorStartedAt = ContinuousClock.now
@@ -3980,19 +3990,34 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 {
                 let codePredictorStepStartedAt = ContinuousClock.now
                 os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Step")
+                // The key is drawn from the request's random state here, where
+                // the eager sampler draws it: one per pass, in pass order.
+                let passKey: MLXArray? = codePredictorPlan.sampling == nil
+                    ? nil
+                    : resolve(key: MLXArray?.none)
                 let codeLogits: MLXArray
                 if codeIdx == 0 {
                     let code0Embed = talker.getInputEmbeddings()(nextToken)
                     codeLogits = codePredictorPlan.run(
-                        pass: 0, codeHidden: codeHidden, code0Embed: code0Embed, token: nil
+                        pass: 0, codeHidden: codeHidden, code0Embed: code0Embed, token: nil, key: passKey
                     )
                 } else {
                     codeLogits = codePredictorPlan.run(
-                        pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!
+                        pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!, key: passKey
                     )
                 }
                 os_signpost(.end, log: stepSignpostLog, name: "Code Predictor Step")
                 codePredictorStepTotal += codePredictorStepStartedAt.elapsed
+                if codePredictorPlan.sampling != nil {
+                    // The pass returned its sampled code. The sampler's
+                    // interval is still emitted, empty: the profile lane
+                    // counts fifteen per step (`trace_intervals.py`), and its
+                    // host time is now part of the pass's own interval.
+                    os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")
+                    os_signpost(.end, log: stepSignpostLog, name: "Sample Predicted Codebook")
+                    codeTokens.append(codeLogits)
+                    continue
+                }
 
                 let samplePredictedCodebookStartedAt = ContinuousClock.now
                 os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")

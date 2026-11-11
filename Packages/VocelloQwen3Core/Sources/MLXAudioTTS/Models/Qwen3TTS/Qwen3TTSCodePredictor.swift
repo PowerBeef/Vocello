@@ -195,10 +195,11 @@ final class CodePredictorStepConstants {
     /// first frame and replayed for the rest of the generation.
     func compiledPlan(
         for predictor: Qwen3TTSCodePredictor,
-        dtype: DType
+        dtype: DType,
+        sampling: CompiledPassSampling? = nil
     ) -> CodePredictorCompiledPlan {
         if let compiledPlan { return compiledPlan }
-        let fresh = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype)
+        let fresh = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype, sampling: sampling)
         compiledPlan = fresh
         return fresh
     }

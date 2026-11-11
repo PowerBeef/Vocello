@@ -866,6 +866,38 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         }
     }
 
+    // MARK: - Sampling inside the code predictor's passes (RF-46)
+
+    /// With a subtalker top-k below the code-predictor vocabulary, the loop
+    /// samples inside each compiled pass; a sampler observer keeps the eager
+    /// sampler. The two must give the same codec frames and samples from one
+    /// seed, on a bf16 talker (production's dtype, so the float32 cast runs),
+    /// through the quality-first loop and the streamed producer. A key drawn
+    /// in another order, or a pass that mis-samples, changes the frames.
+    func testPassesThatSampleGiveTheEagerSamplersTake() async throws {
+        let model = try Self.makeModel()
+        model.talker.update(parameters: model.talker.parameters().mapValues { $0.asType(.bfloat16) })
+        eval(model.talker)
+        let seed: UInt64 = 0x5EED_0F47
+        XCTAssertNotNil(CompiledPassSampling.eligible(
+            stage: Self.samplingPolicy(seed: seed, topK: 8).subtalker,
+            castsLogitsToFloat32: true,
+            vocabSize: Self.codebookSize
+        ), "this stage samples inside the passes")
+
+        let inPass = try await generate(model, seed: seed, topK: 8)
+        final class Calls { var count = 0 }
+        let calls = Calls()
+        model.samplerObserver = { _, _, _, _ in calls.count += 1 }
+        defer { model.samplerObserver = nil }
+        let eager = try await generate(model, seed: seed, topK: 8)
+
+        XCTAssertFalse(inPass.frames.isEmpty)
+        XCTAssertGreaterThan(calls.count, eager.frames.count, "the observed take sampled eagerly, code predictor included")
+        XCTAssertEqual(inPass.frames, eager.frames)
+        XCTAssertEqual(inPass.samples.map(\.bitPattern), eager.samples.map(\.bitPattern))
+    }
+
     // MARK: - Fused projections (RF-46)
 
     /// A 4-bit talker and code predictor driven through the production loops

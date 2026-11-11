@@ -274,6 +274,13 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
   `accuracy: 2e-6` on a small fp32 model, not byte for byte (F-15); the file's own comment claims
   more. The adoption A/B measured 12/12 fixed-seed byte-identical takes on its cells, a one-time
   result that the unit test does not guarantee.
+- **A pass can sample** (RF-46, DECODE-005). When the subtalker stage is the plain temperature and
+  top-k sampler, which production uses, the traced function ends in the sampler and returns the
+  code; the loop resolves the random key from the request's state, where the eager sampler resolved
+  it, and passes it in, so a seed draws the same keys in the same order. Other stages and observed
+  takes keep the eager sampler. `Qwen3CodePredictorCompiledTests` pins the drawn codes against the
+  eager sampler under one seed; the end-to-end identity rests on the fixed-seed PCM digests
+  (`scripts/pcm_identity.py`), since a fused kernel may round differently on another MLX or GPU.
 - **Weights are baked at trace time** (A-16). The plan lives for one generation today; reusing it
   across takes (PERF-10) must declare the weights as inputs or key the plan by load epoch.
 - **Single flight.** Every take traces 15 compiled functions with a nested compiled `silu` (F-09).
@@ -287,13 +294,13 @@ Each frame builds one graph (talker forward, the 15 code-predictor passes, sampl
 step's input embedding) and submits it once. Production uses the `.pipelined` step policy
 (`Qwen3StreamStepEvalPolicy`, `Qwen3TTS.swift:432-445`):
 
-1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:4051-4054`);
+1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:4071-4079`);
 2. the previous chunk's materialization and channel sends run while it computes;
 3. the sampled-token `item` read is the step's first blocking read.
 
 `.full` (a synchronous `eval`) remains a diagnostic for exact per-stage attribution. Nothing else
 reads the GPU inside the step. The next input sums the codebook embeddings with serial bf16 adds
-(`Qwen3TTS.swift:4034-4039`), where the reference uses one reduction (A-17).
+(`Qwen3TTS.swift:4061-4066`), where the reference uses one reduction (A-17).
 
 ### 4.4 The audio decoder
 
@@ -310,8 +317,8 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   MLX's process-global RNG.
 - **float32 logits.** Both stages sample from float32 logits whatever the model's precision, as
   Qwen's reference does (D3, production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` restores
-  model-precision sampling). The cast is lazy inside the step graph (`Qwen3TTS.swift:5242-5244`).
-- **Order** (`sampleToken`, `Qwen3TTS.swift:5225`): token suppression, the repetition penalty (talker
+  model-precision sampling). The cast is lazy inside the step graph (`Qwen3TTS.swift:5269-5271`).
+- **Order** (`sampleToken`, `Qwen3TTS.swift:5250`): token suppression, the repetition penalty (talker
   only), temperature, top-k, top-p, min-p, then MLX's categorical at temperature 1. Temperature
   comes before the truncation filters (ported from mlx-audio `a730a68`).
 - **EOS** is filtered like any token since 2026-10-20 (D2, the RF-18 follow-up screen);
@@ -528,7 +535,10 @@ decision. [`ios-engine-optimization.md`](ios-engine-optimization.md) is historic
 
 The decode loop emits these intervals: Talker Forward, Code Predictor Loop and Code Predictor Step,
 Sample First Codebook and Sample Predicted Codebook, Codec Embedding Assembly, Step Eval Flush,
-Token Read, EOS Read, Audio Decoder, Audio Chunk Eval and Audio Chunk Flush.
+Token Read, EOS Read, Audio Decoder, Audio Chunk Eval and Audio Chunk Flush. Since RF-46 the code
+predictor samples inside its compiled passes in production, so Sample Predicted Codebook is still
+emitted fifteen times a step (the profile lane counts them) but is empty, and the sampler's host
+time is part of Code Predictor Step; `qwen_sample_predicted_codebook_total` reads near zero.
 
 Use the repository profile lane, which launches or attaches by exact PID, requires tracer success and
 validates the trace's table of contents:
@@ -702,7 +712,8 @@ Do not regress these without a maintainer decision:
   layout** (A-05).
 - **No `compile()` that declares quantized parameters as `inputs:`** (§7.4). The pass-indexed
   code-predictor plan is the shipped exception and must keep matching the eager path within
-  tolerance (`Qwen3CodePredictorCompiledTests`).
+  tolerance (`Qwen3CodePredictorCompiledTests`). A pass that samples (§4.2) must draw the eager
+  sampler's codes from one seed, and takes its random key as an input, never as a traced constant.
 - **An mlx-swift move changes `mlxNumericsVersion`** in the same change (§9.1).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**

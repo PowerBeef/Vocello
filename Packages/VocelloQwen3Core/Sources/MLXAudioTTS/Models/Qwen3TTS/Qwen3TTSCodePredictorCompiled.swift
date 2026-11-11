@@ -24,6 +24,62 @@ import MLXNN
 // The math replicates the eager modules op-for-op (same kernels, same order),
 // so fixed-seed output remains byte-identical — enforced by the runtime
 // equivalence test and the end-to-end identity gate.
+//
+// RF-46: a pass can also sample. When the request's subtalker stage is the
+// plain temperature and top-k sampler (`CompiledPassSampling`), the traced
+// function ends in the sampler and returns the code; the loop passes in the
+// random key it resolved from the request's state. The passes still run one
+// after another, each on the code before it: nothing is pipelined.
+
+/// The sampler a pass can run inside its compiled function (RF-46): the plain
+/// temperature and top-k sampler the code predictor uses in production. The
+/// pass then returns the sampled code instead of its logits, one compiled
+/// call where there were a compiled pass and an eager sampler, and MLX fuses
+/// the sampler's elementwise chains. The random key is an input, resolved by
+/// the caller from the request's random state exactly as the eager sampler
+/// resolves it, so the request draws the same keys in the same order.
+struct CompiledPassSampling: Equatable {
+    let temperature: Float
+    let topK: Int
+    let castsLogitsToFloat32: Bool
+
+    /// nil unless `stage` is the sampler this struct reproduces: a positive
+    /// temperature, a top-k that applies, and neither top-p nor min-p. Any
+    /// other stage keeps the eager sampler.
+    static func eligible(
+        stage: Qwen3SamplingStage, castsLogitsToFloat32: Bool, vocabSize: Int
+    ) -> CompiledPassSampling? {
+        guard stage.temperature > 0,
+              stage.topK > 0, stage.topK < vocabSize,
+              !(stage.topP > 0 && stage.topP < 1),
+              !(stage.minP > 0)
+        else { return nil }
+        return CompiledPassSampling(
+            temperature: stage.temperature, topK: stage.topK, castsLogitsToFloat32: castsLogitsToFloat32
+        )
+    }
+
+    /// The eager sampler's graph for this configuration, op for op
+    /// (`Qwen3TTSModel.sampleToken` with no suppression, penalty, EOS, top-p
+    /// or min-p): last position, float32 cast, temperature, top-k mask,
+    /// categorical draw on `key`.
+    func sample(_ logits: MLXArray, key: MLXArray) -> MLXArray {
+        var slice = logits[0..., (-1)..., 0...].squeezed(axis: 1)
+        if castsLogitsToFloat32, slice.dtype != .float32 {
+            slice = slice.asType(.float32)
+        }
+        if temperature != 1.0 {
+            slice = slice / temperature
+        }
+        let vocabSize = slice.dim(-1)
+        let maskIdx = argPartition(-slice, kth: topK - 1, axis: -1)[0..., topK...]
+        let negInf = MLXArray.full(
+            [1, vocabSize - topK], values: MLXArray(-Float.infinity), dtype: slice.dtype
+        )
+        let filtered = putAlong(slice, maskIdx, values: negInf, axis: -1)
+        return categorical(filtered, key: key).reshaped(1, 1)
+    }
+}
 
 /// Per-generation compiled plan. Built lazily on the first frame; the 15
 /// compiled functions and the K/V buffers live for exactly one generation
@@ -37,9 +93,14 @@ final class CodePredictorCompiledPlan {
     private var keyBuffers: [MLXArray]
     private var valueBuffers: [MLXArray]
     private var compiledPasses: [Int: @Sendable ([MLXArray]) -> [MLXArray]] = [:]
+    /// The sampler each pass runs inside its compiled function, when the
+    /// request's subtalker stage is one it reproduces; nil keeps the passes
+    /// returning logits for the eager sampler.
+    let sampling: CompiledPassSampling?
 
-    init(predictor: Qwen3TTSCodePredictor, dtype: DType) {
+    init(predictor: Qwen3TTSCodePredictor, dtype: DType, sampling: CompiledPassSampling? = nil) {
         self.predictor = predictor
+        self.sampling = sampling
         self.passCount = predictor.numCodeGroups - 1
         let layers = predictor.model.layers
         self.layerCount = layers.count
@@ -64,7 +125,12 @@ final class CodePredictorCompiledPlan {
     /// does); later passes consume the previous raw code token, embedded
     /// inside the compiled function through `codecEmbedding[pass - 1]`.
     /// Returns the pass logits. Buffer state advances internally.
-    func run(pass: Int, codeHidden: MLXArray?, code0Embed: MLXArray?, token: MLXArray?) -> MLXArray {
+    ///
+    /// With `sampling` set, `key` is required and the result is the sampled
+    /// code (`[1, 1]`) instead of the logits.
+    func run(
+        pass: Int, codeHidden: MLXArray?, code0Embed: MLXArray?, token: MLXArray?, key: MLXArray? = nil
+    ) -> MLXArray {
         let function = compiledPass(pass)
         var inputs: [MLXArray] = []
         if pass == 0 {
@@ -72,6 +138,9 @@ final class CodePredictorCompiledPlan {
             inputs.append(code0Embed!)
         } else {
             inputs.append(token!)
+        }
+        if sampling != nil {
+            inputs.append(key!)
         }
         inputs.append(contentsOf: keyBuffers)
         inputs.append(contentsOf: valueBuffers)
@@ -81,6 +150,9 @@ final class CodePredictorCompiledPlan {
         // shape, so the step reaches its typed failure at the next error
         // check instead of trapping on the index.
         guard outputs.count == 1 + 2 * layerCount else {
+            if sampling != nil {
+                return MLXArray.zeros([1, 1], dtype: .uint32)
+            }
             return MLXArray.zeros([1, 1, predictor.config.vocabSize], dtype: keyBuffers[0].dtype)
         }
         keyBuffers = Array(outputs[1 ..< (1 + layerCount)])
@@ -92,11 +164,13 @@ final class CodePredictorCompiledPlan {
         if let cached = compiledPasses[pass] { return cached }
         let predictor = self.predictor
         let layerCount = self.layerCount
-        let compiled = compile { [predictor, layerCount] (inputs: [MLXArray]) -> [MLXArray] in
+        let sampling = self.sampling
+        let compiled = compile { [predictor, layerCount, sampling] (inputs: [MLXArray]) -> [MLXArray] in
             Self.tracePass(
                 pass,
                 predictor: predictor,
                 layerCount: layerCount,
+                sampling: sampling,
                 inputs: inputs
             )
         }
@@ -109,9 +183,13 @@ final class CodePredictorCompiledPlan {
         _ pass: Int,
         predictor: Qwen3TTSCodePredictor,
         layerCount: Int,
+        sampling: CompiledPassSampling?,
         inputs: [MLXArray]
     ) -> [MLXArray] {
-        let cursor = pass == 0 ? 2 : 1
+        // Inputs: the pass's own (two for pass 0, one after), then the random
+        // key when the pass samples, then the K and V buffers.
+        let keyIndex = pass == 0 ? 2 : 1
+        let cursor = keyIndex + (sampling == nil ? 0 : 1)
         var keyBuffers = Array(inputs[cursor ..< cursor + layerCount])
         var valueBuffers = Array(inputs[cursor + layerCount ..< cursor + 2 * layerCount])
 
@@ -190,6 +268,9 @@ final class CodePredictorCompiledPlan {
         }
         x = predictor.model.norm(x)
         let logits = predictor.lmHead[pass](x)
+        if let sampling {
+            return [sampling.sample(logits, key: inputs[keyIndex])] + keyBuffers + valueBuffers
+        }
         return [logits] + keyBuffers + valueBuffers
     }
 }

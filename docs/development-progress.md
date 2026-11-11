@@ -17,7 +17,43 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 11: the overhaul measured on the iPhone 17 Pro (resume here)
+### November 11: quality remediation, stage 1 is code complete (resume here)
+
+The remediation the maintainer asked for on November 11 (RF-50 to RF-57) has its first stage in.
+`main` is 10 commits ahead of `origin/main` (`f4edb60a`); nothing is pushed. The phone is not
+available, so everything below ran on the Mac.
+
+- **Document corrections (RF-56, closed).** The upstream readings and stale statements the review
+  found are corrected in the model guides and the October audits.
+- **Clone input correctness (RF-51, code complete).** Three commits:
+  - `b876e29d`: "Use audio only" on a saved voice is no longer overridden by its stored transcript.
+  - `b308c609`: a recognized transcript that does not reach both ends of the clip's audible span
+    needs the user's edit, review or audio-only choice; the CLI refuses it.
+  - `a5bf4add`: one reference check (`CloneReferenceQuality`) for enrollment, the saved-voice list,
+    the Mac's one-off reference and the engine, on the clip as the user gave it. Low source rates,
+    silence and clipping reach the review; an unreadable or silent clip blocks like the 60 second
+    cap, in the review, in the store and in the engine (before a model load). Every transcript takes
+    one shape, template text is composed to NFC as the reference tokenizer does, the reference
+    fingerprint carries a preparation version, and the padding comment is corrected.
+- **No sample changed.** 11 fixed-seed takes (three modes, seven languages, a transcript-backed and
+  an audio-only clone) are PCM-identical between the CLI built before `a5bf4add` and at it, and the
+  earlier build reproduces itself 11 of 11. The CLI refuses a silent or 62 second one-off clip in
+  0.4 seconds, with `audio.reference_silent` and `audio.input_too_long`.
+- **The clipping rule was calibrated before it was shown to anyone.** On 476 licensed speech clips,
+  at their own rates and resampled to 48 kHz: no clean clip flagged, 89% at 3 dB of overdrive, 99%
+  at 6 dB. The earlier rule (peak at or above 0.98) cannot tell loud from clipped.
+- **The second review pass found a defect its own test then caught.** A refused prime first
+  published a failed preparation beside a loaded model, which holds the weights with no idle
+  unload; it now settles like a cancelled prime.
+- **Queued for a phone window (RF-51):** Apple Speech's word times against the coverage rule, the
+  iPhone recorder's Stop under 10 seconds, and the review dialogs' new warnings and
+  partial-transcript state. They are compiled, not driven.
+- **Next:** RF-50 and RF-57 together: run the clone and long-form screens against themselves to
+  learn each metric's noise floor, record each decision rule before its takes exist, add the
+  golden-codes fixture for the encoder, and repeat the deterministic suite to find tests that fail
+  without a code change (BKL-71 is one). Then RF-52 to RF-55 behind those screens.
+
+### November 11: the overhaul measured on the iPhone 17 Pro
 
 The maintainer opened a phone window on November 11. The headless measurements (at `3119a745`), the
 UI benchmark, the long-form journey, full smoke and the frame-health lane (at `3f8fa144` and

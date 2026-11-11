@@ -470,7 +470,7 @@
       "title": "Quality remediation, stage 1: clone input correctness",
       "status": "planned",
       "blockedBy": [],
-      "gate": "With no sample change for a good reference: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12, G-15); briefs, instructions and transcripts are NFC-normalized (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests.",
+      "gate": "With no sample change for a good reference or for text that is already composed and single-spaced: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12); scripts, briefs, instructions and transcripts are composed to NFC as the reference tokenizer composes them (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests, and the iPhone surfaces are confirmed in a phone window.",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "Sources/QwenVoiceCore/NativeCloneSupport.swift",
@@ -478,7 +478,7 @@
         "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's G-01, G-02, G-08 to G-13 and G-15 and ER-05's A-18. Landed 2026-11-11: G-02 (b876e29d: a Studio request states audio-only and the engine no longer reads the stored transcript for it) and G-01 (b308c609: recognized text must reach both ends of the clip's audible span, or it needs the user's edit, review or audio-only choice; on 20 real clips with Whisper word times 19 complete transcripts pass, the one flagged was truly cut short, and 39 of 39 truncated ones are caught). Left: G-08 to G-13, G-15, A-18 and the padding comment. For a device window: Apple Speech's own word times against the coverage rule (this terminal has no Speech permission), through the iPhone saved-voice lifecycle lane."
+      "notes": "Opened 2026-11-11 at the maintainer's request, from the findings verified in the review of 2026-11-11 (ER-04's G-01, G-02, G-08 to G-13 and G-15; ER-05's A-18). Code complete 2026-11-11: G-02 (b876e29d), G-01 (b308c609; on 20 real clips with Whisper word times 19 complete transcripts pass and 39 of 39 truncated ones are caught) and a5bf4add for the rest (one reference check on the original clip for every surface, unreadable and silent clips block, the engine refuses a one-off clip before a model load, one transcript shape, NFC template text, the preparation version, the padding comment). No sample change: 11 fixed-seed takes (three modes, seven languages, a transcript-backed and an audio-only clone) are PCM-identical between the CLI built before a5bf4add and at it, and the earlier build reproduces itself 11 of 11. The punctuation half of G-15 moved to RF-52. Left, all for a phone window: Apple Speech's word times against the coverage rule (this terminal has no Speech permission), the iPhone recorder's Stop under 10 seconds, and the review dialogs' new warnings and partial-transcript state."
     },
     {
       "id": "RF-52",
@@ -486,17 +486,16 @@
       "title": "Quality remediation, stage 2: clone conditioning parity",
       "status": "planned",
       "blockedBy": [
-        "RF-50",
-        "RF-51"
+        "RF-50"
       ],
-      "gate": "Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11).",
+      "gate": "Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's A-02, G-03, A-04, A-26, A-11, A-12 and G-07. The review's pre-screen found no detectable effect of the rotary fix on English clones (+0.004 similarity over 96 pairs), so it is expected to land for parity, not for an audible gain."
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's A-02, G-03, A-04, A-26, A-11, A-12 and G-07. The review's pre-screen found no detectable effect of the rotary fix on English clones (+0.004 similarity over 96 pairs), so it is expected to land for parity, not for an audible gain. RF-51's code landed on 2026-11-11 (a5bf4add); only its phone checks remain, so this item waits on RF-50 alone. A change to reference preparation raises NativeAudioPreparationService.cloneReferencePreparationVersion."
     },
     {
       "id": "RF-53",

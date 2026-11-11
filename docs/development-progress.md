@@ -21,10 +21,9 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 The maintainer opened a phone window on November 11. The headless measurements (at `3119a745`), the
 UI benchmark, the long-form journey, full smoke and the frame-health lane (at `3f8fa144` and
-`f6d78880`) ran on the paired iPhone 17 Pro and confirm
-the overhaul there. No iPhone 15 Pro is paired. `main` is pushed up to `c6a80dcb`, whose required CI check is red because two Linux
-jobs could not reach the Ubuntu package mirror, twice (no test ran in them); later commits wait on
-local `main`.
+`f6d78880`) ran on the paired iPhone 17 Pro and confirm the overhaul there. No iPhone 15 Pro is
+paired. `main` is pushed up to `f4edb60a` with CI green. The earlier `c6a80dcb` stays red only
+because two Linux jobs could not reach the Ubuntu package mirror.
 
 - **Same samples (RF-44, RF-46).** 23 fixed-seed takes are PCM-identical to the build of November 3
   (`ios-lang-bench-20261111-162231-d118b261` against `20261103-183237-3c5b79f2`); the files differ
@@ -72,6 +71,12 @@ local `main`.
   - reloads with the two-minute window: no lane holds a process idle between takes;
   - core placement of the generation thread: Instruments lists the phone as offline without a cable;
   - anything on an iPhone 15 Pro.
+- **An outside report on the Qwen3-TTS integration was counter-verified** (RF-49, closed;
+  [review](audits/2026-11-11-qwen3-tts-quality-report-review.md)). Its facts about the code hold.
+  Measured in the Python port, the encoder's rotary fix (A-02) changes clones by nothing detectable,
+  the 8-bit model beats the 4-bit one by 0.025 in speaker similarity, and an 8-bit code predictor
+  alone gives +0.010 for 56 MB. It changes no code and opens no work; its recommendations are for
+  the parked engine-remediation items.
 - **Next:** a candidate that carries the overhaul, which needs green CI on `main` and the
   maintainer's request, then RF-15's and RF-17's rows on it.
 

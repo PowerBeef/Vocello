@@ -5982,6 +5982,22 @@
       "evidence": [
         "doc:docs/audits/2026-11-10-apple-silicon-performance-research.md"
       ]
+    },
+    {
+      "id": "RF-49",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Counter-verify an outside report on the Qwen3-TTS integration",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A read-only report checks the outside report's claims against the code, the measurement records and upstream, measures its leading findings where installed tools allow, and says what follows for the parked engine-remediation items. No code, artifact or work item changes.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Requested by the maintainer on 2026-11-11, who had a newly released Qwen model audit the integration from our documents. Three read-only passes checked code, records and upstream citations. Three pre-screens ran in the Python port with the QC models (English, clean references, nobody listened): the encoder rotary fix (A-02) changed clone speaker similarity by +0.004 (95% interval -0.003 to +0.011) over 96 pairs; the 8-bit model beats the 4-bit one by 0.025; an 8-bit code predictor alone gives +0.010 for 56 MB. Several upstream readings in our October audits are overstated; the report lists the corrections without making them.",
+      "evidence": [
+        "doc:docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
+      ]
     }
   ]
 }

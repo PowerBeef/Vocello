@@ -82,7 +82,10 @@ because two Linux jobs could not reach the Ubuntu package mirror.
   (RF-51), clone conditioning parity (RF-52), the long-form and language screens with a stop for
   runaway takes (RF-53), the decoder's 72-frame window (RF-54), code-predictor precision (RF-55)
   and document corrections (RF-56). Sample-changing changes land only behind a pre-registered
-  machine screen. Publishing an artifact and moving a pin stay the maintainer's.
+  machine screen. Publishing an artifact and moving a pin stay the maintainer's. The submission
+  waits until the engine and its output are as good as they can be. The tooling the remediation
+  leans on is audited too (RF-57): every screen is first run against itself. The phone is not
+  available, so all of this runs on the Mac and device checks queue for an announced window.
 - **Next:** RF-51 and RF-56 need no screen and go first, with RF-50 beside them; then RF-52 to
   RF-55 by their gates; then a candidate that carries the overhaul and the remediation, which needs
   green CI on `main` and the maintainer's request, and RF-15's and RF-17's rows on it.

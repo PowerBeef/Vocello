@@ -181,7 +181,10 @@ Between September 4 and October 12 the release did not move:
   parity, long-form and language screens, the decoder's attention window, code-predictor precision
   and document corrections. Nobody listens still, so a change that alters samples lands only behind
   a machine screen whose decision rule is recorded before its takes are generated. The submission
-  candidate is the build that carries both the overhaul and the remediation.
+  waits until the engine and its output are as good as they can be, and its candidate is the build
+  that carries both the overhaul and the remediation. The tooling, test procedures, benchmark
+  harness and audio QC analysis the remediation leans on are audited as part of it (RF-57): each
+  screen is first run against itself so that its noise floor is known.
 
 ## The path
 

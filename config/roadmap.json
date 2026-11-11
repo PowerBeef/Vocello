@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-23",
-    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16. Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request.",
+    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16; the submission waits until the engine and its output are as good as they can be. The tooling, test procedures, benchmark harness and audio QC analysis the remediation leans on are audited too (RF-57). Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request.",
     "maxInFlight": 3,
     "freeze": {
       "commit": "e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
@@ -455,7 +455,7 @@
       "title": "Quality remediation, stage 0: the pre-registered machine screens",
       "status": "planned",
       "blockedBy": [],
-      "gate": "A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Nobody listens.",
+      "gate": "A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Before a screen decides anything it is run against itself (the same build and seeds, twice), so each metric's noise floor is known (RF-57). Nobody listens.",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "scripts/clone_fidelity_lane.py",
@@ -561,6 +561,22 @@
       "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Documents only."
     },
     {
+      "id": "RF-57",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Audit the tooling the quality remediation relies on",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/qc.py",
+        "scripts/clone_fidelity_lane.py",
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: the tooling, test procedures, benchmark harness and audio QC analysis came through difficult phases and may be flaky, so they are audited where the remediation leans on them. Known so far: the session-start hook's free-space test fails now and then (BKL-71)."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
@@ -595,7 +611,8 @@
         "RF-52",
         "RF-53",
         "RF-54",
-        "RF-55"
+        "RF-55",
+        "RF-57"
       ],
       "gate": "Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.",
       "sourceOfTruth": [

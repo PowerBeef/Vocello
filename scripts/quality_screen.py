@@ -307,11 +307,31 @@ def run_arm(args: argparse.Namespace) -> Path:
     return arm_dir
 
 
+def refresh_evidence(args: argparse.Namespace) -> int:
+    """Reads an arm's evidence again from the telemetry it kept. The takes are
+    not touched: this only repeats what `run` does after its last take."""
+    arm_dir = Path(args.run) / "arms" / args.arm
+    arm = read_json(arm_dir / "arm.json")
+    rows = read_json(arm_dir / "takes.json")["takes"]
+    if "outcomes" not in arm or len(rows) != len(read_json(Path(args.run) / "plan.json")["takes"]):
+        raise ScreenError(f"arm '{args.arm}' did not finish generating")
+    evidence = arm_evidence(arm_dir / "data/diagnostics/engine/generations.jsonl", rows)
+    unread = unread_overrides(arm["environment"], evidence["activeOverrideKeys"])
+    write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
+    write_json(arm_dir / "arm.json", dict(arm, complete=not unread, overridesNotRead=unread,
+                                          activeOverrideKeys=evidence["activeOverrideKeys"]))
+    print(json.dumps({"arm": args.arm, "complete": not unread, "activeOverrideKeys": evidence["activeOverrideKeys"],
+                      "takesWithReferenceDigest": sum(bool(row.get("referenceAudioDigest")) for row in rows)}))
+    return 2 if unread else 0
+
+
 def arm_evidence(telemetry: Path, rows: list[dict]) -> dict:
     """What the engine's own rows say the arm was: the override keys it read,
     and for each take the digest of the reference audio it was conditioned on.
     An arm is believed from this, not from the environment it was given."""
-    by_generation = {row.get("generationID"): row for row in rows if row.get("generationID")}
+    # The CLI prints a generation's identifier in lowercase; the engine's row
+    # carries it in uppercase.
+    by_generation = {row["generationID"].lower(): row for row in rows if row.get("generationID")}
     active: set[str] = set()
     if telemetry.is_file():
         for line in telemetry.read_text(encoding="utf-8").splitlines():
@@ -319,7 +339,7 @@ def arm_evidence(telemetry: Path, rows: list[dict]) -> dict:
                 record = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            row = by_generation.get(record.get("generationID"))
+            row = by_generation.get(str(record.get("generationID") or "").lower())
             if row is None:
                 continue
             provenance = ((record.get("summary") or {}).get("runEnvironment") or {}).get("runtimeDebugProvenance") or {}
@@ -655,6 +675,10 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--arm", required=True)
     score.add_argument("--cache-only", action="store_true", help="read results already in the QC cache")
     score.set_defaults(run_command=lambda args: (score_arm(args), 0)[1])
+    evidence = commands.add_parser("evidence", help="read an arm's evidence again from its telemetry")
+    evidence.add_argument("--run", required=True)
+    evidence.add_argument("--arm", required=True)
+    evidence.set_defaults(run_command=refresh_evidence)
     compare = commands.add_parser("compare", help="compare two arms of one plan")
     compare.add_argument("--run", required=True)
     compare.add_argument("--a", required=True)

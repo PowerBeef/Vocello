@@ -17,41 +17,74 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 11: quality remediation, stage 1 is code complete (resume here)
+### November 11: quality remediation under way (resume here)
 
-The remediation the maintainer asked for on November 11 (RF-50 to RF-57) has its first stage in.
-`main` is 10 commits ahead of `origin/main` (`f4edb60a`); nothing is pushed. The phone is not
-available, so everything below ran on the Mac.
+The remediation the maintainer asked for on November 11 (RF-50 to RF-57). Nothing is pushed: `main`
+is ahead of `origin/main` (`f4edb60a`) by every commit named here, and a push needs the maintainer's
+word. The phone is not available, so everything ran on the Mac. This entry is written so another
+session can continue from it alone.
 
-- **Document corrections (RF-56, closed).** The upstream readings and stale statements the review
-  found are corrected in the model guides and the October audits.
-- **Clone input correctness (RF-51, code complete).** Three commits:
-  - `b876e29d`: "Use audio only" on a saved voice is no longer overridden by its stored transcript.
-  - `b308c609`: a recognized transcript that does not reach both ends of the clip's audible span
-    needs the user's edit, review or audio-only choice; the CLI refuses it.
-  - `a5bf4add`: one reference check (`CloneReferenceQuality`) for enrollment, the saved-voice list,
-    the Mac's one-off reference and the engine, on the clip as the user gave it. Low source rates,
-    silence and clipping reach the review; an unreadable or silent clip blocks like the 60 second
-    cap, in the review, in the store and in the engine (before a model load). Every transcript takes
-    one shape, template text is composed to NFC as the reference tokenizer does, the reference
-    fingerprint carries a preparation version, and the padding comment is corrected.
-- **No sample changed.** 11 fixed-seed takes (three modes, seven languages, a transcript-backed and
-  an audio-only clone) are PCM-identical between the CLI built before `a5bf4add` and at it, and the
-  earlier build reproduces itself 11 of 11. The CLI refuses a silent or 62 second one-off clip in
-  0.4 seconds, with `audio.reference_silent` and `audio.input_too_long`.
-- **The clipping rule was calibrated before it was shown to anyone.** On 476 licensed speech clips,
-  at their own rates and resampled to 48 kHz: no clean clip flagged, 89% at 3 dB of overdrive, 99%
-  at 6 dB. The earlier rule (peak at or above 0.98) cannot tell loud from clipped.
-- **The second review pass found a defect its own test then caught.** A refused prime first
-  published a failed preparation beside a loaded model, which holds the weights with no idle
-  unload; it now settles like a cancelled prime.
-- **Queued for a phone window (RF-51):** Apple Speech's word times against the coverage rule, the
-  iPhone recorder's Stop under 10 seconds, and the review dialogs' new warnings and
-  partial-transcript state. They are compiled, not driven.
-- **Next:** RF-50 and RF-57 together: run the clone and long-form screens against themselves to
-  learn each metric's noise floor, record each decision rule before its takes exist, add the
-  golden-codes fixture for the encoder, and repeat the deterministic suite to find tests that fail
-  without a code change (BKL-71 is one). Then RF-52 to RF-55 behind those screens.
+**Done**
+
+- **RF-56 (closed):** document corrections.
+- **RF-51 (code complete; phone checks left):** `b876e29d`, `b308c609`, `a5bf4add`. Audio-only is
+  honoured on a saved voice; a recognized transcript must cover the clip; one reference check
+  (`CloneReferenceQuality`) serves every surface and unreadable or silent clips block; every
+  transcript takes one shape; template text is NFC; the reference fingerprint carries a preparation
+  version. No sample changed: 11 fixed-seed takes are PCM-identical before and after.
+- **RF-57 (done, see its note):** XCTest 8 of 8 repeated runs clean; Python 5 of 5 with one
+  environmental failure (BKL-72); the take lanes were audited and found unfit to decide, so:
+- **RF-50 (clone half done):** `scripts/encoder_golden_codes.py` (`d7d18eda`) pins the Swift encoder
+  against the reference one; `scripts/quality_screen.py` (`6e934d2c`) is the paired screen, described
+  in [qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples). Its noise floor at 192
+  takes is 0.035 similarity, 0.027 error rate, 3 gross failures: it catches gross regressions only.
+- **A defect the screen found in its own self-run:** reference preparation is not reproducible
+  (`AVAssetReader` resamples, and even decodes AAC, differently from run to run). `e57ddd57` adds
+  `Resampling.singleCall` (preparation version 2) behind `QWENVOICE_REFERENCE_PREPARATION=single-call`;
+  the default is unchanged.
+
+**In progress: the `reference-preparation-v2` decision (RF-52)**
+
+- The rule is in `config/quality-screens.json`, recorded before its arms.
+- Arms, all at `e57ddd57`, in `build/artifacts/macos/quality-screen/clone-seeds1/arms`: `a3`
+  (default), `b1` and `b2` (the key set). `b1` and `b2` are identical on 190 of 190 takes, which
+  meets the rule's requirement; `a1` and `a3` (default twice) agree on only 167 of 191.
+- What is left is the scored comparison. If `compare-a3-vs-b1.json` is not in that folder, run:
+
+  ```sh
+  PY="$(python3 scripts/select_python.py)"; R=build/artifacts/macos/quality-screen/clone-seeds1
+  "$PY" scripts/quality_screen.py score --run $R --arm a3
+  "$PY" scripts/quality_screen.py score --run $R --arm b1
+  "$PY" scripts/quality_screen.py compare --run $R --a a3 --b b1 --rule reference-preparation-v2
+  ```
+
+- **ADOPT:** set `Resampling.production` to `.singleCall` in
+  `Sources/QwenVoiceCore/AudioPreparation.swift`, update
+  `testTheResamplingPathIsTheAssetReaderUnlessTheGatedKeySelectsTheOther` and the two guides,
+  get the `vocello-swift-review` agent's read, run `scripts/dev.sh check`, commit under RF-52 and
+  record the verdict in RF-52's note. Every saved voice's prompt then rebuilds once.
+  **REJECT or INCONCLUSIVE:** the default stays; record the numbers in RF-52's note.
+
+**Next, in order (each sample-changing step: a knob, a rule recorded first, then the screen)**
+
+1. **RF-52, the two-channel mixdown:** the asset reader and version 2 both mix as the sum over the
+   square root of two, which clips a loud voice recorded on both channels. The average needs a
+   stratum of two-channel references in the screen (a new screen version) and preparation version 3.
+2. **RF-52, the encoder's rotary (A-02, G-03):** `RoPE(traditional: true)` at
+   `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift:130` should be `false`
+   for the tokenizer's encoder (configured at `Qwen3TTSSpeechTokenizer.swift:881`). Put it behind a
+   key read through the package's gate (`VocelloQwen3ImplementationDebugGate`), prove it with
+   `encoder_golden_codes.py compare --expect reference` (use `swift --env KEY=value`), then screen
+   it; the default flip adds an encoder version to `speakerFeatureVersion`.
+3. **RF-52, the rest of its gate:** primed decoder history for streamed clones (A-04, A-26), edge
+   trim and padding (A-12, G-07), the leading space (A-11), punctuated transcripts (G-15).
+4. **RF-50, the long-form screen**, then **RF-53** (D1, D6, the runaway stop), **RF-54** (the
+   decoder's 72-frame window), **RF-55** (code-predictor precision; publishing an artifact is the
+   maintainer's).
+
+**Standing limits:** nobody listens; a pin move, a model artifact and any push or tag need the
+maintainer's specific word; device checks queue for an announced phone window (RF-51's note lists
+them); at most four agents, and none during a measured run.
 
 ### November 11: the overhaul measured on the iPhone 17 Pro
 

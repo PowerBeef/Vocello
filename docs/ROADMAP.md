@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 22/72 (31%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 22/73 (30%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -175,7 +175,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: With no sample change for a good reference or for text that is already composed and single-spaced: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12); scripts, briefs, instructions and transcripts are composed to NFC as the reference tokenizer composes them (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests, and the iPhone surfaces are confirmed in a phone window.
 
 - **`RF-52`** (planned) — Quality remediation, stage 2: clone conditioning parity.
-  gate: Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).
+  gate: Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: reference preparation that gives the same samples every time (the audio file reader and one converter call in place of the asset reader, found 2026-11-11), then the two-channel mixdown by the average in place of the sum over the square root of two; the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).
 
 - **`RF-53`** (planned) — Quality remediation, stage 3: long-form text layout, language fallback and runaway takes.
   gate: Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take.
@@ -616,6 +616,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
 | `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
 | `BKL-71` | parked | The session-start hook's free-space test fails now and then | — |
+| `BKL-72` | parked | The CLI installer's package test fails where created files carry com.apple.provenance | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -814,6 +815,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-71`** (parked) — The session-start hook's free-space test fails now and then.
   gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-72`** (parked) — The CLI installer's package test fails where created files carry com.apple.provenance.
+  gate: test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes from the Claude desktop app's shell, or the builder strips extended attributes from the staged payload so pkgbuild writes no AppleDouble entries into the Bom.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

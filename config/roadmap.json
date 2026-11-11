@@ -462,7 +462,7 @@
         "scripts/macos_test.sh"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-01's parity fixtures for the encoder. The review's method (the Python port with the QC models) is the pre-screen; these lanes are the Swift screen."
+      "notes": "Opened 2026-11-11 at the maintainer's request (the review's verified findings; ER-01's encoder parity fixtures). Landed 2026-11-11. The golden-codes pin: scripts/encoder_golden_codes.py with config/encoder-golden-codes.json (d7d18eda); the Swift encoder follows the adjacent-pair rotary on 98.8% of the first codebook and 95.6% of all codes, the reference one on 31.9%, and reproduces itself. The paired screen: scripts/quality_screen.py with config/quality-screens.json (6e934d2c, e57ddd57); the clone screen is 192 takes over 48 saved voices in six languages. Its self-run: the scorers are reproducible; the noise floor (two seed sets) is 0.035 similarity, 0.027 error rate and 3 gross failures, so it separates a gross regression from no change and nothing finer; the takes were not reproducible, which led to RF-52's preparation change. Left: the long-form screen (project and segment outcomes, Japanese and Voice Design strata, the Consistent variation) and its self-run."
     },
     {
       "id": "RF-51",
@@ -488,14 +488,14 @@
       "blockedBy": [
         "RF-50"
       ],
-      "gate": "Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).",
+      "gate": "Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: reference preparation that gives the same samples every time (the audio file reader and one converter call in place of the asset reader, found 2026-11-11), then the two-channel mixdown by the average in place of the sum over the square root of two; the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's A-02, G-03, A-04, A-26, A-11, A-12 and G-07. The review's pre-screen found no detectable effect of the rotary fix on English clones (+0.004 similarity over 96 pairs), so it is expected to land for parity, not for an audible gain. RF-51's code landed on 2026-11-11 (a5bf4add); only its phone checks remain, so this item waits on RF-50 alone. A change to reference preparation raises NativeAudioPreparationService.cloneReferencePreparationVersion."
+      "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07; G-15's punctuation; waits on RF-50 alone). The review's pre-screen expects the rotary fix to land for parity, not an audible gain. First change, e57ddd57: Resampling.singleCall (preparation version 2) behind QWENVOICE_REFERENCE_PREPARATION=single-call, default unchanged. Rule reference-preparation-v2 was recorded before its arms. Arms at e57ddd57 in build/artifacts/macos/quality-screen/clone-seeds1: b1 and b2 (new path) are identical on 190 of 190 takes; a1 and a3 (default) on 167 of 191. The scored comparison a3 against b1 decides the default (compare-a3-vs-b1.json). A change to preparation raises the preparation version."
     },
     {
       "id": "RF-53",
@@ -560,7 +560,7 @@
         "docs/reference/qc.md"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: the tooling, test procedures, benchmark harness and audio QC analysis came through difficult phases and may be flaky, so they are audited where the remediation leans on them. Known so far: the session-start hook's free-space test fails now and then (BKL-71)."
+      "notes": "Opened 2026-11-11 at the maintainer's request. Done 2026-11-11. The deterministic suites repeated at a6e501eb: XCTest 8 of 8 runs clean; Python 5 of 5 with one failure that is environmental (BKL-72); BKL-71's test did not fail again. Two read-only audits of the take lanes found them unfit to decide: qc-takes passes when scoring fails, no lane scores both speaker and content, refused takes leave the averages, arms share a data directory, asr.edit_rate_min counts no substitutions, WAV digests include a timestamp. scripts/quality_screen.py replaces them for decisions (RF-50); the lane's resume after a QC refusal is fixed (317bd340). The screen's own evidence reader had a bug its guard exposed (identifier case), fixed. Left for the long-form screen: QC v2 has never scored a long take (the phone model stops at 120 s, Whisper fixes the language from the first 30 s, seam pauses read as dropouts)."
     },
     {
       "id": "RF-16",
@@ -2438,6 +2438,21 @@
       "updated": "2026-11-11",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated."
+    },
+    {
+      "id": "BKL-72",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer's package test fails where created files carry com.apple.provenance",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes from the Claude desktop app's shell, or the builder strips extended attributes from the staged payload so pkgbuild writes no AppleDouble entries into the Bom.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-11-11",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-11, found by RF-57's repeated run of the Python suite (5 of 5 runs). Files created from the desktop app's shell carry the com.apple.provenance attribute; pkgbuild then lists ._ entries in the Bom and check_bom refuses the package (fail closed). Not a flake and not the remediation's tooling; whether a release runner is affected is not known."
     },
     {
       "id": "ER-01",

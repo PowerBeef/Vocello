@@ -125,7 +125,8 @@ class OutcomeTests(unittest.TestCase):
 
 class EvidenceTests(unittest.TestCase):
     def test_an_arm_is_believed_from_the_engines_rows_not_from_its_environment(self):
-        rows = [{"takeID": "t1", "generationID": "G1"}, {"takeID": "t2", "generationID": "G2"}, {"takeID": "t3"}]
+        # The CLI reports identifiers in lowercase and the engine's rows in uppercase.
+        rows = [{"takeID": "t1", "generationID": "g1"}, {"takeID": "t2", "generationID": "G2"}, {"takeID": "t3"}]
         records = [
             {"generationID": "G1", "requestReceipt": {"normalizedReferenceAudioDigest": "aa"},
              "summary": {"runEnvironment": {"runtimeDebugProvenance": {"activeOverrideKeys": ["QWENVOICE_X"]}}}},

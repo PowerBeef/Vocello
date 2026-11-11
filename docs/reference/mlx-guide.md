@@ -380,7 +380,9 @@ so one generation cannot change another's.
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
 each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:3235-3305`), and
 every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:3496`). Outside that policy,
-marking clears the cache three times per take (B-09), and the sources hold 30
+marking clears the cache four times per take: before the pass, after its frame-rate stage, after
+the pass and once the generator is dropped (B-09; its per-window clears went with RF-48, see
+`Packages/VocelloQwen3Core/PERFORMANCE.md`, Publication marking). The sources hold 29
 `Memory.clearCache()` call sites in all, the policy sites included (counted 2026-11-10; B-22,
 E2-02).
 
@@ -388,9 +390,13 @@ Clearing is not free: freed buffers are re-created on the next allocation.
 
 - mlx-audio's Python Qwen3-TTS cleared at the same two hot-path sites (every 50 tokens and every
   streamed chunk); MA#851 measured about 13% RTF from removing them on an M1 Pro.
-- Vocello has not measured its own cost. The iPhone runs 113–126 clears per long take at its
-  128 MiB cache (audit D), and D-06 counts the per-chunk clears among the costs the measured 8,192 MB
-  budget does not need. A knob to A/B the iPhone's per-chunk clear is an ER-01 measurement gap.
+- Vocello's own cost, on the M6 (RF-45, 2026-11-10): running the high-memory tier's policy (no
+  per-chunk clear, cadence 200, 1 GB cache) gives PCM-identical takes, so the clears move no sample
+  on this MLX, and is about 1.7% faster where the host bounds a frame (the process clamped to the
+  efficiency cores); unclamped, where the GPU bounds it, the difference is inside the run-to-run
+  drift. The iPhone runs 113–126 clears per long take at its 128 MiB cache (audit D), and D-06 counts
+  the per-chunk clears among the costs the measured budget does not need;
+  `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=off` isolates the per-chunk clear for that device A/B.
 - A full unload left 309 MiB in MLX's cache, because the cache was cleared before the last holder
   released the model; the holder is unidentified (D-04).
 
@@ -738,6 +744,7 @@ override key names and a digest, never raw values.
 | `QWENVOICE_TOKENIZER_RESIDENCY` | Override speech-tokenizer residency. |
 | `QVOICE_TALKER_KV_WINDOW=<n>` | Sliding-window talker KV cache. |
 | `QVOICE_TALKER_KV_QUANT=4\|8` | Quantized talker KV cache. |
+| `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=on\|off` | Turn the per-chunk cache clear on or off on any tier. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | Override the iPhone MLX cache limit. |
 | `QVOICE_IOS_MLX_MEMORY_LIMIT_MB=<n>` | Set a hard iPhone MLX memory limit (never in production). |
 | `QWENVOICE_STREAMING_PREVIEW_DATA=off` | Skip inline PCM preview chunks. |

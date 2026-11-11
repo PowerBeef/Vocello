@@ -1,3 +1,4 @@
+import VocelloQwen3Core
 import XCTest
 @testable import QwenVoiceCore
 
@@ -141,5 +142,41 @@ final class NativeHostMemoryEmulationTests: XCTestCase {
             gpuRecommendedWorkingSetBytes: workingSet,
             hasUnifiedMemory: true
         )
+    }
+
+    // MARK: - Per-chunk cache clear switch (RF-45)
+
+    /// `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR` moves one field of a tier's policy
+    /// and nothing else, on every tier, and an unset or unrecognized value
+    /// leaves the tier as it ships.
+    func testTheStreamChunkCacheClearSwitchMovesOnlyThatField() {
+        XCTAssertEqual(NativeMemoryPolicyResolver.parseStreamChunkCacheClear(" Off "), false)
+        XCTAssertEqual(NativeMemoryPolicyResolver.parseStreamChunkCacheClear("on"), true)
+        XCTAssertNil(NativeMemoryPolicyResolver.parseStreamChunkCacheClear(nil))
+        XCTAssertNil(NativeMemoryPolicyResolver.parseStreamChunkCacheClear("sometimes"))
+
+        let tiers: [NativeDeviceMemoryClass] = [.floor8GBMac, .mid16GBMac, .highMemoryMac, .iPhonePro]
+        for tier in tiers {
+            let shipped = NativeMemoryPolicyResolver.policy(
+                deviceClass: tier, mode: .custom, isBatch: false, streamChunkCacheClearOverride: nil
+            )
+            XCTAssertEqual(shipped.clearMLXCacheOnStreamChunkEmit, tier != .highMemoryMac, "\(tier)")
+            for value in [true, false] {
+                let switched = NativeMemoryPolicyResolver.policy(
+                    deviceClass: tier, mode: .custom, isBatch: false, streamChunkCacheClearOverride: value
+                )
+                XCTAssertEqual(switched.clearMLXCacheOnStreamChunkEmit, value, "\(tier)")
+                XCTAssertEqual(switched.name, shipped.name)
+                XCTAssertEqual(switched.cacheLimitBytes, shipped.cacheLimitBytes)
+                XCTAssertEqual(switched.memoryLimitBytes, shipped.memoryLimitBytes)
+                XCTAssertEqual(switched.clearCacheAfterGeneration, shipped.clearCacheAfterGeneration)
+                XCTAssertEqual(switched.mlxTokenMemoryClearCadence, shipped.mlxTokenMemoryClearCadence)
+                XCTAssertEqual(switched.unloadAfterIdleSeconds, shipped.unloadAfterIdleSeconds)
+                XCTAssertEqual(
+                    NativeMemoryPolicyResolver.memoryConfiguration(for: switched).clearCacheOnStreamChunk,
+                    value
+                )
+            }
+        }
     }
 }

@@ -37,8 +37,68 @@ public enum NativeMemoryPolicyResolver {
         return .highMemoryMac
     }
 
+    /// The diagnostic key that turns the per-chunk MLX cache clear on or off
+    /// on any tier (RF-45).
+    static let streamChunkCacheClearKey = "QWENVOICE_STREAM_CHUNK_CACHE_CLEAR"
+
+    /// `on` or `off` for `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR`; nil, leaving
+    /// the tier's own setting, when unset or unrecognized.
+    static func parseStreamChunkCacheClear(_ raw: String?) -> Bool? {
+        switch raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "on", "true", "1", "yes": true
+        case "off", "false", "0", "no": false
+        default: nil
+        }
+    }
+
+    /// The tier's memory policy. `streamChunkCacheClearOverride` is the
+    /// resolved `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR` diagnostic (internal
+    /// diagnostics build plus `QWENVOICE_DEBUG`): it isolates the per-chunk
+    /// clear from the rest of a tier, so its cost can be measured on a device
+    /// without forcing another tier's cache limit and cadence with it. On the
+    /// M6 the clear changes no sample and costs about 1.7% where the host
+    /// bounds a frame; the iPhone has not been measured.
     public static func policy(
         deviceClass: NativeDeviceMemoryClass = deviceClass(),
+        mode: GenerationMode,
+        isBatch: Bool
+    ) -> NativeMemoryPolicy {
+        policy(
+            deviceClass: deviceClass,
+            mode: mode,
+            isBatch: isBatch,
+            streamChunkCacheClearOverride: parseStreamChunkCacheClear(
+                RuntimeDebugGate.value(for: streamChunkCacheClearKey)
+            )
+        )
+    }
+
+    /// The tier's policy with the switch's value given, for the resolver
+    /// above and for tests.
+    static func policy(
+        deviceClass: NativeDeviceMemoryClass,
+        mode: GenerationMode,
+        isBatch: Bool,
+        streamChunkCacheClearOverride: Bool?
+    ) -> NativeMemoryPolicy {
+        let tier = tierPolicy(deviceClass: deviceClass, mode: mode, isBatch: isBatch)
+        guard let streamChunkCacheClearOverride,
+              streamChunkCacheClearOverride != tier.clearMLXCacheOnStreamChunkEmit
+        else { return tier }
+        return NativeMemoryPolicy(
+            name: tier.name,
+            deviceClass: tier.deviceClass,
+            cacheLimitBytes: tier.cacheLimitBytes,
+            memoryLimitBytes: tier.memoryLimitBytes,
+            clearCacheAfterGeneration: tier.clearCacheAfterGeneration,
+            clearMLXCacheOnStreamChunkEmit: streamChunkCacheClearOverride,
+            mlxTokenMemoryClearCadence: tier.mlxTokenMemoryClearCadence,
+            unloadAfterIdleSeconds: tier.unloadAfterIdleSeconds
+        )
+    }
+
+    private static func tierPolicy(
+        deviceClass: NativeDeviceMemoryClass,
         mode: GenerationMode,
         isBatch: Bool
     ) -> NativeMemoryPolicy {

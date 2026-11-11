@@ -1163,6 +1163,31 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
 
     // MARK: - Script language (U03)
 
+    /// G-02: a long-form clone project keeps the draft's audio-only intent on
+    /// every segment, and a project that never stated it keeps the stored
+    /// transcript (the CLI's `--voice`).
+    func testCloneSegmentsCarryWhetherTheStoredTranscriptIsIgnored() throws {
+        let f = try makeFixture()
+        let plan = try LongFormPlanner.plan(
+            spokenTextPlan: try SpokenTextPlanner.plan(originalText: "One sentence here. Another sentence there."),
+            configuration: LongFormPlanningConfiguration(runtimeTokenLimit: 12, baseSeed: 3)
+        )
+        for ignores in [true, false] {
+            let request = IOSLongFormProjectRequest(
+                mode: .clone, model: f.request.model, plan: plan, voice: "Voice", emotion: nil,
+                deliveryInstructionCellID: nil, languageHint: Qwen3SupportedLanguage.english.rawValue,
+                voiceDescription: nil, refAudio: "/voices/Voice.wav", refText: nil, preparedVoiceID: "Voice",
+                ignoresStoredTranscript: ignores)
+            for index in request.lines.indices {
+                let segment = request.makeGenerationRequest(
+                    segmentIndex: index, outputPath: "/tmp/segment-\(index).wav", generationID: UUID(), variation: nil)
+                guard case .clone(let reference) = segment.payload else { return XCTFail("Expected a clone payload") }
+                XCTAssertEqual(reference.ignoresStoredTranscript, ignores)
+                XCTAssertEqual(reference.bypassesStoredTranscript, ignores)
+            }
+        }
+    }
+
     /// Auto resolves one language over the whole script: a kanji-only heading
     /// isolated as its own segment is spoken in the script's Japanese, never
     /// detected on its own as Chinese. An explicit selection is kept.

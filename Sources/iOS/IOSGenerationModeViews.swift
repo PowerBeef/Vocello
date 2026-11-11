@@ -1583,10 +1583,9 @@ struct IOSVoiceCloningView: View {
            transcriptLoadError == nil {
             return nil
         }
-        return GenerationSemantics.cloneReferenceIdentityKey(
+        return GenerationSemantics.clonePreparationKey(
             modelID: model.id,
-            refAudio: referenceAudioPath,
-            refText: draft.trimmedReferenceTranscript
+            reference: draft.cloneReference(audioPath: referenceAudioPath)
         )
     }
 
@@ -1857,7 +1856,8 @@ struct IOSVoiceCloningView: View {
                     voiceDescription: nil,
                     refAudio: refPath,
                     refText: draft.trimmedReferenceTranscript,
-                    preparedVoiceID: draft.selectedSavedVoiceID
+                    preparedVoiceID: draft.selectedSavedVoiceID,
+                    ignoresStoredTranscript: true
                 ),
                 ttsEngine: ttsEngine,
                 audioPlayer: audioPlayer,
@@ -2067,8 +2067,11 @@ struct IOSVoiceCloningView: View {
         guard let pendingSavedVoiceHandoff else { return }
         defer { self.pendingSavedVoiceHandoff = nil }
 
+        var loadErrorFromDisk: String?
         if let voice = savedVoices.first(where: { $0.id == pendingSavedVoiceHandoff.savedVoiceID }) {
             applySavedVoice(voice)
+            // Kept below: the handoff's own error field must not erase it.
+            loadErrorFromDisk = transcriptLoadError
             let handoffTranscript = pendingSavedVoiceHandoff.transcript
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if draft.referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -2084,7 +2087,7 @@ struct IOSVoiceCloningView: View {
             hydratedSavedVoiceID = pendingSavedVoiceHandoff.savedVoiceID
         }
 
-        transcriptLoadError = pendingSavedVoiceHandoff.transcriptLoadError
+        transcriptLoadError = pendingSavedVoiceHandoff.transcriptLoadError ?? loadErrorFromDisk
         autoTranscribeReferenceIfNeeded()
         // Covers the fallback branch above that bypasses applySavedVoice.
         primeSelectedCloneVoiceProactively()
@@ -2182,11 +2185,7 @@ struct IOSVoiceCloningView: View {
                 // IOS-18: the take is fixed at the tap, as in the other modes.
                 // Priming below awaits, and an edit made meanwhile (script,
                 // transcript, voice, language or seed) must not change it.
-                let reference = CloneReference(
-                    audioPath: refPath,
-                    transcript: currentDraft.trimmedReferenceTranscript,
-                    preparedVoiceID: currentDraft.selectedSavedVoiceID
-                )
+                let reference = currentDraft.cloneReference(audioPath: refPath)
                 let outputPath = makeOutputPath(subfolder: model.outputSubfolder)
                 let voiceName = currentVoiceName
                     ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
@@ -2273,11 +2272,7 @@ struct IOSVoiceCloningView: View {
             return
         }
 
-        let reference = CloneReference(
-            audioPath: refPath,
-            transcript: draft.trimmedReferenceTranscript,
-            preparedVoiceID: draft.selectedSavedVoiceID
-        )
+        let reference = draft.cloneReference(audioPath: refPath)
         let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
         // Seen primed already: an idle unload since then sticks (U18).
         guard clonePrimingIntent.shouldPrime(key: requestKey) else { return }
@@ -2323,11 +2318,7 @@ struct IOSVoiceCloningView: View {
         guard draft.isReferenceReady, transcriptLoadError == nil,
               let model = TTSModel.model(for: .clone), modelManager.isAvailable(model) else { return }
         let reference = draft.referenceAudioPath.map { path in
-            CloneReference(
-                audioPath: path,
-                transcript: draft.trimmedReferenceTranscript,
-                preparedVoiceID: draft.selectedSavedVoiceID
-            )
+            draft.cloneReference(audioPath: path)
         }
         Task {
             await ttsEngine.ensureModelLoadedIfNeeded(id: model.id)

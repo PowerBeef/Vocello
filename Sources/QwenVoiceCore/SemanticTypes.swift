@@ -640,21 +640,49 @@ public struct CloneReference: Hashable, Codable, Sendable {
     public let audioPath: String
     public let conditioningMode: CloneConditioningMode
     public let preparedVoiceID: String?
+    /// Audio-only as an explicit request (G-02). A saved voice's reference with
+    /// no inline transcript otherwise falls back to the transcript stored
+    /// beside it, which is what the CLI's `--voice` and the saved-voice
+    /// prebuild rely on. A Studio draft is the user's stated intent, so it
+    /// sets this: an empty transcript there means the user chose "Use audio
+    /// only", and the stored transcript must not come back in its place.
+    public let ignoresStoredTranscript: Bool
 
-    public init(audioPath: String, transcript: String? = nil, preparedVoiceID: String? = nil) {
+    public init(
+        audioPath: String,
+        transcript: String? = nil,
+        preparedVoiceID: String? = nil,
+        ignoresStoredTranscript: Bool = false
+    ) {
         self.audioPath = audioPath
         self.conditioningMode = CloneConditioningMode(transcript: transcript)
         self.preparedVoiceID = preparedVoiceID
+        self.ignoresStoredTranscript = ignoresStoredTranscript
     }
 
     public init(
         audioPath: String,
         conditioningMode: CloneConditioningMode,
-        preparedVoiceID: String? = nil
+        preparedVoiceID: String? = nil,
+        ignoresStoredTranscript: Bool = false
     ) {
         self.audioPath = audioPath
         self.conditioningMode = conditioningMode.normalized
         self.preparedVoiceID = preparedVoiceID
+        self.ignoresStoredTranscript = ignoresStoredTranscript
+    }
+
+    /// True when this request can only condition on the reference audio: it
+    /// carries no transcript and may not read a stored one.
+    public var isExplicitlyAudioOnly: Bool {
+        ignoresStoredTranscript && !conditioningMode.usesTranscript
+    }
+
+    /// The one case in which `ignoresStoredTranscript` changes what a request
+    /// resolves to: a saved voice with no inline transcript. Identities carry
+    /// the flag only here, so every other request keeps the key it always had.
+    public var bypassesStoredTranscript: Bool {
+        preparedVoiceID != nil && isExplicitlyAudioOnly
     }
 
     public var transcript: String? {
@@ -670,12 +698,17 @@ public struct CloneReference: Hashable, Codable, Sendable {
         case transcript
         case conditioningMode
         case preparedVoiceID
+        case ignoresStoredTranscript
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         audioPath = try container.decode(String.self, forKey: .audioPath)
         preparedVoiceID = try container.decodeIfPresent(String.self, forKey: .preparedVoiceID)
+        // Absent in everything written before G-02: the stored transcript applies.
+        ignoresStoredTranscript = try container.decodeIfPresent(
+            Bool.self, forKey: .ignoresStoredTranscript
+        ) ?? false
 
         if let decodedMode = try container.decodeIfPresent(
             CloneConditioningMode.self,
@@ -706,6 +739,10 @@ public struct CloneReference: Hashable, Codable, Sendable {
         try container.encode(conditioningMode.normalized, forKey: .conditioningMode)
         try container.encodeIfPresent(transcript, forKey: .transcript)
         try container.encodeIfPresent(preparedVoiceID, forKey: .preparedVoiceID)
+        // Written only when set, so earlier payloads stay byte-identical.
+        if ignoresStoredTranscript {
+            try container.encode(true, forKey: .ignoresStoredTranscript)
+        }
     }
 }
 

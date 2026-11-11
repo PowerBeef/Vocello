@@ -1229,7 +1229,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let uiIdentityKey = GenerationSemantics.cloneReferenceIdentityKey(
             modelID: modelID,
             refAudio: reference.audioPath,
-            refText: requestedTranscript
+            refText: requestedTranscript,
+            storedTranscriptBypassed: reference.bypassesStoredTranscript
         )
         clonePreparationState = ClonePreparationState(
             phase: .preparing,

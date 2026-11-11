@@ -16,6 +16,8 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+    /// The clone draft's audio-only intent (G-02); false outside Clone.
+    var ignoresStoredTranscript = false
     /// The draft's pinned seed: a long-form project's base seed and a line
     /// batch's shared seed, as for a single take (U11).
     let pinnedSeed: UInt64?
@@ -86,6 +88,7 @@ struct MacBatchSheetConfiguration: Identifiable, Equatable {
             refAudio: draft.referenceAudioPath,
             refText: draft.trimmedReferenceTranscript,
             preparedVoiceID: draft.selectedSavedVoiceID,
+            ignoresStoredTranscript: true,
             pinnedSeed: draft.pinnedSeed,
             initialText: initialText,
             initialSegmentationMode: initialSegmentationMode

@@ -188,7 +188,8 @@ extension DesktopEngineHost {
             voiceDescription: request.payload.voiceDescription,
             refAudio: request.payload.cloneReference?.audioPath,
             refText: request.payload.cloneReference?.transcript,
-            preparedVoiceID: request.payload.cloneReference?.preparedVoiceID
+            preparedVoiceID: request.payload.cloneReference?.preparedVoiceID,
+            ignoresStoredTranscript: request.payload.cloneReference?.ignoresStoredTranscript ?? false
         )
         let hooks = HeadlessLongFormHooks(presentation: presentation, variation: request.variation)
         let services = HeadlessLongFormServices(directory: request.directory, total: request.plan.segments.count, events: events)

@@ -324,6 +324,18 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertEqual(reference.audioPath, "/tmp/reference.wav")
         XCTAssertEqual(reference.transcript, "Reference transcript")
         XCTAssertEqual(reference.preparedVoiceID, "prepared-voice")
+        XCTAssertFalse(reference.ignoresStoredTranscript, "A batch that never stated audio-only keeps the stored transcript")
+        // G-02: the Studio batch states the draft's intent, and every line carries it.
+        let audioOnly = MacLineBatchRequest(
+            mode: .clone, modelID: "model-clone", modelTier: "speed", outputSubfolder: "batch",
+            supportsInstructionControl: true, lines: ["Line one"], voice: nil, emotion: nil,
+            deliveryInstructionCellID: nil, language: .french, voiceDescription: nil,
+            refAudio: "/voices/Voice.wav", refText: nil, preparedVoiceID: "Voice", ignoresStoredTranscript: true,
+            displayVoiceName: "Voice", variation: nil, batchSeed: 7)
+        guard case .clone(let audioOnlyReference)? = audioOnly.generationRequest(line: "Line one", outputPath: "/tmp/1.wav")?.payload else {
+            return XCTFail("Expected a clone payload")
+        }
+        XCTAssertTrue(audioOnlyReference.bypassesStoredTranscript)
         XCTAssertNil(makeRequest(mode: .clone, refAudio: nil).generationRequest(line: "Line one", outputPath: "/tmp/1.wav"))
         XCTAssertNil(makeRequest(mode: .custom, voice: nil).generationRequest(line: "Line one", outputPath: "/tmp/1.wav"))
     }

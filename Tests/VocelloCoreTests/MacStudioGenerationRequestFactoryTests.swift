@@ -14,6 +14,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceAudioPath: "/tmp/reference.wav",
                 referenceTranscript: LanguageFixtures.english,
                 preparedVoiceID: "reviewed-reference",
+                ignoresStoredTranscript: true,
                 seed: 32_060_828,
                 variation: .consistent,
                 generationID: generationID
@@ -21,6 +22,8 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         )
 
         XCTAssertEqual(request.mode, .clone)
+        guard case .clone(let studioReference) = request.payload else { return XCTFail("Expected a clone payload") }
+        XCTAssertTrue(studioReference.ignoresStoredTranscript, "The Studio's intent reaches the request (G-02)")
         XCTAssertEqual(request.languageHint, Qwen3SupportedLanguage.auto.rawValue)
         XCTAssertEqual(request.generationID, generationID)
         XCTAssertEqual(request.seed, 32_060_828)
@@ -53,6 +56,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceAudioPath: "/tmp/reference.wav",
                 referenceTranscript: LanguageFixtures.english,
                 preparedVoiceID: nil,
+                ignoresStoredTranscript: true,
                 seed: nil,
                 variation: nil
             )
@@ -74,6 +78,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceAudioPath: nil,
                 referenceTranscript: nil,
                 preparedVoiceID: nil,
+                ignoresStoredTranscript: true,
                 seed: nil,
                 variation: nil
             )
@@ -87,6 +92,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceAudioPath: "/tmp/reference.wav",
                 referenceTranscript: nil,
                 preparedVoiceID: nil,
+                ignoresStoredTranscript: true,
                 seed: nil,
                 variation: nil
             )
@@ -197,6 +203,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             referenceAudioPath: "/tmp/reference.wav",
             referenceTranscript: "Reference.",
             preparedVoiceID: nil,
+            ignoresStoredTranscript: true,
             seed: nil,
             variation: nil
         ))
@@ -219,6 +226,19 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 GenerationSemantics.appStreamingInterval,
                 "\(request.mode) streams on the app interval"
             )
+        }
+    }
+
+    /// G-02: the factory passes the caller's choice through in both directions.
+    func testCloneRequestCarriesWhetherTheStoredTranscriptIsIgnored() throws {
+        for ignores in [true, false] {
+            let request = try XCTUnwrap(MacStudioGenerationRequestFactory.voiceClone(
+                modelID: "clone-model", text: "Hello there.", outputPath: "/tmp/clone.wav", language: .english,
+                referenceAudioPath: "/voices/Voice.wav", referenceTranscript: nil, preparedVoiceID: "Voice",
+                ignoresStoredTranscript: ignores, seed: nil, variation: nil))
+            guard case .clone(let reference) = request.payload else { return XCTFail("Expected a clone payload") }
+            XCTAssertEqual(reference.ignoresStoredTranscript, ignores)
+            XCTAssertEqual(reference.bypassesStoredTranscript, ignores)
         }
     }
 }

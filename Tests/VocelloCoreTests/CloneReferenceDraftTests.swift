@@ -34,6 +34,39 @@ final class CloneReferenceDraftTests: XCTestCase {
         XCTAssertEqual(draft.referenceTranscript, "")
     }
 
+    /// G-02: what the draft shows is what conditions the take. Clearing a
+    /// saved voice's transcript and choosing audio only must reach the engine
+    /// as audio only, not as a request that reads the stored transcript back.
+    func testChoosingAudioOnlyForASavedVoiceReachesTheRequestAsAudioOnly() {
+        var draft = VoiceCloningDraft()
+        draft.applySavedVoiceSelection(id: "Alice", wavPath: "/tmp/g02/Alice.wav", transcript: "Alice's sidecar.")
+        let hydrated = draft.cloneReference(audioPath: "/tmp/g02/Alice.wav")
+        XCTAssertEqual(hydrated.transcript, "Alice's sidecar.")
+        XCTAssertFalse(hydrated.bypassesStoredTranscript)
+
+        draft.confirmAudioOnly()
+        XCTAssertTrue(draft.isReferenceReady)
+        let audioOnly = draft.cloneReference(audioPath: "/tmp/g02/Alice.wav")
+        XCTAssertNil(audioOnly.transcript)
+        XCTAssertEqual(audioOnly.preparedVoiceID, "Alice")
+        XCTAssertTrue(audioOnly.bypassesStoredTranscript)
+        XCTAssertNotEqual(
+            GenerationSemantics.clonePreparationKey(modelID: "clone", reference: hydrated),
+            GenerationSemantics.clonePreparationKey(modelID: "clone", reference: audioOnly))
+    }
+
+    func testAOneOffAudioOnlyReferenceKeepsTheKeyItAlwaysHad() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/g02/clip.wav")
+        draft.confirmAudioOnly()
+        let reference = draft.cloneReference(audioPath: "/tmp/g02/clip.wav")
+        XCTAssertTrue(reference.isExplicitlyAudioOnly)
+        XCTAssertFalse(reference.bypassesStoredTranscript)
+        XCTAssertEqual(
+            GenerationSemantics.clonePreparationKey(modelID: "clone", reference: reference),
+            GenerationSemantics.clonePreparationKey(modelID: "clone", reference: CloneReference(audioPath: "/tmp/g02/clip.wav")))
+    }
+
     func testDeletingTheSelectedSavedVoiceClearsTheDraftLikeTheIPhone() {
         var draft = VoiceCloningDraft()
         draft.applySavedVoiceSelection(id: "Alice", wavPath: "/tmp/u14/Alice.wav", transcript: "Alice's sidecar.")

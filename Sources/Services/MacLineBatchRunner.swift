@@ -289,6 +289,7 @@ extension MacLineBatchRequest {
         refAudio: String?,
         refText: String?,
         preparedVoiceID: String?,
+        ignoresStoredTranscript: Bool = false,
         displayVoiceName: String,
         batchSeed: UInt64? = nil,
         lineSeeds: [UInt64]? = nil
@@ -308,6 +309,7 @@ extension MacLineBatchRequest {
             refAudio: refAudio,
             refText: refText,
             preparedVoiceID: preparedVoiceID,
+            ignoresStoredTranscript: ignoresStoredTranscript,
             displayVoiceName: displayVoiceName,
             variation: GenerationVariationPreference.requestValue(),
             batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max),

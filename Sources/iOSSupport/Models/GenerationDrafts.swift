@@ -185,6 +185,19 @@ struct VoiceCloningDraft: Equatable {
         ReferenceTranscriptionReviewState.conditioningLine(referenceTranscript)
     }
 
+    /// The clone reference this draft asks for (G-02). The draft is the
+    /// user's stated intent: the transcript field shows what conditions the
+    /// take, and an empty one means audio only. A saved voice's stored
+    /// transcript is therefore never read in its place.
+    func cloneReference(audioPath: String) -> CloneReference {
+        CloneReference(
+            audioPath: audioPath,
+            transcript: trimmedReferenceTranscript,
+            preparedVoiceID: selectedSavedVoiceID,
+            ignoresStoredTranscript: true
+        )
+    }
+
     /// ASR completion never changes an admitted audio-only intent. Automatic text
     /// must be reviewed explicitly; editing it is also an explicit review decision.
     var isReferenceReady: Bool {

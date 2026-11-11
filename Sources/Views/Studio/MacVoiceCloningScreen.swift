@@ -126,11 +126,7 @@ struct MacVoiceCloningScreen: View {
         }
         return GenerationSemantics.clonePreparationKey(
             modelID: model.id,
-            reference: CloneReference(
-                audioPath: referenceAudioPath,
-                transcript: draft.trimmedReferenceTranscript,
-                preparedVoiceID: draft.selectedSavedVoiceID
-            )
+            reference: draft.cloneReference(audioPath: referenceAudioPath)
         )
     }
 
@@ -937,11 +933,7 @@ struct MacVoiceCloningScreen: View {
             await ttsEngineStore.cancelClonePreparationIfNeeded()
             return
         }
-        let reference = CloneReference(
-            audioPath: refPath,
-            transcript: draft.trimmedReferenceTranscript,
-            preparedVoiceID: draft.selectedSavedVoiceID
-        )
+        let reference = draft.cloneReference(audioPath: refPath)
         let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
         // Seen primed already: an idle unload since then sticks (U18).
         guard session.primingIntent.shouldPrime(key: requestKey) else { return }
@@ -1025,6 +1017,7 @@ struct MacVoiceCloningScreen: View {
             referenceAudioPath: refPath,
             referenceTranscript: currentDraft.trimmedReferenceTranscript,
             preparedVoiceID: currentDraft.selectedSavedVoiceID,
+            ignoresStoredTranscript: true,
             seed: currentDraft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         ) else {
@@ -1055,11 +1048,7 @@ struct MacVoiceCloningScreen: View {
             audioPlayer: audioPlayer,
             clonePriming: MacStudioClonePriming(
                 modelID: model.id,
-                reference: CloneReference(
-                    audioPath: refPath,
-                    transcript: currentDraft.trimmedReferenceTranscript,
-                    preparedVoiceID: currentDraft.selectedSavedVoiceID
-                ),
+                reference: currentDraft.cloneReference(audioPath: refPath),
                 expectedKey: clonePrimingRequestKey
             )
         )

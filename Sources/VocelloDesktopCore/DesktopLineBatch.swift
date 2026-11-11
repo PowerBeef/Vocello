@@ -44,7 +44,9 @@ public struct DesktopLineBatch: Sendable {
             supportsInstructionControl: model.supportsInstructionControl, lines: lines, voice: voice,
             emotion: emotion, deliveryInstructionCellID: deliveryInstructionCellID, language: language ?? .auto,
             voiceDescription: voiceDescription, refAudio: reference?.audioPath, refText: reference?.transcript,
-            preparedVoiceID: reference?.preparedVoiceID, displayVoiceName: voice ?? mode.rawValue,
+            preparedVoiceID: reference?.preparedVoiceID,
+            ignoresStoredTranscript: reference?.ignoresStoredTranscript ?? false,
+            displayVoiceName: voice ?? mode.rawValue,
             variation: variation, batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
         )
     }

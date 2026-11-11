@@ -202,7 +202,8 @@ actor NativePreparedCloneConditioningCache {
         let uiIdentity = GenerationSemantics.cloneReferenceIdentity(
             modelID: modelID,
             refAudio: reference.audioPath,
-            refText: requestedTranscript
+            refText: requestedTranscript,
+            storedTranscriptBypassed: reference.bypassesStoredTranscript
         )
         let internalIdentity = GenerationSemantics.internalCloneReferenceIdentity(
             modelID: modelID,
@@ -418,7 +419,7 @@ actor NativePreparedCloneConditioningCache {
                     voiceID: voiceID,
                     sourceURL: conditioning.normalizedReference.sourceURL,
                     sourceFingerprint: sourceFingerprint,
-                    checksStoredTranscript: conditioning.transcriptMode != .inline,
+                    checksStoredTranscript: Self.comparesStoredTranscriptBeforePublication(conditioning),
                     expectedStoredTranscript: conditioning.resolvedTranscript
                 ) { @concurrent staging in
                     try await model.engine.persistCloneArtifact(handle, to: staging, metadata: metadata)
@@ -478,13 +479,27 @@ actor NativePreparedCloneConditioningCache {
         }
     }
 
+    /// Whether publishing a saved voice's prompt first compares the stored
+    /// transcript with the one the prompt was built from. An inline transcript
+    /// is the caller's own. A request that states audio-only never read the
+    /// stored transcript (G-02), so there is none to compare: its prompt lives
+    /// under the audio-only identity, which no transcript-backed request
+    /// resolves to.
+    static func comparesStoredTranscriptBeforePublication(_ conditioning: ResolvedCloneConditioning) -> Bool {
+        conditioning.transcriptMode != .inline && !conditioning.uiIdentity.storedTranscriptBypassed
+    }
+
     /// Only a saved voice reads the transcript sidecar beside its reference
     /// (P12-09). A one-off reference is used in place, so a same-stem `.txt`
     /// next to it is whatever the user keeps there (notes, a whole-episode
     /// transcript), not a transcript anyone reviewed for this clip; without an
     /// inline transcript it conditions audio-only, as the Studio shows it.
+    ///
+    /// A request that states audio-only (`ignoresStoredTranscript`, G-02) never
+    /// reads it either: the user's choice in the Studio is not replaced by the
+    /// transcript the voice was saved with.
     static func readsTranscriptSidecar(for reference: CloneReference) -> Bool {
-        reference.preparedVoiceID != nil
+        reference.preparedVoiceID != nil && !reference.ignoresStoredTranscript
     }
 
     private func insert(_ conditioning: CachedConditioning) {

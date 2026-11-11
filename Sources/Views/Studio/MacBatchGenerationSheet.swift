@@ -448,6 +448,7 @@ struct MacBatchGenerationSheet: View {
             refAudio: configuration.refAudio,
             refText: configuration.refText,
             preparedVoiceID: configuration.preparedVoiceID,
+            ignoresStoredTranscript: configuration.ignoresStoredTranscript,
             displayVoiceName: displayVoiceName,
             batchSeed: retry?.previous.batchSeed ?? configuration.pinnedSeed,
             lineSeeds: retry.flatMap { $0.lines == lines ? $0.seeds : nil }
@@ -534,7 +535,8 @@ struct MacBatchGenerationSheet: View {
                 voiceDescription: configuration.voiceDescription,
                 refAudio: configuration.refAudio,
                 refText: configuration.refText,
-                preparedVoiceID: configuration.preparedVoiceID
+                preparedVoiceID: configuration.preparedVoiceID,
+                ignoresStoredTranscript: configuration.ignoresStoredTranscript
             ),
             ttsEngine: ttsEngineStore,
             audioPlayer: audioPlayer,

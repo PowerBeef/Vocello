@@ -371,10 +371,13 @@ struct ContentView: View {
             return
         }
         let trimmedTranscript = plan.handoff.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The handoff is a Studio draft in transit, so it states the same
+        // intent the screen's own reference will (G-02) and shares its key.
         let reference = CloneReference(
             audioPath: plan.handoff.wavPath,
             transcript: trimmedTranscript.isEmpty ? nil : trimmedTranscript,
-            preparedVoiceID: plan.handoff.savedVoiceID
+            preparedVoiceID: plan.handoff.savedVoiceID,
+            ignoresStoredTranscript: true
         )
         try? await engineStore.ensureCloneReferencePrimed(
             modelID: cloneModelID,
@@ -519,16 +522,16 @@ struct ContentView: View {
         case .clone:
             // Without recorded consent the clone model is warmed but the
             // reference is never primed (the engine would refuse it).
+            // A reference still under review is not primed: its transcript
+            // may yet be hydrated or confirmed, and an empty one now means
+            // audio only (G-02).
             if allowClonePrime,
                cloneConsentAcknowledged,
+               voiceCloningDraft.isReferenceReady,
                let referenceAudioPath = voiceCloningDraft.referenceAudioPath?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                !referenceAudioPath.isEmpty {
-                let cloneReference = CloneReference(
-                    audioPath: referenceAudioPath,
-                    transcript: voiceCloningDraft.trimmedReferenceTranscript,
-                    preparedVoiceID: voiceCloningDraft.selectedSavedVoiceID
-                )
+                let cloneReference = voiceCloningDraft.cloneReference(audioPath: referenceAudioPath)
                 reference = cloneReference
                 identity = .clone(
                     referenceKey: GenerationSemantics.clonePreparationKey(

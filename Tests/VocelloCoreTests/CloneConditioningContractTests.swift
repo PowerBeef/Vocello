@@ -84,6 +84,142 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertEqual(storedPrebuild.mode, .sidecar)
     }
 
+    /// G-02 through the resolver itself: on one cache, the stored-transcript
+    /// request and the audio-only request for the same saved voice resolve to
+    /// different conditioning, in either order, and each publishes its state
+    /// under the key the Studio computes for it.
+    @concurrent func testTheResolverConditionsAStatedAudioOnlyRequestOnAudioAlone() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("Voice.wav")
+        try Self.writeSineWAV(sampleRate: 24_000, seconds: 1, to: source)
+        try "Stored words".write(to: source.deletingPathExtension().appendingPathExtension("txt"),
+                                 atomically: true, encoding: .utf8)
+        let cache = NativePreparedCloneConditioningCache(capacity: 4)
+        let stored = CloneReference(audioPath: source.path, preparedVoiceID: "Voice")
+        let audioOnly = CloneReference(audioPath: source.path, preparedVoiceID: "Voice", ignoresStoredTranscript: true)
+        for (reference, transcript, mode) in [
+            (stored, "Stored words", ResolvedCloneTranscriptMode.sidecar),
+            (audioOnly, nil, ResolvedCloneTranscriptMode.none),
+            (stored, "Stored words", ResolvedCloneTranscriptMode.sidecar),
+        ] as [(CloneReference, String?, ResolvedCloneTranscriptMode)] {
+            let resolved = try await cache.resolve(
+                modelID: "clone", reference: reference, sampleRate: 24_000,
+                audioPreparationService: NativeAudioPreparationService(),
+                normalizedCloneReferenceDirectory: root.appendingPathComponent("normalized"))
+            XCTAssertEqual(resolved.resolvedTranscript, transcript)
+            XCTAssertEqual(resolved.transcriptMode, mode)
+            XCTAssertEqual(resolved.conditioningMode.usesTranscript, transcript != nil)
+            XCTAssertEqual(resolved.uiIdentityKey,
+                           GenerationSemantics.clonePreparationKey(modelID: "clone", reference: reference))
+            // The audio-only prompt is published without comparing a stored
+            // transcript it never read; the stored-transcript one still compares.
+            XCTAssertEqual(
+                NativePreparedCloneConditioningCache.comparesStoredTranscriptBeforePublication(resolved),
+                transcript != nil)
+        }
+        XCTAssertNotEqual(GenerationSemantics.clonePreparationKey(modelID: "clone", reference: stored),
+                          GenerationSemantics.clonePreparationKey(modelID: "clone", reference: audioOnly))
+        // The warm identity separates them too.
+        func warm(_ reference: CloneReference) -> GenerationSemantics.PrewarmIdentity {
+            GenerationSemantics.prewarmIdentity(for: GenerationRequest(
+                modelID: "clone", text: "Hello.", outputPath: "/tmp/out.wav",
+                payload: .clone(reference: reference)))
+        }
+        XCTAssertNotEqual(warm(stored), warm(audioOnly))
+    }
+
+    /// G-02: "Use audio only" on a saved voice is a request state of its own.
+    /// The stored transcript the voice was saved with must not come back in
+    /// its place, while requests that never stated it keep reading it.
+    func testAStatedAudioOnlyRequestNeverReadsTheSavedVoicesStoredTranscript() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let audio = root.appendingPathComponent("reference.wav")
+        try "Stored words".write(to: audio.deletingPathExtension().appendingPathExtension("txt"),
+                                 atomically: true, encoding: .utf8)
+
+        let stored = CloneReference(audioPath: audio.path, preparedVoiceID: "Voice")
+        let audioOnly = CloneReference(audioPath: audio.path, preparedVoiceID: "Voice", ignoresStoredTranscript: true)
+        XCTAssertFalse(stored.bypassesStoredTranscript)
+        XCTAssertTrue(audioOnly.isExplicitlyAudioOnly)
+        XCTAssertTrue(audioOnly.bypassesStoredTranscript)
+
+        for (reference, expected, mode) in [
+            (stored, "Stored words", ResolvedCloneTranscriptMode.sidecar),
+            (audioOnly, nil, ResolvedCloneTranscriptMode.none),
+        ] as [(CloneReference, String?, ResolvedCloneTranscriptMode)] {
+            let result = try NativePreparedCloneConditioningCache.resolveTranscript(
+                requestedTranscript: reference.transcript, normalizedAudioURL: audio,
+                readsSavedVoiceSidecar: NativePreparedCloneConditioningCache.readsTranscriptSidecar(for: reference))
+            XCTAssertEqual(result.transcript, expected)
+            XCTAssertEqual(result.mode, mode)
+            XCTAssertEqual(
+                NativePreparedCloneConditioningCache.anticipatedConditioningMode(for: reference).usesTranscript,
+                expected != nil)
+        }
+
+        // An inline transcript still wins: the flag only decides the empty case.
+        let inline = CloneReference(audioPath: audio.path, transcript: "Typed words", preparedVoiceID: "Voice",
+                                    ignoresStoredTranscript: true)
+        XCTAssertFalse(inline.isExplicitlyAudioOnly)
+        XCTAssertFalse(inline.bypassesStoredTranscript)
+        XCTAssertEqual(inline.transcript, "Typed words")
+    }
+
+    /// The two requests resolve to different conditioning, so they never share
+    /// a preparation key; every request that existed before keeps its key.
+    func testAudioOnlyForASavedVoiceHasItsOwnKeyAndEveryOtherKeyIsUnchanged() {
+        let stored = CloneReference(audioPath: "/voices/a.wav", preparedVoiceID: "Voice")
+        let audioOnly = CloneReference(audioPath: "/voices/a.wav", preparedVoiceID: "Voice", ignoresStoredTranscript: true)
+        let storedKey = GenerationSemantics.clonePreparationKey(modelID: "clone", reference: stored)
+        let audioOnlyKey = GenerationSemantics.clonePreparationKey(modelID: "clone", reference: audioOnly)
+        XCTAssertEqual(storedKey, "clone|clone|x_vector_only|/voices/a.wav|")
+        XCTAssertEqual(audioOnlyKey, "clone|clone|x_vector_only|/voices/a.wav||stored-transcript-bypassed")
+        XCTAssertNotEqual(
+            GenerationSemantics.cloneReferenceIdentity(modelID: "clone", refAudio: "/voices/a.wav", refText: nil),
+            GenerationSemantics.cloneReferenceIdentity(modelID: "clone", refAudio: "/voices/a.wav", refText: nil,
+                                                       storedTranscriptBypassed: true))
+
+        // Unchanged: a one-off reference and any inline transcript, flag or not.
+        for (plain, flagged) in [
+            (CloneReference(audioPath: "/tmp/one-off.wav"),
+             CloneReference(audioPath: "/tmp/one-off.wav", ignoresStoredTranscript: true)),
+            (CloneReference(audioPath: "/voices/a.wav", transcript: "Typed", preparedVoiceID: "Voice"),
+             CloneReference(audioPath: "/voices/a.wav", transcript: "Typed", preparedVoiceID: "Voice",
+                            ignoresStoredTranscript: true)),
+        ] {
+            XCTAssertEqual(GenerationSemantics.clonePreparationKey(modelID: "clone", reference: plain),
+                           GenerationSemantics.clonePreparationKey(modelID: "clone", reference: flagged))
+        }
+        // A transcript-backed identity can never carry the bypass.
+        XCTAssertFalse(GenerationSemantics.cloneReferenceIdentity(
+            modelID: "clone", refAudio: "/voices/a.wav", refText: "Typed", storedTranscriptBypassed: true
+        ).storedTranscriptBypassed)
+    }
+
+    /// Payloads written before G-02 decode with the stored transcript in
+    /// force, and a request that does not set the flag encodes as it always did.
+    func testTheAudioOnlyFlagIsAbsentFromEarlierPayloadsAndWrittenOnlyWhenSet() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let stored = CloneReference(audioPath: "/voices/a.wav", preparedVoiceID: "Voice")
+        let storedJSON = try XCTUnwrap(String(data: encoder.encode(stored), encoding: .utf8))
+        XCTAssertFalse(storedJSON.contains("ignoresStoredTranscript"))
+        let legacy = Data(#"{"audioPath":"/voices/a.wav","conditioningMode":{"kind":"x_vector_only"},"preparedVoiceID":"Voice"}"#.utf8)
+        let decoded = try JSONDecoder().decode(CloneReference.self, from: legacy)
+        XCTAssertFalse(decoded.ignoresStoredTranscript)
+        XCTAssertEqual(decoded, stored)
+
+        let audioOnly = CloneReference(audioPath: "/voices/a.wav", preparedVoiceID: "Voice", ignoresStoredTranscript: true)
+        let roundTrip = try JSONDecoder().decode(CloneReference.self, from: encoder.encode(audioOnly))
+        XCTAssertEqual(roundTrip, audioOnly)
+        XCTAssertTrue(roundTrip.ignoresStoredTranscript)
+        XCTAssertNotEqual(roundTrip, stored)
+    }
+
     func testPrimedCachePermitsIdleUnloadButPreparationKeepsItsModel() {
         for phase in [ClonePreparationPhase.idle, .primed] {
             XCTAssertTrue(MLXTTSEngine.idleUnloadAllowed(loadState: .loaded(modelID: "clone"), modelID: "clone",

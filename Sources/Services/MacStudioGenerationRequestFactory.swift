@@ -44,6 +44,7 @@ enum MacStudioGenerationRequestFactory {
         referenceAudioPath: String?,
         referenceTranscript: String?,
         preparedVoiceID: String?,
+        ignoresStoredTranscript: Bool,
         seed: UInt64?,
         variation: Qwen3SamplingVariation?,
         generationID: UUID = UUID()
@@ -63,7 +64,8 @@ enum MacStudioGenerationRequestFactory {
                 reference: CloneReference(
                     audioPath: referenceAudioPath,
                     transcript: referenceTranscript.flatMap(ReferenceTranscriptionReviewState.conditioningLine),
-                    preparedVoiceID: preparedVoiceID
+                    preparedVoiceID: preparedVoiceID,
+                    ignoresStoredTranscript: ignoresStoredTranscript
                 )
             ),
             generationID: generationID,

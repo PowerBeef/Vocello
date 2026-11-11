@@ -38,11 +38,24 @@ struct VoicesScreen: View {
             },
             onSelectSavedVoice: { voice in
                 if appModel.requestStudioMode(.clone) {
+                    // An unreadable transcript is reported, never passed on as
+                    // "this voice has none": an empty transcript means audio
+                    // only to the Studio (G-02).
+                    let transcript: String
+                    let transcriptLoadError: String?
+                    do {
+                        // nil is a voice saved without a transcript, not a failure.
+                        transcript = try voice.loadTranscript() ?? ""
+                        transcriptLoadError = nil
+                    } catch {
+                        transcript = ""
+                        transcriptLoadError = IOSInterfaceText.transcriptLoadFailed(voice.name)
+                    }
                     appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
                         savedVoiceID: voice.id,
                         wavPath: voice.wavPath,
-                        transcript: (try? voice.loadTranscript()) ?? "",
-                        transcriptLoadError: nil,
+                        transcript: transcript,
+                        transcriptLoadError: transcriptLoadError,
                         referenceLanguage: voice.enrollmentMetadata?.referenceLanguage ?? .auto
                     )
                 }

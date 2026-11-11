@@ -132,6 +132,9 @@ struct MacLineBatchRequest {
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+    /// The clone draft's audio-only intent (G-02): with no `refText`, a saved
+    /// voice's stored transcript is not read.
+    let ignoresStoredTranscript: Bool
     /// The Studio dock and inline card name for the voice (speaker display
     /// name, brief-derived name or saved voice / reference file name).
     let displayVoiceName: String
@@ -161,6 +164,7 @@ struct MacLineBatchRequest {
         refAudio: String?,
         refText: String?,
         preparedVoiceID: String?,
+        ignoresStoredTranscript: Bool = false,
         displayVoiceName: String,
         variation: Qwen3SamplingVariation?,
         batchSeed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max),
@@ -182,6 +186,7 @@ struct MacLineBatchRequest {
         self.refAudio = refAudio
         self.refText = refText
         self.preparedVoiceID = preparedVoiceID
+        self.ignoresStoredTranscript = ignoresStoredTranscript
         self.displayVoiceName = displayVoiceName
         self.variation = variation
         self.batchSeed = batchSeed
@@ -325,6 +330,7 @@ struct MacLineBatchRequest {
                 referenceAudioPath: refAudio,
                 referenceTranscript: refText,
                 preparedVoiceID: preparedVoiceID,
+                ignoresStoredTranscript: ignoresStoredTranscript,
                 seed: lineSeed,
                 variation: variation,
                 generationID: generationID

@@ -300,6 +300,10 @@ struct IOSLongFormProjectRequest {
     let refAudio: String?
     let refText: String?
     let preparedVoiceID: String?
+    /// The Studio draft's audio-only intent (G-02): with no `refText`, a saved
+    /// voice's stored transcript is not read. False for requests that come
+    /// from a clone reference which never stated it (the CLI's `--voice`).
+    let ignoresStoredTranscript: Bool
     /// One project start: resume and regeneration keep it, a new Generate
     /// mints another. The plan digest alone is not unique once a seed is
     /// pinned (the same script and seed plan the same digest for any voice,
@@ -327,6 +331,7 @@ struct IOSLongFormProjectRequest {
         refAudio: String?,
         refText: String?,
         preparedVoiceID: String?,
+        ignoresStoredTranscript: Bool = false,
         projectStartID: String? = nil
     ) {
         self.projectStartID = projectStartID ?? LongFormHistoryAcceptance.mintProjectStartID()
@@ -344,6 +349,7 @@ struct IOSLongFormProjectRequest {
         self.refAudio = refAudio
         self.refText = refText
         self.preparedVoiceID = preparedVoiceID
+        self.ignoresStoredTranscript = ignoresStoredTranscript
     }
 
     var lines: [String] { plan.segments.map(\.spokenTextForGeneration) }
@@ -388,7 +394,8 @@ struct IOSLongFormProjectRequest {
                 reference: CloneReference(
                     audioPath: refAudio ?? "",
                     transcript: refText,
-                    preparedVoiceID: preparedVoiceID
+                    preparedVoiceID: preparedVoiceID,
+                    ignoresStoredTranscript: ignoresStoredTranscript
                 )
             )
         }

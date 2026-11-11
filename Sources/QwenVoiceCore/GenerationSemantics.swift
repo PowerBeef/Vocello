@@ -120,13 +120,23 @@ public enum GenerationSemantics {
         public let conditioningMode: CloneConditioningMode
         public let referenceAudio: String
         public let referenceFingerprint: String?
+        /// A saved voice asked for audio-only (G-02). Without this, that
+        /// request and the same voice's stored-transcript request would share
+        /// one key, though they resolve to different conditioning.
+        public let storedTranscriptBypassed: Bool
 
-        public init(modelID: String, refAudio: String, refText: String?) {
+        public init(
+            modelID: String,
+            refAudio: String,
+            refText: String?,
+            storedTranscriptBypassed: Bool = false
+        ) {
             self.init(
                 modelID: modelID,
                 referenceAudio: refAudio,
                 referenceFingerprint: nil,
-                conditioningMode: CloneConditioningMode(transcript: refText)
+                conditioningMode: CloneConditioningMode(transcript: refText),
+                storedTranscriptBypassed: storedTranscriptBypassed
             )
         }
 
@@ -134,8 +144,11 @@ public enum GenerationSemantics {
             modelID: String,
             referenceAudio: String,
             referenceFingerprint: String?,
-            conditioningMode: CloneConditioningMode
+            conditioningMode: CloneConditioningMode,
+            storedTranscriptBypassed: Bool = false
         ) {
+            self.storedTranscriptBypassed = storedTranscriptBypassed
+                && !conditioningMode.usesTranscript
             self.modelID = modelID
             self.referenceAudio = referenceAudio.trimmingCharacters(in: .whitespacesAndNewlines)
             let normalizedFingerprint = referenceFingerprint?
@@ -155,8 +168,13 @@ public enum GenerationSemantics {
                     referenceAudio,
                     referenceFingerprint ?? "",
                     conditioningMode.transcript ?? "",
-                ]
+                ] + Self.bypassComponents(storedTranscriptBypassed)
             )
+        }
+
+        /// Appended only when set, so every earlier identity keeps its bytes.
+        private static func bypassComponents(_ bypassed: Bool) -> [String] {
+            bypassed ? ["stored-transcript-bypassed"] : []
         }
 
         public var digest: String {
@@ -170,13 +188,14 @@ public enum GenerationSemantics {
         public var legacyKey: String {
             let legacyAudio = referenceFingerprint.map { "\(referenceAudio)#\($0)" }
                 ?? referenceAudio
-            return [
+            let components = [
                 modelID,
                 GenerationMode.clone.rawValue,
                 conditioningMode.identifier,
                 legacyAudio,
                 conditioningMode.transcript ?? "",
-            ].joined(separator: "|")
+            ] + Self.bypassComponents(storedTranscriptBypassed)
+            return components.joined(separator: "|")
         }
     }
 
@@ -1043,24 +1062,28 @@ public enum GenerationSemantics {
     public static func cloneReferenceIdentityKey(
         modelID: String,
         refAudio: String,
-        refText: String?
+        refText: String?,
+        storedTranscriptBypassed: Bool = false
     ) -> String {
         cloneReferenceIdentity(
             modelID: modelID,
             refAudio: refAudio,
-            refText: refText
+            refText: refText,
+            storedTranscriptBypassed: storedTranscriptBypassed
         ).legacyKey
     }
 
     public static func cloneReferenceIdentity(
         modelID: String,
         refAudio: String,
-        refText: String?
+        refText: String?,
+        storedTranscriptBypassed: Bool = false
     ) -> CloneReferenceIdentity {
         CloneReferenceIdentity(
             modelID: modelID,
             refAudio: refAudio,
-            refText: refText
+            refText: refText,
+            storedTranscriptBypassed: storedTranscriptBypassed
         )
     }
 
@@ -1107,7 +1130,8 @@ public enum GenerationSemantics {
                 cloneReferenceIdentity(
                     modelID: request.modelID,
                     refAudio: reference.audioPath,
-                    refText: reference.transcript
+                    refText: reference.transcript,
+                    storedTranscriptBypassed: reference.bypassesStoredTranscript
                 )
             )
         }
@@ -1121,7 +1145,8 @@ public enum GenerationSemantics {
         cloneReferenceIdentityKey(
             modelID: modelID,
             refAudio: reference.audioPath,
-            refText: reference.transcript
+            refText: reference.transcript,
+            storedTranscriptBypassed: reference.bypassesStoredTranscript
         )
     }
 

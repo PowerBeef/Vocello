@@ -20,6 +20,8 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(saved.preparedVoiceID, voice.id)
         XCTAssertNil(GenerateCommand.rawReferenceConditioningNote(for: saved))
         XCTAssertNil(GenerateCommand.savedVoiceCloneReference(voice, transcriptOverride: nil).transcript)
+        // `--voice` without `--transcript` means the voice's stored transcript (G-02 left it so).
+        XCTAssertFalse(GenerateCommand.savedVoiceCloneReference(voice, transcriptOverride: nil).ignoresStoredTranscript)
     }
 
     // MARK: - Parser

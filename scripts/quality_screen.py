@@ -284,6 +284,7 @@ def run_arm(args: argparse.Namespace) -> Path:
                     result = document["result"]
                     quality = result.get("audioQC") or {}
                     row.update(wav=str(wav.relative_to(arm_dir)), pcmSHA256=pcm_digest(wav),
+                               generationID=result.get("generationID"),
                                durationSeconds=result.get("durationSeconds"), finishReason=result.get("finishReason"),
                                wallSeconds=result.get("wallSeconds"),
                                fastQC={key: quality.get(key) for key in (
@@ -293,11 +294,44 @@ def run_arm(args: argparse.Namespace) -> Path:
         if index % 20 == 0 or index == len(plan["takes"]):
             write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
             print(f"{args.arm}: {index}/{len(plan['takes'])} takes", flush=True)
+    evidence = arm_evidence(data_dir / "diagnostics/engine/generations.jsonl", rows)
+    write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
     counts = {name: sum(row["outcome"] == name for row in rows) for name in ("generated", "refused", "failed")}
-    write_json(arm_dir / "arm.json", dict(arm, complete=True, outcomes=counts,
-                                          voicesNotEnrolled=sum(value is not None for value in enrolled.values())))
-    print(json.dumps({"arm": args.arm, "outcomes": counts}))
+    unread = unread_overrides(overrides, evidence["activeOverrideKeys"])
+    write_json(arm_dir / "arm.json", dict(
+        arm, complete=not unread, outcomes=counts, activeOverrideKeys=evidence["activeOverrideKeys"],
+        overridesNotRead=unread, voicesNotEnrolled=sum(value is not None for value in enrolled.values())))
+    print(json.dumps({"arm": args.arm, "outcomes": counts, "activeOverrideKeys": evidence["activeOverrideKeys"]}))
+    if unread:
+        raise ScreenError(f"the engine never read {', '.join(unread)}: this arm ran as the control and is not usable")
     return arm_dir
+
+
+def arm_evidence(telemetry: Path, rows: list[dict]) -> dict:
+    """What the engine's own rows say the arm was: the override keys it read,
+    and for each take the digest of the reference audio it was conditioned on.
+    An arm is believed from this, not from the environment it was given."""
+    by_generation = {row.get("generationID"): row for row in rows if row.get("generationID")}
+    active: set[str] = set()
+    if telemetry.is_file():
+        for line in telemetry.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            row = by_generation.get(record.get("generationID"))
+            if row is None:
+                continue
+            provenance = ((record.get("summary") or {}).get("runEnvironment") or {}).get("runtimeDebugProvenance") or {}
+            active.update(provenance.get("activeOverrideKeys") or [])
+            row["referenceAudioDigest"] = (record.get("requestReceipt") or {}).get("normalizedReferenceAudioDigest")
+    return {"activeOverrideKeys": sorted(active)}
+
+
+def unread_overrides(overrides: dict[str, str], active: list[str]) -> list[str]:
+    """The app's own keys that no take reported as read. MLX reads its keys
+    itself and the registry cannot see them, so they are not checked."""
+    return sorted(name for name in overrides if not name.startswith("MLX_") and name not in active)
 
 
 # ---------------------------------------------------------------- score
@@ -494,7 +528,10 @@ def summarize(plan: dict, a: dict, b: dict) -> dict:
     def warned(view: dict) -> int:
         return sum(bool((view["rows"][take["takeID"]].get("fastQC") or {}).get("flags")) for take in takes)
 
+    references = [(a["rows"][take["takeID"]].get("referenceAudioDigest"), b["rows"][take["takeID"]].get("referenceAudioDigest"))
+                  for take in paired]
     return {"planned": len(takes), "outcomes": outcomes, "paired": len(paired), "identicalPCM": identical,
+            "referenceAudioDiffers": sum(1 for left, right in references if left and right and left != right),
             "grossFailures": {"a": gross(a), "b": gross(b)}, "fastQCWarned": {"a": warned(a), "b": warned(b)},
             "scored": bool(a["scores"]) and bool(b["scores"]), "metrics": metrics}
 

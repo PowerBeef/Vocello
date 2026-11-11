@@ -123,6 +123,39 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(screen.outcome_of(139, {}), ("failed", "exit 139"))
 
 
+class EvidenceTests(unittest.TestCase):
+    def test_an_arm_is_believed_from_the_engines_rows_not_from_its_environment(self):
+        rows = [{"takeID": "t1", "generationID": "G1"}, {"takeID": "t2", "generationID": "G2"}, {"takeID": "t3"}]
+        records = [
+            {"generationID": "G1", "requestReceipt": {"normalizedReferenceAudioDigest": "aa"},
+             "summary": {"runEnvironment": {"runtimeDebugProvenance": {"activeOverrideKeys": ["QWENVOICE_X"]}}}},
+            {"generationID": "G2", "requestReceipt": {"normalizedReferenceAudioDigest": "bb"}, "summary": {}},
+            {"generationID": "another-run", "summary": {"runEnvironment": {"runtimeDebugProvenance": {
+                "activeOverrideKeys": ["QWENVOICE_OTHER"]}}}},
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            telemetry = Path(temp) / "generations.jsonl"
+            telemetry.write_text("\n".join(json.dumps(record) for record in records) + "\nnot json\n", encoding="utf-8")
+            evidence = screen.arm_evidence(telemetry, rows)
+            self.assertEqual(evidence["activeOverrideKeys"], ["QWENVOICE_X"])
+            self.assertEqual([row.get("referenceAudioDigest") for row in rows], ["aa", "bb", None])
+            self.assertEqual(screen.arm_evidence(Path(temp) / "absent.jsonl", rows)["activeOverrideKeys"], [])
+
+    def test_a_key_the_engine_never_read_makes_the_arm_unusable(self):
+        overrides = {"QWENVOICE_X": "on", "QWENVOICE_TYPO": "on", "MLX_MAX_OPS_PER_BUFFER": "40"}
+        self.assertEqual(screen.unread_overrides(overrides, ["QWENVOICE_X"]), ["QWENVOICE_TYPO"])
+        self.assertEqual(screen.unread_overrides({}, []), [])
+
+    def test_pairs_whose_reference_audio_differs_are_counted(self):
+        plan = plan_of(voices=2, per_voice=2)
+        a_rows = {take["takeID"]: dict(row(take["takeID"]), referenceAudioDigest="same") for take in plan["takes"]}
+        b_rows = {take["takeID"]: dict(row(take["takeID"]), referenceAudioDigest="same") for take in plan["takes"]}
+        b_rows["v0--s0"]["referenceAudioDigest"] = "other"
+        b_rows["v0--s1"]["referenceAudioDigest"] = None
+        summary = screen.summarize(plan, view(plan, a_rows, {}), view(plan, b_rows, {}))
+        self.assertEqual(summary["referenceAudioDiffers"], 1)
+
+
 class ErrorRateTests(unittest.TestCase):
     def test_substitutions_deletions_and_insertions_all_count(self):
         reference = "the ferry leaves at seven"

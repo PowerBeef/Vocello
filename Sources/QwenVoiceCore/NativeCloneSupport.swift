@@ -870,6 +870,23 @@ actor NativePreparedCloneConditioningCache {
     }
 
     static func stableCloneReferenceFingerprint(for sourceURL: URL) throws -> String {
+        preparationFingerprint(
+            contentDigest: try cloneReferenceContentDigest(for: sourceURL),
+            version: NativeAudioPreparationService.cloneReferencePreparationVersion
+        )
+    }
+
+    /// The reference's fingerprint under every preparation version there has
+    /// been, newest last: a prepared copy made by an earlier build is found
+    /// by the name that build gave it.
+    static func cloneReferenceFingerprintsOfEveryPreparationVersion(for sourceURL: URL) throws -> [String] {
+        let contentDigest = try cloneReferenceContentDigest(for: sourceURL)
+        return (1...NativeAudioPreparationService.newestCloneReferencePreparationVersion).map {
+            preparationFingerprint(contentDigest: contentDigest, version: $0)
+        }
+    }
+
+    static func cloneReferenceContentDigest(for sourceURL: URL) throws -> String {
         let resolvedURL = URL(fileURLWithPath: sourceURL.resolvingSymlinksInPath().path)
         let fileHandle = try FileHandle(forReadingFrom: resolvedURL)
         defer { try? fileHandle.close() }
@@ -883,10 +900,7 @@ actor NativePreparedCloneConditioningCache {
             hasher.update(data: chunk)
         }
         let digest = hasher.finalize()
-        return preparationFingerprint(
-            contentDigest: digest.map { unsafe String(format: "%02x", $0) }.joined(),
-            version: NativeAudioPreparationService.cloneReferencePreparationVersion
-        )
+        return digest.map { unsafe String(format: "%02x", $0) }.joined()
     }
 
     /// The reference's identity under one version of audio preparation (G-13).

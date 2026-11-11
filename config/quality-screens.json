@@ -10,20 +10,95 @@
       "variant": "speed",
       "description": "Voice Clone through saved voices, the path both apps use: each reference is a human clip of a pinned, licensed corpus (config/audio-qc-corpora.json), enrolled with its corpus transcript, then asked for scripts of the committed CC0 pool in its own language and one in another language.",
       "languages": {
-        "english": ["libritts-r"],
-        "french": ["mls"],
-        "german": ["mls"],
-        "spanish": ["mls"],
-        "chinese": ["aishell3-subset"],
-        "korean": ["zeroth-korean"]
+        "english": [
+          "libritts-r"
+        ],
+        "french": [
+          "mls"
+        ],
+        "german": [
+          "mls"
+        ],
+        "spanish": [
+          "mls"
+        ],
+        "chinese": [
+          "aishell3-subset"
+        ],
+        "korean": [
+          "zeroth-korean"
+        ]
       },
       "referencesPerLanguage": 8,
-      "referenceSeconds": [5.0, 10.0, 20.0],
+      "referenceSeconds": [
+        5.0,
+        10.0,
+        20.0
+      ],
       "scriptSplit": "calibration",
       "scriptsPerReference": 3,
       "crossLanguageScripts": 1,
-      "crossLanguage": {"english": "french", "default": "english"},
-      "rules": {}
+      "crossLanguage": {
+        "english": "french",
+        "default": "english"
+      },
+      "rules": {
+        "reference-preparation-v2": {
+          "recorded": "2026-11-11",
+          "question": "Does preparing a clone reference with the audio file reader and one converter call (QWENVOICE_REFERENCE_PREPARATION=single-call), in place of the asset reader's own decode and resampling, harm clones?",
+          "arms": "A: the build's default path. B: the same build with the key set. Seed set 1, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "Two B arms on the same seeds are identical on every take (compare --expect identical); arm A is not, which is the defect.",
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "margins": "About 1.4 times the widest bound the noise floor reached (0.035 similarity, 0.027 error rate, 25 ms, 3 failures). At 192 takes the screen separates a gross regression from no change and nothing finer: a change that passes is shown not to be grossly worse, not shown to be better.",
+          "decision": "ADOPT when B is reproducible and no guard's interval reaches past its margin on the harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+        }
+      },
+      "noiseFloor": {
+        "measured": "2026-11-11",
+        "commit": "6e934d2c",
+        "method": "The 192 takes under seed set 1 and again under seed set 2, the same build and data. A change to conditioning moves every take's sampling as a new seed does, so this is what no change at all looks like.",
+        "pairs": 190,
+        "speakerSimilarity": {
+          "meanDifference": -0.0145,
+          "interval95": [
+            -0.0349,
+            0.0055
+          ]
+        },
+        "errorRateBetterFamily": {
+          "meanDifference": 0.0121,
+          "interval95": [
+            0.0002,
+            0.0272
+          ]
+        },
+        "trailingSilenceMS": {
+          "meanDifference": 5.9,
+          "interval95": [
+            -11.2,
+            25.5
+          ]
+        },
+        "grossFailures": [
+          1,
+          4
+        ],
+        "sameSeedsTwice": "159 of 191 takes identical; the 32 that differ belong to the 8 voices whose reference the asset reader resampled differently in the two runs. The scorers gave identical values on identical samples (32-take smoke)."
+      }
     }
   }
 }

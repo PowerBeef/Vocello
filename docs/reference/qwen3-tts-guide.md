@@ -497,6 +497,20 @@ an artifact built on an earlier MLX is rejected at load and rebuilt once from it
   fingerprint, which keys the prepared file's name, the decoded-audio and prompt caches and the
   persisted prompt. Version 1 is the content digest earlier builds used, so nothing was invalidated;
   a change to preparation raises it, and each prompt is then rebuilt once.
+- **Preparation is not reproducible today** (found 2026-11-11 by running the clone screen against
+  itself; RF-52). A reference that is not already 24 kHz mono 16-bit WAV is decoded and resampled
+  by `AVAssetReader`, and that reader gives different samples from run to run: a 16 kHz WAV came out
+  two ways, one sample apart in length, in three of five clips over twelve runs; an AAC file decoded
+  three ways; a FLAC file came out 1,332 frames longer than it is. So one file enrolled twice can
+  make two slightly different voices. Version 2 (`Resampling.singleCall`) decodes with
+  `AVAudioFile` and resamples the whole clip with one `AVAudioConverter` call: the same samples
+  every time, at the clip's exact length. It is selected by the diagnostic key
+  `QWENVOICE_REFERENCE_PREPARATION=single-call` until the clone screen's recorded rule
+  (`config/quality-screens.json`, `reference-preparation-v2`) adopts it.
+- **Two channels are mixed as the sum over the square root of two**, by the asset reader and, to
+  change one thing at a time, by version 2 as well. A voice recorded on both channels comes out
+  3 dB hotter and clips if it peaked above -3 dBFS. Mixing by the average would not; that is a
+  separate change with its own screen (RF-52).
 - **The codec encoder's implementation is still unversioned**, so the A-02 fix must add a version or
   saved voices keep their old reference codes (G-03, RF-52).
 

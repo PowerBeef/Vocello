@@ -328,10 +328,20 @@ final class CloneConditioningContractTests: XCTestCase {
         let file = root.appendingPathComponent("reference.wav")
         try Data("abc".utf8).write(to: file)
         let contentDigest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        XCTAssertEqual(NativeAudioPreparationService.cloneReferencePreparationVersion, 1)
-        XCTAssertEqual(
-            try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: file), contentDigest)
         typealias Cache = NativePreparedCloneConditioningCache
+        typealias Service = NativeAudioPreparationService
+        XCTAssertEqual(try Cache.cloneReferenceContentDigest(for: file), contentDigest)
+        // The fingerprint in use is the one of the resampling path in use.
+        XCTAssertEqual(Service.cloneReferencePreparationVersion, Service.Resampling.current.preparationVersion)
+        XCTAssertEqual(
+            try Cache.stableCloneReferenceFingerprint(for: file),
+            Cache.preparationFingerprint(contentDigest: contentDigest, version: Service.cloneReferencePreparationVersion))
+        XCTAssertEqual(Service.Resampling.assetReader.preparationVersion, 1)
+        XCTAssertEqual(Service.Resampling.singleCall.preparationVersion, 2)
+        XCTAssertEqual(Service.newestCloneReferencePreparationVersion, 2)
+        XCTAssertEqual(
+            try Cache.cloneReferenceFingerprintsOfEveryPreparationVersion(for: file),
+            [contentDigest, Cache.preparationFingerprint(contentDigest: contentDigest, version: 2)])
         XCTAssertEqual(Cache.preparationFingerprint(contentDigest: contentDigest, version: 1), contentDigest)
         let second = Cache.preparationFingerprint(contentDigest: contentDigest, version: 2)
         XCTAssertNotEqual(second, contentDigest)
@@ -342,6 +352,187 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertNotEqual(
             Cache.stableNormalizedCloneReferenceFileName(for: file, referenceFingerprint: second),
             Cache.stableNormalizedCloneReferenceFileName(for: file, referenceFingerprint: contentDigest))
+    }
+
+    /// RF-52: the asset reader's own resampling gives different samples from
+    /// run to run. One converter call over the whole clip gives the same
+    /// samples every time, and the clip's exact length at 24 kHz.
+    @concurrent func testSingleCallResamplingIsReproducibleAndKeepsTheClipsLength() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = NativeAudioPreparationService(resampling: .singleCall)
+        for (rate, seconds) in [(16_000.0, 10.02), (44_100.0, 3.0), (8_000.0, 2.5)] {
+            try Task.checkCancellation()
+            let source = root.appendingPathComponent("source-\(Int(rate)).wav")
+            try Self.writeSineWAV(sampleRate: rate, seconds: seconds, to: source)
+            var digests: Set<String> = []
+            var lengths: Set<Int64> = []
+            for run in 0..<6 {
+                let prepared = try await service.normalizeAudio(AudioPreparationRequest(
+                    inputURL: source, outputURL: root.appendingPathComponent("prepared-\(Int(rate))-\(run).wav")))
+                XCTAssertEqual(prepared.sampleRate, 24_000)
+                XCTAssertEqual(prepared.channelCount, 1)
+                XCTAssertEqual(try AVAudioFile(forReading: prepared.normalizedURL).length, prepared.frameCount)
+                lengths.insert(prepared.frameCount)
+                digests.insert(SHA256.hash(data: try Data(contentsOf: prepared.normalizedURL))
+                    .map { unsafe String(format: "%02x", $0) }.joined())
+            }
+            XCTAssertEqual(digests.count, 1, "\(rate) Hz: every run gives the same file")
+            let sourceFrames = Int((rate * seconds).rounded())
+            let expected = Int64((Double(sourceFrames) * 24_000 / rate).rounded(.up))
+            XCTAssertEqual(lengths.count, 1)
+            XCTAssertLessThanOrEqual(abs((lengths.first ?? 0) - expected), 1, "\(rate) Hz: the clip keeps its length")
+        }
+    }
+
+    func testResamplingKeepsALevelAndMixesChannelsDown() throws {
+        typealias Service = NativeAudioPreparationService
+        let half = Float(0.5.squareRoot())
+        XCTAssertEqual(Service.downmixed([0.2, 0.4, -1, 1, 0.5, 0.5], channels: 2), [0.6 * half, 0, half])
+        XCTAssertEqual(Service.downmixed([0.75, 0.75, 0.75, 0.0, 0.0, 0.375], channels: 3), [0.75, 0.125])
+        XCTAssertEqual(Service.downmixed([0.1, 0.2, 0.3], channels: 1), [0.1, 0.2, 0.3])
+        // Already at the model's rate: the samples are not touched.
+        let tone = (0..<4_800).map { Float(0.25 * sin(2.0 * .pi * 440.0 * Double($0) / 24_000)) }
+        XCTAssertEqual(try Service.resampledToCanonicalRate(tone, sourceSampleRate: 24_000), tone)
+        XCTAssertEqual(try Service.resampledToCanonicalRate([], sourceSampleRate: 16_000), [])
+        // A 440 Hz tone at 48 kHz comes out at 24 kHz with its level and pitch.
+        let source = (0..<48_000).map { Float(0.25 * sin(2.0 * .pi * 440.0 * Double($0) / 48_000)) }
+        let resampled = try Service.resampledToCanonicalRate(source, sourceSampleRate: 48_000)
+        XCTAssertEqual(resampled, try Service.resampledToCanonicalRate(source, sourceSampleRate: 48_000))
+        XCTAssertLessThanOrEqual(abs(resampled.count - 24_000), 1)
+        func rms(_ values: ArraySlice<Float>) -> Double {
+            (values.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(values.count)).squareRoot()
+        }
+        // Away from the edges, where the filter is still filling.
+        XCTAssertEqual(rms(resampled[2_400..<21_600]), rms(source[4_800..<43_200]), accuracy: 0.002)
+        let crossings = zip(resampled[2_400..<21_600], resampled[2_401..<21_601]).filter { $0 < 0 && $1 >= 0 }.count
+        XCTAssertEqual(crossings, 352, accuracy: 1, "440 Hz over 0.8 s")
+    }
+
+    /// The default is the asset reader until the screen has compared the two
+    /// paths: flipping it changes every prepared reference that is not
+    /// already 24 kHz, and every saved voice's prompt. The key acts only in an
+    /// internal-diagnostics build with the master gate on.
+    func testTheResamplingPathIsTheAssetReaderUnlessTheGatedKeySelectsTheOther() {
+        typealias Resampling = NativeAudioPreparationService.Resampling
+        let key = Resampling.environmentKey
+        func resolved(_ environment: [String: String], diagnostics: Bool = true) -> Resampling {
+            Resampling.resolved(environment: environment, internalDiagnosticsAvailable: diagnostics)
+        }
+        XCTAssertEqual(Resampling.production, .assetReader)
+        XCTAssertEqual(resolved([:]), .assetReader)
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1"]), .assetReader)
+        XCTAssertEqual(resolved([key: "single-call"]), .assetReader, "not without the master gate")
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call"], diagnostics: false), .assetReader,
+                       "not in a build without internal diagnostics")
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call"]), .singleCall)
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "asset-reader"]), .assetReader)
+        for mistyped in ["singlecall", "on", "2", ""] {
+            XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: mistyped]), .assetReader, mistyped)
+        }
+        // The asset reader's version is 1, whose fingerprint is the content
+        // digest earlier builds used: the default invalidates nothing (G-13).
+        XCTAssertEqual(
+            NativePreparedCloneConditioningCache.preparationFingerprint(
+                contentDigest: "digest", version: Resampling.production.preparationVersion),
+            "digest")
+        typealias Service = NativeAudioPreparationService
+        XCTAssertNotEqual(Service(resampling: .assetReader), Service(resampling: .singleCall))
+        XCTAssertNotEqual(Service(resampling: .assetReader).hashValue, Service(resampling: .singleCall).hashValue)
+        XCTAssertEqual(Service().resampling, Resampling.current)
+    }
+
+    /// A clip that is already at the model's rate comes through the
+    /// single-call path bit for bit: it is scaled as the reader decodes it.
+    func testCanonicalSamplesRoundTripSixteenBitAudioExactly() {
+        typealias Service = NativeAudioPreparationService
+        for value in [Int16.min, -20_000, -16_384, -1, 0, 1, 16_384, 20_000, Int16.max] {
+            XCTAssertEqual(Service.canonicalSample(Float(value) / 32_768), value)
+        }
+        XCTAssertEqual(Service.canonicalSample(1.0), Int16.max, "full scale clamps")
+        XCTAssertEqual(Service.canonicalSample(-1.5), Int16.min)
+        XCTAssertEqual(Service.canonicalSample(.nan), 0)
+    }
+
+    /// Two channels at the model's rate: nothing is resampled, so the two
+    /// paths must give the same samples. This is the control that shows the
+    /// single-call path changes the resampling and nothing else: the same
+    /// mixdown (the sum over the square root of two, as the asset reader
+    /// mixes), the same scale to 16 bits, the same length.
+    @concurrent func testAStereoClipAtTheModelsRateIsPreparedAlikeOnBothPaths() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let frames = 24_000
+        let tone = (0..<frames).map { Int16((8_000 * sin(2.0 * .pi * 330.0 * Double($0) / 24_000)).rounded()) }
+        let cases: [(String, [Int16], [Int16])] = [
+            ("same", tone, tone),
+            ("left-only", tone, [Int16](repeating: 0, count: frames)),
+        ]
+        for (name, left, right) in cases {
+            let source = root.appendingPathComponent("\(name).wav")
+            try Self.writeStereoPCM16WAV(left: left, right: right, sampleRate: 24_000, to: source)
+            var prepared: [NativeAudioPreparationService.Resampling: [Int16]] = [:]
+            for path in [NativeAudioPreparationService.Resampling.assetReader, .singleCall] {
+                let result = try await NativeAudioPreparationService(resampling: path).normalizeAudio(
+                    AudioPreparationRequest(inputURL: source, outputURL: root.appendingPathComponent("\(name)-\(path.rawValue).wav")))
+                XCTAssertEqual(result.channelCount, 1)
+                XCTAssertEqual(result.frameCount, Int64(frames), "\(name) \(path): no resampling, no lost frames")
+                prepared[path] = try Self.readPCM16(result.normalizedURL)
+            }
+            let single = try XCTUnwrap(prepared[.singleCall])
+            let reader = try XCTUnwrap(prepared[.assetReader])
+            let expected = zip(left, right).map { Int16((Double(Int($0) + Int($1)) * 0.5.squareRoot()).rounded()) }
+            XCTAssertLessThanOrEqual(
+                zip(single, expected).map { abs(Int($0) - Int($1)) }.max() ?? 0, 1,
+                "\(name): the sum over the square root of two")
+            XCTAssertEqual(reader.count, single.count)
+            XCTAssertLessThanOrEqual(
+                zip(reader, single).map { abs(Int($0) - Int($1)) }.max() ?? 0, 1,
+                "\(name): the two paths give the same samples when nothing is resampled")
+        }
+    }
+
+    /// A compressed source decodes at its own rate and channels, then takes
+    /// the same single call.
+    @concurrent func testACompressedStereoSourceIsPreparedReproducibly() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.m4a")
+        do {
+            let file = try AVAudioFile(forWriting: source, settings: [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC), AVSampleRateKey: 44_100.0, AVNumberOfChannelsKey: 2,
+            ])
+            let frames = AVAudioFrameCount(44_100 * 3)
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
+                  let channels = unsafe buffer.floatChannelData else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            buffer.frameLength = frames
+            for index in 0..<Int(frames) {
+                let value = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / 44_100))
+                unsafe channels[0][index] = value
+                unsafe channels[1][index] = value
+            }
+            try file.write(from: buffer)
+        }
+        var digests: Set<String> = []
+        for run in 0..<4 {
+            let prepared = try await NativeAudioPreparationService(resampling: .singleCall).normalizeAudio(
+                AudioPreparationRequest(inputURL: source, outputURL: root.appendingPathComponent("prepared-\(run).wav")))
+            XCTAssertEqual(prepared.sampleRate, 24_000)
+            XCTAssertEqual(prepared.channelCount, 1)
+            XCTAssertEqual(prepared.durationSeconds, 3.0, accuracy: 0.1)
+            digests.insert(SHA256.hash(data: try Data(contentsOf: prepared.normalizedURL))
+                .map { unsafe String(format: "%02x", $0) }.joined())
+            let samples = try Self.readPCM16(prepared.normalizedURL)
+            let level = (samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count)).squareRoot() / 32_768
+            // The same tone on both channels: the mixdown raises it by the square root of two.
+            XCTAssertEqual(level, 0.2, accuracy: 0.01, "the tone's level after the mixdown")
+        }
+        XCTAssertEqual(digests.count, 1)
     }
 
     func testCloneReferenceCodablePreservesModernAndLegacyWireForms() throws {
@@ -955,6 +1146,34 @@ final class CloneConditioningContractTests: XCTestCase {
             AVLinearPCMIsFloatKey: false,
         ]
         _ = try AVAudioFile(forWriting: url, settings: settings)
+    }
+
+    private static func writeStereoPCM16WAV(left: [Int16], right: [Int16], sampleRate: Double, to url: URL) throws {
+        let file = try AVAudioFile(forWriting: url, settings: [
+            AVFormatIDKey: Int(kAudioFormatLinearPCM), AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 2,
+            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsFloatKey: false,
+        ], commonFormat: .pcmFormatInt16, interleaved: false)
+        let frames = AVAudioFrameCount(left.count)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
+              let channels = unsafe buffer.int16ChannelData else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        buffer.frameLength = frames
+        for index in left.indices {
+            unsafe channels[0][index] = left[index]
+            unsafe channels[1][index] = right[index]
+        }
+        try file.write(from: buffer)
+    }
+
+    private static func readPCM16(_ url: URL) throws -> [Int16] {
+        let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatInt16, interleaved: false)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else {
+            throw CocoaError(.fileReadUnknown)
+        }
+        try file.read(into: buffer)
+        guard let channel = unsafe buffer.int16ChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
+        return (0..<Int(buffer.frameLength)).map { unsafe channel[$0] }
     }
 
     private static func writeSineWAV(sampleRate: Double, seconds: Double, to url: URL) throws {

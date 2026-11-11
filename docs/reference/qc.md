@@ -474,6 +474,50 @@ The `lanes` map of `config/qc/detectors.json` names each lane's roles. `run` run
 
 **Clone fidelity.** `qc.fidelity` reads the run's results per take: the register shift from the reference (signed semitones) on the frames where FCPE and SwiftF0 agree, through `qc.pitch.summarize`, and the ReDimNet2+ similarity of the whole take and of its least similar window to the reference embedding.
 
+## Paired screens for a change that alters samples
+
+`scripts/quality_screen.py` (RF-50) is the instrument that decides a sample-changing engine change.
+It is separate from the `qc-takes` lane, which collects calibration takes and is not fit to decide
+(audit of 2026-11-11, RF-57):
+
+| The `qc-takes` lane | The paired screen |
+|---|---|
+| Passes when QC scoring fails | A take without both ASR results and the speaker result fails the scoring step |
+| No lane scores both speaker and content | Speaker similarity (ReDimNet2+) and both ASR families, per take |
+| Refused and failed takes leave the averages | Every planned take has an outcome; a refused or failed one counts against its arm |
+| Arms share one data directory, so a stored clone prompt can serve the other arm | One data directory per arm |
+| `asr.edit_rate_min` counts no substitutions and keeps only the better family | A true edit rate per family (substitutions, deletions, insertions over the script's length) |
+| Identity by WAV digest, which includes the file's creation time | Identity by PCM digest |
+| An arm is named only by its label | An arm records its environment, the executable's digest and the commit, and is believed from the engine's rows: the override keys it reports as read, and each take's prepared-reference digest |
+
+```sh
+PY="$(python3 scripts/select_python.py)"
+"$PY" scripts/quality_screen.py plan --screen clone --seed-set 1 --out <run>
+"$PY" scripts/quality_screen.py run --plan <run>/plan.json --arm a
+"$PY" scripts/quality_screen.py run --plan <run>/plan.json --arm b --env KEY=value
+"$PY" scripts/quality_screen.py score --run <run> --arm a      # and b
+"$PY" scripts/quality_screen.py compare --run <run> --a a --b b --rule <name>
+```
+
+- **A rule is recorded before its takes exist.** `config/quality-screens.json` holds each screen's
+  population and rules; `compare --rule` refuses a rule without its recorded date. The verdicts are
+  ADOPT, REJECT, INCONCLUSIVE and INERT (two arms meant to differ made the same samples).
+- **The clone screen (version 1)** is 48 saved voices enrolled from licensed human clips (six
+  languages, eight speakers each), each asked for three scripts in its language and one in
+  another: 192 takes, about six minutes to generate and fifteen to score on the M6.
+- **Its noise floor** (measured 2026-11-11 at `6e934d2c`: the same takes under two seed sets) is
+  0.035 in mean speaker similarity, 0.027 in the better family's error rate, 25 ms of trailing
+  silence and 3 gross failures. A conditioning change moves every take's sampling as a new seed
+  does, so a difference inside those bounds is no evidence of anything. At this size the screen
+  separates a gross regression from no change and nothing finer.
+- **What the first self-run found.** The scorers are reproducible (identical values on identical
+  samples). The takes were not: 32 of 191 differed between two runs of one build on one seed set,
+  all from eight voices whose reference audio had been prepared differently
+  ([guide, section 8.3](qwen3-tts-guide.md#83-identity-and-caching)).
+- **Limits.** The references are read speech from corpora with corpus transcripts, not users'
+  recordings with recognized transcripts; Japanese, Russian, Italian and Portuguese have no
+  reference clips; nobody listens.
+
 ## Labels
 
 `label sample` reads one or more qc-takes runs (`takes-manifest.json`, `wav/`, `references/`; the clone transcripts come from `batches/index.tsv`). Per language, it draws:

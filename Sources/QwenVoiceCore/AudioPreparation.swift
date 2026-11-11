@@ -1,7 +1,9 @@
 @unsafe @preconcurrency import AVFoundation
+import CoreAudioTypes
 import CoreMedia
 import CryptoKit
 import Foundation
+import os
 
 // MARK: - QwenVoiceCore Runtime Ownership
 //
@@ -205,11 +207,78 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     /// prepared files, caches and persisted prompts made under the earlier
     /// version stop being reused (G-13). Until this existed, a fix to
     /// preparation never reached a reference that had been prepared before.
-    /// When raising it, also teach
-    /// `PreparedVoiceRepository.removeDerivedCloneReferences` the earlier
-    /// versions' file names: it derives a removed voice's prepared copies
-    /// under the current version only.
-    public static let cloneReferencePreparationVersion = 1
+    ///
+    /// - 1: the asset reader resamples (`Resampling.assetReader`).
+    /// - 2: one converter call resamples (`Resampling.singleCall`).
+    ///
+    /// `PreparedVoiceRepository.removeDerivedCloneReferences` removes a
+    /// deleted voice's prepared copies under every version up to the newest.
+    public static var cloneReferencePreparationVersion: Int { Resampling.current.preparationVersion }
+    public static let newestCloneReferencePreparationVersion = 2
+
+    /// How a reference that is not already 24 kHz is brought to it.
+    public enum Resampling: String, Hashable, Sendable {
+        /// The asset reader decodes and resamples in one step. Its output is
+        /// not reproducible: the same 16 kHz file gives two different sample
+        /// sequences, one sample apart in length, in three of five clips over
+        /// twelve runs (measured 2026-11-11, outside Vocello). A voice
+        /// enrolled twice from one file can therefore differ.
+        case assetReader
+        /// The audio file reader decodes the clip at its own rate; the whole
+        /// clip is then resampled by one `AVAudioConverter` call. Both steps
+        /// give the same samples every time and the clip's exact length. The
+        /// asset reader does neither even when it only decodes (measured
+        /// 2026-11-11): one AAC file decoded to three different sample
+        /// sequences over twelve runs, and a FLAC file came out 1,332 frames
+        /// longer than it is. It decodes here only what the audio file
+        /// reader cannot open.
+        case singleCall
+
+        var preparationVersion: Int {
+            switch self {
+            case .assetReader: 1
+            case .singleCall: 2
+            }
+        }
+
+        static let environmentKey = "QWENVOICE_REFERENCE_PREPARATION"
+
+        /// What every build does without the diagnostic key: `assetReader`
+        /// until the clone screen has compared the two paths (RF-52).
+        static let production: Resampling = .assetReader
+
+        /// The path this process uses. Read once: the preparation version is
+        /// part of every reference's identity, so it cannot change mid-run.
+        public static let current = resolved(
+            environment: ProcessInfo.processInfo.environment,
+            internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+        )
+
+        /// `QWENVOICE_REFERENCE_PREPARATION=single-call` or `asset-reader`,
+        /// honoured only in an internal-diagnostics build with the master
+        /// gate on. Any other value is the production path: a screen arm
+        /// proves which path it ran from each take's prepared-reference
+        /// digest, not from the key having been set.
+        static func resolved(
+            environment: [String: String],
+            internalDiagnosticsAvailable: Bool
+        ) -> Resampling {
+            let requested = RuntimeDebugGate.value(
+                for: environmentKey,
+                environment: environment,
+                internalDiagnosticsAvailable: internalDiagnosticsAvailable
+            )
+            return requested.flatMap(Resampling.init(diagnosticValue:)) ?? production
+        }
+
+        init?(diagnosticValue: String) {
+            switch diagnosticValue {
+            case "single-call": self = .singleCall
+            case "asset-reader": self = .assetReader
+            default: return nil
+            }
+        }
+    }
 
     public static let canonicalSampleRate: Double = 24_000
     public static let canonicalChannelCount: AVAudioChannelCount = 1
@@ -217,24 +286,29 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
 
     public let preparedAudioDirectory: URL?
     public let limits: AudioPreparationLimits
+    public let resampling: Resampling
     let testingHooks: AudioPreparationTestingHooks
 
     public init(
         preparedAudioDirectory: URL? = nil,
         limits: AudioPreparationLimits = .defaults
     ) {
-        self.preparedAudioDirectory = preparedAudioDirectory
-        self.limits = limits
-        self.testingHooks = .none
+        self.init(preparedAudioDirectory: preparedAudioDirectory, limits: limits, resampling: .current)
     }
 
+    /// The path is the process's, because the clone reference's fingerprint
+    /// reads the process's preparation version: a service on another path
+    /// would write that path's samples under this path's names. Only tests,
+    /// which prepare into their own directories, choose one.
     init(
         preparedAudioDirectory: URL? = nil,
         limits: AudioPreparationLimits = .defaults,
-        testingHooks: AudioPreparationTestingHooks
+        resampling: Resampling = .current,
+        testingHooks: AudioPreparationTestingHooks = .none
     ) {
         self.preparedAudioDirectory = preparedAudioDirectory
         self.limits = limits
+        self.resampling = resampling
         self.testingHooks = testingHooks
     }
 
@@ -244,10 +318,12 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
     ) -> Bool {
         lhs.preparedAudioDirectory == rhs.preparedAudioDirectory
             && lhs.limits == rhs.limits
+            && lhs.resampling == rhs.resampling
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(preparedAudioDirectory)
+        hasher.combine(resampling)
         hasher.combine(limits)
     }
 
@@ -387,6 +463,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
                 inputURL: sourceURL,
                 outputURL: temporaryURL,
                 limits: limits,
+                resampling: resampling,
                 deadline: deadline,
                 testingHooks: testingHooks
             )
@@ -462,6 +539,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         inputURL: URL,
         outputURL: URL,
         limits: AudioPreparationLimits,
+        resampling: Resampling,
         deadline: AudioPreparationDeadline,
         testingHooks: AudioPreparationTestingHooks
     ) async throws -> Int64 {
@@ -475,6 +553,46 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false,
         ]
+
+        if resampling == .singleCall,
+           let decoded = try decodedMonoSamples(
+               fromAudioFileAt: inputURL,
+               maxDecodedDurationSeconds: limits.maxDecodedDurationSeconds,
+               deadline: deadline
+           ) {
+            try await testingHooks.beforeWriterCreation?()
+            try deadline.check()
+            let writer: AVAudioFile
+            do {
+                writer = try AVAudioFile(
+                    forWriting: outputURL,
+                    settings: outputSettings,
+                    commonFormat: .pcmFormatInt16,
+                    interleaved: false
+                )
+            } catch {
+                // As below: a writer that failed past the deadline timed out.
+                try deadline.check()
+                throw AudioPreparationError.failedToCreateOutput(outputURL.path)
+            }
+            try await testingHooks.beforeConversionLoop?()
+            try deadline.check()
+            let prepared = try resampledToCanonicalRate(
+                decoded.samples,
+                sourceSampleRate: decoded.sampleRate,
+                deadline: deadline
+            )
+            try deadline.check()
+            let written = try writeCanonical(prepared, to: writer, deadline: deadline)
+            try deadline.check()
+            guard written > 0 else {
+                throw AudioPreparationError.unsupportedInput(
+                    "The selected audio file does not contain readable audio frames."
+                )
+            }
+            writer.close()
+            return written
+        }
 
         let asset = AVURLAsset(url: inputURL)
         let track: AVAssetTrack
@@ -503,7 +621,19 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             throw AudioPreparationError.conversionFailed("Couldn't create the native audio reader.")
         }
 
-        let readerOutput = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings)
+        // `singleCall` asks the reader for the track's own rate and channels
+        // as float samples, so it decodes and does nothing else.
+        let decodedSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+        let readerOutput = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: resampling == .singleCall ? decodedSettings : outputSettings
+        )
         readerOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(readerOutput) else {
             throw AudioPreparationError.unsupportedInput("The selected audio track could not be decoded natively.")
@@ -547,7 +677,23 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         do {
             try await testingHooks.beforeConversionLoop?()
             try deadline.check()
-            while let sampleBuffer = readerOutput.copyNextSampleBuffer() {
+            if resampling == .singleCall {
+                let decoded = try decodedMonoSamples(
+                    from: readerOutput,
+                    maxDecodedDurationSeconds: limits.maxDecodedDurationSeconds,
+                    deadline: deadline
+                )
+                try deadline.check()
+                let prepared = try resampledToCanonicalRate(
+                    decoded.samples,
+                    sourceSampleRate: decoded.sampleRate,
+                    deadline: deadline
+                )
+                try deadline.check()
+                totalWrittenFrames = try writeCanonical(prepared, to: writer, deadline: deadline)
+                try deadline.check()
+            }
+            while resampling == .assetReader, let sampleBuffer = readerOutput.copyNextSampleBuffer() {
                 try deadline.check()
                 let frameCount = CMSampleBufferGetNumSamples(sampleBuffer)
                 guard frameCount > 0 else { continue }
@@ -627,6 +773,261 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         writer.close()
 
         return totalWrittenFrames
+    }
+
+    // MARK: - Single-call resampling
+
+    /// The whole file through the audio file reader, mixed down to one
+    /// channel at the file's own rate. Nil when that reader cannot open the
+    /// file, which then goes to the asset reader's decode below.
+    private static func decodedMonoSamples(
+        fromAudioFileAt url: URL,
+        maxDecodedDurationSeconds: Double,
+        deadline: AudioPreparationDeadline
+    ) throws -> (samples: [Float], sampleRate: Double)? {
+        guard let file = try? AVAudioFile(forReading: url) else { return nil }
+        let format = file.processingFormat
+        let sampleRate = format.sampleRate
+        let channels = Int(format.channelCount)
+        guard sampleRate > 0, channels > 0, format.commonFormat == .pcmFormatFloat32, !format.isInterleaved else {
+            return nil
+        }
+        func requireWithinLimit(frames: Int) throws {
+            let seconds = Double(frames) / sampleRate
+            if maxDecodedDurationSeconds > 0, seconds > maxDecodedDurationSeconds {
+                throw AudioPreparationError.inputDurationTooLong(
+                    maxSeconds: maxDecodedDurationSeconds,
+                    actualSeconds: seconds
+                )
+            }
+        }
+        // Refused from the header, before anything is decoded.
+        try requireWithinLimit(frames: Int(file.length))
+        let chunkFrames: AVAudioFrameCount = 32_768
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkFrames) else {
+            throw AudioPreparationError.conversionFailed("Couldn't allocate the decoded audio buffer.")
+        }
+        var mono: [Float] = []
+        mono.reserveCapacity(Int(file.length) + Int(chunkFrames))
+        while true {
+            try deadline.check()
+            buffer.frameLength = 0
+            do {
+                try file.read(into: buffer, frameCount: chunkFrames)
+            } catch {
+                // A compressed file's length is an estimate, so its decoder
+                // can end a little before it; an error before any frame is
+                // a file this reader cannot decode.
+                guard !mono.isEmpty else { return nil }
+                break
+            }
+            let frames = Int(buffer.frameLength)
+            guard frames > 0, let channelData = unsafe buffer.floatChannelData else { break }
+            if channels == 1 {
+                unsafe mono.append(contentsOf: UnsafeBufferPointer(start: channelData[0], count: frames))
+            } else {
+                var interleaved = [Float](repeating: 0, count: frames * channels)
+                for channel in 0..<channels {
+                    let samples = unsafe channelData[channel]
+                    for frame in 0..<frames {
+                        interleaved[frame * channels + channel] = unsafe samples[frame]
+                    }
+                }
+                mono.append(contentsOf: downmixed(interleaved, channels: channels))
+            }
+            try requireWithinLimit(frames: mono.count)
+        }
+        return (mono, sampleRate)
+    }
+
+    /// Everything the asset reader decodes, mixed down to one channel at the
+    /// track's own rate: the fallback for a file the audio file reader cannot
+    /// open. Its decode of a compressed track is not reproducible.
+    private static func decodedMonoSamples(
+        from readerOutput: AVAssetReaderTrackOutput,
+        maxDecodedDurationSeconds: Double,
+        deadline: AudioPreparationDeadline
+    ) throws -> (samples: [Float], sampleRate: Double) {
+        var mono: [Float] = []
+        var sampleRate: Double = 0
+        while let sampleBuffer = readerOutput.copyNextSampleBuffer() {
+            try deadline.check()
+            let frameCount = CMSampleBufferGetNumSamples(sampleBuffer)
+            guard frameCount > 0 else { continue }
+            guard let stream = CMSampleBufferGetFormatDescription(sampleBuffer)?.audioStreamBasicDescription,
+                  isInterleavedFloat32(stream),
+                  sampleRate == 0 || sampleRate == stream.mSampleRate,
+                  let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
+                throw AudioPreparationError.conversionFailed("Decoded audio was not in the format that was asked for.")
+            }
+            sampleRate = stream.mSampleRate
+            let channels = Int(stream.mChannelsPerFrame)
+            let byteCount = frameCount * channels * MemoryLayout<Float>.size
+            guard CMBlockBufferGetDataLength(blockBuffer) == byteCount else {
+                throw AudioPreparationError.conversionFailed("Decoded audio did not match its declared format.")
+            }
+            var interleaved = [Float](repeating: 0, count: frameCount * channels)
+            let status = interleaved.withMutableBufferPointer { destination in
+                unsafe CMBlockBufferCopyDataBytes(
+                    blockBuffer,
+                    atOffset: 0,
+                    dataLength: byteCount,
+                    destination: UnsafeMutableRawPointer(destination.baseAddress!)
+                )
+            }
+            guard status == noErr else {
+                throw AudioPreparationError.conversionFailed("Decoded audio bytes could not be copied.")
+            }
+            mono.append(contentsOf: downmixed(interleaved, channels: channels))
+            let decodedSeconds = Double(mono.count) / sampleRate
+            if maxDecodedDurationSeconds > 0, decodedSeconds > maxDecodedDurationSeconds {
+                throw AudioPreparationError.inputDurationTooLong(
+                    maxSeconds: maxDecodedDurationSeconds,
+                    actualSeconds: decodedSeconds
+                )
+            }
+        }
+        return (mono, sampleRate)
+    }
+
+    /// What `decodedSettings` asks the reader for; anything else would be
+    /// read as the wrong numbers.
+    static func isInterleavedFloat32(_ stream: AudioStreamBasicDescription) -> Bool {
+        stream.mFormatID == kAudioFormatLinearPCM
+            && stream.mFormatFlags & kAudioFormatFlagIsFloat != 0
+            && stream.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0
+            && stream.mFormatFlags & kAudioFormatFlagIsBigEndian == 0
+            && stream.mBitsPerChannel == 32
+            && stream.mSampleRate > 0
+            && stream.mChannelsPerFrame > 0
+    }
+
+    /// One channel from the reader's interleaved frames. Two channels are
+    /// summed and scaled by 1/sqrt(2), which is what the asset reader does
+    /// when it is asked for one channel (measured: a tone on both channels
+    /// comes out 3 dB hotter, a tone on one channel 3 dB quieter), so this
+    /// path changes the resampling and nothing else. That law clips a loud
+    /// voice recorded on both channels; the average would not, and choosing
+    /// it is a separate, screened change (RF-52). More than two channels,
+    /// which a voice reference almost never has, are averaged.
+    static func downmixed(_ interleaved: [Float], channels: Int) -> [Float] {
+        guard channels > 1 else { return interleaved }
+        let scale: Float = channels == 2 ? Float(0.5.squareRoot()) : 1 / Float(channels)
+        return stride(from: 0, to: interleaved.count - channels + 1, by: channels).map { start in
+            var sum: Float = 0
+            for channel in 0..<channels {
+                sum += interleaved[start + channel]
+            }
+            return sum * scale
+        }
+    }
+
+    /// The whole clip through one converter, fed once: the same input gives
+    /// the same output on every run, and the output has the clip's length at
+    /// the new rate (the reader's own resampling drops about a millisecond).
+    static func resampledToCanonicalRate(_ samples: [Float], sourceSampleRate: Double) throws -> [Float] {
+        try resampledToCanonicalRate(samples, sourceSampleRate: sourceSampleRate, deadline: nil)
+    }
+
+    private static func resampledToCanonicalRate(
+        _ samples: [Float],
+        sourceSampleRate: Double,
+        deadline: AudioPreparationDeadline?
+    ) throws -> [Float] {
+        guard !samples.isEmpty, sourceSampleRate != canonicalSampleRate else { return samples }
+        guard let sourceFormat = AVAudioFormat(
+                  commonFormat: .pcmFormatFloat32, sampleRate: sourceSampleRate, channels: 1, interleaved: false),
+              let targetFormat = AVAudioFormat(
+                  commonFormat: .pcmFormatFloat32, sampleRate: canonicalSampleRate, channels: 1, interleaved: false),
+              let converter = AVAudioConverter(from: sourceFormat, to: targetFormat),
+              let input = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(samples.count)),
+              let inputChannel = unsafe input.floatChannelData?[0] else {
+            throw AudioPreparationError.conversionFailed("Couldn't create the sample-rate converter.")
+        }
+        samples.withBufferPointer { source in
+            if let base = source.baseAddress {
+                unsafe inputChannel.update(from: base, count: source.count)
+            }
+        }
+        input.frameLength = AVAudioFrameCount(samples.count)
+        converter.sampleRateConverterAlgorithm = AVSampleRateConverterAlgorithm_Mastering
+        converter.sampleRateConverterQuality = AVAudioQuality.max.rawValue
+
+        let expected = Int((Double(samples.count) * canonicalSampleRate / sourceSampleRate).rounded(.up))
+        var resampled: [Float] = []
+        resampled.reserveCapacity(expected + 64)
+        // The converter asks for input more than once: it gets the one buffer,
+        // then the end of the stream. The closure holds the buffer, so it
+        // stays alive until the conversion is over.
+        let delivered = OSAllocatedUnfairLock(initialState: false)
+        while true {
+            try deadline?.check()
+            guard let output = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: 32_768) else {
+                throw AudioPreparationError.conversionFailed("Couldn't allocate the resampled audio buffer.")
+            }
+            var conversionError: NSError?
+            let status = unsafe converter.convert(to: output, error: &conversionError) { _, inputStatus in
+                let isFirstRequest = delivered.withLock { wasDelivered in
+                    defer { wasDelivered = true }
+                    return !wasDelivered
+                }
+                unsafe inputStatus.pointee = isFirstRequest ? .haveData : .endOfStream
+                return isFirstRequest ? input : nil
+            }
+            if status == .error {
+                throw AudioPreparationError.conversionFailed(
+                    conversionError?.localizedDescription ?? "Sample-rate conversion failed.")
+            }
+            let produced = Int(output.frameLength)
+            if produced > 0, let channel = unsafe output.floatChannelData?[0] {
+                unsafe resampled.append(contentsOf: UnsafeBufferPointer(start: channel, count: produced))
+            }
+            // The tail arrives with `.endOfStream`; a call that produced
+            // nothing has nothing more to give, whatever it reports.
+            if status == .endOfStream || produced == 0 {
+                break
+            }
+        }
+        return resampled
+    }
+
+    /// One float sample as the canonical file stores it: scaled by 32,768,
+    /// the scale the reader decodes 16-bit audio with, so a clip that is
+    /// already at the model's rate comes through bit for bit; rounded to
+    /// nearest and clamped.
+    static func canonicalSample(_ value: Float) -> Int16 {
+        let scaled = (value * 32_768).rounded()
+        return Int16(max(-32_768, min(32_767, scaled.isFinite ? scaled : 0)))
+    }
+
+    /// Float samples to the canonical 16-bit file. Returns the frames written.
+    private static func writeCanonical(
+        _ samples: [Float],
+        to writer: AVAudioFile,
+        deadline: AudioPreparationDeadline
+    ) throws -> Int64 {
+        let chunkFrames = 65_536
+        var written = 0
+        while written < samples.count {
+            try deadline.check()
+            let count = min(chunkFrames, samples.count - written)
+            guard let buffer = AVAudioPCMBuffer(
+                      pcmFormat: writer.processingFormat, frameCapacity: AVAudioFrameCount(count)),
+                  let channel = unsafe buffer.int16ChannelData?[0] else {
+                throw AudioPreparationError.conversionFailed("Couldn't allocate the canonical audio buffer.")
+            }
+            for index in 0..<count {
+                unsafe channel[index] = canonicalSample(samples[written + index])
+            }
+            buffer.frameLength = AVAudioFrameCount(count)
+            do {
+                try writer.write(from: buffer)
+            } catch {
+                throw AudioPreparationError.conversionFailed("Audio write failed: \(error.localizedDescription)")
+            }
+            written += count
+        }
+        return Int64(written)
     }
 
     @concurrent private static func firstAudioTrack(

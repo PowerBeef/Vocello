@@ -1017,6 +1017,47 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertTrue(exists(unrelated))
     }
 
+    /// G-13: a prepared copy carries the preparation version of the build that
+    /// made it, so a deleted voice's copies go under every version's name, and
+    /// stay under every version's name while another voice derives them.
+    @concurrent func testDeleteRemovesThePreparedCopiesOfEveryPreparationVersion() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let source = try writeSource(named: "memo.m4a", bytes: [9, 8, 7])
+        for name in ["Carol", "Carol!"] {
+            let candidate = try await repository.prepare(
+                name: name, audioURL: source, transcript: "a private transcript",
+                qualityWarnings: [], replacingVoiceID: nil)
+            _ = try await repository.commit(id: candidate.id)
+        }
+        let audio = root.appendingPathComponent("voices/Carol.m4a")
+        let fingerprints = try NativePreparedCloneConditioningCache
+            .cloneReferenceFingerprintsOfEveryPreparationVersion(for: audio)
+        XCTAssertEqual(fingerprints.count, NativeAudioPreparationService.newestCloneReferencePreparationVersion)
+        XCTAssertEqual(Set(fingerprints).count, fingerprints.count)
+        let directory = MLXTTSEngine.normalizedCloneReferenceDirectory(in: root)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let copies = fingerprints.map { fingerprint in
+            directory.appendingPathComponent(NativePreparedCloneConditioningCache
+                .stableNormalizedCloneReferenceFileName(for: audio, referenceFingerprint: fingerprint))
+        }
+        for copy in copies {
+            try Data([0x52, 0x49, 0x46, 0x46]).write(to: copy)
+            try "a private transcript".write(to: sidecar(of: copy), atomically: true, encoding: .utf8)
+        }
+
+        try await repository.delete(id: "Carol")
+        for copy in copies {
+            XCTAssertTrue(exists(copy), "\"Carol!\" still derives it")
+            XCTAssertTrue(exists(sidecar(of: copy)))
+        }
+        try await repository.delete(id: "Carol!")
+        for copy in copies {
+            XCTAssertFalse(exists(copy), "no version's copy outlives the voice")
+            XCTAssertFalse(exists(sidecar(of: copy)), "nor its transcript")
+        }
+    }
+
     /// A8-01: a replacement retires the old audio's derived copy, and keeps it
     /// when the replacement publishes the same name and audio.
     @concurrent func testReplacementRemovesTheReplacedVoicesNormalizedCopy() async throws {

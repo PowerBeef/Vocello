@@ -705,30 +705,31 @@ actor PreparedVoiceRepository {
               let liveAudio = try? directoryContents(at: voicesDirectory).filter(isAudio) else {
             return
         }
+        typealias Cache = NativePreparedCloneConditioningCache
         for audioURL in tombstonedAudio {
-            guard let fingerprint = try? NativePreparedCloneConditioningCache
-                .stableCloneReferenceFingerprint(for: audioURL) else { continue }
-            let name = NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(
-                for: audioURL,
-                referenceFingerprint: fingerprint
-            )
-            let stillDerived = liveAudio.contains { liveURL in
-                guard NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(
-                    for: liveURL,
-                    referenceFingerprint: fingerprint
-                ) == name else { return false }
-                let liveFingerprint = try? NativePreparedCloneConditioningCache
-                    .stableCloneReferenceFingerprint(for: liveURL)
-                return liveFingerprint == nil || liveFingerprint == fingerprint
-            }
-            guard !stillDerived else { continue }
-            let normalizedURL = normalizedCloneReferenceDirectory.appendingPathComponent(name)
-            for url in [normalizedURL, normalizedURL.deletingPathExtension().appendingPathExtension("txt")] {
-                // Never a directory, or a link left in a file's place
-                // (the attributes describe the link, not its target).
-                let type = (try? fileManager.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType
-                guard type == .typeRegular else { continue }
-                try? fileManager.removeItem(at: url)
+            guard let contentDigest = try? Cache.cloneReferenceContentDigest(for: audioURL) else { continue }
+            // A prepared copy carries the preparation version of the build
+            // that made it (G-13), so every version's name is looked for.
+            for version in 1...NativeAudioPreparationService.newestCloneReferencePreparationVersion {
+                let fingerprint = Cache.preparationFingerprint(contentDigest: contentDigest, version: version)
+                let name = Cache.stableNormalizedCloneReferenceFileName(for: audioURL, referenceFingerprint: fingerprint)
+                let stillDerived = liveAudio.contains { liveURL in
+                    guard Cache.stableNormalizedCloneReferenceFileName(
+                        for: liveURL,
+                        referenceFingerprint: fingerprint
+                    ) == name else { return false }
+                    let liveDigest = try? Cache.cloneReferenceContentDigest(for: liveURL)
+                    return liveDigest == nil || liveDigest == contentDigest
+                }
+                guard !stillDerived else { continue }
+                let normalizedURL = normalizedCloneReferenceDirectory.appendingPathComponent(name)
+                for url in [normalizedURL, normalizedURL.deletingPathExtension().appendingPathExtension("txt")] {
+                    // Never a directory, or a link left in a file's place
+                    // (the attributes describe the link, not its target).
+                    let type = (try? fileManager.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType
+                    guard type == .typeRegular else { continue }
+                    try? fileManager.removeItem(at: url)
+                }
             }
         }
     }

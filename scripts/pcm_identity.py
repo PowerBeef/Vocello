@@ -119,7 +119,7 @@ def capture(args: argparse.Namespace) -> Path:
 
     command = [
         str(vocello), "bench",
-        "--modes", ",".join(modes), "--variants", "speed", "--lengths", args.lengths,
+        "--modes", ",".join(modes), "--variants", args.variants, "--lengths", args.lengths,
         "--warm", str(args.warm), "--seed", str(args.seed),
         "--telemetry", "off", "--data-dir", str(data_dir), "--no-summary",
         "--label", args.label,
@@ -175,6 +175,7 @@ def capture(args: argparse.Namespace) -> Path:
         "label": args.label,
         "seed": args.seed,
         "modes": modes,
+        "variants": args.variants.split(","),
         "lengths": args.lengths.split(","),
         "warm": args.warm,
         "environmentOverrides": overrides,
@@ -274,6 +275,7 @@ def main() -> int:
     capture_parser.add_argument("--label", required=True)
     capture_parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     capture_parser.add_argument("--modes", default="custom,design,clone")
+    capture_parser.add_argument("--variants", default="speed", help="speed, quality or both")
     capture_parser.add_argument("--lengths", default="short,medium")
     capture_parser.add_argument("--warm", type=int, default=2)
     capture_parser.add_argument(

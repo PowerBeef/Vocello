@@ -1393,12 +1393,19 @@ def segmented_outcomes(batch_results: Path, batch: dict[str, Any],
     return outcomes
 
 
+RESUMABLE_ERROR_CODES = frozenset({"generation_failed", "qc_rejected"})
+
+
 def next_segment_offset(result_path: Path, offset: int, count: int) -> str:
     """Where a stopped batch resumes: after its one failed item, or `stop`.
 
-    Only a genuine generation failure resumes (the engine's mandatory QC
-    rejection is one); a cancellation, an unreadable output or anything else
-    stops the batch. `done` when the failed item was the batch's last.
+    Only a take the engine made and would not publish resumes: a generation
+    failure, or its mandatory QC refusal, which the CLI has reported as
+    `qc_rejected` since 2026-10-21 (before that it was a generation failure,
+    and this rule still named only that code, so one refused take ended its
+    batch and the takes after it were never attempted). A cancellation, an
+    unreadable output or anything else stops the batch. `done` when the failed
+    item was the batch's last.
     """
     payload = _parse_batch_stdout(result_path)
     if not isinstance(payload, dict) or payload.get("schemaVersion") != 2 or not isinstance(payload.get("items"), list):
@@ -1408,7 +1415,7 @@ def next_segment_offset(result_path: Path, offset: int, count: int) -> str:
     for row in rows:
         if row.get("status") == "completed":
             continue
-        if row.get("status") == "failed" and row.get("errorCode") == "generation_failed":
+        if row.get("status") == "failed" and row.get("errorCode") in RESUMABLE_ERROR_CODES:
             following = offset + row["index"] + 1
             return str(following) if following < count else "done"
         return "stop"

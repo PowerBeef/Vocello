@@ -620,6 +620,11 @@ class ManifestTests(Fixture):
         count = len(batch["takeIDs"])
         last = self._emit(batch, self._batch_json(batch, failed_at=count - 1))
         self.assertEqual(next_segment_offset(last, 0, count), "done")
+        # The engine's QC refusal is its own code since 2026-10-21; a batch
+        # resumes after it as after any take the engine would not publish.
+        refused = self._batch_json(batch, failed_at=0)
+        refused["items"][0]["errorCode"] = "qc_rejected"
+        self.assertEqual(next_segment_offset(self._emit(batch, refused), 0, count), "1" if count > 1 else "done")
         cancelled = self._batch_json(batch, failed_at=0)
         cancelled["items"][0].update(status="cancelled", errorCode="cancelled")
         self.assertEqual(next_segment_offset(self._emit(batch, cancelled), 0, count), "stop")

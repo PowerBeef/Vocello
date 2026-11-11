@@ -135,12 +135,12 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
         }
     }
 
-    // MARK: - Sampling inside a pass (RF-46)
+    // MARK: - The frame as one function (RF-46)
 
-    /// A plan whose passes sample must draw exactly the codes the eager
-    /// sampler draws from the same passes' logits under the same random
-    /// state: same keys, in the same order, frame after frame.
-    func testPassesThatSampleDrawTheEagerSamplersCodes() throws {
+    /// The frame function must draw exactly the codes the eager sampler draws
+    /// from the per-pass logits under the same random state (same keys, same
+    /// order, frame after frame) and return the loop's embedding sum.
+    func testTheFrameFunctionDrawsTheEagerSamplersCodesAndTheLoopsEmbeddingSum() throws {
         let config = try makeConfig(numCodeGroups: 16, hidden: 16)
         let passCount = config.numCodeGroups - 1
         let stage = Qwen3SamplingStage(temperature: 0.9, topP: 1, topK: 8, minP: 0)
@@ -148,26 +148,29 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
             stage: stage, castsLogitsToFloat32: true, vocabSize: config.vocabSize
         ))
 
-        for dtype in [DType.float32, .bfloat16] {
+        // Equal widths, and a wider talker, whose hidden state the predictor
+        // projects before every pass (the shipped models' shape).
+        for (dtype, talkerHidden) in [(DType.float32, 16), (.bfloat16, 16), (.bfloat16, 24)] {
             // The predictor's own weights take the dtype, as a shipped
-            // checkpoint's do, so the bf16 leg samples from bf16 logits and
-            // runs the float32 cast production runs.
+            // checkpoint's do, so the bf16 legs sample from bf16 logits and
+            // run the float32 cast production runs.
             MLXRandom.seed(0x5A3D_0046)
-            let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: 16)
+            let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: talkerHidden)
+            XCTAssertEqual(predictor.projection != nil, talkerHidden != 16)
             predictor.update(parameters: predictor.parameters().mapValues { $0.asType(dtype) })
             eval(predictor)
             let probe = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype).run(
                 pass: 0,
-                codeHidden: MLXArray.zeros([1, 1, 16], dtype: dtype),
-                code0Embed: MLXArray.zeros([1, 1, 16], dtype: dtype),
+                codeHidden: MLXArray.zeros([1, 1, talkerHidden], dtype: dtype),
+                code0Embed: MLXArray.zeros([1, 1, talkerHidden], dtype: dtype),
                 token: nil
             )
             XCTAssertEqual(probe.dtype, dtype, "the pass's logits carry the model's dtype")
             func frameInputs(_ frame: Int) -> (hidden: MLXArray, embed: MLXArray) {
                 let keys = MLXRandom.split(key: MLXRandom.key(UInt64(31_000 + frame)), into: 2)
                 return (
-                    MLXRandom.normal([1, 1, 16], key: keys[0]).asType(dtype),
-                    MLXRandom.normal([1, 1, 16], key: keys[1]).asType(dtype)
+                    MLXRandom.normal([1, 1, talkerHidden], key: keys[0]).asType(dtype),
+                    MLXRandom.normal([1, 1, talkerHidden], key: keys[1]).asType(dtype)
                 )
             }
 
@@ -193,36 +196,44 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
                 }
             }
 
-            // The plan under test: each pass samples on a key resolved where
-            // the eager sampler resolves its own.
+            // The plan under test: the frame function, on keys resolved in
+            // pass order where the eager sampler resolves its own. Its sum
+            // must be the loop's left fold over the same embeddings.
             let samplingPlan = CodePredictorCompiledPlan(predictor: predictor, dtype: dtype, sampling: sampling)
             var drawn: [[UInt32]] = []
             withRandomState(MLXRandom.RandomState(seed: 20_261_111)) {
                 for frame in 0 ..< 3 {
                     let inputs = frameInputs(frame)
-                    var codes: [MLXArray] = []
-                    for pass in 0 ..< passCount {
-                        let key = resolve(key: MLXArray?.none)
-                        codes.append(pass == 0
-                            ? samplingPlan.run(
-                                pass: 0, codeHidden: inputs.hidden, code0Embed: inputs.embed, token: nil, key: key)
-                            : samplingPlan.run(
-                                pass: pass, codeHidden: nil, code0Embed: nil, token: codes[pass - 1], key: key))
+                    let keys = (0 ..< passCount).map { _ in resolve(key: MLXArray?.none) }
+                    let result = samplingPlan.runFrame(
+                        codeHidden: inputs.hidden, code0Embed: inputs.embed, keys: keys
+                    )
+                    var expectedSum = inputs.embed
+                    for (index, code) in result.codes.enumerated() {
+                        expectedSum = expectedSum + predictor.codecEmbedding[index](code)
                     }
-                    eval(codes)
-                    XCTAssertTrue(codes.allSatisfy { $0.shape == [1, 1] })
-                    drawn.append(codes.map { $0.asType(.uint32).item(UInt32.self) })
+                    eval(result.codes + [result.embeddingSum, expectedSum])
+                    XCTAssertEqual(result.codes.count, passCount)
+                    XCTAssertTrue(result.codes.allSatisfy { $0.shape == [1, 1] })
+                    XCTAssertEqual(result.embeddingSum.shape, inputs.embed.shape)
+                    XCTAssertEqual(result.embeddingSum.dtype, expectedSum.dtype)
+                    XCTAssertEqual(
+                        result.embeddingSum.asType(.float32).asArray(Float.self).map(\.bitPattern),
+                        expectedSum.asType(.float32).asArray(Float.self).map(\.bitPattern),
+                        "the embedding sum, frame \(frame), \(dtype)"
+                    )
+                    drawn.append(result.codes.map { $0.asType(.uint32).item(UInt32.self) })
                 }
             }
 
-            XCTAssertEqual(drawn, expected, "\(dtype)")
+            XCTAssertEqual(drawn, expected, "\(dtype), talker width \(talkerHidden)")
             XCTAssertGreaterThan(Set(drawn.flatMap { $0 }).count, 3, "the draws are not degenerate")
         }
     }
 
-    /// Only the plain temperature and top-k stage samples inside a pass; any
-    /// other stage keeps the eager sampler, which implements all of them.
-    func testOnlyThePlainTopKStageSamplesInsideAPass() {
+    /// Only the plain temperature and top-k stage runs as the frame function;
+    /// any other stage keeps the eager sampler, which implements all of them.
+    func testOnlyThePlainTopKStageRunsAsTheFrameFunction() {
         func eligible(_ temperature: Float, _ topP: Float, _ topK: Int, _ minP: Float) -> Bool {
             CompiledPassSampling.eligible(
                 stage: Qwen3SamplingStage(temperature: temperature, topP: topP, topK: topK, minP: minP),

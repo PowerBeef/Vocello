@@ -25,19 +25,22 @@ import MLXNN
 // so fixed-seed output remains byte-identical — enforced by the runtime
 // equivalence test and the end-to-end identity gate.
 //
-// RF-46: a pass can also sample. When the request's subtalker stage is the
-// plain temperature and top-k sampler (`CompiledPassSampling`), the traced
-// function ends in the sampler and returns the code; the loop passes in the
-// random key it resolved from the request's state. The passes still run one
-// after another, each on the code before it: nothing is pipelined.
+// RF-46: the frame as one function. When the request's subtalker stage is
+// the plain temperature and top-k sampler (`CompiledPassSampling`), which
+// production uses, `runFrame` runs the fifteen passes, each followed by its
+// sampler, and the sum of the frame's code embeddings in one compiled
+// function; the loop passes in the fifteen random keys it resolved from the
+// request's state. The passes still run one after another, each on the code
+// before it: nothing is pipelined. The per-pass functions serve every other
+// stage and observed takes.
 
-/// The sampler a pass can run inside its compiled function (RF-46): the plain
-/// temperature and top-k sampler the code predictor uses in production. The
-/// pass then returns the sampled code instead of its logits, one compiled
-/// call where there were a compiled pass and an eager sampler, and MLX fuses
-/// the sampler's elementwise chains. The random key is an input, resolved by
-/// the caller from the request's random state exactly as the eager sampler
-/// resolves it, so the request draws the same keys in the same order.
+/// The sampler the frame function runs after each pass (RF-46): the plain
+/// temperature and top-k sampler the code predictor uses in production.
+/// Inside the compiled function MLX fuses its elementwise chains, and the
+/// pass's code feeds the next pass without a round trip through Swift. The
+/// random keys are inputs, resolved by the caller from the request's random
+/// state exactly as the eager sampler resolves them, so the request draws
+/// the same keys in the same order.
 struct CompiledPassSampling: Equatable {
     let temperature: Float
     let topK: Int
@@ -93,14 +96,20 @@ final class CodePredictorCompiledPlan {
     private var keyBuffers: [MLXArray]
     private var valueBuffers: [MLXArray]
     private var compiledPasses: [Int: @Sendable ([MLXArray]) -> [MLXArray]] = [:]
-    /// The sampler each pass runs inside its compiled function, when the
-    /// request's subtalker stage is one it reproduces; nil keeps the passes
-    /// returning logits for the eager sampler.
+    /// The sampler `runFrame` runs after each pass, when the request's
+    /// subtalker stage is one it reproduces; nil leaves only the per-pass
+    /// `run`, whose logits the eager sampler takes.
     let sampling: CompiledPassSampling?
+    private let dtype: DType
+    private var compiledFrame: (@Sendable ([MLXArray]) -> [MLXArray])?
+    /// Frames this plan ran through `runFrame`; the generate loop publishes
+    /// it per take so a test can tell which path a take took.
+    private(set) var frameFunctionCallCount = 0
 
     init(predictor: Qwen3TTSCodePredictor, dtype: DType, sampling: CompiledPassSampling? = nil) {
         self.predictor = predictor
         self.sampling = sampling
+        self.dtype = dtype
         self.passCount = predictor.numCodeGroups - 1
         let layers = predictor.model.layers
         self.layerCount = layers.count
@@ -125,12 +134,7 @@ final class CodePredictorCompiledPlan {
     /// does); later passes consume the previous raw code token, embedded
     /// inside the compiled function through `codecEmbedding[pass - 1]`.
     /// Returns the pass logits. Buffer state advances internally.
-    ///
-    /// With `sampling` set, `key` is required and the result is the sampled
-    /// code (`[1, 1]`) instead of the logits.
-    func run(
-        pass: Int, codeHidden: MLXArray?, code0Embed: MLXArray?, token: MLXArray?, key: MLXArray? = nil
-    ) -> MLXArray {
+    func run(pass: Int, codeHidden: MLXArray?, code0Embed: MLXArray?, token: MLXArray?) -> MLXArray {
         let function = compiledPass(pass)
         var inputs: [MLXArray] = []
         if pass == 0 {
@@ -138,9 +142,6 @@ final class CodePredictorCompiledPlan {
             inputs.append(code0Embed!)
         } else {
             inputs.append(token!)
-        }
-        if sampling != nil {
-            inputs.append(key!)
         }
         inputs.append(contentsOf: keyBuffers)
         inputs.append(contentsOf: valueBuffers)
@@ -150,9 +151,6 @@ final class CodePredictorCompiledPlan {
         // shape, so the step reaches its typed failure at the next error
         // check instead of trapping on the index.
         guard outputs.count == 1 + 2 * layerCount else {
-            if sampling != nil {
-                return MLXArray.zeros([1, 1], dtype: .uint32)
-            }
             return MLXArray.zeros([1, 1, predictor.config.vocabSize], dtype: keyBuffers[0].dtype)
         }
         keyBuffers = Array(outputs[1 ..< (1 + layerCount)])
@@ -160,17 +158,56 @@ final class CodePredictorCompiledPlan {
         return outputs[0]
     }
 
+    /// The frame's fifteen codes and the sum of its sixteen code embeddings,
+    /// from one compiled function (`traceFrame`). `keys` holds one random key
+    /// per pass, resolved in pass order. Requires `sampling`.
+    func runFrame(
+        codeHidden: MLXArray, code0Embed: MLXArray, keys: [MLXArray]
+    ) -> (codes: [MLXArray], embeddingSum: MLXArray) {
+        // Both are the caller's contract, and a mismatch would otherwise trap
+        // inside the trace with no hint of why.
+        guard let sampling else {
+            preconditionFailure("runFrame needs a plan built with a sampling stage")
+        }
+        precondition(keys.count == passCount, "runFrame takes one random key per pass")
+        frameFunctionCallCount += 1
+        let function: @Sendable ([MLXArray]) -> [MLXArray]
+        if let compiledFrame {
+            function = compiledFrame
+        } else {
+            let predictor = self.predictor
+            let passCount = self.passCount
+            let dtype = self.dtype
+            let compiled = compile { [predictor, passCount, dtype, sampling] (inputs: [MLXArray]) -> [MLXArray] in
+                Self.traceFrame(
+                    predictor: predictor, passCount: passCount, sampling: sampling, dtype: dtype, inputs: inputs
+                )
+            }
+            compiledFrame = compiled
+            function = compiled
+        }
+        let outputs = function([codeHidden, code0Embed] + keys)
+        // Under an MLX error handler a failed compile or apply returns no
+        // outputs: placeholders of the right shapes let the step reach its
+        // typed failure at the next error check instead of trapping here.
+        guard outputs.count == passCount + 1 else {
+            return (
+                (0 ..< passCount).map { _ in MLXArray.zeros([1, 1], dtype: .uint32) },
+                MLXArray.zeros(like: code0Embed)
+            )
+        }
+        return (Array(outputs[..<passCount]), outputs[passCount])
+    }
+
     private func compiledPass(_ pass: Int) -> @Sendable ([MLXArray]) -> [MLXArray] {
         if let cached = compiledPasses[pass] { return cached }
         let predictor = self.predictor
         let layerCount = self.layerCount
-        let sampling = self.sampling
-        let compiled = compile { [predictor, layerCount, sampling] (inputs: [MLXArray]) -> [MLXArray] in
+        let compiled = compile { [predictor, layerCount] (inputs: [MLXArray]) -> [MLXArray] in
             Self.tracePass(
                 pass,
                 predictor: predictor,
                 layerCount: layerCount,
-                sampling: sampling,
                 inputs: inputs
             )
         }
@@ -183,25 +220,39 @@ final class CodePredictorCompiledPlan {
         _ pass: Int,
         predictor: Qwen3TTSCodePredictor,
         layerCount: Int,
-        sampling: CompiledPassSampling?,
         inputs: [MLXArray]
     ) -> [MLXArray] {
-        // Inputs: the pass's own (two for pass 0, one after), then the random
-        // key when the pass samples, then the K and V buffers.
-        let keyIndex = pass == 0 ? 2 : 1
-        let cursor = keyIndex + (sampling == nil ? 0 : 1)
+        let cursor = pass == 0 ? 2 : 1
         var keyBuffers = Array(inputs[cursor ..< cursor + layerCount])
         var valueBuffers = Array(inputs[cursor + layerCount ..< cursor + 2 * layerCount])
 
         // Input embedding, matching the eager loop exactly: pass 0 prepends
         // the talker hidden state to the pre-embedded first-codebook token;
         // later passes embed the previous code through codecEmbedding.
-        var embeds: MLXArray
+        let embeds: MLXArray
         if pass == 0 {
             embeds = concatenated([inputs[0], inputs[1]], axis: 1)
         } else {
             embeds = predictor.codecEmbedding[pass - 1](inputs[0])
         }
+        let logits = passLogits(
+            pass, predictor: predictor, embeds: embeds,
+            keyBuffers: &keyBuffers, valueBuffers: &valueBuffers
+        )
+        return [logits] + keyBuffers + valueBuffers
+    }
+
+    /// One pass's logits from its input embedding, writing the pass's K and V
+    /// into the buffers. The body both the per-pass traces and the frame
+    /// trace run.
+    private static func passLogits(
+        _ pass: Int,
+        predictor: Qwen3TTSCodePredictor,
+        embeds input: MLXArray,
+        keyBuffers: inout [MLXArray],
+        valueBuffers: inout [MLXArray]
+    ) -> MLXArray {
+        var embeds = input
         if let projection = predictor.projection {
             embeds = projection(embeds)
         }
@@ -267,10 +318,47 @@ final class CodePredictorCompiledPlan {
             x = x + mlp.downProj(silu(gateUp.gate) * gateUp.up)
         }
         x = predictor.model.norm(x)
-        let logits = predictor.lmHead[pass](x)
-        if let sampling {
-            return [sampling.sample(logits, key: inputs[keyIndex])] + keyBuffers + valueBuffers
+        return predictor.lmHead[pass](x)
+    }
+
+    /// The whole frame as one trace (RF-46): fifteen passes, each sampling its
+    /// code, and the sum of the frame's sixteen code embeddings that the
+    /// talker's next step takes. Inputs: the talker hidden state, the first
+    /// code's embedding, then one random key per pass. Outputs: the fifteen
+    /// codes, then the sum.
+    ///
+    /// It is the per-pass traces laid end to end, with two things they could
+    /// not share. The K and V buffers start as zeros inside the trace, since
+    /// every position a pass reads was written earlier in the same frame, so
+    /// nothing carries between frames. And each code's embedding is computed
+    /// once, for the next pass's input and for the sum, where the loop
+    /// computed it twice; the sum folds left in the loop's order.
+    private static func traceFrame(
+        predictor: Qwen3TTSCodePredictor,
+        passCount: Int,
+        sampling: CompiledPassSampling,
+        dtype: DType,
+        inputs: [MLXArray]
+    ) -> [MLXArray] {
+        let config = predictor.config
+        let bufferShape = [1, config.numKeyValueHeads, passCount + 1, config.headDim]
+        var keyBuffers = predictor.model.layers.map { _ in MLXArray.zeros(bufferShape, dtype: dtype) }
+        var valueBuffers = predictor.model.layers.map { _ in MLXArray.zeros(bufferShape, dtype: dtype) }
+
+        var codes: [MLXArray] = []
+        var embeddingSum = inputs[1]
+        var embeds = concatenated([inputs[0], inputs[1]], axis: 1)
+        for pass in 0 ..< passCount {
+            let logits = passLogits(
+                pass, predictor: predictor, embeds: embeds,
+                keyBuffers: &keyBuffers, valueBuffers: &valueBuffers
+            )
+            let code = sampling.sample(logits, key: inputs[2 + pass])
+            codes.append(code)
+            let embedded = predictor.codecEmbedding[pass](code)
+            embeddingSum = embeddingSum + embedded
+            embeds = embedded
         }
-        return [logits] + keyBuffers + valueBuffers
+        return codes + [embeddingSum]
     }
 }

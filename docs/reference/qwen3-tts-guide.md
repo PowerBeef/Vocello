@@ -511,8 +511,8 @@ The talker's sampler (`Qwen3TTS.swift:5250-5449`, called at `:3905-3918`) runs i
 
 The code predictor runs the same sampler with the subtalker stage, float32 logits, no suppression,
 no EOS and no penalty; in production that stage is plain temperature and top-k, and since RF-46 it
-runs inside each compiled pass on a key the loop resolves from the request's random state, drawing
-the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:4031-4040`). Both production constants live in one value,
+runs inside the frame's one compiled function on keys the loop resolves from the request's random
+state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:4031-4040`). Both production constants live in one value,
 `.production = (fullTextConditioning: true, filtersEOS: true, float32Sampling: true)`, defined
 twice and kept equal: `Qwen3ReferenceParity` in `Generation.swift` and `VocelloQwen3ReferenceParity`
 in `Contracts.swift`. A long-form segment's request turns D1 off.

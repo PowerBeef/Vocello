@@ -274,16 +274,21 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
   `accuracy: 2e-6` on a small fp32 model, not byte for byte (F-15); the file's own comment claims
   more. The adoption A/B measured 12/12 fixed-seed byte-identical takes on its cells, a one-time
   result that the unit test does not guarantee.
-- **A pass can sample** (RF-46, DECODE-005). When the subtalker stage is the plain temperature and
-  top-k sampler, which production uses, the traced function ends in the sampler and returns the
-  code; the loop resolves the random key from the request's state, where the eager sampler resolved
-  it, and passes it in, so a seed draws the same keys in the same order. Other stages and observed
-  takes keep the eager sampler. `Qwen3CodePredictorCompiledTests` pins the drawn codes against the
-  eager sampler under one seed; the end-to-end identity rests on the fixed-seed PCM digests
-  (`scripts/pcm_identity.py`), since a fused kernel may round differently on another MLX or GPU.
+- **The frame as one function** (RF-46, DECODE-005). When the subtalker stage is the plain
+  temperature and top-k sampler, which production uses, `runFrame` runs the fifteen passes, each
+  followed by its sampler, and the sum of the frame's code embeddings in one compiled function; the
+  loop resolves the fifteen random keys from the request's state, where the eager sampler resolved
+  them, and passes them in, so a seed draws the same keys in the same order. Other stages and
+  observed takes keep the per-pass plan and the eager sampler. `Qwen3CodePredictorCompiledTests`
+  pins the drawn codes and the embedding sum against the eager path under one seed; the end-to-end
+  identity rests on the fixed-seed PCM digests (`scripts/pcm_identity.py`), since a fused kernel
+  may round differently on another MLX or GPU.
 - **Weights are baked at trace time** (A-16). The plan lives for one generation today; reusing it
   across takes (PERF-10) must declare the weights as inputs or key the plan by load epoch.
-- **Single flight.** Every take traces 15 compiled functions with a nested compiled `silu` (F-09).
+- **Single flight.** Every take traces its compiled functions afresh: the one frame function in
+  production (RF-46), or 15 per-pass functions with a nested compiled `silu` on the eager-sampler
+  path (F-09). The prewarm runs only the eager predictor and sampler, so the frame function's
+  kernels first compile inside the first take; cold first-chunk latency did not move on the M6.
   mlx-swift 0.32.x contains #461, the fix for a lock-order deadlock between compiled functions and
   `evalLock`; before it, single-flight generation kept that deadlock unreachable (DEP-2). Keep every
   MLX caller single-flight anyway.
@@ -333,7 +338,8 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   pinned seed no longer reproduces its take is listed in
   [`qwen3-tts-guide.md` §9.5](qwen3-tts-guide.md#95-seeds-and-reproducibility).
 - **Cost (F-04).** The new sampler path adds about 80 kernel launches per frame (16 draws × 5); the
-  M6's warm first chunk rose from 146 to 155 ms (§9.5).
+  M6's warm first chunk rose from 146 to 155 ms (§9.5). Since RF-46 the code predictor's fifteen
+  draws run inside the frame function, where MLX fuses the sampler's elementwise chains (§4.2).
 - **Prewarm draws through the production sampler** (`productionSamplerWarmDraws`,
   `Qwen3TTS.swift:1910-1938`; F-05): with top-p 1.0 and 0.95, one penalized id and then two, on a
   private random state whose draws are discarded, so the sampler's kernels compile before the first
@@ -536,9 +542,10 @@ decision. [`ios-engine-optimization.md`](ios-engine-optimization.md) is historic
 The decode loop emits these intervals: Talker Forward, Code Predictor Loop and Code Predictor Step,
 Sample First Codebook and Sample Predicted Codebook, Codec Embedding Assembly, Step Eval Flush,
 Token Read, EOS Read, Audio Decoder, Audio Chunk Eval and Audio Chunk Flush. Since RF-46 the code
-predictor samples inside its compiled passes in production, so Sample Predicted Codebook is still
-emitted fifteen times a step (the profile lane counts them) but is empty, and the sampler's host
-time is part of Code Predictor Step; `qwen_sample_predicted_codebook_total` reads near zero.
+predictor's frame is one compiled function in production, so Code Predictor Step and Sample
+Predicted Codebook are still emitted fifteen times a step (the profile lane counts them) but are
+empty: their host time is Code Predictor Loop's, most of Codec Embedding Assembly's moved there too,
+and `qwen_code_predictor_step_total` and `qwen_sample_predicted_codebook_total` read near zero.
 
 Use the repository profile lane, which launches or attaches by exact PID, requires tracer success and
 validates the trace's table of contents:
@@ -712,8 +719,8 @@ Do not regress these without a maintainer decision:
   layout** (A-05).
 - **No `compile()` that declares quantized parameters as `inputs:`** (§7.4). The pass-indexed
   code-predictor plan is the shipped exception and must keep matching the eager path within
-  tolerance (`Qwen3CodePredictorCompiledTests`). A pass that samples (§4.2) must draw the eager
-  sampler's codes from one seed, and takes its random key as an input, never as a traced constant.
+  tolerance (`Qwen3CodePredictorCompiledTests`). The frame function (§4.2) must draw the eager
+  sampler's codes from one seed, and takes its random keys as inputs, never as traced constants.
 - **An mlx-swift move changes `mlxNumericsVersion`** in the same change (§9.1).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**

@@ -3880,6 +3880,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
         }
 
+        lastTakeFrameFunctionFrames = 0
         for _ in 0 ..< effectiveMaxTokens {
             try Task.checkCancellation()
             let tokenLoopStartedAt = ContinuousClock.now
@@ -3971,8 +3972,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             var codeTokens = [nextToken]
             let codeHidden = hidden[0..., (-1)..., 0...]
             // RF-46: when the subtalker stage is the plain temperature and
-            // top-k sampler, each pass samples inside its compiled function.
-            // A sampler observer needs the logits, so it keeps the eager one.
+            // top-k sampler, the frame's passes sample inside one compiled
+            // function (`runFrame` below). A sampler observer needs the
+            // logits, so it keeps the per-pass plan and the eager sampler.
             let codePredictorPlan = codePredictorStepConstants.compiledPlan(
                 for: talker.codePredictor,
                 dtype: codeHidden.dtype,
@@ -3987,37 +3989,49 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
             let codePredictorStartedAt = ContinuousClock.now
             os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Loop")
-            for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 {
+            // RF-46: with a stage the passes can sample, the whole frame is
+            // one compiled function: fifteen passes and the sum of the
+            // frame's code embeddings. The keys are drawn here from the
+            // request's random state, one per pass in pass order, where the
+            // eager sampler drew them.
+            var frameEmbeddingSum: MLXArray?
+            if codePredictorPlan.sampling != nil {
+                let passCount = talkerConfig.numCodeGroups - 1
+                let keys = (0 ..< passCount).map { _ in resolve(key: MLXArray?.none) }
+                let frame = codePredictorPlan.runFrame(
+                    codeHidden: codeHidden,
+                    code0Embed: talker.getInputEmbeddings()(nextToken),
+                    keys: keys
+                )
+                codeTokens.append(contentsOf: frame.codes)
+                frameEmbeddingSum = frame.embeddingSum
+                lastTakeFrameFunctionFrames = codePredictorPlan.frameFunctionCallCount
+                // The per-pass intervals are still emitted, empty: the profile
+                // lane counts fifteen of each per step (`trace_intervals.py`),
+                // and their host time is the loop interval's.
+                for _ in 0 ..< passCount {
+                    os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Step")
+                    os_signpost(.end, log: stepSignpostLog, name: "Code Predictor Step")
+                    os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")
+                    os_signpost(.end, log: stepSignpostLog, name: "Sample Predicted Codebook")
+                }
+            }
+            for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 where frameEmbeddingSum == nil {
                 let codePredictorStepStartedAt = ContinuousClock.now
                 os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Step")
-                // The key is drawn from the request's random state here, where
-                // the eager sampler draws it: one per pass, in pass order.
-                let passKey: MLXArray? = codePredictorPlan.sampling == nil
-                    ? nil
-                    : resolve(key: MLXArray?.none)
                 let codeLogits: MLXArray
                 if codeIdx == 0 {
                     let code0Embed = talker.getInputEmbeddings()(nextToken)
                     codeLogits = codePredictorPlan.run(
-                        pass: 0, codeHidden: codeHidden, code0Embed: code0Embed, token: nil, key: passKey
+                        pass: 0, codeHidden: codeHidden, code0Embed: code0Embed, token: nil
                     )
                 } else {
                     codeLogits = codePredictorPlan.run(
-                        pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!, key: passKey
+                        pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!
                     )
                 }
                 os_signpost(.end, log: stepSignpostLog, name: "Code Predictor Step")
                 codePredictorStepTotal += codePredictorStepStartedAt.elapsed
-                if codePredictorPlan.sampling != nil {
-                    // The pass returned its sampled code. The sampler's
-                    // interval is still emitted, empty: the profile lane
-                    // counts fifteen per step (`trace_intervals.py`), and its
-                    // host time is now part of the pass's own interval.
-                    os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")
-                    os_signpost(.end, log: stepSignpostLog, name: "Sample Predicted Codebook")
-                    codeTokens.append(codeLogits)
-                    continue
-                }
 
                 let samplePredictedCodebookStartedAt = ContinuousClock.now
                 os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")
@@ -4058,9 +4072,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // Sum all code embeddings for next step
             let codecEmbeddingStartedAt = ContinuousClock.now
             os_signpost(.begin, log: stepSignpostLog, name: "Codec Embedding Assembly")
-            var codecEmbed = talker.getInputEmbeddings()(nextToken)
-            for (i, code) in codeTokens.dropFirst().enumerated() {
-                codecEmbed = codecEmbed + talker.codePredictor.codecEmbedding[i](code)
+            var codecEmbed: MLXArray
+            if let frameEmbeddingSum {
+                // The frame function summed the embeddings it had computed.
+                codecEmbed = frameEmbeddingSum
+            } else {
+                codecEmbed = talker.getInputEmbeddings()(nextToken)
+                for (i, code) in codeTokens.dropFirst().enumerated() {
+                    codecEmbed = codecEmbed + talker.codePredictor.codecEmbedding[i](code)
+                }
             }
 
             inputEmbeds = textEmbed + codecEmbed
@@ -5089,6 +5109,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// must retain at most one frame and materialize only after its normal eval
     /// boundary; observed/unobserved code parity is a separate required check.
     var samplerObserver: ((MLXArray, MLXArray, MLXArray?, MLXArray) -> Void)?
+
+    /// Frames of the latest take that ran the code predictor as one compiled
+    /// function (RF-46); zero for a take on the per-pass plan. Internal, for
+    /// tests: it says which path a take took.
+    private(set) var lastTakeFrameFunctionFrames = 0
 
     final class Qwen3SamplerScratch {
         let vocabSize: Int

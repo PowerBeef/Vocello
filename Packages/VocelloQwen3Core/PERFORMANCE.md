@@ -103,16 +103,21 @@ task-local state and never advance the process-global RNG.
   They pay where the host bounds a frame: 4.0% on the M6 with the process clamped to the efficiency
   cores, and nothing measurable unclamped, where the GPU bounds it (the host waits on the GPU for
   over half of a take there). No iPhone measurement exists yet.
-- **The code predictor samples inside its compiled passes** (RF-46, DECODE-005). When the subtalker
-  stage is the plain temperature and top-k sampler, which production uses, each pass returns its
-  sampled code instead of its logits: one compiled call where there were a compiled pass and an
-  eager sampler, with the sampler's elementwise chains fused. The random key is an input the loop
-  resolves from the request's random state where the eager sampler resolved it, so a seed draws the
-  same keys in the same order. Any other stage, and a take with a sampler observer, keeps the eager
-  sampler. On the M6: PCM-identical on 39 fixed-seed takes (Speed, Quality, instruct-bearing and
-  long), 6.3% faster host-bound, 0.5% faster GPU-bound with 5.3% less host CPU. The identity is
-  measured, not proven: a fused kernel may round differently on another MLX or GPU, and the digests
-  are the guard.
+- **The code predictor's frame is one compiled function** (RF-46, DECODE-005). When the subtalker
+  stage is the plain temperature and top-k sampler, which production uses, one function runs the
+  fifteen passes, each followed by its sampler, and the sum of the frame's sixteen code embeddings
+  that the talker's next step takes. It is the per-pass traces laid end to end: the passes still
+  run in order, each on the code before it. Two things change around them. Each code's embedding is
+  computed once, for the next pass and for the sum, where the loop computed it twice. And the K
+  and V buffers start as zeros inside the function, since every position a pass reads was written
+  earlier in the same frame. The random keys are inputs the loop resolves from the request's
+  random state, one per pass in pass order, where the eager sampler resolved them, so a seed draws
+  the same keys in the same order. Any other stage, and a take with a sampler observer, keeps the
+  per-pass plan and the eager sampler. On the M6: PCM-identical on 39 fixed-seed takes (Speed,
+  Quality, instruct-bearing and long); 8.5% faster in all where the host bounds a frame (6.3% from
+  sampling inside the passes, 2.3% from making the frame one function) and under 1% where the GPU
+  does, with about 6% less host CPU. The identity is measured, not proven: a fused kernel may round
+  differently on another MLX or GPU, and the digests are the guard.
 
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Seeded takes reproduce within one source identity

@@ -1767,6 +1767,8 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-03 | [`ios-xcui-perf-20261103-184800-069eab23`](runs/ui-perf/ios-xcui-perf-20261103-184800-069eab23.json) | canonical | canonical | passed | not-applicable | 9 | — | `a60dd2040b2b` | `55360e5dfbae` | baseline | rf17-ios8-ui-perf-r2 |
+| 2026-11-11 | [`ios-xcui-perf-20261111-175155-f5267c25`](runs/ui-perf/ios-xcui-perf-20261111-175155-f5267c25.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `f6d7888019e5` | `55360e5dfbae` | vs ios-xcui-perf-20261103-184800-069eab23: harness changed | overhaul-ui-perf |
+| 2026-11-11 | [`ios-xcui-perf-20261111-180357-2d245d6e`](runs/ui-perf/ios-xcui-perf-20261111-180357-2d245d6e.json) | canonical | canonical | passed | not-applicable | 9 | — | `f6d7888019e5` | `55360e5dfbae` | vs ios-xcui-perf-20261111-175155-f5267c25: compatible | overhaul-ui-perf-2 |
 
 ## ui-perf / ios / iphone-17-pro / config `9a7f6e403e06`
 

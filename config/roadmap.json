@@ -389,7 +389,7 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02 against memory-policy changes for 3.0. Nothing to ship: no constant is set and the per-chunk clear stays. M6: MLX's default of 40 operations per buffer is fastest; the clear costs 1.7% host-bound. iPhone 17 Pro, 2026-11-11 at 3119a745, cooled interleaved fixed-seed takes (three per arm, nominal heat, identical PCM): the default is 35.5 ms per frame (RTF 0.477); MLX_MAX_OPS_PER_BUFFER=40 is 0.8% slower and halves context switches per frame (596 to 323); QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=off (5 clears instead of 39) changes nothing. Back to back without pauses heat dominates: 20 takes drift from RTF 0.55 to 0.75 at thermal state fair, and no arm differs by more than the drift. ios_device.sh forwards MLX's three keys to the phone (3119a745); the clear switch needs a build with --device-diagnostics. Generation runs at QoS high with the CPU busy 0.56 of a take; core placement needs an Instruments profile, which needs the phone on a cable. Residency sets were not tried. No iPhone 15 Pro is paired."
+      "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02. Nothing to ship: no constant is set and the per-chunk clear stays. M6: MLX's default of 40 operations per buffer is fastest; the clear costs 1.7% host-bound. iPhone 17 Pro, 2026-11-11 at 3119a745, cooled interleaved fixed-seed takes (three per arm, nominal heat, identical PCM): the default is 35.5 ms per frame (RTF 0.477); MLX_MAX_OPS_PER_BUFFER=40 is 0.8% slower and halves context switches per frame; QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=off (5 clears instead of 39) changes nothing. Back to back without pauses heat dominates: 20 takes drift from RTF 0.55 to 0.75 at thermal state fair. Interface: the frame-health lane passed twice at f6d78880 (ios-xcui-perf-20261111-175155-f5267c25, 180357-2d245d6e); the first warned on two player scenarios because History's newest row was a 2-minute project (BKL-69), and the rerun matches 2026-11-03; with a take generating, hitch time is 91 ms per second against 76. Full smoke passed (ios-xcui-smoke-20261111-174409-5a3c5a46). Open: core placement (an Instruments profile needs the phone on a cable); residency sets, not tried; no iPhone 15 Pro is paired."
     },
     {
       "id": "RF-46",
@@ -2269,6 +2269,34 @@
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-10 from RF-41's device run: current iOS shows a confirmation dialog as a popover without its cancel-role button (ios-xcui-model-download-20261110-143248-035dcccd), which is why RF-41's prompt became an alert. The Cancel download dialog on the same screen is still a confirmation dialog, so Keep Download is probably hidden and the dialog is dismissed by tapping outside. Not checked on the device."
+    },
+    {
+      "id": "BKL-69",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone frame-health lane's player scenarios open whatever take is newest in History",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The sheet and scrub scenarios of ui_test.sh ios perf open a seeded row, so their result no longer depends on what ran before; and the player's frame health with a two-minute take open is measured on purpose.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift"
+      ],
+      "updated": "2026-11-11",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-11 from the phone window. Run ios-xcui-perf-20261111-175155-f5267c25 warned on sheet present and dismiss (hitch 247 ms per second against a ceiling of 180) and on scrubbing (402, cadence 30 Hz), with twice the CPU of 2026-11-03: History's newest row was a 2-minute long-form project left by the smoke lane. The rerun on a short newest row (180357-2d245d6e) matches 2026-11-03 with no warning. Not investigated: whether the player with a long take open hitched as much before the overhaul."
+    },
+    {
+      "id": "BKL-70",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A diagnostics launch forwards the host's build-path variables into the app on the phone",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A diagnostics launch forwards only the tuning and run-identity variables a lane sets, not the QVOICE_* build-output paths and the worker session the host exports.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh"
+      ],
+      "updated": "2026-11-11",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-11 from the phone window: device_diagnostics_env_json forwards every QVOICE_* and QWENVOICE_* variable, which includes the absolute build-output paths that scripts/lib/build_paths.sh exports and QVOICE_WORKER_SESSION. They reach only the development app's environment on the maintainer's own phone; no file or record was seen to carry them. Not investigated."
     },
     {
       "id": "ER-01",

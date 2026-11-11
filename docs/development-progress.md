@@ -20,7 +20,8 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 ### November 11: the overhaul measured on the iPhone 17 Pro (resume here)
 
 The maintainer opened a phone window on November 11. The headless measurements (at `3119a745`), the
-UI benchmark and the long-form journey (at `3f8fa144`) ran on the paired iPhone 17 Pro and confirm
+UI benchmark, the long-form journey, full smoke and the frame-health lane (at `3f8fa144` and
+`f6d78880`) ran on the paired iPhone 17 Pro and confirm
 the overhaul there. No iPhone 15 Pro is paired. `main` is pushed up to `c6a80dcb`, whose required CI check is red because two Linux
 jobs could not reach the Ubuntu package mirror, twice (no test ran in them); later commits wait on
 local `main`.
@@ -54,6 +55,12 @@ local `main`.
 - **Long-form.** The long-form journey passed (`ios-xcui-smoke-20261111-173732-88218ccb`), on the
   build that carries assembly v3 and the heat pause. The phone stayed cool, so the pause never
   engaged, and the project's file was not pulled for a detector reading.
+- **Regression checks.** Full smoke passed (`ios-xcui-smoke-20261111-174409-5a3c5a46`). The
+  frame-health lane passed twice at `f6d78880`: its first run
+  (`ios-xcui-perf-20261111-175155-f5267c25`) warned on the two player scenarios because History's
+  newest row was a 2-minute project left by smoke, and the rerun on a short row
+  (`180357-2d245d6e`) matches November 3 with no warning (BKL-69). With a take generating, hitch
+  time is 91 ms per second against 76 on November 3, inside the lane's ceilings.
 - **Tooling.** `scripts/ios_device.sh` forwards MLX's three environment keys to the phone
   (`3119a745`). The cache-clear and memory-profile switches act only in a build made with
   `--device-diagnostics`; the benchmark build ignores them.

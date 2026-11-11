@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 22/69 (32%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 22/71 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -585,6 +585,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-66` | parked | SECURITY.md has no supported row for the App Store iPhone app | — |
 | `BKL-67` | parked | The release rehearsal's Sparkle signatures job was cancelled on November 4 | — |
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
+| `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
+| `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -771,6 +773,14 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-68`** (parked) — The Cancel download dialog may show no Keep Download button on the iPhone.
   gate: Cancelling a model download offers both Cancel Download and Keep Download on the iPhone, seen in a device screenshot.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-69`** (parked) — The iPhone frame-health lane's player scenarios open whatever take is newest in History.
+  gate: The sheet and scrub scenarios of ui_test.sh ios perf open a seeded row, so their result no longer depends on what ran before; and the player's frame health with a two-minute take open is measured on purpose.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-70`** (parked) — A diagnostics launch forwards the host's build-path variables into the app on the phone.
+  gate: A diagnostics launch forwards only the tuning and run-identity variables a lane sets, not the QVOICE_* build-output paths and the worker session the host exports.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

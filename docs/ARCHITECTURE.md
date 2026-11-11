@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -411,6 +411,16 @@ model's own directory, and is disabled only by the registered `QWENVOICE_MARKING
 a capability-bearing diagnostic build under the master gate. Distributed builds cannot disable it.
 Long-form assembly re-marks nothing: segments are marked at segment publication,
 and `LongFormAssembly` appends only the provenance chunk to the stitched product.
+
+**Reading the mark (measured 2026-11-11, RF-44).** The mark is embedded at 24 kHz with no
+resampling, on a 320-sample frame counted from the take's first sample
+(`VocelloQwen3AudioMarking.frameSampleCount`). The reference detector must read the samples at
+24 kHz as they are; resampled to 16 kHz it reads nothing. It reads the mark fully only on that
+frame grid: a file cropped at its start by a count that is not a multiple of 320 reads weaker, at
+some offsets below the detector's 0.5 threshold, and with a wrong payload, until it is realigned
+(a verifier tries the 320 offsets). Published files stay on the grid: a take is marked from its
+first sample, and long-form assembly v3 places every segment a whole number of frames from where
+it was marked.
 
 The shipping product-generation path is `VocelloQwen3Engine` plus its classified session and
 QwenVoiceCore's `GenerationOutputAdapter`. Sampling and Qwen generation-memory settings remain

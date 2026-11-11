@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-11
 summary: The shipping long-form v4 path on both platforms — planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History — and what remains open.
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
@@ -40,6 +40,12 @@ check and `vocello generate` use the same predicate:
 3. **Bounded assembly.** `BoundedLongFormAssembler` joins the persisted PCM16 segment WAVs in fixed
    blocks (bounded gain, edge trim/fade over verified non-speech, declared pauses, atomic publish)
    and the joined output passes its own duration-aware Fast QC with the plan's pause budget.
+   Since assembly v3 (RF-44, 2026-11-11) every segment lands on the watermark's 320-sample frame:
+   it keeps up to one frame (13 ms) more of its own leading non-speech, so its samples sit a whole
+   number of frames from where they were marked. Before v3 the reference detector read a joined
+   file at 0.67 to 0.93 with a wrong payload; after it, at 0.99 with the payload exact. A segment
+   with less leading non-speech than that keeps its trim and the pause in front of it grows by
+   under one frame of silence. Pauses are otherwise unchanged.
 4. **Manifest v4.** `LongFormManifestV4` records plan + execution + assembly + replacement
    evidence and validates fail-closed. Schema-v3 documents remain readable only as a limited
    legacy summary; missing plan identity is never fabricated.

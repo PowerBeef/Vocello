@@ -26,7 +26,13 @@ public enum LongFormAssemblyError: Error, Equatable, Sendable {
 public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
     // v2 (2026-09-26, CORE-12): a segment's boost is capped at the per-take
     // limiter ceiling over its peak. Segments that could not clip join as in v1.
-    public static let currentAlgorithmVersion = 2
+    // v3 (2026-11-11, RF-44): every segment lands on the watermark's frame grid.
+    // Each take is marked from its own first sample, and the reference detector
+    // reads a joined file on one grid from its first sample; a segment trimmed
+    // by an arbitrary count read 0.67 to 0.93 with a wrong payload. A segment
+    // now keeps up to one frame more of its own leading non-speech, so its
+    // samples sit a whole number of frames from where they were marked.
+    public static let currentAlgorithmVersion = 3
 
     public let algorithmVersion: Int
     public let sampleRate: Int
@@ -37,6 +43,9 @@ public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
     public let targetRMS: Double
     public let minimumGain: Double
     public let maximumGain: Double
+    /// The watermark's frame, in samples: the grid every segment is kept on.
+    /// 1 places no constraint (the arithmetic tests use it).
+    public let markFrameSamples: Int
 
     public init(
         algorithmVersion: Int = Self.currentAlgorithmVersion,
@@ -47,7 +56,8 @@ public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
         maximumFadeMillisecondsPerEdge: Int = 10,
         targetRMS: Double = 0.10,
         minimumGain: Double = 0.75,
-        maximumGain: Double = 1.25
+        maximumGain: Double = 1.25,
+        markFrameSamples: Int = VocelloQwen3AudioMarking.frameSampleCount
     ) {
         self.algorithmVersion = algorithmVersion
         self.sampleRate = sampleRate
@@ -58,6 +68,7 @@ public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
         self.targetRMS = targetRMS
         self.minimumGain = minimumGain
         self.maximumGain = maximumGain
+        self.markFrameSamples = markFrameSamples
     }
 
     fileprivate func validated() throws -> Self {
@@ -76,6 +87,9 @@ public struct LongFormAssemblyConfiguration: Codable, Equatable, Sendable {
               minimumGain.isFinite, maximumGain.isFinite,
               minimumGain > 0, maximumGain >= minimumGain else {
             throw LongFormAssemblyError.invalidConfiguration("gain")
+        }
+        guard markFrameSamples >= 1 else {
+            throw LongFormAssemblyError.invalidConfiguration("markFrameSamples")
         }
         return self
     }
@@ -239,6 +253,10 @@ public enum BoundedLongFormAssembler {
         var outputFramePosition: Int64 = 0
         var previousLastFrame: Int16?
         var maximumSegmentBoundaryJump = 0
+        // The next segment is analyzed before the pause in front of it is
+        // written, because where it lands decides how much of its leading
+        // non-speech it keeps.
+        var pendingAnalysis: SegmentAnalysis?
 
         do {
             for (index, segment) in segments.enumerated() {
@@ -253,10 +271,12 @@ public enum BoundedLongFormAssembler {
                     )
                 }
                 try Task.checkCancellation()
-                let analysis = try analyze(
+                let analysis = try pendingAnalysis ?? analyze(
                     segment: segment,
-                    configuration: configuration
+                    configuration: configuration,
+                    outputFramePosition: outputFramePosition
                 )
+                pendingAnalysis = nil
                 let contentStart = outputFramePosition
                 let written = try write(
                     segment: segment,
@@ -268,10 +288,8 @@ public enum BoundedLongFormAssembler {
                 )
                 outputFramePosition += written
 
-                let pauseFrames: Int
-                if index == segments.indices.last {
-                    pauseFrames = 0
-                } else {
+                var pauseFrames = 0
+                if index != segments.indices.last {
                     pauseFrames = max(
                         0,
                         Int(
@@ -280,6 +298,15 @@ public enum BoundedLongFormAssembler {
                                 / 1_000.0).rounded()
                         )
                     )
+                    let next = try analyze(
+                        segment: segments[index + 1],
+                        configuration: configuration,
+                        outputFramePosition: outputFramePosition + Int64(pauseFrames)
+                    )
+                    // Usually zero: the next segment reaches the grid by
+                    // keeping more of its own leading non-speech.
+                    pauseFrames += next.alignmentPaddingFrames
+                    pendingAnalysis = next
                 }
                 let pauseStart = outputFramePosition
                 try writeSilence(
@@ -380,6 +407,28 @@ public enum BoundedLongFormAssembler {
     }
 }
 
+extension BoundedLongFormAssembler {
+    /// Where a segment's content starts so that it lands on the mark's grid.
+    ///
+    /// `candidate` is the most the leading edge may be trimmed and `position`
+    /// the output frame the content would start at. The content must start at
+    /// a source frame congruent to its output frame modulo the mark's frame.
+    /// The segment first trims less, by under one frame, which keeps only its
+    /// own non-speech. When it has less leading non-speech than that, it trims
+    /// as before and the pause in front of it takes the difference as silence.
+    static func gridAlignedStart(
+        candidate: Int64,
+        position: Int64,
+        frame: Int64
+    ) -> (contentStart: Int64, paddingFrames: Int) {
+        let residue = position % frame
+        if candidate >= residue {
+            return (candidate - (candidate - residue) % frame, 0)
+        }
+        return (candidate, Int(candidate - residue + frame))
+    }
+}
+
 private extension BoundedLongFormAssembler {
     /// The per-take limiter's output ceiling in PCM16 units; joined segments
     /// are never boosted past it.
@@ -393,6 +442,9 @@ private extension BoundedLongFormAssembler {
         let gain: Double
         let fadeInFrames: Int
         let fadeOutFrames: Int
+        /// Silence the pause in front of this segment grows by, when the
+        /// segment has too little leading non-speech to reach the grid alone.
+        let alignmentPaddingFrames: Int
     }
 
     static func openReader(
@@ -414,7 +466,8 @@ private extension BoundedLongFormAssembler {
 
     static func analyze(
         segment: LongFormAssemblySegmentSource,
-        configuration: LongFormAssemblyConfiguration
+        configuration: LongFormAssemblyConfiguration,
+        outputFramePosition: Int64
     ) throws -> SegmentAnalysis {
         let file = try openReader(for: segment, configuration: configuration)
         let capacity = AVAudioFrameCount(configuration.blockFrames)
@@ -465,7 +518,12 @@ private extension BoundedLongFormAssembler {
                 * Double(configuration.maximumTrimMillisecondsPerEdge)
                 / 1_000.0).rounded()
         )
-        let contentStart = min(firstAudible, maximumTrimFrames)
+        let aligned = gridAlignedStart(
+            candidate: min(firstAudible, maximumTrimFrames),
+            position: outputFramePosition,
+            frame: Int64(configuration.markFrameSamples)
+        )
+        let contentStart = aligned.contentStart
         let trailingSilence = file.length - lastAudibleExclusive
         let contentEnd = file.length - min(trailingSilence, maximumTrimFrames)
         let rms = sqrt(audibleSquareSum / Double(audibleCount))
@@ -492,7 +550,8 @@ private extension BoundedLongFormAssembler {
             rms: rms,
             gain: gain,
             fadeInFrames: min(maximumFadeFrames, Int(remainingLeadingSilence)),
-            fadeOutFrames: min(maximumFadeFrames, Int(remainingTrailingSilence))
+            fadeOutFrames: min(maximumFadeFrames, Int(remainingTrailingSilence)),
+            alignmentPaddingFrames: aligned.paddingFrames
         )
     }
 

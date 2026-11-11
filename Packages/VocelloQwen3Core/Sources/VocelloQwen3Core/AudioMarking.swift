@@ -15,6 +15,14 @@ public enum VocelloQwen3AudioMarking {
     /// (deterministic embedding and detector-side attribution).
     public static var payload: UInt16 { AudioSealGenerator.messagePayload }
 
+    /// The mark's frame, in samples. A detector reads the mark on this grid,
+    /// counted from the first sample of the file it is given. Audio that is
+    /// cropped or joined after marking must keep every marked sample at a
+    /// position that is a whole number of frames from where it was marked:
+    /// off the grid the reference detector reads a weaker mark and a wrong
+    /// payload (measured 2026-11-11, RF-44).
+    public static var frameSampleCount: Int { AudioSealGenerator.totalStride }
+
     /// Embeds the watermark into 24 kHz mono PCM and returns the marked
     /// samples. The generator is constructed and released inside the call.
     ///

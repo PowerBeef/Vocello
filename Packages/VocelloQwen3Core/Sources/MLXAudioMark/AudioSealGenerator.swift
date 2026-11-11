@@ -227,7 +227,9 @@ public final class AudioSealGenerator {
         return stacked(rows, axis: 0).sum(axis: 0)  // [128]
     }
 
-    static let totalStride = 320  // product of encoder strides
+    /// Samples per frame: the product of the encoder strides. The mark is laid
+    /// on this grid from the first sample, and a detector reads it on the same grid.
+    public static let totalStride = 320
 
     /// One published sample: the input plus its watermark delta, clamped to
     /// full scale. P09-04: Swift's `min(1, .nan)` is 1, so the bare clamp turned

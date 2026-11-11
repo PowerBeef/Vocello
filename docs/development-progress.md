@@ -68,13 +68,18 @@ iPhone, and every engine change kept the samples: fixed-seed PCM digests are ide
   `MLX_ENABLE_TF32=0`; takes with marking off read 0.07 to 0.11.
   - **Finding: detection depends on alignment to the mark's 320-sample frame.** Cropping a take by
     a count that is not a multiple of 320 lowers detection and flips payload bits; at 15 to 28% of
-    crop offsets the detector reads below its 0.5 threshold. Long-form assembly trims each
+    crop offsets the detector reads below its 0.5 threshold. Long-form assembly trimmed each
     segment's edges by arbitrary frame counts, so a long-form file read 0.67 to 0.93 with a wrong
-    payload. Realigned to its own frame, every segment reads 0.999 with the payload exact.
+    payload.
+  - **Fixed in long-form assembly v3:** every segment keeps up to one frame (13 ms) more of its own
+    leading non-speech and lands on the grid, with its pauses unchanged. Three rebuilt projects
+    (Custom Speed with one and three segments, Design Quality with three) read 0.993 to 0.998
+    with the payload exact.
   - **Not known:** whether Meta's own generator at 16 kHz has the same sensitivity (it needs their
-    generator file), and what an iPhone's output reads. The fix is not decided.
-- **Open on the Mac:** the fix for that finding, and the measurements as published benchmark
-  records (publication needs a request).
+    generator file), and what an iPhone's output reads. A file the user crops still has to be
+    realigned by whoever verifies it (`docs/ARCHITECTURE.md`, Reading the mark).
+- **Open on the Mac:** the measurements as published benchmark records (publication needs a
+  request).
 - **For the next announced iPhone window,** in this order: the take's regime on each phone (CPU
   share and QoS class of the generation thread); sample identity of the compiled frame function on
   the phone's GPU; `MLX_MAX_OPS_PER_BUFFER=40` against the default; the cache-clear switch off;

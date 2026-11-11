@@ -53,7 +53,7 @@
     },
     {
       "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
-      "sha256": "019ae8dd217b48c9b8c2e9741cb3d4aec0483ea63b6727e1ba5268b0d1fd7a29",
+      "sha256": "63cbb9deab5bc89e0a31128ab33caf9f13db378f688b850ecd69cfa84e7f2937",
       "upstreamStatus": "added"
     },
     {
@@ -178,7 +178,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "63b8d927a5415f375c519f6609240c2a6fe8bf75899b32835d21a58d05a770a5",
+      "sha256": "8bab1a60125a691f70a0fbb33bd2d3ce9a59308abb3dc7857a89afdf1f005887",
       "upstreamStatus": "added"
     },
     {

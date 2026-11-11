@@ -5,21 +5,30 @@ import MLXNN
 
 // MARK: - RoPE helpers
 
-private func rotateHalf(_ x: MLXArray) -> MLXArray {
-    let half = x.dim(-1) / 2
-    let x1 = x[.ellipsis, ..<half]
-    let x2 = x[.ellipsis, half...]
-    return concatenated([-x2, x1], axis: -1)
-}
+/// One step's rotary phase for the talker: `cos`, the sine with the sign of
+/// its first half flipped, and the index that swaps the two halves of the
+/// last axis.
+///
+/// The reference rotation is `x * cos + rotateHalf(x) * sin` with
+/// `rotateHalf(x) = [-x2, x1]`. Folding the sign into the sine gives
+/// `x * cos + [x2, x1] * [-sin1, sin2]`, the same products with the same
+/// rounding (`(-a) * b` and `a * (-b)` are the same IEEE value), in one
+/// gather where the reference form needs a negation and a two-part
+/// concatenation: two kernel launches fewer for each of the query and the key
+/// in every layer (RF-46).
+struct TalkerRotaryPhase {
+    let cos: MLXArray
+    let signedSin: MLXArray
+    let halfSwap: MLXArray
 
-private func applyRotaryPosEmb(
-    _ q: MLXArray, _ k: MLXArray, cos cosVal: MLXArray, sin sinVal: MLXArray
-) -> (MLXArray, MLXArray) {
-    let cosE = expandedDimensions(cosVal, axis: 1)
-    let sinE = expandedDimensions(sinVal, axis: 1)
-    let qEmbed = q * cosE + rotateHalf(q) * sinE
-    let kEmbed = k * cosE + rotateHalf(k) * sinE
-    return (qEmbed, kEmbed)
+    /// Rotates `q` and `k` (`[batch, heads, length, headDim]`).
+    func rotate(_ q: MLXArray, _ k: MLXArray) -> (MLXArray, MLXArray) {
+        let cosE = expandedDimensions(cos, axis: 1)
+        let sinE = expandedDimensions(signedSin, axis: 1)
+        let qEmbed = q * cosE + take(q, halfSwap, axis: -1) * sinE
+        let kEmbed = k * cosE + take(k, halfSwap, axis: -1) * sinE
+        return (qEmbed, kEmbed)
+    }
 }
 
 // MARK: - Compute inv_freq for RoPE
@@ -44,6 +53,11 @@ final class TalkerRotaryEmbedding: Module {
     let base: Float
     let mropeSection: [Int]
     let _invFreq: MLXArray
+    /// Host-side constants of `TalkerRotaryPhase`, kept as Swift arrays so the
+    /// module's parameters stay exactly the checkpoint's: the half-swap index
+    /// and the sign row (-1 over the first half, +1 over the second).
+    private let halfSwapIndices: [Int32]
+    private let sineSigns: [Float]
 
     init(dim: Int, maxPositionEmbeddings: Int = 32768, base: Float = 10000.0, mropeSection: [Int]? = nil) {
         self.dim = dim
@@ -51,6 +65,9 @@ final class TalkerRotaryEmbedding: Module {
         self.base = base
         self.mropeSection = mropeSection ?? [24, 20, 20]
         self._invFreq = computeInvFreq(dim: dim, base: base)
+        let half = dim / 2
+        self.halfSwapIndices = (0 ..< dim).map { Int32($0 < half ? $0 + half : $0 - half) }
+        self.sineSigns = (0 ..< dim).map { $0 < half ? -1 : 1 }
     }
 
     func applyInterleavedMrope(_ freqs: MLXArray, mropeSection sec: [Int]) -> MLXArray {
@@ -79,7 +96,7 @@ final class TalkerRotaryEmbedding: Module {
         return combined
     }
 
-    func callAsFunction(_ x: MLXArray, positionIds: MLXArray) -> (MLXArray, MLXArray) {
+    func callAsFunction(_ x: MLXArray, positionIds: MLXArray) -> TalkerRotaryPhase {
         var posIds = positionIds
         if posIds.ndim == 2 {
             posIds = broadcast(expandedDimensions(posIds, axis: 0), to: [3, posIds.dim(0), posIds.dim(1)])
@@ -97,8 +114,15 @@ final class TalkerRotaryEmbedding: Module {
         let combined = applyInterleavedMrope(freqs, mropeSection: mropeSection)
         let emb = concatenated([combined, combined], axis: -1)
         let cosVal = MLX.cos(emb).asType(x.dtype)
-        let sinVal = MLX.sin(emb).asType(x.dtype)
-        return (cosVal, sinVal)
+        // The sign is applied in float32, before the cast: negation is exact
+        // and rounding is symmetric, so this is the cast sine with its first
+        // half negated.
+        let signedSin = (MLX.sin(emb) * MLXArray(sineSigns)).asType(x.dtype)
+        return TalkerRotaryPhase(
+            cos: cosVal,
+            signedSin: signedSin,
+            halfSwap: MLXArray(halfSwapIndices)
+        )
     }
 }
 
@@ -136,6 +160,15 @@ final class TalkerAttention: Module {
     @ModuleInfo(key: "o_proj") var oProj: Linear
     @ModuleInfo(key: "q_norm") var qNorm: RMSNorm
     @ModuleInfo(key: "k_norm") var kNorm: RMSNorm
+    /// The query, key and value projections as one product for a one-row
+    /// step (RF-46); nil until `fuseProjections()` runs on a quantized
+    /// checkpoint.
+    private(set) var fusedQKV: FusedQuantizedProjection?
+
+    /// Call once the parameters are loaded and evaluated.
+    func fuseProjections() {
+        fusedQKV = FusedQuantizedProjection.fuse([qProj, kProj, vProj])
+    }
 
     init(config: Qwen3TTSTalkerConfig, layerIdx: Int) {
         self.numHeads = config.numAttentionHeads
@@ -153,15 +186,21 @@ final class TalkerAttention: Module {
 
     func callAsFunction(
         _ x: MLXArray,
-        positionEmbeddings: (MLXArray, MLXArray),
+        positionEmbeddings: TalkerRotaryPhase,
         mask: MLXArray? = nil,
         cache: (any KVCache)? = nil
     ) -> MLXArray {
         let (batch, seqLen, _) = (x.dim(0), x.dim(1), x.dim(2))
 
-        var q = qProj(x).reshaped(batch, seqLen, numHeads, headDim)
-        var k = kProj(x).reshaped(batch, seqLen, numKvHeads, headDim)
-        var v = vProj(x).reshaped(batch, seqLen, numKvHeads, headDim)
+        let projected: [MLXArray]
+        if let fusedQKV, fusedQKV.projects(x) {
+            projected = fusedQKV(x)
+        } else {
+            projected = [qProj(x), kProj(x), vProj(x)]
+        }
+        var q = projected[0].reshaped(batch, seqLen, numHeads, headDim)
+        var k = projected[1].reshaped(batch, seqLen, numKvHeads, headDim)
+        var v = projected[2].reshaped(batch, seqLen, numKvHeads, headDim)
 
         q = qNorm(q)
         k = kNorm(k)
@@ -170,8 +209,7 @@ final class TalkerAttention: Module {
         k = k.transposed(0, 2, 1, 3)
         v = v.transposed(0, 2, 1, 3)
 
-        let (cosVal, sinVal) = positionEmbeddings
-        (q, k) = applyRotaryPosEmb(q, k, cos: cosVal, sin: sinVal)
+        (q, k) = positionEmbeddings.rotate(q, k)
 
         // attentionWithCacheUpdate is behavior-identical for plain caches
         // (cache.update + the same fused SDPA) and additionally dispatches
@@ -199,8 +237,21 @@ final class TalkerMLP: Module {
         _downProj.wrappedValue = Linear(config.intermediateSize, config.hiddenSize, bias: false)
     }
 
+    /// The gate and up projections as one product for a one-row step
+    /// (RF-46); nil until `fuseProjections()` runs on a quantized checkpoint.
+    private(set) var fusedGateUp: FusedQuantizedProjection?
+
+    /// Call once the parameters are loaded and evaluated.
+    func fuseProjections() {
+        fusedGateUp = FusedQuantizedProjection.fuse([gateProj, upProj])
+    }
+
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        downProj(compiledTalkerSwiGLU(gateProj(x), upProj(x)))
+        if let fusedGateUp, fusedGateUp.projects(x) {
+            let projected = fusedGateUp(x)
+            return downProj(compiledTalkerSwiGLU(projected[0], projected[1]))
+        }
+        return downProj(compiledTalkerSwiGLU(gateProj(x), upProj(x)))
     }
 }
 
@@ -237,7 +288,7 @@ final class TalkerDecoderLayer: Module {
 
     func callAsFunction(
         _ x: MLXArray,
-        positionEmbeddings: (MLXArray, MLXArray),
+        positionEmbeddings: TalkerRotaryPhase,
         mask: MLXArray? = nil,
         cache: (any KVCache)? = nil
     ) -> MLXArray {
@@ -394,6 +445,17 @@ final class Qwen3TTSTalkerForConditionalGeneration: Module {
 
     func makeCache(kvQuantBits: Int? = nil) -> [any KVCache] {
         model.makeCache(kvQuantBits: kvQuantBits)
+    }
+
+    /// Fuses the projections that share an input, in the talker and in the
+    /// code predictor (RF-46). Call once the parameters are loaded and
+    /// evaluated; a float checkpoint is left as it is.
+    func fuseProjections() {
+        for layer in model.layers {
+            layer.selfAttn.fuseProjections()
+            layer.mlp.fuseProjections()
+        }
+        codePredictor.fuseProjections()
     }
 
     func makeRotatingCache(keep: Int, window: Int) -> [any KVCache] {

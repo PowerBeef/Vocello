@@ -79,6 +79,21 @@ task-local state and never advance the process-global RNG.
   each step. The prewarm draws once through the production sampler on a private random state, so its
   kernels are compiled before the first take without changing any output.
 
+- **Kernel launches per frame.** Two rewrites remove about 400 of a frame's kernel launches without
+  changing a sample (RF-46; fixed-seed PCM identity on the custom, design and clone matrix):
+  - The talker's rotary step folds the sign of `rotateHalf` into the sine and gathers the swapped
+    halves, the same products with the same rounding in two launches fewer per tensor per layer
+    (DECODE-003).
+  - Projections that share an input (query, key and value; gate and up) run as one quantized
+    product on one-row steps, in the talker and in the compiled code-predictor plan (DECODE-004).
+    The fused arrays are the layers' own rows, so the weights exist once. A prefill keeps the
+    separate products: with more than one input row MLX picks its kernel from the row count and the
+    output width together, and a fused prefill rounds differently.
+
+  They pay where the host bounds a frame: 4.0% on the M6 with the process clamped to the efficiency
+  cores, and nothing measurable unclamped, where the GPU bounds it (the host waits on the GPU for
+  over half of a take there). No iPhone measurement exists yet.
+
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Seeded takes reproduce within one source identity
 only: the float32 change, the 2026-10-20 subtalker and EOS changes and MLX 0.32.3's sampler each

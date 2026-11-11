@@ -172,13 +172,18 @@
       "sourcePatterns": [
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSFusedProjection.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
         "Sources/MLXAudioTTS/RuntimeDebugGate.swift"
       ],
       "testPatterns": [
         "Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift",
         "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift",
-        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
+        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3FusedProjectionTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerRotaryPhaseTests.swift"
       ],
       "documentation": [
         "PERFORMANCE.md"
@@ -198,7 +203,9 @@
         "CONC-001",
         "STREAM-001",
         "DECODE-001",
-        "DECODE-002"
+        "DECODE-002",
+        "DECODE-003",
+        "DECODE-004"
       ]
     },
     {

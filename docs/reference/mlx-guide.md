@@ -200,6 +200,9 @@ not used.
 3. Load `model.safetensors` into `MLXArray` dictionaries and sanitize the keys.
 4. Quantize the module tree (§3.2), then `update(parameters:verify:)`.
 5. Evaluate the weights in batches (§3.2).
+6. Once the loader has released its own references to the weights, fuse the projections that share
+   an input (`fuseProjections()`, §4.1). Fusing earlier would hold every fused layer twice until
+   that release.
 
 ### 3.5 The quantized-load leak
 
@@ -230,12 +233,17 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
 
 - **RoPE is plain 1-D split-half.** `TalkerRotaryEmbedding` computes frequencies for three position
   streams and interleaves them with `mrope_section` `[24, 20, 20]`
-  (`Qwen3TTSTalker.swift:40-101`), then applies `rotate_half` (`:8-23`). Production passes no
-  explicit positions, so the talker stacks three identical streams from the cache offset (`:305-313`),
-  as upstream does (`cumsum(mask) - 1`). M-RoPE's separate positions therefore never occur: the
-  result is plain 1-D RoPE (A-19).
+  (`Qwen3TTSTalker.swift:50-127`), then rotates through `TalkerRotaryPhase` (`:19-32`).
+  Production passes no explicit positions, so the talker stacks three identical streams from the
+  cache offset (`:357-364`), as upstream does (`cumsum(mask) - 1`). M-RoPE's separate positions
+  therefore never occur: the result is plain 1-D RoPE (A-19).
+- **The rotation is `rotate_half` with its sign folded into the sine** (RF-46). The reference form
+  is `x * cos + [-x2, x1] * sin`; the talker computes `x * cos + [x2, x1] * [-sin1, sin2]`, the same
+  products with the same rounding, in one gather where the reference needs a negation and a two-part
+  concatenation (two kernel launches fewer for each of q and k in every layer).
+  `Qwen3TalkerRotaryPhaseTests` pins bit equality in float32, float16 and bfloat16.
 - **Scalar gather.** The interleave reads `freqs[0]`, `freqs[1]` and `freqs[2]`
-  (`Qwen3TTSTalker.swift:57-59`), and RVQ decode reads `codes[idx]`
+  (`Qwen3TTSTalker.swift:75-77`), and RVQ decode reads `codes[idx]`
   (`Qwen3TTSSpeechTokenizer.swift:48`). That scalar-integer gather passes empty index metadata to
   Metal when Metal API validation is on. mlx-audio-swift v0.1.5 (`dbe5eaa`) replaced it with range
   slices; Vocello has not ported that (ER-08, ER-12). No shared Xcode scheme enables API validation,
@@ -243,8 +251,13 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
 - **Attention.** Per-head RMSNorm on q and k precedes RoPE. Attention goes through
   `MLXLMCommon.attentionWithCacheUpdate`: fused scaled-dot-product attention, or the quantized form
   when the cache is a `QuantizedKVCache`. The SwiGLU is `compile(shapeless: true)`
-  (`Qwen3TTSTalker.swift:33-37`).
-- **KV cache.** One unbounded `KVCacheSimple` per layer (`Qwen3TTSTalker.swift:333-339`) in the
+  (`Qwen3TTSTalker.swift:42-46`).
+- **Fused projections on one-row steps** (RF-46). q, k and v share an input, and so do the SwiGLU's
+  gate and up: on a one-row step each group runs as one quantized product over the layers' rows laid
+  end to end (`FusedQuantizedProjection`), in the talker and in the code predictor's eager and
+  compiled paths. The layers are re-pointed at their rows of the fused arrays, so the weights exist
+  once. A prefill keeps the separate products (§9.1, couplings).
+- **KV cache.** One unbounded `KVCacheSimple` per layer (`Qwen3TTSTalker.swift:384-391`) in the
   compute dtype: **bf16**, not fp16. The alternatives are diagnostic knobs only (§7.5).
 
 ### 4.2 The code predictor and its compiled plan
@@ -562,6 +575,18 @@ Couplings:
   (`Qwen3TTSVoiceClonePrompt.mlxNumericsVersion`, `Qwen3TTS.swift:798`, F-06), and
   `scripts/qwen3_core_contract.py` fails when it differs from the pin. An mlx-swift move therefore
   rebuilds every saved voice's prompt once.
+
+- The fused projections (RF-46, §4.1) rest on three properties of the pinned MLX. Review them in
+  every mlx move; the fixed-seed PCM digests (`scripts/pcm_identity.py`) and
+  `Qwen3FusedProjectionTests` fail if one stops holding:
+  - For one input row, the quantized product runs a kernel chosen from the input width and from
+    whether the output width is a multiple of eight (`qmv` in `backend/metal/quantized.cpp`), and
+    computes each output row from that row's weights alone. A fused product therefore gives the
+    separate products' bits.
+  - For more rows the kernel depends on the row count and the output width together
+    (`get_qmv_batch_limit`), which is why a prefill is never fused.
+  - A row slice of an evaluated array shares its buffer (`shared_buffer_slice`), which is what keeps
+    one copy of the weights.
 
 mlx-swift 0.31 and later ship a `CudaBuild` build-tool plugin that cannot be fingerprint-approved
 headlessly; `xcb_run` (`scripts/lib/build_cache.sh`) passes `-skipPackagePluginValidation`

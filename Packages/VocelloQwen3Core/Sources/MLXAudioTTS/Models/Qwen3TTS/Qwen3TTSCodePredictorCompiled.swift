@@ -142,11 +142,12 @@ final class CodePredictorCompiledPlan {
             let attnInput = layer.inputLayernorm(x)
             let attention = layer.selfAttn
             let (batch, _, _) = (attnInput.dim(0), attnInput.dim(1), attnInput.dim(2))
-            var q = attention.qProj(attnInput)
+            let projected = attention.projectQKV(attnInput)
+            var q = projected.q
                 .reshaped(batch, seqLen, attention.numHeads, attention.headDim)
-            var k = attention.kProj(attnInput)
+            var k = projected.k
                 .reshaped(batch, seqLen, attention.numKvHeads, attention.headDim)
-            var v = attention.vProj(attnInput)
+            var v = projected.v
                 .reshaped(batch, seqLen, attention.numKvHeads, attention.headDim)
             q = attention.qNorm(q)
             k = attention.kNorm(k)
@@ -184,7 +185,8 @@ final class CodePredictorCompiledPlan {
             // function is avoided here, and the fused trace subsumes it.
             let mlpInput = layer.postAttentionLayernorm(x)
             let mlp = layer.mlp
-            x = x + mlp.downProj(silu(mlp.gateProj(mlpInput)) * mlp.upProj(mlpInput))
+            let gateUp = mlp.projectGateUp(mlpInput)
+            x = x + mlp.downProj(silu(gateUp.gate) * gateUp.up)
         }
         x = predictor.model.norm(x)
         let logits = predictor.lmHead[pass](x)

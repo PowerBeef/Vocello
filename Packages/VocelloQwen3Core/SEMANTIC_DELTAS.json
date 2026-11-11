@@ -438,6 +438,55 @@
       "removalCriteria": "Remove only after upstream quality-first decode, in-context reference cut and codec replay derive their sample window from explicit reference and generated frame counts instead of counting non-zero first-group codes."
     },
     {
+      "id": "DECODE-003",
+      "title": "Talker rotary step in a sign-folded gather form (two kernel launches fewer per tensor per layer)",
+      "category": "decoding",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerRotaryPhaseTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "diagnostic",
+      "benchmarkEvidenceReason": "Local fixed-seed A/B on the M6 against the optimized CLI of 3cf36192 (scripts/pcm_identity.py, seed 19790615; no published record): all 14 takes of the custom, design and clone matrix are PCM-identical on the Speed (4-bit) models, and all 14 on the Quality (8-bit) models. With the bench clamped to the efficiency cores, where the host bounds a frame, the rotary step alone is 1.8% faster and both launch reductions together 4.0% (three paired rounds: -3.8%, -4.5%, -3.0%; baseline round spread 0.1%). Unclamped, where the GPU bounds a frame, they are neutral (-0.4%, spread 0.3%) with 1.6% less host CPU. No iPhone measurement exists yet.",
+      "upstreamDisposition": "upstreamable",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove only if the talker's rotation moves to one fused kernel whose output is proven equal, or the talker stops applying rotary embeddings per layer."
+    },
+    {
+      "id": "DECODE-004",
+      "title": "One fused quantized product for the projections that share an input, on one-row steps",
+      "category": "decoding",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSFusedProjection.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3FusedProjectionTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "diagnostic",
+      "benchmarkEvidenceReason": "Local fixed-seed A/B on the M6 against the optimized CLI of 3cf36192 (scripts/pcm_identity.py, seed 19790615; no published record): all 14 takes of the custom, design and clone matrix are PCM-identical on the Speed (4-bit) models, and all 14 on the Quality (8-bit) models. With the bench clamped to the efficiency cores, where the host bounds a frame, the rotary step alone is 1.8% faster and both launch reductions together 4.0% (three paired rounds: -3.8%, -4.5%, -3.0%; baseline round spread 0.1%). Unclamped, where the GPU bounds a frame, they are neutral (-0.4%, spread 0.3%) with 1.6% less host CPU. No iPhone measurement exists yet.",
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove if MLX's one-row quantized kernel stops computing each output row independently of the output width (the fixed-seed PCM digests would then differ), or if the pinned MLX gains a fused multi-projection product."
+    },
+    {
       "id": "MARK-001",
       "title": "AudioSeal watermark generator port (EU AI Act Article 50 marking)",
       "category": "architecture",

@@ -5888,6 +5888,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             Memory.clearCache()
         }
 
+        // RF-46: one product for the projections that share an input. It runs
+        // here, once every branch above has released `talkerSourceWeights`:
+        // that dictionary holds the layers' original arrays, and while it
+        // lives re-pointing a layer at its rows of the fused arrays frees
+        // nothing. From here the layers hold the only reference, so each
+        // layer's originals are released as it is fused and the transient is
+        // one layer's projections.
+        let talkerFuseStartedAt = ContinuousClock.now
+        talker.fuseProjections()
+        Memory.clearCache()
+        talkerTimingsMS["talker_projection_fuse"] = talkerFuseStartedAt.elapsedMilliseconds
+
         return LoadedTalkerComponents(
             talker: talker,
             speakerEncoder: speakerEncoder,

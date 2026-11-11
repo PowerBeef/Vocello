@@ -40,6 +40,27 @@ final class CodePredictorAttention: Module {
         _kNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
     }
 
+    /// The query, key and value projections as one product for a one-row
+    /// pass (RF-46); nil until `fuseProjections()` runs on a quantized
+    /// checkpoint.
+    private(set) var fusedQKV: FusedQuantizedProjection?
+
+    /// Call once the parameters are loaded and evaluated.
+    func fuseProjections() {
+        fusedQKV = FusedQuantizedProjection.fuse([qProj, kProj, vProj])
+    }
+
+    /// The three projections of `x`, from the fused matrix when `x` is one
+    /// row. The eager path and the compiled plan both project through here;
+    /// a plan's input shapes are fixed, so its choice is baked in at trace.
+    func projectQKV(_ x: MLXArray) -> (q: MLXArray, k: MLXArray, v: MLXArray) {
+        if let fusedQKV, fusedQKV.projects(x) {
+            let projected = fusedQKV(x)
+            return (projected[0], projected[1], projected[2])
+        }
+        return (qProj(x), kProj(x), vProj(x))
+    }
+
     func callAsFunction(
         _ x: MLXArray,
         offset: Int,
@@ -48,9 +69,10 @@ final class CodePredictorAttention: Module {
     ) -> MLXArray {
         let (batch, seqLen, _) = (x.dim(0), x.dim(1), x.dim(2))
 
-        var q = qProj(x).reshaped(batch, seqLen, numHeads, headDim)
-        var k = kProj(x).reshaped(batch, seqLen, numKvHeads, headDim)
-        var v = vProj(x).reshaped(batch, seqLen, numKvHeads, headDim)
+        let projected = projectQKV(x)
+        var q = projected.q.reshaped(batch, seqLen, numHeads, headDim)
+        var k = projected.k.reshaped(batch, seqLen, numKvHeads, headDim)
+        var v = projected.v.reshaped(batch, seqLen, numKvHeads, headDim)
 
         q = qNorm(q)
         k = kNorm(k)
@@ -99,8 +121,28 @@ final class CodePredictorMLP: Module {
         _downProj.wrappedValue = Linear(config.intermediateSize, config.hiddenSize, bias: false)
     }
 
+    /// The gate and up projections as one product for a one-row pass
+    /// (RF-46); nil until `fuseProjections()` runs on a quantized checkpoint.
+    private(set) var fusedGateUp: FusedQuantizedProjection?
+
+    /// Call once the parameters are loaded and evaluated.
+    func fuseProjections() {
+        fusedGateUp = FusedQuantizedProjection.fuse([gateProj, upProj])
+    }
+
+    /// The gate and up projections of `x`, from the fused matrix when `x` is
+    /// one row. The eager path and the compiled plan both project through here.
+    func projectGateUp(_ x: MLXArray) -> (gate: MLXArray, up: MLXArray) {
+        if let fusedGateUp, fusedGateUp.projects(x) {
+            let projected = fusedGateUp(x)
+            return (projected[0], projected[1])
+        }
+        return (gateProj(x), upProj(x))
+    }
+
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-        downProj(compiledCodePredictorSwiGLU(gateProj(x), upProj(x)))
+        let projected = projectGateUp(x)
+        return downProj(compiledCodePredictorSwiGLU(projected.gate, projected.up))
     }
 }
 
@@ -230,6 +272,16 @@ final class Qwen3TTSCodePredictor: Module {
     @ModuleInfo(key: "lm_head") var lmHead: [Linear]
 
     var codecEmbedding: [Embedding] { model.codecEmbedding }
+
+    /// Fuses each layer's projections that share an input (RF-46). Call once
+    /// the parameters are loaded and evaluated, before the first compiled
+    /// plan is traced: a plan bakes in the projections it was traced with.
+    func fuseProjections() {
+        for layer in model.layers {
+            layer.selfAttn.fuseProjections()
+            layer.mlp.fuseProjections()
+        }
+    }
 
     init(config: Qwen3TTSTalkerCodePredictorConfig, talkerHiddenSize: Int) {
         self.config = config

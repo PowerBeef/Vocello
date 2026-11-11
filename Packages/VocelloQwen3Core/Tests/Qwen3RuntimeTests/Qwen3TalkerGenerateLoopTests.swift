@@ -135,7 +135,12 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
     /// Talker vocabulary = the 1 024 reserved special codec ids the loop
     /// suppresses, plus a 16-entry codebook. Special ids sit inside the reserved
     /// range; EOS is the one special token the sampler may emit.
-    private static func tinyModelConfig() throws -> Qwen3TTSModelConfig {
+    /// `hidden`, `intermediate` and `headDim` default to the tiny float
+    /// fixture. A quantized fixture needs every projection's input width to be
+    /// a multiple of the 64-weight quantization group.
+    private static func tinyModelConfig(
+        hidden: Int = 16, intermediate: Int = 32, headDim: Int = 8
+    ) throws -> Qwen3TTSModelConfig {
         let json = """
         {
           "model_type": "qwen3_tts",
@@ -149,19 +154,19 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
           "sample_rate": 24000,
           "talker_config": {
             "vocab_size": 1040,
-            "hidden_size": 16,
-            "intermediate_size": 32,
+            "hidden_size": \(hidden),
+            "intermediate_size": \(intermediate),
             "num_hidden_layers": 2,
             "num_attention_heads": 2,
             "num_key_value_heads": 1,
-            "head_dim": 8,
+            "head_dim": \(headDim),
             "hidden_act": "silu",
             "max_position_embeddings": 512,
             "rms_norm_eps": 1e-6,
             "rope_theta": 10000,
             "attention_bias": false,
             "num_code_groups": 3,
-            "text_hidden_size": 16,
+            "text_hidden_size": \(hidden),
             "text_vocab_size": 64,
             "codec_eos_token_id": 1030,
             "codec_think_id": 1031,
@@ -172,12 +177,12 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             "codec_bos_id": 1036,
             "code_predictor_config": {
               "vocab_size": 16,
-              "hidden_size": 16,
-              "intermediate_size": 32,
+              "hidden_size": \(hidden),
+              "intermediate_size": \(intermediate),
               "num_hidden_layers": 1,
               "num_attention_heads": 2,
               "num_key_value_heads": 1,
-              "head_dim": 8,
+              "head_dim": \(headDim),
               "hidden_act": "silu",
               "max_position_embeddings": 64,
               "rms_norm_eps": 1e-6,
@@ -859,6 +864,49 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         } catch AudioGenerationError.invalidInput(let message) {
             XCTAssertTrue(message.contains("8 chat tokens"), message)
         }
+    }
+
+    // MARK: - Fused projections (RF-46)
+
+    /// A 4-bit talker and code predictor driven through the production loops
+    /// before and after `fuseProjections()`: the same seed must give the same
+    /// codec frames and the same samples, through the quality-first decode and
+    /// through the streamed producer with its compiled code-predictor plan. A
+    /// wrong projection order, a stale holder or a fused path that rounds
+    /// differently changes the first sampled token.
+    func testFusingAQuantizedTalkersProjectionsLeavesSeededTakesUnchanged() async throws {
+        MLXRandom.seed(0x7A1C_E5)
+        let model = Qwen3TTSModel(
+            config: try Self.tinyModelConfig(hidden: 512, intermediate: 1_024, headDim: 256)
+        )
+        model.speechTokenizer = try Self.tinySpeechTokenizer()
+        model.tokenizer = TinyTextTokenizer()
+        quantize(model: model.talker, groupSize: 64, bits: 4)
+        eval(model)
+        let talker = model.talker
+        XCTAssertNil(talker.model.layers[0].selfAttn.fusedQKV)
+
+        let seed: UInt64 = 0x5EED_0F46
+        let before = try await generate(model, seed: seed)
+        let streamedBefore = try await streamed(model, seed: seed)
+        XCTAssertFalse(before.frames.isEmpty)
+        XCTAssertFalse(streamedBefore.isEmpty)
+
+        talker.fuseProjections()
+        for layer in talker.model.layers {
+            XCTAssertNotNil(layer.selfAttn.fusedQKV)
+            XCTAssertNotNil(layer.mlp.fusedGateUp)
+        }
+        for layer in talker.codePredictor.model.layers {
+            XCTAssertNotNil(layer.selfAttn.fusedQKV)
+            XCTAssertNotNil(layer.mlp.fusedGateUp)
+        }
+
+        let after = try await generate(model, seed: seed)
+        let streamedAfter = try await streamed(model, seed: seed)
+        XCTAssertEqual(after.frames, before.frames)
+        XCTAssertEqual(after.samples.map(\.bitPattern), before.samples.map(\.bitPattern))
+        XCTAssertEqual(streamedAfter, streamedBefore)
     }
 
     /// E4-02: a model whose config has no `talker_config` fails its first take

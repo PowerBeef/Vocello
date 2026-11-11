@@ -1375,6 +1375,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-03 | [`ios-xcui-benchmark-20261103-181710-c657e53a`](runs/ui-generation/ios-xcui-benchmark-20261103-181710-c657e53a.json) | canonical | canonical | passed | qualified | 29 | 0.53 | `a60dd2040b2b` | `aa7af8ff16b8` | baseline | rf17-ios8-ui-benchmark |
+| 2026-11-11 | [`ios-xcui-benchmark-20261111-172017-636b2dd5`](runs/ui-generation/ios-xcui-benchmark-20261111-172017-636b2dd5.json) | canonical | canonical | passed | qualified | 29 | 0.52 | `3f8fa1441b48` | `aa7af8ff16b8` | vs ios-xcui-benchmark-20261103-181710-c657e53a: RTF -0.8% (within noise), TTFC +1.0% (within noise), RAM -13.9% (lower), harness changed | overhaul-ui-benchmark-2 |
 
 ## ui-generation / ios / iphone-17-pro / config `b618272db7b3`
 

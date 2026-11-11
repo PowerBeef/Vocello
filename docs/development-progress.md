@@ -19,9 +19,9 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ### November 11: the overhaul measured on the iPhone 17 Pro (resume here)
 
-The maintainer opened a phone window on November 11. The headless measurements ran on the paired
-iPhone 17 Pro at `3119a745` and confirm the overhaul there. No XCUITest lane ran, and no iPhone 15
-Pro is paired. `main` is pushed up to `c6a80dcb`, whose required CI check is red because two Linux
+The maintainer opened a phone window on November 11. The headless measurements (at `3119a745`), the
+UI benchmark and the long-form journey (at `3f8fa144`) ran on the paired iPhone 17 Pro and confirm
+the overhaul there. No iPhone 15 Pro is paired. `main` is pushed up to `c6a80dcb`, whose required CI check is red because two Linux
 jobs could not reach the Ubuntu package mirror, twice (no test ran in them); later commits wait on
 local `main`.
 
@@ -46,20 +46,27 @@ local `main`.
   peak of the 23 short takes 381 MB lower. Under the iPhone 15 Pro profile (a 5,000 MB limit; GPU
   and heat are not simulated) the three modes peak at 2,132 to 2,767 MB with at least 2,233 MB of
   headroom. MLX's peak does not rise during marking (RF-48).
+- **Live preview (RF-48).** The UI benchmark passed (`ios-xcui-benchmark-20261111-172017-636b2dd5`).
+  Against its November 3 record the preview starts 0.5 to 0.8 seconds sooner after the first chunk
+  on medium and long takes (medium Custom 1.40 to 0.63 s) and 0.1 to 0.2 seconds sooner on short
+  ones, with no underrun in 29 takes. RTF is unchanged (0.53 to 0.52), and the exact footprint peaks
+  are 313 to 415 MB lower.
+- **Long-form.** The long-form journey passed (`ios-xcui-smoke-20261111-173732-88218ccb`), on the
+  build that carries assembly v3 and the heat pause. The phone stayed cool, so the pause never
+  engaged, and the project's file was not pulled for a detector reading.
 - **Tooling.** `scripts/ios_device.sh` forwards MLX's three environment keys to the phone
   (`3119a745`). The cache-clear and memory-profile switches act only in a build made with
   `--device-diagnostics`; the benchmark build ignores them.
 - **Not measured, and why:**
-  - the live preview, the long-form journey and every acceptance row: XCUITest could not start
-    ("Timed out while enabling automation mode", `ios-xcui-benchmark-20261111-170901-04e3d785`, no
-    test ran). The fix is on the phone: Settings, Developer, Enable UI Automation;
+  - the acceptance and promotion rows: they belong to a candidate, and none carries the overhaul
+    yet. (The UI benchmark's first attempt, `ios-xcui-benchmark-20261111-170901-04e3d785`, ran no
+    test: UI Automation was off on the phone until the maintainer turned it on.);
   - the heat pause: it needs serious heat, and the 17 Pro reached fair;
   - reloads with the two-minute window: no lane holds a process idle between takes;
   - core placement of the generation thread: Instruments lists the phone as offline without a cable;
   - anything on an iPhone 15 Pro.
-- **Next:** once UI Automation is on, the UI benchmark (its November 3 record is the live preview's
-  baseline) and the long-form journey; then a candidate that carries the overhaul, which needs
-  green CI on `main` and the maintainer's request, and RF-15's and RF-17's rows on it.
+- **Next:** a candidate that carries the overhaul, which needs green CI on `main` and the
+  maintainer's request, then RF-15's and RF-17's rows on it.
 
 ### November 11: the overhaul's Mac half is complete
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,43 +17,60 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 10 (later): the overhaul's Mac half is in (resume here)
+### November 11: the overhaul's Mac half is complete (resume here)
 
-At the maintainer's request the pause was lifted for builds and tests, and everything in the
-overhaul that needs no iPhone was implemented, measured on the M6 and committed on local `main`
-(not pushed). Each engine change was proven sample-identical by fixed-seed PCM digest.
+Everything in the core overhaul (RF-44 to RF-48) that needs no iPhone is implemented, measured on
+the M6 and committed on `main`. Commits up to `6ddfa629` are pushed with CI green; `fd019b81` to the
+commit carrying this entry wait on local `main` for a push request. Nothing is measured on an
+iPhone, and every engine change kept the samples: fixed-seed PCM digests are identical.
 
 - **The regression net (RF-44).** `scripts/pcm_identity.py` captures fixed-seed PCM digests and
   compares two builds, in alternation against a preserved baseline, on the Speed and Quality models
-  and on instruct-bearing takes. `--clamp background` keeps the bench on the efficiency cores,
-  where the host bounds a frame: the stand-in on a Mac for a device whose CPU is the bottleneck.
-- **What bounds a frame on the M6.** The host is blocked on the GPU for over half of a take (45% in
-  MLX's back-pressure wait, 9% in the token read), so the M6 is GPU-bound and no host-side change
-  can speed it up. Clamped to the efficiency cores the same take is 2.75 times slower and
-  host-bound. Which regime each iPhone is in is the first thing to measure in a device window.
+  and on instruct-bearing and long takes. `--clamp background` keeps the bench on the efficiency
+  cores, where the host bounds a frame: the stand-in on a Mac for a device whose CPU is the
+  bottleneck.
+- **What bounds a frame on the M6.** The host is blocked on the GPU for over half of a take, so the
+  M6 is GPU-bound and no host-side change speeds it up. A frame is 20.1 ms: 16.4 ms in the step
+  submit, 1.8 ms in the token read, under 1 ms of graph building. Clamped to the efficiency cores
+  the same take is host-bound. Which regime each iPhone is in is the first thing to measure in a
+  device window.
 - **Landed, with identical samples:**
-  - about 400 fewer kernel launches per frame (RF-46): 4.0% faster host-bound, neutral GPU-bound;
+  - the rotary step and fused projections, then the code predictor's frame as one compiled
+    function that samples inside it (RF-46): together about 13% faster host-bound (RTF 0.747 to
+    0.652 on the clamped M6) and under 1% GPU-bound. The compiled forms' identity is measured on
+    this Mac's GPU, not proven, so the digests must be recaptured on a phone;
   - the text embedding read by row from the checkpoint file (RF-47): 315 MB less resident memory
     and 315 MB off every take's peak;
-  - the watermark pass without its per-window cache clears (RF-48): finalization a fifth shorter.
-- **Landed, no sample involved:** the live preview starts from a measured pace instead of a fixed
-  3.25-second buffer (RF-48): on the M6 the first sound comes 0.44 s sooner, with no dropouts.
-- **Measured and not changed (RF-45):** MLX's default of 40 operations per command buffer is the
-  fastest on the M6, so no constant is set. The phone's default of 20 measured 8 to 10% slower in
-  the host-bound stand-in. The per-chunk cache clear changes no sample;
-  `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR` isolates it for a device A/B.
-- **Found not worth doing:** holding the watermark's weights between takes (the pass has no
-  measurable fixed cost) and, on the Mac's evidence, the one-frame lookahead (the GPU is already
-  fed continuously where the GPU is the bottleneck, and the host has no slack where it is).
-- **Not done:** compiled samplers and the one-function predictor frame (they change rounding, so
-  they can be screened but not proven identical); the memory bands and the foreground idle window;
-  marking as chunks arrive; the long-form heat pause and its localized copy; splitting the runtime's
-  largest file. The roadmap notes on RF-44 to RF-48 carry the detail.
+  - the watermark pass without its per-window cache clears (RF-48): finalization a fifth shorter;
+  - the runtime's 6,800-line file split into eight by moving lines unchanged (RF-46).
+- **Landed, no sample involved:**
+  - the live preview starts from the take's measured pace instead of a fixed 3.25-second buffer
+    (RF-48): on the M6 the first sound comes 0.44 s sooner, with no dropouts;
+  - the iPhone's two footprint bands are stated at a 6,144 MiB budget and scale to the budget the
+    process measures, and a loaded model stays two minutes in the foreground instead of 30 s,
+    shortened under memory pressure (RF-47);
+  - a long-form run waits between segments while the thermal state is serious or critical, for at
+    most three minutes, and says why in ten languages (RF-48). The Mac never pauses.
+- **Measured and not changed:**
+  - MLX's default of 40 operations per command buffer is the fastest on the M6, so no constant is
+    set (RF-45). The phone's default of 20 measured 8 to 10% slower in the host-bound stand-in.
+    `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR` isolates the per-chunk cache clear for a device A/B;
+  - `MLX_ENABLE_TF32=0` changes every take's samples and shows no speed difference (RF-44);
+  - Quality is 46 to 57% slower than Speed on the M6 (custom medium RTF 0.405 against 0.277).
+- **Judged and left out,** each with its reason in the roadmap notes: holding the watermark's
+  weights between takes; the lagged token read (no regime on the Mac where it pays; decide once the
+  phones' regime is measured); a compiled talker sampler; marking as chunks arrive (it would break
+  the rule that marking must not raise a take's peak); judging the Metal working set against the
+  measured budget (an unmeasured cancel trigger).
+- **Open on the Mac:** the measurements as published benchmark records (publication needs a
+  request) and the watermark detection check (no detector is installed here; it needs a download).
 - **For the next announced iPhone window,** in this order: the take's regime on each phone (CPU
-  share and QoS class of the generation thread); `MLX_MAX_OPS_PER_BUFFER=40` against the default;
-  the cache-clear switch off; the resident and peak memory after RF-47; the preview's start and any
-  underrun on the iPhone 15 Pro; the footprint during marking. The submission candidate is the
-  build that carries these commits, once the phone confirms them.
+  share and QoS class of the generation thread); sample identity of the compiled frame function on
+  the phone's GPU; `MLX_MAX_OPS_PER_BUFFER=40` against the default; the cache-clear switch off;
+  resident and peak memory and the bands on an 8 GB phone; reloads and memory with the two-minute
+  window; the preview's start and any underrun on the iPhone 15 Pro; the footprint during marking;
+  the heat pause on a hot phone. The submission candidate is the build that carries these commits,
+  once the phone confirms them. The App Review notes say nothing about the heat pause yet.
 
 ### November 10: no target dates, and the core overhaul comes before the submission
 

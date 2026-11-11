@@ -243,9 +243,12 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
 
         static let environmentKey = "QWENVOICE_REFERENCE_PREPARATION"
 
-        /// What every build does without the diagnostic key: `assetReader`
-        /// until the clone screen has compared the two paths (RF-52).
-        static let production: Resampling = .assetReader
+        /// What every build does without the diagnostic key. `singleCall`
+        /// since 2026-11-11: the clone screen's rule
+        /// `reference-preparation-v2` adopted it (RF-52). Changing it changes
+        /// every prepared reference that is not already 24 kHz mono 16-bit
+        /// WAV, and rebuilds every saved voice's prompt once.
+        static let production: Resampling = .singleCall
 
         /// The path this process uses. Read once: the preparation version is
         /// part of every reference's identity, so it cannot change mid-run.
@@ -254,9 +257,10 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
         )
 
-        /// `QWENVOICE_REFERENCE_PREPARATION=single-call` or `asset-reader`,
-        /// honoured only in an internal-diagnostics build with the master
-        /// gate on. Any other value is the production path: a screen arm
+        /// `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the earlier
+        /// path (or `single-call` names this one), honoured only in an
+        /// internal-diagnostics build with the master gate on. Any other
+        /// value is the production path: a screen arm
         /// proves which path it ran from each take's prepared-reference
         /// digest, not from the key having been set.
         static func resolved(

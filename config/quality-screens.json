@@ -64,7 +64,56 @@
             }
           },
           "margins": "About 1.4 times the widest bound the noise floor reached (0.035 similarity, 0.027 error rate, 25 ms, 3 failures). At 192 takes the screen separates a gross regression from no change and nothing finer: a change that passes is shown not to be grossly worse, not shown to be better.",
-          "decision": "ADOPT when B is reproducible and no guard's interval reaches past its margin on the harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+          "decision": "ADOPT when B is reproducible and no guard's interval reaches past its margin on the harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
+          "result": {
+            "decided": "2026-11-11",
+            "verdict": "ADOPT",
+            "commit": "e57ddd57",
+            "arms": {
+              "a": "a3",
+              "b": "b1",
+              "bTwice": "b1, b2"
+            },
+            "bReproducible": "190 of 190 takes identical; the default path twice (a1, a3) agreed on 167 of 191",
+            "outcomes": {
+              "a": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              },
+              "b": {
+                "generated": 190,
+                "refused": 1,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 2
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0088,
+              "interval95": [
+                -0.0251,
+                0.0056
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0032,
+              "interval95": [
+                -0.0022,
+                0.0083
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 21.8,
+              "interval95": [
+                6.4,
+                39.8
+              ]
+            },
+            "note": "Takes from references already at 24 kHz are identical in both arms (64 of 64). Trailing silence rose by 22 ms on average, the one guard whose interval excludes zero; its harmful end is 0.2 ms inside the margin."
+          }
         }
       },
       "noiseFloor": {

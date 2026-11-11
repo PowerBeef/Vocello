@@ -10,6 +10,25 @@ clearing, pins) are [`docs/reference/mlx-guide.md`](../../docs/reference/mlx-gui
 and its parity with the reference are
 [`docs/reference/qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md)'s.
 
+## Where the runtime lives
+
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift` held the whole model runtime in one 6,800-line
+file. It is split by concern (RF-46, ARCH-001), by moving lines unchanged:
+
+| File | Holds |
+|---|---|
+| `Qwen3TTS.swift` | The model class: its state, the generation entry points, the generate loop, the chunk decode, the generation gate |
+| `Qwen3TTSLoading.swift` | Loading a prepared directory: weights, talker, speech tokenizer, text tokenizer |
+| `Qwen3TTSPromptAssembly.swift` | The generation inputs of the three modes and the chat-template text rules |
+| `Qwen3TTSSampling.swift` | The sampler scratch and `sampleToken` |
+| `Qwen3TTSCaches.swift` | Tokenizer, prepared-component, conditioning-prefix and decoder-bucket caches |
+| `Qwen3TTSGenerationProfiles.swift` | Prewarm depth, token budget, speed profile, streaming mode, step evaluation |
+| `Qwen3TTSVoiceClonePrompt.swift` | Reference audio and the clone prompt artifact |
+| `Qwen3TTSDiagnostics.swift` | Diagnostic records and throughput arithmetic |
+
+The talker, the code predictor and its compiled plan, the speech tokenizer, the fused projections
+and the text-embedding row reader already had their own files.
+
 ## Loading and prepared state
 
 Model resolution includes the repository revision in cache identity. Prepared loading validates the
@@ -30,7 +49,7 @@ the table in a layout the reader does not know, loads it as a parameter as befor
 
 The speech tokenizer stays resident across generations on macOS and, gated by device class
 (physical memory of 7 GB or more), on iOS (`speechTokenizerResidencySupported`,
-`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift:485-508`; status in
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift:59-82`; status in
 `config/runtime-refactor-contract.json` `phaseStatus.runtimeComponentReuse`;
 `QWENVOICE_TOKENIZER_RESIDENCY` is the registered diagnostic override). **The iOS gate was qualified
 on the withdrawn f16 codec** (A-19): the gate was adopted because artifact version 2026.08.01.1's

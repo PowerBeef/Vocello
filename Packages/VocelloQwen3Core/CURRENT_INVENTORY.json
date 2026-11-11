@@ -73,8 +73,13 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "bded8ac2c93ea2d836dcbf55be699b6a46a11c77989c654a4c3cb560f25e8c64",
+      "sha256": "d0711afaa709be557a8da5819cca173419a419e1d2f7e7c75deeed4a95f834b2",
       "upstreamStatus": "modified"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
+      "sha256": "78002dde2908029f8ad1b2bf46080218e5402f5e2f5bfe6025a7e736af71cc0e",
+      "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
@@ -92,8 +97,33 @@
       "upstreamStatus": "modified"
     },
     {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSDiagnostics.swift",
+      "sha256": "53c4d3ffe3859effd2a16498a299a19a6b5be55f7b00ff8397ad363c2e64f923",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSFusedProjection.swift",
       "sha256": "037bad48a10899fe540a9f497fd1fccf954d5a8f3c6380db011efc902865e406",
+      "upstreamStatus": "added"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSGenerationProfiles.swift",
+      "sha256": "569949f06b7155ceb8ea22b183cacce326afa2f47648189d1a59512221ee6b26",
+      "upstreamStatus": "added"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+      "sha256": "8c3bc286052b7b6a33e779078a4a2813a6758926c4ab34d9531807fd34c1b35d",
+      "upstreamStatus": "added"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
+      "sha256": "d27cf5d28ac16d7c82d56dbd9c269926035b0f6989bb36ab2e97c4fd9e898c31",
+      "upstreamStatus": "added"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
+      "sha256": "145d4b6ecd4836764d98bc059bb372e7ce4e241d3ad1cda8d8ed006888caedcd",
       "upstreamStatus": "added"
     },
     {
@@ -115,6 +145,11 @@
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
       "sha256": "546d7614b6b54cf127a68cd265a04a549094defa1d29184334f7044cf51be485",
       "upstreamStatus": "modified"
+    },
+    {
+      "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
+      "sha256": "a5fb7bbc0ad6a5bc88f92401fd24a2c4abd9c5d35c45fa632ecda47fce20329e",
+      "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TextEmbeddingRows.swift",
@@ -307,11 +342,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 41,
+    "added": 48,
     "identical": 6,
     "modified": 12,
     "removed": 0,
-    "retained": 59
+    "retained": 66
   },
   "upstreamBaselineSHA256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
 }

@@ -29,7 +29,7 @@ OWNERSHIP_NAME = "OWNERSHIP.json"
 BASELINE_SCOPE = (".gitignore", "Package.swift", "Sources/**", "Tests/**", "Examples/**")
 IMPLEMENTATION_SCOPE = ("Package.swift", "Sources/**")
 RUNTIME_IMPACT_SCOPE = ("Package.swift", "Package.resolved", "Sources/**")
-CLONE_NUMERICS_SOURCE = "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+CLONE_NUMERICS_SOURCE = "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
 CLONE_NUMERICS_PATTERN = re.compile(r'static let mlxNumericsVersion = "([^"]*)"')
 LEGACY_RUNTIME_RELATIVE = Path("third_party_patches/mlx-audio-swift")
 ALLOWED_UPSTREAM_STATUSES = {"identical", "modified", "added"}

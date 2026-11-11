@@ -54,16 +54,55 @@
       "id": "qwen3-model-caches",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
       "types": [
+        "Qwen3TTSModel"
+      ],
+      "owner": "Qwen3 model generation gate and cache locks",
+      "invariant": "Mutable MLX values, and the checkpoint file cursor of the text-embedding row reader a loaded talker holds, are accessed only by the single generation owner or their documented lock-protected cache.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each unchecked model/cache box when MLX arrays gain checked sendability or the corresponding value no longer crosses the single-owner generation boundary.",
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+      ]
+    },
+    {
+      "id": "qwen3-component-caches",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
+      "types": [
         "CachedTokenizerBox",
-        "LoadedTalkerComponents",
         "CachedSpeechTokenizerBox",
-        "LoadedSpeechTokenizerComponent",
-        "Qwen3TTSVoiceClonePrompt",
         "CachedConditioningPrefix",
         "CachedConditioningPrefixBox",
         "Qwen3TTSConditioningPrefixCache",
-        "Qwen3TTSStreamingDecoderBucketCache",
-        "Qwen3TTSModel"
+        "Qwen3TTSStreamingDecoderBucketCache"
+      ],
+      "owner": "Qwen3 model generation gate and cache locks",
+      "invariant": "Mutable MLX values, and the checkpoint file cursor of the text-embedding row reader a loaded talker holds, are accessed only by the single generation owner or their documented lock-protected cache.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each unchecked model/cache box when MLX arrays gain checked sendability or the corresponding value no longer crosses the single-owner generation boundary.",
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+      ]
+    },
+    {
+      "id": "qwen3-loaded-components",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+      "types": [
+        "LoadedTalkerComponents",
+        "LoadedSpeechTokenizerComponent"
+      ],
+      "owner": "Qwen3 model generation gate and cache locks",
+      "invariant": "Mutable MLX values, and the checkpoint file cursor of the text-embedding row reader a loaded talker holds, are accessed only by the single generation owner or their documented lock-protected cache.",
+      "reviewedAt": "2026-08-26",
+      "removalCondition": "Remove each unchecked model/cache box when MLX arrays gain checked sendability or the corresponding value no longer crosses the single-owner generation boundary.",
+      "tests": [
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+      ]
+    },
+    {
+      "id": "qwen3-clone-prompt",
+      "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
+      "types": [
+        "Qwen3TTSVoiceClonePrompt"
       ],
       "owner": "Qwen3 model generation gate and cache locks",
       "invariant": "Mutable MLX values, and the checkpoint file cursor of the text-embedding row reader a loaded talker holds, are accessed only by the single generation owner or their documented lock-protected cache.",

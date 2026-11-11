@@ -86,8 +86,10 @@
       "state": "active",
       "files": [
         "Sources/MLXAudioCore/ModelUtils.swift",
-        "Sources/MLXAudioTTS/TTSModel.swift",
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/TTSModel.swift"
       ],
       "tests": [
         "Tests/Qwen3RuntimeTests/**"
@@ -112,6 +114,8 @@
       "state": "active",
       "files": [
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TextEmbeddingRows.swift"
       ],
@@ -138,6 +142,7 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift"
       ],
       "tests": [
@@ -164,6 +169,7 @@
       "files": [
         "Sources/MLXAudioTTS/Generation.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
         "Sources/VocelloQwen3Core/Contracts.swift",
         "Sources/VocelloQwen3Core/LoadedModel.swift",
         "Tests/Qwen3RuntimeTests/Qwen3RequestSamplingTests.swift",
@@ -199,6 +205,7 @@
       "files": [
         "Sources/MLXAudioTTS/Generation.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
         "Sources/VocelloQwen3Core/Contracts.swift",
         "Sources/VocelloQwen3Core/LoadedModel.swift"
       ],
@@ -223,9 +230,10 @@
       "state": "active",
       "files": [
         "Sources/MLXAudioTTS/Generation.swift",
-        "Sources/MLXAudioTTS/RuntimeDebugGate.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSGenerationProfiles.swift",
+        "Sources/MLXAudioTTS/RuntimeDebugGate.swift",
         "Tests/Qwen3RuntimeTests/Qwen3StreamingContractTests.swift"
       ],
       "tests": [
@@ -256,6 +264,7 @@
       "state": "active",
       "files": [
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
         "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift"
       ],
       "tests": [
@@ -277,7 +286,9 @@
       "state": "active",
       "files": [
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
         "Sources/VocelloQwen3Core/LoadedModel.swift"
       ],
       "tests": [
@@ -344,7 +355,8 @@
       "files": [
         "Sources/MLXAudioCore/Generation/GenerationTypes.swift",
         "Sources/MLXAudioTTS/ModelDiagnostics.swift",
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSDiagnostics.swift"
       ],
       "tests": [
         "Tests/Qwen3RuntimeTests/**"
@@ -390,6 +402,35 @@
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
       "removalCriteria": "Retain as the shipping product-generation boundary even if the remaining load/prewarm compatibility bridge or implementation modules are later replaced."
+    },
+    {
+      "id": "ARCH-001",
+      "title": "The Qwen3 runtime's largest file split by concern (pure moves)",
+      "category": "architecture",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSDiagnostics.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSGenerationProfiles.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/**"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "static",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "unverified",
+      "benchmarkEvidenceReason": "No behaviour change to measure: Qwen3TTS.swift's 6,806 lines were moved, unchanged, into eight files (the generate loop and the model's core stay in Qwen3TTS.swift; loading, prompt assembly, sampling, the caches, the generation profiles, the voice-clone prompt and the diagnostic records each get a file), and 31 declarations went from private to internal because their users are now in another file. A script verified that every original line is present after the split; the fixed-seed PCM digests are unchanged.",
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Not a behaviour delta: drop this entry only if the files are merged again or the per-file coverage rule no longer needs it."
     },
     {
       "id": "COMPAT-001",

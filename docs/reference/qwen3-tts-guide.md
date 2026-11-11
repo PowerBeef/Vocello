@@ -177,7 +177,7 @@ A dash means the research report lists no difference from 1.7B.
 - **Text path.** `text_projection` is a SiLU MLP with bias; `codec_head` is untied.
 - **Step input.** Each step's input is the sum of the previous frame's 16 codebook embeddings
   (codebook 0 from the talker's `codec_embedding`, 1–15 from the code predictor's) plus the text track
-  (`Qwen3TTS.swift:4050-4066`).
+  (`Qwen3TTS.swift:2823-2839`).
 - `position_id_per_seconds: 13` is in the config and read by no code.
 
 ### 3.2 Codec vocabulary and control ids
@@ -196,7 +196,7 @@ language and speaker ids. The defaults below match the checkpoint config and the
 **Languages:** english 2050, german 2053, spanish 2054, chinese 2055, japanese 2058, french 2061,
 korean 2064, russian 2069, italian 2070, portuguese 2071; CustomVoice adds `sichuan_dialect` 2062 and
 `beijing_dialect` 2074. **Speakers** are in §4. The engine looks both up in the checkpoint's
-`codec_language_id` and `spk_id` tables, not in a hard-coded list (`Qwen3TTS.swift:1545-1570`).
+`codec_language_id` and `spk_id` tables, not in a hard-coded list (`Qwen3TTS.swift:318-343`).
 
 ### 3.3 Text tokenizer
 
@@ -210,7 +210,7 @@ template. Special ids: `<|im_start|>` 151644, `<|im_end|>` 151645, `assistant` 7
 
 Hidden 1,024, 5 layers, 16 heads / 8 KV heads, θ 1e6, vocabulary 2,048, with 15 codec embeddings at
 talker width, 15 heads and `small_to_mtp_projection` (2,048 → 1,024; identity on 0.6B). Each frame
-runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:3990-4046`), with its own
+runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:2763-2819`), with its own
 sampling settings, no EOS and no repetition penalty (MQ L1671-1680, L1276-1299). The weights sit
 under `talker.code_predictor.model.codec_embedding.{0…14}` and `talker.code_predictor.lm_head.{0…14}`
 (`Qwen3TTSCodePredictor.swift:169-230`).
@@ -277,7 +277,7 @@ engine reads at runtime.
   (RM L187).
 - **Dialect swap.** `spk_is_dialect` maps `eric` to `sichuan_dialect` and `dylan` to
   `beijing_dialect`. With language Chinese or Auto, those two speakers take the dialect language id
-  instead (`Qwen3TTS.swift:1551-1556`), as upstream does (MQ L2118-2122). Production Custom never sends
+  instead (`Qwen3TTS.swift:324-329`), as upstream does (MQ L2118-2122). Production Custom never sends
   Auto (§7.2, D6), so in practice the swap fires when the language resolves to Chinese.
 
 ---
@@ -407,9 +407,9 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 - **Both modes** extract the speaker embedding with the speaker encoder (§3.5) from the unpadded
   reference, a finite `float32 [1, D]` vector cast to the talker's dtype only at the prefix slot.
 - **ICL** also encodes the reference with the tokenizer's encoder. Before encoding, Vocello appends
-  0.5 s of silence (`Qwen3TTS.swift:611-621`, version `icl-ref-silence500ms-v2`); upstream pads
+  0.5 s of silence (`Qwen3TTSVoiceClonePrompt.swift:19-29`, version `icl-ref-silence500ms-v2`); upstream pads
   nothing, and the code comment's claim of upstream parity is wrong (A-12).
-- **ICL target text** gets exactly one leading space (`Qwen3TTS.swift:4657-4663`); upstream joins the
+- **ICL target text** gets exactly one leading space (`Qwen3TTSPromptAssembly.swift:27-33`); upstream joins the
   reference and target tokens with no separator. Vocello added the space for French first-word drops
   (A-11, deliberate; screen before changing).
 - **ICL layout.** Vocello always lays the reference and target text over the reference's codec frames
@@ -440,7 +440,7 @@ The audit found the policy weaker than it reads (G-08–G-11):
 A persisted clone prompt is valid only for the identity it was built under (the full key list is in
 [ARCHITECTURE §4.8](../ARCHITECTURE.md#48-voice-cloning-cache)). Its speaker-feature version composes
 the mel frontend version, the ICL reference-encode version and the MLX build
-(`qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`; `Qwen3TTS.swift:781-798`; F-06), so
+(`qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:189-206`; F-06), so
 an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference. Two
 inputs are still unversioned:
 
@@ -493,13 +493,13 @@ either stage.
 
 ### 9.3 Decoding
 
-The talker's sampler (`Qwen3TTS.swift:5250-5449`, called at `:3905-3918`) runs in this order:
+The talker's sampler (`Qwen3TTSSampling.swift:148-347`, called at `Qwen3TTS.swift:2678-2691`) runs in this order:
 
 1. **Float32 logits.** Logits are cast to float32 before sampling, as the reference does (D3,
    production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` samples in the model's precision).
-2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:3569-3570`), and EOS stays
+2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:2342-2343`), and EOS stays
    suppressed until two frames exist (`productionMinimumGeneratedCodeTokensBeforeEOS`,
-   `Qwen3TTS.swift:1440`), matching upstream's `min_new_tokens=2`.
+   `Qwen3TTS.swift:213`), matching upstream's `min_new_tokens=2`.
 3. **Repetition penalty.** 1.05 over the talker's previously generated codebook-0 ids.
 4. **Temperature**, then **top-k**, then **top-p** (temperature first, ported from mlx-audio
    `a730a68`). Min-p is 0 in production.
@@ -512,7 +512,7 @@ The talker's sampler (`Qwen3TTS.swift:5250-5449`, called at `:3905-3918`) runs i
 The code predictor runs the same sampler with the subtalker stage, float32 logits, no suppression,
 no EOS and no penalty; in production that stage is plain temperature and top-k, and since RF-46 it
 runs inside the frame's one compiled function on keys the loop resolves from the request's random
-state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:4031-4040`). Both production constants live in one value,
+state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:2804-2813`). Both production constants live in one value,
 `.production = (fullTextConditioning: true, filtersEOS: true, float32Sampling: true)`, defined
 twice and kept equal: `Qwen3ReferenceParity` in `Generation.swift` and `VocelloQwen3ReferenceParity`
 in `Contracts.swift`. A long-form segment's request turns D1 off.
@@ -527,7 +527,7 @@ How the target text reaches the talker is generation semantics. The token-level 
   (`non_streaming_mode=True`, WM L642, L738), and stream only the audio. **D1 was adopted for them
   on 2026-10-20** (RF-21, §11.2, §12).
 - **Long-form segments and x-vector clones** use the streaming text layout: after the prefix, the
-  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:4050-4056`).
+  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:2823-2829`).
   Text enters at 12.5 tokens/s against about 4–5 spoken, so an ~860-character segment's text is
   used up after about 16 s and the talker sees only `tts_pad` for the remaining ~40 s (A-01). RF-18's
   screen kept this layout for long-form segments.
@@ -554,7 +554,7 @@ The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and s
 1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in
 [§9.5](mlx-guide.md#95-what-the-0323-move-changed).
 Since CONV-21, prewarm also draws once through the production sampler, with and without top-p, on a
-private seed-0 state that no take reads, and discards the draws (`Qwen3TTS.swift:1901-1937`). The
+private seed-0 state that no take reads, and discards the draws (`Qwen3TTS.swift:674-710`). The
 sampler's kernels therefore compile during prewarm instead of in the first take, and no output
 changes.
 

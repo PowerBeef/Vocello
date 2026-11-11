@@ -90,7 +90,7 @@ both, and lazy timings are never kernel attribution (§8).
 
 MLX runs operations on a stream; the default is the GPU. Vocello runs model work on that one global
 GPU stream (audit F). The only explicit CPU-stream work is the speaker embedding's finite check
-(`Qwen3TTS.swift:1040`), so adopting a stored clone artifact submits no Metal work iOS could refuse
+(`Qwen3TTSVoiceClonePrompt.swift:448`), so adopting a stored clone artifact submits no Metal work iOS could refuse
 in the background (BG-01).
 
 ### 2.5 Unified memory
@@ -132,7 +132,7 @@ threw on a Metal thread and aborted the process: BG-1's crash class (DEP-1).
   half-evaluated state. A file error from mlx-swift's own I/O (`MLX.save`, `loadArrays`) during
   artifact adoption or persistence fails the operation without an unload.
 - **Lazy work stays inside its scope.** The clone reference encode is evaluated inside
-  `createVoiceClonePrompt` (`Qwen3TTS.swift:2257-2260`, F-07) instead of later, in persistence or the
+  `createVoiceClonePrompt` (`Qwen3TTS.swift:1030-1033`, F-07) instead of later, in persistence or the
   first take.
 - **Not captured.** MLX work on a detached task, on a thread outside the task tree, or on MLX's CPU
   scheduler thread still reaches mlx-swift's process-wide fallback.
@@ -163,7 +163,7 @@ not used.
   (group size and bits) and per-layer entries. Vocello's one per-layer entry is
   `model.text_embedding` at 8 bits, group 64, affine, in both tiers, written by
   `scripts/convert_text_embedding_8bit.py` (2026-07-26).
-- **What the loader does** (`Qwen3TTS.swift:5784-5797`). `quantize(model: talker)` runs a per-path
+- **What the loader does** (`Qwen3TTSLoading.swift:359-372`). `quantize(model: talker)` runs a per-path
   closure that quantizes a module only when the checkpoint holds `<path>.scales`, and uses the
   per-layer entry when one names the path, the global entry otherwise. The artifact therefore decides
   which modules are quantized; the code holds no list.
@@ -173,10 +173,10 @@ not used.
   stays float, and the speech tokenizer is a separate fp32 file. The full map, the bytes and the
   artifact history are [`model-delivery.md`](model-delivery.md)'s (artifact provenance).
 - **Verification.** A trusted prepared checkpoint loads with `verify: .noUnusedKeys`, an untrusted
-  one with `.all` (`Qwen3TTS.swift:5813-5815`); a trusted load therefore checks only for unused keys
+  one with `.all` (`Qwen3TTSLoading.swift:388-390`); a trusted load therefore checks only for unused keys
   (A-20).
 - **Batched materialization.** Weights are evaluated four talker or code-predictor layers at a time
-  and eight speech-tokenizer parameter arrays at a time (`Qwen3TTS.swift:470-471`), which bounds the
+  and eight speech-tokenizer parameter arrays at a time (`Qwen3TTSLoading.swift:47-48`), which bounds the
   transient unified-memory peak.
 
 ### 3.3 Precision risks
@@ -297,15 +297,15 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
 
 Each frame builds one graph (talker forward, the 15 code-predictor passes, sampling and the next
 step's input embedding) and submits it once. Production uses the `.pipelined` step policy
-(`Qwen3StreamStepEvalPolicy`, `Qwen3TTS.swift:432-445`):
+(`Qwen3StreamStepEvalPolicy`, `Qwen3TTSGenerationProfiles.swift:285-298`):
 
-1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:4071-4079`);
+1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:2844-2852`);
 2. the previous chunk's materialization and channel sends run while it computes;
 3. the sampled-token `item` read is the step's first blocking read.
 
 `.full` (a synchronous `eval`) remains a diagnostic for exact per-stage attribution. Nothing else
 reads the GPU inside the step. The next input sums the codebook embeddings with serial bf16 adds
-(`Qwen3TTS.swift:4061-4066`), where the reference uses one reduction (A-17).
+(`Qwen3TTS.swift:2834-2839`), where the reference uses one reduction (A-17).
 
 ### 4.4 The audio decoder
 
@@ -322,8 +322,8 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   MLX's process-global RNG.
 - **float32 logits.** Both stages sample from float32 logits whatever the model's precision, as
   Qwen's reference does (D3, production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` restores
-  model-precision sampling). The cast is lazy inside the step graph (`Qwen3TTS.swift:5269-5271`).
-- **Order** (`sampleToken`, `Qwen3TTS.swift:5250`): token suppression, the repetition penalty (talker
+  model-precision sampling). The cast is lazy inside the step graph (`Qwen3TTSSampling.swift:167-169`).
+- **Order** (`sampleToken`, `Qwen3TTSSampling.swift:148`): token suppression, the repetition penalty (talker
   only), temperature, top-k, top-p, min-p, then MLX's categorical at temperature 1. Temperature
   comes before the truncation filters (ported from mlx-audio `a730a68`).
 - **EOS** is filtered like any token since 2026-10-20 (D2, the RF-18 follow-up screen);
@@ -341,7 +341,7 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   M6's warm first chunk rose from 146 to 155 ms (§9.5). Since RF-46 the code predictor's fifteen
   draws run inside the frame function, where MLX fuses the sampler's elementwise chains (§4.2).
 - **Prewarm draws through the production sampler** (`productionSamplerWarmDraws`,
-  `Qwen3TTS.swift:1910-1938`; F-05): with top-p 1.0 and 0.95, one penalized id and then two, on a
+  `Qwen3TTS.swift:683-711`; F-05): with top-p 1.0 and 0.95, one penalized id and then two, on a
   private random state whose draws are discarded, so the sampler's kernels compile before the first
   take and no output changes.
 
@@ -391,8 +391,8 @@ so one generation cannot change another's.
 ### 5.4 Cache clearing and what it costs
 
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
-each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:3235-3305`), and
-every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:3496`). Outside that policy,
+each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:2008-2078`), and
+every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:2269`). Outside that policy,
 marking clears the cache four times per take: before the pass, after its frame-rate stage, after
 the pass and once the generator is dropped (B-09; its per-window clears went with RF-48, see
 `Packages/VocelloQwen3Core/PERFORMANCE.md`, Publication marking). The sources hold 29
@@ -609,7 +609,7 @@ Couplings:
   those two move together (F-19). Review the swift-transformers pin in every mlx move: tokenizer
   behaviour is engine behaviour.
 - The clone-artifact identity names the mlx-swift build
-  (`Qwen3TTSVoiceClonePrompt.mlxNumericsVersion`, `Qwen3TTS.swift:798`, F-06), and
+  (`Qwen3TTSVoiceClonePrompt.mlxNumericsVersion`, `Qwen3TTSVoiceClonePrompt.swift:206`, F-06), and
   `scripts/qwen3_core_contract.py` fails when it differs from the pin. An mlx-swift move therefore
   rebuilds every saved voice's prompt once.
 

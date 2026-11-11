@@ -43,7 +43,7 @@ language (prompt creation takes none), so Vocello binds every artifact under the
 The composite runtime-contract signature includes that immutable installed-artifact identity, the
 validated Qwen runtime topology, and the speaker-feature identifier
 (`Qwen3TTSVoiceClonePrompt.speakerFeatureVersion`,
-`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift:790-798`). That identifier joins three versions
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift:198-206`). That identifier joins three versions
 with `+`:
 
 1. the speaker mel frontend, `qwen-speaker-mel-v1`: 24 kHz audio, 1024-point FFT, 256-sample hop,

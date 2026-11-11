@@ -163,7 +163,8 @@
         "SAMPLER-002",
         "SAMPLER-003",
         "COMPAT-001",
-        "TEL-001"
+        "TEL-001",
+        "ARCH-001"
       ]
     },
     {
@@ -176,6 +177,8 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSFusedProjection.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSGenerationProfiles.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSampling.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
         "Sources/MLXAudioTTS/RuntimeDebugGate.swift"
       ],
@@ -216,7 +219,9 @@
       "state": "production",
       "sourcePatterns": [
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift"
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeakerMelFrontend.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
       "testPatterns": [
         "Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift",

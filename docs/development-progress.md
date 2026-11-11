@@ -30,8 +30,13 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
   the build that carries the overhaul: the candidate-bound work in step 2 (RF-17's records, RF-15's
   rows and the items that ride on them) runs on that build. Step 1 (the maintainer's account steps
   and the App Privacy readback) is unaffected.
-- **The overhaul's stages and gates** come from the research report requested on November 10; its
-  items join the release plan when the report is recorded.
+- **The overhaul's stages and gates** are in the
+  [research report](audits/2026-11-10-apple-silicon-performance-research.md) (RF-43, closed). Its
+  five identity-preserving stages are in the release plan: RF-44 first (instruments and the
+  regression net, no product change), then RF-45 (submission layer), RF-46 (the frame pipeline),
+  RF-47 (memory) and RF-48 (finalization, preview and the heat pause). Its sample-changing stages
+  are not in the plan. Nothing was built or measured for the report: its estimates stay estimates
+  until RF-44 produces numbers.
 
 ### November 1: the path to App Review (its dates were removed on November 10)
 

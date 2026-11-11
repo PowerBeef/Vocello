@@ -5966,6 +5966,22 @@
         "commit:d75e48b7",
         "run:github-actions-release-42872878302"
       ]
+    },
+    {
+      "id": "RF-43",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Research the runtime's speed and memory on Apple silicon",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A read-only report covers what bounds a frame on each device, what the pinned MLX does on these chips, what other ports of the model measured, ranked levers with the measurement that decides each, a staged design for the overhaul, an App Store compliance check of every recommendation and two independent verification passes.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Requested by the maintainer on 2026-11-10. Nothing was built, run or measured: the project was paused. 2026-11-10: the report is recorded. Two independent passes checked it: its corrections are in section 12. Its identity-preserving stages are RF-44 to RF-48.",
+      "evidence": [
+        "doc:docs/audits/2026-11-10-apple-silicon-performance-research.md"
+      ]
     }
   ]
 }

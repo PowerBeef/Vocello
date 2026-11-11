@@ -8,7 +8,7 @@
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-23): The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items join this plan when its research report is recorded.
+**Focus lock** (decided 2026-10-23): The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan.
 Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 **Frozen** at `e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04`: every later commit names an item of this plan in its subject.
@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 43/65 (66%) |
+| `release-first-3-0-2026-09` | active | release-qa | 44/71 (62%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -59,14 +59,19 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04` |
-| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09` |
+| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48` |
+| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
 | `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
 | `RF-41` | in-flight | iPhone model downloads show their size and ask before they start | — |
 | `RF-42` | in-flight | Decide how Vocello behaves on the iPads that can install it | — |
+| `RF-44` | planned | Core overhaul, stage 0: instruments and the regression net | — |
+| `RF-45` | planned | Core overhaul, stage 1: submission layer | `RF-44` |
+| `RF-46` | planned | Core overhaul, stage 2a: the frame pipeline, identity-preserving | `RF-44` |
+| `RF-47` | planned | Core overhaul, stage 3: memory | `RF-44` |
+| `RF-48` | planned | Core overhaul, stage 4: finalization, preview and the heat pause | `RF-44` |
 
 ### Open items in detail
 
@@ -140,6 +145,21 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-42`** (in-flight) — Decide how Vocello behaves on the iPads that can install it.
   gate: The maintainer records a decision for the iPads that satisfy iphone-performance-gaming-tier: admit them in iPhone compatibility mode with device evidence for memory and layout, or keep the unsupported-device screen with its body line localized and without the raw machine identifier. Either way the App Review notes state the device requirement, and any code change rides on the candidate that carries RF-41.
+
+- **`RF-44`** (planned) — Core overhaul, stage 0: instruments and the regression net.
+  gate: Fixed-seed PCM digests per mode exist as a regression net; the loop's graph-build, enqueue and wait totals, kernel and user CPU and context switches per frame are in the published records; the two-tier split is measured on the M6; the command-buffer sweep has run, with its MLX keys registered and the phone's limits replayed on the Mac; per-chunk cache clears are compared on and off on the Mac; and the shipped configuration is compared with MLX_ENABLE_TF32=0 on Voice Cloning short takes, with a watermark detection check (report section 7, M1 to M5b).
+
+- **`RF-45`** (planned) — Core overhaul, stage 1: submission layer.
+  gate: MLX's command-buffer limits are set per chip class as constants before MLX starts; the cache is cleared once per take where the measured headroom allows; the generation thread's core placement is confirmed; residency sets are used during a take only if that measures faster. Each change keeps the fixed-seed PCM digest and shows a measured gain, no higher memory peak than the bands allow and no new interface hitches, on the Mac and, in an announced window, on the iPhone (report cards A1, A2, A4, A5).
+
+- **`RF-46`** (planned) — Core overhaul, stage 2a: the frame pipeline, identity-preserving.
+  gate: The token read lags one frame behind an in-graph seen-mask; the samplers are compiled with the same random stream; q, k, v and gate, up are fused; the talker's rotary step uses the same arithmetic in fewer kernels; the code-predictor frame is one compiled function if its random stream can be kept. Each step keeps the fixed-seed PCM digest and is measured alone, and the loop, samplers, prompt assembly, loading and diagnostics live in separate files (report cards A3, B1, B2, B3, B5; section 6.1).
+
+- **`RF-47`** (planned) — Core overhaul, stage 3: memory.
+  gate: The iPhone budget is 6,144 MB, with bands derived at launch from os_proc_available_memory() plus the footprint; the text embedding is read by row from the weights file; the model stays loaded longer while the app is in the foreground. Each change keeps the fixed-seed PCM digest and the resident saving is measured (report cards E1, E2, E4).
+
+- **`RF-48`** (planned) — Core overhaul, stage 4: finalization, preview and the heat pause.
+  gate: The watermark's weights are held across takes; marking, Fast QC and the hash run as chunks arrive, with every saved or exported take still marked and checked; the live preview's prebuffer follows measured speed; long-form pauses between segments, never inside a take, while the thermal state is serious or critical, and says why (report cards H1, H2, H3; section 8.3).
 
 ## Specialist-audit remediation
 

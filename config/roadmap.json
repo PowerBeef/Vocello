@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-23",
-    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items join this plan when its research report is recorded.",
+    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan.",
     "maxInFlight": 3,
     "freeze": {
       "commit": "e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
@@ -300,7 +300,11 @@
       "title": "Exact-tag iOS quality promotion",
       "status": "planned",
       "blockedBy": [
-        "RF-09"
+        "RF-09",
+        "RF-45",
+        "RF-46",
+        "RF-47",
+        "RF-48"
       ],
       "gate": "scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.",
       "sourceOfTruth": [
@@ -356,6 +360,90 @@
       "notes": "Opened 2026-11-10 from N-1 of docs/audits/2026-11-09-project-audit.md, a release blocker as an App Review rejection risk (Guideline 2.4.1). Apple's Required Device Capabilities data, read 2026-11-10, lists 13 iPad models for the capability: iPad Pro 11-inch (3rd generation) and 12.9-inch (5th generation) and later, iPad Air (5th generation) and later, and iPad mini (A17 Pro). IOSDeviceEligibilityPolicy rejects every identifier that does not start with iPhone, so those iPads show the unsupported-device screen: its title is localized in ten languages, and its body line (IOSDeviceSupport.unsupportedReason in IOSAppBootstrap.swift) is English and prints the raw machine identifier. No iPad has been tried. 2026-11-10, maintainer decision: keep the wall. The body line is now localized in ten languages, names the iPhone 15 Pro floor and iPad, and no longer prints the machine identifier; the App Review notes ask for review on an iPhone 15 Pro or later (read back byte-identical). The screen cannot be shown on the paired iPhone, so it is unseen on a device. Left: the candidate that carries it. 2026-11-10: candidate v3.0.0-ios.9 (build 30) carries it."
     },
     {
+      "id": "RF-44",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Core overhaul, stage 0: instruments and the regression net",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Fixed-seed PCM digests per mode exist as a regression net; the loop's graph-build, enqueue and wait totals, kernel and user CPU and context switches per frame are in the published records; the two-tier split is measured on the M6; the command-buffer sweep has run, with its MLX keys registered and the phone's limits replayed on the Mac; per-chunk cache clears are compared on and off on the Mac; and the shipped configuration is compared with MLX_ENABLE_TF32=0 on Voice Cloning short takes, with a watermark detection check (report section 7, M1 to M5b).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Opened 2026-11-10 by the maintainer's decision that the core overhaul precedes the iOS submission. Draws on ER-01's measurement items and audit finding F-17. No product change. Its numbers decide the size of stages 1 and 2a."
+    },
+    {
+      "id": "RF-45",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Core overhaul, stage 1: submission layer",
+      "status": "planned",
+      "blockedBy": [
+        "RF-44"
+      ],
+      "gate": "MLX's command-buffer limits are set per chip class as constants before MLX starts; the cache is cleared once per take where the measured headroom allows; the generation thread's core placement is confirmed; residency sets are used during a take only if that measures faster. Each change keeps the fixed-seed PCM digest and shows a measured gain, no higher memory peak than the bands allow and no new interface hitches, on the Mac and, in an announced window, on the iPhone (report cards A1, A2, A4, A5).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02 against memory-policy changes for 3.0."
+    },
+    {
+      "id": "RF-46",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Core overhaul, stage 2a: the frame pipeline, identity-preserving",
+      "status": "planned",
+      "blockedBy": [
+        "RF-44"
+      ],
+      "gate": "The token read lags one frame behind an in-graph seen-mask; the samplers are compiled with the same random stream; q, k, v and gate, up are fused; the talker's rotary step uses the same arithmetic in fewer kernels; the code-predictor frame is one compiled function if its random stream can be kept. Each step keeps the fixed-seed PCM digest and is measured alone, and the loop, samplers, prompt assembly, loading and diagnostics live in separate files (report cards A3, B1, B2, B3, B5; section 6.1).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-08's PERF-2 to PERF-6. The report lists three traps for the lagged read: the read must create no new GPU work, the talker's cache write may stop being in place, and the discarded frame has costs. A step that cannot keep the digest moves to stage 2b, which is not in this plan."
+    },
+    {
+      "id": "RF-47",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Core overhaul, stage 3: memory",
+      "status": "planned",
+      "blockedBy": [
+        "RF-44"
+      ],
+      "gate": "The iPhone budget is 6,144 MB, with bands derived at launch from os_proc_available_memory() plus the footprint; the text embedding is read by row from the weights file; the model stays loaded longer while the app is in the foreground. Each change keeps the fixed-seed PCM digest and the resident saving is measured (report cards E1, E2, E4).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md",
+        "Sources/QwenVoiceCore/IOSMemorySnapshot.swift",
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-07, whose premise of an 8,192 MB budget the shipped builds do not have. Game Mode stays off."
+    },
+    {
+      "id": "RF-48",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Core overhaul, stage 4: finalization, preview and the heat pause",
+      "status": "planned",
+      "blockedBy": [
+        "RF-44"
+      ],
+      "gate": "The watermark's weights are held across takes; marking, Fast QC and the hash run as chunks arrive, with every saved or exported take still marked and checked; the live preview's prebuffer follows measured speed; long-form pauses between segments, never inside a take, while the thermal state is serious or critical, and says why (report cards H1, H2, H3; section 8.3).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-10-apple-silicon-performance-research.md",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "Sources/iOS/TTSEngineStore.swift"
+      ],
+      "updated": "2026-11-10",
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on audit findings D-01 and B-09 in ER-08. The heat pause is the response to App Review Guideline 2.4.2 and was a choice left to the maintainer in TTSEngineStore.swift. The App Review notes and the listing quote speeds: they change in the same release."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
@@ -380,7 +468,11 @@
         "AUD-09",
         "F-01",
         "F-16",
-        "DA-04"
+        "DA-04",
+        "RF-45",
+        "RF-46",
+        "RF-47",
+        "RF-48"
       ],
       "gate": "Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.",
       "sourceOfTruth": [
@@ -2191,7 +2283,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "Absorbs BKL-11 (TEST P1.3 to P2) and PA-19. Also delivers BT-06's metal profile (#98) and BT-01's post-unload baseline. 2026-11-10 review: the MLXModelLoadCoordinator seam tests (B-30) landed with DW-03 (94dc16cd, 7fe58fa2); profile --kind metal is still missing.",
+      "notes": "Absorbs BKL-11 (TEST P1.3 to P2) and PA-19. Also delivers BT-06's metal profile (#98) and BT-01's post-unload baseline. 2026-11-10 review: the MLXModelLoadCoordinator seam tests (B-30) landed with DW-03 (94dc16cd, 7fe58fa2); profile --kind metal is still missing. 2026-11-10: RF-44 (core overhaul, stage 0) takes up the measurement items the overhaul needs before the iOS submission, F-17 included.",
       "legacyIds": [
         "BKL-11",
         "PA-19"
@@ -2302,7 +2394,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "iOS 27 reports an 8,192 MB limit on the 12 GB iPhone 17 Pro (retained Oct 14/16 samples); the fixed 4,500/5,200 MiB bands trip at about 55%/63% of it.",
+      "notes": "iOS 27 reports an 8,192 MB limit on the 12 GB iPhone 17 Pro (retained Oct 14/16 samples); the fixed 4,500/5,200 MiB bands trip at about 55%/63% of it. 2026-11-10: RF-47 takes up the budget before the iOS submission. The shipped builds read 6,144 MB on the 12 GB iPhone (8,192 MB only before the Game Mode opt-out), so the premise above is superseded.",
       "blockedBy": [
         "ER-01"
       ]
@@ -2320,7 +2412,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "Absorbs BKL-07; its numerically shifting levers (PERF-1, PERF-7) move to ER-09.",
+      "notes": "Absorbs BKL-07; its numerically shifting levers (PERF-1, PERF-7) move to ER-09. 2026-11-10: RF-45, RF-46 and RF-48 take up PERF-2 to PERF-6, D-01 and B-09 before the iOS submission; the rest stays here.",
       "legacyIds": [
         "BKL-07"
       ],

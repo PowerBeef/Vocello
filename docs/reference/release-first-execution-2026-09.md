@@ -167,7 +167,8 @@ Between September 4 and October 12 the release did not move:
   RF-02 still waits; new dates are the maintainer's decision.
 - **2026-11-10.** The maintainer removes the target dates from the roadmap and the release: no item
   carries a due date, and gates set the order of work. The core overhaul of the runtime (speed and
-  memory on Apple silicon; its stages come from the research requested that day) is performed
+  memory on Apple silicon; its stages are RF-44 to RF-48, from the
+  [research report](../audits/2026-11-10-apple-silicon-performance-research.md)) is performed
   before the iOS App Store submission, and the result must be fully App Store compliant. Build 30
   stays in TestFlight; the submission candidate will be the build that carries the overhaul, so
   RF-17's records and RF-15's rows run on that build. The repository's rules are open to change

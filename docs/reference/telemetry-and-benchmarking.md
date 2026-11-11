@@ -1923,8 +1923,8 @@ pressure level and no warning. iOS additionally fails at a peak process-budget u
 inside the take; audit #68) or minimum headroom <384 MiB, and warns at utilization ≥0.80 or
 headroom <768 MiB. The fractions and headroom bands are declared once in
 `config/ios-memory-budget-policy.json`, beside the app's admission bands (a Swift test pins
-`IOSMemoryBudgetPolicy` and its `EvidenceBudgetUtilization` to it); the absolute footprint bands and
-the Metal working-set ratio no longer judge evidence. The iOS record retains start/end/min headroom
+`IOSMemoryBudgetPolicy` and its `EvidenceBudgetUtilization` to it); the footprint bands (scaled to
+the measured budget in the app since RF-47) and the Metal working-set ratio no longer judge evidence. The iOS record retains start/end/min headroom
 and peak process-budget utilization.
 
 **Contract v1.** Records before 2026-09-25 are contract v1: they required at least 95% periodic

@@ -231,21 +231,28 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         scheduleIdleUnloadIfNeeded(modelID: modelID, policy: policy)
     }
 
-    private func scheduleIdleUnloadIfNeeded(modelID: String, policy: NativeMemoryPolicy) {
+    /// `pressureLevel` is a trim this schedule answers; without one the
+    /// kernel monitor's current level decides.
+    private func scheduleIdleUnloadIfNeeded(
+        modelID: String,
+        policy: NativeMemoryPolicy,
+        pressureLevel: NativeMemoryTrimLevel? = nil
+    ) {
         cancelIdleUnload()
         guard let policyDelay = policy.unloadAfterIdleSeconds else { return }
 
-        // Adaptive shortening: if the system is currently under memory
-        // pressure (the macOS DispatchSource monitor has flagged it),
-        // shorten the idle-unload window so we release the model
-        // sooner. floor8GBMac's policy delay is 120s and we shrink it
-        // to 30s under guarded pressure or 10s under critical — the
-        // user re-pays the model-load cost (~500-700ms) on their next
-        // generation, which is the right trade when memory is tight.
-        // Override (used by tests) still wins over the adaptive value.
-        let adaptiveDelay = adaptiveIdleUnloadDelay(
+        // Adaptive shortening: under memory pressure the two tiers with a
+        // two-minute window (the 8 GB Mac and the iPhone) release the model
+        // sooner, 30 s under a soft trim and 10 s under a hard one. The user
+        // re-pays the load (about a second) on the next take, which is the
+        // right trade when memory is tight. The level is the kernel
+        // monitor's when the window is armed, or the soft trim that re-arms
+        // a running window (`applyMemoryPressureTrim`). Override (used by
+        // tests) still wins over the adaptive value.
+        let adaptiveDelay = Self.adaptiveIdleUnloadDelay(
             policyDelay: policyDelay,
-            deviceClass: policy.deviceClass
+            deviceClass: policy.deviceClass,
+            pressureLevel: pressureLevel ?? memoryPressureMonitor.currentLevel
         )
         let delay = max(idleUnloadDelayOverride ?? adaptiveDelay, 0)
         let token = UUID()
@@ -260,17 +267,19 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
-    private func adaptiveIdleUnloadDelay(
+    /// The idle-unload window a tier keeps at a pressure level (RF-47).
+    /// floor8GBMac and iPhonePro, whose window is two minutes, fall to 30 s
+    /// under a soft trim and 10 s under a hard trim or full unload.
+    /// mid16GBMac (10 minutes) and highMemoryMac (30 minutes) keep their
+    /// baseline; under pressure they rely on the kernel-pressure trims rather
+    /// than churn loads.
+    nonisolated static func adaptiveIdleUnloadDelay(
         policyDelay: Double,
-        deviceClass: NativeDeviceMemoryClass
+        deviceClass: NativeDeviceMemoryClass,
+        pressureLevel: NativeMemoryTrimLevel?
     ) -> Double {
-        // Only the floor8GBMac tier reacts to pressure for idle-unload.
-        // mid16GBMac (10 minutes) and highMemoryMac (30 minutes) keep their
-        // baseline; under pressure they rely on the kernel-pressure trims
-        // rather than churn loads.
-        // iPhonePro already runs at a 30s baseline.
-        guard deviceClass == .floor8GBMac else { return policyDelay }
-        switch memoryPressureMonitor.currentLevel {
+        guard deviceClass == .floor8GBMac || deviceClass == .iPhonePro else { return policyDelay }
+        switch pressureLevel {
         case .softTrim:
             return min(policyDelay, 30.0)
         case .hardTrim, .fullUnload:
@@ -2455,7 +2464,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
         switch level {
         case .softTrim:
-            break
+            // A soft trim keeps the model. An idle window already running
+            // was armed before the pressure arrived: restart it on the
+            // shorter window the tier keeps under a soft trim (RF-47).
+            if idleUnloadToken != nil, case .loaded(let modelID) = loadState,
+               canIdleUnload(modelID: modelID),
+               let mode = modelRegistry.model(id: modelID)?.mode {
+                scheduleIdleUnloadIfNeeded(
+                    modelID: modelID,
+                    policy: NativeMemoryPolicyResolver.policy(mode: mode, isBatch: false),
+                    pressureLevel: .softTrim
+                )
+            }
         case .hardTrim:
             clonePreparationState = .idle
         case .fullUnload:

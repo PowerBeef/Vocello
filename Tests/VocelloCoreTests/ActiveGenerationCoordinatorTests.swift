@@ -774,6 +774,27 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         XCTAssertNil(engine.visibleErrorMessage)
     }
 
+    /// RF-47: the two tiers with a two-minute window shorten it under
+    /// pressure, the iPhone included; the roomier Macs keep theirs.
+    func testTheTwoMinuteTiersShortenTheirIdleWindowUnderPressure() {
+        func delay(_ tier: NativeDeviceMemoryClass, _ level: NativeMemoryTrimLevel?) -> Double {
+            let policy = NativeMemoryPolicyResolver.policy(
+                deviceClass: tier, mode: .custom, isBatch: false, streamChunkCacheClearOverride: nil
+            )
+            return MLXTTSEngine.adaptiveIdleUnloadDelay(
+                policyDelay: policy.unloadAfterIdleSeconds ?? -1, deviceClass: tier, pressureLevel: level
+            )
+        }
+        for tier in [NativeDeviceMemoryClass.iPhonePro, .floor8GBMac] {
+            XCTAssertEqual(delay(tier, nil), 120, "\(tier.rawValue)")
+            XCTAssertEqual(delay(tier, .softTrim), 30, "\(tier.rawValue)")
+            XCTAssertEqual(delay(tier, .hardTrim), 10, "\(tier.rawValue)")
+            XCTAssertEqual(delay(tier, .fullUnload), 10, "\(tier.rawValue)")
+        }
+        XCTAssertEqual(delay(.mid16GBMac, .hardTrim), 600)
+        XCTAssertEqual(delay(.highMemoryMac, .softTrim), 1_800)
+    }
+
     /// AUD-10: every tier idle-unloads a resident model, the high-memory Mac
     /// included, so weights a warm left behind never outlive browsing. The
     /// roomier the tier, the longer it keeps them for the next take.
@@ -782,7 +803,7 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             (.floor8GBMac, 120),
             (.mid16GBMac, 600),
             (.highMemoryMac, 1_800),
-            (.iPhonePro, 30),
+            (.iPhonePro, 120),
         ]
         for (deviceClass, seconds) in expected {
             for mode in [GenerationMode.custom, .design, .clone] {

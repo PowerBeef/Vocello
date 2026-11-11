@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "policyID": "iphone-shipping-default",
-  "description": "The iPhone memory budget, in MiB and fractions. IOSMemoryBudgetPolicy.iPhoneShippingDefault (Sources/QwenVoiceCore/IOSMemorySnapshot.swift) and the unload quiescence evaluator use the headroom, footprint and Metal bands for the app's own admission and trims, and a Swift test pins them to this file. Published iOS evidence is judged on the measured process budget instead (audit #68): a take's peak budget utilization (footprint over footprint plus what remains before the process limit) fails publication at evidenceCriticalBudgetUtilization and warns at evidenceGuardedBudgetUtilization, and its minimum headroom fails below guardedHeadroomMB and warns below healthyHeadroomMB. IOSMemoryBudgetPolicy.EvidenceBudgetUtilization declares the same fractions for the band persisted on telemetry rows, and scripts/benchmark_memory.py gates on them.",
+  "description": "The iPhone memory budget, in MiB and fractions. IOSMemoryBudgetPolicy.iPhoneShippingDefault (Sources/QwenVoiceCore/IOSMemorySnapshot.swift) and the unload quiescence evaluator use the headroom, footprint and Metal bands for the app's own admission and trims, and a Swift test pins them to this file. The two footprint bands are stated at referenceProcessBudgetMB, the budget the shipped build is granted on the iPhones measured so far; where the process measures its own budget (its footprint plus what remains before the limit) the app scales them to it (RF-47); the Metal ratio stays judged against Metal's recommended working set. Published iOS evidence is judged on the measured process budget instead (audit #68): a take's peak budget utilization (footprint over footprint plus what remains before the process limit) fails publication at evidenceCriticalBudgetUtilization and warns at evidenceGuardedBudgetUtilization, and its minimum headroom fails below guardedHeadroomMB and warns below healthyHeadroomMB. IOSMemoryBudgetPolicy.EvidenceBudgetUtilization declares the same fractions for the band persisted on telemetry rows, and scripts/benchmark_memory.py gates on them.",
   "healthyHeadroomMB": 768,
   "guardedHeadroomMB": 384,
   "guardedFootprintMB": 4500,
   "criticalFootprintMB": 5200,
+  "referenceProcessBudgetMB": 6144,
   "criticalGPUWorkingSetUsageRatio": 0.8,
   "evidenceCriticalBudgetUtilization": 0.92,
   "evidenceGuardedBudgetUtilization": 0.8

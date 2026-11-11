@@ -468,6 +468,83 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         ])
     }
 
+    // MARK: - Bands on the measured process budget (RF-47)
+
+    private func budgetSnapshot(
+        footprintMiB: UInt64, remainingMiB: UInt64?, gpuMiB: UInt64? = nil
+    ) -> IOSMemorySnapshot {
+        let mib: UInt64 = 1_048_576
+        return IOSMemorySnapshot(
+            totalDeviceRAMBytes: 12 * 1_024 * mib,
+            availableHeadroomBytes: remainingMiB.map { $0 * mib },
+            residentBytes: footprintMiB * mib,
+            physFootprintBytes: footprintMiB * mib,
+            compressedBytes: 0,
+            gpuAllocatedBytes: gpuMiB.map { $0 * mib },
+            // What every iPhone reports, whatever its process limit.
+            gpuRecommendedWorkingSetBytes: 8_192 * mib,
+            hasUnifiedMemory: true,
+            processLimitRemainingBytes: remainingMiB.map { $0 * mib }
+        )
+    }
+
+    private func footprintBand(_ snapshot: IOSMemorySnapshot) -> IOSMemoryPressureBand {
+        let policy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
+        return policy.context(appSnapshot: snapshot, reason: "test", source: "test").aggregatePressureBand
+    }
+
+    /// The two footprint bands are 4,500 and 5,200 MiB of a 6,144 MiB budget.
+    /// A process that measures another budget gets the same shares of it, and
+    /// one that measures none keeps the absolute bands.
+    func testFootprintBandsFollowTheMeasuredProcessBudget() {
+        // The reference budget: the bands themselves.
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 4_499, remainingMiB: 1_645)), .healthy)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 4_500, remainingMiB: 1_644)), .guarded)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 5_200, remainingMiB: 944)), .critical)
+
+        // A 5,000 MiB budget: guarded from 3,663 MiB, critical from 4,232 MiB.
+        // The absolute bands could never have fired critical under it.
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 3_600, remainingMiB: 1_400)), .healthy)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 3_700, remainingMiB: 1_300)), .guarded)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 4_300, remainingMiB: 700)), .critical)
+
+        // An 8,192 MiB budget: guarded from 6,000 MiB.
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 5_900, remainingMiB: 2_292)), .healthy)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 6_100, remainingMiB: 2_092)), .guarded)
+
+        // No budget reading, or an implausibly small one: the absolute bands.
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 4_499, remainingMiB: nil)), .healthy)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 4_500, remainingMiB: nil)), .guarded)
+        XCTAssertEqual(footprintBand(budgetSnapshot(footprintMiB: 1_000, remainingMiB: 100)), .healthy)
+
+        // A policy with no reference budget (the Mac's) never scales.
+        let absolute = IOSMemoryBudgetPolicy(
+            healthyHeadroomBytes: 1, guardedHeadroomBytes: 0, criticalGPUWorkingSetUsageRatio: 0.8,
+            aggregateGuardedFootprintBytes: 4_500 * 1_048_576, aggregateCriticalFootprintBytes: 5_200 * 1_048_576
+        )
+        XCTAssertEqual(
+            absolute.context(
+                appSnapshot: budgetSnapshot(footprintMiB: 3_700, remainingMiB: 1_300), reason: "test", source: "test"
+            ).aggregatePressureBand,
+            .healthy
+        )
+    }
+
+    /// The Metal ratio stays judged against Metal's recommended working set
+    /// (8,192 MiB on every iPhone), whatever budget the process measures:
+    /// judged against the measured budget it would cancel a running take at
+    /// 80% of it, a trigger no iPhone has measured.
+    func testTheMetalRatioStaysOnMetalsRecommendedWorkingSet() {
+        let policy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
+        // 4,950 MiB is above 80% of a 6,144 MiB budget and 60% of 8,192 MiB.
+        XCTAssertEqual(
+            policy.band(for: budgetSnapshot(footprintMiB: 5_000, remainingMiB: 1_144, gpuMiB: 4_950)), .healthy
+        )
+        XCTAssertEqual(
+            policy.band(for: budgetSnapshot(footprintMiB: 7_000, remainingMiB: 1_192, gpuMiB: 6_600)), .critical
+        )
+    }
+
     func testMacOSMemoryMetricsDoNotApplyIPhonePressureBands() {
         #if os(macOS)
         let samples = [

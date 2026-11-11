@@ -403,19 +403,26 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
     public let criticalGPUWorkingSetUsageRatio: Double
     public let aggregateGuardedFootprintBytes: UInt64?
     public let aggregateCriticalFootprintBytes: UInt64?
+    /// The process budget the footprint bands were set for (RF-47). When a
+    /// snapshot measures its own budget (its footprint plus what remains
+    /// before the process limit), the footprint bands scale with it; nil
+    /// keeps the bands absolute.
+    public let referenceProcessBudgetBytes: UInt64?
 
     public init(
         healthyHeadroomBytes: UInt64,
         guardedHeadroomBytes: UInt64,
         criticalGPUWorkingSetUsageRatio: Double,
         aggregateGuardedFootprintBytes: UInt64? = nil,
-        aggregateCriticalFootprintBytes: UInt64? = nil
+        aggregateCriticalFootprintBytes: UInt64? = nil,
+        referenceProcessBudgetBytes: UInt64? = nil
     ) {
         self.healthyHeadroomBytes = healthyHeadroomBytes
         self.guardedHeadroomBytes = guardedHeadroomBytes
         self.criticalGPUWorkingSetUsageRatio = criticalGPUWorkingSetUsageRatio
         self.aggregateGuardedFootprintBytes = aggregateGuardedFootprintBytes
         self.aggregateCriticalFootprintBytes = aggregateCriticalFootprintBytes
+        self.referenceProcessBudgetBytes = referenceProcessBudgetBytes
     }
 
     /// The shipping iPhone bands, in MiB. `config/ios-memory-budget-policy.json`
@@ -428,6 +435,12 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         public static let guardedFootprint: UInt64 = 4_500
         public static let criticalFootprint: UInt64 = 5_200
         public static let criticalGPUWorkingSetUsageRatio = 0.80
+        /// The process budget the two footprint bands were set for: what the
+        /// shipped build is granted on every iPhone measured so far, 8 GB and
+        /// 12 GB alike, with the increased-memory-limit entitlement and Game
+        /// Mode off (RF-47; the 8,192 MB of earlier builds came with Game
+        /// Mode, which a non-game may not enable).
+        public static let referenceProcessBudget: UInt64 = 6_144
     }
 
     /// The evidence gate on the measured process budget (audit #68). A take's
@@ -456,8 +469,35 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         guardedHeadroomBytes: ShippingBandMiB.guardedHeadroom * 1_048_576,
         criticalGPUWorkingSetUsageRatio: ShippingBandMiB.criticalGPUWorkingSetUsageRatio,
         aggregateGuardedFootprintBytes: ShippingBandMiB.guardedFootprint * 1_048_576,
-        aggregateCriticalFootprintBytes: ShippingBandMiB.criticalFootprint * 1_048_576
+        aggregateCriticalFootprintBytes: ShippingBandMiB.criticalFootprint * 1_048_576,
+        referenceProcessBudgetBytes: ShippingBandMiB.referenceProcessBudget * 1_048_576
     )
+
+    /// The least measured budget the bands are scaled to. A reading below it
+    /// is not a process limit an installed model fits in, so it is treated as
+    /// no reading.
+    static let minimumPlausibleProcessBudgetBytes: UInt64 = 2_048 * 1_048_576
+
+    /// The budget this snapshot's process measures for itself, when the policy
+    /// scales with one and the reading is plausible.
+    func measuredProcessBudget(for snapshot: IOSMemorySnapshot) -> UInt64? {
+        guard referenceProcessBudgetBytes != nil,
+              let measured = snapshot.impliedProcessLimitBytes,
+              measured >= Self.minimumPlausibleProcessBudgetBytes
+        else { return nil }
+        return measured
+    }
+
+    /// A footprint band at this snapshot's own budget: the band's share of
+    /// the reference budget, applied to the measured one (RF-47). At the
+    /// reference budget it is the band itself; without a measured budget it
+    /// is the band unchanged.
+    func footprintBand(_ bandBytes: UInt64, for snapshot: IOSMemorySnapshot) -> UInt64 {
+        guard let referenceProcessBudgetBytes, referenceProcessBudgetBytes > 0,
+              let measured = measuredProcessBudget(for: snapshot)
+        else { return bandBytes }
+        return UInt64(Double(bandBytes) / Double(referenceProcessBudgetBytes) * Double(measured))
+    }
 
     /// Worst evidence band over a whole generation, persisted on engine
     /// telemetry rows (audit P1-6): the peak budget utilization against
@@ -491,6 +531,14 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
     }
 
     public func band(for snapshot: IOSMemorySnapshot) -> IOSMemoryPressureBand {
+        // On an iPhone this band cannot fire before the process limit does:
+        // Metal's recommended working set reads 8,192 MB on every iPhone
+        // against a 6,144 MB budget, so 80% of it is above the limit. It is
+        // left as it is (RF-47): judged against the measured budget it would
+        // become the earliest critical trigger, with no guarded step, in the
+        // band that gates admission and cancels a running take, and no
+        // iPhone has measured that. The headroom bands below do follow the
+        // measured limit.
         if let gpuAllocated = snapshot.gpuAllocatedBytes,
            let gpuRecommendedWorkingSet = snapshot.gpuRecommendedWorkingSetBytes,
            gpuRecommendedWorkingSet > 0,
@@ -537,11 +585,11 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
     private func aggregateBand(appSnapshot: IOSMemorySnapshot) -> IOSMemoryPressureBand {
         guard let footprint = appSnapshot.physFootprintBytes else { return .healthy }
         if let aggregateCriticalFootprintBytes,
-           footprint >= aggregateCriticalFootprintBytes {
+           footprint >= footprintBand(aggregateCriticalFootprintBytes, for: appSnapshot) {
             return .critical
         }
         if let aggregateGuardedFootprintBytes,
-           footprint >= aggregateGuardedFootprintBytes {
+           footprint >= footprintBand(aggregateGuardedFootprintBytes, for: appSnapshot) {
             return .guarded
         }
         return .healthy

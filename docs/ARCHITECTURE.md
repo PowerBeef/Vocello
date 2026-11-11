@@ -474,7 +474,7 @@ footprint only).
 | `.floor8GBMac` | 256 MB | 1 | 120 s | 50 |
 | `.mid16GBMac` | 512 MB | 8 | 600 s | 50 |
 | `.highMemoryMac` | 1 GB | 16 | 1 800 s | 200 |
-| `.iPhonePro` | 128 MB* | 1 | 30 s | 50 |
+| `.iPhonePro` | 128 MB* | 1 | 120 s | 50 |
 
 Every tier idle-unloads and answers kernel pressure (AUD-10). Warms follow intent (entering
 Studio or generating), never browsing. A warm prefetch that ends early (cancelled or failed), a
@@ -485,8 +485,8 @@ take) publishes `.failed`; its weights still unload after the same idle window, 
 stays published until the user's next action replaces it (a take, load, warm or prime) or
 dismisses it (PA-32). The Mac warmup coordinator does not warm from `.failed`. The high-memory window is
 the longest because 2 to 3 GB of idle weights is a small share of 32 GB or more, while an unload
-makes the next take pay a cold load and prewarm; only the floor tier shortens its window under
-pressure.
+makes the next take pay a cold load and prewarm; the floor tier and the iPhone, whose window is two
+minutes, shorten it to 30 or 10 seconds under pressure (RF-47).
 
 † The host's clone-handle LRU (`NativePreparedCloneConditioningCache`). The runtime actor retains
 one clone handle whatever the tier, so only the most recent host slot holds a live handle (see §4.8).

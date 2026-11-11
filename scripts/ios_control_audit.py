@@ -438,7 +438,7 @@ def generate_plan(
                 "takeID": take_id,
                 "mode": mode,
                 # Only the first row is an enforced cold sentinel. Ordinary UI work between
-                # subsequent rows can legitimately cross iOS's 30-second idle-unload boundary,
+                # subsequent rows can legitimately cross iOS's idle-unload boundary (two minutes since RF-47),
                 # so their request receipts are observed rather than inferred from matrix order.
                 "warmState": "cold" if index == 0 else "observed",
                 **values,

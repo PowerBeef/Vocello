@@ -211,7 +211,7 @@ not used.
 
 Every quantized load leaks its initialization graph: about 110 MB after 43 reloads (mlx-audio-swift
 PR #286 and ml-explore/mlx PR #4710, both open when the research checked on 2026-10-16; #4710 has
-since closed unmerged). It applies to Vocello's quantized load and is not fixed here. It matters where loads repeat: the iPhone unloads after 30 s idle and reloads for the next
+since closed unmerged). It applies to Vocello's quantized load and is not fixed here. It matters where loads repeat: the iPhone unloads after two minutes idle (30 s before RF-47) and on leaving the foreground, and reloads for the next
 take (ER-06, ER-07), and D-04's 309 MiB left in MLX's cache after an unload may be partly this
 (research §10).
 
@@ -405,19 +405,30 @@ Clearing is not free: freed buffers are re-created on the next allocation.
 The engine runs in-process, so the app and the engine share one Jetsam budget. The
 `com.apple.developer.kernel.increased-memory-limit` entitlement raises the per-app limit:
 
-- **iOS 27.0.1, iPhone 17 Pro (12 GB): 8,192 MB**, measured in the October 14 and 16 smoke
-  diagnostics (D-06). Peak use there was 2.1–2.6 GB on Speed, 32% of the limit (audit D).
+- **The shipped build: 6,144 MB** on the iPhone 17 Pro (12 GB), under iOS 27.0.1 with build 28
+  and iOS 27.2 with build 29. Builds 24 and 26 read 8,192 MB on the same phone and iOS (the
+  October 14 and 16 smoke diagnostics, D-06); the Game Mode opt-out (RF-37) lies between, and a
+  non-game may not enable Game Mode
+  ([the research report](../audits/2026-11-10-apple-silicon-performance-research.md), card E1).
+  Peak use is 2.1–3.2 GB on Speed, about half of the limit.
 - **iOS 26:** about 6 GB on the same phone (the historical figure in
   [`ios-engine-optimization.md`](ios-engine-optimization.md)).
 - **8 GB phones under iOS 27:** the entitled limit is unmeasured (research open question 9).
   Without the entitlement, a farm iPhone 15 Pro on iOS 27.0 ran 41 Built-in Voice takes at a
   2.52 GB peak (RF-40, exploratory evidence).
 
-The shipping policy still assumes the older budget: the fixed 4,500 / 5,200 MiB footprint bands
-(`IOSMemoryBudgetPolicy.ShippingBandMiB`) trip at about 55% and 63% of the measured limit, and
-`NativeMemoryPolicyResolver` has one fixed iPhone tier (D-06). ER-07 derives the bands from measured
-limits. The engine never relies on a hard MLX limit; it uses `os_proc_available_memory()` and the
-pressure bands.
+The footprint bands follow the measured budget (RF-47). They are stated at 6,144 MiB (4,500 and
+5,200 MiB, 73% and 85% of it, `IOSMemoryBudgetPolicy.ShippingBandMiB`), and a process that measures
+another budget (its footprint plus `os_proc_available_memory()`) gets the same shares of it; with no
+reading they stay absolute. The Metal ratio is unchanged and inert on an iPhone: Metal's
+recommended working set reads 8,192 MB there, above the limit, so 80% of it cannot be reached
+first; judged against the measured budget it would become the earliest critical trigger, which no
+iPhone has measured. `NativeMemoryPolicyResolver` still has one iPhone tier. The engine never relies on a hard MLX
+limit; it uses `os_proc_available_memory()` and the pressure bands.
+
+The iPhone keeps a model loaded for two minutes in the foreground (RF-47; it was 30 seconds) and
+unloads at once on leaving it. The window is 30 or 10 seconds instead when it is armed under kernel
+memory pressure, and a soft trim restarts a running window at 30 seconds; the 8 GB Mac does the same.
 
 ---
 

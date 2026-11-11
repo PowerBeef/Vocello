@@ -515,6 +515,9 @@ assert take_path.read_bytes()==original
             policy.aggregateCriticalFootprintBytes, try mebibytes("criticalFootprintMB") * 1_048_576
         )
         XCTAssertEqual(
+            policy.referenceProcessBudgetBytes, try mebibytes("referenceProcessBudgetMB") * 1_048_576
+        )
+        XCTAssertEqual(
             policy.criticalGPUWorkingSetUsageRatio,
             try XCTUnwrap(contract["criticalGPUWorkingSetUsageRatio"] as? Double)
         )

@@ -156,7 +156,15 @@ public enum NativeMemoryPolicyResolver {
                 clearCacheAfterGeneration: true,
                 clearMLXCacheOnStreamChunkEmit: true,
                 mlxTokenMemoryClearCadence: 50,
-                unloadAfterIdleSeconds: 30
+                // Two minutes in the foreground, as on the 8 GB Mac (RF-47;
+                // it was 30 seconds). A reload costs about a second and
+                // leaks its quantized-load graph (mlx-guide 3.5), and after
+                // RF-47 the resident model is 315 MB smaller. Leaving the
+                // foreground still unloads at once. The window is 30 or 10
+                // seconds instead when it is armed under kernel memory
+                // pressure, and a soft trim restarts a running window at 30
+                // seconds (`MLXTTSEngine.adaptiveIdleUnloadDelay`).
+                unloadAfterIdleSeconds: 120
             )
         }
     }

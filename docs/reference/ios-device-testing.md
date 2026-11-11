@@ -979,8 +979,8 @@ counters. iPhone admission is also strict, on the measured process budget
 footprint plus what remains before the process limit, from the same `task_vm_info` call as
 `limit_bytes_remaining` when the sample carries it, and the exact kernel peak when it rose inside the
 take) ≥0.92 or minimum headroom <384 MiB fails; utilization ≥0.80 or headroom <768 MiB warns. The
-absolute footprint bands (4,500 and 5,200 MiB) and the Metal working-set ratio stay the app's own
-admission bands only: every iPhone reports an 8 GiB Metal working set against its 6 GiB limit, and
+footprint bands (4,500 and 5,200 MiB at a 6,144 MiB budget, scaled to the budget the process
+measures since RF-47) and the Metal working-set ratio stay the app's own admission bands only: every iPhone reports an 8 GiB Metal working set against its 6 GiB limit, and
 the 5 GB floor device's limit sits below 5,200 MiB. A take also publishes
 `processLimitRemainingDriftMB`, the largest same-sample gap between `limit_bytes_remaining` and
 `os_proc_available_memory`, which the first device run checks. The lane requires 15 GiB free before device launch. After validation and

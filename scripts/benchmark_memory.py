@@ -70,6 +70,8 @@ IOS_MEMORY_BUDGET_POLICY_PATH = (
 )
 IOS_MEMORY_BUDGET_KEYS = (
     "healthyHeadroomMB", "guardedHeadroomMB", "guardedFootprintMB", "criticalFootprintMB",
+    # The process budget the two footprint bands are stated at (RF-47).
+    "referenceProcessBudgetMB",
     "criticalGPUWorkingSetUsageRatio",
     # The evidence gate on the measured process budget (audit #68).
     "evidenceGuardedBudgetUtilization", "evidenceCriticalBudgetUtilization",
@@ -273,7 +275,7 @@ def load_ios_memory_budget(path: Path | None = None) -> dict[str, float]:
         bands[key] = float(value)
     if not (
         bands["guardedHeadroomMB"] < bands["healthyHeadroomMB"]
-        and bands["guardedFootprintMB"] < bands["criticalFootprintMB"]
+        and bands["guardedFootprintMB"] < bands["criticalFootprintMB"] < bands["referenceProcessBudgetMB"]
         and bands["criticalGPUWorkingSetUsageRatio"] <= 1
         and bands["evidenceGuardedBudgetUtilization"]
         < bands["evidenceCriticalBudgetUtilization"] <= 1

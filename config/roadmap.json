@@ -372,7 +372,7 @@
         "scripts/macos_test.sh"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 by the maintainer's decision that the core overhaul precedes the iOS submission. Draws on ER-01's measurement items and audit finding F-17. No product change. Its numbers decide the size of stages 1 and 2a."
+      "notes": "Opened 2026-11-10 by the maintainer's decision that the core overhaul precedes the iOS submission. Draws on ER-01's measurement items and audit finding F-17. No product change. Its numbers decide the size of stages 1 and 2a. 2026-11-10: the Mac half is done (0c081a9b to bfc17363). scripts/pcm_identity.py is the regression net: fixed-seed PCM digests, paired A/B against a preserved build, and an efficiency-core clamp as a host-bound proxy. On the M6 the host waits on the GPU for over half of a take, so no host-side change speeds it; clamped, the host bounds a frame (RTF 0.77 against 0.28). MLX's 40 operations per buffer is fastest on the M6; the phone's 20 is 1% slower there and 8 to 10% slower host-bound. Cache-clear tiers give identical PCM. Open: the published loop totals and two-tier split, context switches, the watermark detection check, and every iPhone measurement."
     },
     {
       "id": "RF-45",
@@ -389,7 +389,7 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02 against memory-policy changes for 3.0."
+      "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02 against memory-policy changes for 3.0. 2026-11-10: nothing to ship from the Mac. MLX's default command-buffer size measured fastest on the M6, and the per-chunk clear's cost is inside the drift where the GPU bounds a frame (1.7% where the host does, identical PCM). QWENVOICE_STREAM_CHUNK_CACHE_CLEAR (bfc17363) isolates the clear for the device A/B. For the next announced window: MLX_MAX_OPS_PER_BUFFER=40 against the phone's 20, the clear switch off, and the generation thread's QoS class and CPU share. No constant is set in code until a phone confirms its value; residency sets were not tried."
     },
     {
       "id": "RF-46",
@@ -407,7 +407,7 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-08's PERF-2 to PERF-6. The report lists three traps for the lagged read: the read must create no new GPU work, the talker's cache write may stop being in place, and the discarded frame has costs. A step that cannot keep the digest moves to stage 2b, which is not in this plan."
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-08's PERF-2 to PERF-6. The report lists three traps for the lagged read: the read must create no new GPU work, the talker's cache write may stop being in place, and the discarded frame has costs. A step that cannot keep the digest moves to stage 2b, which is not in this plan. 2026-11-10: the rotary step and the fused projections landed (9209cf5d): about 400 launches fewer per frame, PCM-identical on 28 takes, 4.0% faster host-bound and neutral GPU-bound on the M6. Not done: the lagged token read (where the GPU bounds a frame it is already fed continuously, and where the host does it has no slack, so the Mac shows no regime in which it pays: decide once the phones' regime is measured); compiled samplers and the one-function predictor frame (they change rounding, so they can be screened, not proven identical); the file split."
     },
     {
       "id": "RF-47",
@@ -424,7 +424,7 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-07, whose premise of an 8,192 MB budget the shipped builds do not have. Game Mode stays off."
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on ER-07, whose premise of an 8,192 MB budget the shipped builds do not have. Game Mode stays off. 2026-11-10: the text embedding is read by row from the checkpoint file (2ba30b2e): 315 MB less resident memory and 315 MB off every take's peak, PCM-identical on 36 takes. Not done: the budget bands (the headroom bands already follow the measured limit and peaks sit far below the footprint bands, so it is a cleanup with no measured gain) and the foreground idle window, whose value needs the phone's reload time and memory."
     },
     {
       "id": "RF-48",
@@ -441,7 +441,7 @@
         "Sources/iOS/TTSEngineStore.swift"
       ],
       "updated": "2026-11-10",
-      "notes": "Opened 2026-11-10 with the overhaul. Draws on audit findings D-01 and B-09 in ER-08. The heat pause is the response to App Review Guideline 2.4.2 and was a choice left to the maintainer in TTSEngineStore.swift. The App Review notes and the listing quote speeds: they change in the same release."
+      "notes": "Opened 2026-11-10 with the overhaul. Draws on audit findings D-01 and B-09 in ER-08. The heat pause is the response to App Review Guideline 2.4.2 and was a choice left to the maintainer in TTSEngineStore.swift. The App Review notes and the listing quote speeds: they change in the same release. 2026-11-10: marking is 97% of finalization on the M6 (21 ms per second of audio) and has no measurable fixed part, so holding its weights between takes gains nothing; its per-window cache clears are gone instead (093a092c, 901749f1): finalization a fifth shorter, PCM-identical. The live preview starts from the take's measured pace (af8ca492): first sound 0.44 s sooner on the M6, no dropouts. Not done: marking as chunks arrive, and the heat pause with its localized copy. No iPhone measurement of any of it."
     },
     {
       "id": "RF-16",

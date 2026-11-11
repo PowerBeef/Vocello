@@ -17,7 +17,45 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 10: no target dates, and the core overhaul comes before the submission (resume here)
+### November 10 (later): the overhaul's Mac half is in (resume here)
+
+At the maintainer's request the pause was lifted for builds and tests, and everything in the
+overhaul that needs no iPhone was implemented, measured on the M6 and committed on local `main`
+(not pushed). Each engine change was proven sample-identical by fixed-seed PCM digest.
+
+- **The regression net (RF-44).** `scripts/pcm_identity.py` captures fixed-seed PCM digests and
+  compares two builds, in alternation against a preserved baseline, on the Speed and Quality models
+  and on instruct-bearing takes. `--clamp background` keeps the bench on the efficiency cores,
+  where the host bounds a frame: the stand-in on a Mac for a device whose CPU is the bottleneck.
+- **What bounds a frame on the M6.** The host is blocked on the GPU for over half of a take (45% in
+  MLX's back-pressure wait, 9% in the token read), so the M6 is GPU-bound and no host-side change
+  can speed it up. Clamped to the efficiency cores the same take is 2.75 times slower and
+  host-bound. Which regime each iPhone is in is the first thing to measure in a device window.
+- **Landed, with identical samples:**
+  - about 400 fewer kernel launches per frame (RF-46): 4.0% faster host-bound, neutral GPU-bound;
+  - the text embedding read by row from the checkpoint file (RF-47): 315 MB less resident memory
+    and 315 MB off every take's peak;
+  - the watermark pass without its per-window cache clears (RF-48): finalization a fifth shorter.
+- **Landed, no sample involved:** the live preview starts from a measured pace instead of a fixed
+  3.25-second buffer (RF-48): on the M6 the first sound comes 0.44 s sooner, with no dropouts.
+- **Measured and not changed (RF-45):** MLX's default of 40 operations per command buffer is the
+  fastest on the M6, so no constant is set. The phone's default of 20 measured 8 to 10% slower in
+  the host-bound stand-in. The per-chunk cache clear changes no sample;
+  `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR` isolates it for a device A/B.
+- **Found not worth doing:** holding the watermark's weights between takes (the pass has no
+  measurable fixed cost) and, on the Mac's evidence, the one-frame lookahead (the GPU is already
+  fed continuously where the GPU is the bottleneck, and the host has no slack where it is).
+- **Not done:** compiled samplers and the one-function predictor frame (they change rounding, so
+  they can be screened but not proven identical); the memory bands and the foreground idle window;
+  marking as chunks arrive; the long-form heat pause and its localized copy; splitting the runtime's
+  largest file. The roadmap notes on RF-44 to RF-48 carry the detail.
+- **For the next announced iPhone window,** in this order: the take's regime on each phone (CPU
+  share and QoS class of the generation thread); `MLX_MAX_OPS_PER_BUFFER=40` against the default;
+  the cache-clear switch off; the resident and peak memory after RF-47; the preview's start and any
+  underrun on the iPhone 15 Pro; the footprint during marking. The submission candidate is the
+  build that carries these commits, once the phone confirms them.
+
+### November 10: no target dates, and the core overhaul comes before the submission
 
 - **Maintainer decisions of November 10** (recorded in `focusLock.decision`):
   - The target dates are removed from the roadmap and the release. No item carries a due date;

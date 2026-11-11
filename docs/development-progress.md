@@ -77,8 +77,15 @@ because two Linux jobs could not reach the Ubuntu package mirror.
   the 8-bit model beats the 4-bit one by 0.025 in speaker similarity, and an 8-bit code predictor
   alone gives +0.010 for 56 MB. It changes no code and opens no work; its recommendations are for
   the parked engine-remediation items.
-- **Next:** a candidate that carries the overhaul, which needs green CI on `main` and the
-  maintainer's request, then RF-15's and RF-17's rows on it.
+- **Maintainer decision of November 11: quality remediation before the submission.** The review's
+  verified findings are RF-50 to RF-56: the machine screens (RF-50), clone input correctness
+  (RF-51), clone conditioning parity (RF-52), the long-form and language screens with a stop for
+  runaway takes (RF-53), the decoder's 72-frame window (RF-54), code-predictor precision (RF-55)
+  and document corrections (RF-56). Sample-changing changes land only behind a pre-registered
+  machine screen. Publishing an artifact and moving a pin stay the maintainer's.
+- **Next:** RF-51 and RF-56 need no screen and go first, with RF-50 beside them; then RF-52 to
+  RF-55 by their gates; then a candidate that carries the overhaul and the remediation, which needs
+  green CI on `main` and the maintainer's request, and RF-15's and RF-17's rows on it.
 
 ### November 11: the overhaul's Mac half is complete
 

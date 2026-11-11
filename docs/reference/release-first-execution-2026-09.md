@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: The iOS 3.0 App Store submission path rebaselined on October 12, the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
 sourceOfTruth:
   - config/roadmap.json
@@ -173,6 +173,15 @@ Between September 4 and October 12 the release did not move:
   stays in TestFlight; the submission candidate will be the build that carries the overhaul, so
   RF-17's records and RF-15's rows run on that build. The repository's rules are open to change
   where that makes the project better.
+- **2026-11-11.** The overhaul's phone measurements ran on the iPhone 17 Pro and confirm it
+  (identical samples, 316 MB less at MLX's peak). The maintainer then decides that output quality
+  is remediated before the iOS App Store submission: the findings verified in the
+  [review of an outside report](../audits/2026-11-11-qwen3-tts-quality-report-review.md) become
+  RF-50 to RF-56, in stages: the machine screens, clone input correctness, clone conditioning
+  parity, long-form and language screens, the decoder's attention window, code-predictor precision
+  and document corrections. Nobody listens still, so a change that alters samples lands only behind
+  a machine screen whose decision rule is recorded before its takes are generated. The submission
+  candidate is the build that carries both the overhaul and the remediation.
 
 ## The path
 

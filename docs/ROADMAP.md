@@ -8,7 +8,7 @@
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-23): The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan.
+**Focus lock** (decided 2026-10-23): The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16. Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request.
 Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 **Frozen** at `e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04`: every later commit names an item of this plan in its subject.
@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 45/72 (62%) |
+| `release-first-3-0-2026-09` | active | release-qa | 45/79 (57%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 22/71 (31%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 22/72 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -59,8 +59,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-12` | planned | Upload the verified 3.0.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.0.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48` |
-| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48` |
+| `RF-16` | planned | Submit 3.0.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55` |
+| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
@@ -72,6 +72,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-46` | planned | Core overhaul, stage 2a: the frame pipeline, identity-preserving | `RF-44` |
 | `RF-47` | planned | Core overhaul, stage 3: memory | `RF-44` |
 | `RF-48` | planned | Core overhaul, stage 4: finalization, preview and the heat pause | `RF-44` |
+| `RF-50` | planned | Quality remediation, stage 0: the pre-registered machine screens | — |
+| `RF-51` | planned | Quality remediation, stage 1: clone input correctness | — |
+| `RF-52` | planned | Quality remediation, stage 2: clone conditioning parity | `RF-50`, `RF-51` |
+| `RF-53` | planned | Quality remediation, stage 3: long-form text layout, language fallback and runaway takes | `RF-50` |
+| `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
+| `RF-55` | planned | Quality remediation, stage 5: code-predictor precision | `RF-50` |
+| `RF-56` | planned | Correct the upstream readings and stale references in the model documents | — |
 
 ### Open items in detail
 
@@ -160,6 +167,27 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-48`** (planned) — Core overhaul, stage 4: finalization, preview and the heat pause.
   gate: The watermark's weights are held across takes; marking, Fast QC and the hash run as chunks arrive, with every saved or exported take still marked and checked; the live preview's prebuffer follows measured speed; long-form pauses between segments, never inside a take, while the thermal state is serious or critical, and says why (report cards H1, H2, H3; section 8.3).
+
+- **`RF-50`** (planned) — Quality remediation, stage 0: the pre-registered machine screens.
+  gate: A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Nobody listens.
+
+- **`RF-51`** (planned) — Quality remediation, stage 1: clone input correctness.
+  gate: With no sample change for a good reference: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12, G-15); briefs, instructions and transcripts are NFC-normalized (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests.
+
+- **`RF-52`** (planned) — Quality remediation, stage 2: clone conditioning parity.
+  gate: Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11).
+
+- **`RF-53`** (planned) — Quality remediation, stage 3: long-form text layout, language fallback and runaway takes.
+  gate: Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take.
+
+- **`RF-54`** (planned) — Quality remediation, stage 4: the decoder's 72-frame attention window.
+  gate: The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.
+
+- **`RF-55`** (planned) — Quality remediation, stage 5: code-predictor precision.
+  gate: The speed and memory cost of an 8-bit code predictor under the 4-bit talker is measured on the Mac, unclamped and on the efficiency cores; the pre-screen's similarity gain is repeated in Swift on more voices and languages; and the maintainer decides on a new Speed artifact from those numbers. Publishing an artifact is the maintainer's step.
+
+- **`RF-56`** (planned) — Correct the upstream readings and stale references in the model documents.
+  gate: The corrections listed in section 9 of the review of 2026-11-11 are made.
 
 ## Specialist-audit remediation
 
@@ -587,6 +615,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
 | `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
+| `BKL-71` | parked | The session-start hook's free-space test fails now and then | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -781,6 +810,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-70`** (parked) — A diagnostics launch forwards the host's build-path variables into the app on the phone.
   gate: A diagnostics launch forwards only the tuning and run-identity variables a lane sets, not the QVOICE_* build-output paths and the worker session the host exports.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-71`** (parked) — The session-start hook's free-space test fails now and then.
+  gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

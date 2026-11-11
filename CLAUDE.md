@@ -119,6 +119,10 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
     due date and gates set the order. The runtime's core overhaul (RF-44 to RF-48,
     `docs/audits/2026-11-10-apple-silicon-performance-research.md`) is performed before the iOS
     submission, and the result must be fully App Store compliant.
+  - **Output quality is remediated before the submission** (decision of 2026-11-11): RF-50 to
+    RF-56, from `docs/audits/2026-11-11-qwen3-tts-quality-report-review.md`. A change that alters
+    samples lands only behind a machine screen whose decision rule is recorded before its takes
+    are generated.
   - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
   - **Backlog items that need no iPhone stay authorized** (decision of 2026-10-16): each is closed in
     the change that fixes it, and a Mac-only request joins the plan as an item. Ask the maintainer

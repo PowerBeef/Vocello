@@ -4,7 +4,7 @@
   "focusLock": {
     "plan": "release-first-3-0-2026-09",
     "decided": "2026-10-23",
-    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan.",
+    "decision": "The iOS 3.0 App Store submission is the release goal. The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16. Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request.",
     "maxInFlight": 3,
     "freeze": {
       "commit": "e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04"
@@ -304,7 +304,13 @@
         "RF-45",
         "RF-46",
         "RF-47",
-        "RF-48"
+        "RF-48",
+        "RF-50",
+        "RF-51",
+        "RF-52",
+        "RF-53",
+        "RF-54",
+        "RF-55"
       ],
       "gate": "scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.",
       "sourceOfTruth": [
@@ -444,6 +450,117 @@
       "notes": "Opened 2026-11-10 with the overhaul (D-01 and B-09 in ER-08). Landed: the watermark pass without its per-window cache clears (093a092c, 901749f1); the live preview started from the take's measured pace (af8ca492); long-form waits between segments while the thermal state is serious or critical, at most three minutes, and says why (fd019b81). Left out: holding the watermark's weights and marking as chunks arrive (it would raise a take's peak). M6: finalization a fifth shorter, first sound 0.44 s sooner. iPhone 17 Pro, 2026-11-11: the UI benchmark passed at 3f8fa144 (ios-xcui-benchmark-20261111-172017-636b2dd5). Against 2026-11-03 the preview starts 0.5 to 0.8 s sooner after the first chunk on medium and long takes (medium Custom 1.40 to 0.63 s) and 0.1 to 0.2 s on short ones, with no underrun in 29 takes; RTF is unchanged (0.53 to 0.52) and finalization 1 to 5% shorter. The kernel's footprint high-water mark does not rise during finalization on 36 headless takes. The long-form journey passed (ios-xcui-smoke-20261111-173732-88218ccb). Open: the heat pause at serious heat (the 17 Pro reached fair), the iPhone 15 Pro's preview, and the App Review notes, which say nothing about heat."
     },
     {
+      "id": "RF-50",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 0: the pre-registered machine screens",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Nobody listens.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "scripts/clone_fidelity_lane.py",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-01's parity fixtures for the encoder. The review's method (the Python port with the QC models) is the pre-screen; these lanes are the Swift screen."
+    },
+    {
+      "id": "RF-51",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 1: clone input correctness",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "With no sample change for a good reference: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12, G-15); briefs, instructions and transcripts are NFC-normalized (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Sources/QwenVoiceCore/NativeCloneSupport.swift",
+        "Sources/QwenVoiceCore/AudioPreparation.swift",
+        "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's G-01, G-02, G-08 to G-13 and G-15 and ER-05's A-18."
+    },
+    {
+      "id": "RF-52",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 2: clone conditioning parity",
+      "status": "planned",
+      "blockedBy": [
+        "RF-50",
+        "RF-51"
+      ],
+      "gate": "Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11).",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's A-02, G-03, A-04, A-26, A-11, A-12 and G-07. The review's pre-screen found no detectable effect of the rotary fix on English clones (+0.004 similarity over 96 pairs), so it is expected to land for parity, not for an audible gain."
+    },
+    {
+      "id": "RF-53",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 3: long-form text layout, language fallback and runaway takes",
+      "status": "planned",
+      "blockedBy": [
+        "RF-50"
+      ],
+      "gate": "Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-03's open D1 question and ER-05's D6. Both switches exist (QWENVOICE_FULL_TEXT_CONDITIONING, QWENVOICE_CUSTOM_AUTO_LANGUAGE). ICA-15's rule stands: never trim, silently regenerate or substitute a seed."
+    },
+    {
+      "id": "RF-54",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 4: the decoder's 72-frame attention window",
+      "status": "planned",
+      "blockedBy": [
+        "RF-50"
+      ],
+      "gate": "The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up PA-16's decoder half (A-03). PA-16's clause about the encoder's 250-frame window is not taken up: the codec guide and the model research say not to add it."
+    },
+    {
+      "id": "RF-55",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 5: code-predictor precision",
+      "status": "planned",
+      "blockedBy": [
+        "RF-50"
+      ],
+      "gate": "The speed and memory cost of an 8-bit code predictor under the 4-bit talker is measured on the Mac, unclamped and on the efficiency cores; the pre-screen's similarity gain is repeated in Swift on more voices and languages; and the maintainer decides on a new Speed artifact from those numbers. Publishing an artifact is the maintainer's step.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "docs/reference/qwen3-tts-guide.md"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. The review's pre-screen: an 8-bit code predictor alone gives +0.010 speaker similarity (95% interval +0.002 to +0.019, 48 pairs) for 56 MB; the all-8-bit model gives +0.025."
+    },
+    {
+      "id": "RF-56",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Correct the upstream readings and stale references in the model documents",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The corrections listed in section 9 of the review of 2026-11-11 are made.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Documents only."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",
@@ -472,7 +589,13 @@
         "RF-45",
         "RF-46",
         "RF-47",
-        "RF-48"
+        "RF-48",
+        "RF-50",
+        "RF-51",
+        "RF-52",
+        "RF-53",
+        "RF-54",
+        "RF-55"
       ],
       "gate": "Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.",
       "sourceOfTruth": [
@@ -1331,7 +1454,7 @@
         "docs/reference/mimi-codec-guide.md",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
-      "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output. 2026-10-13 core engine review: the gate should add that no encoder KV stays resident after an encode; a window alone does not fix MEM-1 (BKL-03). 2026-10-16: re-homed into engine-remediation-2026-10; audit A-03 refines it (the decoder's fp32 KV grows for the whole take) and the MLX refresh goes first.",
+      "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output. 2026-10-13 core engine review: the gate should add that no encoder KV stays resident after an encode; a window alone does not fix MEM-1 (BKL-03). 2026-10-16: re-homed into engine-remediation-2026-10; audit A-03 refines it (the decoder's fp32 KV grows for the whole take) and the MLX refresh goes first. 2026-11-11: RF-54 takes up the decoder's window before the iOS submission; the encoder clause is not taken up.",
       "plan": "engine-remediation-2026-10",
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23)."
@@ -2299,6 +2422,21 @@
       "notes": "Parked 2026-11-11 from the phone window: device_diagnostics_env_json forwards every QVOICE_* and QWENVOICE_* variable, which includes the absolute build-output paths that scripts/lib/build_paths.sh exports and QVOICE_WORKER_SESSION. They reach only the development app's environment on the maintainer's own phone; no file or record was seen to carry them. Not investigated."
     },
     {
+      "id": "BKL-71",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The session-start hook's free-space test fails now and then",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.",
+      "sourceOfTruth": [
+        "scripts/hooks/session_start.sh",
+        "scripts/tests/test_agent_hooks.py"
+      ],
+      "updated": "2026-11-11",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",
@@ -2349,7 +2487,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "A-09: ICA-06, ICA-15 and RF-06 share A-01's post-text regime; they stay in their plans and are re-measured here. 2026-11-10 review: the baseline is RF-18 plus RF-21 (9cd075bd gave single streamed takes their whole script)."
+      "notes": "A-09: ICA-06, ICA-15 and RF-06 share A-01's post-text regime; they stay in their plans and are re-measured here. 2026-11-10 review: the baseline is RF-18 plus RF-21 (9cd075bd gave single streamed takes their whole script). 2026-11-11: RF-53 takes up the long-form D1 screen before the iOS submission."
     },
     {
       "id": "ER-04",
@@ -2365,7 +2503,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "The maintainer kept clone conditioning out of the pre-freeze set on 2026-10-16."
+      "notes": "The maintainer kept clone conditioning out of the pre-freeze set on 2026-10-16. 2026-11-11: RF-51 and RF-52 take up G-01 to G-03, G-07 to G-13, G-15, A-02, A-04, A-11, A-12 and A-26 before the iOS submission; G-04 to G-06 and G-16 to G-21 stay here."
     },
     {
       "id": "ER-05",
@@ -2380,7 +2518,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls. 2026-10-17: RF-18's follow-up screen supports it: C1 (Consistent with the subtalker on reference values) failed 2 of 56 long-form projects against 9 for C0; adoption goes with RF-18 once E4 finishes. 2026-10-20: done with RF-18 (7a125aaf): the subtalker keeps the reference sampling for every variation and D2 (EOS filtered) is production, both by the follow-up screen's pre-registered rules. Left here: D6, A-17, A-18, A-10 and BKL-01.",
+      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls. 2026-10-17: RF-18's follow-up screen supports it: C1 (Consistent with the subtalker on reference values) failed 2 of 56 long-form projects against 9 for C0; adoption goes with RF-18 once E4 finishes. 2026-10-20: done with RF-18 (7a125aaf): the subtalker keeps the reference sampling for every variation and D2 (EOS filtered) is production, both by the follow-up screen's pre-registered rules. Left here: D6, A-17, A-18, A-10 and BKL-01. 2026-11-11: RF-51 takes up A-18 and RF-53 takes up D6 before the iOS submission.",
       "legacyIds": [
         "BKL-01"
       ]

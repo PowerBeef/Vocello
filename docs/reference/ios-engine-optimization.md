@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: ios
-reviewed: 2026-10-20
+reviewed: 2026-11-11
 summary: Historical record (June–August 2026, iOS 26) of the iPhone engine's bring-up and optimization — the in-process move, the Jetsam and memory posture, streaming-first, the canonical July record and the disposed levers — with its iOS 27 memory limit and RTF labels corrected; current numbers live in the engine audit and benchmarks/HISTORY.md.
 sourceOfTruth:
   - config/runtime-debug-knobs.json
@@ -137,7 +137,8 @@ The `iPhonePro` policy is the most aggressive tier (it shares the app's budget):
 | Pressure monitor active | **yes** | yes | yes |
 
 (`NativeMemoryPolicyResolver.swift` — iPhonePro block. The 128 MB cache + per-chunk clear + 50-token
-cadence + 30 s idle-unload are what keep the streaming peak flat.)
+cadence are what keep the streaming peak flat. The idle unload was 30 s when this was written and
+is two minutes in the foreground since RF-47 (2026-11-11).)
 
 ### 2.3 Pressure bands, admission, and cache clearing
 

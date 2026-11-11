@@ -677,6 +677,11 @@ registry; one claim is stale (B-20), one is false but safe by single-flight (CON
 
 ### V — Adversarial verification (blind refuter over 12 claims; the lead verified 10 more directly)
 
+Corrected 2026-11-11 ([review](2026-11-11-qwen3-tts-quality-report-review.md)): A-02's
+divergence is real, and a pre-screen found no detectable effect of its fix on clone output; mlx-audio's
+6549fc2 added the encoder with the correct setting from the start. G-12's "never matches" holds only
+for a stored transcript with newlines, tabs or repeated spaces.
+
 The lead verified A-01's mechanism, A-02 (plus upstream mlx-audio 6549fc2), B-02, B-03, C-02,
 C-03, D-01, E-02, E-05 and G-01. The refuter's 12 claims: 6 confirmed, 6 partly confirmed, 0
 refuted.

@@ -399,5 +399,11 @@ stay dated and link to the owners.
 5. Whether the paper's streaming numbers used 25 or 72 frames of decoder context.
 6. Whether Qwen's evaluation ran the codec in bf16.
 7. How much A-02 and 4-bit code-predictor quantization change output (needs a parity or measured run).
+   Corrected 2026-11-11: a pre-screen in the Python port measured both
+   ([review](2026-11-11-qwen3-tts-quality-report-review.md), section 4). The A-02 fix changes clone
+   speaker similarity by +0.004 (95% interval -0.003 to +0.011, 96 pairs); the 8-bit model beats
+   the 4-bit one by 0.025, and an 8-bit code predictor alone gives +0.010. mlx-audio's `6549fc2`
+   added its encoder with the correct rotary from the start, so it is not a fix of a measured
+   defect, and vLLM-Omni's pull request 5041 closed unmerged after finding no gain.
 8. Whether the scalar-gather issue reproduces under mlx-swift 0.32.3, and the load leak's real size.
 9. The iOS 27 memory limit on 8 GB phones (D-06 verified only the 12 GB iPhone 17 Pro).

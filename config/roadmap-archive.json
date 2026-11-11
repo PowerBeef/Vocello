@@ -5998,6 +5998,22 @@
       "evidence": [
         "doc:docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
       ]
+    },
+    {
+      "id": "RF-56",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Correct the upstream readings and stale references in the model documents",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The corrections listed in section 9 of the review of 2026-11-11 are made.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
+      ],
+      "updated": "2026-11-11",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Documents only. 2026-11-11: the corrections are made in the three model guides, the MLX guide, UPSTREAM.md, the iOS engine guide and, as dated correction notes, the audits of 2026-10-12, 2026-10-16 and 2026-10-17; PA-16's and QC-06's gates are corrected. The padding comment in Qwen3TTSVoiceClonePrompt.swift goes with RF-51.",
+      "evidence": [
+        "commit:4d516102"
+      ]
     }
   ]
 }

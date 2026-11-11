@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: backend-and-platform
-reviewed: 2026-10-28
+reviewed: 2026-11-11
 summary: Survey of tools, models, dependencies, MCP servers, plugins and skills for catching the voice-clip defects the QC harness keeps missing; root causes, verified generator divergences, a layered strategy and a phased recommendation. Research only, no implementation.
 sourceOfTruth:
   - docs/reference/qc.md
@@ -259,6 +259,10 @@ language as the script), with a UI warning.
     ([mlx-audio #921](https://github.com/Blaizzy/mlx-audio/issues/921)).
   - About 20% of takes come out in the wrong speaker's voice when the reference is in another language
     ([#80](https://github.com/QwenLM/Qwen3-TTS/issues/80)).
+  - Corrected 2026-11-11 ([review](2026-11-11-qwen3-tts-quality-report-review.md), section 5):
+    issue 341 reports output that begins with the reference transcript's last words and says
+    nothing about how the reference ends; the mlx-audio 921 result is one user's single clip; and
+    the 20% figure of issue 80 comes from an all-English setup.
 
 **P2 — accent leakage.** Action: native-French voices made through Voice Design → Clone, and a French
 diction line that mirrors the English one.

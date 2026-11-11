@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 45/80 (56%) |
+| `release-first-3-0-2026-09` | active | release-qa | 46/80 (58%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -78,7 +78,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-53` | planned | Quality remediation, stage 3: long-form text layout, language fallback and runaway takes | `RF-50` |
 | `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
 | `RF-55` | planned | Quality remediation, stage 5: code-predictor precision | `RF-50` |
-| `RF-56` | planned | Correct the upstream readings and stale references in the model documents | — |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
 
 ### Open items in detail
@@ -186,9 +185,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-55`** (planned) — Quality remediation, stage 5: code-predictor precision.
   gate: The speed and memory cost of an 8-bit code predictor under the 4-bit talker is measured on the Mac, unclamped and on the efficiency cores; the pre-screen's similarity gain is repeated in Swift on more voices and languages; and the maintainer decides on a new Speed artifact from those numbers. Publishing an artifact is the maintainer's step.
-
-- **`RF-56`** (planned) — Correct the upstream readings and stale references in the model documents.
-  gate: The corrections listed in section 9 of the review of 2026-11-11 are made.
 
 - **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
   gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.
@@ -396,7 +392,7 @@ Narrative authority: [`docs/audits/2026-10-16-engine-runtime-audit.md`](audits/2
   unparkWhen: Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).
 
 - **`PA-16`** (parked) — Speech-tokenizer attention honors the model's sliding windows.
-  gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
+  gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache; the encoder keeps full causal attention, as the reference runs it (corrected 2026-11-11: the codec guide and the model research say not to add its 250-frame window); a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
   unparkWhen: Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).
 
 - **`PA-33`** (parked) — Engine-side lease for model deletion.
@@ -936,7 +932,7 @@ Narrative authority: [`docs/reference/qc.md`](reference/qc.md)
   unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
 
 - **`QC-06`** (parked) — Product follow-ups surfaced by QC.
-  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).
+  gate: Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human; these figures have no measurement record in the repository and are re-measured first, noted 2026-11-11), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).
   unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
 
 - **`QC-08`** (parked) — In-app Fast QC v9: relative silence, ending fade and loudness.

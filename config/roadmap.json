@@ -548,19 +548,6 @@
       "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. The review's pre-screen: an 8-bit code predictor alone gives +0.010 speaker similarity (95% interval +0.002 to +0.019, 48 pairs) for 56 MB; the all-8-bit model gives +0.025."
     },
     {
-      "id": "RF-56",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Correct the upstream readings and stale references in the model documents",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "The corrections listed in section 9 of the review of 2026-11-11 are made.",
-      "sourceOfTruth": [
-        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md"
-      ],
-      "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Documents only."
-    },
-    {
       "id": "RF-57",
       "plan": "release-first-3-0-2026-09",
       "title": "Audit the tooling the quality remediation relies on",
@@ -1465,7 +1452,7 @@
       "id": "PA-16",
       "title": "Speech-tokenizer attention honors the model's sliding windows",
       "status": "parked",
-      "gate": "The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.",
+      "gate": "The decoder transformer applies its 72-frame sliding window with a bounded KV cache; the encoder keeps full causal attention, as the reference runs it (corrected 2026-11-11: the codec guide and the model research say not to add its 250-frame window); a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.",
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
         "docs/reference/mimi-codec-guide.md",
@@ -1473,7 +1460,7 @@
       ],
       "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output. 2026-10-13 core engine review: the gate should add that no encoder KV stays resident after an encode; a window alone does not fix MEM-1 (BKL-03). 2026-10-16: re-homed into engine-remediation-2026-10; audit A-03 refines it (the decoder's fp32 KV grows for the whole take) and the MLX refresh goes first. 2026-11-11: RF-54 takes up the decoder's window before the iOS submission; the encoder clause is not taken up.",
       "plan": "engine-remediation-2026-10",
-      "updated": "2026-11-10",
+      "updated": "2026-11-11",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23)."
     },
     {
@@ -1661,7 +1648,7 @@
       "blockedBy": [
         "QC-03"
       ],
-      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).",
+      "gate": "Each finding has a product item or a decision: register anchoring for Built-in and Design (take-to-take SD 2.4 and 3.1 st vs 1.1 human; these figures have no measurement record in the repository and are re-measured first, noted 2026-11-11), regenerate-on-outlier, Design brief gender, clone pitch, and the three defects heard on fr-0101--dylan (whispered final syllable, false start before a word, over-linked liaison with an inserted vowel).",
       "sourceOfTruth": [
         "docs/reference/qc.md",
         "docs/audits/2026-10-10-generation-quality-investigation.md",
@@ -1671,7 +1658,7 @@
         "docs/audits/2026-10-10-local-audio-candidate-implementation.md",
         "docs/audits/2026-10-12-audio-qc-tooling-research.md"
       ],
-      "updated": "2026-10-12",
+      "updated": "2026-11-11",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone evidence, transcript review, French starter, actual-audio enrollment, private receipts and bounded replay. CTC/DSP evidence now includes phonation, unaligned-fragment and reviewed-boundary producers; review corrected availability/export-loss coverage. Clean d52d5ae9 completed thirteen retained development clips in four runs, all strict gate 4. New candidates overlap Dylan whisper (IoU .474) and missed false start (.75), but acceptable clips also nominate. Existing measurements/model bindings are unchanged; thirteen held-out confirmations stay excluded. Next: independent class definitions/localized labels, complete negatives, genuine reviewed boundary paths, exact failing Clone pairs, accent and causal qualification. No qualified acceptance, shipping decoder repair or regeneration. QC-08/RF-14 remain separate. Linked audits preserve failed checks and initial pressure refusals. The 2026-10-12 tooling research puts class/span labels and generator-divergence A/B tests first; no phase started."
     },

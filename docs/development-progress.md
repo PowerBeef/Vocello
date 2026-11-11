@@ -41,29 +41,20 @@ session can continue from it alone.
 - **A defect the screen found in its own self-run:** reference preparation is not reproducible
   (`AVAssetReader` resamples, and even decodes AAC, differently from run to run). `e57ddd57` adds
   `Resampling.singleCall` (preparation version 2) behind `QWENVOICE_REFERENCE_PREPARATION=single-call`;
-  the default is unchanged.
+  it is the default since `a715b2ae` (below).
 
-**In progress: the `reference-preparation-v2` decision (RF-52)**
+**Decided: reference preparation is reproducible (RF-52, first change)**
 
-- The rule is in `config/quality-screens.json`, recorded before its arms.
-- Arms, all at `e57ddd57`, in `build/artifacts/macos/quality-screen/clone-seeds1/arms`: `a3`
-  (default), `b1` and `b2` (the key set). `b1` and `b2` are identical on 190 of 190 takes, which
-  meets the rule's requirement; `a1` and `a3` (default twice) agree on only 167 of 191.
-- What is left is the scored comparison. If `compare-a3-vs-b1.json` is not in that folder, run:
-
-  ```sh
-  PY="$(python3 scripts/select_python.py)"; R=build/artifacts/macos/quality-screen/clone-seeds1
-  "$PY" scripts/quality_screen.py score --run $R --arm a3
-  "$PY" scripts/quality_screen.py score --run $R --arm b1
-  "$PY" scripts/quality_screen.py compare --run $R --a a3 --b b1 --rule reference-preparation-v2
-  ```
-
-- **ADOPT:** set `Resampling.production` to `.singleCall` in
-  `Sources/QwenVoiceCore/AudioPreparation.swift`, update
-  `testTheResamplingPathIsTheAssetReaderUnlessTheGatedKeySelectsTheOther` and the two guides,
-  get the `vocello-swift-review` agent's read, run `scripts/dev.sh check`, commit under RF-52 and
-  record the verdict in RF-52's note. Every saved voice's prompt then rebuilds once.
-  **REJECT or INCONCLUSIVE:** the default stays; record the numbers in RF-52's note.
+- The rule `reference-preparation-v2` (in `config/quality-screens.json`, recorded before its arms,
+  with its result) said ADOPT, and `a715b2ae` made the single-call path the default.
+- Two runs of the new path gave 190 identical takes of 190; the old path twice gave 167 of 191.
+  Against the old path: speaker similarity -0.009 (interval -0.025 to +0.006), error rate +0.003,
+  gross failures 1 and 2, and 22 ms more trailing silence on average (interval +6 to +40 ms, just
+  inside the 40 ms margin). The screen shows it is not grossly worse, not that it is better.
+- The default build reproduces the screened arm on 190 of 190 takes (arm `c1` against `b1`).
+- Every reference that is not already 24 kHz mono 16-bit WAV is prepared anew, and every saved
+  voice's prompt rebuilds once. Arms and comparisons:
+  `build/artifacts/macos/quality-screen/clone-seeds1`.
 
 **Next, in order (each sample-changing step: a knob, a rule recorded first, then the screen)**
 

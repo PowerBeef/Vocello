@@ -95,8 +95,11 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private var debugForceCriticalOnceArmed = false
     /// Sustained-load thermal policy (roadmap P3): serious/critical thermal state
     /// gates PROACTIVE warm work (prewarm, clone priming) so the device can cool
-    /// between takes. Generation itself is never thermally blocked — that would
-    /// need a maintainer decision. `QVOICE_IOS_THERMAL_GATE=off` disables the gate.
+    /// between takes. A take itself is never thermally blocked here. A
+    /// long-form run waits between its segments while the device is hot
+    /// (`LongFormHeatPause`, the maintainer's decision of 2026-11-10, RF-48);
+    /// that is the run's own policy, not this gate's.
+    /// `QVOICE_IOS_THERMAL_GATE=off` disables the gate.
     private var latestThermalState: ProcessInfo.ThermalState = ProcessInfo.processInfo.thermalState
     /// nonisolated(unsafe): written once during MainActor init, read only in deinit
     /// (when no other references remain) — satisfies strict concurrency for the

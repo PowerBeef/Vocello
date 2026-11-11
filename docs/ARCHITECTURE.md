@@ -822,8 +822,13 @@ concrete type. Key iOS behaviors:
   characterized without a model, UI host, network, or Simulator.
 - **Thermal gate** (2026-07-02): `TTSEngineStore.startThermalObservation` records
   thermal transitions and blocks PROACTIVE warm work (prewarm/clone priming) at
-  serious/critical; generation is never thermally blocked
+  serious/critical; a take is never thermally blocked
   (`QVOICE_IOS_THERMAL_GATE=off` is a debug-gated diagnostic override).
+- **Long-form heat pause** (RF-48, 2026-11-11): between the segments of a long-form run, never
+  inside a take, `LongFormHeatPause` holds the next segment while the thermal state is serious or
+  critical, for at most three minutes, and the progress line says why. The first take of a run,
+  single takes and segment regeneration are never held; Stop works throughout. The apps pause; the
+  CLI, which has no progress line, does not.
 - **Interruption recorder** (2026-07-02): `IOSInterruptionRecorder` (CXCallObserver +
   UIApplication lifecycle) runs during headless device diagnostics only; events land in
   `device-diagnostics-done.json` as `interruptions` so doomed runs self-report calls/backgrounding.

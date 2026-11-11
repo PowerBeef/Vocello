@@ -168,7 +168,8 @@ inline-card publication remains attempt-scoped in the view after the shared boun
 
 Scripts above the single-take limit route to a long-form project in all three modes
 ([long-form-generation.md](long-form-generation.md)): the helper line narrates per-segment
-progress, the dock's Cancel stops the whole run, a stopped project with reusable takes exposes
+progress, and says so when the run waits between segments for a hot iPhone to cool (RF-48); the
+dock's Cancel stops the whole run, a stopped project with reusable takes exposes
 `longform_resumeChip`, and a completed in-session project exposes `iosLongForm_segmentsChip`, a
 setup-row chip whose confirmation-dialog items (`iosLongForm_regenerateSegment_<index>`) regenerate
 one segment with a fresh recorded seed and reassemble the joined output. The completed project

@@ -15,6 +15,8 @@ final class VocelloPresentationTextTests: XCTestCase {
                        "Generated segment 2 of 3; project not yet saved")
         XCTAssertEqual(VocelloPresentationText.regeneratingSegment(1, total: 3),
                        "Regenerating segment 1 of 3…")
+        XCTAssertEqual(VocelloPresentationText.coolingDownBeforeSegment(2, total: 3),
+                       "Paused to cool down. Segment 2 of 3 starts on its own.")
     }
 
     func testDynamicPresentationPreservesSubstitutedContentVerbatim() {

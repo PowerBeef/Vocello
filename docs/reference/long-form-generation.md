@@ -139,6 +139,13 @@ chip opens a confirmation dialog, regenerates one segment through the shared rep
 lineage, and reassembles the joined output), and line-separated batch remains intentionally absent — long-form **is** the
 device-validated sequential-streaming design the iOS batch-removal invariant demanded.
 
+Between segments, never inside a take, the run waits while the system reports a serious or
+critical thermal state (`LongFormHeatPause`, RF-48, 2026-11-11): the helper line says why
+("Paused to cool down. Segment 2 of 3 starts on its own."), VoiceOver is told once, Stop works
+throughout, and after three minutes the next segment starts anyway. The first take of a run,
+including the first after Resume, is never held. The Mac app pauses the same way; the CLI does
+not. Not yet exercised on a hot iPhone.
+
 Device acceptance passed 2026-07-24 on the paired iPhone 17 Pro (smoke run
 `ios-xcui-smoke-20260724-183626-f9961535`): a >2,000-character script planned three segments,
 streamed them sequentially (55.0 s + 45.4 s + 26.6 s), joined 127.2 s of audio through the

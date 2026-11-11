@@ -174,6 +174,12 @@ struct VocelloPresentationText: Sendable {
             comment: "Complete user-facing generatingSegment message. Preserve substitution identities."), number, total)
     }
 
+    func coolingDownBeforeSegment(_ number: Int, total: Int) -> String {
+        localization.format(localization.string(localized: "vocello.presentation.coolingDownBeforeSegment",
+            defaultValue: "Paused to cool down. Segment %1$lld of %2$lld starts on its own.",
+            comment: "Complete user-facing coolingDownBeforeSegment message. Preserve substitution identities."), number, total)
+    }
+
     func generatedSegmentPending(_ number: Int, total: Int) -> String {
         localization.format(localization.string(localized: "vocello.presentation.generatedSegmentPending",
             defaultValue: "Generated segment %1$lld of %2$lld; project not yet saved",
@@ -883,6 +889,7 @@ extension VocelloPresentationText {
     static func regeneratingSegment(_ number: Int, total: Int) -> String { Self().regeneratingSegment(number, total: total) }
     static func reusingSegment(_ number: Int, total: Int) -> String { Self().reusingSegment(number, total: total) }
     static func generatingSegment(_ number: Int, total: Int) -> String { Self().generatingSegment(number, total: total) }
+    static func coolingDownBeforeSegment(_ number: Int, total: Int) -> String { Self().coolingDownBeforeSegment(number, total: total) }
     static func generatedSegmentPending(_ number: Int, total: Int) -> String { Self().generatedSegmentPending(number, total: total) }
     static func joiningSegments(_ count: Int) -> String { Self().joiningSegments(count) }
     static func segmentQCRejected(_ number: Int) -> String { Self().segmentQCRejected(number) }

@@ -2653,6 +2653,72 @@
         }
       }
     },
+    "vocello.presentation.coolingDownBeforeSegment": {
+      "comment": "Complete user-facing coolingDownBeforeSegment message. Preserve substitutions.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused to cool down. Segment %1$lld of %2$lld starts on its own."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause pour refroidir. Le segment %1$lld sur %2$lld démarrera tout seul."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausa para enfriar. El segmento %1$lld de %2$lld empezará solo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause zum Abkühlen. Abschnitt %1$lld von %2$lld startet von selbst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausa per raffreddare. Il segmento %1$lld di %2$lld partirà da solo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausa para esfriar. O segmento %1$lld de %2$lld começa sozinho."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在降温，已暂停。第 %1$lld / %2$lld 段将自动开始。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "冷却のため一時停止中。区間 %1$lld / %2$lld は自動で始まります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기기를 식히는 중입니다. 구간 %1$lld / %2$lld 생성은 자동으로 시작됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пауза для охлаждения. Сегмент %1$lld из %2$lld начнётся сам."
+          }
+        }
+      }
+    },
     "vocello.presentation.generatedSegmentPending": {
       "comment": "Complete user-facing generatedSegmentPending message. Preserve substitutions.",
       "extractionState": "manual",

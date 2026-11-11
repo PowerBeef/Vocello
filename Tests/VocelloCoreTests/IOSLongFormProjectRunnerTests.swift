@@ -309,8 +309,10 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
             }
         }
 
-        func makeCoordinator() -> IOSLongFormCoordinator {
-            IOSLongFormCoordinator(hooks: hooks, services: services)
+        /// No test reads the test machine's own thermal state: the default
+        /// pause never holds, and the heat tests script theirs.
+        func makeCoordinator(heatPause: LongFormHeatPause = .never) -> IOSLongFormCoordinator {
+            IOSLongFormCoordinator(hooks: hooks, services: services, heatPause: heatPause)
         }
 
         func makeRunner(cancellation: IOSLongFormCancellationState) -> IOSLongFormProjectRunner {
@@ -319,7 +321,8 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
                 audioPlayer: player,
                 cancellationState: cancellation,
                 hooks: hooks,
-                services: services
+                services: services,
+                heatPause: .never
             )
         }
     }
@@ -527,6 +530,116 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
     }
 
     // MARK: - Cancellation and resume
+
+    // MARK: - Heat pause (RF-48)
+
+    /// A scripted thermal state for the heat pause: the readings it will
+    /// return in order (the last one repeats), and what the run showed and
+    /// had generated at each wait.
+    @MainActor
+    private final class ScriptedHeat {
+        var readings: [ProcessInfo.ThermalState]
+        private(set) var waits = 0
+        private(set) var messagesWhileWaiting: [String] = []
+        private(set) var takesStartedAtEachWait: [Int] = []
+        var onWait: (@MainActor () -> Void)?
+        /// The coordinator whose progress line is read at each wait.
+        var coordinator: IOSLongFormCoordinator?
+
+        init(_ readings: [ProcessInfo.ThermalState]) { self.readings = readings }
+
+        func pause(
+            takeCount: @escaping @MainActor () -> Int,
+            maximumPause: Duration = .seconds(180)
+        ) -> LongFormHeatPause {
+            LongFormHeatPause(
+                thermalState: { [self] in readings.count > 1 ? readings.removeFirst() : (readings.first ?? .nominal) },
+                wait: { [self] _ in
+                    await MainActor.run {
+                        waits += 1
+                        messagesWhileWaiting.append(coordinator?.progress.statusMessage ?? "")
+                        takesStartedAtEachWait.append(takeCount())
+                        onWait?()
+                    }
+                },
+                pollInterval: .seconds(2),
+                maximumPause: maximumPause
+            )
+        }
+    }
+
+    func testAHotDeviceHoldsTheNextSegmentUntilItCoolsAndSaysWhy() async throws {
+        let f = try makeFixture()
+        // Read once before segment 2 (hot), then twice more in the wait loop
+        // (hot, hot), then cool for the rest of the run.
+        let heat = ScriptedHeat([.serious, .critical, .serious, .fair])
+        let made = f.makeCoordinator(heatPause: heat.pause(takeCount: { f.engine.takeRequests.count }))
+        heat.coordinator = made
+
+        made.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to finish") { !made.isProcessing }
+
+        guard case .completed = made.outcome else {
+            return XCTFail("Expected a completed project, got \(String(describing: made.outcome))")
+        }
+        XCTAssertEqual(f.engine.takeRequests.map(\.text), f.request.lines, "every segment is still generated, in order")
+        XCTAssertEqual(heat.waits, 2, "two hot readings in the wait loop, then it cooled")
+        XCTAssertEqual(heat.takesStartedAtEachWait, [1, 1], "the pause sits between segments 1 and 2, never inside a take")
+        XCTAssertEqual(
+            heat.messagesWhileWaiting,
+            Array(repeating: f.hooks.presentation.coolingDownBeforeSegment(2, total: 3), count: 2),
+            "the progress line says why the run is waiting"
+        )
+    }
+
+    func testTheFirstSegmentIsNeverHeldAndAHotDeviceStopsHoldingAtTheCeiling() async throws {
+        let f = try makeFixture()
+        // Hot for the whole run: the first take starts at once, and each
+        // later segment waits out the ceiling (three two-second waits of six
+        // seconds) and then starts anyway.
+        let heat = ScriptedHeat([.critical])
+        let made = f.makeCoordinator(
+            heatPause: heat.pause(takeCount: { f.engine.takeRequests.count }, maximumPause: .seconds(6))
+        )
+        heat.coordinator = made
+
+        made.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to finish") { !made.isProcessing }
+
+        guard case .completed = made.outcome else {
+            return XCTFail("Expected a completed project, got \(String(describing: made.outcome))")
+        }
+        XCTAssertEqual(f.engine.takeRequests.count, 3)
+        XCTAssertEqual(heat.takesStartedAtEachWait, [1, 1, 1, 2, 2, 2], "no wait before the first take; three per later segment")
+    }
+
+    func testStopDuringAHeatPauseCancelsTheProjectWithoutStartingTheNextTake() async throws {
+        let f = try makeFixture()
+        let heat = ScriptedHeat([.serious])
+        let made = f.makeCoordinator(heatPause: heat.pause(takeCount: { f.engine.takeRequests.count }))
+        heat.coordinator = made
+        var stopAccepted: Bool?
+        heat.onWait = {
+            guard stopAccepted == nil else { return }
+            stopAccepted = made.cancel(ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        }
+
+        made.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the project to stop") { !made.isProcessing }
+
+        XCTAssertEqual(stopAccepted, true)
+        guard case .cancelled(let segments) = made.outcome else {
+            return XCTFail("Expected a cancelled project, got \(String(describing: made.outcome))")
+        }
+        XCTAssertEqual(f.engine.takeRequests.count, 1, "the held segment's take never starts")
+        XCTAssertEqual(segments.filter(\.isSaved).count, 1, "the finished segment is kept")
+        XCTAssertEqual(segments.dropFirst().map(\.status), [.cancelled, .cancelled], "the held segments are cancelled, not failed")
+        XCTAssertEqual(f.services.timeline.count, 2, "only the finished take was submitted and completed")
+        XCTAssertTrue(made.canResume, "a project stopped in a pause resumes like any other")
+        // The stop request is recorded asynchronously, so the pause may poll
+        // once more before it sees it: at most one further two-second wait.
+        XCTAssertLessThanOrEqual(heat.waits, 2)
+    }
 
     func testCancellingMidProjectKeepsTheSavedSegmentAndResumeFinishesWithoutRegeneratingIt() async throws {
         let f = try makeFixture()

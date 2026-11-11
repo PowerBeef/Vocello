@@ -198,9 +198,12 @@ extension DesktopEngineHost {
             preconditionFailure("a new Studio coordinator refused its first attempt")
         }
         let cancellationState = IOSLongFormCancellationState()
+        // No heat pause here: this host shows no progress line that could say
+        // why a run is waiting, and a Mac at a terminal is not a phone in a hand.
         let runner = IOSLongFormProjectRunner(
             ttsEngine: store, audioPlayer: HeadlessLongFormPlayback(),
-            cancellationState: cancellationState, hooks: hooks, services: services
+            cancellationState: cancellationState, hooks: hooks, services: services,
+            heatPause: .never
         )
         let initial = projectRequest.lines.enumerated().map { IOSLongFormSegmentState(index: $0, line: $1, status: .pending) }
         // A signal cancels this task; the runner also honours the Stop the apps

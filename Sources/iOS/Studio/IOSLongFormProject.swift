@@ -1,3 +1,4 @@
+import Accessibility
 import AVFoundation
 import Foundation
 import Observation
@@ -29,6 +30,52 @@ import QwenVoiceCore
 /// failed one (`StudioRetakeSeed`) and records the seed it used (U10); a
 /// pinned Studio seed is the plan's base seed (U11); and Auto resolves one
 /// language for the whole script (`StudioScriptLanguage`, U03).
+
+// MARK: - Heat pause
+
+/// A long-form run's wait between segments while the device is hot (RF-48).
+///
+/// A long script keeps the GPU busy for minutes, and a phone answers with
+/// heat: the iPhone 15 Pro goes from generating in 1.6 times a take's length
+/// to about 3 times once it is hot. Between segments, never inside a take,
+/// the run waits while the system reports a serious or critical thermal state,
+/// says so in the progress line, and starts the next segment by itself when
+/// the state falls or the ceiling is reached. Stop works throughout. This is
+/// the app's answer to App Review Guideline 2.4.2 (apps must not generate
+/// excessive heat), and the maintainer's decision of 2026-11-10; single takes
+/// and segment regeneration are never held.
+///
+/// The ceiling exists because a device can stay hot for reasons the app does
+/// not control (a charger, the sun): the run must still end. The first
+/// segment a run generates is never held, since the heat is not this run's;
+/// that includes the first segment after Resume, which the user asked for.
+/// A pause longer than the idle-unload window ends in an ordinary reload.
+struct LongFormHeatPause: Sendable {
+    /// The device's thermal state now.
+    var thermalState: @MainActor @Sendable () -> ProcessInfo.ThermalState = {
+        ProcessInfo.processInfo.thermalState
+    }
+    /// One wait between two readings; tests replace it.
+    var wait: @Sendable (Duration) async -> Void = { duration in
+        _ = try? await Task.sleep(for: duration)
+    }
+    var pollInterval: Duration = .seconds(2)
+    /// The longest one pause lasts before the next segment starts anyway.
+    var maximumPause: Duration = .seconds(180)
+
+    /// A pause that never holds a segment: for a host with no progress line
+    /// to say why it waits (the CLI), and for tests that must not read the
+    /// test machine's own thermal state.
+    static let never = LongFormHeatPause(thermalState: { .nominal })
+
+    static func holdsNextSegment(at state: ProcessInfo.ThermalState) -> Bool {
+        switch state {
+        case .serious, .critical: true
+        case .nominal, .fair: false
+        @unknown default: false
+        }
+    }
+}
 
 // MARK: - Platform hooks
 
@@ -423,10 +470,17 @@ final class IOSLongFormCoordinator {
     @ObservationIgnored private let hooks: any IOSLongFormPlatformHooks
     @ObservationIgnored private let services: any IOSLongFormProjectServices
 
+    @ObservationIgnored private let heatPause: LongFormHeatPause
+
     /// The apps use `init(hooks:)`, which passes `IOSLongFormProductionServices`.
-    init(hooks: any IOSLongFormPlatformHooks, services: any IOSLongFormProjectServices) {
+    init(
+        hooks: any IOSLongFormPlatformHooks,
+        services: any IOSLongFormProjectServices,
+        heatPause: LongFormHeatPause = LongFormHeatPause()
+    ) {
         self.hooks = hooks
         self.services = services
+        self.heatPause = heatPause
     }
 
     private(set) var isProcessing = false
@@ -680,7 +734,8 @@ final class IOSLongFormCoordinator {
             audioPlayer: audioPlayer,
             cancellationState: cancellationState,
             hooks: hooks,
-            services: services
+            services: services,
+            heatPause: heatPause
         )
         segments = request.lines.enumerated().map { index, line in
             var segment = IOSLongFormSegmentState(index: index, line: line, status: .pending)
@@ -795,19 +850,39 @@ final class IOSLongFormProjectRunner {
     private let cancellationState: IOSLongFormCancellationState
     private let hooks: any IOSLongFormPlatformHooks
     private let services: any IOSLongFormProjectServices
+    private let heatPause: LongFormHeatPause
 
     init(
         ttsEngine: TTSEngineStore,
         audioPlayer: any IOSLongFormAudioPlayback,
         cancellationState: IOSLongFormCancellationState,
         hooks: any IOSLongFormPlatformHooks,
-        services: any IOSLongFormProjectServices
+        services: any IOSLongFormProjectServices,
+        heatPause: LongFormHeatPause = LongFormHeatPause()
     ) {
         self.ttsEngine = ttsEngine
         self.audioPlayer = audioPlayer
         self.cancellationState = cancellationState
         self.hooks = hooks
         self.services = services
+        self.heatPause = heatPause
+    }
+
+    /// Waits while the device is hot, up to the pause's ceiling. Returns true
+    /// when Stop was requested meanwhile.
+    private func waitForCoolDown() async -> Bool {
+        // The ceiling counts polls: a cancelled task makes the default wait
+        // return at once, and the loop then ends on the task's cancellation.
+        var waited = Duration.zero
+        while !Task.isCancelled,
+              LongFormHeatPause.holdsNextSegment(at: heatPause.thermalState()),
+              waited < heatPause.maximumPause {
+            if await cancellationState.wasRequested() { return true }
+            await heatPause.wait(heatPause.pollInterval)
+            waited += heatPause.pollInterval
+        }
+        if Task.isCancelled { return true }
+        return await cancellationState.wasRequested()
     }
 
     private func evaluateQC(path: String, expectedPauseCount: Int) async -> AudioQualityGate.Report {
@@ -837,6 +912,8 @@ final class IOSLongFormProjectRunner {
         var segments = initialSegments
         let total = segments.count
         var qualityReports: [AudioQualityGate.Report?] = []
+        /// Takes this run has started: the heat pause never holds the first.
+        var startedTakeCount = 0
 
         func publish(active: Int?, message: String) {
             onProgress(
@@ -883,6 +960,21 @@ final class IOSLongFormProjectRunner {
                 publish(active: index, message: hooks.presentation.reusingSegment(index + 1, total: total))
                 continue
             }
+
+            // RF-48: between segments, let a hot device cool before the next take.
+            if startedTakeCount > 0,
+               LongFormHeatPause.holdsNextSegment(at: heatPause.thermalState()) {
+                let message = hooks.presentation.coolingDownBeforeSegment(index + 1, total: total)
+                publish(active: index, message: message)
+                // The line can stay up for minutes: tell VoiceOver once, when
+                // the pause begins, rather than leave it to be found.
+                AccessibilityNotification.Announcement(message).post()
+                if await waitForCoolDown() {
+                    markCancelled(startingAt: index)
+                    return .cancelled(segments: segments)
+                }
+            }
+            startedTakeCount += 1
 
             segments[index].status = .running
             publish(active: index, message: hooks.presentation.generatingSegment(index + 1, total: total))

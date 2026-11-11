@@ -124,6 +124,9 @@ def capture(args: argparse.Namespace) -> Path:
         "--telemetry", "off", "--data-dir", str(data_dir), "--no-summary",
         "--label", args.label,
     ]
+    if args.delivery:
+        # Instruct-bearing takes: they build their prompt on another path.
+        command += ["--delivery", args.delivery]
     if "clone" in modes:
         # The fixture is a Voice Design reference the repository generated itself.
         command += ["--voice", CLONE_VOICE, "--confirm-consent"]
@@ -178,6 +181,7 @@ def capture(args: argparse.Namespace) -> Path:
         "variants": args.variants.split(","),
         "lengths": args.lengths.split(","),
         "warm": args.warm,
+        "delivery": args.delivery,
         "environmentOverrides": overrides,
         "qosClamp": args.clamp,
         "source": {
@@ -278,6 +282,10 @@ def main() -> int:
     capture_parser.add_argument("--variants", default="speed", help="speed, quality or both")
     capture_parser.add_argument("--lengths", default="short,medium")
     capture_parser.add_argument("--warm", type=int, default=2)
+    capture_parser.add_argument(
+        "--delivery", metavar="LIST",
+        help="add the bench's instruct-bearing cells, for example happy.strong,whisper.strong",
+    )
     capture_parser.add_argument(
         "--vocello", metavar="PATH",
         help="capture with this executable instead of build/vocello (a preserved baseline build)",

@@ -17,9 +17,11 @@ enum Qwen3TTSReferenceAudio {
     static let sampleRate = 24_000
 
     /// Trailing silence appended to the reference before codec encode on the
-    /// ICL path, matching upstream Qwen3-TTS reference preprocessing. The
-    /// padding gives the tokenizer a clean utterance boundary so clone takes
-    /// stop inheriting a truncated final phoneme from the reference.
+    /// ICL path. This is Vocello's own step: upstream Qwen3-TTS encodes the
+    /// reference as it is given, with no padding. It was added so a clone take
+    /// would not inherit a truncated final phoneme from the reference; that
+    /// effect has not been measured, and the padding against none is one of
+    /// the arms RF-52 screens (A-12, G-07).
     static let codecEncodeTrailingSilenceSamples = sampleRate / 2
 
     /// Version token for ICL reference-encode preprocessing. It participates

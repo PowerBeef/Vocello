@@ -788,6 +788,35 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         XCTAssertFalse(voice.enrollmentMetadataUnreadable, "no sidecar is an older or recorded voice")
     }
 
+    /// G-08: the store refuses what every review surface refuses, so a
+    /// one-shot enrollment cannot keep a reference that cannot condition a take.
+    @concurrent func testACandidateWithABlockingFindingCannotBeCommitted() async throws {
+        let repository = makeRepository()
+        try await repository.reconcile()
+        let source = try writeSource(named: "source.wav")
+        for blocking in ["reference_duration_excessive", "reference_quality_unreadable", "reference_near_silence"] {
+            let candidate = try await repository.prepare(
+                name: "Blocked Voice", audioURL: source, transcript: nil,
+                qualityWarnings: ["reference_duration_short", blocking], replacingVoiceID: nil)
+            do {
+                _ = try await repository.commit(id: candidate.id)
+                XCTFail("\(blocking) must not be committed")
+            } catch let error as PreparedVoiceRepositoryError {
+                XCTAssertEqual(error, .referenceRejected([blocking]))
+            }
+            let voices = try await repository.list()
+            XCTAssertEqual(voices, [])
+            try await repository.discard(id: candidate.id)
+        }
+        // Advice never blocks the store.
+        let advised = try await repository.prepare(
+            name: "Advised Voice", audioURL: source, transcript: nil,
+            qualityWarnings: ["reference_duration_short", "reference_source_rate_low", "reference_possible_clipping"],
+            replacingVoiceID: nil)
+        let record = try await repository.commit(id: advised.id)
+        XCTAssertEqual(record.name, "Advised Voice")
+    }
+
     @concurrent func testDiscardIsIdempotentAndAllowsSameNameRetry() async throws {
         let repository = makeRepository()
         try await repository.reconcile()

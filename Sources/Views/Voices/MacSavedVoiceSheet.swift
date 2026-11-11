@@ -386,8 +386,8 @@ struct MacSavedVoiceSheet: View {
             ),
             presenting: pendingVoiceForReview
         ) { candidate in
-            // The hard-block tier (>60 s) hides "Keep voice" so the user has to
-            // discard or cancel; the soft-warn tier keeps all three buttons.
+            // A blocking finding (over 60 s, unreadable, silent) hides "Keep
+            // voice", so the user discards or cancels; advice keeps all three.
             if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                 Button(MacInterfaceText.savedVoiceKeepVoice) {
                     acceptPendingVoice(candidate)
@@ -741,7 +741,9 @@ struct MacSavedVoiceSheet: View {
     }
 
     private var reviewAlertTitle: String {
-        errorMessage == nil ? MacInterfaceText.voicesReferenceOutsideRange : MacInterfaceText.savedVoiceSaveFailedTitle
+        errorMessage == nil
+            ? MacInterfaceText.qualityWarningTitle(tokens: pendingVoiceForReview?.qualityWarnings ?? [])
+            : MacInterfaceText.savedVoiceSaveFailedTitle
     }
 
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {

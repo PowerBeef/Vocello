@@ -87,8 +87,11 @@ L434-438 for the role and instruct turns, L495 and L532 for the target;
 L67 and L80 for ICL; the one ICL difference is a leading space, §2.3). Before tokenizing, it
 replaces ChatML, `<tts_…>` and think/tool control tokens in the script, instruction and transcript
 with a space (`Qwen3ChatTemplateText`, `Qwen3TTSPromptAssembly.swift` L488-505), so user text
-cannot open a turn. Instructions and briefs are not NFC-normalized (engine audit A-18, open in
-ER-05).
+cannot open a turn. The same step composes the text to NFC (`preparedForTemplate`; **A-18, fixed
+2026-11-11, RF-51**): the reference tokenizer installs an NFC normalizer, and Vocello's is built from
+`vocab.json` and `merges.txt` without one, so decomposed text (an accent typed as a letter plus a
+combining mark, Hangul as jamo) used to reach the model as byte sequences the reference never
+produces. Text already in NFC is unchanged, so takes made from it are sample-identical.
 
 The prompt strings are **not** a suspect for delivery problems.
 
@@ -334,13 +337,19 @@ outside contributor and unreviewed.
   request now states the draft's intent (`CloneReference.ignoresStoredTranscript`), and the engine
   does not read the stored transcript for it. The CLI's `--voice` and the saved-voice prebuild
   still use the stored transcript.
-- **Shape the transcript like the script.** **G-15 (open)**: recognized transcripts carry no
-  punctuation and skip the text planner the target goes through. **G-12 (open)**: stored transcripts
-  keep their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim.
-  A CLI or prebuilt prompt differs from a Studio prompt only when the stored transcript contains
-  newlines, tabs or repeated spaces, because Studio collapses whitespace runs and the prompt
-  identity uses the transcript text (corrected 2026-11-11: this guide used to say the prebuild
-  never matches a Studio take).
+- **One shape for every transcript.** **G-12 (fixed 2026-11-11, RF-51)**: stored transcripts kept
+  their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim, so
+  they conditioned on different text than a Studio take from the same voice whenever the stored
+  transcript held newlines, tabs or repeated spaces. Every transcript now passes through
+  `CloneConditioningMode.conditioningText` (`Sources/QwenVoiceCore/SemanticTypes.swift`): each run
+  of whitespace becomes one space and the text is composed to NFC. The Studio's field, a typed
+  `--transcript`, a recognized transcript and a stored one give the same prompt and the same prompt
+  identity for the same words. A voice whose stored transcript had such whitespace gets its prompt
+  rebuilt once.
+- **Recognized transcripts carry no punctuation.** **G-15 (open, RF-52)**: Apple's recognizer is
+  asked for plain words, while the target script is punctuated text. Whether a punctuated transcript
+  conditions better is a sample-changing question, so it is decided by a screen and not flipped
+  blind.
 - **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
   `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends exactly one space to the target
   (`Qwen3TTSPromptAssembly.swift` L74-79). The tokenizer is byte-level BPE without a prefix space, so the

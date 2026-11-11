@@ -933,6 +933,57 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         }
     }
 
+    /// RF-51 (G-11): a prime of a one-off clip the engine refuses is a fact
+    /// about the clip, not an engine failure. Nothing is loaded or unloaded,
+    /// the resident model keeps its idle unload, and no failure is published,
+    /// so the shell shows no engine error and later warms are not refused.
+    @MainActor
+    func testAPrimeOfARefusedOneOffClipIsNotAnEngineFailure() async throws {
+        for resident in ["pro_clone", "pro_custom"] {
+            try await withResidentEngine(resident: resident, warmRequests: .holdBodyLoad) { engine, coordinator, published in
+                let clip = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("vocello-refused-prime-\(UUID().uuidString).wav")
+                defer { try? FileManager.default.removeItem(at: clip) }
+                try Self.writeSilentCanonicalWAV(seconds: 12, to: clip)
+                let before = await coordinator.events
+                do {
+                    try await engine.ensureCloneReferencePrimed(
+                        modelID: "pro_clone", reference: CloneReference(audioPath: clip.path))
+                    XCTFail("resident \(resident): a silent one-off clip must not be primed")
+                } catch let rejection as CloneReferenceQuality.Rejection {
+                    XCTAssertEqual(rejection.tokens, [CloneReferenceQuality.nearSilenceToken])
+                }
+                let after = await coordinator.events
+                XCTAssertEqual(
+                    after, before + ["capabilities"],
+                    "resident \(resident): the prime looked the model up and stopped; nothing loaded or unloaded")
+                XCTAssertEqual(engine.loadState, .loaded(modelID: resident), "resident \(resident)")
+                XCTAssertEqual(engine.clonePreparationState, .idle)
+                XCTAssertNil(engine.visibleErrorMessage)
+                XCTAssertFalse(published.includesAFailure, "resident \(resident): a refused clip is not an engine failure")
+                try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, after: after)
+            }
+        }
+    }
+
+    /// A canonical 24 kHz mono 16-bit WAV of zeros, written as bytes.
+    private static func writeSilentCanonicalWAV(seconds: Int, to url: URL) throws {
+        let dataBytes = UInt32(seconds * 24_000 * 2)
+        var header = Data("RIFF".utf8)
+        func append<T: FixedWidthInteger>(_ value: T) {
+            for byte in 0..<MemoryLayout<T>.size {
+                header.append(UInt8(truncatingIfNeeded: value >> (8 * byte)))
+            }
+        }
+        append(UInt32(36) + dataBytes)
+        header.append(Data("WAVEfmt ".utf8))
+        append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
+        append(UInt32(24_000)); append(UInt32(48_000)); append(UInt16(2)); append(UInt16(16))
+        header.append(Data("data".utf8))
+        append(dataBytes)
+        try (header + Data(count: Int(dataBytes))).write(to: url)
+    }
+
     /// DW-03: a prewarm that ends inside its body, after its descriptor
     /// lookup. The runtime releases the model at the step that ended it (its
     /// load step's catch, or its warm catch), and the engine settles from

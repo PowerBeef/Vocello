@@ -91,6 +91,14 @@ struct MacVoiceCloningScreen: View {
         coordinator.isGenerating || ttsEngineStore.hasActiveGeneration
     }
 
+    /// What the reference chip reports: the saved voice's warnings, or the
+    /// one-off clip's. A one-off clip never passes enrollment's review, so the
+    /// Studio runs the same check when the clip is chosen and records it on
+    /// the draft (G-11), where `isReferenceReady` and the shell's warm read it.
+    private var referenceWarnings: [String] {
+        selectedVoice?.qualityWarnings ?? draft.oneOffReferenceWarnings
+    }
+
     private var canRunBatch: Bool {
         ttsEngineStore.isReady
             && cloneConsentAcknowledged
@@ -151,6 +159,15 @@ struct MacVoiceCloningScreen: View {
     }
 
     private var readinessDescriptor: VoiceCloningReadinessDescriptor {
+        // A clip that cannot be used at all is said first: reviewing its
+        // transcript would not make it usable.
+        if let token = draft.oneOffReferenceBlockingToken {
+            return VoiceCloningReadinessDescriptor(
+                noteIsReady: false, title: MacInterfaceText.cloningReferenceSection,
+                detail: MacInterfaceText.qualityWarningHeadline(token: token) ?? MacInterfaceText.qualityChooseAnother,
+                trailingText: nil
+            )
+        }
         if draft.referenceAudioPath != nil, !draft.isReferenceReady {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false, title: MacInterfaceText.cloningReferenceSection,
@@ -279,6 +296,7 @@ struct MacVoiceCloningScreen: View {
             syncSavedVoiceSelectionState()
         }
         .onChange(of: savedVoicesViewModel.voices) { _, _ in syncSavedVoiceSelectionState() }
+        .task(id: draft.oneOffReferenceSelectionID) { await checkOneOffReference() }
         .task(id: clonePrimingTaskID) {
             await syncCloneReferencePriming()
         }
@@ -558,7 +576,7 @@ struct MacVoiceCloningScreen: View {
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
 
-                    if let token = selectedVoice?.qualityWarnings.first,
+                    if let token = referenceWarnings.first,
                        let shortLabel = MacInterfaceText.qualityWarningShortLabel(token: token) {
                         warningChip(token: token, shortLabel: shortLabel)
                     } else {
@@ -621,14 +639,14 @@ struct MacVoiceCloningScreen: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("voiceCloning_referenceWarning")
         .accessibilityHint(
-            selectedVoice?.qualityWarnings.first.flatMap { MacInterfaceText.qualityWarningHeadline(token: $0) } ?? shortLabel
+            MacInterfaceText.qualityWarningHeadline(token: token) ?? shortLabel
         )
         .popover(isPresented: $showsWarningDetails, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-                Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
+                Label(MacInterfaceText.qualityWarningTitle(tokens: referenceWarnings), systemImage: "exclamationmark.triangle.fill")
                     .macType(.screenTitle)
                     .foregroundStyle(MacTheme.Status.guarded)
-                Text(MacInterfaceText.qualityWarningSummary(tokens: selectedVoice?.qualityWarnings ?? [token]))
+                Text(MacInterfaceText.qualityWarningSummary(tokens: referenceWarnings))
                     .macType(.body)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -862,6 +880,15 @@ struct MacVoiceCloningScreen: View {
         session.transcriptLoadError = nil
         session.hydratedSavedVoiceID = nil
         autoTranscribeReference(path: path)
+    }
+
+    /// Checks the one-off clip off the main actor; the draft keeps the result
+    /// only for the selection it was made for.
+    private func checkOneOffReference() async {
+        guard let selectionID = draft.oneOffReferenceSelectionID, let path = draft.referenceAudioPath else { return }
+        let warnings = await CloneReferenceQuality.measuredWarnings(forReferenceAt: URL(fileURLWithPath: path))
+        guard !Task.isCancelled else { return }
+        draft.recordOneOffReferenceCheck(warnings: warnings, for: selectionID)
     }
 
     /// Best-effort on-device transcription of a fresh reference clip (saved

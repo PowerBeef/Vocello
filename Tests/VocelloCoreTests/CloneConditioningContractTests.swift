@@ -259,6 +259,91 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertEqual(reference.transcript, "Reference words.")
     }
 
+    /// G-12 and A-18: one shape for a transcript, whichever surface supplied it.
+    func testEveryTranscriptSourceTakesOneConditioningShape() {
+        let shaped = "First line. Second line, after a tab and a wide space."
+        let raw = "  First line.\nSecond line,\tafter a tab\u{00A0}and a wide\u{3000}space. \r\n"
+        XCTAssertEqual(CloneConditioningMode.conditioningText(raw), shaped)
+        XCTAssertEqual(CloneConditioningMode(transcript: raw), .transcriptBacked(shaped))
+        XCTAssertEqual(CloneConditioningMode.transcriptBacked(raw).transcript, shaped)
+        XCTAssertEqual(NativePreparedCloneConditioningCache.normalizedTranscript(raw), shaped)
+        XCTAssertEqual(ReferenceTranscriptionReviewState.conditioningLine(raw), shaped)
+        for empty in [nil, "", " \n\t ", "\u{3000}"] as [String?] {
+            XCTAssertNil(CloneConditioningMode.conditioningText(empty))
+            XCTAssertEqual(CloneConditioningMode(transcript: empty), .xVectorOnly)
+        }
+        // Text already in that shape is returned scalar for scalar.
+        XCTAssertEqual(
+            Array(CloneConditioningMode.conditioningText(shaped)!.unicodeScalars),
+            Array(shaped.unicodeScalars))
+        // Decomposed text is composed, as the reference tokenizer composes it.
+        // Swift compares strings by canonical equivalence, so compare scalars.
+        let decomposed = "Cafe\u{301} de\u{301}ja\u{300} vu"
+        XCTAssertEqual(
+            Array(CloneConditioningMode.conditioningText(decomposed)!.unicodeScalars),
+            Array("Caf\u{E9} d\u{E9}j\u{E0} vu".unicodeScalars))
+    }
+
+    /// G-12: a stored transcript with line breaks used to reach the CLI's
+    /// `--voice` take and the prebuilt prompt verbatim, so they conditioned on
+    /// different text than the Studio's take from the same voice.
+    @concurrent func testAStoredTranscriptConditionsLikeTheStudiosFieldForTheSameWords() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("Voice.wav")
+        try Self.writeSineWAV(sampleRate: 24_000, seconds: 1, to: source)
+        try "Stored words,\n  on two lines.\n".write(
+            to: source.deletingPathExtension().appendingPathExtension("txt"), atomically: true, encoding: .utf8)
+        let cache = NativePreparedCloneConditioningCache(capacity: 4)
+        @concurrent func resolve(_ reference: CloneReference) async throws -> ResolvedCloneConditioning {
+            try await cache.resolve(
+                modelID: "clone", reference: reference, sampleRate: 24_000,
+                audioPreparationService: NativeAudioPreparationService(),
+                normalizedCloneReferenceDirectory: root.appendingPathComponent("normalized"))
+        }
+        // The CLI's `--voice` and the prebuild: the stored transcript is read.
+        let stored = try await resolve(CloneReference(audioPath: source.path, preparedVoiceID: "Voice"))
+        // The Studio: the field's text, shaped by the draft.
+        let field = VoiceCloningDraft(
+            selectedSavedVoiceID: "Voice", referenceAudioPath: source.path,
+            referenceTranscript: "Stored words,\n  on two lines.\n")
+        let studio = try await resolve(field.cloneReference(audioPath: source.path))
+        XCTAssertEqual(stored.resolvedTranscript, "Stored words, on two lines.")
+        XCTAssertEqual(studio.resolvedTranscript, stored.resolvedTranscript)
+        XCTAssertEqual(studio.conditioningMode, stored.conditioningMode)
+        XCTAssertEqual(studio.internalIdentity, stored.internalIdentity)
+        XCTAssertEqual(
+            NativePreparedCloneConditioningCache.anticipatedConditioningMode(
+                for: CloneReference(audioPath: source.path, preparedVoiceID: "Voice")),
+            stored.conditioningMode)
+    }
+
+    /// G-13: the reference's fingerprint carries the preparation version, and
+    /// version 1 is the content digest earlier builds used.
+    func testTheReferenceFingerprintCarriesThePreparationVersion() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("reference.wav")
+        try Data("abc".utf8).write(to: file)
+        let contentDigest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        XCTAssertEqual(NativeAudioPreparationService.cloneReferencePreparationVersion, 1)
+        XCTAssertEqual(
+            try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: file), contentDigest)
+        typealias Cache = NativePreparedCloneConditioningCache
+        XCTAssertEqual(Cache.preparationFingerprint(contentDigest: contentDigest, version: 1), contentDigest)
+        let second = Cache.preparationFingerprint(contentDigest: contentDigest, version: 2)
+        XCTAssertNotEqual(second, contentDigest)
+        XCTAssertEqual(second.count, 64)
+        XCTAssertEqual(second, Cache.preparationFingerprint(contentDigest: contentDigest, version: 2))
+        XCTAssertNotEqual(second, Cache.preparationFingerprint(contentDigest: contentDigest, version: 3))
+        // A new version names a new prepared file, so the old one is never reused.
+        XCTAssertNotEqual(
+            Cache.stableNormalizedCloneReferenceFileName(for: file, referenceFingerprint: second),
+            Cache.stableNormalizedCloneReferenceFileName(for: file, referenceFingerprint: contentDigest))
+    }
+
     func testCloneReferenceCodablePreservesModernAndLegacyWireForms() throws {
         let modern = CloneReference(
             audioPath: "reference.wav",

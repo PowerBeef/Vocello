@@ -901,6 +901,19 @@ actor NativeEngineRuntime {
             for: request,
             capabilities: descriptorCapabilities
         )
+        if case .clone(let reference) = request.payload {
+            do {
+                try await preparedCloneConditioningCache.requireUsableOneOffReferenceBeforeLoad(reference)
+            } catch {
+                // Named at the stage it belongs to, as the same refusal is
+                // when it comes from conditioning after the load.
+                throw NativeRuntimeError.wrapping(
+                    error,
+                    stage: .clonePreparation,
+                    message: "The native runtime could not prepare the clone reference"
+                )
+            }
+        }
         await recordDiagnosticEvent(
             "runtime-prepare-before-load-model",
             request: request,
@@ -1446,6 +1459,9 @@ actor NativeEngineRuntime {
             reference: reference,
             capabilities: capabilities
         )
+        // Before the load and before the allocator policy: a refused clip
+        // costs neither (a proactive prime follows every draft edit).
+        try await preparedCloneConditioningCache.requireUsableOneOffReferenceBeforeLoad(reference)
         let memoryPolicy = NativeMemoryPolicyResolver.policy(
             mode: .clone,
             isBatch: false

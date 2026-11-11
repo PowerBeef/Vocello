@@ -167,6 +167,26 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.qualityUnreadable", defaultValue: "Reference audio could not be read.",
                comment: "iOS display-only qualityUnreadable; preserve model IDs, prompt text and warning policy.")
     }
+    static var referenceNeedsCheck: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.referenceNeedsCheck", defaultValue: "Check this reference",
+               comment: "iOS display-only referenceNeedsCheck; preserve model IDs, prompt text and warning policy.")
+    }
+    static var qualityNearSilence: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.qualityNearSilence", defaultValue: "Reference is silent or nearly silent.",
+               comment: "iOS display-only qualityNearSilence; preserve model IDs, prompt text and warning policy.")
+    }
+    static var qualitySourceRateLow: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.qualitySourceRateLow", defaultValue: "Reference was recorded at a low sample rate (under 16 kHz), so the clone may sound muffled.",
+               comment: "iOS display-only qualitySourceRateLow; preserve model IDs, prompt text and warning policy.")
+    }
+    static var qualityClipping: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.qualityClipping", defaultValue: "Reference looks clipped (too loud when it was recorded), so the clone may sound distorted.",
+               comment: "iOS display-only qualityClipping; preserve model IDs, prompt text and warning policy.")
+    }
+    static var qualityChooseAnother: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.qualityChooseAnother", defaultValue: "Choose another clip to use for cloning.",
+               comment: "iOS display-only qualityChooseAnother; preserve model IDs, prompt text and warning policy.")
+    }
     static var qualityIntro: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.qualityIntro", defaultValue: "Voice cloning works best with 10–20 seconds of clean speech.",
                comment: "iOS display-only qualityIntro; preserve model IDs, prompt text and warning policy.")
@@ -210,6 +230,12 @@ import QwenVoiceCore
         }
     }
 
+    /// Title over a quality warning: the range title only when every finding
+    /// is about the clip's length.
+    static func qualityTitle(_ tokens: [String]) -> String {
+        PreparedVoiceQualityWarning.concernsLengthOnly(tokens) ? referenceRange : referenceNeedsCheck
+    }
+
     static func qualitySummary(_ tokens: [String]) -> String {
         let lines = tokens.compactMap { token -> String? in
             switch token {
@@ -217,12 +243,21 @@ import QwenVoiceCore
             case "reference_duration_long": return qualityLong
             case "reference_duration_excessive": return qualityExcessive
             case "reference_quality_unreadable": return qualityUnreadable
+            case "reference_near_silence": return qualityNearSilence
+            case "reference_source_rate_low": return qualitySourceRateLow
+            case "reference_possible_clipping": return qualityClipping
             default: return nil
             }
         }
         guard !lines.isEmpty else { return qualityIntro }
-        let trailer = PreparedVoiceQualityWarning.isHardBlocking(tokens) ? qualityHard : qualitySoft
-        return qualityIntro + "\n\n" + lines.map { "• \($0)" }.joined(separator: "\n") + "\n\n" + trailer
+        let closing: String? = switch PreparedVoiceQualityWarning.summaryClosing(for: tokens) {
+        case .shortenToMaximum: qualityHard
+        case .chooseAnotherClip: qualityChooseAnother
+        case .outsideRecommendedLength: qualitySoft
+        case nil: nil
+        }
+        return ([qualityIntro, lines.map { "• \($0)" }.joined(separator: "\n")] + [closing].compactMap(\.self))
+            .joined(separator: "\n\n")
     }
     static func deleteAllHistory(_ count: Int) -> String {
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteAllHistory", defaultValue: "This permanently deletes all %1$lld history entries and their audio files.",
@@ -838,6 +873,10 @@ import QwenVoiceCore
     static var recordMinimum: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.recordMinimum", defaultValue: "Keep recording. 10 second minimum.",
                comment: "iOS interface: Keep recording. 10 second minimum.. Presentation only; never use as a model prompt or stored identity.")
+    }
+    static var recordTooShort: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.recordTooShort", defaultValue: "Clip is under 10 seconds. Retake a longer one.",
+               comment: "iOS interface: recorder status after a capture that was stopped before the 10 second minimum. Presentation only; never use as a model prompt or stored identity.")
     }
     static var recordEnough: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.recordEnough", defaultValue: "Sounds good. Tap stop when ready.",

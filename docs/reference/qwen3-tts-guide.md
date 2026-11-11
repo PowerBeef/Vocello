@@ -444,18 +444,45 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 
 ### 8.2 Reference length and warnings
 
-Qwen advertises a "3-second rapid clone" (RM L77). Vocello's thresholds come from the hosted
-service's guidance, not from a documented limit of the open model
-(`NativeCloneSupport.swift:705-739`): under 10 s warns, 30–60 s warns, and over 60 s is the one
-hard block (`hardBlockingTokens`, `SemanticTypes.swift:862`), which stops a saved voice being kept.
-The audit found the policy weaker than it reads (G-08–G-11):
+Qwen advertises a "3-second rapid clone" (RM L77). Vocello's duration thresholds come from the hosted
+service's guidance, not from a documented limit of the open model. One check,
+`CloneReferenceQuality` (`Sources/QwenVoiceCore/CloneReferenceQuality.swift`), serves enrollment, the
+saved-voice list, a one-off reference in the Mac Studio and the engine, and reads the clip as the user
+gave it (RF-51, fixed 2026-11-11; the audit's G-08 to G-11):
 
-- The sample-rate and channel warnings test the already-normalized 24 kHz mono file
-  (`AudioPreparation.swift:650-680`), so they never fire, and the silence and clipping warnings reach
-  only telemetry: 8 kHz phone audio enrolls silently.
-- An unreadable reference can still be kept, with a soft warning only.
-- The iPhone's Stop bypasses the 10 s minimum, which the Mac enforces.
-- Mac one-off references skip the duration policy entirely, sending 0–120 s straight into ICL (G-11).
+| Finding | Token | Effect |
+|---|---|---|
+| Under 10 s | `reference_duration_short` | Advice |
+| 30 to 60 s | `reference_duration_long` | Advice |
+| Over 60 s | `reference_duration_excessive` | Blocks |
+| Cannot be read | `reference_quality_unreadable` | Blocks |
+| Silent (level under -66 dBFS) | `reference_near_silence` | Blocks |
+| Source sampled below 16 kHz | `reference_source_rate_low` | Advice |
+| Clipped | `reference_possible_clipping` | Advice |
+
+- **Blocks** means three things. The review surfaces offer no "Keep voice". The saved-voice store
+  refuses to commit such a candidate, so a one-shot enrollment cannot keep it either. And the engine
+  refuses a one-off reference (`CloneReferenceQuality.Rejection`) before it loads a model, so the Mac
+  Studio, line batches, long-form and the CLI's `--reference` share one policy and a refused clip
+  costs no load. The apps show the reason (too long, or silent) from the catalog; the CLI reports
+  `audio.input_too_long` or `audio.reference_silent`. A voice already saved keeps working.
+- **Every surface measures the clip as the user gave it**, so they cannot disagree about it. The
+  engine keeps its result per file state (path, size and modification time), so a take after the
+  first, a long-form segment or a batch line reads no audio for the check again.
+- **The source rate is read from the original file's header.** Preparation resamples to 24 kHz mono,
+  so the earlier check of the prepared file never fired and 8 kHz telephone audio enrolled silently.
+- **Clipping is counted as flat tops**: the signal held at the clip's own peak for 125 microseconds
+  (three samples at 24 kHz), at least 0.5 times a second. On 476 licensed speech clips, at their own
+  rates and resampled to 48 kHz, no clean clip is flagged (the highest has 0.43 a second), 89% of the
+  same clips overdriven by 3 dB are, and 99% by 6 dB. A loud clean clip is not flagged, and a clip
+  overdriven and then turned down still is. A lossy re-encode smooths the flat tops, so clipping baked
+  into an AAC or MP3 file is not detected.
+- **Enrollment runs the whole check; the saved-voice list reads only the header** (duration and
+  source rate), so listing stays one cheap read per voice.
+- **The iPhone recorder's Stop keeps a clip under 10 s on the recorder**, as the Mac's does.
+- **Not checked:** whether the clip holds speech at all (a recording of room noise passes), and the
+  bandwidth of a narrow-band clip that was upsampled before it reached Vocello. Silence and clipping
+  are judged on the clip's first 30 seconds.
 
 ### 8.3 Identity and caching
 
@@ -463,12 +490,15 @@ A persisted clone prompt is valid only for the identity it was built under (the 
 [ARCHITECTURE §4.8](../ARCHITECTURE.md#48-voice-cloning-cache)). Its speaker-feature version composes
 the mel frontend version, the ICL reference-encode version and the MLX build
 (`qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:189-206`; F-06), so
-an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference. Two
-inputs are still unversioned:
+an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference.
 
-- the codec encoder's implementation, so the A-02 fix must add a version or saved voices keep their
-  old reference codes (G-03);
-- the host's audio preparation (G-13).
+- **The host's audio preparation is versioned** (G-13, fixed 2026-11-11, RF-51):
+  `NativeAudioPreparationService.cloneReferencePreparationVersion` is folded into the reference's
+  fingerprint, which keys the prepared file's name, the decoded-audio and prompt caches and the
+  persisted prompt. Version 1 is the content digest earlier builds used, so nothing was invalidated;
+  a change to preparation raises it, and each prompt is then rebuilt once.
+- **The codec encoder's implementation is still unversioned**, so the A-02 fix must add a version or
+  saved voices keep their old reference codes (G-03, RF-52).
 
 The in-memory clone prompt cache rarely helps today: every Clone take re-adopts the prompt from disk
 before that cache is consulted (B-16, ER-06).

@@ -1908,6 +1908,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.voices.referenceOutsideRange", defaultValue: "Reference outside recommended range",
                comment: "macOS interface: reference-quality popover title. Presentation only.")
     }
+    static var voicesReferenceNeedsCheck: String {
+        localization.string(localized: "vocello.mac.voices.referenceNeedsCheck", defaultValue: "Check this reference",
+               comment: "macOS interface: reference-quality title when the finding is not about the clip's length. Presentation only.")
+    }
     static var voicesReferenceOutsideRangeShort: String {
         localization.string(localized: "vocello.mac.voices.referenceOutsideRangeShort", defaultValue: "Reference outside range",
                comment: "macOS interface: compact warning pill label when no specific warning token is known. Presentation only.")
@@ -1952,6 +1956,18 @@ enum MacInterfaceText {
     static var voicesWarningReferenceUnreadable: String {
         localization.string(localized: "vocello.mac.voices.warningReferenceUnreadable", defaultValue: "Reference unreadable",
                comment: "macOS interface: warning pill for a reference clip that could not be decoded. Presentation only.")
+    }
+    static var voicesWarningReferenceSilent: String {
+        localization.string(localized: "vocello.mac.voices.warningReferenceSilent", defaultValue: "Reference silent",
+               comment: "macOS interface: warning pill for a reference clip with no audible sound. Presentation only.")
+    }
+    static var voicesWarningReferenceLowSampleRate: String {
+        localization.string(localized: "vocello.mac.voices.warningReferenceLowSampleRate", defaultValue: "Low sample rate",
+               comment: "macOS interface: warning pill for a reference clip recorded below 16 kHz. Presentation only.")
+    }
+    static var voicesWarningReferenceClipped: String {
+        localization.string(localized: "vocello.mac.voices.warningReferenceClipped", defaultValue: "Reference clipped",
+               comment: "macOS interface: warning pill for a reference clip that was recorded too loud. Presentation only.")
     }
     static var voicesYourVoices: String {
         localization.string(localized: "vocello.mac.voices.yourVoices", defaultValue: "Your voices",
@@ -2115,6 +2131,22 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.quality.unreadable", defaultValue: "Reference audio could not be read.",
                comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
     }
+    static var qualityNearSilence: String {
+        localization.string(localized: "vocello.mac.quality.nearSilence", defaultValue: "Reference is silent or nearly silent.",
+               comment: "macOS interface: saved-voice quality warning line; the reference clip holds no audible sound. Presentation only.")
+    }
+    static var qualitySourceRateLow: String {
+        localization.string(localized: "vocello.mac.quality.sourceRateLow", defaultValue: "Reference was recorded at a low sample rate (under 16 kHz), so the clone may sound muffled.",
+               comment: "macOS interface: saved-voice quality warning line; the reference file's sample rate is below 16 kHz. Presentation only.")
+    }
+    static var qualityClipping: String {
+        localization.string(localized: "vocello.mac.quality.clipping", defaultValue: "Reference looks clipped (too loud when it was recorded), so the clone may sound distorted.",
+               comment: "macOS interface: saved-voice quality warning line; the reference clip's waveform is flattened at its peak. Presentation only.")
+    }
+    static var qualityChooseAnother: String {
+        localization.string(localized: "vocello.mac.quality.chooseAnother", defaultValue: "Choose another clip to use for cloning.",
+               comment: "macOS interface: closing line of the quality warning when the clip cannot be used at all. Presentation only.")
+    }
     static var qualityIntro: String {
         localization.string(localized: "vocello.mac.quality.intro", defaultValue: "Voice cloning works best with 10–20 seconds of clean speech.",
                comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
@@ -2210,16 +2242,31 @@ enum MacInterfaceText {
         case "reference_duration_long": qualityLong
         case "reference_duration_excessive": qualityExcessive
         case "reference_quality_unreadable": qualityUnreadable
+        case "reference_near_silence": qualityNearSilence
+        case "reference_source_rate_low": qualitySourceRateLow
+        case "reference_possible_clipping": qualityClipping
         default: nil
         }
+    }
+
+    /// Title over a quality warning: the range title only when every finding
+    /// is about the clip's length.
+    static func qualityWarningTitle(tokens: [String]) -> String {
+        PreparedVoiceQualityWarning.concernsLengthOnly(tokens) ? voicesReferenceOutsideRange : voicesReferenceNeedsCheck
     }
 
     /// Interface rendering of `PreparedVoiceQualityWarning.summary(for:)`.
     static func qualityWarningSummary(tokens: [String]) -> String {
         let lines = tokens.compactMap { qualityWarningHeadline(token: $0) }
         guard !lines.isEmpty else { return qualityIntro }
-        let trailer = PreparedVoiceQualityWarning.isHardBlocking(tokens) ? qualityHard : qualitySoft
-        return qualityIntro + "\n\n" + lines.map { "• \($0)" }.joined(separator: "\n") + "\n\n" + trailer
+        let closing: String? = switch PreparedVoiceQualityWarning.summaryClosing(for: tokens) {
+        case .shortenToMaximum: qualityHard
+        case .chooseAnotherClip: qualityChooseAnother
+        case .outsideRecommendedLength: qualitySoft
+        case nil: nil
+        }
+        return ([qualityIntro, lines.map { "• \($0)" }.joined(separator: "\n")] + [closing].compactMap(\.self))
+            .joined(separator: "\n\n")
     }
 
     /// Interface name of a generation mode (`GenerationMode.displayName` is the
@@ -2240,6 +2287,9 @@ enum MacInterfaceText {
         case "reference_duration_long": voicesWarningReferenceTooLong
         case "reference_duration_excessive": voicesWarningReferenceExceedsLimit
         case "reference_quality_unreadable": voicesWarningReferenceUnreadable
+        case "reference_near_silence": voicesWarningReferenceSilent
+        case "reference_source_rate_low": voicesWarningReferenceLowSampleRate
+        case "reference_possible_clipping": voicesWarningReferenceClipped
         default: nil
         }
     }

@@ -869,8 +869,8 @@ struct IOSVoiceDesignView: View {
                 ),
                 presenting: pendingVoiceForReview
             ) { candidate in
-                // Hard-block tier (>60 s) hides the "Keep voice" button
-                // so the user has to discard or cancel; soft-warn tier
+                // A blocking finding (over 60 s, unreadable, silent) hides
+                // "Keep voice", so the user discards or cancels; advice
                 // keeps all three buttons.
                 if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                     Button(IOSInterfaceText.keepVoice) {
@@ -983,7 +983,9 @@ struct IOSVoiceDesignView: View {
     }
 
     private var designedVoiceReviewAlertTitle: String {
-        saveError == nil ? IOSInterfaceText.referenceRange : IOSInterfaceText.saveVoiceFailed
+        saveError == nil
+            ? IOSInterfaceText.qualityTitle(pendingVoiceForReview?.qualityWarnings ?? [])
+            : IOSInterfaceText.saveVoiceFailed
     }
 
     private func designedVoiceReviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {

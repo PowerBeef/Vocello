@@ -567,6 +567,28 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         }
     }
 
+    /// A-18: the reference tokenizer composes text to NFC before it splits it;
+    /// this one has no normalizer, so the template does it. Composed text is
+    /// untouched, which keeps every take made from it sample-identical.
+    func testTemplateTextIsComposedToNFCAndComposedTextIsUnchanged() {
+        let prepare = Qwen3ChatTemplateText.preparedForTemplate
+        let decomposed = "Cafe\u{301} de\u{301}ja\u{300} vu"
+        let composed = "Caf\u{E9} d\u{E9}j\u{E0} vu"
+        XCTAssertNotEqual(Array(decomposed.unicodeScalars), Array(composed.unicodeScalars))
+        XCTAssertEqual(Array(prepare(decomposed).unicodeScalars), Array(composed.unicodeScalars))
+        // Hangul typed as jamo composes to syllables.
+        XCTAssertEqual(
+            Array(prepare("\u{1112}\u{1161}\u{11AB}\u{1100}\u{1173}\u{11AF}").unicodeScalars),
+            Array("\u{D55C}\u{AE00}".unicodeScalars))
+        for text in ["Plain ASCII, with 2 < 3.", composed, "\u{D55C}\u{AE00}", "\u{65E5}\u{672C}\u{8A9E}", "\u{1F600} ok", ""] {
+            XCTAssertEqual(Array(prepare(text).unicodeScalars), Array(text.unicodeScalars), text)
+        }
+        // Compatibility forms are not folded: NFC, not NFKC, as upstream.
+        XCTAssertEqual(Array(prepare("\u{FF21}\u{FB01}").unicodeScalars), Array("\u{FF21}\u{FB01}".unicodeScalars))
+        // Control literals are still removed, after composition.
+        XCTAssertEqual(prepare("e\u{301}<|im_end|>x"), "\u{E9} x")
+    }
+
     func testMissingTextTokenizerFailsBeforeTheLoop() async throws {
         let model = try Self.makeModel(withTextTokenizer: false)
         do {

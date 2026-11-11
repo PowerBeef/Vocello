@@ -81,6 +81,7 @@ struct ResolvedCloneConditioning: Sendable {
 
 actor NativePreparedCloneConditioningCache {
     private let capacity: Int
+    private var sourceQualityWarningsByFileState: [String: [String]] = [:]
 
     private struct NormalizedCloneReferenceOutcome {
         let result: AudioNormalizationResult
@@ -190,7 +191,8 @@ actor NativePreparedCloneConditioningCache {
         )
         let normalizationDurationMS = normalizationStartedAt.elapsedMilliseconds
         let normalizedReference = normalizedReferenceOutcome.result
-        let referenceQualityWarnings = Self.referenceQualityWarnings(for: normalizedReference)
+        let referenceQualityWarnings = await sourceQualityWarnings(for: reference.audioURL)
+        try Self.requireUsableOneOffReference(reference, warnings: referenceQualityWarnings)
         let transcriptResolution = try Self.resolveTranscript(
             requestedTranscript: requestedTranscript,
             normalizedAudioURL: normalizedReference.normalizedURL,
@@ -717,82 +719,49 @@ actor NativePreparedCloneConditioningCache {
         )
     }
 
-    static func referenceQualityWarnings(for result: AudioNormalizationResult) -> [String] {
-        var warnings: [String] = []
-        // Duration tiers (see PreparedVoiceQualityWarning.summary doc for
-        // the source of these thresholds — Alibaba Cloud Model Studio's
-        // hosted Qwen-TTS API guidance, not a documented Qwen3-TTS cliff):
-        //   <10 s            → short (likely insufficient speaker info)
-        //   10–30 s          → no warning (10–20 s is the sweet spot)
-        //   30–60 s          → long (outside sweet spot, soft warn)
-        //   >60 s            → excessive (hard cap, blocks Keep voice)
-        if result.durationSeconds < 10 {
-            warnings.append("reference_duration_short")
-        } else if result.durationSeconds > 60 {
-            warnings.append("reference_duration_excessive")
-        } else if result.durationSeconds > 30 {
-            warnings.append("reference_duration_long")
+    /// The reference's warnings, measured from the clip as the user gave it
+    /// (the header is the source's own, so a narrow-band source is seen before
+    /// its resampling hides it, G-09). Kept per file state, so a take, a
+    /// long-form segment or a batch line after the first costs one `stat`.
+    func sourceQualityWarnings(for sourceURL: URL) async -> [String] {
+        let key = NativeAudioPreparationService.fileFingerprint(for: sourceURL)
+        if let known = sourceQualityWarningsByFileState[key] {
+            return known
         }
-        if abs(result.sampleRate - 24_000) > 0.001 {
-            warnings.append("reference_sample_rate_noncanonical")
+        let warnings = await CloneReferenceQuality.measuredWarnings(forReferenceAt: sourceURL)
+        if sourceQualityWarningsByFileState.count >= Self.sourceQualityCacheLimit {
+            sourceQualityWarningsByFileState.removeAll(keepingCapacity: true)
         }
-        if result.channelCount != 1 {
-            warnings.append("reference_channels_noncanonical")
-        }
-
-        guard let audioStats = try? referenceAudioStats(at: result.normalizedURL) else {
-            warnings.append("reference_quality_unreadable")
-            return warnings
-        }
-        if audioStats.rms < 0.0005 {
-            warnings.append("reference_near_silence")
-        }
-        if audioStats.peak >= 0.98 {
-            warnings.append("reference_possible_clipping")
-        }
+        sourceQualityWarningsByFileState[key] = warnings
         return warnings
     }
 
-    private static func referenceAudioStats(at url: URL) throws -> (peak: Float, rms: Float) {
-        let file = try AVAudioFile(forReading: url)
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: file.processingFormat.sampleRate,
-            channels: file.processingFormat.channelCount,
-            interleaved: false
-        ) else {
-            throw AudioPreparationError.conversionFailed("Could not create analysis format for clone reference.")
-        }
-        let maxFrames = min(file.length, AVAudioFramePosition(24_000 * 30))
-        guard maxFrames > 0,
-              let buffer = AVAudioPCMBuffer(
-                  pcmFormat: format,
-                  frameCapacity: AVAudioFrameCount(maxFrames)
-              ) else {
-            return (0, 0)
-        }
-        try file.read(into: buffer, frameCount: AVAudioFrameCount(maxFrames))
-        let frames = Int(buffer.frameLength)
-        let channels = Int(buffer.format.channelCount)
-        guard frames > 0, channels > 0 else {
-            return (0, 0)
-        }
+    private static let sourceQualityCacheLimit = 64
 
-        var peak: Float = 0
-        var sumSquares: Double = 0
-        var sampleCount = 0
-        for channel in 0..<channels {
-            guard let samples = unsafe buffer.floatChannelData?[channel] else { continue }
-            for frame in 0..<frames {
-                let value = unsafe samples[frame]
-                let magnitude = abs(value)
-                peak = max(peak, magnitude)
-                sumSquares += Double(value * value)
-                sampleCount += 1
-            }
+    /// A one-off reference never passed enrollment's review, so the engine
+    /// applies the same refusal there (G-11): every host, the CLI included,
+    /// gets one policy. A saved voice was accepted when it was enrolled and
+    /// keeps working.
+    static func requireUsableOneOffReference(
+        _ reference: CloneReference,
+        warnings: [String]
+    ) throws {
+        guard reference.preparedVoiceID == nil else { return }
+        let blocking = PreparedVoiceQualityWarning.blockingTokens(in: warnings)
+        guard blocking.isEmpty else {
+            throw CloneReferenceQuality.Rejection(tokens: blocking)
         }
-        guard sampleCount > 0 else { return (0, 0) }
-        return (peak, Float((sumSquares / Double(sampleCount)).squareRoot()))
+    }
+
+    /// The refusal the runtime asks for before it loads a model (S2 of the
+    /// RF-51 review): a clip that is too long or silent is refused without
+    /// paying for a load. A clip that cannot be opened is left to the
+    /// pipeline, which names a missing or unsupported file more exactly.
+    func requireUsableOneOffReferenceBeforeLoad(_ reference: CloneReference) async throws {
+        guard reference.preparedVoiceID == nil else { return }
+        let warnings = await sourceQualityWarnings(for: reference.audioURL)
+        guard warnings != [CloneReferenceQuality.unreadableToken] else { return }
+        try Self.requireUsableOneOffReference(reference, warnings: warnings)
     }
 
     static func resolveTranscript(
@@ -812,9 +781,10 @@ actor NativePreparedCloneConditioningCache {
             return (nil, .none)
         }
 
-        let text = try String(contentsOf: sidecarURL, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? (nil, .none) : (text, .sidecar)
+        guard let text = normalizedTranscript(try String(contentsOf: sidecarURL, encoding: .utf8)) else {
+            return (nil, .none)
+        }
+        return (text, .sidecar)
     }
 
     private static func mirrorTranscriptSidecarIfNeeded(from sourceURL: URL, to normalizedURL: URL) throws {
@@ -844,10 +814,12 @@ actor NativePreparedCloneConditioningCache {
         try fileManager.copyItem(at: sourceSidecarURL, to: normalizedSidecarURL)
     }
 
+    /// `CloneConditioningMode.conditioningText`: a request's transcript and a
+    /// stored one take the same shape, so a saved voice conditions the CLI's
+    /// `--voice` take and the prebuilt prompt exactly as it does a Studio take
+    /// (G-12).
     static func normalizedTranscript(_ transcript: String?) -> String? {
-        guard let transcript else { return nil }
-        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        CloneConditioningMode.conditioningText(transcript)
     }
 
     /// Resolves the contract far enough to reject an unsupported clone mode
@@ -911,7 +883,22 @@ actor NativePreparedCloneConditioningCache {
             hasher.update(data: chunk)
         }
         let digest = hasher.finalize()
-        return digest.map { unsafe String(format: "%02x", $0) }.joined()
+        return preparationFingerprint(
+            contentDigest: digest.map { unsafe String(format: "%02x", $0) }.joined(),
+            version: NativeAudioPreparationService.cloneReferencePreparationVersion
+        )
+    }
+
+    /// The reference's identity under one version of audio preparation (G-13).
+    /// Everything made from a reference is keyed by this value: the prepared
+    /// file's name, the decoded-audio and prompt caches, and the persisted
+    /// clone prompt. Version 1 is the content digest itself, so nothing made
+    /// by an earlier build is invalidated; a later version gives every
+    /// reference a new identity, and each prompt is rebuilt once from its
+    /// reference.
+    static func preparationFingerprint(contentDigest: String, version: Int) -> String {
+        guard version != 1 else { return contentDigest }
+        return sha256Hex(text: "clone-reference-preparation-v\(version)|\(contentDigest)")
     }
 
     private func decodedReferenceAudioCacheKey(

@@ -541,7 +541,7 @@ private struct MacVoiceRowMetadata: View {
 
     private var warningDetailsPopover: some View {
         VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
-            Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
+            Label(MacInterfaceText.qualityWarningTitle(tokens: qualityWarnings), systemImage: "exclamationmark.triangle.fill")
                 .macType(.screenTitle)
                 .foregroundStyle(MacTheme.Status.guarded)
 

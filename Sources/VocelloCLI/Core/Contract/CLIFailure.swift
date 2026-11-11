@@ -206,7 +206,8 @@ public enum CLIFailure {
         case .savedVoiceStoreBusy: return .storeBusy
         case .modelUnavailable: return .modelNotInstalled
         case .referenceAudioMissing: return .inputFileNotFound
-        case .referenceAudioUnsupported, .referenceAudioTooLong, .referenceAudioUnreadable: return .invalidInput
+        case .referenceAudioUnsupported, .referenceAudioTooLong, .referenceAudioUnreadable, .referenceAudioSilent:
+            return .invalidInput
         case .storageFull: return .storageFull
         case .storageUnavailable: return .outputUnavailable
         }

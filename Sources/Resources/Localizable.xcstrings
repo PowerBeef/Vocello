@@ -75090,6 +75090,996 @@
           }
         }
       }
+    },
+    "vocello.mac.quality.nearSilence": {
+      "comment": "macOS interface: saved-voice quality warning line; the reference clip holds no audible sound. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference is silent or nearly silent."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence est silencieuse ou presque."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia está en silencio o casi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz ist stumm oder nahezu stumm."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento è silenzioso o quasi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência está em silêncio ou quase."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频无声或几乎无声。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が無音か、ほぼ無音です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오에 소리가 없거나 거의 없습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец беззвучный или почти беззвучный."
+          }
+        }
+      }
+    },
+    "vocello.mac.quality.sourceRateLow": {
+      "comment": "macOS interface: saved-voice quality warning line; the reference file's sample rate is below 16 kHz. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference was recorded at a low sample rate (under 16 kHz), so the clone may sound muffled."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence a été enregistrée à une faible fréquence d’échantillonnage (moins de 16 kHz) ; le clone peut sembler étouffé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia se grabó con una frecuencia de muestreo baja (menos de 16 kHz), por lo que el clon puede sonar apagado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz wurde mit niedriger Abtastrate aufgenommen (unter 16 kHz), der Klon kann daher dumpf klingen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento è stato registrato a una frequenza di campionamento bassa (meno di 16 kHz), quindi il clone può suonare ovattato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência foi gravada com taxa de amostragem baixa (menos de 16 kHz), então o clone pode soar abafado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频的采样率较低（低于 16 kHz），克隆的声音可能发闷。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声のサンプルレートが低いため（16 kHz未満）、クローンの音がこもることがあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오의 샘플링 속도가 낮아(16kHz 미만) 복제된 음성이 먹먹하게 들릴 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец записан с низкой частотой дискретизации (менее 16 кГц), поэтому клон может звучать глухо."
+          }
+        }
+      }
+    },
+    "vocello.mac.quality.clipping": {
+      "comment": "macOS interface: saved-voice quality warning line; the reference clip's waveform is flattened at its peak. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference looks clipped (too loud when it was recorded), so the clone may sound distorted."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence semble saturée (enregistrée trop fort) ; le clone peut sembler déformé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia parece saturada (se grabó demasiado alta), por lo que el clon puede sonar distorsionado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz wirkt übersteuert (zu laut aufgenommen), der Klon kann daher verzerrt klingen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento sembra saturato (registrato a volume troppo alto), quindi il clone può suonare distorto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência parece saturada (gravada alto demais), então o clone pode soar distorcido."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频似乎有削波（录制时音量过大），克隆的声音可能失真。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が音割れしているようです（録音時の音量が大きすぎます）。クローンの音が歪むことがあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오가 클리핑된 것 같습니다(녹음 음량이 너무 큼). 복제된 음성이 왜곡될 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец, похоже, записан с перегрузкой (слишком громко), поэтому клон может звучать искажённо."
+          }
+        }
+      }
+    },
+    "vocello.mac.quality.chooseAnother": {
+      "comment": "macOS interface: closing line of the quality warning when the clip cannot be used at all. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another clip to use for cloning."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un autre clip pour le clonage."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige otro clip para clonar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle zum Klonen einen anderen Clip."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un altro clip per la clonazione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha outro clipe para clonagem."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择其他音频用于克隆。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クローンには別の音声を選んでください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복제하려면 다른 오디오를 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для клонирования выберите другую запись."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.warningReferenceSilent": {
+      "comment": "macOS interface: warning pill for a reference clip with no audible sound. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference silent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence silencieuse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referencia en silencio"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenz stumm"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riferimento silenzioso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referência em silêncio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频无声"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が無音です"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조에 소리가 없음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец беззвучный"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.warningReferenceLowSampleRate": {
+      "comment": "macOS interface: warning pill for a reference clip recorded below 16 kHz. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low sample rate"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échantillonnage faible"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestreo bajo"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niedrige Abtastrate"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Campionamento basso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amostragem baixa"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采样率较低"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サンプルレートが低い"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "샘플링 속도 낮음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Низкая частота дискретизации"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.warningReferenceClipped": {
+      "comment": "macOS interface: warning pill for a reference clip that was recorded too loud. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference clipped"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence saturée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referencia saturada"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenz übersteuert"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riferimento saturato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referência saturada"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频削波"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が音割れ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조가 클리핑됨"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец с перегрузкой"
+          }
+        }
+      }
+    },
+    "vocello.ui.qualityNearSilence": {
+      "comment": "iOS display-only qualityNearSilence; preserve model IDs, prompt text and warning policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference is silent or nearly silent."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence est silencieuse ou presque."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia está en silencio o casi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz ist stumm oder nahezu stumm."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento è silenzioso o quasi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência está em silêncio ou quase."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频无声或几乎无声。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が無音か、ほぼ無音です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오에 소리가 없거나 거의 없습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец беззвучный или почти беззвучный."
+          }
+        }
+      }
+    },
+    "vocello.ui.qualitySourceRateLow": {
+      "comment": "iOS display-only qualitySourceRateLow; preserve model IDs, prompt text and warning policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference was recorded at a low sample rate (under 16 kHz), so the clone may sound muffled."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence a été enregistrée à une faible fréquence d’échantillonnage (moins de 16 kHz) ; le clone peut sembler étouffé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia se grabó con una frecuencia de muestreo baja (menos de 16 kHz), por lo que el clon puede sonar apagado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz wurde mit niedriger Abtastrate aufgenommen (unter 16 kHz), der Klon kann daher dumpf klingen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento è stato registrato a una frequenza di campionamento bassa (meno di 16 kHz), quindi il clone può suonare ovattato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência foi gravada com taxa de amostragem baixa (menos de 16 kHz), então o clone pode soar abafado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频的采样率较低（低于 16 kHz），克隆的声音可能发闷。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声のサンプルレートが低いため（16 kHz未満）、クローンの音がこもることがあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오의 샘플링 속도가 낮아(16kHz 미만) 복제된 음성이 먹먹하게 들릴 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец записан с низкой частотой дискретизации (менее 16 кГц), поэтому клон может звучать глухо."
+          }
+        }
+      }
+    },
+    "vocello.ui.qualityClipping": {
+      "comment": "iOS display-only qualityClipping; preserve model IDs, prompt text and warning policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference looks clipped (too loud when it was recorded), so the clone may sound distorted."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La référence semble saturée (enregistrée trop fort) ; le clone peut sembler déformé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La referencia parece saturada (se grabó demasiado alta), por lo que el clon puede sonar distorsionado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenz wirkt übersteuert (zu laut aufgenommen), der Klon kann daher verzerrt klingen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riferimento sembra saturato (registrato a volume troppo alto), quindi il clone può suonare distorto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A referência parece saturada (gravada alto demais), então o clone pode soar distorcido."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频似乎有削波（录制时音量过大），克隆的声音可能失真。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声が音割れしているようです（録音時の音量が大きすぎます）。クローンの音が歪むことがあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오가 클리핑된 것 같습니다(녹음 음량이 너무 큼). 복제된 음성이 왜곡될 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец, похоже, записан с перегрузкой (слишком громко), поэтому клон может звучать искажённо."
+          }
+        }
+      }
+    },
+    "vocello.ui.qualityChooseAnother": {
+      "comment": "iOS display-only qualityChooseAnother; preserve model IDs, prompt text and warning policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another clip to use for cloning."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un autre clip pour le clonage."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige otro clip para clonar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle zum Klonen einen anderen Clip."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un altro clip per la clonazione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha outro clipe para clonagem."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择其他音频用于克隆。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クローンには別の音声を選んでください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복제하려면 다른 오디오를 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для клонирования выберите другую запись."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.referenceNeedsCheck": {
+      "comment": "macOS interface: reference-quality title when the finding is not about the clip's length. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check this reference"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifiez cette référence"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisa esta referencia"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenz prüfen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controlla questo riferimento"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confira esta referência"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请检查此参考音频"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この参照音声を確認してください"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 참조 오디오를 확인하세요"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверьте этот образец"
+          }
+        }
+      }
+    },
+    "vocello.ui.referenceNeedsCheck": {
+      "comment": "iOS display-only referenceNeedsCheck; preserve model IDs, prompt text and warning policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check this reference"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifiez cette référence"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisa esta referencia"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenz prüfen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controlla questo riferimento"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confira esta referência"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请检查此参考音频"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この参照音声を確認してください"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 참조 오디오를 확인하세요"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверьте этот образец"
+          }
+        }
+      }
+    },
+    "vocello.ui.recordTooShort": {
+      "comment": "iOS interface: recorder status after a capture that was stopped before the 10 second minimum. Presentation only; never use as a model prompt or stored identity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip is under 10 seconds. Retake a longer one."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’extrait fait moins de 10 secondes. Recommencez avec un extrait plus long."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El clip dura menos de 10 segundos. Graba uno más largo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Clip ist kürzer als 10 Sekunden. Nimm einen längeren auf."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il clip dura meno di 10 secondi. Registrane uno più lungo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O clipe tem menos de 10 segundos. Grave um mais longo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频不足 10 秒。请重新录制更长的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声が10秒未満です。もう少し長く録り直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오디오가 10초 미만입니다. 더 길게 녹음하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запись короче 10 секунд. Запишите более длинную."
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_silent": {
+      "extractionState": "manual",
+      "comment": "Voice Cloning error when the reference audio holds no audible sound.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reference audio is silent. Choose another clip."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet audio de référence est silencieux. Choisissez un autre clip."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este audio de referencia está en silencio. Elige otro clip."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Referenzaudio ist stumm. Wähle einen anderen Clip."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo audio di riferimento è silenzioso. Scegli un altro clip."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este áudio de referência está em silêncio. Escolha outro clipe."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此参考音频没有声音。请选择其他音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この参照音声は無音です。別の音声を選んでください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 참조 오디오에는 소리가 없습니다. 다른 오디오를 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот образец беззвучный. Выберите другую запись."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

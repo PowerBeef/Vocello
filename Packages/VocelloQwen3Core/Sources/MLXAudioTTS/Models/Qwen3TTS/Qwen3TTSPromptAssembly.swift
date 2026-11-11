@@ -61,8 +61,8 @@ extension Qwen3TTSModel {
         }
 
         // Reference text and target text tokenization
-        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
-        let refText = Qwen3ChatTemplateText.neutralizingControlTokens(refText)
+        let text = Qwen3ChatTemplateText.preparedForTemplate(text)
+        let refText = Qwen3ChatTemplateText.preparedForTemplate(refText)
         let targetTokenCount = tokenizer.encode(text: text).count
         let refChatText = "<|im_start|>assistant\n\(refText)<|im_end|>\n"
         let refIds = MLXArray(tokenizer.encode(text: refChatText).map { Int32($0) }).reshaped(1, -1)
@@ -373,7 +373,7 @@ extension Qwen3TTSModel {
         }
 
         // Tokenize text with ChatML template
-        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
+        let text = Qwen3ChatTemplateText.preparedForTemplate(text)
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map { Int32($0) }).reshaped(1, -1)
 
@@ -420,7 +420,7 @@ extension Qwen3TTSModel {
 
         // Instruct embedding
         var instructEmbed: MLXArray?
-        if let instruct = instruct.map(Qwen3ChatTemplateText.neutralizingControlTokens), !instruct.isEmpty {
+        if let instruct = instruct.map(Qwen3ChatTemplateText.preparedForTemplate), !instruct.isEmpty {
             let instructText = "<|im_start|>user\n\(instruct)<|im_end|>\n"
             let instructIds = MLXArray(tokenizer.encode(text: instructText).map { Int32($0) }).reshaped(1, -1)
             instructEmbed = talker.textProjection(try talker.embedText(instructIds))
@@ -501,5 +501,22 @@ enum Qwen3ChatTemplateText {
             with: " ",
             options: .regularExpression
         )
+    }
+
+    /// User text as the template takes it: composed to NFC, then cleared of
+    /// control-token literals. The reference tokenizer normalizes to NFC
+    /// itself (`Qwen2Tokenizer` installs `normalizers.NFC()`), and this
+    /// tokenizer is built from `vocab.json` and `merges.txt` with no
+    /// normalizer, so decomposed text (an accent typed as a letter and a
+    /// combining mark, Hangul as jamo) used to reach the model as byte
+    /// sequences the reference never produces (A-18). Text already in NFC,
+    /// which is nearly all text, is returned as it was.
+    static func preparedForTemplate(_ text: String) -> String {
+        neutralizingControlTokens(composed(text))
+    }
+
+    static func composed(_ text: String) -> String {
+        // ASCII is its own NFC form; skip the Foundation call on the common path.
+        text.utf8.allSatisfy { $0 < 0x80 } ? text : text.precomposedStringWithCanonicalMapping
     }
 }

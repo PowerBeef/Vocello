@@ -446,7 +446,9 @@ struct IOSRecordVoiceSheet: View {
     }
 
     private var reviewAlertTitle: String {
-        enrollError == nil ? IOSInterfaceText.referenceRange : IOSInterfaceText.saveVoiceFailed
+        enrollError == nil
+            ? IOSInterfaceText.qualityTitle(pendingVoiceForReview?.qualityWarnings ?? [])
+            : IOSInterfaceText.saveVoiceFailed
     }
 
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {

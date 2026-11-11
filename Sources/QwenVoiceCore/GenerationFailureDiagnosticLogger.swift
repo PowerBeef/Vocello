@@ -230,6 +230,18 @@ public final class GenerationFailureDiagnosticLogger: Sendable {
             }
         }
 
+        if let rejection = error as? CloneReferenceQuality.Rejection {
+            // The code names what the user can act on, so the apps show the
+            // matching reason and the CLI's `detail.reason` says which it was.
+            if rejection.tokens.contains(CloneReferenceQuality.nearSilenceToken) {
+                return ErrorMetadata(code: "audio.reference_silent", classification: .audio)
+            }
+            if rejection.tokens.contains(CloneReferenceQuality.excessiveDurationToken) {
+                return ErrorMetadata(code: "audio.input_too_long", classification: .audio)
+            }
+            return ErrorMetadata(code: "audio.processing_failed", classification: .audio)
+        }
+
         if let documentError = error as? DocumentIOError {
             switch documentError {
             case .missingSource:
@@ -458,6 +470,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     case referenceAudioUnsupported = "audio.input_unsupported"
     case referenceAudioTooLong = "audio.input_too_long"
     case referenceAudioUnreadable = "audio.processing_failed"
+    case referenceAudioSilent = "audio.reference_silent"
     case storageFull = "storage.full"
     case storageUnavailable = "storage.output_unavailable"
 
@@ -548,6 +561,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
         case "audio.input_unsupported": self = .referenceAudioUnsupported
         case "audio.input_too_large", "audio.input_too_long": self = .referenceAudioTooLong
         case "audio.decode_timeout", "audio.processing_failed": self = .referenceAudioUnreadable
+        case "audio.reference_silent": self = .referenceAudioSilent
         case "storage.full": self = .storageFull
         case "storage.permission_denied", "storage.output_unavailable", "storage.write_failed":
             self = .storageUnavailable

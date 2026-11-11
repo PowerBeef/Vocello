@@ -32,7 +32,7 @@ struct MacRecordVoiceSheet: View {
     }
 
     private var canUse: Bool {
-        stage == .captured && recorder.elapsed >= ReferenceClipRecorder.minDuration
+        stage == .captured && ReferenceClipRecorder.meetsMinimumDuration(recorder.elapsed)
     }
 
     private var timerColor: Color {

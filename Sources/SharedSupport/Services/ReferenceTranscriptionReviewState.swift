@@ -7,9 +7,9 @@ import QwenVoiceCore
 /// sidecar, an existing reviewed transcript, or a user's edit. Both Apple frontends use this
 /// exact policy; platform views only render the resulting status and actions.
 struct ReferenceTranscriptionReviewState: Equatable, Sendable {
+    /// The engine's own shaping, so the field shows what conditions the take.
     static func conditioningLine(_ raw: String) -> String? {
-        let collapsed = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return collapsed.isEmpty ? nil : collapsed
+        CloneConditioningMode.conditioningText(raw)
     }
 
     /// How much of the clip's speech a recognized transcript spans (G-01). A

@@ -1264,6 +1264,17 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             clonePreparationState = .idle
             await settleCancelledModelOperation()
             throw CancellationError()
+        } catch let error where Self.isCloneReferenceRejection(error) {
+            // The reference was refused before any model was loaded (too long
+            // or silent). That is a fact about the clip, shown where the clip
+            // is chosen, not an engine failure: the engine's state returns to
+            // what it was, as after a cancelled prime, so later warms are not
+            // refused and the resident model keeps its idle unload (a failed
+            // preparation published beside a loaded model would hold the
+            // weights: `idleUnloadAllowed`).
+            clonePreparationState = .idle
+            await settleCancelledModelOperation()
+            throw error
         } catch {
             // A captured MLX failure gets product copy, and the model it may
             // have left half-evaluated is unloaded under the priming lease.
@@ -2027,39 +2038,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         return await SavedVoiceAudioReads.preparedVoices(from: records)
     }
 
-    /// Cheap duration-only probe of a saved-voice reference WAV used at
-    /// enrollment + list time. Tokens match the
-    /// `NativeCloneSupport.referenceQualityWarnings(for:)` schema, but
-    /// this path skips the full audio-normalization (resample, trim,
-    /// peak/RMS analysis) — those finer warnings come back via
-    /// `clone_reference_warnings` at generation time. Thresholds match
-    /// NativeCloneSupport: <10 s = short, >30 s = long, >60 s = excessive.
+    /// The saved-voice list's warnings: the stored file's header only
+    /// (duration and source sample rate), so listing stays one cheap read per
+    /// voice. The signal checks ran when the voice was enrolled.
     nonisolated static func savedReferenceQualityWarnings(forAudioAt path: String) -> [String] {
-        var warnings: [String] = []
-        guard let durationSeconds = referenceAudioDurationSeconds(at: path) else {
-            warnings.append("reference_quality_unreadable")
-            return warnings
-        }
-        if durationSeconds < 10 {
-            warnings.append("reference_duration_short")
-        } else if durationSeconds > 60 {
-            warnings.append("reference_duration_excessive")
-        } else if durationSeconds > 30 {
-            warnings.append("reference_duration_long")
-        }
-        return warnings
+        CloneReferenceQuality.warnings(forReferenceAt: URL(fileURLWithPath: path), depth: .header)
     }
 
-    /// Reads the WAV header via `AVAudioFile` (no PCM decode). Returns
-    /// `nil` for unreadable files; the caller treats that as a
-    /// `reference_quality_unreadable` warning.
-    nonisolated static func referenceAudioDurationSeconds(at path: String) -> Double? {
-        guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) else {
-            return nil
-        }
-        let sampleRate = file.processingFormat.sampleRate
-        guard sampleRate > 0 else { return nil }
-        return Double(file.length) / sampleRate
+    /// Enrollment's warnings, shown to the user before the voice is kept
+    /// (G-09, G-10): the full check of the clip as the user gave it, before
+    /// any conversion the store makes of it.
+    nonisolated static func enrollmentReferenceQualityWarnings(forOriginalAt path: String) -> [String] {
+        CloneReferenceQuality.warnings(forReferenceAt: URL(fileURLWithPath: path))
     }
 
     /// `cache/normalized_clone_refs` under an engine root: normalized clone references,
@@ -2159,7 +2149,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 AudioPreparationRequest(inputURL: requestedURL, outputURL: target)
             ).normalizedURL
         }
-        let warnings = await SavedVoiceAudioReads.qualityWarnings(forAudioAt: sourceURL.path)
+        let warnings = await SavedVoiceAudioReads.enrollmentQualityWarnings(forOriginalAt: requestedURL.path)
         do {
             let candidate = try await repository.prepare(
                 name: name,
@@ -2306,6 +2296,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             enrollmentMetadataUnreadable: record.enrollmentMetadataUnreadable,
             audioProvenanceMode: record.audioProvenanceMode
         )
+    }
+
+    /// The runtime's refusal of a one-off clone reference before a prime loads
+    /// anything. Only that: a failure of preparation itself comes after the
+    /// load, wrapped, and stays a failure.
+    nonisolated static func isCloneReferenceRejection(_ error: Error) -> Bool {
+        error is CloneReferenceQuality.Rejection
     }
 
     /// Keeps the retryable busy state typed across the engine boundary so
@@ -2601,12 +2598,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 }
 
-/// CORE-16: saved-voice audio reads the engine keeps off the main actor. Each
-/// reads one file's header (`AVAudioFile`), once per saved voice when listing.
+/// CORE-16: saved-voice audio reads the engine keeps off the main actor: one
+/// header read (`AVAudioFile`) per saved voice when listing, and the signal of
+/// one clip's opening when a voice is enrolled.
 private enum SavedVoiceAudioReads {
     @concurrent
-    static func qualityWarnings(forAudioAt path: String) async -> [String] {
-        MLXTTSEngine.savedReferenceQualityWarnings(forAudioAt: path)
+    static func enrollmentQualityWarnings(forOriginalAt path: String) async -> [String] {
+        MLXTTSEngine.enrollmentReferenceQualityWarnings(forOriginalAt: path)
     }
 
     @concurrent

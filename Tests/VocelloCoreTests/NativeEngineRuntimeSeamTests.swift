@@ -191,6 +191,56 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         XCTAssertEqual(loaded, RuntimeSeam.cloneModel, "a clone-preparation failure keeps the model")
     }
 
+    /// RF-51 (G-11): a one-off clip that cannot condition a take is refused
+    /// before the prime applies a policy or loads a model. A proactive prime
+    /// follows every draft edit, so a refused clip must cost neither.
+    @concurrent func testAClonePrimeRefusesABlockedOneOffClipBeforePolicyAndLoad() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let silent = root.appendingPathComponent("silent.wav")
+        try RuntimeSeam.writeSilentWAV(seconds: 12, to: silent)
+
+        let fixture = RuntimeSeamFixture()
+        do {
+            _ = try await fixture.runtime.primeCloneReference(
+                modelID: RuntimeSeam.cloneModel, reference: CloneReference(audioPath: silent.path))
+            XCTFail("a silent one-off clip must not be primed")
+        } catch let rejection as CloneReferenceQuality.Rejection {
+            XCTAssertEqual(rejection.tokens, [CloneReferenceQuality.nearSilenceToken])
+        }
+        XCTAssertEqual(fixture.log.entries, ["capabilities"], "no policy, no load")
+        let loaded = await fixture.runtime.loadedModelID()
+        XCTAssertNil(loaded)
+
+        // A take with the same clip is refused before its load too, as a
+        // clone-preparation failure with the reason the apps and the CLI show.
+        let takeFixture = RuntimeSeamFixture()
+        do {
+            _ = try await takeFixture.runtime.prepareGeneration(for: GenerationRequest(
+                mode: .clone, modelID: RuntimeSeam.cloneModel, text: "A short line.", outputPath: "",
+                shouldStream: false, payload: .clone(reference: CloneReference(audioPath: silent.path))))
+            XCTFail("a take from a silent one-off clip must be refused")
+        } catch let error as NativeRuntimeError {
+            XCTAssertEqual(error.stage, .clonePreparation)
+            XCTAssertEqual(GenerationFailurePresentationReason(error), .referenceAudioSilent)
+        }
+        XCTAssertEqual(RuntimeSeam.count(of: "load:", in: takeFixture.log.entries), 0, "refused before the load")
+        let takeLoaded = await takeFixture.runtime.loadedModelID()
+        XCTAssertNil(takeLoaded)
+
+        // The same file as a saved voice was accepted at enrollment: the prime
+        // goes on to its policy and its load.
+        _ = await RuntimeSeam.primeError(
+            fixture.runtime, modelID: RuntimeSeam.cloneModel,
+            reference: CloneReference(audioPath: silent.path, preparedVoiceID: "seam-silent-voice"))
+        XCTAssertEqual(Array(fixture.log.entries.prefix(4)), [
+            "capabilities",
+            "capabilities", RuntimeSeam.applyPolicy(mode: .clone),
+            "load:\(RuntimeSeam.cloneModel)",
+        ])
+    }
+
     // MARK: - Failed load
 
     /// A load the coordinator fails is unloaded through the coordinator, leaves
@@ -503,13 +553,35 @@ private enum RuntimeSeam {
     }
 
     /// The error a prime of `savedVoiceReference` ends with, or nil.
-    @concurrent static func primeError(_ runtime: NativeEngineRuntime, modelID: String) async -> (any Error)? {
+    @concurrent static func primeError(
+        _ runtime: NativeEngineRuntime,
+        modelID: String,
+        reference: CloneReference = savedVoiceReference
+    ) async -> (any Error)? {
         do {
-            _ = try await runtime.primeCloneReference(modelID: modelID, reference: savedVoiceReference)
+            _ = try await runtime.primeCloneReference(modelID: modelID, reference: reference)
             return nil
         } catch {
             return error
         }
+    }
+
+    /// A canonical 24 kHz mono 16-bit WAV of zeros, written as bytes.
+    static func writeSilentWAV(seconds: Int, to url: URL) throws {
+        let dataBytes = UInt32(seconds * 24_000 * 2)
+        var header = Data("RIFF".utf8)
+        func append<T: FixedWidthInteger>(_ value: T) {
+            for byte in 0..<MemoryLayout<T>.size {
+                header.append(UInt8(truncatingIfNeeded: value >> (8 * byte)))
+            }
+        }
+        append(UInt32(36) + dataBytes)
+        header.append(Data("WAVEfmt ".utf8))
+        append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
+        append(UInt32(24_000)); append(UInt32(48_000)); append(UInt16(2)); append(UInt16(16))
+        header.append(Data("data".utf8))
+        append(dataBytes)
+        try (header + Data(count: Int(dataBytes))).write(to: url)
     }
 
     /// Queues the caller behind a contender that has just made a coordinator

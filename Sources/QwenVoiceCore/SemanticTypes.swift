@@ -560,10 +560,23 @@ public enum CloneConditioningMode: Hashable, Codable, Sendable {
         case xVectorOnly = "x_vector_only"
     }
 
+    /// The one shape of a reference transcript as conditioning (G-12, A-18):
+    /// every run of whitespace is one space, the text is composed to NFC, and
+    /// nothing left means no transcript. A transcript of spoken audio has no
+    /// line structure, and a newline is a token the model never heard beside
+    /// this audio. The Studio's field, a typed `--transcript`, a recognized
+    /// transcript and a saved voice's stored one all pass through here, so
+    /// the same words give the same prompt and the same prompt identity
+    /// whichever surface asked.
+    public static func conditioningText(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let line = raw.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return line.isEmpty ? nil : line.precomposedStringWithCanonicalMapping
+    }
+
     public init(transcript: String?) {
-        let normalized = transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let normalized, !normalized.isEmpty {
-            self = .transcriptBacked(normalized)
+        if let text = Self.conditioningText(transcript) {
+            self = .transcriptBacked(text)
         } else {
             self = .xVectorOnly
         }
@@ -572,8 +585,7 @@ public enum CloneConditioningMode: Hashable, Codable, Sendable {
     public var transcript: String? {
         switch self {
         case .transcriptBacked(let transcript):
-            let normalized = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-            return normalized.isEmpty ? nil : normalized
+            return Self.conditioningText(transcript)
         case .xVectorOnly:
             return nil
         }
@@ -791,9 +803,9 @@ public struct PreparedVoice: Identifiable, Hashable, Codable, Sendable {
     /// Quality observations about the underlying reference audio. Tokens
     /// match the existing `clone_reference_warnings` schema in
     /// `NativeCloneSupport.referenceQualityWarnings(for:)` —
-    /// e.g. `reference_duration_short`, `reference_duration_long`,
-    /// `reference_quality_unreadable`. Empty when the reference is
-    /// within the recommended window (currently 10–20 s).
+    /// e.g. `reference_duration_short`, `reference_source_rate_low`,
+    /// `reference_quality_unreadable` (`CloneReferenceQuality` owns the
+    /// list). Empty when nothing was found.
     /// UI surfaces these as soft warnings during enrollment + as inline
     /// badges in the saved-voices list.
     public let qualityWarnings: [String]
@@ -890,20 +902,62 @@ public struct PreparedVoiceCandidate: Identifiable, Hashable, Codable, Sendable 
 /// Unknown tokens fall through to `nil` so callers can choose whether to
 /// display a generic warning line or drop it.
 public enum PreparedVoiceQualityWarning {
-    /// Tokens whose presence in a voice's `qualityWarnings` array means
-    /// the voice cannot be kept — the enrollment UI must remove the
-    /// "Keep voice" affordance and force the user to discard or re-pick.
-    /// Currently only the >60 s excessive-duration token blocks (matches
-    /// Alibaba Cloud Model Studio's 60 s hard cap on the hosted Qwen-TTS
-    /// API). Soft-warn tokens are reported but do not block keeping.
-    public static let hardBlockingTokens: Set<String> = ["reference_duration_excessive"]
+    /// Tokens that mean the reference cannot condition a take: the enrollment
+    /// UI removes "Keep voice", and the engine refuses a one-off reference
+    /// that carries one (RF-51, G-08 and G-11).
+    ///
+    /// - Over 60 seconds: the hosted Qwen-TTS service's cap.
+    /// - Unreadable: there is no audio to clone from.
+    /// - Near silence: a muted or empty recording has no voice in it.
+    ///
+    /// Every other token is advice and never blocks.
+    public static let hardBlockingTokens: Set<String> = [
+        CloneReferenceQuality.excessiveDurationToken,
+        CloneReferenceQuality.unreadableToken,
+        CloneReferenceQuality.nearSilenceToken,
+    ]
 
-    /// True if any token in the array hits a hard-block tier (currently
-    /// just `reference_duration_excessive`). Use this in the enrollment
-    /// alert to skip the "Keep voice" button and message the user that
-    /// the reference must be replaced.
+    /// True if any token blocks. Enrollment uses it to drop "Keep voice" and
+    /// tell the user the reference must be replaced.
     public static func isHardBlocking(_ tokens: [String]) -> Bool {
         !Set(tokens).isDisjoint(with: hardBlockingTokens)
+    }
+
+    /// The blocking tokens among `tokens`, in their order.
+    public static func blockingTokens(in tokens: [String]) -> [String] {
+        tokens.filter(hardBlockingTokens.contains)
+    }
+
+    /// True when every warning is about the clip's length, which is what the
+    /// "outside recommended range" title says; any other finding needs the
+    /// neutral title.
+    public static func concernsLengthOnly(_ tokens: [String]) -> Bool {
+        let lengthTokens: Set<String> = [
+            CloneReferenceQuality.shortDurationToken, CloneReferenceQuality.longDurationToken,
+            CloneReferenceQuality.excessiveDurationToken,
+        ]
+        return Set(tokens).isSubset(of: lengthTokens)
+    }
+
+    /// The closing line of a warning summary. A blocked reference says what
+    /// to do about it; advice about length says the clip still works. Advice
+    /// about the signal needs no closing line: its headline states the effect.
+    public enum SummaryClosing: Sendable {
+        case shortenToMaximum
+        case chooseAnotherClip
+        case outsideRecommendedLength
+    }
+
+    public static func summaryClosing(for tokens: [String]) -> SummaryClosing? {
+        let blocking = blockingTokens(in: tokens)
+        if !blocking.isEmpty {
+            // Only the duration cap has a remedy other than another clip.
+            return blocking == [CloneReferenceQuality.excessiveDurationToken] ? .shortenToMaximum : .chooseAnotherClip
+        }
+        let lengthAdvice: Set<String> = [
+            CloneReferenceQuality.shortDurationToken, CloneReferenceQuality.longDurationToken,
+        ]
+        return Set(tokens).isDisjoint(with: lengthAdvice) ? nil : .outsideRecommendedLength
     }
 
     /// Sentence-length explanation. Used in the enrollment alert body
@@ -918,6 +972,12 @@ public enum PreparedVoiceQualityWarning {
             return "Reference exceeds the 60 second maximum supported for cloning."
         case "reference_quality_unreadable":
             return "Reference audio could not be read."
+        case "reference_near_silence":
+            return "Reference is silent or nearly silent."
+        case "reference_source_rate_low":
+            return "Reference was recorded at a low sample rate (under 16 kHz), so the clone may sound muffled."
+        case "reference_possible_clipping":
+            return "Reference looks clipped (too loud when it was recorded), so the clone may sound distorted."
         default:
             return nil
         }
@@ -937,6 +997,12 @@ public enum PreparedVoiceQualityWarning {
             return "Reference exceeds 60 s"
         case "reference_quality_unreadable":
             return "Reference unreadable"
+        case "reference_near_silence":
+            return "Reference silent"
+        case "reference_source_rate_low":
+            return "Low sample rate"
+        case "reference_possible_clipping":
+            return "Reference clipped"
         default:
             return nil
         }
@@ -956,12 +1022,20 @@ public enum PreparedVoiceQualityWarning {
         if lines.isEmpty {
             return "Voice cloning works best with 10–20 seconds of clean speech."
         }
-        let trailer = isHardBlocking(tokens)
-            ? "Pick a clip that is 60 seconds or shorter to use it for cloning."
-            : "Clones from references outside this range still work, but may sound less consistent."
-        return "Voice cloning works best with 10–20 seconds of clean speech.\n\n" +
-            lines.map { "• \($0)" }.joined(separator: "\n") +
-            "\n\n" + trailer
+        let closing: String?
+        switch summaryClosing(for: tokens) {
+        case .shortenToMaximum:
+            closing = "Pick a clip that is 60 seconds or shorter to use it for cloning."
+        case .chooseAnotherClip:
+            closing = "Choose another clip to use for cloning."
+        case .outsideRecommendedLength:
+            closing = "Clones from references outside this range still work, but may sound less consistent."
+        case nil:
+            closing = nil
+        }
+        return (["Voice cloning works best with 10–20 seconds of clean speech."]
+            + [lines.map { "• \($0)" }.joined(separator: "\n")]
+            + [closing].compactMap(\.self)).joined(separator: "\n\n")
     }
 }
 

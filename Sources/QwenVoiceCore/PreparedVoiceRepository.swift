@@ -11,9 +11,15 @@ enum PreparedVoiceRepositoryError: LocalizedError, Equatable {
     case malformedCandidate
     case recoveryRequired
     case storeBusy
+    /// The candidate's reference carries a blocking finding (over 60 s,
+    /// unreadable or silent), so it cannot become a saved voice.
+    case referenceRejected([String])
 
     var errorDescription: String? {
         switch self {
+        case .referenceRejected(let tokens):
+            let reasons = tokens.compactMap(PreparedVoiceQualityWarning.headline(for:))
+            return reasons.isEmpty ? "The reference clip cannot be used for cloning." : reasons.joined(separator: " ")
         case .invalidName:
             return "Invalid saved voice name."
         case .invalidIdentifier:
@@ -353,6 +359,13 @@ actor PreparedVoiceRepository {
         let manifest = try loadManifest(from: candidateDirectory)
         guard manifest.id == id else {
             throw PreparedVoiceRepositoryError.malformedCandidate
+        }
+        // The store is the last owner of the rule every review surface
+        // applies (G-08): a one-shot enrollment, or a host that forgot the
+        // check, cannot keep a reference that cannot condition a take.
+        let blocking = PreparedVoiceQualityWarning.blockingTokens(in: manifest.qualityWarnings)
+        guard blocking.isEmpty else {
+            throw PreparedVoiceRepositoryError.referenceRejected(blocking)
         }
         try requireNameAvailable(
             manifest.name,

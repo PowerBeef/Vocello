@@ -14,6 +14,55 @@ final class CloneReferenceDraftTests: XCTestCase {
         XCTAssertNil(draft.selectedSavedVoiceID)
     }
 
+    /// G-11: the draft carries the one-off clip's check, so the Studio's
+    /// controls, its priming and the shell's background warm all read one fact.
+    func testAOneOffClipTheEngineWouldRefuseIsNeverReady() {
+        var draft = VoiceCloningDraft()
+        XCTAssertNil(draft.oneOffReferenceSelectionID)
+        draft.replaceReferenceAudio(with: "/tmp/long.wav")
+        draft.confirmAudioOnly()
+        let selection = try? XCTUnwrap(draft.oneOffReferenceSelectionID)
+        XCTAssertTrue(draft.isReferenceReady, "an unchecked clip is not held back: the engine refuses it if it must")
+
+        draft.recordOneOffReferenceCheck(
+            warnings: ["reference_duration_excessive", "reference_source_rate_low"], for: selection ?? "")
+        XCTAssertEqual(draft.oneOffReferenceWarnings, ["reference_duration_excessive", "reference_source_rate_low"])
+        XCTAssertEqual(draft.oneOffReferenceBlockingToken, "reference_duration_excessive")
+        XCTAssertFalse(draft.isReferenceReady)
+
+        // Advice alone never holds the clip back.
+        draft.replaceReferenceAudio(with: "/tmp/phone.wav")
+        draft.confirmAudioOnly()
+        XCTAssertEqual(draft.oneOffReferenceWarnings, [], "a new clip starts unchecked")
+        draft.recordOneOffReferenceCheck(
+            warnings: ["reference_source_rate_low"], for: draft.oneOffReferenceSelectionID ?? "")
+        XCTAssertTrue(draft.isReferenceReady)
+        XCTAssertEqual(draft.oneOffReferenceWarnings, ["reference_source_rate_low"])
+    }
+
+    func testACheckForAnEarlierSelectionIsDroppedAndASavedVoiceHasNone() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/clip.wav")
+        let first = draft.oneOffReferenceSelectionID ?? ""
+        // The same path chosen again is a new selection: the file may have been replaced.
+        draft.replaceReferenceAudio(with: "/tmp/clip.wav")
+        XCTAssertNotEqual(draft.oneOffReferenceSelectionID, first)
+        draft.recordOneOffReferenceCheck(warnings: ["reference_near_silence"], for: first)
+        XCTAssertEqual(draft.oneOffReferenceWarnings, [], "a late result for the earlier selection is dropped")
+
+        draft.recordOneOffReferenceCheck(
+            warnings: ["reference_near_silence"], for: draft.oneOffReferenceSelectionID ?? "")
+        XCTAssertEqual(draft.oneOffReferenceBlockingToken, "reference_near_silence")
+        // A saved voice was checked when it was enrolled; the clip's result does not follow it.
+        draft.applySavedVoiceSelection(id: "Voice", wavPath: "/tmp/Voice.wav", transcript: "Stored words")
+        XCTAssertNil(draft.oneOffReferenceSelectionID)
+        XCTAssertEqual(draft.oneOffReferenceWarnings, [])
+        XCTAssertNil(draft.oneOffReferenceBlockingToken)
+        XCTAssertTrue(draft.isReferenceReady)
+        draft.clearReference()
+        XCTAssertEqual(draft.oneOffReferenceWarnings, [])
+    }
+
     func testChoosingTheSamePathAgainStartsANewReferenceReview() {
         var draft = VoiceCloningDraft()
         draft.referenceAudioPath = "/tmp/u14-clip-a.wav"

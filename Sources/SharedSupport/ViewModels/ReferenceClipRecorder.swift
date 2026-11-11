@@ -13,6 +13,11 @@ final class ReferenceClipRecorder: NSObject {
     static let minDuration: Double = 10.0
     static let maxDuration: Double = 20.0
 
+    /// The one rule for "this recording can be used", on both platforms.
+    static func meetsMinimumDuration(_ elapsed: Double) -> Bool {
+        elapsed >= minDuration
+    }
+
     /// Posted just before capture starts (macOS), so the app's player pauses
     /// instead of playing into the new reference (MAC-14). On iOS the one
     /// session owner and `IOSPlaybackExclusivity` do this.

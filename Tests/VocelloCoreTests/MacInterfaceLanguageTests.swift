@@ -127,14 +127,22 @@ final class MacInterfaceLanguageTests: XCTestCase {
         XCTAssertNil(MacInterfaceText.presetName(id: "retired"))
         XCTAssertEqual(MacInterfaceText.deliveryDurationAdvisory, DeliveryInstructionAdvisor.advisoryMessage)
         let tokens = ["reference_duration_short", "reference_duration_long",
-                      "reference_duration_excessive", "reference_quality_unreadable"]
+                      "reference_duration_excessive", "reference_quality_unreadable",
+                      "reference_near_silence", "reference_source_rate_low", "reference_possible_clipping"]
         for token in tokens + ["unknown_token"] {
             XCTAssertEqual(MacInterfaceText.qualityWarningHeadline(token: token), PreparedVoiceQualityWarning.headline(for: token))
+            XCTAssertEqual(MacInterfaceText.qualityWarningShortLabel(token: token), PreparedVoiceQualityWarning.shortLabel(for: token))
         }
         for set in [[], ["reference_duration_short"], ["reference_duration_long", "reference_quality_unreadable"],
-                    ["reference_duration_excessive"], ["unknown_token"]] {
+                    ["reference_duration_excessive"], ["unknown_token"], ["reference_near_silence"],
+                    ["reference_source_rate_low"], ["reference_duration_short", "reference_possible_clipping"]] {
             XCTAssertEqual(MacInterfaceText.qualityWarningSummary(tokens: set), PreparedVoiceQualityWarning.summary(for: set))
         }
+        // The range title is kept for findings about length; anything else gets the neutral one.
+        XCTAssertEqual(MacInterfaceText.qualityWarningTitle(tokens: ["reference_duration_long"]),
+                       MacInterfaceText.voicesReferenceOutsideRange)
+        XCTAssertEqual(MacInterfaceText.qualityWarningTitle(tokens: ["reference_duration_long", "reference_possible_clipping"]),
+                       MacInterfaceText.voicesReferenceNeedsCheck)
     }
 
     func testEngineDisplayStringsFollowTheInterfaceLanguage() {

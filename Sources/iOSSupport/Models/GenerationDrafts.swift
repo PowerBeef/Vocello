@@ -160,6 +160,20 @@ struct VoiceCloningDraft: Equatable {
     var text = ""
     private(set) var referenceReview = ReferenceTranscriptionReviewState(initialTranscript: "")
     private(set) var referenceOperation = UUID()
+    /// Counts explicit one-off selections, so a clip replaced in place at the
+    /// same path is checked again (G-11).
+    private(set) var oneOffReferenceSelection = 0
+    /// The quality check of the one-off clip, with the selection it describes.
+    /// It lives on the draft, not on a screen, because everything that acts on
+    /// the reference reads the draft: the Studio's controls, its priming and
+    /// the shell's background warm. A saved voice was checked when it was
+    /// enrolled and carries its own warnings.
+    private(set) var oneOffReferenceCheck: OneOffReferenceCheck?
+
+    struct OneOffReferenceCheck: Equatable {
+        let selectionID: String
+        let warnings: [String]
+    }
 
     init(
         selectedSavedVoiceID: String? = nil,
@@ -200,9 +214,35 @@ struct VoiceCloningDraft: Equatable {
 
     /// ASR completion never changes an admitted audio-only intent. Automatic text
     /// must be reviewed explicitly; editing it is also an explicit review decision.
+    /// A one-off clip the engine would refuse is never ready (G-11).
     var isReferenceReady: Bool {
         referenceAudioPath != nil && referenceReview.allowsSave(transcript: referenceTranscript)
             && referenceReview.phase != .ready(.automatic)
+            && oneOffReferenceBlockingToken == nil
+    }
+
+    /// Identifies the one-off clip now selected; nil for a saved voice or no clip.
+    var oneOffReferenceSelectionID: String? {
+        guard selectedSavedVoiceID == nil, let referenceAudioPath else { return nil }
+        return "\(oneOffReferenceSelection)#\(referenceAudioPath)"
+    }
+
+    /// The selected one-off clip's warnings, once its check has been recorded.
+    var oneOffReferenceWarnings: [String] {
+        guard let check = oneOffReferenceCheck, check.selectionID == oneOffReferenceSelectionID else { return [] }
+        return check.warnings
+    }
+
+    /// Why the selected one-off clip cannot condition a take, if it cannot.
+    var oneOffReferenceBlockingToken: String? {
+        PreparedVoiceQualityWarning.blockingTokens(in: oneOffReferenceWarnings).first
+    }
+
+    /// Records a check made for `selectionID`; a result for a clip that is no
+    /// longer the selection is dropped.
+    mutating func recordOneOffReferenceCheck(warnings: [String], for selectionID: String) {
+        guard selectionID == oneOffReferenceSelectionID else { return }
+        oneOffReferenceCheck = OneOffReferenceCheck(selectionID: selectionID, warnings: warnings)
     }
 
     mutating func reviewReferenceTranscript() {
@@ -305,6 +345,8 @@ struct VoiceCloningDraft: Equatable {
         referenceTranscript = ""
         referenceAudioPath = path
         selectedSavedVoiceID = nil
+        oneOffReferenceSelection += 1
+        oneOffReferenceCheck = nil
         referenceReview.awaitAudio()
         referenceOperation = UUID()
         return clearsTranscript

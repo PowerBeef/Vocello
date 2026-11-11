@@ -197,6 +197,20 @@ private struct AudioPreparationDeadline: Sendable {
 }
 
 public struct NativeAudioPreparationService: AudioPreparationService, Hashable, Sendable {
+    /// Version of what preparation does to a clone reference before it is
+    /// encoded (decode, downmix, resample to the canonical format). Raise it
+    /// with any change that alters the prepared samples: the clone path folds
+    /// it into the reference's fingerprint
+    /// (`NativePreparedCloneConditioningCache.preparationFingerprint`), so
+    /// prepared files, caches and persisted prompts made under the earlier
+    /// version stop being reused (G-13). Until this existed, a fix to
+    /// preparation never reached a reference that had been prepared before.
+    /// When raising it, also teach
+    /// `PreparedVoiceRepository.removeDerivedCloneReferences` the earlier
+    /// versions' file names: it derives a removed voice's prepared copies
+    /// under the current version only.
+    public static let cloneReferencePreparationVersion = 1
+
     public static let canonicalSampleRate: Double = 24_000
     public static let canonicalChannelCount: AVAudioChannelCount = 1
     public static let canonicalBitDepth = 16

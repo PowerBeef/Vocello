@@ -752,6 +752,10 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.error.reference_audio_unreadable",
                 defaultValue: "Vocello couldn't read this reference audio. Choose another audio file.",
                 comment: "Voice Cloning error when the reference audio could not be read.")
+        case .referenceAudioSilent:
+            return localization.string(localized: "vocello.error.reference_audio_silent",
+                defaultValue: "This reference audio is silent. Choose another clip.",
+                comment: "Voice Cloning error when the reference audio holds no audible sound.")
         case .storageFull:
             return localization.string(localized: "vocello.error.storage_full",
                 defaultValue: "There isn't enough storage space to save this take. Free up space, then try again.",

@@ -290,7 +290,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     private func trimmedInstruction(_ instruct: String?) -> String? {
         guard let instruct else { return nil }
-        let trimmed = Qwen3ChatTemplateText.neutralizingControlTokens(instruct)
+        let trimmed = Qwen3ChatTemplateText.preparedForTemplate(instruct)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
@@ -490,7 +490,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         let textPrepareStartedAt = ContinuousClock.now
-        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
+        let text = Qwen3ChatTemplateText.preparedForTemplate(text)
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
@@ -527,7 +527,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         let textPrepareStartedAt = ContinuousClock.now
-        let text = Qwen3ChatTemplateText.neutralizingControlTokens(text)
+        let text = Qwen3ChatTemplateText.preparedForTemplate(text)
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)

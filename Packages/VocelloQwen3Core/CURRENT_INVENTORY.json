@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "d0711afaa709be557a8da5819cca173419a419e1d2f7e7c75deeed4a95f834b2",
+      "sha256": "48b2cbec4ab8f093958ae94264d0fc1e19a56a309ed87104bf3d182a3cf5306a",
       "upstreamStatus": "modified"
     },
     {
@@ -118,7 +118,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
-      "sha256": "d27cf5d28ac16d7c82d56dbd9c269926035b0f6989bb36ab2e97c4fd9e898c31",
+      "sha256": "166ac2c62a3e08b26bbfe70e9d46125212f8659c2a98ef2fb91b2cffc075ef88",
       "upstreamStatus": "added"
     },
     {
@@ -148,7 +148,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
-      "sha256": "a5fb7bbc0ad6a5bc88f92401fd24a2c4abd9c5d35c45fa632ecda47fce20329e",
+      "sha256": "b8dc3e98dae7f9f1754e2f55765f1a2a46359d2edcea4f866eff7fb7c3d47fe3",
       "upstreamStatus": "added"
     },
     {
@@ -303,7 +303,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "19f0448695f0ae70c76e6675ae9b7ea817bb2635fb05f3988ff1f50a281d4a1c",
+      "sha256": "1d31c1ef9691f39bf370a6c2b2b188e9242e8007153c99ac8cf0ff748a992591",
       "upstreamStatus": "added"
     },
     {

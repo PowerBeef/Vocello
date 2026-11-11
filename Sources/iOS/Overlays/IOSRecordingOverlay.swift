@@ -212,8 +212,9 @@ struct IOSRecordingOverlay: View {
         if !recorder.isRecording && recorder.elapsed == 0 {
             return IOSInterfaceText.recordBegin
         }
-        if recorder.elapsed < ReferenceClipRecorder.minDuration {
-            return IOSInterfaceText.recordMinimum
+        if !ReferenceClipRecorder.meetsMinimumDuration(recorder.elapsed) {
+            // Stopped short, nothing is recording any more: say what to do next.
+            return recorder.isRecording ? IOSInterfaceText.recordMinimum : IOSInterfaceText.recordTooShort
         }
         if recorder.elapsed <= ReferenceClipRecorder.maxDuration {
             return IOSInterfaceText.recordEnough
@@ -237,7 +238,11 @@ struct IOSRecordingOverlay: View {
                     tint: Theme.Brand.modeClone,
                     isEnabled: true,
                     action: {
-                        if let url = recorder.stopAndSave() {
+                        // A clip under the minimum stays here, where Retake and
+                        // the disabled "need 10 seconds" control say why, as on
+                        // the Mac (G-10). Only a usable clip goes on to review.
+                        if let url = recorder.stopAndSave(),
+                           ReferenceClipRecorder.meetsMinimumDuration(recorder.elapsed) {
                             handOffClip(at: url)
                         }
                     }
@@ -264,7 +269,7 @@ struct IOSRecordingOverlay: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("iosRecord_retake")
 
-                let canUse = recorder.elapsed >= ReferenceClipRecorder.minDuration
+                let canUse = ReferenceClipRecorder.meetsMinimumDuration(recorder.elapsed)
                 IOSPrimaryCTAButton(
                     title: canUse ? IOSInterfaceText.useClip : IOSInterfaceText.need10,
                     symbol: canUse ? "checkmark" : nil,

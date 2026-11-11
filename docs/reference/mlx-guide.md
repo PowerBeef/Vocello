@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -410,6 +410,9 @@ Clearing is not free: freed buffers are re-created on the next allocation.
   drift. The iPhone runs 113–126 clears per long take at its 128 MiB cache (audit D), and D-06 counts
   the per-chunk clears among the costs the measured budget does not need;
   `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=off` isolates the per-chunk clear for that device A/B.
+  On the iPhone 17 Pro (2026-11-11, cooled interleaved fixed-seed takes, a build made with
+  `--device-diagnostics`) the switch cuts a medium take's clears from 39 to 5 and changes neither
+  its samples nor its frame time (35.5 ms either way), so the iPhone tier keeps the clear.
 - A full unload left 309 MiB in MLX's cache, because the cache was cleared before the last holder
   released the model; the holder is unidentified (D-04).
 

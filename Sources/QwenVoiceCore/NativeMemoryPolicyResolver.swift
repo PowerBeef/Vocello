@@ -57,7 +57,8 @@ public enum NativeMemoryPolicyResolver {
     /// clear from the rest of a tier, so its cost can be measured on a device
     /// without forcing another tier's cache limit and cadence with it. On the
     /// M6 the clear changes no sample and costs about 1.7% where the host
-    /// bounds a frame; the iPhone has not been measured.
+    /// bounds a frame; on the iPhone 17 Pro it changes no sample and no
+    /// measurable time (cooled takes, 2026-11-11), so the tier keeps it.
     public static func policy(
         deviceClass: NativeDeviceMemoryClass = deviceClass(),
         mode: GenerationMode,

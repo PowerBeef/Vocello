@@ -318,8 +318,9 @@ public final class AudioSealGenerator {
         // pass, after its frame-rate stage, after the pass, and by
         // `markedPCM` once the generator is dropped. MLX's peak counts
         // active memory only, which this does not change, and on the M6 the
-        // take's sampled footprint stayed below its pre-marking peak; the
-        // iPhone has not been measured.
+        // take's sampled footprint stayed below its pre-marking peak. On
+        // the iPhone 17 Pro the kernel's footprint high-water mark did not
+        // rise during finalization on 36 takes (2026-11-11).
         //
         // Every stage drains an explicit autoreleasepool: eval commits Metal
         // command buffers and other autoreleased ObjC objects, and the Swift

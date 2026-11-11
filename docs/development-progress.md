@@ -17,12 +17,55 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 11: the overhaul's Mac half is complete (resume here)
+### November 11: the overhaul measured on the iPhone 17 Pro (resume here)
+
+The maintainer opened a phone window on November 11. The headless measurements ran on the paired
+iPhone 17 Pro at `3119a745` and confirm the overhaul there. No XCUITest lane ran, and no iPhone 15
+Pro is paired. `main` is pushed up to `c6a80dcb`, whose required CI check is red because two Linux
+jobs could not reach the Ubuntu package mirror, twice (no test ran in them); later commits wait on
+local `main`.
+
+- **Same samples (RF-44, RF-46).** 23 fixed-seed takes are PCM-identical to the build of November 3
+  (`ios-lang-bench-20261111-162231-d118b261` against `20261103-183237-3c5b79f2`); the files differ
+  only in their 192-byte metadata chunk. 29 more takes are identical across the diagnostic arms
+  below. The language gate prints the same lines as on November 3, including its failures on fixed
+  seeds.
+- **Watermark.** All 23 phone-made takes read 0.999 to 1.0 under Meta's detector with the payload
+  exact.
+- **Speed.** A frame takes 3.5% less time on the 14 takes that ran cool in both runs (39.5 to
+  37.6 ms). A cooled medium Custom take is 35.5 ms per frame, RTF 0.477. The app's CPU is busy 0.56
+  of a take at QoS high, so the 17 Pro sits near the GPU-bound end, like the M6.
+- **Nothing to tune in the submission layer (RF-45).** On cooled interleaved takes, 40 operations
+  per command buffer is 0.8% slower than the phone's default of 20, and turning the per-chunk cache
+  clear off changes nothing. No constant is set and the clear stays.
+- **Heat is the larger effect.** Twenty takes back to back drift from RTF 0.55 to 0.75 at thermal
+  state fair; with 75 seconds between takes the phone stays nominal at 0.48 to 0.49.
+- **Memory (RF-47).** The retained-memory qualification passed
+  (`ios-memory-qualification-20261111-170450-503cb136`). Against November 3, MLX's peak is 316 MB
+  lower in each mode, the footprint held after a take about 215 MB lower, and the median footprint
+  peak of the 23 short takes 381 MB lower. Under the iPhone 15 Pro profile (a 5,000 MB limit; GPU
+  and heat are not simulated) the three modes peak at 2,132 to 2,767 MB with at least 2,233 MB of
+  headroom. MLX's peak does not rise during marking (RF-48).
+- **Tooling.** `scripts/ios_device.sh` forwards MLX's three environment keys to the phone
+  (`3119a745`). The cache-clear and memory-profile switches act only in a build made with
+  `--device-diagnostics`; the benchmark build ignores them.
+- **Not measured, and why:**
+  - the live preview, the long-form journey and every acceptance row: XCUITest could not start
+    ("Timed out while enabling automation mode", `ios-xcui-benchmark-20261111-170901-04e3d785`, no
+    test ran). The fix is on the phone: Settings, Developer, Enable UI Automation;
+  - the heat pause: it needs serious heat, and the 17 Pro reached fair;
+  - reloads with the two-minute window: no lane holds a process idle between takes;
+  - core placement of the generation thread: Instruments lists the phone as offline without a cable;
+  - anything on an iPhone 15 Pro.
+- **Next:** once UI Automation is on, the UI benchmark (its November 3 record is the live preview's
+  baseline) and the long-form journey; then a candidate that carries the overhaul, which needs
+  green CI on `main` and the maintainer's request, and RF-15's and RF-17's rows on it.
+
+### November 11: the overhaul's Mac half is complete
 
 Everything in the core overhaul (RF-44 to RF-48) that needs no iPhone is implemented, measured on
-the M6 and committed on `main`. Commits up to `6ddfa629` are pushed with CI green; `fd019b81` to the
-commit carrying this entry wait on local `main` for a push request. Nothing is measured on an
-iPhone, and every engine change kept the samples: fixed-seed PCM digests are identical.
+the M6 and committed on `main`. Every engine change kept the samples: fixed-seed PCM digests are
+identical.
 
 - **The regression net (RF-44).** `scripts/pcm_identity.py` captures fixed-seed PCM digests and
   compares two builds, in alternation against a preserved baseline, on the Speed and Quality models
@@ -80,13 +123,7 @@ iPhone, and every engine change kept the samples: fixed-seed PCM digests are ide
     realigned by whoever verifies it (`docs/ARCHITECTURE.md`, Reading the mark).
 - **Open on the Mac:** the measurements as published benchmark records (publication needs a
   request).
-- **For the next announced iPhone window,** in this order: the take's regime on each phone (CPU
-  share and QoS class of the generation thread); sample identity of the compiled frame function on
-  the phone's GPU; `MLX_MAX_OPS_PER_BUFFER=40` against the default; the cache-clear switch off;
-  resident and peak memory and the bands on an 8 GB phone; reloads and memory with the two-minute
-  window; the preview's start and any underrun on the iPhone 15 Pro; the footprint during marking;
-  the heat pause on a hot phone. The submission candidate is the build that carries these commits,
-  once the phone confirms them. The App Review notes say nothing about the heat pause yet.
+- **The App Review notes** say nothing about the heat pause yet.
 
 ### November 10: no target dates, and the core overhaul comes before the submission
 

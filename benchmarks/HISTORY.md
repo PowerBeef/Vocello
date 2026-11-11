@@ -1168,6 +1168,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-03 | [`ios-memory-qualification-20261103-184038-a1004c76`](runs/memory-qualification/ios-memory-qualification-20261103-184038-a1004c76.json) | focused | focused | passed | qualified | 9 | 0.57 | `a60dd2040b2b` | `b5ba83b875ad` | baseline | ios-memory-qualification-20261103-184038-a1004c76 |
+| 2026-11-11 | [`ios-memory-qualification-20261111-170450-503cb136`](runs/memory-qualification/ios-memory-qualification-20261111-170450-503cb136.json) | focused | focused | passed | qualified | 9 | 0.52 | `3119a74506f8` | `b5ba83b875ad` | vs ios-memory-qualification-20261103-184038-a1004c76: RTF -7.2% (within noise), TTFC -5.6% (faster), RAM -5.9% (within noise), harness changed | ios-memory-qualification-20261111-170450-503cb136 |
 
 ## memory-qualification / ios / iphone-17-pro / config `dcec19b63f13`
 

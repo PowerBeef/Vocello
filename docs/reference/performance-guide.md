@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: Swift 6 and Metal performance reference for the apps and CLI — build settings, isolation, value types, dispatch, allocation and ARC; profiling and GPU capture; how MLX drives Metal (command buffers, kernel caching, compile(), no MPS, unified memory, Metal memory telemetry); direct-Metal patterns for future custom kernels; iOS Metal limits, troubleshooting and the performance-change checklist.
 sourceOfTruth:
   - project.yml
@@ -537,6 +537,9 @@ limits, or until a synchronization point. `Device` sets those limits by GPU clas
 `MLX_MAX_OPS_PER_BUFFER` and `MLX_MAX_MB_PER_BUFFER` override them (`device.cpp:625-626`,
 `utils.h:182-191`). Batching
 amortizes submission cost; it does not merge kernels, which is `compile()`'s job (§12.3).
+Vocello sets neither key (RF-45): the default of 40 is the fastest on the M6, and on the iPhone
+17 Pro 40 operations measured 0.8% slower than its default of 20 on cooled fixed-seed takes, with
+identical samples and half the context switches per frame (2026-11-11).
 
 ### 12.2 Kernel compilation and caching
 

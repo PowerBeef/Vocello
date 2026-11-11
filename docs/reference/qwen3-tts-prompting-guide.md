@@ -1,16 +1,20 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: Sourced reference for everything Qwen3-TTS reads as text — the ChatML wire format and prefill layouts, the script, the delivery instruction, the voice description, the presets, and the transcript and reference rules for clones — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSGenerationProfiles.swift
   - Sources/QwenVoiceCore/GenerationSemantics.swift
   - Sources/QwenVoiceCore/EmotionPreset.swift
   - Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift
   - config/delivery-instruction-contract.json
   - scripts/bench_delivery_prosody.py
   - docs/audits/2026-10-17-qwen3-tts-model-research.md
+  - docs/audits/2026-11-11-qwen3-tts-quality-report-review.md
 ---
 # Qwen3-TTS Prompting Guide
 
@@ -30,7 +34,10 @@ _First written 2026-08-02 from a primary-source research pass and a code audit; 
 against the [ER-13 model research](../audits/2026-10-17-qwen3-tts-model-research.md) and the
 [engine audit](../audits/2026-10-16-engine-runtime-audit.md), after RF-18 and CONV-21 shipped.
 Upstream line numbers (`WM`, `MQ`, `RM`) are QwenLM/Qwen3-TTS at `022e286b98`, keyed as in the
-research report; finding IDs (A-11, G-01, D6…) are the audit's._
+research report; finding IDs (A-11, G-01, D6…) are the audit's. On 2026-11-11 several upstream
+readings were corrected, and the line references into the runtime were updated for its split into
+several files (`76fa18e7`), against the
+[counter-verification review](../audits/2026-11-11-qwen3-tts-quality-report-review.md)._
 
 ## How to read this document
 
@@ -75,18 +82,20 @@ Reference and target are tokenized separately and concatenated, so no separator 
 
 `MEASURED-HERE`. This checkout builds the same strings
 ([`Qwen3TTS.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
-L1661-1665 for the role and instruct turns, L1722 and L1759 for the target, L4650 and L4663 for ICL;
-the one ICL difference is a leading space, §2.3). Before tokenizing, it replaces ChatML, `<tts_…>`
-and think/tool control tokens in the script, instruction and transcript with a space
-(`Qwen3ChatTemplateText`, L6674-6691), so user text cannot open a turn. Instructions and briefs are
-not NFC-normalized (engine audit A-18, open in ER-05).
+L434-438 for the role and instruct turns, L495 and L532 for the target;
+[`Qwen3TTSPromptAssembly.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift)
+L67 and L80 for ICL; the one ICL difference is a leading space, §2.3). Before tokenizing, it
+replaces ChatML, `<tts_…>` and think/tool control tokens in the script, instruction and transcript
+with a space (`Qwen3ChatTemplateText`, `Qwen3TTSPromptAssembly.swift` L488-505), so user text
+cannot open a turn. Instructions and briefs are not NFC-normalized (engine audit A-18, open in
+ER-05).
 
 The prompt strings are **not** a suspect for delivery problems.
 
 ### 1.1 The prefill, position by position
 
 `OFFICIAL` (MQ L2068-2233; [research §3](../audits/2026-10-17-qwen3-tts-model-research.md#3-architecture-as-implemented-upstream-17b-unless-noted)),
-`MEASURED-HERE` (`buildConditioningPrefix`, `Qwen3TTS.swift` L1609-1703). The instruct turn and the
+`MEASURED-HERE` (`buildConditioningPrefix`, `Qwen3TTS.swift` L382-476). The instruct turn and the
 role header are text-only positions. From the codec prefix on, every position is the **sum** of a
 text-lane embedding and a codec-lane embedding:
 
@@ -103,11 +112,11 @@ of three layouts:
 
 - **Streaming** (`non_streaming_mode=False`). The first text token is summed with `codec_bos`; the
   rest of the text, ending in `tts_eos`, trails one token per generated frame, and after it the
-  talker sees `tts_pad` (`prepareInputs`, L1705-1740). The wrapper's docstring says this mode only
+  talker sees `tts_pad` (`prepareInputs`, L478-513). The wrapper's docstring says this mode only
   *simulates* streaming text input (WM L513-515).
 - **Non-streaming** (`non_streaming_mode=True`). All the text and `tts_eos`, each over `codec_pad`,
   then `tts_pad` summed with `codec_bos`; the talker then sees only `tts_pad`
-  (`prepareFullTextNonStreamingInputs`, L1742-1788).
+  (`prepareFullTextNonStreamingInputs`, L515-561).
 - **ICL clone.** Reference and target text plus the reference's codec frames (§2.3).
 
 Which layout a take uses:
@@ -120,9 +129,9 @@ Which layout a take uses:
 | Clone with a transcript (ICL) | non-streaming ICL | streaming (WM L478): **G-14**, deliberate (§2.3) |
 | Clone without a transcript (speaker only) | streaming | streaming |
 
-The clone rows follow `Qwen3TextConditioningMode` (`Qwen3TTS.swift` L411-430): a clone ignores the
-requested mode. A long-form segment's request turns D1 off (`GenerationRequest.longFormSegment`,
-`Qwen3TalkerSamplingOverride.referenceParity`); the internal-diagnostics knob
+The clone rows follow `Qwen3TextConditioningMode` (`Qwen3TTSGenerationProfiles.swift` L264-283): a
+clone ignores the requested mode. A long-form segment's request turns D1 off
+(`GenerationRequest.longFormSegment`, `Qwen3TalkerSamplingOverride.referenceParity`); the internal-diagnostics knob
 `QWENVOICE_FULL_TEXT_CONDITIONING` forces either layout for every streamed take
 (`Qwen3ReferenceParity.production`, `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`).
 
@@ -149,14 +158,17 @@ during training to improve instruction following, especially for complex descrip
 credits this mechanism specifically for instruction following, and again for the voice-design
 result.
 
-`OFFICIAL`, and it cuts the other way: Qwen's own evaluation ran Seed-TTS and InstructTTSEval with
-language `auto`, the **nothink** branch, and set the language explicitly for the other benchmarks
-(RM L465; research §4). The instruction-following scores in §4.2 were measured without the
-thinking pattern. Qwen also advises setting the language when it is known (RM L50, L167).
+`OFFICIAL`, with a limit: the README says Qwen's evaluation ran Seed-TTS and InstructTTSEval with
+language `auto` and set the language explicitly for the other benchmarks (RM L465; research §4).
+In the open code, `auto` selects the **nothink** prefill. The technical report does not say that
+its instruction-following scores (§4.2) were measured without the thinking pattern; it says only
+that a probabilistically activated thinking pattern was used in training (corrected 2026-11-11:
+this guide used to state the scores were measured without it). Qwen also advises setting the
+language when it is known (RM L50, L167).
 
 `OFFICIAL` and `MEASURED-HERE`, the dialect swap: a dialect speaker (Dylan → Beijing, Eric → Sichuan)
 whose language is Chinese or Auto gets its dialect id instead of a language id (MQ L2118-2122);
-Vocello does the same (`resolvedLanguageIdentifier`, `Qwen3TTS.swift` L1545-1556).
+Vocello does the same (`resolvedLanguageIdentifier`, `Qwen3TTS.swift` L318-329).
 
 `MEASURED-HERE`. This checkout implements both branches faithfully, but **which branch a request
 takes depends on language detection**, and the fallbacks differ per mode
@@ -179,8 +191,9 @@ this way loses its dialect id. The internal-diagnostics knob `QWENVOICE_CUSTOM_A
 restores the reference behaviour for A/B work.
 
 `UNVERIFIED`. Whether the `nothink` branch measurably weakens instruction adherence on this
-checkpoint is not measured, and upstream publishes no ablation; its own instruction scores come from
-`nothink`. It is a cheap A/B (§10.4).
+checkpoint is not measured, and upstream publishes no ablation. The README's evaluation setup
+implies `nothink` for the instruction scores, but the technical report does not say which branch
+they used. It is a cheap A/B (§10.4).
 
 ---
 
@@ -236,7 +249,7 @@ instruction, structurally: the clone payload and `GenerationSessionIdentity.clon
 `deliveryStyle` (`SemanticTypes.swift` L1483-1486, `GenerationSemantics.swift` L373-392), and the
 runtime's `prepareVoiceCloneInputs` takes only text, clone prompt, and language. There is no code path
 by which a Vocello clone request reaches the instruct branch. The runtime also keeps the 0.6B guard
-(`supportsCustomInstructionControl`, `Qwen3TTS.swift` L1514-1516), which matches upstream, but it is
+(`supportsCustomInstructionControl`, `Qwen3TTS.swift` L287-289), which matches upstream, but it is
 defensive only: Vocello ships no 0.6B checkpoint, just the three 1.7B models in
 [`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json).
 
@@ -280,10 +293,10 @@ clone" (RM L77), and the open code caps neither reference nor text length. The 1
 length and 60 s maximum in Alibaba's documentation are for its hosted service, not the open weights
 (research §2). `MEASURED-HERE`: a Vocello clone prompt with reference codes and a
 non-empty transcript runs ICL; one without a transcript runs speaker-only
-(`prepareVoiceCloneInputs`, `Qwen3TTS.swift` L4770-4817).
+(`prepareVoiceCloneInputs`, `Qwen3TTSPromptAssembly.swift` L187-234).
 
-**The ICL layout.** `MEASURED-HERE` (`prepareICLGenerationInputs`, `Qwen3TTS.swift` L4629-4768), in
-order:
+**The ICL layout.** `MEASURED-HERE` (`prepareICLGenerationInputs`,
+`Qwen3TTSPromptAssembly.swift` L46-185), in order:
 
 1. the role header (text-only positions);
 2. the codec prefix of §1.1, with the reference's x-vector in the speaker slot and the target's
@@ -296,15 +309,19 @@ After that the talker sees only `tts_pad`. This is upstream's **non-streaming** 
 Upstream's clone default is streaming (`non_streaming_mode=False`, WM L478), which overlays the text
 on the reference frames instead (MQ L1977-2019). Vocello always uses the non-streaming layout, an
 inheritance from mlx-audio (G-14, deliberate; ER-03 owns any change, by screen). The upstream evidence
-favours that choice: a long reference in the streaming layout speeds speech up (QwenLM#239), and the
-open PR #362 measured +16.7% with a 12.9 s reference streaming against 0.0% non-streaming, and
-proposes non-streaming as the clone default.
+favours that choice: a long reference in the streaming layout speeds speech up (QwenLM#239), and
+pull request 362 measured +16.7% with a 12.9 s reference streaming against 0.0% non-streaming, and
+proposes non-streaming as the clone default. As of 2026-11-11 that pull request is open, from an
+outside contributor and unreviewed.
 
 **Transcript rules.**
 
-- **Cover the whole reference.** `COMMUNITY`, checked against the official code by the research: a
-  `ref_text` that covers only part of the reference makes ICL loop without EOS (mlx-audio #921, 3 of
-  3 degenerate on PyTorch). `MEASURED-HERE`, **G-01 (open, ER-04)**: saved-voice enrollment accepts a
+- **Cover the whole reference.** `COMMUNITY`, reported and not proven: a `ref_text` that covers
+  only part of the reference is reported to make ICL loop without EOS (mlx-audio #921). The sample
+  is one user, one clip and one text: on official PyTorch, three degenerate takes of three with a
+  transcript covering about 6 s of a 10 s clip, and five normal takes of five with the full
+  transcript. It is a credible mechanism (corrected 2026-11-11: this guide used to give "3 of 3"
+  without the sample). `MEASURED-HERE`, **G-01 (open, ER-04)**: saved-voice enrollment accepts a
   partial recognition transcript (for example only the second sentence of a 16 s clip) and reaches
   ready with Save enabled. The planned fix requires review when recognition does not cover the
   clip's edges.
@@ -313,31 +330,44 @@ proposes non-streaming as the clone default.
   does nothing.
 - **Shape the transcript like the script.** **G-15 (open)**: recognized transcripts carry no
   punctuation and skip the text planner the target goes through. **G-12 (open)**: stored transcripts
-  keep their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim,
-  so the prebuild never matches a Studio take.
+  keep their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim.
+  A CLI or prebuilt prompt differs from a Studio prompt only when the stored transcript contains
+  newlines, tabs or repeated spaces, because Studio collapses whitespace runs and the prompt
+  identity uses the transcript text (corrected 2026-11-11: this guide used to say the prebuild
+  never matches a Studio take).
 - **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
   `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends exactly one space to the target
-  (`Qwen3TTS.swift` L4657-4662). The tokenizer is byte-level BPE without a prefix space, so the
+  (`Qwen3TTSPromptAssembly.swift` L74-79). The tokenizer is byte-level BPE without a prefix space, so the
   first target word otherwise glues to the transcript; the space was added after French first words
   were dropped. It also changes the first tokens of CJK targets. Screen before changing it (ER-04).
 - **`language` names the script's language, never the reference's** (`GenerationSemantics.swift`
-  L881-887). `COMMUNITY`: a reference in another language than the script produced the wrong speaker
-  in about 20% of takes (QwenLM#80) and leaks its accent (#134). Vocello does not flag cross-language
-  references (G-16–G-21).
+  L881-887). `COMMUNITY`: QwenLM#80 reports the wrong speaker in about 20% of takes. That figure
+  comes from one user in an all-English setup on vLLM-Omni; the cross-language remark in the same
+  issue is separate and unquantified (corrected 2026-11-11: this guide used to attach the 20% to
+  cross-language references). QwenLM#134 reports that a reference keeps its accent across
+  languages; these are user reports without maintainer confirmation. Vocello does not flag
+  cross-language references (G-16–G-21).
 
 **Reference audio rules.**
 
-- **The tail can echo.** `COMMUNITY`: the end of the reference can reappear at the start of the take
-  (QwenLM#341); onset noise and stray syllables are reported too (#119, #200). `MEASURED-HERE`,
-  **G-07 (open, ER-04)**: Vocello's recorded references end abruptly — a hard stop at 20.4 s or on
-  Stop, with no trim and no fade — and then get 0.5 s of zeros appended to a non-zero last sample,
-  which is the documented trigger.
+- **The tail can echo.** `COMMUNITY`: QwenLM#341 reports clones whose output begins with the last
+  words of the reference transcript, on the official PyTorch code at full precision. Its author
+  verified the trim arithmetic and supposed that the model runs past the reference boundary. No
+  maintainer answered, and one commenter fixed one voice of six by cutting the reference's last
+  phrase. Onset noise and stray syllables are reported too (#119, #200). `MEASURED-HERE`,
+  **G-07 (open, ER-04)**: Vocello's recorded references end abruptly, with a hard stop at 20.4 s or
+  on Stop and no trim or fade, and then get 0.5 s of zeros appended to a non-zero last sample.
+  QwenLM#341 never mentions a reference that ends abruptly, so the link between abrupt endings and
+  echoes is Vocello's own inference, and it is unmeasured (corrected 2026-11-11: this guide used to
+  call the hard stop the documented trigger).
 - **Trailing silence (A-12, open, ER-04).** Vocello appends 0.5 s of silence before the codec encode
-  (`codecEncodeTrailingSilenceSamples`, `Qwen3TTS.swift` L615; version `icl-ref-silence500ms-v2`,
-  L621); the x-vector uses the unpadded audio. Upstream pads nothing, so the code comment's claim of
-  upstream parity (L611-614) is wrong.
+  (`codecEncodeTrailingSilenceSamples`, `Qwen3TTSVoiceClonePrompt.swift` L23; version
+  `icl-ref-silence500ms-v2`, L29); the x-vector uses the unpadded audio. Upstream pads nothing, so
+  the code comment's claim of upstream parity (L19-22) is wrong.
 - **Codes and decode.** The reference codes come from an encoder with the wrong rotary convention
-  (A-02), and streamed clones decode without the reference's history (D5/A-04). Both are in the
+  (A-02), and streamed clones decode without the reference's history (D5/A-04). A-02 was measured
+  on 2026-11-11 with no detectable effect on clone output, and no upstream report shows audible
+  harm from the cold decoder (QwenLM#219 was withdrawn by its author). Both are in the
   [12 Hz tokenizer guide](mimi-codec-guide.md).
 
 ---
@@ -403,9 +433,11 @@ Long-form behaviour is in [`long-form-generation.md`](long-form-generation.md).
 
 `COMMUNITY`. Qwen3-TTS inherits Qwen3's text understanding, so unnormalized text with punctuation
 intact is the right input; pre-normalizing numbers and abbreviations into words removes information
-the model uses. `UNVERIFIED` as a rule: upstream issues report numbers misread across languages
+the model uses. `UNVERIFIED` as a rule: upstream issues report numbers misread
 (#68, #151, #256, #305, #328), and Vocello's planner does not pre-normalize them (research §5).
-Neither side has been measured here.
+All five issues were closed by the inactivity bot with no maintainer reply. #256 and #328 are
+misreadings, not wrong-language readings; #305 is a single report run on vLLM-Omni; and none
+concerns abbreviations (corrected 2026-11-11). Neither side has been measured here.
 
 ---
 
@@ -781,7 +813,8 @@ empty prompt for English output: the instruct turn then carries the diction sent
 ```
 
 `OFFICIAL`. The published InstructTTSEval scores in §4.2 were produced at exactly these defaults,
-with `max_new_tokens=2048`, bf16 and language `auto`, the `nothink` branch (RM L465; §1.3). That
+with `max_new_tokens=2048`, bf16 and language `auto` (RM L465). In the open code `auto` selects the
+`nothink` prefill; the technical report does not say which branch its scores used (§1.3). That
 is the strongest available statement about sampling: these settings are what the reported
 instruction-following numbers were measured at.
 
@@ -824,12 +857,23 @@ links instruction-following quality to sampling settings.** Any claim that lower
 improves instruction adherence here is `UNVERIFIED`.
 
 `OFFICIAL` and `UNVERIFIED`. Qwen trained and evaluated in bf16, recommends fp32 where bf16 is
-unavailable because the code predictor is "extremely sensitive to precision" (QwenLM#43), and never
-evaluated a quantized checkpoint. Vocello ships 4-bit (Speed) and 8-bit (Quality) quantizations that
-quantize every code-predictor projection and head (research §1, finding 8, and research §7). No
-upstream evaluation of instruction adherence under quantization exists. Instruction following is generally the first
-capability to degrade under quantization, so this is a real open question (§10.7) rather than a
-settled one.
+unavailable, and never evaluated a quantized checkpoint. A collaborator says the code predictor is
+"extremely sensitive to precision" (QwenLM#43); the context is half-precision assertion failures on
+CUDA, not a quality comparison of quantized weights (corrected 2026-11-11). Vocello ships 4-bit
+(Speed) and 8-bit (Quality) quantizations that quantize every code-predictor projection and head
+(research §1, finding 8, and research §7). No upstream evaluation of instruction adherence under
+quantization exists. Instruction following is generally the first capability to degrade under
+quantization, so this is a real open question (§10.7) rather than a settled one.
+
+`MEASURED-HERE`, a pre-screen of 2026-11-11 on clone fidelity, not on instruction adherence
+([review §4.2](../audits/2026-11-11-qwen3-tts-quality-report-review.md#42-4-bit-against-8-bit) and
+[§4.3](../audits/2026-11-11-qwen3-tts-quality-report-review.md#43-where-the-loss-sits-mixed-precision)).
+The 8-bit Base model's clones match the reference speaker better than the 4-bit model's by 0.025
+in ReDimNet2+ similarity (95% interval +0.016 to +0.034, 48 pairs). An 8-bit code predictor under
+the 4-bit talker gives +0.010 (+0.002 to +0.019) for 56 MB (189.0 MB to 245.1 MB), and the 8-bit
+talker alone gives +0.007 for 712 MB. Speed was not measured; the runs used the Python port, in
+English, and nobody listened. The local model files confirm 51 quantized code-predictor modules in
+both tiers.
 
 ---
 
@@ -1118,8 +1162,9 @@ gate.
    §8.2, which also records the tier-parity half of this item: a bug, fixed separately.
 4. **`language="english"` versus `auto`** on Design, and on Custom through the D6 knob
    (`QWENVOICE_CUSTOM_AUTO_LANGUAGE`). A different `think`/`nothink` prefill branch (§1.3): the
-   technical report credits the thinking pattern for instruction following, yet Qwen's own
-   instruction scores were measured under `nothink`. D6 is ER-05's to decide by screen.
+   technical report credits the thinking pattern, used in training, for instruction following, and
+   does not say which branch its instruction scores used; the README's language `auto` implies
+   `nothink` (corrected 2026-11-11). D6 is ER-05's to decide by screen.
 5. **A Chinese instruction against the English one** on CustomVoice, output text held constant.
    This requires a controlled comparison; Table 8's separate language datasets do not predict
    the result (§4.4). The dated research also proposes French-output comparisons.
@@ -1131,7 +1176,9 @@ gate.
    4-bit and 8-bit quantizations were measured head-to-head on fresh seeds and the 8-bit arm
    separates no *better* (UAR 0.375 vs 0.477, overlapping per-cell intervals) — quantization is
    not the adherence bottleneck between our own tiers. The bf16 comparison itself remains
-   unmeasured; upstream measures bf16 only, we ship quantized (§7).
+   unmeasured; upstream measures bf16 only, we ship quantized (§7). Clone fidelity is a separate
+   question with a first answer: in the 2026-11-11 pre-screen the 8-bit Base model's clones match
+   the reference speaker better than the 4-bit model's by 0.025 in speaker similarity (§7).
 8. **The clone input.** The ICL join's leading space (A-11), the reference's trailing silence
    (A-12) and the clone layout (G-14) each change what the model reads (§2.3). They are ER-04's and
    ER-03's to screen before any change; none is a copy question.

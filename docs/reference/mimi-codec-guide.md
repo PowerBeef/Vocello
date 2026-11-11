@@ -1,17 +1,20 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-20
+reviewed: 2026-11-11
 summary: The Qwen3-TTS 12 Hz speech tokenizer guide (formerly the Mimi codec guide; the filename is kept) — the Mimi-derived encoder, split RVQ and Qwen decoder as owned in Vocello, streaming and partition semantics, where Vocello's decode and clone-reference encode diverge from the reference (A-02, A-03, A-04, G-03), and the shipped fp32 codec.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift
+  - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Quantization.swift
   - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Seanet.swift
   - docs/audits/2026-10-17-qwen3-tts-model-research.md
   - docs/audits/2026-10-16-engine-runtime-audit.md
+  - docs/audits/2026-11-11-qwen3-tts-quality-report-review.md
 ---
 # Qwen3-TTS 12 Hz Speech Tokenizer Guide
 
@@ -21,10 +24,16 @@ sourceOfTruth:
 
 **Conventions.** Vocello paths are relative to `Packages/VocelloQwen3Core/Sources/`: `ST` is
 `MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift`, `Q` is
-`MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`. Upstream line numbers (`TV2`, `TC2`, `WM`, `HFM`) are
+`MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`, `VC` is
+`MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift` and `LD` is
+`MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift`. The runtime file was split by concern in
+`76fa18e7` (2026-11-11), and the `Q`, `VC` and `LD` line numbers below were read after that split.
+Upstream line numbers (`TV2`, `TC2`, `WM`, `HFM`) are
 QwenLM/Qwen3-TTS at `022e286b98` and transformers 4.57.3, keyed as in the
 [ER-13 research report](../audits/2026-10-17-qwen3-tts-model-research.md). Finding IDs (A-02, G-03…)
-are from the [engine audit](../audits/2026-10-16-engine-runtime-audit.md).
+are from the [engine audit](../audits/2026-10-16-engine-runtime-audit.md). The measurements and
+upstream corrections dated 2026-11-11 are from the
+[counter-verification review](../audits/2026-11-11-qwen3-tts-quality-report-review.md).
 
 **What this file owns:** the tokenizer's structure, its Swift implementation, decode and streaming
 semantics, the clone-reference encoder, and how they differ from the reference. **Owned elsewhere:**
@@ -60,7 +69,7 @@ into PCM. The encoder runs only to turn a clone reference into codes for in-cont
 
 | ID | What | Status |
 | --- | --- | --- |
-| A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; ships with G-03's version bump (ER-04) |
+| A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; ships with G-03's version bump (ER-04); no detectable effect on clone output in the 2026-11-11 pre-screen |
 | A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open (PA-16) |
 | D5 / A-04 | Streamed clones decode from a cold decoder; the reference decodes reference plus generated codes (§5) | open, with A-26 (ER-04) |
 | — | Encoder attention is full causal, as upstream's is (§2.3) | matches; do not add the 250-frame window |
@@ -90,26 +99,45 @@ Qwen keeps 16 (TV2 L983-984), and Vocello's validation insists on 32 configured 
 via research §3).
 
 The encoder loads by default only for Base (clone) checkpoints (`includeEncoder`,
-`Q:5632`). The speaker encoder (mel → x-vector) is a separate module, `Qwen3TTSSpeakerEncoder`; see
+`LD:259`). The speaker encoder (mel → x-vector) is a separate module, `Qwen3TTSSpeakerEncoder`; see
 §9.4.
 
 ### 2.2 The rotary-embedding bug (A-02)
 
 The checkpoint stores HF-format q/k weights, permuted for transformers' split-half `rotate_half`
-(HFM L542-560, L668). Vocello's encoder transformer applies
-`RoPE(traditional: true)`, the adjacent-pair convention
-(`MLXAudioCodecs/Mimi/Transformer.swift:129`), and `sanitize(weights:)` only concatenates the
-separate q, k and v projections into one `in_proj` (`ST:1372-1385`, `ST:1503-1507`). mlx-audio fixed
-the same port with `rope_traditional=False` (`6549fc2`, "silence in VC"); mlx-audio-swift `main` and
-Vocello have not (research §1, finding 4). The PowerBeef02 codec file is byte-identical to Qwen's
-(§7), so the weights are in HF layout.
+(HFM L542-560, L668): the Hugging Face conversion script permutes the rows of the q and k
+projections for split-half rotary (verified upstream on 2026-11-11). Vocello's encoder transformer
+applies `RoPE(traditional: true)`, the adjacent-pair convention
+(`MLXAudioCodecs/Mimi/Transformer.swift:130`), and `sanitize(weights:)` only concatenates the
+separate q, k and v projections into one `in_proj` (`ST:1372-1385`, `ST:1503-1507`). mlx-audio's
+port uses `rope_traditional=False`. Its commit `6549fc2` added the encoder with that setting from
+the start; it did not fix a measured defect, and nothing in it measures the setting's effect
+(corrected 2026-11-11: this guide used to call the commit a fix). mlx-audio-swift `main` still has
+the adjacent-pair convention, as Vocello does (research §1, finding 4). The PowerBeef02 codec file
+is byte-identical to Qwen's (§7), so the weights are in HF layout.
 
 Consequence: every transcript-backed clone encodes reference codes that differ from the official
-tokenizer's, and persisted clone artifacts hold those codes. How much this changes output is
-unmeasured (research open question 7).
+tokenizer's, and persisted clone artifacts hold those codes. How much this changes output was
+research open question 7. It was measured for the first time on 2026-11-11
+([review §4.1](../audits/2026-11-11-qwen3-tts-quality-report-review.md#41-the-encoders-rotary-convention-a-02)):
+
+- **The stored codes differ from the reference's.** The fixture voice's stored prompt, made by the
+  Swift encoder, matches the reference encoder on 31% of codes. It matches a PyTorch emulation of
+  the adjacent-pair rotary on 96.8% of codes, and on 100% of the first codebook.
+- **Both code sets decode equally close to the input.** Decoded with the Qwen decoder, the
+  reference codes reach a speaker similarity of 0.983 to the input and the adjacent-pair codes
+  0.981.
+- **Clone output does not change detectably.** A pre-screen in the Python port (English, clean
+  references, 96 paired clones) found +0.004 speaker similarity for the reference convention, with
+  a 95% interval of -0.003 to +0.011, and an identical word error rate.
+
+A-02 stays open. The pre-screen does not cover other languages, cross-language references, noisy
+or phone recordings, targets longer than 10 s or the Swift runtime; nobody listened; and ER-04's
+code-parity experiment still has to run in Swift. The fix is for parity with the reference, so
+that later comparisons start from the same codes. Expect no audible change from it.
 
 **G-03.** Nothing versions the encoder implementation. The clone identity's speaker-feature version
-is `qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3` (`Q:790-798`): the mel frontend,
+is `qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3` (`VC:198-206`): the mel frontend,
 the ICL reference preprocessing and the MLX build (F-06, since CONV-21). After a RoPE fix alone, every
 saved voice would keep adopting its persisted wrong codes. The fix therefore adds an encoder version
 to that identifier, pinned by a golden-codes test, so transcript-backed artifacts rebuild once
@@ -128,13 +156,13 @@ proposed, would move Vocello away from the reference.
 ### 2.4 Other encoder facts
 
 - **Eager encode (F-07, fixed).** `createVoiceClonePrompt` now evaluates the reference codes inside
-  the caller's MLX scope (`Q:2257`), so the lazy encode no longer escapes into `MLX.save` or the
+  the caller's MLX scope (`Q:1030-1033`), so the lazy encode no longer escapes into `MLX.save` or the
   first take.
 - **Memory (A-08, A-28, open).** The encoder KV cache is kept between calls and a longer input
   concatenates onto the stale buffer (MEM-1). The SEANet encoder runs on the whole reference: about
   126 MB per activation for a 20 s reference and 740 MB for a 120 s Mac reference.
 - **Reference padding.** Before encoding, Vocello appends 0.5 s of silence to the reference
-  (`Q:607-650`); the x-vector uses the unpadded audio. Upstream pads nothing (A-12). The input rule
+  (`VC:15-61`); the x-vector uses the unpadded audio. Upstream pads nothing (A-12). The input rule
   and its status belong to the [prompting guide §2.3](qwen3-tts-prompting-guide.md).
 
 ---
@@ -279,12 +307,12 @@ Production decodes only through `streamingStep(_:)`, never through the batch cal
 
 | Path | How it decodes | Source |
 | --- | --- | --- |
-| Streamed takes | `streamingStep` per playback chunk, on the runtime's chunk schedule | `Q:4185-4195`, `Q:4385-4392` |
-| Quality-first takes | `streamingDecode` over 25-frame ranges (`qualityFirstDecoderChunkFrames`), then the sample window `[reference, reference + generated) × 1920` | `Q:3075-3125` |
-| Codec replay (diagnostics) | `streamingStep` over the recorded ranges | `Q:3270-3300` |
+| Streamed takes | `streamingStep` per playback chunk, on the runtime's chunk schedule | `Q:3009-3016`, `Q:3205-3213` |
+| Quality-first takes | `streamingDecode` over 25-frame ranges (`qualityFirstDecoderChunkFrames`), then the sample window `[reference, reference + generated) × 1920` | `Q:1848-1901` |
+| Codec replay (diagnostics) | `streamingStep` over the recorded ranges | `Q:2040-2082` |
 
 The quality-first window counts frames explicitly; it never infers length from non-zero codes, since
-code 0 is a legal codec token (`Q:3077-3094`).
+code 0 is a legal codec token (`Q:1850-1867`).
 
 **Clone history (D5, A-04).** Quality-first clones decode the reference codes and the generated codes
 together and cut the reference's samples, as upstream does. Streamed clones start from a cold
@@ -316,8 +344,11 @@ will measure the difference.
 - **The official Hugging Face demo Space** bundles pre-February tokenizer code with the old trim
   (555 samples short) and the old `> 0` length rule. Do not use it as a parity reference (research
   §1, finding 10).
-- **QwenLM#219** (community): a cold decoder distorts the first token of a take. It bears on
-  Vocello's cold streamed-clone decode (A-04).
+- **QwenLM#219** (community, withdrawn): it reported a distorted first token on a non-streamed
+  Built-in Voice take. Its author withdrew the cause in the thread: the WAV was clean and the fault
+  was an MP3 encoder's delay. It is not evidence of a cold-decoder defect and does not bear on
+  Vocello's cold streamed-clone decode (A-04), which has no upstream report of audible harm behind
+  it (corrected 2026-11-11).
 - **QwenLM#223** (community): `chunked_decode` loses samples between chunks. It belongs in PA-16's
   parity fixture against the official 300/25 decode (research §10).
 - **mlx-audio `c4d29e6`** (2026-10-07) added the transposed-conv bias twice at streaming chunk
@@ -328,7 +359,7 @@ will measure the difference.
 
 A streaming chunk size travels from the contract to the talker loop as seconds
 (`frames / 12.5`) and back. `Qwen3StreamChunkSchedule.codecFrames(forStreamingInterval:)` now rounds
-(`Q:1395-1407`, commit `54842e39`, 2026-10-18); the earlier truncation lost a frame for 37 of the
+(`Q:168-180`, commit `54842e39`, 2026-10-18); the earlier truncation lost a frame for 37 of the
 chunk sizes 1–512. The product's own tier mapper still truncates by design
 (`StreamChunkPolicy.currentShippingDefault`): 0.6 s is 7 frames there. The generic
 `streamingDecode(_:chunkTokens:)` helper defaults to 100 frames, which is 8 s of audio; production
@@ -386,7 +417,7 @@ is open (research question 6).
 
 **Clone-artifact identity.** Persisted clone prompts hold encoder output, so anything that changes
 the encode must change the speaker-feature version (§2.2): the reference preprocessing
-(`icl-ref-silence500ms-v2`, `Q:621`), the MLX build (`mlx-swift-0.32.3`, `Q:798`), and, once A-02 is
+(`icl-ref-silence500ms-v2`, `VC:29`), the MLX build (`mlx-swift-0.32.3`, `VC:206`), and, once A-02 is
 fixed, the encoder itself (G-03). Audio preparation has no version either (G-13), so its fixes never
 reach cached references; G-13 lands first in ER-04.
 

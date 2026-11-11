@@ -181,10 +181,21 @@ not used.
 
 ### 3.3 Precision risks
 
-- Qwen trained and evaluated in bf16 and recommends fp32 where bf16 is unavailable, because the code
-  predictor is "extremely sensitive to precision" (QwenLM#43). No quantized checkpoint was ever
-  evaluated upstream, and Vocello's 4-bit artifacts quantize all 51 code-predictor linear and head
-  tensors. How much that changes output is unmeasured (research open question 7).
+- Qwen trained and evaluated in bf16 and recommends fp32 where bf16 is unavailable. A collaborator
+  says the code predictor is "extremely sensitive to precision" (QwenLM#43); the context is
+  half-precision assertion failures on CUDA, not a quality comparison of quantized weights
+  (corrected 2026-11-11). No quantized checkpoint was ever evaluated upstream, and Vocello's
+  artifacts quantize all 51 code-predictor linear and head modules in both tiers, which the local
+  model files confirm.
+- How much quantization changes output was research open question 7. A pre-screen of 2026-11-11
+  gives a first answer for clone fidelity
+  ([review §4.2](../audits/2026-11-11-qwen3-tts-quality-report-review.md#42-4-bit-against-8-bit) and
+  [§4.3](../audits/2026-11-11-qwen3-tts-quality-report-review.md#43-where-the-loss-sits-mixed-precision)):
+  the 8-bit Base model's clones match the reference speaker better than the 4-bit model's by 0.025
+  in ReDimNet2+ similarity (95% interval +0.016 to +0.034, 48 pairs); an 8-bit code predictor under
+  the 4-bit talker gives +0.010 (+0.002 to +0.019) for 56 MB (189.0 MB to 245.1 MB); the 8-bit
+  talker alone gives +0.007 for 712 MB. Speed was not measured, the runs used the Python port in
+  English, and nobody listened. The model guide's §2.3 owns the result.
 - The ports' lessons (research §6): keep embeddings, the speaker encoder and the codec unquantized,
   run RVQ encode in fp32, and avoid fp16 logits. Vocello keeps the codec fp32 (the f16 codec was
   withdrawn on 2026-09-14), samples from float32 logits (§4.5), and casts the float32 speaker
@@ -209,11 +220,26 @@ not used.
 
 ### 3.5 The quantized-load leak
 
-Every quantized load leaks its initialization graph: about 110 MB after 43 reloads (mlx-audio-swift
-PR #286 and ml-explore/mlx PR #4710, both open when the research checked on 2026-10-16; #4710 has
-since closed unmerged). It applies to Vocello's quantized load and is not fixed here. It matters where loads repeat: the iPhone unloads after two minutes idle (30 s before RF-47) and on leaving the foreground, and reloads for the next
-take (ER-06, ER-07), and D-04's 309 MiB left in MLX's cache after an unload may be partly this
-(research §10).
+Every quantized load leaks its initialization graph. The state of the upstream fix, as read on
+2026-11-11 ([review §5](../audits/2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold)):
+
+- **The size is not measured on Vocello.** mlx-audio-swift pull request 286 reports about 110 MB
+  after 43 reloads. Its author measured that on Qwen3-ASR 4-bit, not on a TTS model, and the pull
+  request is still open.
+- **ml-explore/mlx pull request 4710 is not the fix.** It closed unmerged on 2026-10-19. An MLX
+  maintainer pointed to pull request 4453, "Break the sibling cycle when an array is released by
+  assignment", merged on 2026-09-11, as the fix.
+- **The fix is not in Vocello's pin.** mlx-swift 0.32.3 carries MLX core 0.32.2, released on
+  2026-08-25, before the merge. (That is the core's own version number, not the mlx-swift release
+  0.32.2 that §9.1 excludes.) The first MLX release after the merge is 0.32.3, of 2026-09-29.
+- **So the fix arrives with a pin move,** which needs the maintainer's authorization (§9.3), not
+  by porting mlx-audio-swift's pull request 286.
+
+The leak applies to Vocello's quantized load and is not fixed here. It matters where loads repeat:
+the iPhone unloads after two minutes idle (120 s since `eb0775f0`, RF-47; it was 30 s) and on
+leaving the foreground, and reloads for the next take (ER-06, ER-07). Reloads are therefore rarer
+than when the research was written. D-04's 309 MiB left in MLX's cache after an unload may be
+partly this (research §10).
 
 ### 3.6 API history
 
@@ -814,7 +840,9 @@ scripts/macos_test.sh profile custom:speed:
 - [mlx-swift](https://github.com/ml-explore/mlx-swift) and [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm)
 - MLX issues and pull requests cited here: [#3523](https://github.com/ml-explore/mlx/pull/3523)
   (command-buffer errors), [#4177](https://github.com/ml-explore/mlx/pull/4177) (inverse-CDF
-  categorical), [#4710](https://github.com/ml-explore/mlx/pull/4710) (load leak); mlx-swift
+  categorical), [#4710](https://github.com/ml-explore/mlx/pull/4710) (load leak, closed unmerged)
+  and [#4453](https://github.com/ml-explore/mlx/pull/4453) (the load-leak fix, merged 2026-09-11,
+  not in the pinned core); mlx-swift
   [#461](https://github.com/ml-explore/mlx-swift/pull/461) (compiled-function deadlock)
 - [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift) (PR [#286](https://github.com/Blaizzy/mlx-audio-swift/pull/286))
   and [mlx-audio](https://github.com/Blaizzy/mlx-audio) (issue [#851](https://github.com/Blaizzy/mlx-audio/issues/851))

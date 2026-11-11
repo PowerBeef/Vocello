@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: backend-mlx
-reviewed: 2026-10-28
+reviewed: 2026-11-11
 summary: Sourced research on the Qwen3-TTS checkpoints Vocello ships and their upstream family — releases and provenance, the architecture as implemented upstream, official defaults, known failure modes, ports since the fork and Vocello's artifact recipe — with a parity ledger and the reference-documentation gap analysis that drives ER-13's overhaul.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -94,6 +94,12 @@ Vocello paths: `Q` = `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3
    validation is on, in RVQ decode and MRoPE; Vocello still uses it (`ST:48`, `T:57-60`). And every
    quantized load leaks its initialization graph (MAS#286, ml-explore/mlx#4710, both open; about 110 MB
    after 43 reloads), which bears on the iPhone's 30 s idle unload and D-04.
+   Corrected 2026-11-11: ml-explore/mlx#4710 closed unmerged on 2026-10-19, and an MLX maintainer
+   pointed to ml-explore/mlx#4453, merged 2026-09-11, as the fix. The pinned MLX core is 0.32.2
+   (released 2026-08-25), which does not contain it, so the fix arrives with a pin move that needs
+   the maintainer's authorization, not by porting MAS#286. MAS#286 is still open, and its 110 MB
+   figure was self-reported on Qwen3-ASR 4-bit, not on a TTS model. The iPhone's idle unload has
+   been 120 s since `eb0775f0`. See the [review, §5](2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold) and [§6](2026-11-11-qwen3-tts-quality-report-review.md#6-statements-that-are-out-of-date-or-stretched).
 10. **Don't use the official Hugging Face demo Space as a parity reference.** It bundles pre-February
     tokenizer code with the old transposed-conv trim (555 samples short) and the old `> 0` length rule.
 
@@ -221,6 +227,10 @@ reusable designed voice, design then clone (RM L288-290). Community findings che
 official code: a `ref_text` covering only part of the reference makes ICL loop without EOS (MA#921, 3/3
 degenerate on PyTorch); a long reference in the streaming ICL layout speeds speech up (QwenLM#239; PR
 #362, open, proposes non-streaming as the clone default).
+Corrected 2026-11-11: MA#921 is one user's report on one clip and one text, with three degenerate
+takes of three on official PyTorch when the transcript covered about 6 s of a 10 s clip, and five
+normal takes of five with the full transcript. It is a credible mechanism, not a proof
+([review, §5](2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold)).
 
 **Instruct and briefs.** Free text wrapped as a user turn, no length limit in code; the blog shows
 attribute lists, prose and persona cards. A Qwen collaborator recommends sampling a design several times
@@ -251,7 +261,7 @@ text versus its table).
 | Missing EOS, run-on, noise | QwenLM#118 (~0.5% of Base runs never emit EOS), #305 (5 minutes of noise on a cross-lingual year), #258, #318; VO#6158 reproduces on official CUDA | the 2048 cap ends them as `maxTokens`; RF-18 saw two runaway takes under Consistent |
 | Truncation at the tail | #55 (ja/ko last word), #181 (last two words, up to 70% in cases), QD#161 (isolated words); MA#882 (fixed by removing EOS re-insertion) | D2 |
 | Pace drift and silences | #239 (rate climbs over long text: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (measured +16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 (clones always faster) | A-01, RF-18 |
-| Clone identity and echoes | #80 (~20% wrong speaker), #134 (source accent leaks), #341 (echo of the reference tail), #119, #200 (onset noise or stray syllable), #219 (cold-decoder first-token distortion) | G-01, G-07, A-04, D-02 |
+| Clone identity and echoes | #80 (~20% wrong speaker), #134 (source accent leaks), #341 (echo of the reference tail), #119, #200 (onset noise or stray syllable), #219 (cold-decoder first-token distortion). (Corrected 2026-11-11: #80's 20% comes from one user in an all-English setup on vLLM-Omni, and its cross-language remark is separate and unquantified; #341 reports output that begins with the last words of the reference transcript and never mentions an abrupt reference ending, so its tie to G-07 is our own unmeasured inference; #219 concerned a non-streamed Built-in Voice take and was withdrawn by its author, the fault being an MP3 encoder's delay. See the [review, §5](2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold).) | G-01, G-07, A-04, D-02 |
 | Numbers across languages | #68, #151, #305, #256, #328, QD#330 | the planner does not pre-normalize numbers |
 | Accents | #134, #359 (Chinese accent on vivian/serena), QD#230 (Design in es/fr sounds English), #248 (dialect instructions ignored) | Design and dialect control are suggestive only |
 | Precision | #333 (NaN under FA2), #355 (fp16 overflow) | D3 adopted float32 sampling |
@@ -269,7 +279,7 @@ and last reviewed `d302a5c6` (v0.1.3; `UPSTREAM.md`). Upstream has since cut v0.
 |---|---|
 | mlx-audio-swift `dbe5eaa` (v0.1.5): mlx-swift 0.32.3 / lm 3.32.3; scalar gather → range slice in RVQ decode and MRoPE; `streamingStep` evaluates before `sending` | pins now match (CONV-21, 2026-10-16); the range-slice change is **not ported** (`ST:48`, `T:57-60`) |
 | mlx-audio-swift PR #270 (open): `nonStreamingMode = true` for CustomVoice/VoiceDesign | = D1 |
-| mlx-audio-swift PR #286 (open): stop the per-load initialization-graph leak (ml-explore/mlx#4710) | applies to Vocello's quantized load (Q 5667-5705) |
+| mlx-audio-swift PR #286 (open): stop the per-load initialization-graph leak (ml-explore/mlx#4710) | applies to Vocello's quantized load (Q 5667-5705). (Corrected 2026-11-11: ml-explore/mlx#4710 closed unmerged; the fix is ml-explore/mlx#4453, merged 2026-09-11, which is not in the pinned MLX core 0.32.2 and arrives with a pin move, not by porting PR #286. See the [review, §5](2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold).) |
 | mlx-audio `6549fc2`: Mimi `rope_traditional=False`; fp32 RVQ encode; EOS kept after top-k/top-p; ICL repetition-penalty floor 1.5 | RoPE **not fixed** (A-02); EOS re-insertion **inherited** (D2); no 1.5 floor (1.05 is upstream's) |
 | mlx-audio `d2d02bf` (MA#882): EOS filtered like any token | D2 open |
 | mlx-audio `a730a68`: temperature before top-p/min-p | ported |
@@ -372,7 +382,9 @@ stay dated and link to the owners.
 - **PA-16:** keep the decoder window; drop the encoder-window step, which would diverge from upstream;
   QwenLM#223's sample loss belongs in its 300/25 parity fixture.
 - **ER-06 / ER-07:** the quantized-load leak (MAS#286, mlx#4710) under the iPhone's idle unload; D-04's
-  309 MiB may be partly this.
+  309 MiB may be partly this. Corrected 2026-11-11: the upstream fix is mlx#4453, which is not in
+  the pinned MLX core and arrives with a pin move, and the idle unload is now 120 s
+  ([review, §5](2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold)).
 - **ER-08 / ER-12:** port the range-slice gathers (`ST:48`, `T:57-60`); remove the dead `chunkedDecode`
   and legacy `decode`.
 - **ER-11:** VO#8569's codec budget and fresh-seed retry; #118's ~0.5% no-EOS rate.

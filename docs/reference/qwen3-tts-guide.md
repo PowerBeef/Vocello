@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-10
+reviewed: 2026-11-11
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -21,6 +21,7 @@ sourceOfTruth:
   - Sources/Resources/qwenvoice_contract.json
   - docs/audits/2026-10-17-qwen3-tts-model-research.md
   - docs/audits/2026-10-16-engine-runtime-audit.md
+  - docs/audits/2026-11-11-qwen3-tts-quality-report-review.md
 ---
 
 # Qwen3-TTS Reference Guide
@@ -41,7 +42,9 @@ Every model fact below comes from Vocello's code, from the sourced research repo
 [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md) (upstream
 citations such as `MQ L615` or `QwenLM#239` use its source keys), or from the
 [engine runtime audit](../audits/2026-10-16-engine-runtime-audit.md) (finding IDs such as A-02 or
-G-01). Code citations are `path:line` at the commit that last reviewed this file.
+G-01). The corrections to upstream readings and the measurements dated 2026-11-11 come from the
+[counter-verification review](../audits/2026-11-11-qwen3-tts-quality-report-review.md) of that day. Code citations are
+`path:line` at the commit that last reviewed this file.
 
 **Update this file** when `qwenvoice_contract.json` changes a model, variant, speaker or default;
 when the engine's sampling, decoding or conditioning changes (`UnsafeSpeechGenerationModel.swift`,
@@ -126,9 +129,22 @@ Three model ids, each in two variants, all MLX conversions of the 1.7B checkpoin
 - **Marking:** every artifact also carries Meta's AudioSeal generator
   (`marking/audioseal_wm16_generator_fp16.safetensors`).
 - **Precision caveat:** Qwen trained and evaluated in bf16 and recommends fp32 where bf16 is
-  unavailable, because the code predictor is "extremely sensitive to precision" (QwenLM#43). No
-  quantized checkpoint was ever evaluated upstream, and Vocello's 4-bit tier quantizes all 51
-  code-predictor linear and head tensors.
+  unavailable. A collaborator says the code predictor is "extremely sensitive to precision"
+  (QwenLM#43); the context is half-precision assertion failures on CUDA, not a quality comparison
+  of quantized weights (corrected 2026-11-11). No quantized checkpoint was ever evaluated upstream.
+  Vocello quantizes all 51 code-predictor linear and head modules in both tiers, which the local
+  model files confirm (2026-11-11).
+- **Precision pre-screen (2026-11-11,
+  [review §4.2](../audits/2026-11-11-qwen3-tts-quality-report-review.md#42-4-bit-against-8-bit) and
+  [§4.3](../audits/2026-11-11-qwen3-tts-quality-report-review.md#43-where-the-loss-sits-mixed-precision)).**
+  Quantization costs clone fidelity, measurably and by a small amount:
+  - The 8-bit Base model's clones match the reference speaker better than the 4-bit model's by
+    0.025 in ReDimNet2+ similarity (95% interval +0.016 to +0.034, 48 pairs).
+  - An 8-bit code predictor under the 4-bit talker gives +0.010 (+0.002 to +0.019) for 56 MB
+    (189.0 MB to 245.1 MB).
+  - The 8-bit talker alone gives +0.007 for 712 MB.
+  - Speed was not measured. The runs used the Python port, in English, and nobody listened, so
+    this is a pre-screen, not a qualification.
 
 ### 2.4 Licenses
 
@@ -177,7 +193,7 @@ A dash means the research report lists no difference from 1.7B.
 - **Text path.** `text_projection` is a SiLU MLP with bias; `codec_head` is untied.
 - **Step input.** Each step's input is the sum of the previous frame's 16 codebook embeddings
   (codebook 0 from the talker's `codec_embedding`, 1–15 from the code predictor's) plus the text track
-  (`Qwen3TTS.swift:2823-2839`).
+  (`Qwen3TTS.swift:2835-2859`).
 - `position_id_per_seconds: 13` is in the config and read by no code.
 
 ### 3.2 Codec vocabulary and control ids
@@ -210,10 +226,10 @@ template. Special ids: `<|im_start|>` 151644, `<|im_end|>` 151645, `assistant` 7
 
 Hidden 1,024, 5 layers, 16 heads / 8 KV heads, θ 1e6, vocabulary 2,048, with 15 codec embeddings at
 talker width, 15 heads and `small_to_mtp_projection` (2,048 → 1,024; identity on 0.6B). Each frame
-runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:2763-2819`), with its own
+runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:2763-2833`), with its own
 sampling settings, no EOS and no repetition penalty (MQ L1671-1680, L1276-1299). The weights sit
 under `talker.code_predictor.model.codec_embedding.{0…14}` and `talker.code_predictor.lm_head.{0…14}`
-(`Qwen3TTSCodePredictor.swift:169-230`).
+(`Qwen3TTSCodePredictor.swift:212`, `:273`).
 
 ### 3.5 Speaker encoder (Base only)
 
@@ -244,7 +260,8 @@ Three model-level facts matter for parity (§12):
 
 - **Encoder.** Transformers' `MimiModel` without its decoder. Its q/k weights are stored for
   `rotate_half`, but Vocello's port applies `RoPE(traditional: true)`
-  (`Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift:130`; A-02, open). Its
+  (`Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift:130`; A-02, open, with
+  no detectable effect on clone output in the 2026-11-11 pre-screen, §12). Its
   attention is full causal (`Transformer.swift:168`), which matches upstream: the configured 250-frame
   window applies only under FlashAttention-2, which the official loader does not select.
 - **Decoder.** Qwen's own code. Upstream gives each of its 8 transformer layers a 72-frame sliding
@@ -318,8 +335,11 @@ clone the result (§5.4).
 Two conditioning modes, chosen by whether a transcript resolves:
 
 - **ICL (transcript-backed):** the speaker embedding plus the reference's codec codes and its
-  transcript. Upstream requires `ref_text` for ICL (WM L436-438), and it must cover the **whole**
-  reference: a transcript of only part of it makes ICL loop without EOS (MA#921).
+  transcript. Upstream requires `ref_text` for ICL (WM L436-438), and it should cover the **whole**
+  reference: a transcript of only part of it is reported to make ICL loop without EOS. The report
+  is MA#921, from one user with one clip and one text: on official PyTorch, three degenerate takes
+  of three with a transcript covering about 6 s of a 10 s clip, and five normal takes of five with
+  the full transcript.
 - **x-vector only (audio-only):** the speaker embedding alone. Upstream ignores any transcript here
   and calls the quality lower (RM L243). An empty or whitespace transcript selects this mode; it never
   falls back to Voice Design.
@@ -409,16 +429,18 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 - **ICL** also encodes the reference with the tokenizer's encoder. Before encoding, Vocello appends
   0.5 s of silence (`Qwen3TTSVoiceClonePrompt.swift:19-29`, version `icl-ref-silence500ms-v2`); upstream pads
   nothing, and the code comment's claim of upstream parity is wrong (A-12).
-- **ICL target text** gets exactly one leading space (`Qwen3TTSPromptAssembly.swift:27-33`); upstream joins the
+- **ICL target text** gets exactly one leading space (`Qwen3TTSPromptAssembly.swift:74-79`); upstream joins the
   reference and target tokens with no separator. Vocello added the space for French first-word drops
   (A-11, deliberate; screen before changing).
 - **ICL layout.** Vocello always lays the reference and target text over the reference's codec frames
   in the non-streaming overlay (mlx-audio lineage, G-14). Upstream's `generate_voice_clone` defaults
   to the streaming layout (WM L478), and a long reference in that layout speeds speech up
-  (QwenLM#239; PR #362, open, proposes non-streaming as the default).
+  (QwenLM#239). Pull request 362 proposes non-streaming as the default; as of 2026-11-11 it is
+  open, from an outside contributor and unreviewed.
 - **Decoder history.** Upstream's ICL decodes the reference codes plus the generated ones and drops
   the reference's share of the samples (WM L612-633). Vocello's streamed clones start from a cold
-  decoder (A-04, open with A-26).
+  decoder (A-04, open with A-26). No upstream report shows audible harm from a cold decoder: the
+  one that was cited, QwenLM#219, was withdrawn by its author (§11.1).
 
 ### 8.2 Reference length and warnings
 
@@ -493,7 +515,7 @@ either stage.
 
 ### 9.3 Decoding
 
-The talker's sampler (`Qwen3TTSSampling.swift:148-347`, called at `Qwen3TTS.swift:2678-2691`) runs in this order:
+The talker's sampler (`Qwen3TTSSampling.swift:173-372`, called at `Qwen3TTS.swift:2679-2692`) runs in this order:
 
 1. **Float32 logits.** Logits are cast to float32 before sampling, as the reference does (D3,
    production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` samples in the model's precision).
@@ -512,7 +534,7 @@ The talker's sampler (`Qwen3TTSSampling.swift:148-347`, called at `Qwen3TTS.swif
 The code predictor runs the same sampler with the subtalker stage, float32 logits, no suppression,
 no EOS and no penalty; in production that stage is plain temperature and top-k, and since RF-46 it
 runs inside the frame's one compiled function on keys the loop resolves from the request's random
-state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:2804-2813`). Both production constants live in one value,
+state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:2792-2831`). Both production constants live in one value,
 `.production = (fullTextConditioning: true, filtersEOS: true, float32Sampling: true)`, defined
 twice and kept equal: `Qwen3ReferenceParity` in `Generation.swift` and `VocelloQwen3ReferenceParity`
 in `Contracts.swift`. A long-form segment's request turns D1 off.
@@ -527,7 +549,7 @@ How the target text reaches the talker is generation semantics. The token-level 
   (`non_streaming_mode=True`, WM L642, L738), and stream only the audio. **D1 was adopted for them
   on 2026-10-20** (RF-21, §11.2, §12).
 - **Long-form segments and x-vector clones** use the streaming text layout: after the prefix, the
-  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:2823-2829`).
+  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:2837-2843`).
   Text enters at 12.5 tokens/s against about 4–5 spoken, so an ~860-character segment's text is
   used up after about 16 s and the talker sees only `tts_pad` for the remaining ~40 s (A-01). RF-18's
   screen kept this layout for long-form segments.
@@ -611,16 +633,17 @@ refresh left RTF, memory and audio QC unchanged on the M6 and raised its warm fi
 ### 11.1 Upstream failure modes and their status in Vocello
 
 From the research report [§5](../audits/2026-10-17-qwen3-tts-model-research.md#5-known-failure-modes),
-updated for RF-18.
+updated for RF-18. The upstream readings in the clone, loop and number rows were corrected on
+2026-11-11 against the [counter-verification review, §5](../audits/2026-11-11-qwen3-tts-quality-report-review.md#5-citations-that-do-not-hold).
 
 | Symptom | Upstream reports | In Vocello |
 | --- | --- | --- |
-| Missing EOS, run-on, noise | QwenLM#118 (~0.5% of Base runs never emit EOS), #305 (5 minutes of noise on a cross-lingual year), #258, #318; reproduced on official CUDA (VO#6158) | The 2,048-frame cap ends them as `maxTokens`. RF-18's runaway endings (the cap, or 10 s or more of terminal silence) ran only under Consistent: 3 in the control, 0 after the subtalker fix. VO#8569's budget and fresh-seed retry are ER-11 candidates |
+| Missing EOS, run-on, noise | QwenLM#118 (~0.5% of Base runs never emit EOS), #305 (5 minutes of noise on a cross-lingual year; a single report, run on vLLM-Omni), #258, #318; reproduced on official CUDA (VO#6158) | The 2,048-frame cap ends them as `maxTokens`. RF-18's runaway endings (the cap, or 10 s or more of terminal silence) ran only under Consistent: 3 in the control, 0 after the subtalker fix. VO#8569's budget and fresh-seed retry are ER-11 candidates |
 | Truncated last words | #55 (Japanese and Korean), #181 (last two words), QD#161; MA#882 (fixed by removing EOS re-insertion) | D2 adopted 2026-10-20; it changed no Expressive take (§11.2) |
-| Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (+16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; long-form segments keep it (RF-18) and single takes have the full text since RF-21; Consistent known limitation (§11.2) |
-| ICL loops without EOS | MA#921: a transcript covering only part of the reference | Enrollment can accept a partial transcript (G-01, ER-04) |
-| Clone identity, accent leaks and echoes | #80 (~20% wrong speaker), #134 (source accent), #341 (echo of the reference tail), #119, #200 (onset noise or stray syllable), #219 (cold-decoder first-token distortion) | References end abruptly before the 0.5 s pad (G-07, the #341 trigger); streamed clones decode from a cold decoder (A-04); cross-language references are not flagged (G-16–21) |
-| Numbers across languages | #68, #151, #305, #256, #328, QD#330 | The planner does not pre-normalize numbers |
+| Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (open and unreviewed, from an outside contributor: +16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; long-form segments keep it (RF-18) and single takes have the full text since RF-21; Consistent known limitation (§11.2) |
+| ICL loops without EOS | MA#921, reported by one user on one clip and one text: on official PyTorch, 3 degenerate takes of 3 with a transcript covering about 6 s of a 10 s clip, and 5 normal takes of 5 with the full transcript | Enrollment can accept a partial transcript (G-01, ER-04) |
+| Clone identity, accent leaks and echoes | #80 (about 20% wrong speaker, from one user in an all-English setup on vLLM-Omni; the cross-language remark in that issue is separate and unquantified). #134 (the source accent is kept across languages; user reports, no maintainer confirmation). #341 (clones whose output begins with the last words of the reference transcript, on the official PyTorch code at full precision; the author verified the trim arithmetic and supposed the model runs past the reference boundary; no maintainer answered; one commenter fixed one voice of six by cutting the reference's last phrase). #119, #200 (onset noise or stray syllable). #219 is withdrawn: it concerned a non-streamed Built-in Voice take, and its author found the WAV clean and the fault in an MP3 encoder's delay | References end abruptly before the 0.5 s pad (G-07). #341 never mentions abrupt endings, so the link between them and echoes is Vocello's own unmeasured inference. Streamed clones decode from a cold decoder (A-04), with no upstream evidence of audible harm. Cross-language references are not flagged (G-16–21) |
+| Numbers across languages | #68, #151, #305, #256, #328, QD#330. All five QwenLM issues were closed by the inactivity bot with no maintainer reply; #256 and #328 are misreadings, not wrong-language readings; #305 is a single report run on vLLM-Omni; none concerns abbreviations | The planner does not pre-normalize numbers |
 | Accents and dialects | #134, #359, QD#230, #248 | Design accents and dialect control are suggestive only (§7.3) |
 | Precision | #333 (NaN under FlashAttention-2), #355 (fp16 logit overflow) | D3: float32 sampling since 2026-10-13 |
 | Fine-tuning | #179, #278, #337, #371 and others | Out of scope: Vocello ships no fine-tuning |
@@ -677,7 +700,8 @@ updated for RF-18.
 ## 12. Parity ledger
 
 Every verified place Vocello's runtime departs from Qwen's reference implementation (`qwen_tts` at
-`022e286b98`, transformers 4.57.3), as of 2026-10-20. The research report
+`022e286b98`, transformers 4.57.3), as of 2026-10-20, with the A-02 and precision measurements of
+2026-11-11. The research report
 [§8](../audits/2026-10-17-qwen3-tts-model-research.md#8-parity-ledger) carries the upstream citations.
 
 | ID | Divergence | Upstream | Vocello | Status | Owner |
@@ -688,19 +712,41 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every variation | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
 | D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | cold decoder | open, with A-26 | ER-04 |
 | D6 | Custom with no detected language | `nothink`, no language id | English plus the English diction sentence | open, by design; `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` is the A/B arm | ER-05 |
-| A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump | ER-04 |
+| A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump; measured 2026-11-11 with no detectable effect on clone output (below) | ER-04 |
 | A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |
 | — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
 | A-11 | ICL target text | no separator after the reference text | exactly one leading space | deliberate (French first-word drops); screen before changing | ER-04 |
 | A-12 | ICL reference padding | none | +0.5 s of silence; its comment wrongly claims parity | open; fix the comment | ER-04 |
-| G-14 | ICL layout | streaming by default (PR #362 proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
+| G-14 | ICL layout | streaming by default (PR #362, open and unreviewed, proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
 | — | Repetition penalty scope | talker codebook 0 only | same | matches | — |
 | — | Minimum frames before EOS; special-id suppression | 2; 2048–3071 except EOS | same | matches | — |
 | — | Dialect speakers under Chinese or Auto | dialect language id | same | matches | — |
 | — | Talker RoPE; decoder output | `rotate_half`; `clamp(-1, 1)` | same | matches | — |
 | — | Token cap | 8,192 in the config; 2,048 in evaluation | 2,048 | deliberate (= evaluation) | — |
 | — | Codec precision | bf16 in the README setup; the file is fp32 | fp32 | deliberate (an f16 codec opened streamed clone takes with a burst; withdrawn 2026-09-14) | — |
-| — | Weights | bf16 | 4-bit or 8-bit affine, group 64, 8-bit text embedding | deliberate; never evaluated upstream | — |
+| — | Weights | bf16 | 4-bit or 8-bit affine, group 64, 8-bit text embedding | deliberate; never evaluated upstream; in the 2026-11-11 pre-screen 8-bit clones match the reference speaker better than 4-bit ones by 0.025 (§2.3) | — |
+
+**A-02, measured on 2026-11-11** ([review §4.1](../audits/2026-11-11-qwen3-tts-quality-report-review.md#41-the-encoders-rotary-convention-a-02)).
+The finding stays open, and its effect is no longer unmeasured:
+
+- **The divergence is real.** The Hugging Face conversion script permutes the rows of the q and k
+  projections for split-half rotary (verified upstream on 2026-11-11), Qwen runs that code, and
+  Vocello's encoder applies the adjacent-pair form.
+- **The stored codes differ.** The Swift encoder's stored codes match the reference encoder's on
+  31% of codes. They match an emulation of the adjacent-pair rotary on 96.8%, and on 100% of the
+  first codebook.
+- **Both code sets decode equally close to the input:** speaker similarity 0.983 for the
+  reference codes against 0.981.
+- **Clone output does not change detectably.** A pre-screen in the Python port (English, clean
+  references, 96 paired clones) found +0.004 speaker similarity for the fix (95% interval -0.003
+  to +0.011) and an identical word error rate.
+- **Upstream ports.** mlx-audio's commit `6549fc2` added the encoder with the correct setting from
+  the start; it did not fix a measured defect. mlx-audio-swift `main` still has the wrong
+  convention.
+
+The pre-screen does not cover other languages, cross-language or noisy references, long targets or
+the Swift runtime. The fix is for parity, with G-03's version bump, and no audible change is
+expected from it.
 
 The audit's A-06 and A-07 are D2 and D6. One constraint follows from D1 (A-05): a talker KV window
 would evict the unspoken script under the streaming text layout, so a window is allowed only with a

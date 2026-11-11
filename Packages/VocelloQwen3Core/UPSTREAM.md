@@ -57,7 +57,9 @@ safeguards; it is a reference, not a tracked upstream.
 From section 6 of the
 [ER-13 model research](../../docs/audits/2026-10-17-qwen3-tts-model-research.md#6-ports-and-changes-since-the-fork),
 updated for what shipped since. The parity items (A-n, D-n) are tracked in the model guide's parity
-ledger ([`qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md)).
+ledger ([`qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md)). The leak row and the Mimi
+rotary row were corrected on 2026-11-11 against the
+[counter-verification review](../../docs/audits/2026-11-11-qwen3-tts-quality-report-review.md).
 
 | Upstream change | Vocello |
 |---|---|
@@ -65,8 +67,8 @@ ledger ([`qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md)).
 | mlx-audio-swift `dbe5eaa`: range slices replace the scalar gather in RVQ decode and MRoPE | not ported (ER-08, ER-12) |
 | mlx-audio-swift `dbe5eaa`: `streamingStep` evaluates before `sending` | not ported |
 | mlx-audio-swift PR #270 (open): non-streaming text for CustomVoice and VoiceDesign | = D1; adopted for single takes 2026-10-20 (RF-21), long-form segments keep streaming text (RF-18) |
-| mlx-audio-swift PR #286 (open): stop the per-load initialization-graph leak | applies to Vocello's quantized load; not ported (ER-06, ER-07) |
-| mlx-audio `6549fc2`: Mimi `rope_traditional=False` | not fixed (A-02, ER-04, with G-03's version bump) |
+| mlx-audio-swift PR #286 (still open on 2026-11-11): stop the per-load initialization-graph leak. Its 110 MB figure was self-reported on Qwen3-ASR 4-bit, not on a TTS model | applies to Vocello's quantized load; not ported, and porting it is not the route. ml-explore/mlx pull request 4710 closed unmerged on 2026-10-19, and an MLX maintainer pointed to pull request 4453 ("Break the sibling cycle when an array is released by assignment", merged 2026-09-11) as the fix. The pinned MLX core is 0.32.2 (released 2026-08-25, inside mlx-swift 0.32.3) and does not contain it; the first MLX release after the merge is 0.32.3 (2026-09-29). The fix arrives with a pin move, which needs the maintainer's authorization (ER-06, ER-07) |
+| mlx-audio `6549fc2`: adds the Mimi encoder with `rope_traditional=False` from the start; it is not a fix of a measured defect | Vocello still applies the adjacent-pair convention, as mlx-audio-swift `main` does (A-02, ER-04, with G-03's version bump). Measured on 2026-11-11: the stored codes match the reference encoder's on 31% of codes, and a pre-screen found no detectable effect on clone output |
 | mlx-audio `6549fc2`: EOS kept after top-k/top-p | inherited, then removed on 2026-10-20 (D2) |
 | mlx-audio `6549fc2`: ICL repetition-penalty floor 1.5 | not adopted; 1.05 is the reference's value |
 | mlx-audio `d2d02bf` (MA#882): EOS filtered like any token | matched since 2026-10-20 (D2) |

@@ -143,6 +143,32 @@ saved voice would keep adopting its persisted wrong codes. The fix therefore add
 to that identifier, pinned by a golden-codes test, so transcript-backed artifacts rebuild once
 (ER-04; [`CLONE_ARTIFACT_FORMAT.md`](../../Packages/VocelloQwen3Core/CLONE_ARTIFACT_FORMAT.md)).
 
+**The golden-codes pin (RF-50, 2026-11-11).** `scripts/encoder_golden_codes.py` holds the Swift
+encoder against the reference one on a synthetic fixture (three six-second clips of vowel-like and
+consonant-like sound, generated from fixed integers, so no recorded speech is needed).
+`config/encoder-golden-codes.json` carries the codes Hugging Face's `MimiModel` produces from those
+clips with the tokenizer's weights, under both rotary conventions. On the fixture the two conventions
+agree on 31% of codes, so it separates them.
+
+```sh
+python3 scripts/encoder_golden_codes.py fixture --out <dir> --golden config/encoder-golden-codes.json
+python3 scripts/encoder_golden_codes.py swift --fixture <dir> --out <new dir>   # needs scripts/build.sh cli-optimized
+python3 scripts/encoder_golden_codes.py compare --swift <new dir> --expect adjacent
+```
+
+- **Measured at `a5bf4add`:** the Swift codes follow the adjacent-pair convention on 98.8% of the
+  first codebook and 95.6% of all codes, and the reference convention on 31.9%. Two runs give the
+  same codes byte for byte.
+- **The rule** (in the golden file): at least 95% of the first codebook and 85% of all codes under
+  the expected convention, and at most 70% under the other. Two frameworks split near-ties in the
+  fine codebooks differently, so 100% is not the bar.
+- **After the A-02 fix** the same command passes with `--expect reference` and fails with
+  `--expect adjacent`. `--env NAME=VALUE` passes a diagnostic knob to the encoder's process, so the
+  fix can be shown behind its knob before it becomes the default.
+- **Limits:** the fixture is synthetic, it runs on the Mac with an installed model, and it pins the
+  codes, not what a clone sounds like. `reference` (which needs torch and transformers) reruns only
+  when the fixture or the tokenizer changes.
+
 ### 2.3 Attention window: leave it full causal
 
 The encoder config declares `sliding_window: 250`. Under transformers 4.57.3 that window is honoured

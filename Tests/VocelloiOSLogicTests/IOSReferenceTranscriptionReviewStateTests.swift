@@ -138,7 +138,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
             state.acceptAutomaticTranscript(
                 "Stale words",
                 generation: staleGeneration,
-                currentTranscript: ""
+                currentTranscript: "", coverage: .whole
             )
         )
     }
@@ -150,7 +150,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
             state.acceptAutomaticTranscript(
                 "Recognized words",
                 generation: generation,
-                currentTranscript: ""
+                currentTranscript: "", coverage: .whole
             )
         )
         XCTAssertEqual(state.phase, .ready(.automatic))
@@ -166,7 +166,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
             state.acceptAutomaticTranscript(
                 "Delayed automatic words",
                 generation: staleGeneration,
-                currentTranscript: "My corrected words"
+                currentTranscript: "My corrected words", coverage: .whole
             )
         )
         XCTAssertEqual(state.phase, .ready(.manual))
@@ -182,7 +182,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
             state.acceptAutomaticTranscript(
                 "Stale words",
                 generation: staleGeneration,
-                currentTranscript: ""
+                currentTranscript: "", coverage: .whole
             )
         )
         XCTAssertEqual(state.phase, .unavailable(.cancelled))
@@ -243,7 +243,7 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     func testANewClipClearsATranscriptRecognizedForTheOldOne() {
         var state = ReferenceTranscriptionReviewState(initialTranscript: "")
         let firstPass = state.beginAutomaticTranscription()
-        XCTAssertTrue(state.acceptAutomaticTranscript("Hello, this is Anna.", generation: firstPass, currentTranscript: ""))
+        XCTAssertTrue(state.acceptAutomaticTranscript("Hello, this is Anna.", generation: firstPass, currentTranscript: "", coverage: .whole))
         state.bindTranscript(to: "/tmp/clip-a.wav")
         XCTAssertTrue(state.allowsSave(transcript: "Hello, this is Anna."))
 
@@ -253,12 +253,12 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
         XCTAssertFalse(state.allowsSave(transcript: ""), "Save waits for the new clip's recognition")
         XCTAssertFalse(state.allowsSave(transcript: "Hello, this is Anna."))
         XCTAssertFalse(
-            state.acceptAutomaticTranscript("Late words for clip A.", generation: firstPass, currentTranscript: ""),
+            state.acceptAutomaticTranscript("Late words for clip A.", generation: firstPass, currentTranscript: "", coverage: .whole),
             "a recognizer result for the replaced clip cannot land on the new one"
         )
 
         let secondPass = state.beginAutomaticTranscription()
-        XCTAssertTrue(state.acceptAutomaticTranscript("A different paragraph.", generation: secondPass, currentTranscript: ""))
+        XCTAssertTrue(state.acceptAutomaticTranscript("A different paragraph.", generation: secondPass, currentTranscript: "", coverage: .whole))
         state.bindTranscript(to: "/tmp/clip-b.wav")
         XCTAssertTrue(state.allowsSave(transcript: "A different paragraph."))
     }
@@ -356,4 +356,40 @@ final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
         XCTAssertEqual(selection.language, .auto, "unrecognized text requires confirmation again")
     }
 
+    /// G-01: recognized text that does not reach both ends of the clip's
+    /// speech is shown for completion and never saves as it is.
+    func testATranscriptThatDoesNotCoverTheClipNeedsTheUsersDecision() {
+        for coverage in [ReferenceTranscriptionReviewState.TranscriptCoverage.partial, .unknown] {
+            var state = ReferenceTranscriptionReviewState(initialTranscript: "")
+            let generation = state.beginAutomaticTranscription()
+            XCTAssertTrue(state.acceptAutomaticTranscript(
+                "Only the second sentence.", generation: generation, currentTranscript: "", coverage: coverage),
+                "The text is still applied, so the user can complete it")
+            XCTAssertEqual(state.phase, .ready(.automaticPartial))
+            XCTAssertFalse(state.allowsSave(transcript: "Only the second sentence."))
+            XCTAssertTrue(state.offersAudioOnlyConfirmation)
+            XCTAssertEqual(state.preparedVoiceTranscriptSource, .unknown)
+            XCTAssertEqual(state.status.message,
+                           VocelloPresentationText.enrollmentTranscriptionStatus(.automaticPartial))
+
+            var edited = state
+            edited.userEditedTranscript("The first sentence. Only the second sentence.")
+            XCTAssertEqual(edited.phase, .ready(.manual))
+            XCTAssertTrue(edited.allowsSave(transcript: "The first sentence. Only the second sentence."))
+
+            var audioOnly = state
+            audioOnly.confirmAudioOnly()
+            XCTAssertTrue(audioOnly.allowsSave(transcript: ""))
+        }
+    }
+
+    func testATranscriptThatCoversTheClipIsAcceptedAsBefore() {
+        var state = ReferenceTranscriptionReviewState(initialTranscript: "")
+        let generation = state.beginAutomaticTranscription()
+        XCTAssertTrue(state.acceptAutomaticTranscript(
+            "The whole clip.", generation: generation, currentTranscript: "", coverage: .whole))
+        XCTAssertEqual(state.phase, .ready(.automatic))
+        XCTAssertTrue(state.allowsSave(transcript: "The whole clip."))
+        XCTAssertFalse(state.offersAudioOnlyConfirmation)
+    }
 }

@@ -424,6 +424,7 @@ struct VocelloPresentationText: Sendable {
         case sidecarReady
         case transcribing
         case automaticReady
+        case automaticPartial
         case manualReady
         case permissionDenied
         case unavailable
@@ -480,6 +481,11 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.enrollment.transcription.automatic_ready",
                 defaultValue: "Automatic transcript ready. Review it before saving.",
                 comment: "Enrollment status after on-device speech recognition supplied editable text."
+            )
+        case .automaticPartial:
+            return localization.string(localized: "vocello.enrollment.transcription.automatic_partial",
+                defaultValue: "The transcript may not cover the whole clip. Complete or correct it, or use audio only.",
+                comment: "Enrollment status when the recognized text does not reach both ends of the clip's speech."
             )
         case .manualReady:
             return localization.string(localized: "vocello.enrollment.transcription.manual_ready",

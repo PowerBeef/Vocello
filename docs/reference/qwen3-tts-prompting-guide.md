@@ -321,13 +321,19 @@ outside contributor and unreviewed.
   is one user, one clip and one text: on official PyTorch, three degenerate takes of three with a
   transcript covering about 6 s of a 10 s clip, and five normal takes of five with the full
   transcript. It is a credible mechanism (corrected 2026-11-11: this guide used to give "3 of 3"
-  without the sample). `MEASURED-HERE`, **G-01 (open, ER-04)**: saved-voice enrollment accepts a
-  partial recognition transcript (for example only the second sentence of a 16 s clip) and reaches
-  ready with Save enabled. The planned fix requires review when recognition does not cover the
-  clip's edges.
-- **"Use audio only" must drop the transcript.** **G-02 (open, ER-04)**: on a saved voice that has a
-  transcript, the option still conditions on the stored one, so the user's remedy for bad ICL output
-  does nothing.
+  without the sample). `MEASURED-HERE`, **G-01 (fixed 2026-11-11, RF-51)**: enrollment used to
+  accept a partial recognition transcript (for example only the second sentence of a 16 s clip) and
+  reach ready with Save enabled. Recognition now compares its first and last word times with the
+  clip's audible span (the first to the last 20 ms window within 30 dB of the loudest), within 15%
+  of that span, clamped to 1 to 2.5 s. Text that falls short, or that cannot be judged, is shown
+  with a warning and does not save or condition a take until the user edits it, reviews it in the
+  Studio, or chooses audio only; the CLI refuses it. Interior gaps are not checked, and the measure
+  has only been tested on synthetic timings.
+- **"Use audio only" drops the transcript.** **G-02 (fixed 2026-11-11, RF-51)**: on a saved voice
+  that has a transcript, the option used to condition on the stored one all the same. A Studio
+  request now states the draft's intent (`CloneReference.ignoresStoredTranscript`), and the engine
+  does not read the stored transcript for it. The CLI's `--voice` and the saved-voice prebuild
+  still use the stored transcript.
 - **Shape the transcript like the script.** **G-15 (open)**: recognized transcripts carry no
   punctuation and skip the text planner the target goes through. **G-12 (open)**: stored transcripts
   keep their newlines, and the CLI `--voice` path and the prompt prebuild read the `.txt` verbatim.

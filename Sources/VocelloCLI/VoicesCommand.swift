@@ -292,6 +292,12 @@ enum VoicesCommand {
                 .invalidInput, "the reference has no transcript: \(reason)",
                 hint: "pass --transcript \"…\" with its words, --audio-only, or --transcribe always"
             )
+        case .transcriptIncomplete:
+            CLIError(
+                .invalidInput,
+                "the recognized text may not cover the whole clip, and a partial transcript can make clones run on",
+                hint: "pass --transcript \"…\" with all of its words, or --audio-only"
+            )
         case .languageNeeded:
             CLIError(.invalidInput, "the transcript's language could not be detected", hint: "pass --language")
         case .qualityRefused(let warnings, let hardBlocking):

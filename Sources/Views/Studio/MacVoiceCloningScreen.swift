@@ -890,8 +890,8 @@ struct MacVoiceCloningScreen: View {
             let result = await VoiceClipTranscriber.stableEnrollmentResult(url: URL(fileURLWithPath: path))
             guard !Task.isCancelled, draft.referenceAudioPath == path,
                   draft.referenceOperation == operation else { return }
-            if let text = result?.text {
-                draft.acceptReferenceTranscript(text, generation: generation)
+            if let result, let text = result.text {
+                draft.acceptReferenceTranscript(text, generation: generation, coverage: result.coverage)
             } else {
                 draft.referenceTranscriptionUnavailable(generation: generation)
             }

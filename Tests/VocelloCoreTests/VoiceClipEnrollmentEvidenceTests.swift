@@ -62,7 +62,7 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
             algorithmVersion: VoiceClipTranscriber.EnrollmentEvidence.currentAlgorithmVersion,
             authorizationStatus: .authorized, outcome: .success, attempts: [], bestLanguage: "french",
             bestLanguageScore: 1, bestTranscriptConfidence: 1
-        ))
+        ), coverage: .whole)
     }
 
     func testEnrollmentEvidenceContainsNoTranscriptOrPath() throws {
@@ -113,7 +113,7 @@ final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
             review.acceptAutomaticTranscript(
                 "Recognized words",
                 generation: generation,
-                currentTranscript: ""
+                currentTranscript: "", coverage: .whole
             )
         )
         let evidence = VoiceClipTranscriber.EnrollmentEvidence(

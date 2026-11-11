@@ -67,6 +67,28 @@ final class CloneReferenceDraftTests: XCTestCase {
             GenerationSemantics.clonePreparationKey(modelID: "clone", reference: CloneReference(audioPath: "/tmp/g02/clip.wav")))
     }
 
+    /// G-01 in the Studio: a partial transcript is never ready on its own;
+    /// the user's review or the audio-only choice resolves it.
+    func testAPartialTranscriptIsNotReadyUntilTheUserReviewsIt() {
+        var draft = VoiceCloningDraft()
+        draft.replaceReferenceAudio(with: "/tmp/g01/clip.wav")
+        let operation = draft.beginReferenceTranscription()
+        draft.acceptReferenceTranscript("Only the second sentence.", generation: operation, coverage: .partial)
+        XCTAssertEqual(draft.referenceTranscript, "Only the second sentence.")
+        XCTAssertEqual(draft.referenceReview.phase, .ready(.automaticPartial))
+        XCTAssertFalse(draft.isReferenceReady)
+
+        var reviewed = draft
+        reviewed.reviewReferenceTranscript()
+        XCTAssertTrue(reviewed.isReferenceReady)
+        XCTAssertEqual(reviewed.cloneReference(audioPath: "/tmp/g01/clip.wav").transcript, "Only the second sentence.")
+
+        var audioOnly = draft
+        audioOnly.confirmAudioOnly()
+        XCTAssertTrue(audioOnly.isReferenceReady)
+        XCTAssertTrue(audioOnly.cloneReference(audioPath: "/tmp/g01/clip.wav").isExplicitlyAudioOnly)
+    }
+
     func testDeletingTheSelectedSavedVoiceClearsTheDraftLikeTheIPhone() {
         var draft = VoiceCloningDraft()
         draft.applySavedVoiceSelection(id: "Alice", wavPath: "/tmp/u14/Alice.wav", transcript: "Alice's sidecar.")
@@ -134,7 +156,7 @@ final class CloneReferenceDraftTests: XCTestCase {
         draft.replaceReferenceAudio(with: "/tmp/a.wav")
         let operation = draft.beginReferenceTranscription()
         XCTAssertFalse(draft.isReferenceReady)
-        draft.acceptReferenceTranscript("  Bonjour\n le monde.  ", generation: operation)
+        draft.acceptReferenceTranscript("  Bonjour\n le monde.  ", generation: operation, coverage: .whole)
         XCTAssertEqual(draft.trimmedReferenceTranscript, "Bonjour le monde.")
         XCTAssertFalse(draft.isReferenceReady)
         draft.reviewReferenceTranscript()
@@ -146,7 +168,7 @@ final class CloneReferenceDraftTests: XCTestCase {
         draft.replaceReferenceAudio(with: "/tmp/a.wav")
         let operation = draft.beginReferenceTranscription()
         draft.confirmAudioOnly()
-        draft.acceptReferenceTranscript("Late recognized words", generation: operation)
+        draft.acceptReferenceTranscript("Late recognized words", generation: operation, coverage: .whole)
         XCTAssertNil(draft.trimmedReferenceTranscript)
         XCTAssertTrue(draft.isReferenceReady)
         XCTAssertEqual(draft.referenceReview.phase, .audioOnlyConfirmed)
@@ -159,9 +181,9 @@ final class CloneReferenceDraftTests: XCTestCase {
         draft.replaceReferenceAudio(with: "/tmp/b.wav")
         draft.replaceReferenceAudio(with: "/tmp/a.wav")
         let current = draft.beginReferenceTranscription()
-        draft.acceptReferenceTranscript("Stale A", generation: first)
+        draft.acceptReferenceTranscript("Stale A", generation: first, coverage: .whole)
         XCTAssertEqual(draft.referenceTranscript, "")
-        draft.acceptReferenceTranscript("Current A", generation: current)
+        draft.acceptReferenceTranscript("Current A", generation: current, coverage: .whole)
         XCTAssertEqual(draft.referenceTranscript, "Current A")
     }
 
@@ -171,7 +193,7 @@ final class CloneReferenceDraftTests: XCTestCase {
         let operation = draft.beginReferenceTranscription()
         draft.referenceTranscript = "My words"
         draft.referenceTranscript = ""
-        draft.acceptReferenceTranscript("Earlier words", generation: operation)
+        draft.acceptReferenceTranscript("Earlier words", generation: operation, coverage: .whole)
         XCTAssertEqual(draft.referenceTranscript, "")
         XCTAssertFalse(draft.isReferenceReady)
     }
@@ -191,11 +213,11 @@ final class CloneReferenceDraftTests: XCTestCase {
         draft.replaceReferenceAudio(with: "/tmp/a.wav")
         let first = draft.beginReferenceTranscription()
         draft.replaceReferenceAudio(with: "/tmp/a.wav")
-        draft.acceptReferenceTranscript("Old contents", generation: first)
+        draft.acceptReferenceTranscript("Old contents", generation: first, coverage: .whole)
         XCTAssertEqual(draft.referenceTranscript, "")
         let second = draft.beginReferenceTranscription()
         draft.clearReference()
-        draft.acceptReferenceTranscript("After clearing", generation: second)
+        draft.acceptReferenceTranscript("After clearing", generation: second, coverage: .whole)
         XCTAssertFalse(draft.isReferenceReady)
         XCTAssertEqual(draft.referenceTranscript, "")
     }

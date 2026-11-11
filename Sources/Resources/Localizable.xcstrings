@@ -16471,6 +16471,72 @@
         }
       }
     },
+    "vocello.enrollment.transcription.automatic_partial": {
+      "comment": "Enrollment status when the recognized text does not reach both ends of the clip's speech.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The transcript may not cover the whole clip. Complete or correct it, or use audio only."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcription ne couvre peut-être pas tout l’extrait. Complétez-la ou corrigez-la, ou utilisez l’audio seul."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puede que la transcripción no cubra todo el clip. Complétala o corrígela, o usa solo audio."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Transkript deckt möglicherweise nicht den ganzen Clip ab. Ergänze oder korrigiere es, oder verwende nur Audio."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione potrebbe non coprire tutto il clip. Completala o correggila, oppure usa solo l’audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A transcrição pode não cobrir o clipe inteiro. Complete ou corrija, ou use somente áudio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转录可能未覆盖整段音频。请补全或更正，或仅使用音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字起こしがクリップ全体をカバーしていない可能性があります。補完または修正するか、音声のみを使用してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "받아쓰기가 클립 전체를 포함하지 않을 수 있습니다. 보완하거나 수정하거나, 오디오만 사용하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Расшифровка может охватывать не весь клип. Дополните или исправьте её либо используйте только аудио."
+          }
+        }
+      }
+    },
     "vocello.enrollment.transcription.automatic_ready": {
       "comment": "Enrollment status after on-device speech recognition supplied editable text.",
       "extractionState": "manual",

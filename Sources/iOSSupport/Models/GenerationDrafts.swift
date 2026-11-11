@@ -230,10 +230,15 @@ struct VoiceCloningDraft: Equatable {
                                       identity: referenceOperation, audioPath: referenceAudioPath)
     }
 
-    mutating func acceptReferenceTranscript(_ text: String, generation: TranscriptionOperation) {
+    mutating func acceptReferenceTranscript(
+        _ text: String,
+        generation: TranscriptionOperation,
+        coverage: ReferenceTranscriptionReviewState.TranscriptCoverage
+    ) {
         guard generation.identity == referenceOperation, generation.audioPath == referenceAudioPath,
               referenceReview.acceptAutomaticTranscript(text, generation: generation.generation,
-                                                       currentTranscript: referenceTranscript) else { return }
+                                                       currentTranscript: referenceTranscript,
+                                                       coverage: coverage) else { return }
         let automaticReview = referenceReview
         referenceTranscript = text
         // The observer handles user edits; recognition retains its original source.

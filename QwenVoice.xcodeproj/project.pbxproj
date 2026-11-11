@@ -444,6 +444,7 @@
 		758D5ECBC6890C55E9738942 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE6246EDCA8B09170C7F0FF /* DatabaseService.swift */; };
 		75FBB39C30D85969ABA8EB72 /* CLIGenerateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D59F8E52BE1B0846EB130C5 /* CLIGenerateRequest.swift */; };
 		7628081BA5C0D244B2DBAB30 /* MacBatchGenerationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D19986918FF5B7862E79E4B /* MacBatchGenerationSheet.swift */; };
+		7683651C002A3B800CE8532C /* DesktopVoiceEnrollmentCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D77D858EBB3CCEFA40E4E0 /* DesktopVoiceEnrollmentCoverageTests.swift */; };
 		7695C5D9D7C7ECDD8765EB76 /* TTSContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFE60519958CBFBF3235652 /* TTSContract.swift */; };
 		76CE158D2B415108476E8EB9 /* serena.wav in Resources */ = {isa = PBXBuildFile; fileRef = C52FA18321C5A22081DC54BB /* serena.wav */; };
 		77174D8B033ADB739E094830 /* VocelloThemeTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039DD229D9A6C4AD2070ED91 /* VocelloThemeTokens.swift */; };
@@ -1292,6 +1293,7 @@
 		529573580A6DE8AD81DD4CDE /* ProactiveTaskChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProactiveTaskChainTests.swift; sourceTree = "<group>"; };
 		52EC36B416E67546686E825D /* ReferenceClipRecordingStashTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceClipRecordingStashTests.swift; sourceTree = "<group>"; };
 		5332417B34885992BFDB5873 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		53D77D858EBB3CCEFA40E4E0 /* DesktopVoiceEnrollmentCoverageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopVoiceEnrollmentCoverageTests.swift; sourceTree = "<group>"; };
 		5477A8FFBCCA880DA2E272AD /* IOSShellPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSShellPrimitives.swift; sourceTree = "<group>"; };
 		54D7E9FF77042614ADD58259 /* ActiveGenerationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveGenerationCoordinator.swift; sourceTree = "<group>"; };
 		54F1D30915F4B460D0B6D53E /* SavedVoiceSheetConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedVoiceSheetConfiguration.swift; sourceTree = "<group>"; };
@@ -1832,6 +1834,7 @@
 				CA4C01C75610CCCBDAF3BB21 /* DeliveryInstructionAdvisorTests.swift */,
 				0255426242C6F0512BE3AB3E /* DesktopHistoryReaderTests.swift */,
 				8C14FD858DFF597B5A46945A /* DesktopModelSelectionTests.swift */,
+				53D77D858EBB3CCEFA40E4E0 /* DesktopVoiceEnrollmentCoverageTests.swift */,
 				FB217412F6DB22A6229CF052 /* DiagnosticMemoryPolicyExportTests.swift */,
 				6CE8264AC60F514B71A893C3 /* EmotionPresetResolutionTests.swift */,
 				34F0F4D661758EB422FF78F5 /* EngineStartupSweepTests.swift */,
@@ -3606,6 +3609,7 @@
 				1F35735AA2374C35DB82D5D0 /* DeliveryInstructionAdvisorTests.swift in Sources */,
 				E2190002E3612EFF8D164CDA /* DesktopHistoryReaderTests.swift in Sources */,
 				303B74E3399D3B29CCA3C86D /* DesktopModelSelectionTests.swift in Sources */,
+				7683651C002A3B800CE8532C /* DesktopVoiceEnrollmentCoverageTests.swift in Sources */,
 				2C6D5486975F897A6585E817 /* DiagnosticMemoryPolicyExportTests.swift in Sources */,
 				4F594EE9D845E4B4C51FE25B /* EmotionPresetResolutionTests.swift in Sources */,
 				1DAD8C2EB396111BC41BFA27 /* EngineStartupSweepTests.swift in Sources */,

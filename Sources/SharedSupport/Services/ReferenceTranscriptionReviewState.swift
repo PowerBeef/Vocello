@@ -12,9 +12,27 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
         return collapsed.isEmpty ? nil : collapsed
     }
 
+    /// How much of the clip's speech a recognized transcript spans (G-01). A
+    /// transcript that leaves part of the reference unspoken is the reported
+    /// cause of transcript-backed clones that never end, so only `whole` is
+    /// accepted without the user's review.
+    enum TranscriptCoverage: String, Sendable, Equatable {
+        /// The first and last recognized words reach both ends of the audible clip.
+        case whole
+        /// Speech is audible before the first or after the last recognized word.
+        case partial
+        /// The recognizer reported no timestamps, or the clip could not be measured.
+        case unknown
+    }
+
     enum ReadySource: Equatable, Sendable {
         case sidecar
         case automatic
+        /// Recognized text that does not reach both ends of the clip's speech,
+        /// or whose reach could not be measured (G-01). It is shown for the
+        /// user to complete, and it never saves or conditions a take as it is:
+        /// an edit, a review or the audio-only choice resolves it.
+        case automaticPartial
         case manual
         /// A transcript supplied by a pre-existing workflow, such as saving a generated clip or
         /// replacing an enrolled reference. It is ready for review but has no new ASR evidence.
@@ -119,7 +137,8 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
     mutating func acceptAutomaticTranscript(
         _ text: String,
         generation: UInt64,
-        currentTranscript: String
+        currentTranscript: String,
+        coverage: TranscriptCoverage
     ) -> Bool {
         guard generation == operationGeneration, phase == .transcribing else { return false }
         guard currentTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -131,7 +150,7 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
             phase = .unavailable(.emptyResult)
             return false
         }
-        phase = .ready(.automatic)
+        phase = .ready(coverage == .whole ? .automatic : .automaticPartial)
         return true
     }
 
@@ -174,6 +193,8 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
     func allowsSave(transcript: String) -> Bool {
         let hasTranscript = !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         switch phase {
+        case .ready(.automaticPartial):
+            return false
         case .ready:
             return hasTranscript
         case .audioOnlyConfirmed:
@@ -184,8 +205,10 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
     }
 
     var offersAudioOnlyConfirmation: Bool {
-        if case .unavailable = phase { return true }
-        return false
+        switch phase {
+        case .unavailable, .ready(.automaticPartial): return true
+        case .awaitingAudio, .ready, .transcribing, .audioOnlyConfirmed: return false
+        }
     }
 
     var preparedVoiceTranscriptSource: PreparedVoiceTranscriptSource {
@@ -194,7 +217,8 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
         case .ready(.automatic): return .automatic
         case .ready(.manual): return .manual
         case .audioOnlyConfirmed: return .audioOnly
-        case .awaitingAudio, .ready(.existing), .transcribing, .unavailable: return .unknown
+        case .awaitingAudio, .ready(.existing), .ready(.automaticPartial), .transcribing, .unavailable:
+            return .unknown
         }
     }
 
@@ -228,6 +252,12 @@ struct ReferenceTranscriptionReviewState: Equatable, Sendable {
             return Status(
                 message: VocelloPresentationText.enrollmentTranscriptionStatus(.automaticReady),
                 symbolName: "checkmark.circle.fill",
+                showsProgress: false
+            )
+        case .ready(.automaticPartial):
+            return Status(
+                message: VocelloPresentationText.enrollmentTranscriptionStatus(.automaticPartial),
+                symbolName: "exclamationmark.triangle.fill",
                 showsProgress: false
             )
         case .ready(.manual):

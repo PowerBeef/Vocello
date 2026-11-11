@@ -89,6 +89,10 @@ public enum DesktopVoiceEnrollment {
         case voiceNotFound(String)
         /// No transcript and no audio-only confirmation; `reason` says why none came.
         case transcriptNeeded(reason: String)
+        /// Recognition returned text that may not cover the whole clip (G-01).
+        /// Nobody is here to complete it, and running recognition again gives
+        /// the same text.
+        case transcriptIncomplete
         /// A transcript needs its reference language, which could not be detected.
         case languageNeeded
         /// The candidate had quality warnings and was discarded.
@@ -121,6 +125,17 @@ extension DesktopEngineHost {
 
     /// Saves (or replaces) a clone voice as the app's voice sheet does.
     public func enrollVoice(_ request: DesktopVoiceEnrollment.Request) async throws -> DesktopVoiceEnrollment.Result {
+        try await enrollVoice(request) { @concurrent in
+            await VoiceClipTranscriber.stableEnrollmentResult(url: $0)
+        }
+    }
+
+    /// `recognize` is the on-device recognition of the clip, a parameter so
+    /// the refusals that follow it are tested without Speech.
+    func enrollVoice(
+        _ request: DesktopVoiceEnrollment.Request,
+        recognize: @Sendable @concurrent (URL) async -> VoiceClipTranscriber.EnrollmentResult?
+    ) async throws -> DesktopVoiceEnrollment.Result {
         typealias Failure = DesktopVoiceEnrollment.Failure
         let path = request.audioPath
         let existing = try await store.listPreparedVoices()
@@ -199,14 +214,18 @@ extension DesktopEngineHost {
                 break
             }
             let generation = review.beginAutomaticTranscription()
-            guard let result = await VoiceClipTranscriber.stableEnrollmentResult(url: URL(fileURLWithPath: path)) else {
+            guard let result = await recognize(URL(fileURLWithPath: path)) else {
                 throw Failure.transcriptNeeded(reason: "the clip could not be read for recognition, or changed while it ran")
             }
             evidence = result.evidence
             guard let text = result.text,
-                  review.acceptAutomaticTranscript(text, generation: generation, currentTranscript: "") else {
+                  review.acceptAutomaticTranscript(text, generation: generation, currentTranscript: "",
+                                                   coverage: result.coverage) else {
                 throw Failure.transcriptNeeded(reason: DesktopVoiceEnrollment.reason(for: result.evidence))
             }
+            // G-01: no one is here to complete a transcript that leaves part of
+            // the clip unspoken, so the command stops and says how to go on.
+            guard result.coverage == .whole else { throw Failure.transcriptIncomplete }
             transcript = text
             review.bindTranscript(to: path)
             language.applyDetectedLanguage(result.language)

@@ -233,7 +233,8 @@ struct IOSRecordVoiceSheet: View {
                 let applied = transcriptionReview.acceptAutomaticTranscript(
                     recognizedText,
                     generation: generation,
-                    currentTranscript: transcript
+                    currentTranscript: transcript,
+                    coverage: result.coverage
                 )
                 if applied {
                     transcript = recognizedText

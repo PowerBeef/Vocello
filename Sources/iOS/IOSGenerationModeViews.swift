@@ -1010,9 +1010,10 @@ struct IOSVoiceDesignView: View {
             guard !Task.isCancelled, saveSheetOperation == operation,
                   saveSheetReview.isCurrent(generation: generation) else { return }
             saveSheetEvidence = result?.evidence
-            if let text = result?.text,
+            if let result, let text = result.text,
                saveSheetReview.acceptAutomaticTranscript(text, generation: generation,
-                                                         currentTranscript: saveSheetTranscript) {
+                                                         currentTranscript: saveSheetTranscript,
+                                                         coverage: result.coverage) {
                 saveSheetTranscript = text
                 saveSheetReview.bindTranscript(to: candidate.audioPath)
             } else {
@@ -2107,8 +2108,8 @@ struct IOSVoiceCloningView: View {
             let result = await VoiceClipTranscriber.stableEnrollmentResult(url: URL(fileURLWithPath: path))
             guard !Task.isCancelled, draft.referenceAudioPath == path,
                   draft.referenceOperation == operation else { return }
-            if let text = result?.text {
-                draft.acceptReferenceTranscript(text, generation: generation)
+            if let result, let text = result.text {
+                draft.acceptReferenceTranscript(text, generation: generation, coverage: result.coverage)
             } else {
                 draft.referenceTranscriptionUnavailable(generation: generation)
             }

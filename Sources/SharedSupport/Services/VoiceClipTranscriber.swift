@@ -113,10 +113,21 @@ enum VoiceClipTranscriber {
         var bestTranscriptConfidence: Double?
     }
 
+    /// The review policy owns the type, so the policy compiles without Speech.
+    typealias TranscriptCoverage = ReferenceTranscriptionReviewState.TranscriptCoverage
+
+    /// Where a clip is audible, in seconds from its start.
+    struct AudibleSpan: Sendable, Equatable {
+        var startSeconds: Double
+        var endSeconds: Double
+    }
+
     struct EnrollmentResult: Sendable, Equatable {
         var text: String?
         var language: Qwen3SupportedLanguage
         var evidence: EnrollmentEvidence
+        /// How much of the clip the transcript spans; `unknown` when there is no text.
+        var coverage: TranscriptCoverage
     }
 
     struct VerificationEvidence: Codable, Sendable, Equatable {
@@ -348,7 +359,8 @@ enum VoiceClipTranscriber {
                     bestLanguage: nil,
                     bestLanguageScore: nil,
                     bestTranscriptConfidence: nil
-                )
+                ),
+                coverage: .unknown
             )
         }
 
@@ -366,16 +378,25 @@ enum VoiceClipTranscriber {
                     bestLanguage: nil,
                     bestLanguageScore: nil,
                     bestTranscriptConfidence: nil
-                )
+                ),
+                coverage: .unknown
             )
         }
 
         let localeCandidates = candidates.map {
             EnrollmentLocaleCandidate(localeIdentifier: $0.locale.identifier, language: $0.language)
         }
+        let audible = audibleSpan(url: url)
         return await enrollmentResult(
             candidates: localeCandidates,
             authorization: authorization,
+            coverage: { pass in
+                transcriptCoverage(
+                    segmentStartSeconds: pass.segmentStartSeconds,
+                    segmentEndSeconds: pass.segmentEndSeconds,
+                    audibleSpan: audible
+                )
+            },
             recognize: { @concurrent index in
                 await recognizeDetailed(
                     url: url,
@@ -447,10 +468,13 @@ enum VoiceClipTranscriber {
         scoreLanguage: @Sendable (String, Qwen3SupportedLanguage) -> Double = {
             languageMatchScore(text: $0, expected: $1)
         },
+        coverage: @Sendable (RecognitionPass) -> TranscriptCoverage,
         recognize: @Sendable @concurrent (Int) async -> RecognitionPass
     ) async -> EnrollmentResult {
         var attempts: [EnrollmentLocaleAttempt] = []
         var best: (text: String, language: Qwen3SupportedLanguage, score: EnrollmentPassScore)?
+        // The coverage of whichever pass is `best`, judged when it becomes best.
+        var bestCoverage = TranscriptCoverage.unknown
         for (offset, candidate) in candidates.enumerated() {
             let pass = await recognize(offset)
             let trimmed = pass.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -477,15 +501,20 @@ enum VoiceClipTranscriber {
             // A pass that fails the language gate never displaces one that
             // passes it; among gated passes the recognizer's confidence wins.
             let gated = score.languageScore >= minimumUsableScore
+            let becomesBest: Bool
             if let current = best {
                 let currentGated = current.score.languageScore >= minimumUsableScore
                 if gated != currentGated {
-                    if gated { best = (text, candidate.language, score) }
-                } else if enrollmentPassRanksAbove(score, current.score) {
-                    best = (text, candidate.language, score)
+                    becomesBest = gated
+                } else {
+                    becomesBest = enrollmentPassRanksAbove(score, current.score)
                 }
             } else {
+                becomesBest = true
+            }
+            if becomesBest {
                 best = (text, candidate.language, score)
+                bestCoverage = coverage(pass)
             }
             if gated, enrollmentPassEndsSearch(score) { break }
         }
@@ -514,7 +543,88 @@ enum VoiceClipTranscriber {
                 bestLanguage: best?.language.rawValue,
                 bestLanguageScore: best?.score.languageScore,
                 bestTranscriptConfidence: best?.score.confidence
-            )
+            ),
+            coverage: accepted == nil ? .unknown : bestCoverage
+        )
+    }
+
+    /// G-01. The recognized words must reach both ends of the audible clip,
+    /// within the allowance the output verifier uses for a take's edges (15%
+    /// of the audible length, between 1 and 2.5 seconds). The clip's audible
+    /// span is the measure, not the file's length, so leading or trailing
+    /// silence is never mistaken for speech the recognizer missed. Interior
+    /// speech is not checked.
+    static func transcriptCoverage(
+        segmentStartSeconds: Double?,
+        segmentEndSeconds: Double?,
+        audibleSpan: AudibleSpan?
+    ) -> TranscriptCoverage {
+        guard let audibleSpan, let start = segmentStartSeconds, let end = segmentEndSeconds,
+              start.isFinite, end.isFinite,
+              audibleSpan.startSeconds.isFinite, audibleSpan.endSeconds.isFinite,
+              audibleSpan.endSeconds > audibleSpan.startSeconds else {
+            return .unknown
+        }
+        let audibleSeconds = audibleSpan.endSeconds - audibleSpan.startSeconds
+        let allowance = min(
+            outputVerificationMaximumEdgeAllowanceSeconds,
+            max(outputVerificationMinimumEdgeAllowanceSeconds, audibleSeconds * outputVerificationEdgeAllowanceFraction)
+        )
+        let reachesStart = start <= audibleSpan.startSeconds + allowance
+        let reachesEnd = end >= audibleSpan.endSeconds - allowance
+        return reachesStart && reachesEnd ? .whole : .partial
+    }
+
+    /// The span from the first to the last 20 ms window within 30 dB of the
+    /// clip's loudest window. Room noise under that floor does not extend it.
+    static func audibleSpan(url: URL) -> AudibleSpan? {
+        guard let file = try? AVAudioFile(forReading: url) else { return nil }
+        let format = file.processingFormat
+        let sampleRate = format.sampleRate
+        let channels = Int(format.channelCount)
+        guard sampleRate > 0, channels > 0, file.length > 0 else { return nil }
+        let window = max(1, Int(sampleRate * 0.02))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(window * 256)) else {
+            return nil
+        }
+        var energies: [Double] = []
+        energies.reserveCapacity(Int(file.length) / window + 1)
+        var windowSum = 0.0
+        var windowFrames = 0
+        while file.framePosition < file.length {
+            do { try file.read(into: buffer) } catch { return nil }
+            let frames = Int(buffer.frameLength)
+            guard frames > 0 else { break }
+            guard let channelData = unsafe buffer.floatChannelData else { return nil }
+            for frame in 0..<frames {
+                var sum = 0.0
+                for channel in 0..<channels {
+                    let value = Double(unsafe channelData[channel][frame])
+                    sum += value * value
+                }
+                windowSum += sum / Double(channels)
+                windowFrames += 1
+                if windowFrames == window {
+                    energies.append(windowSum / Double(window))
+                    windowSum = 0
+                    windowFrames = 0
+                }
+            }
+        }
+        if windowFrames > 0 { energies.append(windowSum / Double(windowFrames)) }
+        return audibleSpan(windowEnergies: energies, windowSeconds: Double(window) / sampleRate,
+                           clipSeconds: Double(file.length) / sampleRate)
+    }
+
+    /// The span over per-window mean-square energies; separate so it is tested without a file.
+    static func audibleSpan(windowEnergies: [Double], windowSeconds: Double, clipSeconds: Double) -> AudibleSpan? {
+        guard let peak = windowEnergies.max(), peak > 0, windowSeconds > 0 else { return nil }
+        let floor = peak / 1_000  // 30 dB under the loudest window
+        guard let first = windowEnergies.firstIndex(where: { $0 >= floor }),
+              let last = windowEnergies.lastIndex(where: { $0 >= floor }) else { return nil }
+        return AudibleSpan(
+            startSeconds: Double(first) * windowSeconds,
+            endSeconds: min(Double(last + 1) * windowSeconds, clipSeconds)
         )
     }
 

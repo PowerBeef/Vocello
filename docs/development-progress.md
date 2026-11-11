@@ -62,8 +62,19 @@ iPhone, and every engine change kept the samples: fixed-seed PCM digests are ide
   phones' regime is measured); a compiled talker sampler; marking as chunks arrive (it would break
   the rule that marking must not raise a take's peak); judging the Metal working set against the
   measured budget (an unmeasured cancel trigger).
-- **Open on the Mac:** the measurements as published benchmark records (publication needs a
-  request) and the watermark detection check (no detector is installed here; it needs a download).
+- **The watermark check ran on November 11 (RF-44),** with Meta's reference detector reading the
+  24 kHz samples as published. Seven single takes in the shipped configuration, in three modes on
+  both models, read 0.998 to 1.0 with the payload `0x56C0` exact, and so do two with
+  `MLX_ENABLE_TF32=0`; takes with marking off read 0.07 to 0.11.
+  - **Finding: detection depends on alignment to the mark's 320-sample frame.** Cropping a take by
+    a count that is not a multiple of 320 lowers detection and flips payload bits; at 15 to 28% of
+    crop offsets the detector reads below its 0.5 threshold. Long-form assembly trims each
+    segment's edges by arbitrary frame counts, so a long-form file read 0.67 to 0.93 with a wrong
+    payload. Realigned to its own frame, every segment reads 0.999 with the payload exact.
+  - **Not known:** whether Meta's own generator at 16 kHz has the same sensitivity (it needs their
+    generator file), and what an iPhone's output reads. The fix is not decided.
+- **Open on the Mac:** the fix for that finding, and the measurements as published benchmark
+  records (publication needs a request).
 - **For the next announced iPhone window,** in this order: the take's regime on each phone (CPU
   share and QoS class of the generation thread); sample identity of the compiled frame function on
   the phone's GPU; `MLX_MAX_OPS_PER_BUFFER=40` against the default; the cache-clear switch off;

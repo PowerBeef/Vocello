@@ -478,7 +478,7 @@
         "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's G-01, G-02, G-08 to G-13 and G-15 and ER-05's A-18."
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-04's G-01, G-02, G-08 to G-13 and G-15 and ER-05's A-18. Landed 2026-11-11: G-02 (b876e29d: a Studio request states audio-only and the engine no longer reads the stored transcript for it) and G-01 (b308c609: recognized text must reach both ends of the clip's audible span, or it needs the user's edit, review or audio-only choice; on 20 real clips with Whisper word times 19 complete transcripts pass, the one flagged was truly cut short, and 39 of 39 truncated ones are caught). Left: G-08 to G-13, G-15, A-18 and the padding comment. For a device window: Apple Speech's own word times against the coverage rule (this terminal has no Speech permission), through the iPhone saved-voice lifecycle lane."
     },
     {
       "id": "RF-52",

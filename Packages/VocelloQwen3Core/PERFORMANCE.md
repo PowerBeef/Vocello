@@ -158,6 +158,20 @@ memory series: the macOS app hosts the engine, so its app and engine samplers ar
 process and their samples are merged by uptime, never summed (memory contract v2; contract-v1
 records paired and summed the two layers' samples by uptime).
 
+## Publication marking
+
+The AudioSeal pass that marks every published take runs after the last frame and is nearly all of
+a take's finalization: about 21 ms per second of audio on the M6, 7.5% of a take's wall time, against
+13 ms in all for Fast QC, the digest and the write on a 23-second take (measured with
+`QWENVOICE_MARKING=off`). Its cost scales with length and has no measurable fixed part, so holding the
+generator's weights between takes would gain nothing; the load-and-drop stays.
+
+The pass windows its convolutions to bound memory. It no longer clears the allocator cache after
+each window (RF-48): full windows allocate the same sizes, so the cache hands one window's workspace
+to the next. That cut finalization by a fifth (503 ms to 405 ms on a 23-second take) with identical
+samples, an unchanged MLX peak before and after marking, and a sampled footprint below the take's
+pre-marking peak. Window geometry is unchanged: it decides the marked samples.
+
 ## Mimi decoder correctness
 
 The speech-tokenizer decoder uses input-side overlap-and-discard, exact block-count fallback,

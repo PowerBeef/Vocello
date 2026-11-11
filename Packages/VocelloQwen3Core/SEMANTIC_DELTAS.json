@@ -523,7 +523,8 @@
         "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"
       ],
       "documentation": [
-        "SEMANTIC_DELTAS.json"
+        "SEMANTIC_DELTAS.json",
+        "PERFORMANCE.md"
       ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],

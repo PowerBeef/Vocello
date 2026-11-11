@@ -1,4 +1,5 @@
 import Foundation
+import MLXAudioCore
 @preconcurrency import MLX
 @preconcurrency import MLXLMCommon
 import MLXNN
@@ -304,7 +305,11 @@ final class Qwen3TTSTalkerModel: Module {
     let config: Qwen3TTSTalkerConfig
 
     @ModuleInfo(key: "codec_embedding") var codecEmbedding: Embedding
-    @ModuleInfo(key: "text_embedding") var textEmbedding: Embedding
+    /// The text embedding as a parameter; nil when `textEmbeddingRows` reads
+    /// it from the checkpoint file instead (RF-47), so the table is neither a
+    /// checkpoint key of this module nor resident.
+    @ModuleInfo(key: "text_embedding") var textEmbedding: Embedding?
+    let textEmbeddingRows: Qwen3TextEmbeddingRows?
     let layers: [TalkerDecoderLayer]
     @ModuleInfo var norm: RMSNorm
     let rotaryEmb: TalkerRotaryEmbedding
@@ -313,10 +318,13 @@ final class Qwen3TTSTalkerModel: Module {
     /// `rotating`). Updated by `makeCache()` and `makeRotatingCache()`.
     var latestCreatedCacheType: String = "unknown"
 
-    init(config: Qwen3TTSTalkerConfig) {
+    init(config: Qwen3TTSTalkerConfig, textEmbeddingRows: Qwen3TextEmbeddingRows? = nil) {
         self.config = config
+        self.textEmbeddingRows = textEmbeddingRows
         _codecEmbedding.wrappedValue = Embedding(embeddingCount: config.vocabSize, dimensions: config.hiddenSize)
-        _textEmbedding.wrappedValue = Embedding(embeddingCount: config.textVocabSize, dimensions: config.textHiddenSize)
+        _textEmbedding.wrappedValue = textEmbeddingRows == nil
+            ? Embedding(embeddingCount: config.textVocabSize, dimensions: config.textHiddenSize)
+            : nil
         self.layers = (0 ..< config.numHiddenLayers).map { TalkerDecoderLayer(config: config, layerIdx: $0) }
         _norm.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
         self.rotaryEmb = TalkerRotaryEmbedding(
@@ -411,9 +419,11 @@ final class Qwen3TTSTalkerForConditionalGeneration: Module {
     @ModuleInfo(key: "codec_head") var codecHead: Linear
     @ModuleInfo(key: "code_predictor") var codePredictor: Qwen3TTSCodePredictor
 
-    init(config: Qwen3TTSTalkerConfig) {
+    /// `textEmbeddingRows` reads the text embedding from the checkpoint file;
+    /// without it the table is a parameter of the model.
+    init(config: Qwen3TTSTalkerConfig, textEmbeddingRows: Qwen3TextEmbeddingRows? = nil) {
         self.config = config
-        _model.wrappedValue = Qwen3TTSTalkerModel(config: config)
+        _model.wrappedValue = Qwen3TTSTalkerModel(config: config, textEmbeddingRows: textEmbeddingRows)
         _textProjection.wrappedValue = ResizeMLP(
             inputSize: config.textHiddenSize,
             intermediateSize: config.textHiddenSize,
@@ -430,7 +440,19 @@ final class Qwen3TTSTalkerForConditionalGeneration: Module {
     }
 
     func getInputEmbeddings() -> Embedding { model.codecEmbedding }
-    func getTextEmbeddings() -> Embedding { model.textEmbedding }
+
+    /// The text embeddings of `ids`, shaped `ids.shape + [textHiddenSize]`:
+    /// read from the checkpoint file when the model was loaded that way,
+    /// from the embedding parameter otherwise. The two give the same bits.
+    func embedText(_ ids: MLXArray) throws -> MLXArray {
+        if let rows = model.textEmbeddingRows {
+            return try rows.embed(ids)
+        }
+        guard let embedding = model.textEmbedding else {
+            throw AudioGenerationError.modelNotInitialized("Text embedding not loaded")
+        }
+        return embedding(ids)
+    }
 
     func callAsFunction(
         _ inputsEmbeds: MLXArray,

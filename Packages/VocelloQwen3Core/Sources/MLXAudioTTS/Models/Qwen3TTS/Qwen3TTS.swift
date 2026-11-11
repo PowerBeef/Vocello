@@ -1627,7 +1627,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let ttsTokens = MLXArray(
             [Int32(config.ttsBosTokenId), Int32(config.ttsEosTokenId), Int32(config.ttsPadTokenId)]
         ).reshaped(1, 3)
-        let ttsEmbeds = talker.textProjection(talker.getTextEmbeddings()(ttsTokens))
+        let ttsEmbeds = talker.textProjection(try talker.embedText(ttsTokens))
         let ttsBosEmbed = ttsEmbeds[0..., 0 ..< 1, 0...]
         let ttsEosEmbed = ttsEmbeds[0..., 1 ..< 2, 0...]
         let ttsPadEmbed = ttsEmbeds[0..., 2 ..< 3, 0...]
@@ -1670,7 +1670,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let prefixTokenizeMS = prefixTokenizeStartedAt.elapsedMilliseconds
 
         let prefixEmbedBuildStartedAt = ContinuousClock.now
-        let roleEmbed = talker.textProjection(talker.getTextEmbeddings()(assistantPrefixIDs))
+        let roleEmbed = talker.textProjection(try talker.embedText(assistantPrefixIDs))
 
         let padCount = codecPrefixEmbed.dim(1) - 2
         let padEmbeds = broadcast(ttsPadEmbed, to: [1, padCount, ttsPadEmbed.dim(-1)])
@@ -1679,7 +1679,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         let instructEmbed: MLXArray?
         if let instructIDs {
-            instructEmbed = talker.textProjection(talker.getTextEmbeddings()(instructIDs))
+            instructEmbed = talker.textProjection(try talker.embedText(instructIDs))
         } else {
             instructEmbed = nil
         }
@@ -1721,7 +1721,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
-        let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
+        let textEmbed = talker.textProjection(try talker.embedText(inputIds))
         try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         let firstTextEmbed = textEmbed[0..., 3 ..< 4, 0...] + prefix.codecLastEmbed
@@ -1758,7 +1758,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let targetTokenCount = tokenizer.encode(text: text).count
         let chatText = "<|im_start|>assistant\n\(text)<|im_end|>\n<|im_start|>assistant\n"
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map(Int32.init)).reshaped(1, -1)
-        let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
+        let textEmbed = talker.textProjection(try talker.embedText(inputIds))
         try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         let targetTextEmbed = concatenated(
@@ -4673,14 +4673,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let ttsTokens = MLXArray(
             [Int32(config.ttsBosTokenId), Int32(config.ttsEosTokenId), Int32(config.ttsPadTokenId)]
         ).reshaped(1, 3)
-        let ttsEmbeds = talker.textProjection(talker.getTextEmbeddings()(ttsTokens))
+        let ttsEmbeds = talker.textProjection(try talker.embedText(ttsTokens))
         let ttsBosEmbed = ttsEmbeds[0..., 0 ..< 1, 0...]
         let ttsEosEmbed = ttsEmbeds[0..., 1 ..< 2, 0...]
         let ttsPadEmbed = ttsEmbeds[0..., 2 ..< 3, 0...]
 
         // Build text embeddings for ref+target
         let combinedTextIds = concatenated([refTextIds, targetTextIds], axis: 1)
-        var textEmbed = talker.textProjection(talker.getTextEmbeddings()(combinedTextIds))
+        var textEmbed = talker.textProjection(try talker.embedText(combinedTextIds))
         textEmbed = concatenated([textEmbed, ttsEosEmbed], axis: 1)
         let textLen = textEmbed.dim(1)
 
@@ -4755,7 +4755,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Role embedding
-        let roleEmbed = talker.textProjection(talker.getTextEmbeddings()(targetIds[0..., 0 ..< 3]))
+        let roleEmbed = talker.textProjection(try talker.embedText(targetIds[0..., 0 ..< 3]))
 
         // Build prefix: text side overlayed with codec prefix
         let padCount = codecPrefixEmbed.dim(1) - 2
@@ -4860,7 +4860,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let ttsTokens = MLXArray(
             [Int32(config.ttsBosTokenId), Int32(config.ttsEosTokenId), Int32(config.ttsPadTokenId)]
         ).reshaped(1, 3)
-        let ttsEmbeds = talker.textProjection(talker.getTextEmbeddings()(ttsTokens))
+        let ttsEmbeds = talker.textProjection(try talker.embedText(ttsTokens))
         let ttsBosEmbed = ttsEmbeds[0..., 0 ..< 1, 0...]
         let ttsEosEmbed = ttsEmbeds[0..., 1 ..< 2, 0...]
         let ttsPadEmbed = ttsEmbeds[0..., 2 ..< 3, 0...]
@@ -4903,7 +4903,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             )
         }
         let assistantPrefixIDs = MLXArray(assistantTokens.map(Int32.init)).reshaped(1, -1)
-        let roleEmbed = talker.textProjection(talker.getTextEmbeddings()(assistantPrefixIDs))
+        let roleEmbed = talker.textProjection(try talker.embedText(assistantPrefixIDs))
 
         let padCount = codecPrefixEmbed.dim(1) - 2
         let padEmbeds = broadcast(ttsPadEmbed, to: [1, padCount, ttsPadEmbed.dim(-1)])
@@ -4963,14 +4963,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let inputIds = MLXArray(tokenizer.encode(text: chatText).map { Int32($0) }).reshaped(1, -1)
 
         // Get text embeddings
-        let textEmbed = talker.textProjection(talker.getTextEmbeddings()(inputIds))
+        let textEmbed = talker.textProjection(try talker.embedText(inputIds))
         try Self.validateChatTemplateTokenCount(textEmbed.dim(1))
 
         // TTS special tokens
         let ttsTokens = MLXArray(
             [Int32(config.ttsBosTokenId), Int32(config.ttsEosTokenId), Int32(config.ttsPadTokenId)]
         ).reshaped(1, 3)
-        let ttsEmbeds = talker.textProjection(talker.getTextEmbeddings()(ttsTokens))
+        let ttsEmbeds = talker.textProjection(try talker.embedText(ttsTokens))
         let ttsBosEmbed = ttsEmbeds[0..., 0 ..< 1, 0...]
         let ttsEosEmbed = ttsEmbeds[0..., 1 ..< 2, 0...]
         let ttsPadEmbed = ttsEmbeds[0..., 2 ..< 3, 0...]
@@ -5008,7 +5008,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         if let instruct = instruct.map(Qwen3ChatTemplateText.neutralizingControlTokens), !instruct.isEmpty {
             let instructText = "<|im_start|>user\n\(instruct)<|im_end|>\n"
             let instructIds = MLXArray(tokenizer.encode(text: instructText).map { Int32($0) }).reshaped(1, -1)
-            instructEmbed = talker.textProjection(talker.getTextEmbeddings()(instructIds))
+            instructEmbed = talker.textProjection(try talker.embedText(instructIds))
         }
 
         // Role embedding (first 3 tokens: <|im_start|>assistant\n)
@@ -5711,7 +5711,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 ]
             )
         )
-        let talker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        // RF-47: read the text embedding's rows from the checkpoint file when
+        // it holds them in a known layout, instead of loading the table.
+        let textEmbeddingRows = try openTextEmbeddingRows(
+            in: modelDir, config: config, talkerConfig: talkerConfig
+        )
+        let talker = Qwen3TTSTalkerForConditionalGeneration(
+            config: talkerConfig, textEmbeddingRows: textEmbeddingRows
+        )
         let speakerEncoder = shouldLoadSpeakerEncoder
             ? Qwen3TTSSpeakerEncoder(config: config.speakerEncoderConfig)
             : nil
@@ -5764,6 +5771,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             )
         )
         talkerTimingsMS["talker_weight_sanitize"] = talkerSanitizeStartedAt.elapsedMilliseconds
+        if textEmbeddingRows != nil {
+            // The model has no text-embedding parameter then, and these lazy
+            // arrays are dropped without ever being read from the file.
+            for suffix in ["weight", "scales", "biases"] {
+                talkerWeights.removeValue(forKey: "\(Self.textEmbeddingModuleKey).\(suffix)")
+            }
+        }
         var talkerPairs = talkerWeights.map { ($0.key, $0.value) }
 
         let talkerQuantizeStartedAt = ContinuousClock.now
@@ -5854,6 +5868,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let talkerBooleanFlags: [String: Bool] = [
             "talker_verify_relaxed": loadOptions.trustPreparedCheckpoint,
             "talker_eval_chunked": true,
+            "talker_text_embedding_from_file": textEmbeddingRows != nil,
             "speaker_encoder_requested": shouldLoadSpeakerEncoder,
         ]
 
@@ -5949,9 +5964,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         talkerCoreArrays.append(
             contentsOf: flattenedParameterArrays(from: talker.model.codecEmbedding.parameters())
         )
-        talkerCoreArrays.append(
-            contentsOf: flattenedParameterArrays(from: talker.model.textEmbedding.parameters())
-        )
+        if let textEmbedding = talker.model.textEmbedding {
+            talkerCoreArrays.append(
+                contentsOf: flattenedParameterArrays(from: textEmbedding.parameters())
+            )
+        }
         talkerCoreArrays.append(
             contentsOf: flattenedParameterArrays(from: talker.model.norm.parameters())
         )
@@ -6351,6 +6368,39 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     private static func preparedDirectoryKey(for modelDir: URL) -> String {
         modelDir.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    /// The talker's text embedding as the model's parameter tree names it.
+    private static let textEmbeddingModuleKey = "model.text_embedding"
+
+    /// A row reader over the checkpoint's text embedding, or nil when the
+    /// table must be loaded as a parameter: the checkpoint is not the single
+    /// `model.safetensors` the production artifacts ship, or it holds the
+    /// table in a layout the reader does not know.
+    private static func openTextEmbeddingRows(
+        in modelDir: URL,
+        config: Qwen3TTSModelConfig,
+        talkerConfig: Qwen3TTSTalkerConfig
+    ) throws -> Qwen3TextEmbeddingRows? {
+        let weightsFile = modelDir.appendingPathComponent("model.safetensors")
+        guard FileManager.default.fileExists(atPath: weightsFile.path) else { return nil }
+        let recipe = config.perLayerQuantization?.quantization(layer: textEmbeddingModuleKey)
+            ?? config.quantization
+        let quantization: Qwen3TextEmbeddingRows.Quantization?
+        if let recipe {
+            // Only the affine recipe has a row-wise dequantization here.
+            guard recipe.mode == .affine else { return nil }
+            quantization = .init(groupSize: recipe.groupSize, bits: recipe.bits)
+        } else {
+            quantization = nil
+        }
+        return try Qwen3TextEmbeddingRows.open(
+            weightsFile: weightsFile,
+            tensorPrefix: "talker.\(textEmbeddingModuleKey)",
+            rowCount: talkerConfig.textVocabSize,
+            dimensions: talkerConfig.textHiddenSize,
+            quantization: quantization
+        )
     }
 
     private static func loadWeights(

@@ -18,6 +18,16 @@ tokenizer through a platform-bounded LRU (one entry on iOS, three on macOS). Wei
 is batched to bound transient unified-memory peaks. Clone-capable profiles include the learned
 encoders, while ordinary synthesis may load the decoder-only tokenizer surface.
 
+The talker's text embedding is not loaded (RF-47, LOAD-002). It is 151,936 rows and about a quarter
+of a Speed checkpoint (315 MB of 1,272 MB), and a take reads a few hundred of its rows, once, to
+build its prompt. `Qwen3TextEmbeddingRows` keeps the checkpoint file open and reads those rows from
+it, then dequantizes them with the call the embedding layer uses, so the result is the layer's bit
+for bit (fixed-seed PCM identity on the Speed and Quality models) and the table never enters the
+process: MLX's active memory after a load fell from 1,271.6 MB to 956.3 MB on the M6, and every
+take's peak by the same 315 MB. A checkpoint that is not the single `model.safetensors`, or holds
+the table in a layout the reader does not know, loads it as a parameter as before
+(`talker_text_embedding_from_file` on the load's telemetry says which).
+
 The speech tokenizer stays resident across generations on macOS and, gated by device class
 (physical memory of 7 GB or more), on iOS (`speechTokenizerResidencySupported`,
 `Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift:485-508`; status in

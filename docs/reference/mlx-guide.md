@@ -163,7 +163,7 @@ not used.
   (group size and bits) and per-layer entries. Vocello's one per-layer entry is
   `model.text_embedding` at 8 bits, group 64, affine, in both tiers, written by
   `scripts/convert_text_embedding_8bit.py` (2026-07-26).
-- **What the loader does** (`Qwen3TTS.swift:5770-5783`). `quantize(model: talker)` runs a per-path
+- **What the loader does** (`Qwen3TTS.swift:5784-5797`). `quantize(model: talker)` runs a per-path
   closure that quantizes a module only when the checkpoint holds `<path>.scales`, and uses the
   per-layer entry when one names the path, the global entry otherwise. The artifact therefore decides
   which modules are quantized; the code holds no list.
@@ -173,7 +173,7 @@ not used.
   stays float, and the speech tokenizer is a separate fp32 file. The full map, the bytes and the
   artifact history are [`model-delivery.md`](model-delivery.md)'s (artifact provenance).
 - **Verification.** A trusted prepared checkpoint loads with `verify: .noUnusedKeys`, an untrusted
-  one with `.all` (`Qwen3TTS.swift:5799-5801`); a trusted load therefore checks only for unused keys
+  one with `.all` (`Qwen3TTS.swift:5813-5815`); a trusted load therefore checks only for unused keys
   (A-20).
 - **Batched materialization.** Weights are evaluated four talker or code-predictor layers at a time
   and eight speech-tokenizer parameter arrays at a time (`Qwen3TTS.swift:470-471`), which bounds the
@@ -197,7 +197,10 @@ not used.
 2. Download through the production catalog's exact delivery plan and activate only after every
    file's digest verifies; swift-huggingface 1.0.0 is only the transport
    ([`model-delivery.md`](model-delivery.md)).
-3. Load `model.safetensors` into `MLXArray` dictionaries and sanitize the keys.
+3. Load `model.safetensors` into `MLXArray` dictionaries and sanitize the keys. The talker's text
+   embedding is the exception (RF-47): `Qwen3TextEmbeddingRows` reads the rows a prompt uses from
+   the file, so its three tensors are dropped unread and the model has no such parameter
+   (`Packages/VocelloQwen3Core/PERFORMANCE.md`, Loading and prepared state).
 4. Quantize the module tree (§3.2), then `update(parameters:verify:)`.
 5. Evaluate the weights in batches (§3.2).
 6. Once the loader has released its own references to the weights, fuse the projections that share
@@ -257,13 +260,13 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
   end to end (`FusedQuantizedProjection`), in the talker and in the code predictor's eager and
   compiled paths. The layers are re-pointed at their rows of the fused arrays, so the weights exist
   once. A prefill keeps the separate products (§9.1, couplings).
-- **KV cache.** One unbounded `KVCacheSimple` per layer (`Qwen3TTSTalker.swift:384-391`) in the
+- **KV cache.** One unbounded `KVCacheSimple` per layer (`Qwen3TTSTalker.swift:392-399`) in the
   compute dtype: **bf16**, not fp16. The alternatives are diagnostic knobs only (§7.5).
 
 ### 4.2 The code predictor and its compiled plan
 
 - **RoPE.** `MLXFast.RoPE(traditional: false)`, the split-half layout
-  (`Qwen3TTSCodePredictor.swift:62-73`); this fused RoPE replaced a hand-rolled rotate-half chain
+  (`Qwen3TTSCodePredictor.swift:88-95`); this fused RoPE replaced a hand-rolled rotate-half chain
   (§7.2).
 - **The compiled plan** (`Qwen3TTSCodePredictorCompiled.swift`; `SEMANTIC_DELTAS.json` DECODE-001,
   active). The 15 passes are compiled once per generation, keyed by pass index, and own their K/V

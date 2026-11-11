@@ -106,6 +106,30 @@
       "removalCriteria": "Remove only when an upstream loader provides the same revision, capability, trust, and cache contracts."
     },
     {
+      "id": "LOAD-002",
+      "title": "Text embedding read by row from the checkpoint file instead of loaded as a parameter",
+      "category": "loading",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TextEmbeddingRows.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3TextEmbeddingRowsTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "benchmarkEvidenceStatus": "diagnostic",
+      "benchmarkEvidenceReason": "Local fixed-seed A/B on the M6 (scripts/pcm_identity.py, seed 19790615; no published record): all 14 takes of the custom, design and clone matrix are PCM-identical on the Speed models and all 14 on the Quality models. One telemetry-on run each way: MLX active memory after load 1,271.6 MB to 956.3 MB (-315.3 MB, the table's size in the Speed checkpoint), the take's MLX peak 2,374.8 MB to 2,059.5 MB on Built-in Voice and 3,265.7 MB to 2,950.4 MB on Voice Cloning, the process footprint after a take 1,870 MB to 1,595 MB. No iPhone measurement exists yet.",
+      "upstreamDisposition": "upstreamable",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove if MLX gains file-backed or lazily paged parameters that keep an unread embedding table out of the process footprint, or if the text embedding stops being a pure row lookup."
+    },
+    {
       "id": "SAMPLER-001",
       "title": "Official talker and subtalker sampling with reusable hot-loop state",
       "category": "sampling",

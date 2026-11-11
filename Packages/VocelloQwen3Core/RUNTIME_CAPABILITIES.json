@@ -158,6 +158,7 @@
       "benchmarkEvidenceReason": "Focused macOS and physical-iPhone Custom, Design, and Clone runs exercised request-local sampling v2 on the exact dirty worktree fingerprints; clean fixed-seed repeat controls and full-matrix promotion remain pending.",
       "upstreamDeltaIDs": [
         "LOAD-001",
+        "LOAD-002",
         "SAMPLER-001",
         "SAMPLER-002",
         "SAMPLER-003",

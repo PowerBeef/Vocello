@@ -20,8 +20,9 @@ public enum VocelloQwen3AudioMarking {
     ///
     /// Runs on the default (GPU) device deliberately: the pass executes only
     /// after the post-take cache trim, when the generation working set has
-    /// been released, and the windowed embedder returns each window's
-    /// buffers immediately — MLX's CPU conv path measured near 1× realtime
+    /// been released, and the windowed embedder's workspace is one window
+    /// per window size class, recycled through the allocator cache and
+    /// cleared when the pass ends — MLX's CPU conv path measured near 1× realtime
     /// with ~300 MB per-window transients, while the Metal path is fast and
     /// its transient wired use is freed before the next take. The
     /// fail-closed peak-equality assertion in the memory-qualification lane

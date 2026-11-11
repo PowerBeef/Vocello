@@ -53,7 +53,7 @@
     },
     {
       "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
-      "sha256": "796c8c94d49b7658da4d3cdc8dc23cb4edb9bf0c56d866302da67ee0023e3483",
+      "sha256": "019ae8dd217b48c9b8c2e9741cb3d4aec0483ea63b6727e1ba5268b0d1fd7a29",
       "upstreamStatus": "added"
     },
     {
@@ -143,7 +143,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "204c0f2db8ba48dd5527ada139a57aab471ebac35860e54869eeec9b9bf88086",
+      "sha256": "63b8d927a5415f375c519f6609240c2a6fe8bf75899b32835d21a58d05a770a5",
       "upstreamStatus": "added"
     },
     {
@@ -188,7 +188,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
-      "sha256": "7ad7659afe94eb3ee169717b206f120a27c7e88c94c87461be7e3a9d94a51c9b",
+      "sha256": "acf1c35b78580e30d4a36a44477a3be4271979aef8322cd627ca62d429126e74",
       "upstreamStatus": "added"
     },
     {

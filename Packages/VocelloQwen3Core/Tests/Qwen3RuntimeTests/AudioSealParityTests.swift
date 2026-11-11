@@ -193,6 +193,30 @@ final class AudioSealParityTests: XCTestCase {
         XCTAssertEqual(try generator.watermark(pcm: pcm), try generator.watermark(pcm: pcm), "embedding is deterministic")
     }
 
+    /// RF-48: the pass does not clear the allocator cache between windows, so
+    /// the cache it leaves must be one workspace per window size class, not
+    /// one per window: six times the windows may not grow it.
+    func testTheWindowedPassLeavesACacheThatDoesNotGrowWithTheTakesLength() throws {
+        let generator = try AudioSealGenerator(weightsURL: try syntheticWeightsURL())
+        func cacheAfterMarking(windows: Int) throws -> Int {
+            let samples = windows * 16 * AudioSealGenerator.totalStride
+            let pcm = (0 ..< samples).map { 0.1 * sin(Float($0) * 0.01) }
+            Memory.clearCache()
+            let before = Memory.cacheMemory
+            _ = try generator.watermark(pcm: pcm, coreFrames: 16, marginFrames: 8)
+            let after = Memory.cacheMemory
+            Memory.clearCache()
+            return after - before
+        }
+        let short = try cacheAfterMarking(windows: 6)
+        let long = try cacheAfterMarking(windows: 36)
+        XCTAssertGreaterThan(short, 0, "the pass recycles its workspace through the cache")
+        XCTAssertLessThanOrEqual(
+            Double(long), Double(short) * 1.25,
+            "the cache grew with the number of windows: \(short) bytes for 6, \(long) for 36"
+        )
+    }
+
     func testFacadeTransformMarksWithTheShippingEmbedderAndKeepsTheSampleCount() throws {
         let url = try syntheticWeightsURL()
         let pcm = syntheticPCM()

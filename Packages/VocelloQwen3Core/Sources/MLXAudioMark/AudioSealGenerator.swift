@@ -304,16 +304,20 @@ public final class AudioSealGenerator {
             return zip(pcm, delta).map { Self.markedSample($0, delta: $1) }
         }
 
-        // The allocator cache is not cleared between windows (RF-48). Every
-        // full window allocates the same buffer sizes, so the cache hands
-        // one window's workspace to the next and holds no more than that
-        // workspace; clearing it per window returned the buffers to the OS
+        // The allocator cache is not cleared between windows (RF-48). MLX
+        // reuses a cached buffer only for a request of nearly its size, and
+        // windows come in a few size classes (the first, the interior ones,
+        // the one or two at the end), so the cache hands an interior
+        // window's workspace to the next and holds one workspace per class,
+        // whatever the take's length, under MLX's cache limit (128 MB on the
+        // iPhone tier). Clearing per window returned the buffers to the OS
         // and made the next window allocate them again, a fifth of the
-        // marking pass on the M6. The caller clears the cache before the
-        // pass and after it, and `markedPCM` after the generator is dropped.
-        // The peak-equality contract is unaffected: MLX's peak counts active
-        // memory, which this does not change, and the take's sampled
-        // footprint stayed below its pre-marking peak.
+        // marking pass on the M6. The cache is still cleared before the
+        // pass, after its frame-rate stage, after the pass, and by
+        // `markedPCM` once the generator is dropped. MLX's peak counts
+        // active memory only, which this does not change, and on the M6 the
+        // take's sampled footprint stayed below its pre-marking peak; the
+        // iPhone has not been measured.
         //
         // Every stage drains an explicit autoreleasepool: eval commits Metal
         // command buffers and other autoreleased ObjC objects, and the Swift

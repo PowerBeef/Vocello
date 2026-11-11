@@ -719,8 +719,13 @@ env = {
     "QVOICE_IOS_DEVICE_RUN_ID": os.environ["QV_RUNID"],
     "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC": os.environ["QV_SPEC"],
 }
+# MLX reads these three itself, before the app code runs: the command-buffer
+# limits (performance-guide.md, 12.1) and the float32 mode. Named, not a prefix,
+# so nothing else of the host environment reaches the phone.
+mlx_keys = ("MLX_MAX_OPS_PER_BUFFER", "MLX_MAX_MB_PER_BUFFER", "MLX_ENABLE_TF32")
 for key, value in os.environ.items():
-    if (key.startswith("QWENVOICE_") or key.startswith("QVOICE_")) and key not in env:
+    forwarded = key.startswith("QWENVOICE_") or key.startswith("QVOICE_") or key in mlx_keys
+    if forwarded and key not in env:
         env[key] = value
 print(json.dumps(env))'
 }

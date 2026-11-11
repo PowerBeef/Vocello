@@ -55,6 +55,44 @@ class RunDiagnosticsDirTests(unittest.TestCase):
         self.assertEqual(self.resolve("ios-logs-20261020-130125"), str(self.dest))
 
 
+class DiagnosticsLaunchEnvironmentTests(unittest.TestCase):
+    """What a diagnostics launch carries from the host's environment into the app."""
+
+    def launch_environment(self, host: dict[str, str]) -> dict[str, str]:
+        shell = LaneShell(self, "ios_device.sh")
+        result = shell.run("device_diagnostics_env_json 'custom:speed:hello' run-1", env=host)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_forwards_the_tuning_prefixes_and_the_three_named_mlx_keys(self) -> None:
+        environment = self.launch_environment({
+            "QWENVOICE_STREAM_CHUNK_CACHE_CLEAR": "off",
+            "QVOICE_IOS_MEMORY_PROFILE": "iphone15pro",
+            "MLX_MAX_OPS_PER_BUFFER": "40",
+            "MLX_MAX_MB_PER_BUFFER": "40",
+            "MLX_ENABLE_TF32": "0",
+        })
+        self.assertEqual(environment["QWENVOICE_STREAM_CHUNK_CACHE_CLEAR"], "off")
+        self.assertEqual(environment["QVOICE_IOS_MEMORY_PROFILE"], "iphone15pro")
+        self.assertEqual(environment["MLX_MAX_OPS_PER_BUFFER"], "40")
+        self.assertEqual(environment["MLX_MAX_MB_PER_BUFFER"], "40")
+        self.assertEqual(environment["MLX_ENABLE_TF32"], "0")
+
+    def test_keeps_its_own_keys_and_forwards_nothing_else_of_the_host(self) -> None:
+        environment = self.launch_environment({
+            "QVOICE_IOS_DEVICE_RUN_ID": "another-run",
+            "QWENVOICE_DEBUG": "0",
+            "MLX_SOMETHING_ELSE": "1",
+            "HOME_SECRET": "never",
+        })
+        self.assertEqual(environment["QVOICE_IOS_DEVICE_RUN_ID"], "run-1")
+        self.assertEqual(environment["QWENVOICE_DEBUG"], "1")
+        self.assertEqual(environment["QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC"], "custom:speed:hello")
+        self.assertNotIn("MLX_SOMETHING_ELSE", environment)
+        self.assertNotIn("HOME_SECRET", environment)
+        self.assertNotIn("PATH", environment)
+
+
 class ResolveDeviceTests(unittest.TestCase):
     PHONE = {
         "identifier": "physical-phone",

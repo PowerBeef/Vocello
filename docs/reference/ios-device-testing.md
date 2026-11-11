@@ -727,7 +727,10 @@ generation take; every step lands in a required-step ledger with the verdict und
 host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint policy above.
 
 `bench`, `lang-bench`, `speech-assets`, `profile`, `memory`, and the deliberate crash diagnostic launch
-`IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts. `bench`
+`IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts. A
+diagnostics launch also forwards every `QWENVOICE_*` and `QVOICE_*` variable the caller set, and
+three keys MLX reads itself: `MLX_MAX_OPS_PER_BUFFER`, `MLX_MAX_MB_PER_BUFFER` and
+`MLX_ENABLE_TF32` (RF-45). Nothing else of the host's environment reaches the phone. `bench`
 builds the app with `build --optimized` (`-O`, the shipped topology); every build writes a receipt
 naming the app executable and its digest, and publication binds `toolchain.optimization` to that
 receipt instead of a literal. While a headless take runs, the host copies only the run's completion

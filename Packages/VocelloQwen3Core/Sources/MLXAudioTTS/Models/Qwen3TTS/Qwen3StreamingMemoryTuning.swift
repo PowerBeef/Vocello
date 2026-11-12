@@ -38,6 +38,12 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// the clone screen's rule `clone-decoder-history-primed-confirm`).
     /// `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder.
     let cloneDecoderPriming: Bool
+    /// RF-55 (`QWENVOICE_CODE_PREDICTOR_BITS=8`): the talker's code predictor
+    /// is taken from the installed sibling of this model at that precision
+    /// (the 8-bit artifact of the same mode, which carries its integrity
+    /// record), the rest of the talker staying as installed. nil loads the
+    /// model as it is.
+    let codePredictorBits: Int?
 
     init(
         talkerKVQuantBits: Int?,
@@ -45,7 +51,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         encoderSplitHalfRotary: Bool = false,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: Bool = false,
-        cloneDecoderPriming: Bool = true
+        cloneDecoderPriming: Bool = true,
+        codePredictorBits: Int? = nil
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
@@ -53,6 +60,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
         self.decoderSlidingWindow = decoderSlidingWindow
         self.cloneDecoderPriming = cloneDecoderPriming
+        self.codePredictorBits = codePredictorBits
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
@@ -61,7 +69,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         encoderSplitHalfRotary: false,
         referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: false,
-        cloneDecoderPriming: true
+        cloneDecoderPriming: true,
+        codePredictorBits: nil
     )
 
     static func resolve(
@@ -98,7 +107,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
                 ? Qwen3TTSReferenceAudio.legacyTrailingSilenceSamples
                 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
-            cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold"
+            cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold",
+            codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil
         )
     }
 }

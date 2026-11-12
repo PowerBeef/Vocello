@@ -1,6 +1,7 @@
 import Foundation
 import MLX
 import MLXAudioCodecs
+import MLXLMCommon
 @testable import MLXAudioTTS
 import XCTest
 
@@ -16,6 +17,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_ENCODER_ROTARY": "split-half",
         "QWENVOICE_DECODER_WINDOW": "on",
         "QWENVOICE_CLONE_DECODER_HISTORY": "cold",
+        "QWENVOICE_CODE_PREDICTOR_BITS": "8",
     ]
 
     /// A resident tokenizer is reused only by a load that asked for the same
@@ -44,6 +46,85 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         let keys = [key(encoder: true), key(encoder: true, rotary: true), key(encoder: true, window: true),
                     key(encoder: true, rotary: true, window: true)]
         XCTAssertEqual(Set(keys).count, keys.count)
+    }
+
+    /// RF-55: the code predictor's sibling is the same model's installed
+    /// artifact at the asked precision, and nothing else.
+    func testTheCodePredictorSiblingIsOnlyTheInstalledSameModelAtThatPrecision() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cp-sibling-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let own = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-4bit")
+        let sibling = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-8bit")
+        XCTAssertEqual(try Qwen3TTSModel.codePredictorSiblingDirectory(of: own, ownBits: 4, bits: 8).lastPathComponent,
+                       sibling.lastPathComponent)
+        XCTAssertThrowsError(try Qwen3TTSModel.codePredictorSiblingDirectory(
+            of: root.appendingPathComponent("unnamed"), ownBits: 4, bits: 8))
+        func write(_ directory: URL, type: String, bits: Int, installed: Bool) throws {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let config = #"{"tts_model_type": "\#(type)", "quantization": {"group_size": 64, "bits": \#(bits)}}"#
+            try Data(config.utf8).write(to: directory.appendingPathComponent("config.json"))
+            if installed {
+                try Data("{}".utf8).write(to: directory.appendingPathComponent(".qwenvoice-model-integrity.json"))
+            } else {
+                try? FileManager.default.removeItem(at: directory.appendingPathComponent(".qwenvoice-model-integrity.json"))
+            }
+        }
+        let ownConfig = try JSONDecoder().decode(
+            Qwen3TTSModelConfig.self, from: Data(#"{"tts_model_type": "base"}"#.utf8))
+        XCTAssertThrowsError(try Qwen3TTSModel.codePredictorSibling(of: own, config: ownConfig, ownBits: 4, bits: 8),
+                             "no sibling installed")
+        try write(sibling, type: "base", bits: 8, installed: false)
+        XCTAssertThrowsError(try Qwen3TTSModel.codePredictorSibling(of: own, config: ownConfig, ownBits: 4, bits: 8),
+                             "a directory without its integrity record is not an installed artifact")
+        try write(sibling, type: "custom_voice", bits: 8, installed: true)
+        XCTAssertThrowsError(try Qwen3TTSModel.codePredictorSibling(of: own, config: ownConfig, ownBits: 4, bits: 8),
+                             "another model type")
+        try write(sibling, type: "base", bits: 4, installed: true)
+        XCTAssertThrowsError(try Qwen3TTSModel.codePredictorSibling(of: own, config: ownConfig, ownBits: 4, bits: 8),
+                             "another precision")
+        try write(sibling, type: "base", bits: 8, installed: true)
+        let resolved = try Qwen3TTSModel.codePredictorSibling(of: own, config: ownConfig, ownBits: 4, bits: 8)
+        XCTAssertEqual(resolved.directory.lastPathComponent, sibling.lastPathComponent)
+        XCTAssertEqual(resolved.quantization.bits, 8)
+        XCTAssertEqual(resolved.quantization.groupSize, 64)
+
+        // Hosts load from a prepared overlay whose weights link into the
+        // installed folder: the sibling is found beside the installed folder.
+        try FileManager.default.createDirectory(at: own, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: own.appendingPathComponent("model.safetensors"))
+        let overlay = root.appendingPathComponent("cache/prepared_models/Qwen3-TTS-12Hz-1.7B-Base-4bit")
+        try FileManager.default.createDirectory(at: overlay, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: overlay.appendingPathComponent("model.safetensors"),
+            withDestinationURL: own.appendingPathComponent("model.safetensors"))
+        XCTAssertEqual(Qwen3TTSModel.installedDirectory(of: overlay).standardizedFileURL.resolvingSymlinksInPath().path,
+                       own.standardizedFileURL.resolvingSymlinksInPath().path)
+        let throughOverlay = try Qwen3TTSModel.codePredictorSibling(of: overlay, config: ownConfig, ownBits: 4, bits: 8)
+        XCTAssertEqual(throughOverlay.directory.lastPathComponent, sibling.lastPathComponent)
+        XCTAssertEqual(Qwen3TTSModel.installedDirectory(of: own).standardizedFileURL.resolvingSymlinksInPath().path,
+                       own.standardizedFileURL.resolvingSymlinksInPath().path, "a folder loaded in place is its own")
+    }
+
+    /// RF-55: only the code predictor takes the sibling's recipe; everything
+    /// else keeps the model's own per-layer and global recipes.
+    func testOnlyTheCodePredictorTakesTheSiblingsQuantization() throws {
+        let config = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(#"""
+            {"model_type": "qwen3_tts", "tts_model_type": "base", "quantization": {"group_size": 64, "bits": 4, "mode": "affine",
+             "model.text_embedding": {"group_size": 64, "bits": 8, "mode": "affine"}}}
+            """#.utf8))
+        let eight: (Int, Int, QuantizationMode) = (64, 8, .affine)
+        func bits(_ path: String, scales: Bool = true, sibling: Bool = true) -> Int? {
+            Qwen3TTSModel.talkerQuantization(
+                path: path, hasScales: scales, config: config, codePredictor: sibling ? eight : nil)?.1
+        }
+        XCTAssertEqual(bits("code_predictor.lm_head.3"), 8)
+        XCTAssertEqual(bits("code_predictor.model.layers.2.self_attn.q_proj"), 8)
+        XCTAssertNil(bits("code_predictor.model.codec_embedding.0", scales: false), "no scales, never quantized")
+        XCTAssertEqual(bits("model.text_embedding"), 8, "its own per-layer recipe")
+        XCTAssertEqual(bits("codec_head"), 4)
+        XCTAssertEqual(bits("model.layers.0.mlp.gate_proj"), 4)
+        XCTAssertEqual(bits("code_predictor_shadow.proj"), 4, "only the code predictor itself")
+        XCTAssertEqual(bits("code_predictor.lm_head.3", sibling: false), 4, "without the key, as installed")
     }
 
     /// A distribution host (app or CLI) attests no internal diagnostics
@@ -99,6 +180,17 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         XCTAssertTrue(internalRun.encoderSplitHalfRotary)
         XCTAssertTrue(internalRun.decoderSlidingWindow)
         XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.decoderSlidingWindow)
+        // RF-55: the code predictor from the 8-bit sibling, only for "8".
+        XCTAssertEqual(internalRun.codePredictorBits, 8)
+        XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.production.codePredictorBits)
+        for value in ["4", "16", "on", ""] {
+            var bits = everyOverrideRequested
+            bits["QWENVOICE_CODE_PREDICTOR_BITS"] = value
+            XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: bits)
+                .codePredictorBits, value)
+        }
+        XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: everyOverrideRequested)
+            .codePredictorBits)
         // A-04: a streamed clone's decoder is primed with the reference by
         // default (adopted 2026-11-12); only the gated key restores it cold.
         XCTAssertFalse(internalRun.cloneDecoderPriming)

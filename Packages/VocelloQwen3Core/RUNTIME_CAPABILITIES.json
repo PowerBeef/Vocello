@@ -166,7 +166,8 @@
         "SAMPLER-003",
         "COMPAT-001",
         "TEL-001",
-        "ARCH-001"
+        "ARCH-001",
+        "QUANT-001"
       ]
     },
     {

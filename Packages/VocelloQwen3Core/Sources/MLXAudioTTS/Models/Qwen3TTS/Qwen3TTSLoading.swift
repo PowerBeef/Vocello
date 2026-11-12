@@ -427,21 +427,40 @@ extension Qwen3TTSModel {
                 talkerWeights.removeValue(forKey: "\(Self.textEmbeddingModuleKey).\(suffix)")
             }
         }
+        // RF-55 (diagnostic): the code predictor from the installed sibling of
+        // this model at another precision, quantized as that sibling is.
+        var codePredictorQuantization: (Int, Int, QuantizationMode)?
+        var usedCodePredictorSibling = false
+        if let bits = loadOptions.diagnosticOverrides.codePredictorBits,
+           let ownBits = config.quantization?.bits, ownBits != bits {
+            let sibling = try Self.codePredictorSibling(of: modelDir, config: config, ownBits: ownBits, bits: bits)
+            let siblingWeights = try loadWeights(from: sibling.directory, directSafetensorsFileName: "model.safetensors")
+            let prefix = "\(Self.codePredictorModuleKey)."
+            let ownKeys = Set(talkerWeights.keys.filter { $0.hasPrefix(prefix) })
+            let siblingKeys = Set(siblingWeights.keys.compactMap { key -> String? in
+                key.hasPrefix("talker.\(prefix)") ? String(key.dropFirst("talker.".count)) : nil
+            })
+            // Every own code-predictor tensor is replaced, none is added: a
+            // sibling converted another way would otherwise mix scales.
+            guard !ownKeys.isEmpty, ownKeys == siblingKeys else {
+                throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling's code predictor differs in layout")
+            }
+            for key in ownKeys { talkerWeights.removeValue(forKey: key) }
+            for key in siblingKeys { talkerWeights[key] = siblingWeights["talker.\(key)"] }
+            codePredictorQuantization = sibling.quantization.asTuple
+            usedCodePredictorSibling = true
+        }
         var talkerPairs = talkerWeights.map { ($0.key, $0.value) }
 
         let talkerQuantizeStartedAt = ContinuousClock.now
         if config.quantization != nil || config.perLayerQuantization != nil {
             quantize(model: talker) { path, _ in
-                guard talkerWeights["\(path).scales"] != nil else {
-                    return nil
-                }
-
-                if let perLayerQuant = config.perLayerQuantization,
-                   let layerQuant = perLayerQuant.quantization(layer: path) {
-                    return layerQuant.asTuple
-                }
-
-                return config.quantization?.asTuple
+                Self.talkerQuantization(
+                    path: path,
+                    hasScales: talkerWeights["\(path).scales"] != nil,
+                    config: config,
+                    codePredictor: codePredictorQuantization
+                )
             }
         }
         talkerTimingsMS["talker_quantize_prepare"] = talkerQuantizeStartedAt.elapsedMilliseconds
@@ -459,7 +478,7 @@ extension Qwen3TTSModel {
                 ]
             )
         )
-        let talkerVerifyMode: Module.VerifyUpdate = loadOptions.trustPreparedCheckpoint
+        let talkerVerifyMode: Module.VerifyUpdate = loadOptions.trustPreparedCheckpoint && !usedCodePredictorSibling
             ? .noUnusedKeys
             : .all
 
@@ -515,7 +534,9 @@ extension Qwen3TTSModel {
         talkerTimingsMS["talker_parameter_eval"] = talkerEvalStartedAt.elapsedMilliseconds
 
         let talkerBooleanFlags: [String: Bool] = [
-            "talker_verify_relaxed": loadOptions.trustPreparedCheckpoint,
+            "talker_verify_relaxed": loadOptions.trustPreparedCheckpoint && !usedCodePredictorSibling,
+            // RF-55: the code predictor came from the installed 8-bit sibling.
+            "talker_code_predictor_from_sibling": usedCodePredictorSibling,
             "talker_eval_chunked": true,
             "talker_text_embedding_from_file": textEmbeddingRows != nil,
             "speaker_encoder_requested": shouldLoadSpeakerEncoder,
@@ -1062,6 +1083,70 @@ extension Qwen3TTSModel {
             dimensions: talkerConfig.textHiddenSize,
             quantization: quantization
         )
+    }
+
+    static let codePredictorModuleKey = "code_predictor"
+
+    /// The quantization each talker module loads with: none without scales; the
+    /// code predictor's own recipe when it comes from a sibling (RF-55); else
+    /// the per-layer recipe, else the global one.
+    static func talkerQuantization(
+        path: String,
+        hasScales: Bool,
+        config: Qwen3TTSModelConfig,
+        codePredictor: (Int, Int, QuantizationMode)?
+    ) -> (Int, Int, QuantizationMode)? {
+        guard hasScales else { return nil }
+        if let codePredictor, path == codePredictorModuleKey || path.hasPrefix("\(codePredictorModuleKey).") {
+            return codePredictor
+        }
+        if let perLayerQuant = config.perLayerQuantization,
+           let layerQuant = perLayerQuant.quantization(layer: path) {
+            return layerQuant.asTuple
+        }
+        return config.quantization?.asTuple
+    }
+
+    /// RF-55: the installed sibling of `modelDir` at `bits` (the `-8bit`
+    /// directory beside a `-4bit` one), only when it is an installed artifact
+    /// (its integrity record present) of the same model type quantized at
+    /// exactly `bits`; anything else refuses the load.
+    static func codePredictorSibling(
+        of modelDir: URL, config: Qwen3TTSModelConfig, ownBits: Int, bits: Int
+    ) throws -> (directory: URL, quantization: BaseConfiguration.Quantization) {
+        let directory = try codePredictorSiblingDirectory(
+            of: installedDirectory(of: modelDir), ownBits: ownBits, bits: bits)
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: directory.appendingPathComponent(".qwenvoice-model-integrity.json").path) else {
+            throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling is not an installed artifact")
+        }
+        let siblingConfig = try JSONDecoder().decode(
+            Qwen3TTSModelConfig.self, from: Data(contentsOf: directory.appendingPathComponent("config.json")))
+        guard siblingConfig.ttsModelType == config.ttsModelType,
+              let quantization = siblingConfig.quantization, quantization.bits == bits else {
+            throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling is another model")
+        }
+        return (directory, quantization)
+    }
+
+    /// Hosts load from a prepared overlay whose weights link into the
+    /// installed folder; the sibling sits beside the installed folder, so the
+    /// weights' link is followed back to it. A folder loaded in place is its
+    /// own installed folder.
+    static func installedDirectory(of modelDir: URL) -> URL {
+        modelDir.appendingPathComponent("model.safetensors").resolvingSymlinksInPath().deletingLastPathComponent()
+    }
+
+    /// The sibling's directory: this one's name with its precision suffix
+    /// swapped (`…-4bit` to `…-8bit`), beside it.
+    static func codePredictorSiblingDirectory(of modelDir: URL, ownBits: Int, bits: Int) throws -> URL {
+        let name = modelDir.lastPathComponent
+        let suffix = "-\(ownBits)bit"
+        guard name.hasSuffix(suffix) else {
+            throw AudioGenerationError.modelNotInitialized("The model directory names no precision")
+        }
+        return modelDir.deletingLastPathComponent()
+            .appendingPathComponent(String(name.dropLast(suffix.count)) + "-\(bits)bit", isDirectory: true)
     }
 
     private static func loadWeights(

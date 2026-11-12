@@ -1091,7 +1091,71 @@
             }
           },
           "expected": "Fewer refused projects in English, French and Voice Design. Japanese may stay refused for its segment length, which long-form-japanese-budget screens apart. The subtalker already keeps the reference sampling under every variation (RF-18, 2026-10-20); October's shorter segments made Consistent worse.",
-          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 in either seed set's report: a long-form segment under Consistent then samples its talker at 0.8 and 0.95. REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE."
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 in either seed set's report: a long-form segment under Consistent then samples its talker at 0.8 and 0.95. REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "8eac67bc (executable 9f6e97d45175cf7f; no Swift change since the rule's commit)",
+            "arms": {
+              "a": "ca",
+              "b": "cb",
+              "runs": "long-form-consistent-seeds1 and -seeds2"
+            },
+            "refusedProjects": {
+              "a": 18,
+              "b": 8,
+              "of": 32
+            },
+            "byStratum": {
+              "custom-english": {
+                "a": 4,
+                "b": 0,
+                "of": 8
+              },
+              "custom-french": {
+                "a": 4,
+                "b": 2,
+                "of": 8
+              },
+              "custom-japanese": {
+                "a": 8,
+                "b": 6,
+                "of": 8
+              },
+              "design-english": {
+                "a": 2,
+                "b": 0,
+                "of": 8
+              }
+            },
+            "failureClasses": {
+              "a": [
+                "qc_rejected"
+              ],
+              "b": [
+                "qc_rejected"
+              ]
+            },
+            "errorRateBetterFamily": {
+              "seedSet1": {
+                "meanDifference": 0.0013,
+                "interval95": [
+                  -0.0014,
+                  0.0034
+                ],
+                "pairs": 7
+              },
+              "seedSet2": {
+                "meanDifference": -0.0055,
+                "interval95": [
+                  -0.0192,
+                  0.0028
+                ],
+                "pairs": 5
+              }
+            },
+            "note": "Every clause holds: the control refused 18 of 32 (at least 8 required), Balanced's talker sampling refused 8 (at most half), every refusal in both arms is Fast QC's (mostly silent gaps past 2 s and slow delivery), and the better family's error rate is flat on paired projects. Adopted: a long-form segment under Consistent samples its talker at 0.8 and 0.95; a single take keeps 0.7 and 0.9. Japanese stays mostly refused under Consistent (6 of 8), which the East Asian budget screens apart."
+          }
         },
         "long-form-east-asian-budget": {
           "recorded": "2026-11-12",

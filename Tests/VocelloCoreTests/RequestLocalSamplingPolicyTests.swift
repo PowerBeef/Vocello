@@ -120,6 +120,24 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         }
     }
 
+    /// RF-53 (rule long-form-consistent-talker): a long-form segment under
+    /// Consistent samples its talker as Balanced does; a single Consistent take
+    /// and every other variation keep their own talker in a segment too.
+    func testALongFormSegmentUnderConsistentSamplesItsTalkerAsBalanced() {
+        let expected: [(Qwen3SamplingVariation?, Bool, Float, Float)] = [
+            (.consistent, true, 0.8, 0.95), (.consistent, false, 0.7, 0.9),
+            (.balanced, true, 0.8, 0.95), (.expressive, true, 0.9, 1), (nil, true, 0.9, 1),
+        ]
+        for (variation, segment, temperature, topP) in expected {
+            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
+                requestedSeed: 7, variation: variation, longFormSegment: segment
+            )
+            let name = "\(String(describing: variation)) segment \(segment)"
+            XCTAssertEqual(policy.talker.temperature, temperature, accuracy: 0.0001, name)
+            XCTAssertEqual(policy.talker.topP, topP, accuracy: 0.0001, name)
+        }
+    }
+
     /// The registered GEN-NOEOS knob's value: a whole number of codec frames
     /// inside the facade's bound, or no hold at all.
     func testEOSSuppressionKnobParsesOnlyBoundedWholeFrames() {

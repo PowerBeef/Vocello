@@ -1651,8 +1651,9 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     public let deliveryInstructionCellID: String?
     /// One segment of a long-form project. A segment keeps the streaming
     /// trailing-text layout, which RF-18 qualified for long segments; every
-    /// other streamed take sees its whole text up front (RF-21). Optional
-    /// synthesized Codable preserves older IPC payloads.
+    /// other streamed take sees its whole text up front (RF-21). Under the
+    /// Consistent variation a segment also samples its talker as Balanced
+    /// does (RF-53). Optional synthesized Codable preserves older IPC payloads.
     public let longFormSegment: Bool?
 
     public init(

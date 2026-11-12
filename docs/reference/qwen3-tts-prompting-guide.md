@@ -443,7 +443,9 @@ measurement in §2.3), and upstream defaults Custom and Design to the full-text 
   reference subtalker sampling cut Consistent's failed projects from 9 to 2; lowering the planner's
   segment budget from 300 to 200 made it worse (15); Expressive failed none in any arm. The subtalker
   change and EOS filtering shipped (§7). Consistent's remaining failures are a documented 3.0 known
-  limitation.
+  limitation; on 2026-11-12 a long-form segment under Consistent began sampling its talker as
+  Balanced does, which cut the November screen's refused Consistent projects from 18 to 8 of 32
+  (RF-53).
 
 The planner still fills each segment to about 60 s (C-02); shorter segments need their own screen.
 Long-form behaviour is in [`long-form-generation.md`](long-form-generation.md).
@@ -842,13 +844,13 @@ instruction-following numbers were measured at.
 top-p 1.0, top-k 50, repetition penalty 1.05 and the 2,048-token app cap, and
 `Qwen3GenerationConfiguration` carries them in code. The subtalker's values are not in the contract;
 they come from code. The take **variation** narrows only the talker
-(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift` L95-144):
+(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift` L101-173):
 
 | Variation | Talker temperature / top-p | Subtalker (code predictor) |
 | --- | --- | --- |
 | Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / top-p 1.0 |
 | Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / top-p 1.0 |
-| Consistent | 0.7 / 0.9 | 0.9 / top-k 50 / top-p 1.0 |
+| Consistent | 0.7 / 0.9; a long-form segment 0.8 / 0.95 (RF-53) | 0.9 / top-k 50 / top-p 1.0 |
 
 The runtime keeps the subtalker as its own sampling stage (`Qwen3RequestSamplingPolicy.subtalker`),
 and since RF-18 (2026-10-20) production fills it with upstream's values whatever the variation, as

@@ -559,17 +559,20 @@ fallback (2,048; `model.generate` alone uses 4,096). Qwen's README examples and 
 ### 9.2 Take variations
 
 The user-facing **take variation** changes only the talker
-(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift:101-150`):
+(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift:101-173`):
 
 | Variation | Talker temperature / top-p | Subtalker | Repetition penalty |
 | --- | --- | --- | --- |
 | Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
 | Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
-| Consistent | 0.7 / 0.9 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
+| Consistent | 0.7 / 0.9; a long-form segment 0.8 / 0.95 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
 
 Top-k is 50 for both stages. Until 2026-10-20 the subtalker copied the talker, so Balanced and
 Consistent narrowed it too. The RF-18 follow-up screen's C1 arm restored the reference subtalker and
 cut Consistent's failed long-form projects from 9 to 2 of 56 (§11.2), and it shipped in `7a125aaf`.
+Since 2026-11-12 a long-form segment under Consistent samples its talker as Balanced does: the
+long-form screen refused 18 of 32 Consistent projects at 0.7 / 0.9, mostly for silent gaps past
+2 s, and 8 at 0.8 / 0.95 (rule `long-form-consistent-talker`, RF-53).
 The internal-diagnostics knobs (`QWENVOICE_TALKER_*`, `QWENVOICE_SUBTALKER_*`) can still override
 either stage.
 
@@ -618,7 +621,7 @@ How the target text reaches the talker is generation semantics. The token-level 
 ### 9.5 Seeds and reproducibility
 
 Every request carries an effective seed (requested or random) and runs on its own MLX random state;
-the sampling algorithm version is 2 (`Generation.swift:79-90`). Seeded takes are deterministic on one
+the sampling algorithm version is 2 (`Generation.swift:79-91`). Seeded takes are deterministic on one
 build: a rerun of a fixed seed reproduced its PCM byte for byte in the RF-18 screens. A seed does not
 reproduce takes across these changes (this list is the one the other guides link to):
 
@@ -630,7 +633,9 @@ reproduce takes across these changes (this list is the one the other guides link
   takes most;
 - RF-21's whole-script text layout for single streamed takes (`9cd075bd`, 2026-10-20, §9.4), which
   changes every streamed Built-in Voice and Voice Design take; long-form segments keep the
-  trailing-text layout.
+  trailing-text layout;
+- RF-53's Consistent long-form talker (2026-11-12, rule `long-form-consistent-talker`), which
+  samples a long-form segment under Consistent at 0.8 / 0.95 and changes only those segments.
 
 The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and swift-huggingface to
 1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in
@@ -728,7 +733,11 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
 
   C1 and D2 shipped together; C2 did not. E0 and E4 were byte-identical on all 56 projects, so the
   effect is C1's. The first RF-18 screen had already rejected D1: pooled, D1-on failed 3 of 23 long
-  segments and D1-off 2 of 27, all under Consistent.
+  segments and D1-off 2 of 27, all under Consistent. The November long-form screen (projects of
+  twenty sentences, Fast QC v10) still refused 18 of 32 Consistent projects, mostly for silent gaps
+  past 2 s and slow delivery; sampling the talker as Balanced does (0.8 / 0.95) refused 8, with the
+  error rate flat, and shipped for long-form segments on 2026-11-12 (rule
+  `long-form-consistent-talker`, RF-53). Japanese stays the weakest (6 of 8 refused).
 - **Single takes see their whole text (D1, adopted 2026-10-20, RF-21).** With the streaming text
   layout, a short take that opened with a sigh or a long pause could feed its whole script before
   speech started; the talker then saw only `tts_pad` and whispered or mumbled (a French take ran to

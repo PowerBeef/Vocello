@@ -96,8 +96,9 @@ enum Qwen3TalkerSamplingOverride {
         return value
     }
 
-    /// A generation request's policy: its seed and variation, and the text
-    /// layout its kind of take keeps (a long-form segment trailing text).
+    /// A generation request's policy: its seed and variation, and what its kind
+    /// of take keeps (a long-form segment trailing text and, under Consistent,
+    /// Balanced's talker sampling).
     static func samplingConfiguration(for request: GenerationRequest) -> VocelloQwen3SamplingConfiguration {
         samplingConfiguration(
             requestedSeed: request.seed,
@@ -116,6 +117,14 @@ enum Qwen3TalkerSamplingOverride {
         var topP = official.topP
         switch variation {
         case .balanced:
+            temperature = 0.8
+            topP = 0.95
+        case .consistent where longFormSegment:
+            // RF-53: a long-form segment under Consistent samples its talker as
+            // Balanced does. At 0.7 / 0.9 the long-form screen refused 18 of 32
+            // Consistent projects, mostly for silent gaps past 2 s; at 0.8 / 0.95
+            // it refused 8 (rule long-form-consistent-talker). A single take
+            // keeps Consistent's own sampling.
             temperature = 0.8
             topP = 0.95
         case .consistent:

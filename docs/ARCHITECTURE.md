@@ -329,7 +329,8 @@ actors that own the heavy, isolated work:
   `variation`, plus batch (`batchIndex`/`batchTotal`), `streamingTitle`,
   `suppressStreamingPreview` (request-local silent generation), `captureCodecTrace`
   (diagnostics only), `deliveryInstructionCellID` and `longFormSegment` (one segment of a
-  long-form project, which keeps the streaming trailing-text layout).
+  long-form project, which keeps the streaming trailing-text layout and, under Consistent, samples
+  its talker as Balanced does).
   - `GenerationRequest.Payload`:
     - `.custom(speakerID:deliveryStyle:)`
     - `.design(voiceDescription:deliveryStyle:)`
@@ -433,7 +434,7 @@ travel with the request instead of mutating process-global generation state.
 talker only, and the subtalker keeps the reference values. The reference-parity arms (D1 full-text
 single takes, D2 EOS filtering, D3 float32 sampling) reach the runtime only as request-local
 `VocelloQwen3ReferenceParity` values: a long-form segment (`GenerationRequest.longFormSegment`)
-turns D1 off, registered internal-diagnostics knobs turn any arm on or off, and a request that
+turns D1 off (and under Consistent takes Balanced's talker sampling, RF-53), registered internal-diagnostics knobs turn any arm on or off, and a request that
 departs from production names its arms on the engine row (`reference_parity`). The values, the
 arms and the text layouts per take kind are owned by
 [`qwen3-tts-guide.md` §9](reference/qwen3-tts-guide.md#9-generation-parameters).

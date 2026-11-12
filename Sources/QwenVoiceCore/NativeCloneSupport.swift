@@ -118,6 +118,28 @@ enum CloneConditioningDiagnostics {
             environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable)
             + CloneReferencePadding.speakerFeatureSuffix(
                 environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable)
+            + CloneReferenceEdges.speakerFeatureSuffix(
+                environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable)
+    }
+}
+
+/// G-07 (RF-52): whether this process's package trims a transcript-backed clone
+/// reference's silent edges and fades it before conditioning reads it (audio-only
+/// prompts and production take it as given). The package reads the same key at load
+/// (`Qwen3LoadTimeDiagnosticOverrides.referenceEdgesTrimmed`); the host folds it
+/// into the speaker-feature version, as for the rotary and the padding.
+enum CloneReferenceEdges {
+    static let environmentKey = "QWENVOICE_REFERENCE_EDGES"
+    static let trimmedSuffix = "+icl-ref-edges-trimmed"
+
+    /// Read as the package reads it: trimmed and lowercased.
+    static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        let requested = RuntimeDebugGate.value(
+            for: environmentKey,
+            environment: environment,
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return requested == "trimmed" ? trimmedSuffix : ""
     }
 }
 

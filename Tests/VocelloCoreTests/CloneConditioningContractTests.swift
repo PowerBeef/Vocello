@@ -90,9 +90,28 @@ final class CloneConditioningContractTests: XCTestCase {
         // The default suffix composes every key: the identity a stored prompt
         // is checked against follows each of them.
         typealias Diagnostics = CloneConditioningDiagnostics
-        let armed = ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half", Padding.environmentKey: "half-second"]
+        // G-07: the key that trims the reference's edges does the same.
+        typealias Edges = CloneReferenceEdges
+        XCTAssertEqual(Edges.speakerFeatureSuffix(
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: " Trimmed "], internalDiagnosticsAvailable: true),
+            Edges.trimmedSuffix)
+        XCTAssertEqual(Edges.speakerFeatureSuffix(
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "trimmed"], internalDiagnosticsAvailable: false), "")
+        XCTAssertEqual(Edges.speakerFeatureSuffix(
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "on"], internalDiagnosticsAvailable: true), "")
+        XCTAssertEqual(Edges.speakerFeatureSuffix(
+            environment: [Edges.environmentKey: "trimmed"], internalDiagnosticsAvailable: true), "",
+            "the key needs QWENVOICE_DEBUG")
+        let edgesTrimmed = NativePreparedCloneConditioningCache.clonePromptIdentity(
+            referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "runtime",
+            diagnosticSuffix: Edges.trimmedSuffix)
+        XCTAssertNotEqual(edgesTrimmed.runtimeContractSignature, identity.runtimeContractSignature,
+                          "a prompt built from a trimmed reference is never adopted as one built from it as given")
+        XCTAssertNotEqual(edgesTrimmed.runtimeContractSignature, padded.runtimeContractSignature)
+        let armed = ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half", Padding.environmentKey: "half-second",
+                     Edges.environmentKey: "trimmed"]
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: true),
-                       Rotary.splitHalfSuffix + Padding.halfSecondSuffix)
+                       Rotary.splitHalfSuffix + Padding.halfSecondSuffix + Edges.trimmedSuffix)
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: false), "")
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix, "", "this test run honours no key")
         XCTAssertEqual(CloneReferencePadding.encoderInputLabel, "clone_reference_encoder_input_unpadded")

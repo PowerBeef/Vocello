@@ -50,6 +50,13 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// keeps its one leading space. Production puts one space before every
     /// target.
     let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
+    /// RF-52, G-07 (`QWENVOICE_REFERENCE_EDGES=trimmed`): a transcript-backed
+    /// clone reference's silent edges are trimmed and it is faded in and out
+    /// before the speaker embedding and the codec encode read it
+    /// (`Qwen3TTSReferenceAudio.edgesTrimmedAndFaded`). Audio-only prompts and
+    /// production take the reference as given, as upstream does. The host folds the same key into
+    /// the clone prompt's speaker-feature version.
+    let referenceEdgesTrimmed: Bool
 
     init(
         talkerKVQuantBits: Int?,
@@ -59,7 +66,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: Bool = false,
         cloneDecoderPriming: Bool = true,
         codePredictorBits: Int? = nil,
-        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false
+        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false,
+        referenceEdgesTrimmed: Bool = false
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
@@ -69,6 +77,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         self.cloneDecoderPriming = cloneDecoderPriming
         self.codePredictorBits = codePredictorBits
         self.iclTargetSpaceOnlyBeforeSpacedScripts = iclTargetSpaceOnlyBeforeSpacedScripts
+        self.referenceEdgesTrimmed = referenceEdgesTrimmed
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
@@ -79,7 +88,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: false,
         cloneDecoderPriming: true,
         codePredictorBits: nil,
-        iclTargetSpaceOnlyBeforeSpacedScripts: false
+        iclTargetSpaceOnlyBeforeSpacedScripts: false,
+        referenceEdgesTrimmed: false
     )
 
     static func resolve(
@@ -118,7 +128,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
             cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold",
             codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil,
-            iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") == "spaced-scripts"
+            iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") == "spaced-scripts",
+            referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") == "trimmed"
         )
     }
 }

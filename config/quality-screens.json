@@ -528,6 +528,30 @@
             "speed": "Measured before the rule (scripts/pcm_identity.py, fixed seeds, M6): real-time factor 0.303 to 0.363 long and 0.366 to 0.439 medium unclamped (about 20% slower where the GPU bounds a frame), -1% to +6.5% on the efficiency cores.",
             "note": "The point estimate repeats the review's pre-screen (+0.009 against +0.010) and nothing is worse, but the interval's lower end is -0.0001, so by the recorded rule the gain is not shown. For the maintainer's artifact decision: about +0.01 speaker similarity and a slightly better error rate, against about 20% more time on a GPU-bound device and 56 MB of weights."
           }
+        },
+        "reference-edges-trimmed": {
+          "recorded": "2026-11-12",
+          "question": "Does conditioning on a transcript-backed clone reference whose silent edges are trimmed (100 ms kept around its sound) and that is faded in and out over 10 ms (QWENVOICE_REFERENCE_EDGES=trimmed, G-07), in place of the reference as given, harm transcript-backed clones?",
+          "arms": "A: the build at the commit that adds the key, default. B: the same build with the key set. Seed set 1 of the clone screen, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The default arm A reproduces arm qa (the default at 3478b21b) on every take, so the commits since changed nothing a per-process take hears. The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT. B is not run twice: the key changes the reference's samples by a fixed rule, and every B arm run twice so far reproduced itself.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Small. The screen's references are corpus clips with clean, mostly short silent edges, so the trim removes some lead-in and tail silence and the fades act on near-silence; a recorded or imported reference with long silences or a cut ending is where G-07 was filed (a hard stop at 20.4 s or Stop, no trim, no fade). The tie to QwenLM issue 341's echoes is this project's own inference.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: conditioning then trims and fades a transcript-backed reference by default (audio-only prompts, which the screen does not measure, keep it as given), the conditioning version is raised, so every saved prompt rebuilds once, and the reference-primed codec replay trims as conditioning does. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the reference is taken as given."
         }
       },
       "noiseFloor": {

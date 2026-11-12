@@ -55,10 +55,64 @@ enum Qwen3TTSReferenceAudio {
         return canonical
     }
 
+    /// G-07 (RF-52): a reference without its silent edges, faded in and out.
+    /// Every 10 ms window whose RMS reaches 50 dB below the loudest window's
+    /// (and at least -70 dBFS) counts as sound; the reference keeps everything
+    /// from 100 ms before the first such window to 100 ms after the last, so
+    /// soft onsets and endings stay, then fades in and out over 10 ms (half a
+    /// raised cosine) so a reference that was cut mid-sound ends without a
+    /// step. A reference with no sound, or shorter than two windows, is
+    /// returned as given. Returns `[T']`.
+    static func edgesTrimmedAndFaded(_ audio: MLXArray) throws -> MLXArray {
+        let samples = try canonicalMonoBatch(audio)[0].asType(.float32).asArray(Float.self)
+        return MLXArray(edgesTrimmedAndFaded(samples))
+    }
+
+    static func edgesTrimmedAndFaded(_ samples: [Float]) -> [Float] {
+        let window = sampleRate / 100
+        let margin = sampleRate / 10
+        let fade = sampleRate / 100
+        guard samples.count >= 2 * window else {
+            return samples
+        }
+        var levels: [Float] = []
+        levels.reserveCapacity(samples.count / window + 1)
+        var start = 0
+        while start < samples.count {
+            let end = min(samples.count, start + window)
+            var energy: Float = 0
+            for index in start ..< end {
+                energy += samples[index] * samples[index]
+            }
+            levels.append((energy / Float(end - start)).squareRoot())
+            start = end
+        }
+        guard let loudest = levels.max(), loudest > 0 else {
+            return samples
+        }
+        let threshold = max(loudest * Float(pow(10.0, -50.0 / 20.0)), Float(pow(10.0, -70.0 / 20.0)))
+        guard let first = levels.firstIndex(where: { $0 >= threshold }),
+              let last = levels.lastIndex(where: { $0 >= threshold })
+        else {
+            return samples
+        }
+        let lower = max(0, first * window - margin)
+        let upper = min(samples.count, (last + 1) * window + margin)
+        var kept = Array(samples[lower ..< upper])
+        let ramp = min(fade, kept.count / 2)
+        for index in 0 ..< ramp {
+            let gain = 0.5 - 0.5 * cos(Float.pi * Float(index) / Float(ramp))
+            kept[index] *= gain
+            kept[kept.count - 1 - index] *= gain
+        }
+        return kept
+    }
+
     /// Canonical `[1, 1, T + pad]` codec-encoder input with a chosen amount of
     /// trailing silence; zero, the production value, encodes the reference as
-    /// it is, as upstream does (A-12, RF-52). x-vector extraction always takes
-    /// the reference as it is.
+    /// it is, as upstream does (A-12, RF-52). x-vector extraction never takes
+    /// this padding. Both read the same reference, edge-trimmed or as given
+    /// (`Qwen3TTSModel.conditioningReference`).
     static func encoderInput(_ audio: MLXArray, trailingSilenceSamples: Int) throws -> MLXArray {
         let monoBatch = try canonicalMonoBatch(audio)
         guard trailingSilenceSamples > 0 else {

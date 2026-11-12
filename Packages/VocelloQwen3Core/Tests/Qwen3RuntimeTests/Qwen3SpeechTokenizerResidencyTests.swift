@@ -19,6 +19,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_CLONE_DECODER_HISTORY": "cold",
         "QWENVOICE_CODE_PREDICTOR_BITS": "8",
         "QWENVOICE_ICL_TARGET_SPACE": "spaced-scripts",
+        "QWENVOICE_REFERENCE_EDGES": "trimmed",
     ]
 
     /// A resident tokenizer is reused only by a load that asked for the same
@@ -211,6 +212,17 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
                 .decoderSlidingWindow, expected, value)
             XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: windowed)
                 .decoderSlidingWindow, value)
+        }
+        // G-07: the reference's edges trimmed and faded, only for "trimmed".
+        XCTAssertTrue(internalRun.referenceEdgesTrimmed)
+        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.referenceEdgesTrimmed)
+        for (value, expected) in [(" Trimmed ", true), ("on", false), ("trim", false), ("", false)] {
+            var edges = everyOverrideRequested
+            edges["QWENVOICE_REFERENCE_EDGES"] = value
+            XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: edges)
+                .referenceEdgesTrimmed, expected, value)
+            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: edges)
+                .referenceEdgesTrimmed, value)
         }
         // A-11: the space before a Han or kana target, only for "spaced-scripts".
         XCTAssertTrue(internalRun.iclTargetSpaceOnlyBeforeSpacedScripts)

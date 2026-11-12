@@ -228,6 +228,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// separator under the gated `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts`
     /// (A-11, RF-52); production puts one space before every target.
     let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
+    /// A transcript-backed clone reference's silent edges are trimmed and it is
+    /// faded in and out under the gated `QWENVOICE_REFERENCE_EDGES=trimmed`
+    /// (G-07, RF-52); audio-only prompts and production take it as given.
+    let referenceEdgesTrimmed: Bool
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?
     var tokenizer: Tokenizer?
@@ -1005,6 +1009,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
     }
 
+    /// A transcript-backed clone reference as conditioning reads it, for the
+    /// speaker embedding and the codec encode alike: as given in production,
+    /// as upstream takes it; trimmed at its silent edges and faded in and out
+    /// under the gated `QWENVOICE_REFERENCE_EDGES=trimmed` (G-07, RF-52).
+    /// Audio-only (x-vector) prompts never pass through it.
+    func conditioningReference(_ refAudio: MLXArray) throws -> MLXArray {
+        guard referenceEdgesTrimmed else {
+            return refAudio
+        }
+        return try Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(refAudio)
+    }
+
     public func createVoiceClonePrompt(
         refAudio: MLXArray,
         refText: String?,
@@ -1024,7 +1040,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             )
         }
 
-        let speakerEmbedding = try extractSpeakerEmbedding(refAudio)
+        // G-07 reaches transcript-backed prompts only: the clone screen that
+        // decides it measures those, so an audio-only prompt keeps its
+        // reference as given whatever the key says.
+        let reference = iclMode ? try conditioningReference(refAudio) : refAudio
+        let speakerEmbedding = try extractSpeakerEmbedding(reference)
         if xVectorOnlyMode, speakerEmbedding == nil {
             throw AudioGenerationError.modelNotInitialized(
                 "Qwen3 x-vector clone prompt creation requires an initialized speaker encoder."
@@ -1038,7 +1058,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 )
             }
             let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInput(
-                refAudio, trailingSilenceSamples: referenceTrailingSilenceSamples)
+                reference, trailingSilenceSamples: referenceTrailingSilenceSamples)
             let encoded = try speechTokenizer.encode(refAudioForEncoder)
             // F-07: evaluate the reference encode here, inside the caller's MLX
             // error scope and lease, instead of letting the lazy graph run later
@@ -1124,10 +1144,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
            let refText,
            speechTokenizer.hasEncoder
         {
-            let speakerEmbedding = try extractSpeakerEmbedding(refAudio)
+            let reference = try conditioningReference(refAudio)
+            let speakerEmbedding = try extractSpeakerEmbedding(reference)
             inputEmbedsInit = try prepareICLGenerationInputs(
                 text: text,
-                refAudio: refAudio,
+                refAudio: reference,
                 refText: refText,
                 speakerEmbedding: speakerEmbedding,
                 language: lang
@@ -1181,7 +1202,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         talkerKVQuantBits: Int? = nil,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         streamedCloneDecoderPriming: Bool = true,
-        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false
+        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false,
+        referenceEdgesTrimmed: Bool = false
     ) {
         self.config = config
         self.talker = talker
@@ -1189,6 +1211,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
         self.streamedCloneDecoderPriming = streamedCloneDecoderPriming
         self.iclTargetSpaceOnlyBeforeSpacedScripts = iclTargetSpaceOnlyBeforeSpacedScripts
+        self.referenceEdgesTrimmed = referenceEdgesTrimmed
         self.speakerEncoder = speakerEncoder
     }
 
@@ -2056,7 +2079,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     }
 
     /// Diagnostic codec round trip (audio QC population N2). The encoder sees
-    /// exactly the clone path's reference input (`encoderInput`, with the model's trailing silence)
+    /// the clone path's codec input for a reference as given (`encoderInput`,
+    /// with the model's trailing silence); it never trims edges, so it does
+    /// not reproduce the codes of a take made under
+    /// `QWENVOICE_REFERENCE_EDGES=trimmed` (G-07)
     /// and keeps every codebook it produces; the codes then decode through
     /// `replayDecoderArm` on the production non-streaming 25-frame schedule and
     /// sample window, the schedule the replay's `fullAudio` uses. The codes are
@@ -2256,10 +2282,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         } else if let refAudio,
            let refText,
            speechTokenizer.hasEncoder {
-            let speakerEmbedding = try extractSpeakerEmbedding(refAudio)
+            let reference = try conditioningReference(refAudio)
+            let speakerEmbedding = try extractSpeakerEmbedding(reference)
             let prepared = try prepareICLGenerationInputs(
                 text: text,
-                refAudio: refAudio,
+                refAudio: reference,
                 refText: refText,
                 speakerEmbedding: speakerEmbedding,
                 language: language

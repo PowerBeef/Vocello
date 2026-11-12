@@ -151,6 +151,46 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         }
     }
 
+    /// G-07 (RF-52): the trim keeps 100 ms around the first and last window
+    /// with sound, fades both ends over 10 ms, and returns a reference with no
+    /// sound, or too short to judge, unchanged.
+    func testEdgeTrimKeepsAMarginAroundTheSoundAndFadesBothEnds() throws {
+        let rate = Qwen3TTSReferenceAudio.sampleRate
+        let tone = (0 ..< rate).map { Float(0.3 * sin(2 * Double.pi * 220 * Double($0) / Double(rate))) }
+        let silence = [Float](repeating: 0, count: rate / 2)
+        let quietNoise = (0 ..< rate / 2).map { Float(1e-5 * sin(Double($0) * 1.7)) }
+        let trimmed = Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(silence + quietNoise + tone + silence)
+        // The sound starts at 1 s and runs 1 s: 100 ms either side survives.
+        XCTAssertEqual(trimmed.count, rate + 2 * (rate / 10))
+        XCTAssertEqual(trimmed.first, 0, "faded in from zero")
+        XCTAssertEqual(Array(trimmed[(rate / 10 + 240) ..< (rate / 10 + 480)]),
+                       Array(tone[240 ..< 480]), "the sound itself is untouched past the fade")
+        XCTAssertLessThan(abs(trimmed[trimmed.count - 1]), 1e-6, "faded out to zero")
+
+        // A clip cut mid-sound keeps every sample and gains only the fades:
+        // half-raised-cosine ramps of 10 ms, at half gain halfway in, from a
+        // tone whose first and last samples are not zero.
+        let shifted = (0 ..< rate).map { Float(0.3 * sin(2 * Double.pi * 220 * Double($0) / Double(rate) + 1)) }
+        let cut = Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(shifted)
+        let ramp = rate / 100
+        XCTAssertEqual(cut.count, shifted.count)
+        XCTAssertNotEqual(shifted[0], 0)
+        XCTAssertNotEqual(shifted[shifted.count - 1], 0)
+        XCTAssertEqual(cut[0], 0, "faded in from zero")
+        XCTAssertEqual(cut[cut.count - 1], 0, "faded out to zero")
+        XCTAssertEqual(cut[ramp / 2], shifted[ramp / 2] * 0.5, accuracy: 1e-6)
+        XCTAssertEqual(cut[cut.count - 1 - ramp / 2], shifted[shifted.count - 1 - ramp / 2] * 0.5, accuracy: 1e-6)
+        XCTAssertEqual(Array(cut[ramp ..< cut.count - ramp]), Array(shifted[ramp ..< shifted.count - ramp]),
+                       "untouched between the fades")
+
+        XCTAssertEqual(Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(silence), silence, "no sound: as given")
+        let short = Array(tone.prefix(300))
+        XCTAssertEqual(Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(short), short, "under two windows: as given")
+        let viaArray = try Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(
+            MLXArray(silence + tone).reshaped(1, 1, -1)).asArray(Float.self)
+        XCTAssertEqual(viaArray, Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(silence + tone))
+    }
+
     func testCodecEncoderInputRejectsNonCanonicalLayouts() {
         XCTAssertThrowsError(
             try Qwen3TTSReferenceAudio.encoderInput(MLXArray.zeros([2, 64]), trailingSilenceSamples: 0)

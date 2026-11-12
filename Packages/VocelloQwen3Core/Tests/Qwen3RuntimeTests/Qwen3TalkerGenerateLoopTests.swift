@@ -1004,6 +1004,33 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
                        "both keep one space without the key")
     }
 
+    /// G-07 (RF-52): without the key a transcript-backed reference reaches
+    /// conditioning as given (the same shape, dtype and bits); under it,
+    /// trimmed and faded exactly as `edgesTrimmedAndFaded` makes it.
+    func testTheReferenceEdgesKeyReachesConditioning() throws {
+        let tiny = try Self.tinyModelConfig()
+        let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
+        func model(key: Bool) -> Qwen3TTSModel {
+            Qwen3TTSModel(
+                config: tiny,
+                talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+                speakerEncoder: nil,
+                referenceEdgesTrimmed: key
+            )
+        }
+        let rate = Qwen3TTSReferenceAudio.sampleRate
+        let silence = [Float](repeating: 0, count: rate / 2)
+        let sound = (0 ..< rate / 2).map { Float(0.3 * sin(Double($0) * 0.05 + 1)) }
+        let reference = MLXArray(silence + sound + silence).reshaped(1, -1).asType(.float16)
+        let asGiven = try model(key: false).conditioningReference(reference)
+        XCTAssertEqual(asGiven.shape, reference.shape)
+        XCTAssertEqual(asGiven.dtype, .float16)
+        XCTAssertEqual(asGiven.asArray(Float16.self).map(\.bitPattern), reference.asArray(Float16.self).map(\.bitPattern))
+        let trimmed = try model(key: true).conditioningReference(reference).asArray(Float.self)
+        XCTAssertEqual(trimmed, Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(reference.asType(.float32).asArray(Float.self)))
+        XCTAssertEqual(trimmed.count, sound.count + 2 * (rate / 10))
+    }
+
     /// E4-02: a model whose config has no `talker_config` fails its first take
     /// with a typed error instead of trapping on a force-unwrap.
     func testAModelWithoutATalkerConfigFailsTypedInsteadOfTrapping() async throws {

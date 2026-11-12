@@ -372,11 +372,14 @@ outside contributor and unreviewed.
   verified the trim arithmetic and supposed that the model runs past the reference boundary. No
   maintainer answered, and one commenter fixed one voice of six by cutting the reference's last
   phrase. Onset noise and stray syllables are reported too (#119, #200). `MEASURED-HERE`,
-  **G-07 (open, ER-04)**: Vocello's recorded references end abruptly, with a hard stop at 20.4 s or
-  on Stop and no trim or fade, and then get 0.5 s of zeros appended to a non-zero last sample.
-  QwenLM#341 never mentions a reference that ends abruptly, so the link between abrupt endings and
-  echoes is Vocello's own inference, and it is unmeasured (corrected 2026-11-11: this guide used to
-  call the hard stop the documented trigger).
+  **G-07 (open, RF-52)**: Vocello's recorded references can end abruptly, with a hard stop at 20.4 s
+  or on Stop and no trim or fade; since A-12 (below) the codec encodes them as they are, with no
+  appended zeros. QwenLM#341 never mentions a reference that ends abruptly, so the link between
+  abrupt endings and echoes is Vocello's own inference, and it is unmeasured (corrected 2026-11-11:
+  this guide used to call the hard stop the documented trigger). Since 2026-11-12 the gated
+  `QWENVOICE_REFERENCE_EDGES=trimmed` trims a transcript-backed reference's silent edges (100 ms kept
+  around its sound) and fades it in and out over 10 ms before the x-vector and the codec read it;
+  the clone screen's rule `reference-edges-trimmed` decides whether that becomes the default.
 - **Trailing silence (A-12, decided 2026-11-11, RF-52).** The reference is encoded as it is, as
   upstream does (`Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples` is 0; version
   `icl-ref-unpadded-v3`), and the x-vector uses the same audio. Vocello used to append 0.5 s of

@@ -729,6 +729,34 @@
       "removalCriteria": "A-11. Production puts one space before every clone target (a fix for French first words that glued to the reference transcript); upstream joins them with no separator. QWENVOICE_ICL_TARGET_SPACE=spaced-scripts drops it before a target whose first letter is Han or kana. The clone-cjk screen's rule icl-target-space-unspaced-scripts decides the default; remove the key once its verdict is applied."
     },
     {
+      "id": "CLONE-006",
+      "title": "Clone reference taken as given, as upstream; edge trim and fade selectable",
+      "category": "clone-conditioning",
+      "state": "diagnostic",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+      ],
+      "documentation": [
+        "UPSTREAM.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "G-07. Production conditions on the reference as given, as upstream does; QWENVOICE_REFERENCE_EDGES=trimmed trims a transcript-backed reference's silent edges (100 ms kept around its sound) and fades it in and out over 10 ms for both the speaker embedding and the codec encode; audio-only prompts keep the reference as given. The clone screen's rule reference-edges-trimmed decides the default; remove the key once its verdict is applied. An adoption raises the conditioning version and makes the reference-primed codec replay (vocello bench, codecRoundTrip) encode the reference as conditioning does."
+    },
+    {
       "id": "QUANT-001",
       "title": "Code predictor from the installed 8-bit sibling, selectable",
       "category": "quantization",

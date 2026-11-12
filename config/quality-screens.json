@@ -552,6 +552,102 @@
           },
           "expected": "Small. The screen's references are corpus clips with clean, mostly short silent edges, so the trim removes some lead-in and tail silence and the fades act on near-silence; a recorded or imported reference with long silences or a cut ending is where G-07 was filed (a hard stop at 20.4 s or Stop, no trim, no fade). The tie to QwenLM issue 341's echoes is this project's own inference.",
           "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: conditioning then trims and fades a transcript-backed reference by default (audio-only prompts, which the screen does not measure, keep it as given), the conditioning version is raised, so every saved prompt rebuilds once, and the reference-primed codec replay trims as conditioning does. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the reference is taken as given."
+        },
+        "hybrid-attn-vs-speed": {
+          "recorded": "2026-11-12",
+          "question": "Are transcript-backed clones from the hybrid recipe attn (QWENVOICE_MIXED_PRECISION=attn on the 4-bit model: the four attention projections of the talker at 8 bits, +176 MB of weights, the code predictor at 4 bits) no worse than the 4-bit Speed model's (RF-55)?",
+          "arms": "Seed set 3 of the clone screen (run clone-hybrid-seeds3), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality, the 8-bit model) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. A: sp. B: attn.",
+          "requires": "The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT. No arm is run twice: every arm run twice so far reproduced itself take for take.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Against Speed, a small gain in speaker similarity (all 8-bit gave +0.025 in the review's pre-screen) and nothing worse.",
+          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+        },
+        "hybrid-attn-vs-quality": {
+          "recorded": "2026-11-12",
+          "question": "Are transcript-backed clones from the hybrid recipe attn (QWENVOICE_MIXED_PRECISION=attn on the 4-bit model: the four attention projections of the talker at 8 bits, +176 MB of weights, the code predictor at 4 bits) no worse than the 8-bit Quality model's (RF-55)?",
+          "arms": "Seed set 3 of the clone screen (run clone-hybrid-seeds3), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality, the 8-bit model) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. A: qv. B: attn.",
+          "requires": "The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT. No arm is run twice: every arm run twice so far reproduced itself take for take.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Against Quality, a small loss in speaker similarity at most, inside the margin.",
+          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+        },
+        "hybrid-attn-down-vs-speed": {
+          "recorded": "2026-11-12",
+          "question": "Are transcript-backed clones from the hybrid recipe attn-down (QWENVOICE_MIXED_PRECISION=attn-down on the 4-bit model: the four attention projections and the MLP down projection of the talker at 8 bits, +352 MB of weights, the code predictor at 4 bits) no worse than the 4-bit Speed model's (RF-55)?",
+          "arms": "Seed set 3 of the clone screen (run clone-hybrid-seeds3), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality, the 8-bit model) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. A: sp. B: attn-down.",
+          "requires": "The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT. No arm is run twice: every arm run twice so far reproduced itself take for take.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Against Speed, a small gain in speaker similarity (all 8-bit gave +0.025 in the review's pre-screen) and nothing worse.",
+          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+        },
+        "hybrid-attn-down-vs-quality": {
+          "recorded": "2026-11-12",
+          "question": "Are transcript-backed clones from the hybrid recipe attn-down (QWENVOICE_MIXED_PRECISION=attn-down on the 4-bit model: the four attention projections and the MLP down projection of the talker at 8 bits, +352 MB of weights, the code predictor at 4 bits) no worse than the 8-bit Quality model's (RF-55)?",
+          "arms": "Seed set 3 of the clone screen (run clone-hybrid-seeds3), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality, the 8-bit model) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. A: qv. B: attn-down.",
+          "requires": "The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT. No arm is run twice: every arm run twice so far reproduced itself take for take.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Against Quality, a small loss in speaker similarity at most, inside the margin.",
+          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
         }
       },
       "noiseFloor": {
@@ -1415,6 +1511,54 @@
           },
           "expected": "B loses fewer projects. Its predecessor long-form-han-kana-budget was INCONCLUSIVE by narrow misses on 32 projects (B lost 11 against A's 21, where the rule asked at most half; the error rate fell by 0.12 and 0.11, one seed set's interval reaching +0.027), with no language worse and no new failure class. This rule keeps the question and the guard and tests the difference on twice the projects, paired, instead of a fixed ratio.",
           "decision": "ADOPT when the control reproduces the defect, the sign test gives p below 0.05 in B's favour, neither language loses more projects under B than under A, B has no failure class A lacks, and no seed set's report puts the better family's error-rate interval past +0.04: the planner then budgets text written mostly in Han or kana at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B loses more projects than A, or a seed set's error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and the budget stays at 300."
+        },
+        "hybrid-attn-long-form": {
+          "recorded": "2026-11-12",
+          "question": "Do long-form projects from the hybrid recipe attn (QWENVOICE_MIXED_PRECISION=attn on the 4-bit model: the four attention projections of the talker at 8 bits, +176 MB of weights, the code predictor at 4 bits) generate more often than the 4-bit Speed model's, and about as often as the 8-bit Quality model's (RF-55)?",
+          "arms": "Every stratum of the long-form screen (Built-in Voice in English, French, Japanese, Chinese and Korean; Voice Design in English), the Expressive variation only (the maintainer retires the others, RF-58), seed sets 13, 14 and 15, which no arm has used (runs long-form-hybrid-seeds13 to -seeds15: 24 projects each, 72 per arm), at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. B is attn.",
+          "requires": "The control reproduces the defect: sp refuses or fails at least 12 of its 72 projects.",
+          "primaryMetric": "Projects paired by script and seed. Against sp: those B generated and sp did not, against the reverse, by an exact one-sided sign test on the discordant pairs. Against qv: generated projects of 72. Also per stratum, B's failure classes against sp's, and the better family's error rate on projects both arms of a pair generated, each seed set's report read (compare --rule with A sp, and again with A qv).",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "More projects than Speed, most of all in Chinese, Japanese and Korean, and within a few of Quality. Exploratory probes on seed sets 5 and 6 (24 East Asian Expressive projects; they decide nothing) generated 11 on Speed, 22 on Quality, 19 with attn-down, 17 with attn, 14 with mlp and 8 with down.",
+          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model."
+        },
+        "hybrid-attn-down-long-form": {
+          "recorded": "2026-11-12",
+          "question": "Do long-form projects from the hybrid recipe attn-down (QWENVOICE_MIXED_PRECISION=attn-down on the 4-bit model: the four attention projections and the MLP down projection of the talker at 8 bits, +352 MB of weights, the code predictor at 4 bits) generate more often than the 4-bit Speed model's, and about as often as the 8-bit Quality model's (RF-55)?",
+          "arms": "Every stratum of the long-form screen (Built-in Voice in English, French, Japanese, Chinese and Korean; Voice Design in English), the Expressive variation only (the maintainer retires the others, RF-58), seed sets 13, 14 and 15, which no arm has used (runs long-form-hybrid-seeds13 to -seeds15: 24 projects each, 72 per arm), at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm qv (run --variant quality) and one arm per candidate (attn, attn-down), each in its own data directory, all generated before any is scored and with nothing else running, after this rule was recorded. B is attn-down.",
+          "requires": "The control reproduces the defect: sp refuses or fails at least 12 of its 72 projects.",
+          "primaryMetric": "Projects paired by script and seed. Against sp: those B generated and sp did not, against the reverse, by an exact one-sided sign test on the discordant pairs. Against qv: generated projects of 72. Also per stratum, B's failure classes against sp's, and the better family's error rate on projects both arms of a pair generated, each seed set's report read (compare --rule with A sp, and again with A qv).",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "More projects than Speed, most of all in Chinese, Japanese and Korean, and within a few of Quality. Exploratory probes on seed sets 5 and 6 (24 East Asian Expressive projects; they decide nothing) generated 11 on Speed, 22 on Quality, 19 with attn-down, 17 with attn, 14 with mlp and 8 with down.",
+          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model."
+        },
+        "hybrid-single-model": {
+          "recorded": "2026-11-12",
+          "question": "Which hybrid recipe, if any, replaces both the Speed and the Quality models as Vocello's single model (maintainer decisions of 2026-11-12: a custom model may ship, up to 20% more generation time is acceptable, and one model replaces the selector if it is right)?",
+          "arms": "The arms of the candidates' own rules (attn, attn-down): hybrid-<recipe>-vs-speed and -vs-quality on the clone screen, hybrid-<recipe>-long-form on the long-form screen. No take of its own.",
+          "requires": "Cost ceilings, read from the same arms' engine rows (generation ran with nothing else running): the median engine real-time factor of the candidate's clone takes, and of its long-form segments, is at most 1.20 times sp's; its added weights are at most 560 MB.",
+          "primaryMetric": "The three rules' verdicts per candidate, then cost.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "At least one candidate passes. Exploratory single Korean takes put attn at 1.06 times Speed's real-time factor, attn-down at 1.15 and Quality at 1.63, and refused 0, 2 and 0 of 52 takes against Speed's 4.",
+          "decision": "A candidate QUALIFIES when its three rules are ADOPT (or its rule against Speed on clones is ADOPT and its rule against Quality is no worse than INCONCLUSIVE with a mean similarity loss under 0.02) and it is inside both ceilings. With one qualifier, it is the single-model candidate. With several, the one with the fewest added weights, unless a richer one generates at least 4 more long-form projects of 72 or is better on clone similarity with its interval excluding zero. With none, no single model is chosen and the recipes are revised. The chosen candidate then goes to: a built artifact per mode proven PCM-identical to its key's arm, Voice Design and Built-in Voice single takes, the iPhone's memory and speed (a farm run or a phone window), and the maintainer's publication decision. Nothing ships from this rule alone."
         }
       },
       "noiseFloor": {

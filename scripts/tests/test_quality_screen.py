@@ -135,6 +135,15 @@ class PlanTests(unittest.TestCase):
         with self.assertRaises(screen.ScreenError):
             screen.select_scripts(joined, pool, "english", "ref", 3)
 
+    def test_an_arm_may_run_the_same_takes_on_another_variant_and_says_so(self):
+        plan = {"variant": "speed", "planSHA256": "abc", "takes": [{"takeID": "t"}]}
+        self.assertEqual(screen.plan_for_variant(plan, None), (plan, None))
+        self.assertEqual(screen.plan_for_variant(plan, "speed"), (plan, None))
+        other, recorded = screen.plan_for_variant(plan, "quality")
+        self.assertEqual((other["variant"], recorded, other["planSHA256"], other["takes"]),
+                         ("quality", "quality", "abc", plan["takes"]))
+        self.assertEqual(plan["variant"], "speed", "the plan itself is not changed")
+
     def test_only_registered_environment_families_reach_an_arm(self):
         self.assertEqual(screen.parse_overrides(["QWENVOICE_X=on", "MLX_Y=2"]), {"QWENVOICE_X": "on", "MLX_Y": "2"})
         for bad in ("PATH=/tmp", "QWENVOICE_X", "=on"):

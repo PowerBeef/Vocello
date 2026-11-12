@@ -513,6 +513,9 @@ PY="$(python3 scripts/select_python.py)"
   a rule requires the talker untouched: `requiresSameCodeCount` reads each take's
   `qwen_generated_code_count` from the engine's rows (`requiresSameDuration`, a take's length, is no
   test for clones, whose onset trim reads the decoder's first frames).
+- **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
+  8-bit model; the arm records it, and two arms on different variants are never one setting. The
+  hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models.
 - **Edit rates are bounded at 1 per script unit** (since 2026-11-11): a recognizer that runs away on
   a take inserts without limit, and one such take carried a whole screen's mean once.
 - **The long-form kind** (`long-form`, RF-50) runs projects as the apps do (`--long-form always`):

@@ -362,6 +362,15 @@ def parse_overrides(values: list[str]) -> dict[str, str]:
     return overrides
 
 
+def plan_for_variant(plan: dict, variant: str | None) -> tuple[dict, str | None]:
+    """The plan an arm runs: the screen's own, or the same takes on another
+    installed variant of the model (`run --variant`), which the arm records.
+    The plan's digest is unchanged: the takes are the same."""
+    if variant is None or variant == plan["variant"]:
+        return plan, None
+    return dict(plan, variant=variant), variant
+
+
 def git_value(*arguments: str) -> str:
     completed = subprocess.run(["git", *arguments], cwd=ROOT, text=True, capture_output=True, check=False)
     return completed.stdout.strip() if completed.returncode == 0 else ""
@@ -401,6 +410,7 @@ def run_arm(args: argparse.Namespace) -> Path:
     if not vocello.exists():
         raise ScreenError(f"{vocello} is missing; run scripts/build.sh cli-optimized")
     overrides = parse_overrides(args.env or [])
+    plan, variant = plan_for_variant(plan, getattr(args, "variant", None))
     data_dir = arm_dir / "data"
     data_dir.mkdir(parents=True)
     (arm_dir / "wav").mkdir()
@@ -413,6 +423,8 @@ def run_arm(args: argparse.Namespace) -> Path:
     arm = {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "planSHA256": plan["planSHA256"],
            "environment": overrides, "executableSHA256": sha256_file(vocello.resolve()),
            "commit": git_value("rev-parse", "HEAD"), "dirtyPaths": len(git_value("status", "--porcelain").splitlines())}
+    if variant:
+        arm["variant"] = variant
     write_json(arm_dir / "arm.json", arm)
     common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input"]
     if plan.get("kind") == "long-form":
@@ -944,10 +956,13 @@ def compare_arms(args: argparse.Namespace) -> int:
                                                            if group in (take["stratum"], take["variation"])])
                              for group in groups}
     same_arm = (a["arm"]["environment"] == b["arm"]["environment"]
-                and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"])
+                and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"]
+                and a["arm"].get("variant") == b["arm"].get("variant"))
     report = {"schemaVersion": SCHEMA_VERSION, "screen": plan["screen"], "planSHA256": plan["planSHA256"],
-              "a": {"arm": args.a, **{key: a["arm"][key] for key in ("environment", "executableSHA256", "commit")}},
-              "b": {"arm": args.b, **{key: b["arm"][key] for key in ("environment", "executableSHA256", "commit")}},
+              "a": {"arm": args.a, **{key: a["arm"][key] for key in ("environment", "executableSHA256", "commit")},
+                    "variant": a["arm"].get("variant") or plan["variant"]},
+              "b": {"arm": args.b, **{key: b["arm"][key] for key in ("environment", "executableSHA256", "commit")},
+                    "variant": b["arm"].get("variant") or plan["variant"]},
               "summary": summary}
     code = 0
     if args.expect == "identical":
@@ -1025,6 +1040,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--arm", required=True)
     run.add_argument("--env", action="append", help="KEY=VALUE for this arm's processes; repeatable")
     run.add_argument("--vocello", help="a preserved build (default: build/vocello)")
+    run.add_argument("--variant", choices=("speed", "quality"),
+                     help="run the plan's takes on this installed variant instead of the screen's own")
     run.set_defaults(run_command=lambda args: (run_arm(args), 0)[1])
     score = commands.add_parser("score", help="score an arm with the QC v2 runners")
     score.add_argument("--run", required=True)

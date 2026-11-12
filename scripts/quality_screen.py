@@ -295,7 +295,10 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
         stratum = screen["strata"][name]
         language, mode = stratum["language"], stratum["mode"]
         voices = stratum["speakers"] if mode == "custom" else stratum["voiceBriefs"]
-        entries = [entry for entry in pool if entry["language"] == language and entry["split"] == screen["scriptSplit"]]
+        # "all" draws from both halves of the pool: a project needs more
+        # sentences than one half holds.
+        entries = [entry for entry in pool if entry["language"] == language
+                   and screen["scriptSplit"] in ("all", entry["split"])]
         entries.sort(key=lambda entry: rank(f"{screen['name']}|{name}|script|{entry['id']}"))
         if len(entries) < per * count:
             raise ScreenError(f"{name}: the script pool holds fewer than {per * count} {language} scripts")

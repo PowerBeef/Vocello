@@ -745,9 +745,9 @@
       "version": 1,
       "kind": "long-form",
       "variant": "speed",
-      "scriptSplit": "calibration",
-      "sentencesPerProject": 10,
-      "projectsPerStratum": 6,
+      "scriptSplit": "all",
+      "sentencesPerProject": 20,
+      "projectsPerStratum": 4,
       "variations": [
         "expressive",
         "consistent"
@@ -786,8 +786,33 @@
           ]
         }
       },
-      "description": "Long-form projects as the apps run them (--long-form always: planned into segments, each a streaming take, joined): per stratum six scripts of ten pool sentences (about 30 to 45 seconds), each once under the default Expressive variation and once under Consistent, with the same script. Built-in Voice in English, French and Japanese, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
-      "rules": {}
+      "description": "Long-form projects as the apps run them (--long-form always: planned into segments of up to about 900 characters, each a streaming take, joined): per stratum four scripts of twenty pool sentences drawn from both halves of the pool (about 70 to 100 seconds, two segments or more), each once under the default Expressive variation and once under Consistent, with the same script. Built-in Voice in English, French and Japanese, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
+      "rules": {
+        "long-form-full-text": {
+          "recorded": "2026-11-12",
+          "question": "Does full-text conditioning for long-form segments (QWENVOICE_FULL_TEXT_CONDITIONING=on: each segment's whole text laid over the prefix, the reference's non_streaming_mode=True, as single takes already do since RF-21) in place of trailing text harm long-form projects (D1)?",
+          "arms": "A: the build at the commit that records this rule, default (segments keep trailing text). B: the same build with the key set. Seed set 1 of this screen, each arm in its own data directory, generated after this rule was recorded. The floor: A under seed set 1 against A under seed set 2.",
+          "requires": "Two B arms on the same seeds are identical on every take. This screen's noise floor (passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            },
+            "segmentsWarned": {
+              "higherIsBetter": false,
+              "margin": 0.5
+            }
+          },
+          "expected": "Unknown. RF-20's content screen (2026-10-16) found no failure in either layout but its full-text arm was under its own minimum size, and it ran before the subtalker fix of 2026-10-19. Single takes adopted full text on 2026-10-20 (RF-21); segments kept trailing text.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: long-form segments then take full-text conditioning, as single takes do. REJECT when a guard's whole interval lies past its margin, or B loses more projects than allowed. Otherwise INCONCLUSIVE, and segments keep trailing text."
+        }
+      }
     }
   }
 }

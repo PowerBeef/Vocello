@@ -43,19 +43,21 @@ language (prompt creation takes none), so Vocello binds every artifact under the
 The composite runtime-contract signature includes that immutable installed-artifact identity, the
 validated Qwen runtime topology, and the speaker-feature identifier
 (`Qwen3TTSVoiceClonePrompt.speakerFeatureVersion`,
-`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift:207-215`). That identifier joins three versions
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift:285-293`). That identifier joins three versions
 with `+`:
 
 1. the speaker mel frontend, `qwen-speaker-mel-v1`: 24 kHz audio, 1024-point FFT, 256-sample hop,
    384-sample reflect padding, periodic Hann window, magnitude spectrum, 128
    Slaney-scale/Slaney-normalized mel bands, and natural-log scaling;
-2. the ICL reference-encode preprocessing, `icl-ref-unpadded-v3`: the reference is encoded as it is,
-   as upstream does (since 2026-11-11, RF-52; `icl-ref-silence500ms-v2` appended 0.5 s of silence);
+2. the ICL reference-encode preprocessing, `icl-ref-edges-trimmed-v4`: a transcript-backed reference's
+   silent edges are trimmed (100 ms kept around its sound) and it is faded in and out over 10 ms before
+   the speaker embedding and the encode read it, then encoded unpadded (since 2026-11-12, G-07, RF-52;
+   `icl-ref-unpadded-v3` took it as given, `icl-ref-silence500ms-v2` appended 0.5 s of silence);
 3. the MLX build that computed the stored tensors, `mlx-swift-<pin>` (since 2026-10-16, F-06;
    currently `mlx-swift-0.32.3`). It moves with the mlx-swift pin, and
    `scripts/qwen3_core_contract.py` fails when the two differ.
 
-The identifier today reads `qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3`. Changed
+The identifier today reads `qwen-speaker-mel-v1+icl-ref-edges-trimmed-v4+mlx-swift-0.32.3`. Changed
 weights, a runtime or feature-contract change, or an MLX move invalidates both in-memory and
 persisted prompts, so each saved voice rebuilds its prompt once from its reference audio.
 Schema-2 artifacts predate this binding and are rejected by both the compatibility reader and the

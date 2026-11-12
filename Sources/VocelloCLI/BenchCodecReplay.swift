@@ -46,7 +46,12 @@ enum BenchCodecReplay {
         var referencePrimedIncremental: ReplayOutput?
         var referencePrimedProductionNonStreaming: ReplayOutput?
         var referencePrimedArtifactRoot: String?
+        /// How the replay process encoded the reference (its padding and, G-07,
+        /// its edges), not a reading of the source take's receipt, which
+        /// records neither: a take made by another build or under other keys
+        /// may have conditioned on different samples.
         var referenceEncoderInput: String?
+        var referenceEdges: String?
         var status = "started"
         var failureCode: String?
         var elapsedSeconds: Double?
@@ -216,7 +221,11 @@ enum BenchCodecReplay {
             )
             report.productionNonStreaming = ReplayOutput(artifact: full.0, audioQC: full.1)
             if let referenceSamples {
-                let encoded = try await loaded.engine.codecRoundTrip(modelID: model.id, samples: referenceSamples)
+                // The reference as this process's conditioning reads it (G-07), which
+                // is the take's when the same build and keys made it; the report
+                // records which (referenceEncoderInput, referenceEdges).
+                let encoded = try await loaded.engine.codecRoundTrip(
+                    modelID: model.id, samples: CloneReferenceEdges.conditionedReferenceSamples(referenceSamples))
                 let joined = try StartupReliabilityDiagnosticEvidence.referencePrimedReplayInput(
                     referenceFrames: encoded.codes, generatedFrames: trace.frames,
                     generatedRanges: evidence.codecChunkRanges ?? []
@@ -225,6 +234,7 @@ enum BenchCodecReplay {
                 report.referenceCodecSHA256 = digest(try CodecRoundTripEvidence.codesData(encoded.codes))
                 report.referenceFrameCount = encoded.codes.count
                 report.referenceEncoderInput = CloneReferencePadding.encoderInputLabel
+                report.referenceEdges = CloneReferenceEdges.conditioningLabel
                 report.referencePrimedArtifactRoot = "reference-primed"
                 try write(report, to: reportURL)
                 let primed = try await loaded.engine.replayStartupReliabilityCodecTrace(

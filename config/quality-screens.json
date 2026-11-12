@@ -551,7 +551,64 @@
             }
           },
           "expected": "Small. The screen's references are corpus clips with clean, mostly short silent edges, so the trim removes some lead-in and tail silence and the fades act on near-silence; a recorded or imported reference with long silences or a cut ending is where G-07 was filed (a hard stop at 20.4 s or Stop, no trim, no fade). The tie to QwenLM issue 341's echoes is this project's own inference.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: conditioning then trims and fades a transcript-backed reference by default (audio-only prompts, which the screen does not measure, keep it as given), the conditioning version is raised, so every saved prompt rebuilds once, and the reference-primed codec replay trims as conditioning does. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the reference is taken as given."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: conditioning then trims and fades a transcript-backed reference by default (audio-only prompts, which the screen does not measure, keep it as given), the conditioning version is raised, so every saved prompt rebuilds once, and the reference-primed codec replay trims as conditioning does. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the reference is taken as given.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "24a52f99 (executable ac07b1af9b2dbe84)",
+            "arms": {
+              "a": "ta",
+              "b": "tb",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "aReproducesDefault": "ta is identical to qa on every take (191 of 191)",
+            "bDiffers": "no take identical (0 of 190 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              },
+              "b": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 3,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0022,
+              "interval95": [
+                -0.0084,
+                0.014
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": 0.0005,
+              "interval95": [
+                -0.0114,
+                0.0127
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": -0.0041,
+              "interval95": [
+                -0.0186,
+                0.0078
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -15.0,
+              "interval95": [
+                -26.9,
+                -3.3
+              ]
+            },
+            "note": "Not worse beyond any margin; the trailing silence is shorter, its interval wholly below zero, and the similarity and error-rate moves are inside the screen's floor. Adopted: conditioning trims and fades a transcript-backed reference's edges by default, codecEncodeConditioningVersion moves to icl-ref-edges-trimmed-v4, so every saved prompt rebuilds once, and the reference-primed codec replay encodes the reference as conditioning does. Audio-only prompts, which the screen did not measure, keep the reference as given."
+          }
         },
         "hybrid-attn-vs-speed": {
           "recorded": "2026-11-12",

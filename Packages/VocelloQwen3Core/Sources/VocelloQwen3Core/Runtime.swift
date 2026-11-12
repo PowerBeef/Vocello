@@ -310,3 +310,16 @@ final class VocelloQwen3MLXErrorScope: Sendable {
         }
     }
 }
+
+/// G-07 (RF-52): a transcript-backed clone reference's samples as conditioning
+/// reads them (trimmed at its silent edges and faded in production, as given
+/// under the gated `QWENVOICE_REFERENCE_EDGES=as-given`), for evidence that
+/// must encode the reference as a take's conditioning did.
+public enum VocelloQwen3CloneReference {
+    public static func conditionedSamples(_ samples: [Float], internalDiagnosticsAvailable: Bool) -> [Float] {
+        Qwen3CloneReferenceConditioning.conditionedSamples(
+            samples,
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        )
+    }
+}

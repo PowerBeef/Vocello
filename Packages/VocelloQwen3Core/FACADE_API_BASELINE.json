@@ -438,7 +438,9 @@
     "Sources/VocelloQwen3Core/Runtime.swift::public static func clearRuntimeCaches( isolation: isolated (any Actor)? = #isolation ) async",
     "Sources/VocelloQwen3Core/Runtime.swift::public enum VocelloQwen3RuntimeFailure: Error, Equatable, Sendable",
     "Sources/VocelloQwen3Core/Runtime.swift::public var failureCode: VocelloQwen3FailureCode",
-    "Sources/VocelloQwen3Core/Runtime.swift::public init?(mlxError error: any Error)"
+    "Sources/VocelloQwen3Core/Runtime.swift::public init?(mlxError error: any Error)",
+    "Sources/VocelloQwen3Core/Runtime.swift::public enum VocelloQwen3CloneReference",
+    "Sources/VocelloQwen3Core/Runtime.swift::public static func conditionedSamples(_ samples: [Float], internalDiagnosticsAvailable: Bool) -> [Float]"
   ],
   "schemaVersion": 1,
   "sourceFiles": [
@@ -476,7 +478,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "005636885a93632c5576e7d87b4632b3e8d916cb88d8a2248b260aa0624d067c"
+      "sha256": "55527d9486b1b1a5aafe02f6d0fc90544a7d87f4c3b96514a5c87ca601213239"
     }
   ],
   "sourceRoot": "Sources/VocelloQwen3Core"

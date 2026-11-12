@@ -20,7 +20,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_CODE_PREDICTOR_BITS": "8",
         "QWENVOICE_MIXED_PRECISION": "down",
         "QWENVOICE_ICL_TARGET_SPACE": "every-target",
-        "QWENVOICE_REFERENCE_EDGES": "trimmed",
+        "QWENVOICE_REFERENCE_EDGES": "as-given",
     ]
 
     /// A resident tokenizer is reused only by a load that asked for the same
@@ -275,15 +275,16 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: windowed)
                 .decoderSlidingWindow, value)
         }
-        // G-07: the reference's edges trimmed and faded, only for "trimmed".
-        XCTAssertTrue(internalRun.referenceEdgesTrimmed)
-        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.referenceEdgesTrimmed)
-        for (value, expected) in [(" Trimmed ", true), ("on", false), ("trim", false), ("", false)] {
+        // G-07: production trims and fades the reference's edges (adopted
+        // 2026-11-12); only "as-given" takes it as given.
+        XCTAssertFalse(internalRun.referenceEdgesTrimmed)
+        XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.production.referenceEdgesTrimmed)
+        for (value, expected) in [(" As-Given ", false), ("trimmed", true), ("on", true), ("", true)] {
             var edges = everyOverrideRequested
             edges["QWENVOICE_REFERENCE_EDGES"] = value
             XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: edges)
                 .referenceEdgesTrimmed, expected, value)
-            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: edges)
+            XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: edges)
                 .referenceEdgesTrimmed, value)
         }
         // A-11: production joins a Han or kana target with no space (adopted

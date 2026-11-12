@@ -123,14 +123,15 @@ enum CloneConditioningDiagnostics {
     }
 }
 
-/// G-07 (RF-52): whether this process's package trims a transcript-backed clone
-/// reference's silent edges and fades it before conditioning reads it (audio-only
-/// prompts and production take it as given). The package reads the same key at load
+/// G-07 (RF-52): whether this process's package takes a transcript-backed clone
+/// reference as given instead of trimming its silent edges and fading it, as
+/// production has since 2026-11-12 (conditioning version
+/// `icl-ref-edges-trimmed-v4`). The package reads the same key at load
 /// (`Qwen3LoadTimeDiagnosticOverrides.referenceEdgesTrimmed`); the host folds it
 /// into the speaker-feature version, as for the rotary and the padding.
-enum CloneReferenceEdges {
+public enum CloneReferenceEdges {
     static let environmentKey = "QWENVOICE_REFERENCE_EDGES"
-    static let trimmedSuffix = "+icl-ref-edges-trimmed"
+    static let asGivenSuffix = "+icl-ref-edges-as-given"
 
     /// Read as the package reads it: trimmed and lowercased.
     static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
@@ -139,7 +140,26 @@ enum CloneReferenceEdges {
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return requested == "trimmed" ? trimmedSuffix : ""
+        return requested == "as-given" ? asGivenSuffix : ""
+    }
+
+    /// A reference's samples as this process's conditioning reads them, for
+    /// evidence that encodes the reference as a take did (the reference-primed
+    /// codec replay).
+    public static func conditionedReferenceSamples(_ samples: [Float]) -> [Float] {
+        VocelloQwen3CloneReference.conditionedSamples(
+            samples,
+            internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+        )
+    }
+
+    /// How this process's conditioning prepares a reference's edges, for
+    /// evidence that records it.
+    public static var conditioningLabel: String {
+        speakerFeatureSuffix(
+            environment: ProcessInfo.processInfo.environment,
+            internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+        ).isEmpty ? "clone_reference_edges_trimmed_faded" : "clone_reference_edges_as_given"
     }
 }
 

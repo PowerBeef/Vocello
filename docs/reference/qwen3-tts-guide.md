@@ -425,9 +425,10 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 ### 8.1 The clone prompt
 
 - **Both modes** extract the speaker embedding with the speaker encoder (§3.5) from the unpadded
-  reference, a finite `float32 [1, D]` vector cast to the talker's dtype only at the prefix slot.
-- **ICL** also encodes the reference with the tokenizer's encoder, as it is, as upstream does (version
-  `icl-ref-unpadded-v3`, since 2026-11-11). Vocello used to append 0.5 s of silence first (A-12,
+  reference (an ICL prompt's trimmed and faded first, below; an audio-only prompt's as given), a finite `float32 [1, D]` vector cast to the talker's dtype only at the prefix slot.
+- **ICL** also encodes the reference with the tokenizer's encoder, unpadded, as upstream does (since
+  2026-11-11), after trimming its silent edges and fading it (G-07, since 2026-11-12; version
+  `icl-ref-edges-trimmed-v4`). Vocello used to append 0.5 s of silence first (A-12,
   its own step); the clone screen's rule `reference-padding-none` adopted none: speaker similarity
   +0.019 (interval +0.001 to +0.039), trailing silence -22 ms (-35 to -8), the better family's error
   rate +0.012 (+0.002 to +0.026, the size of the screen's own noise floor), gross failures 2 and 4.
@@ -500,7 +501,7 @@ gave it (RF-51, fixed 2026-11-11; the audit's G-08 to G-11):
 A persisted clone prompt is valid only for the identity it was built under (the full key list is in
 [ARCHITECTURE §4.8](../ARCHITECTURE.md#48-voice-cloning-cache)). Its speaker-feature version composes
 the mel frontend version, the ICL reference-encode version and the MLX build
-(`qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:198-215`; F-06), so
+(`qwen-speaker-mel-v1+icl-ref-edges-trimmed-v4+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:285-293`; F-06), so
 an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference.
 
 - **The host's audio preparation is versioned** (G-13, fixed 2026-11-11, RF-51):
@@ -711,7 +712,7 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
 | Truncated last words | #55 (Japanese and Korean), #181 (last two words), QD#161; MA#882 (fixed by removing EOS re-insertion) | D2 adopted 2026-10-20; it changed no Expressive take (§11.2) |
 | Pace drift and long silences in long takes | #239 (rate climbs: text fed at 12.5 tokens/s against ~4–5 spoken), PR #362 (open and unreviewed, from an outside contributor: +16.7% with a 12.9 s reference in streaming, 0.0% non-streaming), #290 | A-01's streaming text layout (§9.4) is the leading mechanism; long-form segments keep it (RF-18) and single takes have the full text since RF-21; Consistent known limitation (§11.2) |
 | ICL loops without EOS | MA#921, reported by one user on one clip and one text: on official PyTorch, 3 degenerate takes of 3 with a transcript covering about 6 s of a 10 s clip, and 5 normal takes of 5 with the full transcript | Fixed 2026-11-11 (G-01, RF-51): recognized text that does not reach both ends of the clip's audible span needs the user's edit, review or audio-only choice before it saves or conditions a take |
-| Clone identity, accent leaks and echoes | #80 (about 20% wrong speaker, from one user in an all-English setup on vLLM-Omni; the cross-language remark in that issue is separate and unquantified). #134 (the source accent is kept across languages; user reports, no maintainer confirmation). #341 (clones whose output begins with the last words of the reference transcript, on the official PyTorch code at full precision; the author verified the trim arithmetic and supposed the model runs past the reference boundary; no maintainer answered; one commenter fixed one voice of six by cutting the reference's last phrase). #119, #200 (onset noise or stray syllable). #219 is withdrawn: it concerned a non-streamed Built-in Voice take, and its author found the WAV clean and the fault in an MP3 encoder's delay | Recorded references can end abruptly, and are encoded as they are since A-12 (G-07). #341 never mentions abrupt endings, so the link between them and echoes is Vocello's own unmeasured inference; the gated `QWENVOICE_REFERENCE_EDGES=trimmed` trims and fades a transcript-backed reference's edges, pending the clone screen's rule `reference-edges-trimmed` (RF-52). Streamed clones decode after the reference's codes since A-04 was adopted (2026-11-12). Cross-language references are not flagged (G-16–21) |
+| Clone identity, accent leaks and echoes | #80 (about 20% wrong speaker, from one user in an all-English setup on vLLM-Omni; the cross-language remark in that issue is separate and unquantified). #134 (the source accent is kept across languages; user reports, no maintainer confirmation). #341 (clones whose output begins with the last words of the reference transcript, on the official PyTorch code at full precision; the author verified the trim arithmetic and supposed the model runs past the reference boundary; no maintainer answered; one commenter fixed one voice of six by cutting the reference's last phrase). #119, #200 (onset noise or stray syllable). #219 is withdrawn: it concerned a non-streamed Built-in Voice take, and its author found the WAV clean and the fault in an MP3 encoder's delay | Recorded references can end abruptly; since 2026-11-12 a transcript-backed reference's silent edges are trimmed and it is faded in and out before conditioning reads it (G-07, adopted by the clone screen's rule `reference-edges-trimmed`: no guard harmed, trailing silence 15 ms shorter, RF-52). #341 never mentions abrupt endings, so the link between them and echoes is Vocello's own unmeasured inference. Streamed clones decode after the reference's codes since A-04 was adopted (2026-11-12). Cross-language references are not flagged (G-16–21) |
 | Numbers across languages | #68, #151, #305, #256, #328, QD#330. All five QwenLM issues were closed by the inactivity bot with no maintainer reply; #256 and #328 are misreadings, not wrong-language readings; #305 is a single report run on vLLM-Omni; none concerns abbreviations | The planner does not pre-normalize numbers |
 | Accents and dialects | #134, #359, QD#230, #248 | Design accents and dialect control are suggestive only (§7.3) |
 | Precision | #333 (NaN under FlashAttention-2), #355 (fp16 logit overflow) | D3: float32 sampling since 2026-10-13 |
@@ -790,6 +791,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
 | A-11 | ICL target text | no separator after the reference text | none before a Han or kana target since 2026-11-12; one leading space otherwise (French first-word drops) | matches for Han and kana; adopted by the `clone-cjk` screen's rule `icl-target-space-unspaced-scripts`; `every-target` restores the space | RF-52 |
 | A-12 | ICL reference padding | none | none since 2026-11-11 (`icl-ref-unpadded-v3`; 0.5 s of silence before) | matches; adopted by the clone screen's rule `reference-padding-none` | RF-52 |
+| G-07 | Clone reference edges | taken as given | a transcript-backed reference trimmed at its silent edges (100 ms kept around its sound) and faded over 10 ms since 2026-11-12 (`icl-ref-edges-trimmed-v4`); audio-only taken as given | **adopted** by the clone screen's rule `reference-edges-trimmed`; `QWENVOICE_REFERENCE_EDGES=as-given` restores it as given | RF-52 |
 | G-14 | ICL layout | streaming by default (PR #362, open and unreviewed, proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
 | — | Repetition penalty scope | talker codebook 0 only | same | matches | — |
 | — | Minimum frames before EOS; special-id suppression | 2; 2048–3071 except EOS | same | matches | — |

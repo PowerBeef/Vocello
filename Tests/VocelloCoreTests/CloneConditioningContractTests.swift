@@ -90,28 +90,33 @@ final class CloneConditioningContractTests: XCTestCase {
         // The default suffix composes every key: the identity a stored prompt
         // is checked against follows each of them.
         typealias Diagnostics = CloneConditioningDiagnostics
-        // G-07: the key that trims the reference's edges does the same.
+        // G-07: the key that takes the reference as given again (production
+        // trims and fades its edges since 2026-11-12) does the same.
         typealias Edges = CloneReferenceEdges
         XCTAssertEqual(Edges.speakerFeatureSuffix(
-            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: " Trimmed "], internalDiagnosticsAvailable: true),
-            Edges.trimmedSuffix)
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: " As-Given "], internalDiagnosticsAvailable: true),
+            Edges.asGivenSuffix)
         XCTAssertEqual(Edges.speakerFeatureSuffix(
-            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "trimmed"], internalDiagnosticsAvailable: false), "")
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "as-given"], internalDiagnosticsAvailable: false), "")
         XCTAssertEqual(Edges.speakerFeatureSuffix(
-            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "on"], internalDiagnosticsAvailable: true), "")
+            environment: ["QWENVOICE_DEBUG": "1", Edges.environmentKey: "trimmed"], internalDiagnosticsAvailable: true), "",
+            "trimmed is the default now")
         XCTAssertEqual(Edges.speakerFeatureSuffix(
-            environment: [Edges.environmentKey: "trimmed"], internalDiagnosticsAvailable: true), "",
+            environment: [Edges.environmentKey: "as-given"], internalDiagnosticsAvailable: true), "",
             "the key needs QWENVOICE_DEBUG")
-        let edgesTrimmed = NativePreparedCloneConditioningCache.clonePromptIdentity(
+        XCTAssertEqual(Edges.conditioningLabel, "clone_reference_edges_trimmed_faded", "this test run honours no key")
+        let edgesAsGiven = NativePreparedCloneConditioningCache.clonePromptIdentity(
             referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "runtime",
-            diagnosticSuffix: Edges.trimmedSuffix)
-        XCTAssertNotEqual(edgesTrimmed.runtimeContractSignature, identity.runtimeContractSignature,
-                          "a prompt built from a trimmed reference is never adopted as one built from it as given")
-        XCTAssertNotEqual(edgesTrimmed.runtimeContractSignature, padded.runtimeContractSignature)
+            diagnosticSuffix: Edges.asGivenSuffix)
+        XCTAssertNotEqual(edgesAsGiven.runtimeContractSignature, identity.runtimeContractSignature,
+                          "a prompt built from the reference as given is never adopted as one built from it trimmed")
+        XCTAssertNotEqual(edgesAsGiven.runtimeContractSignature, padded.runtimeContractSignature)
+        XCTAssertTrue(VocelloQwen3CloneArtifactSchema.speakerFeatureVersion.contains("+icl-ref-edges-trimmed-v4+"),
+                      "the adoption moved the conditioning version, so every saved prompt rebuilds once")
         let armed = ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half", Padding.environmentKey: "half-second",
-                     Edges.environmentKey: "trimmed"]
+                     Edges.environmentKey: "as-given"]
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: true),
-                       Rotary.splitHalfSuffix + Padding.halfSecondSuffix + Edges.trimmedSuffix)
+                       Rotary.splitHalfSuffix + Padding.halfSecondSuffix + Edges.asGivenSuffix)
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: false), "")
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix, "", "this test run honours no key")
         XCTAssertEqual(CloneReferencePadding.encoderInputLabel, "clone_reference_encoder_input_unpadded")

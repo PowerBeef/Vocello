@@ -1012,9 +1012,11 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertTrue(defaults.iclTargetSpaceOnlyBeforeSpacedScripts, "the model's default is production's")
     }
 
-    /// G-07 (RF-52): without the key a transcript-backed reference reaches
-    /// conditioning as given (the same shape, dtype and bits); under it,
-    /// trimmed and faded exactly as `edgesTrimmedAndFaded` makes it.
+    /// G-07 (RF-52): with the trim off (`QWENVOICE_REFERENCE_EDGES=as-given`) a
+    /// transcript-backed reference reaches conditioning as given (the same
+    /// shape, dtype and bits); with it on, production since 2026-11-12, trimmed
+    /// and faded exactly as `edgesTrimmedAndFaded` makes it. A model built with
+    /// the defaults trims, as production does.
     func testTheReferenceEdgesKeyReachesConditioning() throws {
         let tiny = try Self.tinyModelConfig()
         let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
@@ -1030,13 +1032,66 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let silence = [Float](repeating: 0, count: rate / 2)
         let sound = (0 ..< rate / 2).map { Float(0.3 * sin(Double($0) * 0.05 + 1)) }
         let reference = MLXArray(silence + sound + silence).reshaped(1, -1).asType(.float16)
-        let asGiven = try model(key: false).conditioningReference(reference)
+        func bits(_ array: MLXArray) -> [UInt16] { array.asArray(Float16.self).map(\.bitPattern) }
+        let asGiven = try model(key: false).conditioningReference(reference, transcriptBacked: true)
         XCTAssertEqual(asGiven.shape, reference.shape)
         XCTAssertEqual(asGiven.dtype, .float16)
-        XCTAssertEqual(asGiven.asArray(Float16.self).map(\.bitPattern), reference.asArray(Float16.self).map(\.bitPattern))
-        let trimmed = try model(key: true).conditioningReference(reference).asArray(Float.self)
+        XCTAssertEqual(bits(asGiven), bits(reference))
+        let trimmed = try model(key: true).conditioningReference(reference, transcriptBacked: true).asArray(Float.self)
         XCTAssertEqual(trimmed, Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(reference.asType(.float32).asArray(Float.self)))
         XCTAssertEqual(trimmed.count, sound.count + 2 * (rate / 10))
+        // An audio-only (x-vector) reference is taken as given whichever way
+        // the key is set.
+        for key in [false, true] {
+            let audioOnly = try model(key: key).conditioningReference(reference, transcriptBacked: false)
+            XCTAssertEqual(audioOnly.shape, reference.shape, "key \(key)")
+            XCTAssertEqual(bits(audioOnly), bits(reference), "key \(key)")
+        }
+        let defaults = Qwen3TTSModel(
+            config: tiny,
+            talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+            speakerEncoder: nil
+        )
+        XCTAssertTrue(defaults.referenceEdgesTrimmed, "the model's default is production's")
+    }
+
+    /// G-07 at the prompt builder every saved clone voice goes through
+    /// (`createVoiceClonePrompt`): a transcript-backed prompt's codes are the
+    /// speech tokenizer's encoding of the reference trimmed and faded when the
+    /// setting is on (production), and of the reference as given when it is off.
+    func testATranscriptBackedPromptEncodesTheConditionedReference() throws {
+        var tiny = try Self.tinyModelConfig()
+        tiny.ttsModelType = "base"
+        let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
+        let tokenizer = Qwen3TTSSpeechTokenizer(
+            config: try JSONDecoder().decode(Qwen3TTSTokenizerConfig.self, from: Data(#"{"encoder_config": {}}"#.utf8)),
+            includeEncoder: true
+        )
+        let rate = Qwen3TTSReferenceAudio.sampleRate
+        let silence = [Float](repeating: 0, count: rate / 2)
+        let sound = (0 ..< rate / 2).map { Float(0.3 * sin(Double($0) * 0.05 + 1)) }
+        let samples = silence + sound + silence
+        var frames: [Bool: Int] = [:]
+        for trim in [false, true] {
+            let model = Qwen3TTSModel(
+                config: tiny,
+                talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+                speakerEncoder: nil,
+                referenceEdgesTrimmed: trim
+            )
+            model.speechTokenizer = tokenizer
+            let prompt = try model.createVoiceClonePrompt(
+                refAudio: MLXArray(samples).reshaped(1, -1), refText: "A reference.", xVectorOnlyMode: false)
+            let codes = try XCTUnwrap(prompt.refCodes)
+            let conditioned = trim ? Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(samples) : samples
+            let expected = try tokenizer.encode(Qwen3TTSReferenceAudio.encoderInput(
+                MLXArray(conditioned).reshaped(1, -1), trailingSilenceSamples: model.referenceTrailingSilenceSamples))
+            XCTAssertEqual(codes.shape, expected.shape, "trim \(trim)")
+            XCTAssertTrue(arrayEqual(codes, expected).item(Bool.self), "trim \(trim)")
+            frames[trim] = codes.dim(-1)
+        }
+        XCTAssertLessThan(try XCTUnwrap(frames[true]), try XCTUnwrap(frames[false]),
+                          "the trimmed reference is shorter, so it encodes to fewer frames")
     }
 
     /// E4-02: a model whose config has no `talker_config` fails its first take

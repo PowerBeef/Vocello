@@ -730,7 +730,7 @@
     },
     {
       "id": "CLONE-006",
-      "title": "Clone reference taken as given, as upstream; edge trim and fade selectable",
+      "title": "Transcript-backed clone reference trimmed and faded at its edges; as given restorable",
       "category": "clone-conditioning",
       "state": "diagnostic",
       "files": [
@@ -740,7 +740,8 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
         "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift",
         "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
-        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
+        "Sources/VocelloQwen3Core/Runtime.swift"
       ],
       "tests": [
         "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift",
@@ -754,7 +755,7 @@
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
-      "removalCriteria": "G-07. Production conditions on the reference as given, as upstream does; QWENVOICE_REFERENCE_EDGES=trimmed trims a transcript-backed reference's silent edges (100 ms kept around its sound) and fades it in and out over 10 ms for both the speaker embedding and the codec encode; audio-only prompts keep the reference as given. The clone screen's rule reference-edges-trimmed decides the default; remove the key once its verdict is applied. An adoption raises the conditioning version and makes the reference-primed codec replay (vocello bench, codecRoundTrip) encode the reference as conditioning does."
+      "removalCriteria": "G-07. Since 2026-11-12 a transcript-backed reference's silent edges are trimmed (100 ms kept around its sound) and it is faded in and out over 10 ms before the speaker embedding and the codec encode read it (the clone screen's rule reference-edges-trimmed adopted it; codecEncodeConditioningVersion icl-ref-edges-trimmed-v4, so every saved prompt rebuilt once); audio-only prompts take it as given, as upstream does, and the reference-primed codec replay encodes the conditioned samples. QWENVOICE_REFERENCE_EDGES=as-given restores the reference as given; remove that key once no screen needs it."
     },
     {
       "id": "QUANT-001",

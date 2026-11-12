@@ -58,8 +58,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// The host folds the same key into the clone prompt's speaker-feature
     /// version, so a prompt encoded one way is never adopted the other way.
     let encoderSplitHalfRotary: Bool
-    /// RF-52, A-12: the clone reference is encoded as it is, as upstream does
-    /// (production since 2026-11-11); `QWENVOICE_REFERENCE_PADDING=half-second`
+    /// RF-52, A-12: the clone reference is encoded with no padding, as
+    /// upstream does (production since 2026-11-11); `QWENVOICE_REFERENCE_PADDING=half-second`
     /// restores the half second of zeros Vocello appended before. The host
     /// folds the same key into the clone prompt's speaker-feature version.
     let referenceTrailingSilenceSamples: Int
@@ -90,11 +90,13 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// the gated `QWENVOICE_ICL_TARGET_SPACE=every-target` puts one space before
     /// every target again.
     let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
-    /// RF-52, G-07 (`QWENVOICE_REFERENCE_EDGES=trimmed`): a transcript-backed
-    /// clone reference's silent edges are trimmed and it is faded in and out
-    /// before the speaker embedding and the codec encode read it
-    /// (`Qwen3TTSReferenceAudio.edgesTrimmedAndFaded`). Audio-only prompts and
-    /// production take the reference as given, as upstream does. The host folds the same key into
+    /// RF-52, G-07: a transcript-backed clone reference's silent edges are
+    /// trimmed and it is faded in and out before the speaker embedding and the
+    /// codec encode read it (`Qwen3TTSReferenceAudio.edgesTrimmedAndFaded`). On
+    /// in production since 2026-11-12 (the clone screen's rule
+    /// reference-edges-trimmed); the gated `QWENVOICE_REFERENCE_EDGES=as-given`
+    /// takes the reference as given, as upstream does. Audio-only prompts always
+    /// take it as given. The host folds the same key into
     /// the clone prompt's speaker-feature version.
     let referenceEdgesTrimmed: Bool
 
@@ -108,7 +110,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         codePredictorBits: Int? = nil,
         mixedPrecisionRecipe: Qwen3MixedPrecisionRecipe? = nil,
         iclTargetSpaceOnlyBeforeSpacedScripts: Bool = true,
-        referenceEdgesTrimmed: Bool = false
+        referenceEdgesTrimmed: Bool = true
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
@@ -132,7 +134,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         codePredictorBits: nil,
         mixedPrecisionRecipe: nil,
         iclTargetSpaceOnlyBeforeSpacedScripts: true,
-        referenceEdgesTrimmed: false
+        referenceEdgesTrimmed: true
     )
 
     static func resolve(
@@ -173,7 +175,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil,
             mixedPrecisionRecipe: gatedValue("QWENVOICE_MIXED_PRECISION").flatMap(Qwen3MixedPrecisionRecipe.init(rawValue:)),
             iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") != "every-target",
-            referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") == "trimmed"
+            referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") != "as-given"
         )
     }
 }

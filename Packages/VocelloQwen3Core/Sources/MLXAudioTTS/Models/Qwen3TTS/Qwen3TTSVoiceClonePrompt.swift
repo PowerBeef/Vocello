@@ -1,5 +1,5 @@
 // Reference audio and the voice-clone prompt artifact of the Qwen3-TTS runtime.
-// Moved out of Qwen3TTS.swift unchanged (RF-46).
+// Moved out of Qwen3TTS.swift (RF-46); the conditioned clone reference (G-07, RF-52) since.
 
 import CryptoKit
 import Foundation
@@ -11,6 +11,26 @@ import MLXAudioCore
 import MLXNN
 import os
 import Tokenizers
+
+/// The samples a transcript-backed clone conditions on, for a caller outside
+/// the model that must encode a reference exactly as conditioning does (the
+/// reference-primed codec replay): trimmed at its silent edges and faded in
+/// production (G-07), as given under the gated
+/// `QWENVOICE_REFERENCE_EDGES=as-given`. The setting is resolved as a model
+/// load resolves it.
+public enum Qwen3CloneReferenceConditioning {
+    public static func conditionedSamples(
+        _ samples: [Float],
+        internalDiagnosticsAvailable: Bool,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [Float] {
+        let overrides = Qwen3LoadTimeDiagnosticOverrides.resolve(
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable,
+            environment: environment
+        )
+        return overrides.referenceEdgesTrimmed ? Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(samples) : samples
+    }
+}
 
 enum Qwen3TTSReferenceAudio {
     /// Reference audio uses the codec's fixed 24 kHz contract.
@@ -31,9 +51,12 @@ enum Qwen3TTSReferenceAudio {
     /// Version token for ICL reference-encode preprocessing. It participates
     /// in the persisted clone-artifact conditioning version, so any change to
     /// how the reference is prepared for `speechTokenizer.encode` must change
-    /// this string to force fail-closed artifact and cache rebuilds. v3: the
-    /// reference is encoded unpadded (v2 appended half a second of zeros).
-    static let codecEncodeConditioningVersion = "icl-ref-unpadded-v3"
+    /// this string to force fail-closed artifact and cache rebuilds. v4: a
+    /// transcript-backed reference's silent edges are trimmed and it is faded
+    /// in and out before the speaker embedding and the encode read it (G-07),
+    /// and it is still encoded unpadded; v3 took it as given, v2 appended half a
+    /// second of zeros.
+    static let codecEncodeConditioningVersion = "icl-ref-edges-trimmed-v4"
 
     /// Accepts only the three mono layouts used by the Qwen clone contract and
     /// returns one canonical `[1, T]` batch. Never selects or truncates a batch
@@ -55,7 +78,8 @@ enum Qwen3TTSReferenceAudio {
         return canonical
     }
 
-    /// G-07 (RF-52): a reference without its silent edges, faded in and out.
+    /// G-07 (RF-52, production since 2026-11-12): a reference without its
+    /// silent edges, faded in and out.
     /// Every 10 ms window whose RMS reaches 50 dB below the loudest window's
     /// (and at least -70 dBFS) counts as sound; the reference keeps everything
     /// from 100 ms before the first such window to 100 ms after the last, so

@@ -191,6 +191,26 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         XCTAssertEqual(viaArray, Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(silence + tone))
     }
 
+    /// G-07: evidence that encodes a clone reference outside the model gets
+    /// the samples conditioning reads: trimmed and faded in production and
+    /// in a build without diagnostics, as given only under the gated
+    /// `as-given`.
+    func testTheConditionedReferenceSamplesFollowTheLoadSetting() {
+        let rate = Qwen3TTSReferenceAudio.sampleRate
+        let samples = [Float](repeating: 0, count: rate / 2)
+            + (0 ..< rate / 2).map { Float(0.3 * sin(Double($0) * 0.05 + 1)) }
+            + [Float](repeating: 0, count: rate / 2)
+        let trimmed = Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(samples)
+        XCTAssertLessThan(trimmed.count, samples.count)
+        let asGiven = ["QWENVOICE_DEBUG": "1", "QWENVOICE_REFERENCE_EDGES": "as-given"]
+        XCTAssertEqual(Qwen3CloneReferenceConditioning.conditionedSamples(
+            samples, internalDiagnosticsAvailable: true, environment: [:]), trimmed)
+        XCTAssertEqual(Qwen3CloneReferenceConditioning.conditionedSamples(
+            samples, internalDiagnosticsAvailable: true, environment: asGiven), samples)
+        XCTAssertEqual(Qwen3CloneReferenceConditioning.conditionedSamples(
+            samples, internalDiagnosticsAvailable: false, environment: asGiven), trimmed)
+    }
+
     func testCodecEncoderInputRejectsNonCanonicalLayouts() {
         XCTAssertThrowsError(
             try Qwen3TTSReferenceAudio.encoderInput(MLXArray.zeros([2, 64]), trailingSilenceSamples: 0)
@@ -203,7 +223,7 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         // prompt caches rebuild.
         XCTAssertEqual(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion,
-            "qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3"
+            "qwen-speaker-mel-v1+icl-ref-edges-trimmed-v4+mlx-swift-0.32.3"
         )
         XCTAssertTrue(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion

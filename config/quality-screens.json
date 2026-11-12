@@ -607,7 +607,8 @@
                 -3.3
               ]
             },
-            "note": "Not worse beyond any margin; the trailing silence is shorter, its interval wholly below zero, and the similarity and error-rate moves are inside the screen's floor. Adopted: conditioning trims and fades a transcript-backed reference's edges by default, codecEncodeConditioningVersion moves to icl-ref-edges-trimmed-v4, so every saved prompt rebuilds once, and the reference-primed codec replay encodes the reference as conditioning does. Audio-only prompts, which the screen did not measure, keep the reference as given."
+            "note": "Not worse beyond any margin; the trailing silence is shorter, its interval wholly below zero, and the similarity and error-rate moves are inside the screen's floor. Adopted: conditioning trims and fades a transcript-backed reference's edges by default, codecEncodeConditioningVersion moves to icl-ref-edges-trimmed-v4, so every saved prompt rebuilds once, and the reference-primed codec replay encodes the reference as conditioning does. Audio-only prompts, which the screen did not measure, keep the reference as given.",
+            "defaultReproduces": "td at 9db958fd, the adopting commit, is PCM-identical to tb on every take (191 of 191: same duration and code count); td ran with QWENVOICE_ICL_TARGET_SPACE=every-target because tb predates A-11's adoption"
           }
         },
         "hybrid-attn-vs-speed": {

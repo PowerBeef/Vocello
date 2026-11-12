@@ -238,6 +238,8 @@ def joined_script(entries: list[dict], language: str) -> dict:
 
 
 def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) -> dict:
+    if screen.get("kind") == "long-form":
+        return build_long_form_plan(screen, seed_set, languages)
     if screen.get("kind") != "clone":
         raise ScreenError(f"screen kind '{screen.get('kind')}' is not implemented")
     pool = read_json(SCRIPT_POOL)["entries"]
@@ -275,6 +277,64 @@ def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) 
             "mode": screen["mode"], "variant": screen["variant"], "seedSet": seed_set, "voices": voices, "takes": takes}
     plan["planSHA256"] = sha256_text(json.dumps(plan, sort_keys=True, ensure_ascii=False))
     return plan
+
+
+def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None = None) -> dict:
+    """Long-form projects (RF-50): per stratum, `projectsPerStratum` scripts of
+    `sentencesPerProject` pool sentences, each run once per variation with the
+    same script, so a project's variations pair within it. A project, not a
+    take, is the unit the interval resamples (its `voice`)."""
+    pool = read_json(SCRIPT_POOL)["entries"]
+    selected = strata or list(screen["strata"])
+    unknown = [name for name in selected if name not in screen["strata"]]
+    if unknown:
+        raise ScreenError(f"not in the screen: {', '.join(unknown)}")
+    per, count = screen["sentencesPerProject"], screen["projectsPerStratum"]
+    takes = []
+    for name in selected:
+        stratum = screen["strata"][name]
+        language, mode = stratum["language"], stratum["mode"]
+        voices = stratum["speakers"] if mode == "custom" else stratum["voiceBriefs"]
+        entries = [entry for entry in pool if entry["language"] == language and entry["split"] == screen["scriptSplit"]]
+        entries.sort(key=lambda entry: rank(f"{screen['name']}|{name}|script|{entry['id']}"))
+        if len(entries) < per * count:
+            raise ScreenError(f"{name}: the script pool holds fewer than {per * count} {language} scripts")
+        for index in range(count):
+            script = joined_script(entries[index * per:(index + 1) * per], language)
+            project = f"{name}-{index + 1:02d}"
+            voice = voices[index % len(voices)]
+            for variation in screen["variations"]:
+                take_id = f"{project}--{variation}"
+                take = {"takeID": take_id, "voice": project, "stratum": name, "mode": mode, "language": language,
+                        "variation": variation, "scriptID": script["id"], "text": script["text"],
+                        "seed": take_seed(screen, seed_set, take_id)}
+                take["speaker" if mode == "custom" else "voiceBrief"] = voice
+                takes.append(take)
+    plan = {"schemaVersion": SCHEMA_VERSION, "screen": screen["name"], "screenVersion": screen["version"],
+            "kind": "long-form", "variant": screen["variant"], "seedSet": seed_set, "voices": [], "takes": takes}
+    plan["planSHA256"] = sha256_text(json.dumps(plan, sort_keys=True, ensure_ascii=False))
+    return plan
+
+
+def long_form_command(vocello: Path, plan: dict, take: dict, wav: Path, common: list[str]) -> list[str]:
+    voice = ["--speaker", take["speaker"]] if take["mode"] == "custom" else ["--voice-brief", take["voiceBrief"]]
+    return [str(vocello), "generate", "--mode", take["mode"], "--variant", plan["variant"], *voice,
+            "--text", take["text"], "--language", take["language"], "--seed", str(take["seed"]),
+            "--variation", take["variation"], "--long-form", "always", "--out", str(wav), *common]
+
+
+def segment_summary(result: dict) -> dict:
+    """What a project's segments say: how many, how each ended, and how many
+    passed with Fast QC warnings (a refused segment fails the project)."""
+    segments = result.get("longFormSegments") or []
+    reasons: dict[str, int] = {}
+    for segment in segments:
+        reason = segment.get("finishReason") or "unknown"
+        reasons[reason] = reasons.get(reason, 0) + 1
+    return {"count": len(segments), "finishReasons": dict(sorted(reasons.items())),
+            "warned": sum(bool(segment.get("qcWarnings")) for segment in segments),
+            "warnings": sorted({warning for segment in segments for warning in segment.get("qcWarnings") or []}),
+            "longestSeconds": max((segment.get("durationSeconds") or 0 for segment in segments), default=0)}
 
 
 # ---------------------------------------------------------------- run
@@ -343,6 +403,8 @@ def run_arm(args: argparse.Namespace) -> Path:
            "commit": git_value("rev-parse", "HEAD"), "dirtyPaths": len(git_value("status", "--porcelain").splitlines())}
     write_json(arm_dir / "arm.json", arm)
     common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input"]
+    if plan.get("kind") == "long-form":
+        return run_long_form_arm(args, plan, arm, arm_dir, vocello, environment, common)
 
     # A reference that is not the file the plan was made from would fail or
     # change its voice's takes, and the arm would carry the blame.
@@ -401,6 +463,48 @@ def run_arm(args: argparse.Namespace) -> Path:
     return arm_dir
 
 
+def run_long_form_arm(args: argparse.Namespace, plan: dict, arm: dict, arm_dir: Path, vocello: Path,
+                      environment: dict[str, str], common: list[str]) -> Path:
+    rows = []
+    for index, take in enumerate(plan["takes"], start=1):
+        wav = arm_dir / "wav" / f"{take['takeID']}.wav"
+        code, document = invoke(long_form_command(vocello, plan, take, wav, common), environment)
+        outcome, reason = outcome_of(code, document)
+        row = {"takeID": take["takeID"], "seed": take["seed"], "outcome": outcome, "reason": reason}
+        if outcome == "generated":
+            if not wav.is_file():
+                row.update(outcome="failed", reason="no output file")
+            else:
+                result = document["result"]
+                row.update(wav=str(wav.relative_to(arm_dir)), pcmSHA256=pcm_digest(wav),
+                           generationID=result.get("generationID"), durationSeconds=result.get("durationSeconds"),
+                           finishReason=result.get("finishReason"), wallSeconds=result.get("wallSeconds"),
+                           segments=segment_summary(result))
+        rows.append(row)
+        if index % 10 == 0 or index == len(plan["takes"]):
+            write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
+    counts = {kind: sum(row["outcome"] == kind for row in rows) for kind in ("generated", "refused", "failed")}
+    # A long-form project's engine rows are its segments; any of them names
+    # the keys the engine read.
+    active: set[str] = set()
+    telemetry = arm_dir / "data/diagnostics/engine/generations.jsonl"
+    if telemetry.is_file():
+        for line in telemetry.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            provenance = ((record.get("summary") or {}).get("runEnvironment") or {}).get("runtimeDebugProvenance") or {}
+            active.update(provenance.get("activeOverrideKeys") or [])
+    unread = unread_overrides(arm["environment"], sorted(active))
+    write_json(arm_dir / "arm.json", dict(arm, complete=not unread, outcomes=counts, activeOverrideKeys=sorted(active),
+                                          overridesNotRead=unread))
+    print(json.dumps({"arm": args.arm, "outcomes": counts, "activeOverrideKeys": sorted(active)}))
+    if unread:
+        raise ScreenError(f"the engine never read {', '.join(unread)}: this arm ran as the control and is not usable")
+    return arm_dir
+
+
 def refresh_evidence(args: argparse.Namespace) -> int:
     """Reads an arm's evidence again from the telemetry it kept. The takes are
     not touched: this only repeats what `run` does after its last take."""
@@ -439,7 +543,25 @@ def arm_evidence(telemetry: Path, rows: list[dict]) -> dict:
             provenance = ((record.get("summary") or {}).get("runEnvironment") or {}).get("runtimeDebugProvenance") or {}
             active.update(provenance.get("activeOverrideKeys") or [])
             row["referenceAudioDigest"] = (record.get("requestReceipt") or {}).get("normalizedReferenceAudioDigest")
+            codes = generated_code_count(record)
+            if codes is not None:
+                row["generatedCodeCount"] = codes
     return {"activeOverrideKeys": sorted(active)}
+
+
+def generated_code_count(record: dict) -> int | None:
+    """The talker's codec frames for a take, from the engine row's own timing
+    map (`qwen_generated_code_count`), wherever the row nests it."""
+    stack = [record]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            if isinstance(value.get("qwen_generated_code_count"), int):
+                return value["qwen_generated_code_count"]
+            stack.extend(value.values())
+        elif isinstance(value, list):
+            stack.extend(value)
+    return None
 
 
 def unread_overrides(overrides: dict[str, str], active: list[str]) -> list[str]:
@@ -505,14 +627,17 @@ def score_arm(args: argparse.Namespace) -> Path:
         if row["outcome"] != "generated":
             continue
         take, audio = planned[take_id], arm_dir / row["wav"]
-        voice = voices[take["voice"]]
-        manifest_takes.append({
+        voice = voices.get(take["voice"])
+        entry = {
             "takeID": take_id, "token": store.take_token(f"{plan['planSHA256'][:12]}-{args.arm}", take_id),
             "audio": str(audio), "audioSHA256": store.audio_sha256(audio), "language": take["language"],
-            "text": take["text"], "mode": plan["mode"], "voice": take["voice"], "cell": plan["screen"],
-            "reference": voice["audio"], "referenceSHA256": store.audio_sha256(Path(voice["audio"])),
-            "referenceText": voice["transcript"], "finishReason": row.get("finishReason"), "seed": row["seed"],
-            "family": take["scriptID"]})
+            "text": take["text"], "mode": take.get("mode") or plan["mode"], "voice": take["voice"],
+            "cell": plan["screen"], "finishReason": row.get("finishReason"), "seed": row["seed"],
+            "family": take["scriptID"]}
+        if voice:
+            entry.update(reference=voice["audio"], referenceSHA256=store.audio_sha256(Path(voice["audio"])),
+                         referenceText=voice["transcript"])
+        manifest_takes.append(entry)
     manifest_path = arm_dir / "qc-takes.json"
     write_json(manifest_path, {"schema": store.TAKES_SCHEMA, "source": f"quality-screen-{args.arm}", "takes": manifest_takes})
     if not args.cache_only:
@@ -525,7 +650,8 @@ def score_arm(args: argparse.Namespace) -> Path:
             raise ScreenError(f"QC scoring failed (exit {completed.returncode}); nothing was scored for this arm")
 
     def result(model: str, take: dict, variant: bool) -> dict:
-        key = store.variant_key(take["text"], take["language"], take["referenceSHA256"]) if variant else None
+        key = (store.variant_key(take["text"], take["language"], take["referenceSHA256"])
+               if variant and take.get("referenceSHA256") else None)
         path = QC_RESULTS / model / f"{store.result_stem(take['audioSHA256'], key)}.json"
         if not path.is_file():
             raise ScreenError(f"{take['takeID']}: no {model} result; a take is never scored in part")
@@ -542,9 +668,13 @@ def score_arm(args: argparse.Namespace) -> Path:
         rates = {model: error_rate(take["text"], (value.get("outputs") or {}).get("text") or "", take["language"])
                  for model, value in asr.items()}
         score = {"speakerSimilarity": None, "errorRate": rates}
-        if "outputs" in speaker:
+        if "outputs" in speaker and speaker["outputs"].get("reference"):
             score["speakerSimilarity"] = cosine(speaker["outputs"]["whole"], speaker["outputs"]["reference"])
             score.update(window_similarities(speaker["outputs"]))
+        elif "outputs" in speaker:
+            spread = window_spread(speaker["outputs"])
+            if spread is not None:
+                score["speakerWindowSpread"] = spread
         else:
             # Too short for a speaker embedding: a take that cannot hold its
             # script, counted as a gross failure rather than dropped.
@@ -570,6 +700,18 @@ def window_similarities(outputs: dict) -> dict[str, float]:
     return values
 
 
+def window_spread(outputs: dict) -> float | None:
+    """How far the take's speaker windows drift from the take as a whole: the
+    range of their cosine distances to its whole embedding. Higher is less
+    consistent; None for a take of one window."""
+    whole = outputs.get("whole")
+    windows = [window for window in outputs.get("windows") or [] if window.get("embedding")]
+    if not whole or len(windows) < 2:
+        return None
+    distances = [1.0 - cosine(window["embedding"], whole) for window in windows]
+    return max(distances) - min(distances)
+
+
 def is_measured_outcome(result: dict) -> bool:
     """A runner's refusal that says something about the take itself: audio
     too short to embed. Any other runner error is a scoring failure."""
@@ -581,9 +723,12 @@ def is_measured_outcome(result: dict) -> bool:
 # Higher is worse for every metric here except the speaker similarities.
 SIMILARITY_METRICS = ("speakerSimilarity", "speakerSimilarityLate", "speakerSimilarityWorstWindow")
 METRICS = (*SIMILARITY_METRICS, "errorRateBetterFamily", "errorRate:" + ASR_MODELS[0],
-           "errorRate:" + ASR_MODELS[1], "trailingSilenceMS", "durationSeconds")
+           "errorRate:" + ASR_MODELS[1], "trailingSilenceMS", "durationSeconds",
+           "speakerWindowSpread", "segmentsWarned")
 # A take whose better ASR family misses half of the script says something else.
 GROSS_ERROR_RATE = 0.5
+# Every edit rate is read bounded at one edit per script unit.
+MAXIMUM_EDIT_RATE = 1.0
 
 
 def take_metrics(row: dict, score: dict | None) -> dict[str, float]:
@@ -593,11 +738,15 @@ def take_metrics(row: dict, score: dict | None) -> dict[str, float]:
     silence = (row.get("fastQC") or {}).get("trailingSilenceMS")
     if silence is not None:
         values["trailingSilenceMS"] = silence
+    if row.get("segments"):
+        values["segmentsWarned"] = row["segments"]["warned"]
     if score:
-        for metric in SIMILARITY_METRICS:
+        for metric in (*SIMILARITY_METRICS, "speakerWindowSpread"):
             if score.get(metric) is not None:
                 values[metric] = score[metric]
-        rates = {model: rate for model, rate in score["errorRate"].items() if rate is not None}
+        # Bounded at 1 (since 2026-11-11): a recognizer that runs away on a
+        # take inserts without limit, and one such take could carry a mean.
+        rates = {model: min(rate, MAXIMUM_EDIT_RATE) for model, rate in score["errorRate"].items() if rate is not None}
         for model, rate in rates.items():
             values[f"errorRate:{model}"] = rate
         if rates:
@@ -649,6 +798,12 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
     same_duration = sum(a["rows"][take["takeID"]].get("durationSeconds") is not None
                         and a["rows"][take["takeID"]].get("durationSeconds") == b["rows"][take["takeID"]].get("durationSeconds")
                         for take in paired)
+    # The talker's own count of codec frames: unlike a take's length, which a
+    # clone's onset trim can move, it changes only when the talker did.
+    same_codes = sum(a["rows"][take["takeID"]].get("generatedCodeCount") is not None
+                     and a["rows"][take["takeID"]].get("generatedCodeCount")
+                     == b["rows"][take["takeID"]].get("generatedCodeCount")
+                     for take in paired)
     metrics = {}
     for metric in METRICS:
         clusters: dict[str, list[float]] = {}
@@ -675,9 +830,11 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
             row = view["rows"][take["takeID"]]
             score = view["scores"].get(take["takeID"])
             rate = take_metrics(row, score).get("errorRateBetterFamily")
+            runaway = bool(((row.get("segments") or {}).get("finishReasons") or {}).get("maximum_tokens"))
             count += (row["outcome"] != "generated"
                       or bool(score and score.get("tooShortToScore"))
-                      or (rate is not None and rate >= GROSS_ERROR_RATE))
+                      or (rate is not None and rate >= GROSS_ERROR_RATE)
+                      or runaway)
         return count
 
     def warned(view: dict) -> int:
@@ -686,7 +843,7 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
     references = [(a["rows"][take["takeID"]].get("referenceAudioDigest"), b["rows"][take["takeID"]].get("referenceAudioDigest"))
                   for take in paired]
     return {"planned": len(takes), "outcomes": outcomes, "paired": len(paired), "identicalPCM": identical,
-            "sameDuration": same_duration,
+            "sameDuration": same_duration, "sameCodeCount": same_codes,
             "referenceAudioDiffers": sum(1 for left, right in references if left and right and left != right),
             "grossFailures": {"a": gross(a), "b": gross(b)}, "fastQCWarned": {"a": warned(a), "b": warned(b)},
             "scored": bool(a["scores"]) and bool(b["scores"]), "metrics": metrics}
@@ -736,6 +893,9 @@ def decide(summary: dict, rule: dict, floor: dict | None = None) -> dict:
             harms.append(f"{metric} is worse by more than {guard['margin']}")
         elif worst > guard["margin"]:
             reasons.append(f"{metric}: the interval reaches past the margin of {guard['margin']}")
+    if rule.get("requiresSameCodeCount") and summary.get("sameCodeCount") != summary.get("paired"):
+        reasons.append(f"{summary.get('paired', 0) - summary.get('sameCodeCount', 0)} paired takes changed their "
+                       "talker's code count, so the change reached the talker")
     if rule.get("requiresSameDuration") and summary.get("sameDuration") != summary.get("paired"):
         reasons.append(f"{summary.get('paired', 0) - summary.get('sameDuration', 0)} paired takes changed length, "
                        "so the change reached the talker")
@@ -765,6 +925,11 @@ def compare_arms(args: argparse.Namespace) -> int:
         summary["strata"] = {
             layout: summarize(plan, a, b, [take for take in plan["takes"] if layouts[take["voice"]] == layout])
             for layout in sorted({value for value in layouts.values() if value})}
+    if plan.get("kind") == "long-form":
+        groups = sorted({take["stratum"] for take in plan["takes"]}) + sorted({take["variation"] for take in plan["takes"]})
+        summary["strata"] = {group: summarize(plan, a, b, [take for take in plan["takes"]
+                                                           if group in (take["stratum"], take["variation"])])
+                             for group in groups}
     same_arm = (a["arm"]["environment"] == b["arm"]["environment"]
                 and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"])
     report = {"schemaVersion": SCHEMA_VERSION, "screen": plan["screen"], "planSHA256": plan["planSHA256"],
@@ -807,7 +972,7 @@ def compare_arms(args: argparse.Namespace) -> int:
     write_json(out, report)
     print(json.dumps({"verdict": report["verdict"], "report": str(out.relative_to(ROOT)) if out.is_relative_to(ROOT) else out.name,
                       **{key: summary[key] for key in ("planned", "outcomes", "paired", "identicalPCM", "sameDuration",
-                                                       "grossFailures")}},
+                                                       "sameCodeCount", "grossFailures")}},
                      indent=1))
     return code
 

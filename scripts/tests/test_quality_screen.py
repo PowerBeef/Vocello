@@ -60,7 +60,12 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("clone", names)
         for screen_name in names:
             definition = screen.load_screen(screen_name)
-            self.assertEqual(definition["kind"], "clone")
+            self.assertIn(definition["kind"], ("clone", "long-form"))
+            if definition["kind"] == "long-form":
+                self.assertGreaterEqual(definition["sentencesPerProject"], 2)
+                for stratum in definition["strata"].values():
+                    self.assertTrue(stratum.get("speakers") if stratum["mode"] == "custom" else stratum.get("voiceBriefs"))
+                continue
             self.assertEqual(len(definition["referenceSeconds"]), 3)
             self.assertIn("default", definition["crossLanguage"])
             self.assertGreaterEqual(definition.get("sentencesPerTake", 1), 1)
@@ -135,6 +140,67 @@ class PlanTests(unittest.TestCase):
         for bad in ("PATH=/tmp", "QWENVOICE_X", "=on"):
             with self.assertRaises(screen.ScreenError):
                 screen.parse_overrides([bad])
+
+
+class LongFormTests(unittest.TestCase):
+    SCREEN = {"name": "lf", "version": 1, "kind": "long-form", "variant": "speed", "scriptSplit": "calibration",
+              "sentencesPerProject": 3, "projectsPerStratum": 2, "variations": ["expressive", "consistent"],
+              "strata": {"custom-english": {"mode": "custom", "language": "english", "speakers": ["aiden", "ryan"]},
+                         "design-english": {"mode": "design", "language": "english", "voiceBriefs": ["A calm voice."]}}}
+
+    def test_a_project_runs_once_per_variation_on_one_script_and_is_one_cluster(self):
+        plan = screen.build_long_form_plan(self.SCREEN, 1)
+        self.assertEqual(len(plan["takes"]), 8)
+        first, second = plan["takes"][0], plan["takes"][1]
+        self.assertEqual((first["variation"], second["variation"]), ("expressive", "consistent"))
+        self.assertEqual(first["text"], second["text"])
+        self.assertEqual(first["voice"], second["voice"], "the interval resamples projects, not takes")
+        self.assertNotEqual(first["seed"], second["seed"])
+        self.assertEqual(first["text"].count(" "), sum(entry["text"].count(" ") for entry in screen.read_json(
+            screen.SCRIPT_POOL)["entries"] if entry["id"] in first["scriptID"].split("+")) + 2,
+                         "three sentences joined by two spaces")
+        self.assertEqual(len(first["scriptID"].split("+")), 3)
+        self.assertEqual([take["speaker"] for take in plan["takes"][:4:2]], ["aiden", "ryan"])
+        design = [take for take in plan["takes"] if take["mode"] == "design"]
+        self.assertTrue(all(take["voiceBrief"] == "A calm voice." and "speaker" not in take for take in design))
+        self.assertEqual(plan["kind"], "long-form")
+        reseeded = screen.build_long_form_plan(self.SCREEN, 2)
+        self.assertTrue(screen.same_takes_other_seeds(plan, reseeded))
+        with self.assertRaises(screen.ScreenError):
+            screen.build_long_form_plan(self.SCREEN, 1, ["no-such-stratum"])
+
+    def test_a_project_is_asked_for_as_the_apps_route_long_text(self):
+        plan = screen.build_long_form_plan(self.SCREEN, 1)
+        custom = screen.long_form_command(Path("/v"), plan, plan["takes"][0], Path("/o.wav"), ["--json"])
+        self.assertEqual(custom[custom.index("--long-form") + 1], "always")
+        self.assertEqual(custom[custom.index("--speaker") + 1], "aiden")
+        self.assertEqual(custom[custom.index("--variation") + 1], "expressive")
+        self.assertEqual(custom[custom.index("--language") + 1], "english")
+        design = screen.long_form_command(Path("/v"), plan, plan["takes"][-1], Path("/o.wav"), [])
+        self.assertIn("--voice-brief", design)
+        self.assertNotIn("--speaker", design)
+
+    def test_segments_report_how_they_ended_and_a_runaway_is_a_gross_failure(self):
+        summary = screen.segment_summary({"longFormSegments": [
+            {"finishReason": "end_of_sequence", "qcWarnings": [], "durationSeconds": 5.0},
+            {"finishReason": "maximum_tokens", "qcWarnings": ["dropout:900ms"], "durationSeconds": 9.0}]})
+        self.assertEqual(summary, {"count": 2, "finishReasons": {"end_of_sequence": 1, "maximum_tokens": 1},
+                                   "warned": 1, "warnings": ["dropout:900ms"], "longestSeconds": 9.0})
+        plan = plan_of(voices=2, per_voice=1)
+        scores = {take["takeID"]: score(0.7, 0.02, 0.01) for take in plan["takes"]}
+        runaway = dict(row("v0--s0"), segments=summary)
+        result = screen.summarize(plan, view(plan, {}, scores), view(plan, {"v0--s0": runaway}, scores))
+        self.assertEqual(result["grossFailures"], {"a": 0, "b": 1})
+        self.assertEqual(screen.take_metrics(runaway, None)["segmentsWarned"], 1)
+
+    def test_without_a_reference_the_speaker_score_is_the_spread_of_the_take_s_windows(self):
+        windows = [{"embedding": [1.0, 0.0]}, {"embedding": [1.0, 1.0]}, {"embedding": [1.0, 0.1]}]
+        spread = screen.window_spread({"whole": [1.0, 0.0], "windows": windows})
+        self.assertAlmostEqual(spread, 1 - 2 ** -0.5)
+        self.assertIsNone(screen.window_spread({"whole": [1.0, 0.0], "windows": windows[:1]}))
+        metrics = screen.take_metrics(row("t"), {"errorRate": {QWEN: 0.1, WHISPER: 0.2}, "speakerWindowSpread": spread})
+        self.assertAlmostEqual(metrics["speakerWindowSpread"], spread)
+        self.assertNotIn("speakerSimilarity", metrics)
 
 
 class ChannelLayoutTests(unittest.TestCase):
@@ -307,6 +373,39 @@ class DurationTests(unittest.TestCase):
         self.assertIn("reached the talker", decided["open"][0])
         kept = screen.decide(dict(DecisionTests().summary((-0.01, 0.01), (0.0, 0.0)), paired=6, sameDuration=6), rule)
         self.assertEqual(kept["verdict"], "ADOPT")
+
+
+class CodeCountTests(unittest.TestCase):
+    def test_the_talker_s_code_count_is_read_from_the_engine_row_wherever_it_nests(self):
+        record = {"summary": {"timingsMS": {"qwen_generated_code_count": 72}}}
+        self.assertEqual(screen.generated_code_count(record), 72)
+        self.assertIsNone(screen.generated_code_count({"summary": {}}))
+        with tempfile.TemporaryDirectory() as temp:
+            telemetry = Path(temp) / "generations.jsonl"
+            telemetry.write_text(json.dumps({"generationID": "ABC", "timings": {"qwen_generated_code_count": 40}}) + "\n")
+            rows = [{"takeID": "t", "generationID": "abc"}]
+            screen.arm_evidence(telemetry, rows)
+            self.assertEqual(rows[0]["generatedCodeCount"], 40)
+
+    def test_a_clone_onset_trim_moves_the_length_but_only_the_talker_moves_the_code_count(self):
+        plan = plan_of(voices=3, per_voice=2)
+        scores = {take["takeID"]: score(0.7, 0.02, 0.01) for take in plan["takes"]}
+        a_rows = {take["takeID"]: dict(row(take["takeID"]), generatedCodeCount=50) for take in plan["takes"]}
+        trimmed = dict(a_rows, **{"v0--s0": dict(a_rows["v0--s0"], durationSeconds=3.94, digest="q")})
+        summary = screen.summarize(plan, view(plan, a_rows, scores), view(plan, trimmed, scores))
+        self.assertEqual((summary["sameDuration"], summary["sameCodeCount"]), (5, 6))
+        rule = dict(DecisionTests.RULE, requiresSameCodeCount=True)
+        decided = screen.decide(dict(DecisionTests().summary((-0.01, 0.01), (0.0, 0.0)), paired=6, sameCodeCount=6), rule)
+        self.assertEqual(decided["verdict"], "ADOPT")
+        moved = screen.decide(dict(DecisionTests().summary((-0.01, 0.01), (0.0, 0.0)), paired=6, sameCodeCount=5), rule)
+        self.assertEqual(moved["verdict"], "INCONCLUSIVE")
+        self.assertIn("talker's code count", moved["open"][0])
+
+    def test_a_runaway_transcription_is_read_as_one_edit_per_unit_at_most(self):
+        metrics = screen.take_metrics(row("t"), score(0.7, 32.6, 2.6))
+        self.assertEqual(metrics["errorRate:" + QWEN], 1.0)
+        self.assertEqual(metrics["errorRateBetterFamily"], 1.0)
+        self.assertEqual(screen.take_metrics(row("t"), score(0.7, 0.2, 0.3))["errorRateBetterFamily"], 0.2)
 
 
 class DecisionTests(unittest.TestCase):

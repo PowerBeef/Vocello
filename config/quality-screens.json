@@ -302,7 +302,93 @@
             }
           },
           "expected": "Unknown. A cold decoder acts most on a take's first frames; the upstream report of audible harm (QwenLM issue 219) was withdrawn by its author. Priming costs decoding the reference once per take before the first audio; it is reported, not judged.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default, and with the decoder window adopted they prime from only the frames the window reaches (A-26). REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default, and with the decoder window adopted they prime from only the frames the window reaches (A-26). REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
+          "result": {
+            "decided": "2026-11-11",
+            "verdict": "INCONCLUSIVE",
+            "commit": "dcfa4de6",
+            "arms": {
+              "a": "ha",
+              "b": "hb1",
+              "bTwice": "hb1, hb2",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "aReproducesDefault": "ha is identical to wa on every take",
+            "bReproducible": "hb1 and hb2 identical on every take",
+            "outcomes": {
+              "a": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              },
+              "b": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 4,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0597,
+              "interval95": [
+                0.0516,
+                0.0682
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": 0.0614,
+              "interval95": [
+                0.052,
+                0.0707
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": -0.0056,
+              "interval95": [
+                -0.0132,
+                0.0002
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 2.6,
+              "interval95": [
+                0.2,
+                6.6
+              ]
+            },
+            "open": [
+              "51 paired takes changed length, so the change reached the talker"
+            ],
+            "note": "The one open requirement is a proxy that does not hold for clones: the talker's own code count is identical on all 191 paired takes (engine rows, qwen_generated_code_count), and the 51 takes that changed length are exactly those whose clone onset trim (clone_leading_silence_trimmed_frames) changed, because priming changes the decoder's first frames, which the onset gate reads. Every guard is well inside its margin, and speaker similarity rose by +0.060, about twelve times the noise floor's mean shift. By the letter of the rule the default stays; clone-decoder-history-primed-confirm decides it on fresh seeds with the talker's code count as the requirement."
+          }
+        },
+        "clone-decoder-history-primed-confirm": {
+          "recorded": "2026-11-11",
+          "question": "Confirmation on fresh seeds: does decoding a streamed transcript-backed clone with the reference's history (QWENVOICE_CLONE_DECODER_HISTORY=primed) in place of a cold decoder harm clone takes (A-04, A-26)?",
+          "arms": "A: the build at dcfa4de6, default. B: the same build with the key set. Seed set 2 of the clone screen (run clone-seeds2, whose seeds no arm of this build has used), each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The same build's default reproduced wa on every take of seed set 1 (ha), and two B arms of this build were identical there (hb1, hb2). Every paired take keeps the talker's code count (requiresSameCodeCount, from the engine rows): priming acts in the decoder only, and a take's length is not the test, because a clone's onset trim reads the decoder's first frames. The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. Edit rates are read bounded at 1 per script unit (the screen tool since 2026-11-11). B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT.",
+          "requiresSameCodeCount": true,
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Seed set 1 moved speaker similarity +0.060 (+0.052 to +0.068) with every guard inside its margin; this run checks it was not those seeds.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
         }
       },
       "noiseFloor": {
@@ -542,9 +628,166 @@
             }
           },
           "expected": "Unknown. Past 72 frames the shipped decoder attends to keys at distances its weights were never trained on; upstream's decoder never does. The first 72 frames of every take decode identically under both arms.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: the default then decodes with the window, which changes every take longer than 5.76 s, and the decoder's cache is bounded to the window next, a change that keeps the output identical. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: the default then decodes with the window, which changes every take longer than 5.76 s, and the decoder's cache is bounded to the window next, a change that keeps the output identical. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
+          "result": {
+            "decided": "2026-11-11",
+            "verdict": "INCONCLUSIVE",
+            "commit": "1651e871",
+            "arms": {
+              "a": "la",
+              "b": "lb1",
+              "bTwice": "lb1, lb2",
+              "floor": "la (seed set 1) against ls (seed set 2)"
+            },
+            "aReproducesDefault": "wa (this build's default on the clone screen) is identical to pb1 on every take",
+            "bReproducible": "lb1 and lb2 identical on every take",
+            "sameDuration": "96 of 96 paired takes: the talker's codes did not move",
+            "outcomes": {
+              "a": {
+                "generated": 96,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 96,
+                "refused": 0,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 1
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0019,
+              "interval95": [
+                0.0006,
+                0.0037
+              ]
+            },
+            "speakerSimilarityLate": {
+              "meanDifference": -0.0015,
+              "interval95": [
+                -0.0036,
+                0.0011
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": -0.003,
+              "interval95": [
+                -0.0054,
+                -0.0003
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0164,
+              "interval95": [
+                -0.001,
+                0.0494
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -0.1,
+              "interval95": [
+                -0.5,
+                0.2
+              ]
+            },
+            "open": [
+              "errorRateBetterFamily: the interval reaches past the margin of 0.04",
+              "the noise floor of trailingSilenceMS (34.0) exceeds 0.71 of its margin"
+            ],
+            "note": "Every move is small: speaker similarity +0.002 whole and -0.0015 late, the worst window -0.003, trailing silence -0.1 ms. The error-rate interval is one take: german-07's four-sentence German take is a gross failure in both arms (late speaker similarity 0.12 in both) and both recognizers ran away transcribing it (edit rates 1.0 and 6.3 in A, 32.6 and 2.6 in B); without it the difference is about zero. That an unbounded per-take edit rate can carry a mean is a defect of the screen's metric, fixed after this decision for later rules. The default stays without the window; a later screen on fresh seeds can decide it with the bounded metric and a decoder-only floor recorded first."
+          }
         }
+      },
+      "noiseFloor": {
+        "measured": "2026-11-11",
+        "commit": "1651e871",
+        "method": "Arm la (seed set 1) against arm ls (seed set 2), the same build and data.",
+        "pairs": 95,
+        "speakerSimilarity": {
+          "meanDifference": 0.0055,
+          "interval95": [
+            -0.0054,
+            0.0183
+          ]
+        },
+        "speakerSimilarityLate": {
+          "meanDifference": 0.0045,
+          "interval95": [
+            -0.0061,
+            0.0173
+          ]
+        },
+        "errorRateBetterFamily": {
+          "meanDifference": 0.0031,
+          "interval95": [
+            -0.0015,
+            0.008
+          ]
+        },
+        "trailingSilenceMS": {
+          "meanDifference": -13.7,
+          "interval95": [
+            -34.0,
+            3.6
+          ]
+        },
+        "grossFailures": [
+          1,
+          1
+        ],
+        "note": "The trailing-silence bound (34 ms) exceeds 0.71 of a 40 ms margin, so at this size the screen cannot decide that guard for a change that moves sampling."
       }
+    },
+    "long-form": {
+      "version": 1,
+      "kind": "long-form",
+      "variant": "speed",
+      "scriptSplit": "calibration",
+      "sentencesPerProject": 10,
+      "projectsPerStratum": 6,
+      "variations": [
+        "expressive",
+        "consistent"
+      ],
+      "strata": {
+        "custom-english": {
+          "mode": "custom",
+          "language": "english",
+          "speakers": [
+            "aiden",
+            "ryan"
+          ]
+        },
+        "custom-french": {
+          "mode": "custom",
+          "language": "french",
+          "speakers": [
+            "aiden",
+            "serena"
+          ]
+        },
+        "custom-japanese": {
+          "mode": "custom",
+          "language": "japanese",
+          "speakers": [
+            "ono_anna"
+          ]
+        },
+        "design-english": {
+          "mode": "design",
+          "language": "english",
+          "voiceBriefs": [
+            "A calm man in his forties with a low, warm voice, speaking clearly at an unhurried pace.",
+            "A bright young woman with a clear, friendly voice and lively, natural intonation.",
+            "An older woman with a soft, slightly husky voice who reads in a gentle, measured way."
+          ]
+        }
+      },
+      "description": "Long-form projects as the apps run them (--long-form always: planned into segments, each a streaming take, joined): per stratum six scripts of ten pool sentences (about 30 to 45 seconds), each once under the default Expressive variation and once under Consistent, with the same script. Built-in Voice in English, French and Japanese, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
+      "rules": {}
     }
   }
 }

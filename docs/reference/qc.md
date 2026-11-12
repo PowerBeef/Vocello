@@ -509,9 +509,18 @@ PY="$(python3 scripts/select_python.py)"
   two-channel WAV (half duplicated, half left-only). `clone-long` asks each for two takes of four
   joined pool sentences (`sentencesPerTake`, about 15 to 20 s), for what acts only late in a take:
   `speakerSimilarityLate` scores the speaker windows that start at 6 s or later (past the decoder's
-  72-frame reach), `speakerSimilarityWorstWindow` the take's worst window, and a rule with
-  `requiresSameDuration` stays open unless every paired take kept its length (a decoder-only change
-  cannot move the talker's frames).
+  72-frame reach), `speakerSimilarityWorstWindow` the take's worst window. For a decoder-only change
+  a rule requires the talker untouched: `requiresSameCodeCount` reads each take's
+  `qwen_generated_code_count` from the engine's rows (`requiresSameDuration`, a take's length, is no
+  test for clones, whose onset trim reads the decoder's first frames).
+- **Edit rates are bounded at 1 per script unit** (since 2026-11-11): a recognizer that runs away on
+  a take inserts without limit, and one such take carried a whole screen's mean once.
+- **The long-form kind** (`long-form`, RF-50) runs projects as the apps do (`--long-form always`):
+  per stratum (Built-in Voice in English, French and Japanese; Voice Design in English) six scripts
+  of ten pool sentences, each under the Expressive and the Consistent variation on the same script.
+  It scores both ASR families over the joined output, the spread of the speaker windows (no
+  reference), each segment's end reason (one that ran to the frame cap is a gross failure) and the
+  segments' Fast QC warnings; strata are reported by stratum and by variation.
 - **Its noise floor** (measured 2026-11-11 at `6e934d2c`: the same takes under two seed sets) is
   0.035 in mean speaker similarity, 0.027 in the better family's error rate, 25 ms of trailing
   silence and 3 gross failures. A conditioning change moves every take's sampling as a new seed

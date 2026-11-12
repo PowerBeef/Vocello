@@ -37,8 +37,14 @@ session can continue from it alone.
 - **RF-50 (clone half done):** `scripts/encoder_golden_codes.py` pins the Swift encoder against the
   reference one; `scripts/quality_screen.py` is the paired screen
   ([qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples)). Screens: `clone`
-  (48 saved voices, six languages, 192 takes) and `clone-stereo` (the same references saved as
-  two-channel WAVs). At this size they catch gross regressions only.
+  (48 saved voices, six languages, 192 takes), `clone-stereo` (the same references saved as
+  two-channel WAVs) and `clone-long` (the same references, two four-sentence takes each, about 15
+  to 20 s, for what acts only late in a take; `2236c3cb`). At this size they catch gross
+  regressions only.
+- **RF-53, the too-short refusal:** Fast QC v9 (`278a11d7`) fails a take far too short for its
+  script (`speaking_rate_fast`), each bound half the fastest human corpus clip of its class, judged
+  on a conservative unit count. The Mac gate bench's baseline binds the QC version, so it must be
+  seeded again (a measured lane on a quiet host) before the gate bench is next used.
 
 **RF-52 decisions, each by a rule recorded before its arms** (rules and results in
 `config/quality-screens.json`; arms under `build/artifacts/macos/quality-screen/`)
@@ -48,6 +54,7 @@ session can continue from it alone.
 | Reproducible preparation: audio file reader and one converter call (version 2) | `reference-preparation-v2` | ADOPT: identical 190 of 190 where the old path gave 167 of 191 | `a715b2ae` |
 | Two channels averaged, as upstream (version 3) | `reference-mixdown-average` | ADOPT: not worse, not shown better | `fffcc709` |
 | Encoder split-half rotary (A-02), key `QWENVOICE_ENCODER_ROTARY=split-half` | `encoder-rotary-split-half` | INCONCLUSIVE: error rate +0.021 (+0.005 to +0.041), gross 2 to 5, mostly cross-language | stays adjacent |
+| Reference encoded unpadded, as upstream (A-12); `QWENVOICE_REFERENCE_PADDING=half-second` restores the padding | `reference-padding-none` | ADOPT: similarity +0.019, trailing silence -22 ms, error rate +0.012 inside its margin, gross 2 and 4 | `a144a489` (`icl-ref-unpadded-v3`) |
 
 Each default build reproduces its screened arm take for take, and adding each key changed nothing
 by default (checked take for take). Every saved voice's prompt rebuilds once on first use after
@@ -56,15 +63,21 @@ while it is off.
 
 **Next, in order (each sample-changing step: a knob, a rule recorded first, then the screen)**
 
-1. **RF-52, the rest of its gate:** primed decoder history for streamed transcript-backed clones
-   (A-04, A-26), edge trim and fade with the 500 ms padding screened against none (A-12, G-07), the
+1. **RF-54, the decoder's 72-frame window:** the key `QWENVOICE_DECODER_WINDOW=on` is in
+   (`c4bfee76`); the `clone-long` screen decides it under `decoder-window-72`. The run: build, the
+   default arm `wa` on the clone screen against its `pb1` (identical expected), `la` and `ls` on
+   `clone-long` seed sets 1 and 2 (the floor), `lb1` and `lb2` with the key, scoring, then
+   `compare --rule decoder-window-72 --floor compare-la-vs-ls.json`. If it is adopted, bound the
+   decoder cache to the window next (output identical).
+2. **RF-52, the rest of its gate:** primed decoder history for streamed transcript-backed clones
+   (A-04, A-26: decode the reference codes through `streamingStep` before the take, behind a key;
+   with the window adopted only the last 72 frames are needed), edge trim and fade (G-07), the
    leading space on the clone target per script family (A-11), punctuated recognized transcripts
-   (G-15). The A-12 padding change raises `codecEncodeConditioningVersion`.
-2. **RF-50, the long-form screen**, then **RF-53**: D1 and D6 by screen, the in-loop stop for a
-   runaway ending, and a Fast QC refusal for a take far too short for its script (a 0.32-second
-   German sentence passed Fast QC in the rotary screen's keyed arm).
-3. **RF-54** (the decoder's 72-frame window) and **RF-55** (code-predictor precision; publishing an
-   artifact is the maintainer's).
+   (G-15).
+3. **RF-50, the long-form screen**, then the rest of **RF-53**: D1 and D6 by screen, and the
+   in-loop stop for a runaway ending (stop once the running trailing silence passes 2,000 ms, the
+   larger egregious bound, so no accepted take changes).
+4. **RF-55** (code-predictor precision; publishing an artifact is the maintainer's).
 
 **Standing limits:** nobody listens; a pin move, a model artifact and any push or tag need the
 maintainer's specific word; device checks queue for an announced phone window (RF-51's note lists

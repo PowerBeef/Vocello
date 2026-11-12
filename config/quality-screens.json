@@ -445,6 +445,30 @@
             },
             "note": "Replicates seed set 1 (+0.060): priming a streamed clone's decoder with the reference raises speaker similarity by about 0.056, more than ten times the screen's noise floor shift, with the error rate unchanged and the talker untouched. Adopted: streamed transcript-backed clones prime by default."
           }
+        },
+        "code-predictor-8bit": {
+          "recorded": "2026-11-12",
+          "question": "Does the Swift engine repeat the review's pre-screen (an 8-bit code predictor under the 4-bit talker: speaker similarity +0.010, interval +0.002 to +0.019, 48 pairs) on the clone screen's six languages (QWENVOICE_CODE_PREDICTOR_BITS=8: the code predictor from the installed 8-bit sibling), and does it harm anything (RF-55)?",
+          "arms": "A: the build at the commit that records this rule, default (the 4-bit code predictor). B: the same build with the key set. Seed set 1 of the clone screen, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The default arm A reproduces arm hb1 on every take (the primed decoder, adopted at 1a308d7e, is the default since). Two B arms on the same seeds are identical on every take. The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes. The code predictor feeds the talker's next frame, so takes may change length and code count; neither is required equal.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Speaker similarity a little higher, as in the pre-screen; nothing else moves beyond its margin. Measured before this rule, on the M6 with fixed seeds: the 8-bit code predictor makes a clone take about 20% slower where the GPU bounds a frame (real-time factor 0.303 to 0.363 long, 0.366 to 0.439 medium, two rounds each) and costs little where the host bounds it (efficiency cores: -1% to +6.5%), for 56 MB more weights.",
+          "decision": "This rule changes no default: an 8-bit code predictor needs a new Speed artifact, which is the maintainer's decision. REPEATED when no guard reaches past its margin on the harmful side and B's speaker-similarity interval lies wholly above zero; NOT REPEATED when no guard harms but the interval includes zero; HARM when a guard's whole interval lies past its margin or B loses more takes than allowed. The tool's ADOPT reads as no harm; the similarity interval then decides REPEATED or NOT REPEATED."
         }
       },
       "noiseFloor": {

@@ -431,10 +431,13 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
   its own step); the clone screen's rule `reference-padding-none` adopted none: speaker similarity
   +0.019 (interval +0.001 to +0.039), trailing silence -22 ms (-35 to -8), the better family's error
   rate +0.012 (+0.002 to +0.026, the size of the screen's own noise floor), gross failures 2 and 4.
-- **ICL target text** gets exactly one leading space (`Qwen3ICLTargetText.boundaryMarked`); upstream joins the
-  reference and target tokens with no separator. Vocello added the space for French first-word drops
-  (A-11, deliberate). `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts` drops it before a target whose first letter is Han or kana
-  in a diagnostics build since 2026-11-12, decided by the `clone-cjk` screen (RF-52).
+- **ICL target text** gets exactly one leading space unless its first letter is Han or kana
+  (`Qwen3ICLTargetText.boundaryMarked`); upstream joins the reference and target tokens with no separator.
+  Vocello added the space for French first-word drops (A-11, deliberate); since 2026-11-12 a Han or kana
+  target joins as upstream's does, adopted by the `clone-cjk` screen's rule
+  `icl-target-space-unspaced-scripts` (RF-52: no guard moved beyond the screen's floor, and 2 takes lost
+  against 6). `QWENVOICE_ICL_TARGET_SPACE=every-target` puts the space before every target again in a
+  diagnostics build.
 - **ICL layout.** Vocello always lays the reference and target text over the reference's codec frames
   in the non-streaming overlay (mlx-audio lineage, G-14). Upstream's `generate_voice_clone` defaults
   to the streaming layout (WM L478), and a long reference in that layout speeds speech up
@@ -785,7 +788,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump; measured 2026-11-11 with no detectable effect on clone output (below) | ER-04 |
 | A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |
 | — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
-| A-11 | ICL target text | no separator after the reference text | exactly one leading space | deliberate (French first-word drops); screen before changing | ER-04 |
+| A-11 | ICL target text | no separator after the reference text | none before a Han or kana target since 2026-11-12; one leading space otherwise (French first-word drops) | matches for Han and kana; adopted by the `clone-cjk` screen's rule `icl-target-space-unspaced-scripts`; `every-target` restores the space | RF-52 |
 | A-12 | ICL reference padding | none | none since 2026-11-11 (`icl-ref-unpadded-v3`; 0.5 s of silence before) | matches; adopted by the clone screen's rule `reference-padding-none` | RF-52 |
 | G-14 | ICL layout | streaming by default (PR #362, open and unreviewed, proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
 | — | Repetition penalty scope | talker codebook 0 only | same | matches | — |

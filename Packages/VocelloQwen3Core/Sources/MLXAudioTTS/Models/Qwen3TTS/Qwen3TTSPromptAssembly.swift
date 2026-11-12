@@ -21,9 +21,9 @@ enum Qwen3ICLTargetText {
     /// first word loses its word-boundary marker and glues to the transcript;
     /// short French first words (such as "Ce") were dropped, so Vocello puts
     /// exactly one space before the target (idempotent). With
-    /// `onlyBeforeSpacedScripts` a target whose first letter is Han or kana
-    /// gets none, as upstream's join gives it: those scripts mark no word
-    /// boundary with spaces. Digits and punctuation before the first letter do
+    /// `onlyBeforeSpacedScripts` (production since 2026-11-12, A-11) a target
+    /// whose first letter is Han or kana gets none, as upstream's join gives
+    /// it: those scripts mark no word boundary with spaces. Digits and punctuation before the first letter do
     /// not decide ("3个苹果" joins, "2024 report" keeps its space).
     static func boundaryMarked(_ text: String, onlyBeforeSpacedScripts: Bool) -> String {
         let target = text.drop(while: { $0.isWhitespace })

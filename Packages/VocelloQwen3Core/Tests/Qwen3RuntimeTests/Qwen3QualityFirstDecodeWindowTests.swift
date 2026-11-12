@@ -373,11 +373,12 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertEqual(Qwen3TTSPrimedDecoderStateCache.shared.count, 0)
     }
 
-    /// A-11 (RF-52): production puts exactly one space before every clone
-    /// target; under the key a target whose first letter is Han or kana gets
-    /// none, and every other target keeps its one space.
-    func testTheCloneTargetSpaceFollowsTheFirstLettersScriptOnlyUnderTheKey() {
-        let cases: [(text: String, production: String, spacedScriptsOnly: String)] = [
+    /// A-11 (RF-52): in production (since 2026-11-12) a clone target whose
+    /// first letter is Han or kana gets no leading space, and every other
+    /// target keeps exactly one; under `QWENVOICE_ICL_TARGET_SPACE=every-target`
+    /// every target gets one.
+    func testTheCloneTargetSpaceFollowsTheFirstLettersScriptInProduction() {
+        let cases: [(text: String, everyTarget: String, production: String)] = [
             ("Ce matin.", " Ce matin.", " Ce matin."),
             ("  Ce matin.", " Ce matin.", " Ce matin."),
             ("人人生而自由。", " 人人生而自由。", "人人生而自由。"),
@@ -399,9 +400,9 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         ]
         for item in cases {
             XCTAssertEqual(Qwen3ICLTargetText.boundaryMarked(item.text, onlyBeforeSpacedScripts: false),
-                           item.production, item.text)
+                           item.everyTarget, item.text)
             XCTAssertEqual(Qwen3ICLTargetText.boundaryMarked(item.text, onlyBeforeSpacedScripts: true),
-                           item.spacedScriptsOnly, item.text)
+                           item.production, item.text)
         }
     }
 

@@ -225,8 +225,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// 2026-11-12, off under the gated `QWENVOICE_CLONE_DECODER_HISTORY=cold`.
     let streamedCloneDecoderPriming: Bool
     /// A clone target in Han or kana follows the reference transcript with no
-    /// separator under the gated `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts`
-    /// (A-11, RF-52); production puts one space before every target.
+    /// separator, as upstream joins them (A-11, RF-52; production since
+    /// 2026-11-12); the gated `QWENVOICE_ICL_TARGET_SPACE=every-target` puts one
+    /// space before every target again.
     let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
     /// A transcript-backed clone reference's silent edges are trimmed and it is
     /// faded in and out under the gated `QWENVOICE_REFERENCE_EDGES=trimmed`
@@ -1202,7 +1203,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         talkerKVQuantBits: Int? = nil,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         streamedCloneDecoderPriming: Bool = true,
-        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false,
+        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = true,
         referenceEdgesTrimmed: Bool = false
     ) {
         self.config = config

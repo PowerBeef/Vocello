@@ -973,9 +973,11 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertEqual(streamedAfter, streamedBefore)
     }
 
-    /// A-11 (RF-52): the key reaches the clone layout. Under it a Han target
-    /// joins the reference transcript one token shorter (no leading space)
-    /// and a Latin target keeps its space; without it both keep the space.
+    /// A-11 (RF-52): the setting reaches the clone layout. With it (production
+    /// since 2026-11-12) a Han target joins the reference transcript one token
+    /// shorter (no leading space) and a Latin target keeps its space; without
+    /// it (`QWENVOICE_ICL_TARGET_SPACE=every-target`) both keep the space. A
+    /// model built with the defaults joins as production does.
     func testTheCloneTargetSpaceKeyReachesTheCloneLayout() throws {
         let tiny = try Self.tinyModelConfig()
         let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
@@ -996,12 +998,18 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         }
         let han = "人人生而自由。"
         let latin = "Ce matin."
-        let hanProduction = try inputFrames(key: false, text: han)
-        let latinProduction = try inputFrames(key: false, text: latin)
-        XCTAssertEqual(try inputFrames(key: true, text: han), hanProduction - 1)
-        XCTAssertEqual(try inputFrames(key: true, text: latin), latinProduction)
-        XCTAssertEqual(hanProduction - latinProduction, han.count - latin.count,
-                       "both keep one space without the key")
+        let hanEveryTarget = try inputFrames(key: false, text: han)
+        let latinEveryTarget = try inputFrames(key: false, text: latin)
+        XCTAssertEqual(try inputFrames(key: true, text: han), hanEveryTarget - 1)
+        XCTAssertEqual(try inputFrames(key: true, text: latin), latinEveryTarget)
+        XCTAssertEqual(hanEveryTarget - latinEveryTarget, han.count - latin.count,
+                       "both keep one space under every-target")
+        let defaults = Qwen3TTSModel(
+            config: tiny,
+            talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+            speakerEncoder: nil
+        )
+        XCTAssertTrue(defaults.iclTargetSpaceOnlyBeforeSpacedScripts, "the model's default is production's")
     }
 
     /// G-07 (RF-52): without the key a transcript-backed reference reaches

@@ -18,7 +18,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_DECODER_WINDOW": "on",
         "QWENVOICE_CLONE_DECODER_HISTORY": "cold",
         "QWENVOICE_CODE_PREDICTOR_BITS": "8",
-        "QWENVOICE_ICL_TARGET_SPACE": "spaced-scripts",
+        "QWENVOICE_ICL_TARGET_SPACE": "every-target",
         "QWENVOICE_REFERENCE_EDGES": "trimmed",
     ]
 
@@ -224,15 +224,18 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: edges)
                 .referenceEdgesTrimmed, value)
         }
-        // A-11: the space before a Han or kana target, only for "spaced-scripts".
-        XCTAssertTrue(internalRun.iclTargetSpaceOnlyBeforeSpacedScripts)
-        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.iclTargetSpaceOnlyBeforeSpacedScripts)
-        for (value, expected) in [(" Spaced-Scripts ", true), ("none", false), ("on", false), ("", false)] {
+        // A-11: production joins a Han or kana target with no space (adopted
+        // 2026-11-12); only "every-target" puts the space back. The resolver's
+        // own defaults are production's.
+        XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides(talkerKVQuantBits: nil, speechTokenizerResidency: nil), .production)
+        XCTAssertFalse(internalRun.iclTargetSpaceOnlyBeforeSpacedScripts)
+        XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.production.iclTargetSpaceOnlyBeforeSpacedScripts)
+        for (value, expected) in [(" Every-Target ", false), ("spaced-scripts", true), ("on", true), ("", true)] {
             var spacing = everyOverrideRequested
             spacing["QWENVOICE_ICL_TARGET_SPACE"] = value
             XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: spacing)
                 .iclTargetSpaceOnlyBeforeSpacedScripts, expected, value)
-            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: spacing)
+            XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: spacing)
                 .iclTargetSpaceOnlyBeforeSpacedScripts, value)
         }
         XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.encoderSplitHalfRotary)

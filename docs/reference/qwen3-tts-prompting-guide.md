@@ -84,7 +84,7 @@ Reference and target are tokenized separately and concatenated, so no separator 
 ([`Qwen3TTS.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift)
 L434-438 for the role and instruct turns, L495 and L532 for the target;
 [`Qwen3TTSPromptAssembly.swift`](../../Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift)
-L67 and L80 for ICL; the one ICL difference is a leading space, §2.3). Before tokenizing, it
+L67 and L80 for ICL; the one ICL difference is a leading space, except before Han or kana, §2.3). Before tokenizing, it
 replaces ChatML, `<tts_…>` and think/tool control tokens in the script, instruction and transcript
 with a space (`Qwen3ChatTemplateText`, `Qwen3TTSPromptAssembly.swift` L488-505), so user text
 cannot open a turn. The same step composes the text to NFC (`preparedForTemplate`; **A-18, fixed
@@ -351,12 +351,13 @@ outside contributor and unreviewed.
   conditions better is a sample-changing question, so it is decided by a screen and not flipped
   blind.
 - **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
-  `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends exactly one space to the target
-  (`Qwen3ICLTargetText.boundaryMarked`). The tokenizer is byte-level BPE without a prefix space, so the
+  `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends one space to a target whose first letter
+  is not Han or kana (`Qwen3ICLTargetText.boundaryMarked`). The tokenizer is byte-level BPE without a prefix space, so the
   first target word otherwise glues to the transcript; the space was added after French first words
-  were dropped. It also changes the first tokens of CJK targets. Since 2026-11-12
-  `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts` (a diagnostics build) drops it before a target
-  whose first letter is Han or kana, and the `clone-cjk` screen's rule `icl-target-space-unspaced-scripts` decides it (RF-52).
+  were dropped. It also changed the first tokens of CJK targets, so since 2026-11-12 a target whose
+  first letter is Han or kana gets none, as upstream's join gives it (the `clone-cjk` screen's rule
+  `icl-target-space-unspaced-scripts` adopted it, RF-52); `QWENVOICE_ICL_TARGET_SPACE=every-target`
+  (a diagnostics build) restores the space before every target.
 - **`language` names the script's language, never the reference's** (`GenerationSemantics.swift`
   L881-887). `COMMUNITY`: QwenLM#80 reports the wrong speaker in about 20% of takes. That figure
   comes from one user in an all-English setup on vLLM-Omni; the cross-language remark in the same
@@ -918,7 +919,7 @@ both tiers.
 | Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone payload or identity |
 | 0.6B instruction guard | present and matches upstream; defensive, since no 0.6B checkpoint ships |
 | Text layout of streamed Custom and Design takes | full text for single takes (D1, RF-21); streaming trailing text for long-form segments (RF-18; §1.1, §3.1) |
-| ICL layout | upstream's non-streaming clone layout, plus one leading space on the target (G-14, A-11; §2.3) |
+| ICL layout | upstream's non-streaming clone layout, plus one leading space on a target whose first letter is not Han or kana (G-14, A-11; §2.3) |
 | Subtalker sampler | its own stage, at upstream's 0.9 / 50 / 1.0 for every variation since 2026-10-20 |
 | EOS | filtered like any token since 2026-10-20 (D2) |
 | Decode budget | fixed constant, not text-derived |
@@ -1206,8 +1207,9 @@ gate.
    question with a first answer: in the 2026-11-11 pre-screen the 8-bit Base model's clones match
    the reference speaker better than the 4-bit model's by 0.025 in speaker similarity (§7).
 8. **The clone input.** The ICL join's leading space (A-11), the reference's trailing silence
-   (A-12) and the clone layout (G-14) each change what the model reads (§2.3). They are ER-04's and
-   ER-03's to screen before any change; none is a copy question.
+   (A-12) and the clone layout (G-14) each change what the model reads (§2.3). A-12 (2026-11-11)
+   and A-11 for Han and kana targets (2026-11-12) were screened and adopted under RF-52; G-14 is
+   still ER-03's to screen before any change. None is a copy question.
 
 `MEASURED-HERE`, **DP-6, 2026-08-03 — an instruction clause can be simply ignored.** Over 23 seeds
 the shipped `angry` copy moves pitch **+5.98 semitones** (d=1.40, win rate 0.91), confirming the

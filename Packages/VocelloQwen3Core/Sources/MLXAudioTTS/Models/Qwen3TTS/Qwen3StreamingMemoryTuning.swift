@@ -44,11 +44,12 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// record), the rest of the talker staying as installed. nil loads the
     /// model as it is.
     let codePredictorBits: Int?
-    /// RF-52, A-11 (`QWENVOICE_ICL_TARGET_SPACE=spaced-scripts`): a clone
-    /// target whose first letter is Han or kana follows the reference
-    /// transcript with no separator, as upstream joins them; every other target
-    /// keeps its one leading space. Production puts one space before every
-    /// target.
+    /// RF-52, A-11: a clone target whose first letter is Han or kana follows
+    /// the reference transcript with no separator, as upstream joins them;
+    /// every other target keeps its one leading space. On in production since
+    /// 2026-11-12 (the clone-cjk screen's rule icl-target-space-unspaced-scripts);
+    /// the gated `QWENVOICE_ICL_TARGET_SPACE=every-target` puts one space before
+    /// every target again.
     let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
     /// RF-52, G-07 (`QWENVOICE_REFERENCE_EDGES=trimmed`): a transcript-backed
     /// clone reference's silent edges are trimmed and it is faded in and out
@@ -66,7 +67,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: Bool = false,
         cloneDecoderPriming: Bool = true,
         codePredictorBits: Int? = nil,
-        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false,
+        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = true,
         referenceEdgesTrimmed: Bool = false
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
@@ -88,7 +89,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: false,
         cloneDecoderPriming: true,
         codePredictorBits: nil,
-        iclTargetSpaceOnlyBeforeSpacedScripts: false,
+        iclTargetSpaceOnlyBeforeSpacedScripts: true,
         referenceEdgesTrimmed: false
     )
 
@@ -128,7 +129,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
             cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold",
             codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil,
-            iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") == "spaced-scripts",
+            iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") != "every-target",
             referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") == "trimmed"
         )
     }

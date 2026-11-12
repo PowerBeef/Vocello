@@ -22,22 +22,30 @@ class RuntimeSecurityContractTests(unittest.TestCase):
 
     def test_concurrency_registry_metadata_and_budget_are_current(self) -> None:
         contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        # The newest review is the registry's own "today": a reviewed growth
+        # or a fresh review never needs this test edited.
+        newest_review = max(
+            date.fromisoformat(item["reviewedAt"])
+            for item in contract["entries"] + contract["unsafeDeclarations"]
+            if "reviewedAt" in item
+        )
         self.assertEqual(
             MODULE.concurrency_metadata_errors(
                 contract,
-                observed_unchecked_count=27,
-                observed_unsafe_count=2,
-                today=date(2026, 10, 20),
+                observed_unchecked_count=contract["budget"]["maximumUncheckedSendableDeclarations"],
+                observed_unsafe_count=contract["budget"]["maximumNonisolatedUnsafeDeclarations"],
+                today=newest_review,
             ),
             [],
         )
 
     def test_concurrency_registry_rejects_unreviewed_growth(self) -> None:
         contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
+        budget = contract["budget"]
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=28,
-            observed_unsafe_count=3,
+            observed_unchecked_count=budget["maximumUncheckedSendableDeclarations"] + 1,
+            observed_unsafe_count=budget["maximumNonisolatedUnsafeDeclarations"] + 1,
             today=date(2026, 8, 29),
         )
         self.assertTrue(any("unchecked Sendable declarations exceed" in error for error in errors))

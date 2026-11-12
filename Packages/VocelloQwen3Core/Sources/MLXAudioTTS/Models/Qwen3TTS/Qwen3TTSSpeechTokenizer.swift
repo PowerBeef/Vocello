@@ -975,6 +975,63 @@ final class Qwen3TTSSpeechTokenizerEncoder: Module {
     }
 }
 
+// MARK: - Decoder streaming state (A-26)
+
+/// A layer that keeps history between streaming steps: one array, `nil`
+/// before its first step and after a reset.
+protocol Qwen3DecoderStreamingStateCarrier: AnyObject {
+    var streamingState: MLXArray? { get set }
+}
+
+extension CausalConv1d: Qwen3DecoderStreamingStateCarrier {
+    var streamingState: MLXArray? {
+        get { streamBuffer }
+        set { streamBuffer = newValue }
+    }
+}
+
+extension DecoderBlockUpsample: Qwen3DecoderStreamingStateCarrier {
+    var streamingState: MLXArray? {
+        get { inputContext }
+        set { inputContext = newValue }
+    }
+}
+
+extension DecoderInitialConv: Qwen3DecoderStreamingStateCarrier {
+    var streamingState: MLXArray? {
+        get { streamBuffer }
+        set { streamBuffer = newValue }
+    }
+}
+
+extension DecoderOutputConv: Qwen3DecoderStreamingStateCarrier {
+    var streamingState: MLXArray? {
+        get { streamBuffer }
+        set { streamBuffer = newValue }
+    }
+}
+
+/// A-26 (RF-52): a copy of a decoder's streaming history. Each array is
+/// evaluated and compact: where a live state is a view of a larger buffer it
+/// is copied out, so it holds only its own bytes (a live state that is
+/// already compact shares its buffer), and no later step can change it.
+struct Qwen3DecoderStreamingSnapshot {
+    /// The module path of every layer that keeps history, with or without one.
+    let layerPaths: Set<String>
+    /// The history of each layer that has one, by module path.
+    let layerStates: [String: MLXArray]
+    /// The pre-transformer's cache: each layer's keys and values.
+    let transformerStates: [[MLXArray]]?
+
+    var arrays: [MLXArray] {
+        Array(layerStates.values) + (transformerStates ?? []).flatMap { $0 }
+    }
+
+    var byteCount: Int {
+        arrays.reduce(0) { $0 + $1.nbytes }
+    }
+}
+
 // MARK: - Full Speech Tokenizer Decoder
 
 final class Qwen3TTSSpeechTokenizerDecoder: Module {
@@ -1057,6 +1114,75 @@ final class Qwen3TTSSpeechTokenizerDecoder: Module {
         if let outConv = decoder.last as? DecoderOutputConv {
             outConv.resetState()
         }
+    }
+
+    /// Every layer that keeps streaming history, by module path.
+    func streamingStateCarriers() -> [String: any Qwen3DecoderStreamingStateCarrier] {
+        var carriers: [String: any Qwen3DecoderStreamingStateCarrier] = [:]
+        for (path, module) in namedModules() {
+            if let carrier = module as? any Qwen3DecoderStreamingStateCarrier {
+                carriers[path] = carrier
+            }
+        }
+        return carriers
+    }
+
+    /// A-26 (RF-52): a copy of the streaming history, or `nil` when the
+    /// pre-transformer cache is not the key/value cache this decoder makes and
+    /// can restore.
+    func streamingStateSnapshot() -> Qwen3DecoderStreamingSnapshot? {
+        var transformerStates: [[MLXArray]]?
+        if let transformerCache {
+            var states: [[MLXArray]] = []
+            for layerCache in transformerCache {
+                let state = layerCache.state
+                guard layerCache is KVCacheSimple, state.count == 2 else { return nil }
+                states.append(state.map { $0.contiguous() })
+            }
+            transformerStates = states
+        }
+        let carriers = streamingStateCarriers()
+        var layerStates: [String: MLXArray] = [:]
+        for (path, carrier) in carriers {
+            if let state = carrier.streamingState {
+                layerStates[path] = state.contiguous()
+            }
+        }
+        let snapshot = Qwen3DecoderStreamingSnapshot(
+            layerPaths: Set(carriers.keys),
+            layerStates: layerStates,
+            transformerStates: transformerStates
+        )
+        eval(snapshot.arrays)
+        return snapshot
+    }
+
+    /// A-26 (RF-52): puts a snapshot of this decoder's own layers back. Every
+    /// layer and cache gets a new array over the snapshot's data, never the
+    /// snapshot's array itself, so the steps that follow cannot change the
+    /// snapshot. Refuses a snapshot of other layers and then changes nothing.
+    func restoreStreamingState(_ snapshot: Qwen3DecoderStreamingSnapshot) -> Bool {
+        let carriers = streamingStateCarriers()
+        let layerCount = preTransformer.layers.count
+        guard Set(carriers.keys) == snapshot.layerPaths,
+              (snapshot.transformerStates?.count ?? layerCount) == layerCount,
+              snapshot.transformerStates?.allSatisfy({ $0.count == 2 }) ?? true
+        else {
+            return false
+        }
+        for (path, carrier) in carriers {
+            carrier.streamingState = snapshot.layerStates[path].map { $0.contiguous() }
+        }
+        if let states = snapshot.transformerStates {
+            var cache = preTransformer.makeCache()
+            for index in cache.indices {
+                cache[index].state = states[index].map { $0.contiguous() }
+            }
+            transformerCache = cache
+        } else {
+            transformerCache = nil
+        }
+        return true
     }
 
     /// Incrementally decode only new codec tokens.

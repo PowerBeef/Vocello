@@ -443,9 +443,11 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
   the reference's share of the samples (WM L612-633). Vocello's streamed clones start from a cold
   decoder until 2026-11-12 (A-04). They now prime the decoder with the reference's codes, adopted by
   the clone screen on two seed sets (speaker similarity +0.060 and +0.056, error rate unchanged;
-  `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder). A-26, caching the primed state,
-  is open. No upstream report shows audible harm from a cold decoder: the
-  one that was cited, QwenLM#219, was withdrawn by its author (§11.1).
+  `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder). Since A-26 the first streamed
+  take of a reference keeps the primed state and later streamed takes restore it, bit for bit the
+  same; a quality-first clone still decodes the reference on every take. No upstream report shows
+  audible harm from a cold decoder: the one that was cited, QwenLM#219, was withdrawn by its author
+  (§11.1).
 
 ### 8.2 Reference length and warnings
 
@@ -768,7 +770,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | D2 | EOS after top-k/top-p | filtered like any token | filtered | **adopted** 2026-10-20; `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion | — |
 | D3 | Sampling precision | float32 logits | float32 logits | **adopted** 2026-10-13 | — |
 | — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every variation | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
-| D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | primed with the reference since 2026-11-12 | matches; adopted by `clone-decoder-history-primed-confirm`; A-26 open | RF-52 |
+| D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | primed with the reference since 2026-11-12 | matches; adopted by `clone-decoder-history-primed-confirm`; the primed state is reused since A-26 | RF-52 |
 | D6 | Custom with no detected language | `nothink`, no language id | English plus the English diction sentence | open, by design; `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` is the A/B arm | ER-05 |
 | A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump; measured 2026-11-11 with no detectable effect on clone output (below) | ER-04 |
 | A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |

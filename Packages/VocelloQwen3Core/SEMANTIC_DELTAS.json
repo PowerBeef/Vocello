@@ -682,6 +682,8 @@
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
         "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
         "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
         "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
       ],
@@ -696,7 +698,7 @@
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
-      "removalCriteria": "Production primes since 2026-11-12 (clone-decoder-history-primed-confirm adopted it). Remove the cold restore key once no screen needs it; A-26 then caches the primed state per clone prompt or, with the decoder window adopted, primes from only the frames the window reaches."
+      "removalCriteria": "Production primes since 2026-11-12 (clone-decoder-history-primed-confirm adopted it), and since A-26 the first streamed take of a reference keeps a copy of the primed state that later streamed takes restore, PCM-identical; quality-first clones still decode the reference every take. Remove the cold restore key once no screen needs it; with the decoder window adopted, priming could keep only the frames the window reaches."
     },
     {
       "id": "QUANT-001",

@@ -324,6 +324,146 @@ final class Qwen3TTSStreamingDecoderBucketCache: @unchecked Sendable {
     }
 }
 
+/// A-26 (RF-52): the primed decoder state of recent clone references. A
+/// streamed transcript-backed clone primes the decoder with its reference's
+/// codes (A-04); the first priming of a reference keeps a copy of the state it
+/// leaves (`Qwen3DecoderStreamingSnapshot`), and later takes of that reference
+/// on the same decoder restore the copy instead of decoding the reference
+/// again. An entry belongs to one decoder object, held weakly so a released
+/// decoder's entry never serves another, and to one exact reference: its
+/// codes' type, shape and bytes, and the piece size priming decodes them in.
+/// An entry holds the reference's frames of decoder key/value cache (64 KiB a
+/// frame at fp32, about 47 MiB for a 60 s reference) and a few frames of
+/// convolution history, so the cache is bounded by entries and by bytes, the
+/// newest entry always kept. Only streamed takes use it: a quality-first clone
+/// decodes the reference with its own codes in one partition each take.
+/// `Qwen3TTSMemoryCaches.clearAll` clears it with the other runtime caches.
+final class Qwen3TTSPrimedDecoderStateCache: @unchecked Sendable {
+    static let shared = Qwen3TTSPrimedDecoderStateCache()
+
+#if os(iOS)
+    static let defaultLimit = 1
+    static let defaultByteBudget = 48 * 1_048_576
+#else
+    static let defaultLimit = 4
+    static let defaultByteBudget = 96 * 1_048_576
+#endif
+
+    private struct Key: Hashable {
+        let decoder: ObjectIdentifier
+        let reference: String
+    }
+
+    private final class Entry {
+        weak var decoder: Qwen3TTSSpeechTokenizerDecoder?
+        let snapshot: Qwen3DecoderStreamingSnapshot
+        let byteCount: Int
+
+        init(decoder: Qwen3TTSSpeechTokenizerDecoder, snapshot: Qwen3DecoderStreamingSnapshot) {
+            self.decoder = decoder
+            self.snapshot = snapshot
+            self.byteCount = snapshot.byteCount
+        }
+    }
+
+    private let limit: Int
+    private let byteBudget: Int
+    private let lock = NSLock()
+    private var entries: [Key: Entry] = [:]
+    private var lruKeys: [Key] = []
+
+    init(
+        limit: Int = Qwen3TTSPrimedDecoderStateCache.defaultLimit,
+        byteBudget: Int = Qwen3TTSPrimedDecoderStateCache.defaultByteBudget
+    ) {
+        self.limit = max(1, limit)
+        self.byteBudget = max(0, byteBudget)
+    }
+
+    /// The reference part of a key: the piece size, then the codes' type,
+    /// shape and the SHA-256 of their bytes in logical order.
+    static func referenceKey(referenceCodes: MLXArray, pieceFrames: Int) -> String {
+        let data = referenceCodes.asData(access: .copy)
+        let digest = SHA256.hash(data: data.data).map { String(format: "%02x", $0) }.joined()
+        let shape = data.shape.map(String.init).joined(separator: "x")
+        return "\(pieceFrames)|\(data.dType)|\(shape)|\(digest)"
+    }
+
+    func snapshot(
+        forReference reference: String,
+        decoder: Qwen3TTSSpeechTokenizerDecoder
+    ) -> Qwen3DecoderStreamingSnapshot? {
+        lock.lock()
+        defer { lock.unlock() }
+        dropReleasedDecoders()
+        let key = Key(decoder: ObjectIdentifier(decoder), reference: reference)
+        guard let entry = entries[key], entry.decoder === decoder else {
+            return nil
+        }
+        touch(key)
+        return entry.snapshot
+    }
+
+    func store(
+        _ snapshot: Qwen3DecoderStreamingSnapshot,
+        forReference reference: String,
+        decoder: Qwen3TTSSpeechTokenizerDecoder
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        dropReleasedDecoders()
+        let key = Key(decoder: ObjectIdentifier(decoder), reference: reference)
+        entries[key] = Entry(decoder: decoder, snapshot: snapshot)
+        touch(key)
+        // The least recently used go first while past either bound; the
+        // newest entry stays even when it alone is past the byte budget.
+        while lruKeys.count > 1,
+              lruKeys.count > limit || entries.values.reduce(0, { $0 + $1.byteCount }) > byteBudget,
+              let evicted = lruKeys.first {
+            lruKeys.removeFirst()
+            entries.removeValue(forKey: evicted)
+        }
+    }
+
+    /// The bytes the live entries hold.
+    var byteCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        dropReleasedDecoders()
+        return entries.values.reduce(0) { $0 + $1.byteCount }
+    }
+
+    /// The entries whose decoder is still alive.
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        dropReleasedDecoders()
+        return entries.count
+    }
+
+    func clear() {
+        lock.lock()
+        entries.removeAll()
+        lruKeys.removeAll()
+        lock.unlock()
+    }
+
+    private func touch(_ key: Key) {
+        lruKeys.removeAll { $0 == key }
+        lruKeys.append(key)
+    }
+
+    /// A released decoder's identifier can name a new decoder, so its entries
+    /// go before every lookup.
+    private func dropReleasedDecoders() {
+        let released = entries.filter { $0.value.decoder == nil }.map(\.key)
+        for key in released {
+            entries.removeValue(forKey: key)
+            lruKeys.removeAll { $0 == key }
+        }
+    }
+}
+
 public enum Qwen3TTSMemoryCaches {
     public static func clearAll(
         isolation: isolated (any Actor)? = #isolation
@@ -332,6 +472,7 @@ public enum Qwen3TTSMemoryCaches {
         Qwen3TTSPreparedComponentCache.shared.clear()
         Qwen3TTSConditioningPrefixCache.shared.clear()
         Qwen3TTSStreamingDecoderBucketCache.shared.clear()
+        Qwen3TTSPrimedDecoderStateCache.shared.clear()
         Memory.clearCache()
     }
 }

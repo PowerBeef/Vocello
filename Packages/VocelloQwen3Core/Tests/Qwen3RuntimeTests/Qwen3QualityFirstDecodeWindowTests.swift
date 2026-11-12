@@ -214,6 +214,165 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertLessThanOrEqual(zip(sevens, expected).map { abs($0 - $1) }.max() ?? .infinity, 1e-5)
     }
 
+    /// A-26 (RF-52): a primed state kept from the first take and restored for
+    /// later ones decodes bit for bit as decoding the reference again, also
+    /// past the key/value cache's 256-frame allocation step.
+    func testARestoredPrimedStateDecodesExactlyAsPrimingAgain() throws {
+        let tokenizer = try makeTinyTokenizer()
+        let decoder = tokenizer.decoder
+        let generatedFrames = 40
+        for referenceFrames in [31, 270] {
+            let codes = fixtureCodes(frameCount: referenceFrames + generatedFrames, zeroFrames: [])
+            let referenceCodes = codes[0..., 0 ..< referenceFrames, 0...].transposed(0, 2, 1)
+            let generatedCodes = codes[0..., referenceFrames..., 0...].transposed(0, 2, 1)
+            func take(prime: () throws -> Void) rethrows -> [Float] {
+                decoder.resetStreamingState()
+                defer { decoder.resetStreamingState() }
+                try prime()
+                var output: [Float] = []
+                for start in stride(from: 0, to: generatedFrames, by: 8) {
+                    let end = min(generatedFrames, start + 8)
+                    output += decoder.streamingStep(generatedCodes[0..., 0..., start ..< end]).asArray(Float.self)
+                }
+                return output
+            }
+            let primedAgain = try take {
+                _ = try Qwen3TTSModel.primeStreamingDecoder(decoder, referenceCodes: referenceCodes)
+            }
+            let primedStates = Qwen3TTSPrimedDecoderStateCache()
+            var reused: [Bool] = []
+            for takeNumber in 1 ... 3 {
+                let output = try take {
+                    let priming = try Qwen3TTSModel.primeStreamingDecoderReusingState(
+                        decoder, referenceCodes: referenceCodes, primedStates: primedStates
+                    )
+                    XCTAssertEqual(priming.frames, referenceFrames)
+                    reused.append(priming.reused)
+                }
+                XCTAssertEqual(output, primedAgain, "\(referenceFrames) reference frames, take \(takeNumber)")
+            }
+            XCTAssertEqual(reused, [false, true, true], "\(referenceFrames) reference frames")
+        }
+    }
+
+    /// A-26: a snapshot holds every stateful layer's history and the
+    /// pre-transformer cache; a reset empties all of them; a snapshot of other
+    /// layers is refused and changes nothing.
+    func testASnapshotCoversEveryStreamingLayerAndRefusesOtherLayers() throws {
+        let tokenizer = try makeTinyTokenizer()
+        let decoder = tokenizer.decoder
+        let referenceCodes = fixtureCodes(frameCount: 31, zeroFrames: []).transposed(0, 2, 1)
+        decoder.resetStreamingState()
+        defer { decoder.resetStreamingState() }
+        _ = try Qwen3TTSModel.primeStreamingDecoder(decoder, referenceCodes: referenceCodes)
+        let carriers = decoder.streamingStateCarriers()
+        XCTAssertFalse(carriers.isEmpty)
+        let snapshot = try XCTUnwrap(decoder.streamingStateSnapshot())
+        XCTAssertEqual(snapshot.layerPaths, Set(carriers.keys))
+        for (path, carrier) in carriers {
+            let live = carrier.streamingState
+            XCTAssertEqual(snapshot.layerStates[path]?.shape, live?.shape, path)
+            if let live, let kept = snapshot.layerStates[path] {
+                XCTAssertTrue(arrayEqual(kept, live).item(Bool.self), path)
+            }
+        }
+        // A kernel-one convolution keeps no history; every other layer does.
+        XCTAssertGreaterThan(snapshot.layerStates.count, 0)
+        XCTAssertEqual(snapshot.transformerStates?.count, decoder.preTransformer.layers.count)
+        XCTAssertGreaterThan(snapshot.byteCount, 0)
+
+        decoder.resetStreamingState()
+        XCTAssertTrue(decoder.streamingStateCarriers().values.allSatisfy { $0.streamingState == nil },
+                      "a reset leaves no layer's history behind")
+        XCTAssertNil(decoder.transformerCache)
+
+        let otherLayers = Qwen3DecoderStreamingSnapshot(
+            layerPaths: snapshot.layerPaths.union(["elsewhere"]),
+            layerStates: snapshot.layerStates,
+            transformerStates: snapshot.transformerStates
+        )
+        XCTAssertFalse(decoder.restoreStreamingState(otherLayers))
+        let otherCache = Qwen3DecoderStreamingSnapshot(
+            layerPaths: snapshot.layerPaths, layerStates: snapshot.layerStates, transformerStates: []
+        )
+        XCTAssertFalse(decoder.restoreStreamingState(otherCache))
+        let keysOnly = Qwen3DecoderStreamingSnapshot(
+            layerPaths: snapshot.layerPaths, layerStates: snapshot.layerStates,
+            transformerStates: snapshot.transformerStates?.map { Array($0.prefix(1)) }
+        )
+        XCTAssertFalse(decoder.restoreStreamingState(keysOnly), "a layer without its values is refused, not trapped")
+        XCTAssertTrue(decoder.streamingStateCarriers().values.allSatisfy { $0.streamingState == nil })
+        XCTAssertNil(decoder.transformerCache)
+
+        XCTAssertTrue(decoder.restoreStreamingState(snapshot))
+        XCTAssertEqual(decoder.transformerCache?.first?.offset, 31)
+    }
+
+    /// A-26: a kept state serves only its own decoder and reference, the least
+    /// recently used one goes past the limit, a released decoder's entries go
+    /// with it, and the runtime's cache clearing empties the shared cache.
+    func testThePrimedStateCacheServesOnlyItsDecoderAndReference() async throws {
+        let first = try makeTinyTokenizer().decoder
+        let second = try makeTinyTokenizer().decoder
+        let codes = fixtureCodes(frameCount: 12, zeroFrames: []).transposed(0, 2, 1)
+        let reference = Qwen3TTSPrimedDecoderStateCache.referenceKey(referenceCodes: codes, pieceFrames: 25)
+        let contiguousCopy = MLXArray(codes.asArray(Int32.self), codes.shape)
+        XCTAssertEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+            referenceCodes: contiguousCopy, pieceFrames: 25))
+        XCTAssertNotEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+            referenceCodes: codes, pieceFrames: 7))
+        XCTAssertNotEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+            referenceCodes: fixtureCodes(frameCount: 12, zeroFrames: [3]).transposed(0, 2, 1), pieceFrames: 25))
+
+        first.resetStreamingState()
+        _ = try Qwen3TTSModel.primeStreamingDecoder(first, referenceCodes: codes)
+        let snapshot = try XCTUnwrap(first.streamingStateSnapshot())
+        first.resetStreamingState()
+
+        let cache = Qwen3TTSPrimedDecoderStateCache(limit: 2)
+        cache.store(snapshot, forReference: reference, decoder: first)
+        XCTAssertNotNil(cache.snapshot(forReference: reference, decoder: first))
+        XCTAssertNil(cache.snapshot(forReference: reference, decoder: second), "another decoder")
+        XCTAssertNil(cache.snapshot(forReference: "another reference", decoder: first))
+
+        cache.store(snapshot, forReference: "b", decoder: first)
+        XCTAssertNotNil(cache.snapshot(forReference: reference, decoder: first))
+        cache.store(snapshot, forReference: "c", decoder: first)
+        XCTAssertEqual(cache.count, 2)
+        XCTAssertNil(cache.snapshot(forReference: "b", decoder: first), "the least recently used goes first")
+        XCTAssertNotNil(cache.snapshot(forReference: reference, decoder: first))
+
+        do {
+            let released = try makeTinyTokenizer().decoder
+            cache.store(snapshot, forReference: reference, decoder: released)
+            XCTAssertNotNil(cache.snapshot(forReference: reference, decoder: released))
+        }
+        XCTAssertEqual(cache.count, 1, "a released decoder's entry goes with it")
+        cache.clear()
+        XCTAssertEqual(cache.count, 0)
+
+        // The byte budget evicts the least recently used too, and keeps the
+        // newest entry even when it alone is past the budget.
+        XCTAssertGreaterThan(snapshot.byteCount, 0)
+        let bounded = Qwen3TTSPrimedDecoderStateCache(limit: 4, byteBudget: 2 * snapshot.byteCount)
+        for name in ["one", "two", "three"] {
+            bounded.store(snapshot, forReference: name, decoder: first)
+        }
+        XCTAssertEqual(bounded.count, 2)
+        XCTAssertEqual(bounded.byteCount, 2 * snapshot.byteCount)
+        XCTAssertNil(bounded.snapshot(forReference: "one", decoder: first))
+        let tiny = Qwen3TTSPrimedDecoderStateCache(limit: 4, byteBudget: 1)
+        tiny.store(snapshot, forReference: "one", decoder: first)
+        tiny.store(snapshot, forReference: "two", decoder: first)
+        XCTAssertEqual(tiny.count, 1)
+        XCTAssertNotNil(tiny.snapshot(forReference: "two", decoder: first))
+
+        Qwen3TTSPrimedDecoderStateCache.shared.store(snapshot, forReference: reference, decoder: first)
+        XCTAssertEqual(Qwen3TTSPrimedDecoderStateCache.shared.count, 1)
+        await Qwen3TTSMemoryCaches.clearAll()
+        XCTAssertEqual(Qwen3TTSPrimedDecoderStateCache.shared.count, 0)
+    }
+
     // MARK: - Fixtures
 
     private func makeTinyTokenizer() throws -> Qwen3TTSSpeechTokenizer {

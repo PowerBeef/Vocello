@@ -71,7 +71,7 @@ into PCM. The encoder runs only to turn a clone reference into codes for in-cont
 | --- | --- | --- |
 | A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; selectable behind `QWENVOICE_ENCODER_ROTARY` since 2026-11-11; the Swift clone screen was inconclusive with the direction pointing at harm, so the default stays (RF-52) |
 | A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open; selectable behind `QWENVOICE_DECODER_WINDOW=on` since 2026-11-11; the `clone-long` screen's rule `decoder-window-72` decides the default (RF-54) |
-| D5 / A-04 | Streamed clones decoded from a cold decoder; the reference decodes reference plus generated codes (§5) | matches since 2026-11-12: streamed clones prime with the reference (`clone-decoder-history-primed-confirm`: speaker similarity +0.056, error rate unchanged); `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder; A-26 (caching the primed state) is open |
+| D5 / A-04 | Streamed clones decoded from a cold decoder; the reference decodes reference plus generated codes (§5) | matches since 2026-11-12: streamed clones prime with the reference (`clone-decoder-history-primed-confirm`: speaker similarity +0.056, error rate unchanged); `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder; since A-26 a streamed take restores the primed state its reference's first streamed take kept |
 | — | Encoder attention is full causal, as upstream's is (§2.3) | matches; do not add the 250-frame window |
 | — | The codec runs in fp32; Qwen's README setup loads bf16 (§7) | deliberate |
 
@@ -358,9 +358,17 @@ decoder with no reference history until 2026-11-12. Streamed clones now decode t
 through `streamingStep` in 25-frame pieces before the take and discard their samples, so a streamed
 clone hears the history a quality-first one does: the clone screen adopted it on two seed sets
 (speaker similarity +0.060 and +0.056, error rate unchanged; RF-52), and
-`QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder in a diagnostics build. Priming re-decodes the whole reference on every take (about 65%
-more decoder work for a 20 s reference on a 30 s take), so A-26 then caches the primed state per
-clone prompt, or, with the decoder window adopted, primes only from the frames the window reaches.
+`QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder in a diagnostics build. Priming
+decodes the whole reference (about 950 ms median on the M6 for the clone screen's references), so
+since A-26 the first streamed take of a reference keeps a compact copy of the primed state
+(`Qwen3TTSPrimedDecoderStateCache`: one reference and 48 MiB on the iPhone, four and 96 MiB on the
+Mac, cleared with the other runtime caches), and later streamed takes restore it, bit for bit the
+state decoding the reference again leaves (`Qwen3QualityFirstDecodeWindowTests`). The clone prewarm
+does not prime: a proactive prime stops only when its token is revoked, so priming there could keep
+the GPU busy after the app deactivates (BG-01). A quality-first clone still decodes the reference
+with its own codes on every take: restoring a primed state there would change the decode partition
+unless the reference spans a multiple of 25 frames, which matches only within the partition
+tolerance and would need its own screen.
 
 **No window (A-03).** By default the decoder attends causally over the whole take. Its fp32 KV grows
 by about 64 KiB per frame: about 48 MiB at 60 s and 128 MiB at the 2,048-frame cap. Since

@@ -21,7 +21,7 @@ file. It is split by concern (RF-46, ARCH-001), by moving lines unchanged:
 | `Qwen3TTSLoading.swift` | Loading a prepared directory: weights, talker, speech tokenizer, text tokenizer |
 | `Qwen3TTSPromptAssembly.swift` | The generation inputs of the three modes and the chat-template text rules |
 | `Qwen3TTSSampling.swift` | The sampler scratch and `sampleToken` |
-| `Qwen3TTSCaches.swift` | Tokenizer, prepared-component, conditioning-prefix and decoder-bucket caches |
+| `Qwen3TTSCaches.swift` | Tokenizer, prepared-component, conditioning-prefix, decoder-bucket and primed-decoder-state (A-26) caches |
 | `Qwen3TTSGenerationProfiles.swift` | Prewarm depth, token budget, speed profile, streaming mode, step evaluation |
 | `Qwen3TTSVoiceClonePrompt.swift` | Reference audio and the clone prompt artifact |
 | `Qwen3TTSDiagnostics.swift` | Diagnostic records and throughput arithmetic |

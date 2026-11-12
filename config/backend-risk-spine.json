@@ -199,9 +199,12 @@
       "runtimeCapabilityID": "bounded-streaming",
       "title": "Streamed clones decode from a cold decoder without reference history",
       "source": "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open: fixed together with A-26's primed decoder history (ER-04)."
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests/testAStreamPrimedWithTheReferenceDecodesAsTheQualityFirstWindow",
+        "Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests/testARestoredPrimedStateDecodesExactlyAsPrimingAgain"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "A-05",

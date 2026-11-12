@@ -3,7 +3,7 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 27,
+    "maximumUncheckedSendableDeclarations": 28,
     "maximumNonisolatedUnsafeDeclarations": 2,
     "reviewCadenceDays": 365
   },
@@ -73,14 +73,16 @@
         "CachedConditioningPrefix",
         "CachedConditioningPrefixBox",
         "Qwen3TTSConditioningPrefixCache",
-        "Qwen3TTSStreamingDecoderBucketCache"
+        "Qwen3TTSStreamingDecoderBucketCache",
+        "Qwen3TTSPrimedDecoderStateCache"
       ],
       "owner": "Qwen3 model generation gate and cache locks",
       "invariant": "Mutable MLX values, and the checkpoint file cursor of the text-embedding row reader a loaded talker holds, are accessed only by the single generation owner or their documented lock-protected cache.",
-      "reviewedAt": "2026-08-26",
+      "reviewedAt": "2026-11-12",
       "removalCondition": "Remove each unchecked model/cache box when MLX arrays gain checked sendability or the corresponding value no longer crosses the single-owner generation boundary.",
       "tests": [
-        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift"
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3GenerationGateTests.swift",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
       ]
     },
     {

@@ -468,7 +468,66 @@
             }
           },
           "expected": "Speaker similarity a little higher, as in the pre-screen; nothing else moves beyond its margin. Measured before this rule, on the M6 with fixed seeds: the 8-bit code predictor makes a clone take about 20% slower where the GPU bounds a frame (real-time factor 0.303 to 0.363 long, 0.366 to 0.439 medium, two rounds each) and costs little where the host bounds it (efficiency cores: -1% to +6.5%), for 56 MB more weights.",
-          "decision": "This rule changes no default: an 8-bit code predictor needs a new Speed artifact, which is the maintainer's decision. REPEATED when no guard reaches past its margin on the harmful side and B's speaker-similarity interval lies wholly above zero; NOT REPEATED when no guard harms but the interval includes zero; HARM when a guard's whole interval lies past its margin or B loses more takes than allowed. The tool's ADOPT reads as no harm; the similarity interval then decides REPEATED or NOT REPEATED."
+          "decision": "This rule changes no default: an 8-bit code predictor needs a new Speed artifact, which is the maintainer's decision. REPEATED when no guard reaches past its margin on the harmful side and B's speaker-similarity interval lies wholly above zero; NOT REPEATED when no guard harms but the interval includes zero; HARM when a guard's whole interval lies past its margin or B loses more takes than allowed. The tool's ADOPT reads as no harm; the similarity interval then decides REPEATED or NOT REPEATED.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "NOT REPEATED (no harm)",
+            "toolVerdict": "ADOPT (no guard reaches its margin)",
+            "commit": "9b006d4b (executable of the RF-55 key's build)",
+            "arms": {
+              "a": "qa",
+              "b": "qb1",
+              "bTwice": "qb1, qb2 identical",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "aReproducesDefault": "qa is identical to hb1 on every take",
+            "outcomes": {
+              "a": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              },
+              "b": {
+                "generated": 191,
+                "refused": 1,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 3,
+              "b": 2
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0093,
+              "interval95": [
+                -0.0001,
+                0.0206
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": 0.0111,
+              "interval95": [
+                0.0019,
+                0.0208
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": -0.0067,
+              "interval95": [
+                -0.0155,
+                0.0004
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 6.2,
+              "interval95": [
+                -10.4,
+                26.4
+              ]
+            },
+            "speed": "Measured before the rule (scripts/pcm_identity.py, fixed seeds, M6): real-time factor 0.303 to 0.363 long and 0.366 to 0.439 medium unclamped (about 20% slower where the GPU bounds a frame), -1% to +6.5% on the efficiency cores.",
+            "note": "The point estimate repeats the review's pre-screen (+0.009 against +0.010) and nothing is worse, but the interval's lower end is -0.0001, so by the recorded rule the gain is not shown. For the maintainer's artifact decision: about +0.01 speaker similarity and a slightly better error rate, against about 20% more time on a GPU-bound device and 56 MB of weights."
+          }
         }
       },
       "noiseFloor": {
@@ -958,6 +1017,22 @@
           },
           "expected": "Fewer refused projects: the refused Japanese segments ran 70 s and more with 2.2 to 2.9 s silent gaps and slow delivery, past the roughly 60 s envelope long-form delivery was validated at. October's shorter budget (200 for every script) made English and French Consistent projects worse, so this is screened for Japanese alone.",
           "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 (each seed set's report read, the interval of either reaching past the margin making it INCONCLUSIVE): East Asian scripts then plan with a budget of 150 units while every other script keeps 300 (a planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays."
+        },
+        "long-form-consistent-talker": {
+          "recorded": "2026-11-12",
+          "question": "Under the Consistent variation, do long-form projects fail less when the talker samples as Balanced does (QWENVOICE_TALKER_TEMP=0.8 and QWENVOICE_TALKER_TOPP=0.95, in place of Consistent's 0.7 and 0.9) (RF-53)?",
+          "arms": "The long-form screen's Consistent projects alone (runs long-form-consistent-seeds1 and -seeds2: four projects per stratum, Built-in Voice in English, French and Japanese and Voice Design in English), at the build of the commit that records this rule. A: default. B: both keys set. Seed sets 1 and 2, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The control reproduces the defect: A refuses at least 8 of its 32 projects across both seed sets (the long-form screen refused 18 of 32 Consistent projects).",
+          "primaryMetric": "Refused or failed projects across both seed sets, A against B, overall and per stratum, and B's failure classes against A's.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Fewer refused projects in English, French and Voice Design. Japanese may stay refused for its segment length, which long-form-japanese-budget screens apart. The subtalker already keeps the reference sampling under every variation (RF-18, 2026-10-20); October's shorter segments made Consistent worse.",
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 in either seed set's report: a long-form segment under Consistent then samples its talker at 0.8 and 0.95. REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE."
         }
       },
       "noiseFloor": {

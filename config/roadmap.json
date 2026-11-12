@@ -544,7 +544,7 @@
         "docs/reference/qwen3-tts-guide.md"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. The review's pre-screen: an 8-bit code predictor alone gives +0.010 speaker similarity (95% interval +0.002 to +0.019, 48 pairs) for 56 MB; the all-8-bit model gives +0.025."
+      "notes": "Opened 2026-11-11 at the maintainer's request (the review's pre-screen: an 8-bit code predictor alone gives +0.010 speaker similarity, interval +0.002 to +0.019, 48 pairs, for 56 MB; all 8-bit +0.025). Measured 2026-11-12 with QWENVOICE_CODE_PREDICTOR_BITS=8 (8bec3007: the code predictor from the installed 8-bit sibling, no new artifact): about 20% slower where the GPU bounds a frame (real-time factor 0.303 to 0.363 long, 0.366 to 0.439 medium on the M6), -1% to +6.5% on the efficiency cores. The clone screen's rule code-predictor-8bit (six languages, 190 pairs): no harm, gain NOT REPEATED by its rule: similarity +0.009 (interval -0.0001 to +0.021), worst window +0.011 (+0.002 to +0.021), error rate -0.007, gross failures 3 and 2. Waiting on the maintainer: whether that is worth a new Speed artifact (publishing one is the maintainer's)."
     },
     {
       "id": "RF-57",

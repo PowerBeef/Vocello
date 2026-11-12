@@ -237,9 +237,12 @@ def joined_script(entries: list[dict], language: str) -> dict:
             "text": separator.join(entry["text"] for entry in entries)}
 
 
-def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) -> dict:
+def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None,
+               variations: list[str] | None = None) -> dict:
     if screen.get("kind") == "long-form":
-        return build_long_form_plan(screen, seed_set, languages)
+        return build_long_form_plan(screen, seed_set, languages, variations)
+    if variations:
+        raise ScreenError("--variations applies to a long-form screen")
     if screen.get("kind") != "clone":
         raise ScreenError(f"screen kind '{screen.get('kind')}' is not implemented")
     pool = read_json(SCRIPT_POOL)["entries"]
@@ -279,7 +282,8 @@ def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) 
     return plan
 
 
-def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None = None) -> dict:
+def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None = None,
+                         variations: list[str] | None = None) -> dict:
     """Long-form projects (RF-50): per stratum, `projectsPerStratum` scripts of
     `sentencesPerProject` pool sentences, each run once per variation with the
     same script, so a project's variations pair within it. A project, not a
@@ -290,6 +294,9 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
     if unknown:
         raise ScreenError(f"not in the screen: {', '.join(unknown)}")
     per, count = screen["sentencesPerProject"], screen["projectsPerStratum"]
+    unknown_variations = [name for name in variations or [] if name not in screen["variations"]]
+    if unknown_variations:
+        raise ScreenError(f"not a variation of the screen: {', '.join(unknown_variations)}")
     takes = []
     for name in selected:
         stratum = screen["strata"][name]
@@ -307,6 +314,8 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
             project = f"{name}-{index + 1:02d}"
             voice = voices[index % len(voices)]
             for variation in screen["variations"]:
+                if variations and variation not in variations:
+                    continue
                 take_id = f"{project}--{variation}"
                 take = {"takeID": take_id, "voice": project, "stratum": name, "mode": mode, "language": language,
                         "variation": variation, "scriptID": script["id"], "text": script["text"],
@@ -987,7 +996,8 @@ def compare_arms(args: argparse.Namespace) -> int:
 def command_plan(args: argparse.Namespace) -> int:
     screen = load_screen(args.screen)
     languages = [value for value in (args.languages or "").split(",") if value] or None
-    plan = build_plan(screen, args.seed_set, languages)
+    variations = [value for value in (args.variations or "").split(",") if value] or None
+    plan = build_plan(screen, args.seed_set, languages, variations)
     run_dir = Path(args.out) if args.out else (
         managed_output_path("QVOICE_ARTIFACTS_MACOS") / "quality-screen" / f"{args.screen}-{plan['planSHA256'][:12]}")
     if (run_dir / "plan.json").exists():
@@ -1006,7 +1016,8 @@ def main(argv: list[str] | None = None) -> int:
     plan = commands.add_parser("plan", help="write the take plan of a screen")
     plan.add_argument("--screen", required=True)
     plan.add_argument("--seed-set", type=int, default=1)
-    plan.add_argument("--languages", help="a subset of the screen's languages, comma-separated")
+    plan.add_argument("--languages", help="a subset of the screen's languages (a long-form screen's strata), comma-separated")
+    plan.add_argument("--variations", help="a long-form screen: a subset of its variations, comma-separated")
     plan.add_argument("--out", help="run directory (default: under build/artifacts)")
     plan.set_defaults(run_command=command_plan)
     run = commands.add_parser("run", help="generate one arm")

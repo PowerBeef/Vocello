@@ -166,6 +166,14 @@ class LongFormTests(unittest.TestCase):
         self.assertEqual(plan["kind"], "long-form")
         reseeded = screen.build_long_form_plan(self.SCREEN, 2)
         self.assertTrue(screen.same_takes_other_seeds(plan, reseeded))
+        consistent = screen.build_long_form_plan(self.SCREEN, 1, variations=["consistent"])
+        self.assertEqual(len(consistent["takes"]), 4)
+        self.assertTrue(all(take["variation"] == "consistent" for take in consistent["takes"]))
+        self.assertEqual({take["seed"] for take in consistent["takes"]},
+                         {take["seed"] for take in plan["takes"] if take["variation"] == "consistent"},
+                         "the same takes, the same seeds")
+        with self.assertRaises(screen.ScreenError):
+            screen.build_long_form_plan(self.SCREEN, 1, variations=["balanced"])
         with self.assertRaises(screen.ScreenError):
             screen.build_long_form_plan(self.SCREEN, 1, ["no-such-stratum"])
 

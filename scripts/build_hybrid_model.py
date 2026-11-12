@@ -116,6 +116,14 @@ def verified_source(folder: Path, repo: str, revision: str) -> dict:
     return record
 
 
+def content_revision(files: list[dict]) -> str:
+    """The contract and the installed-model check name a revision as a 40-character Git-style SHA. A
+    local build has no commit, so its revision is the SHA-1 of its file list (the path, size and
+    SHA-256 of every required file): a content identity that changes with any byte of the artifact."""
+    canonical = json.dumps(sorted(files, key=lambda item: item["path"]), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(canonical.encode()).hexdigest()
+
+
 def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) -> dict:
     entry = next(model for model in contract["models"] if model["id"] == CONTRACT_IDS[mode])
     speed = next(variant for variant in entry["variants"] if variant["kind"] == "speed")
@@ -178,11 +186,11 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) 
 
     files = [{"path": relative, "size": (folder / relative).stat().st_size, "sha256": sha256(folder / relative)}
              for relative in sorted(speed["requiredRelativePaths"])]
-    weights_digest = next(item["sha256"] for item in files if item["path"] == "model.safetensors")
-    record = dict(four_record, repo=f"local/vocello-hybrid-{recipe}-{MODES[mode]}", revision=weights_digest,
+    revision = content_revision(files)
+    record = dict(four_record, repo=f"local/vocello-hybrid-{recipe}-{MODES[mode]}", revision=revision,
                   target_folder=folder.name, created_at_utc="1970-01-01T00:00:00Z", files=files)
     (folder / INTEGRITY).write_text(json.dumps(record, indent=1) + "\n")
-    return {"mode": mode, "folder": folder.name, "repo": record["repo"], "revision": weights_digest,
+    return {"mode": mode, "folder": folder.name, "repo": record["repo"], "revision": revision,
             "bytes": sum(item["size"] for item in files), "selectedModules": len(modules),
             "weightsBytes": total, "addedWeightBytes": total - (four / "model.safetensors").stat().st_size + four_start}
 

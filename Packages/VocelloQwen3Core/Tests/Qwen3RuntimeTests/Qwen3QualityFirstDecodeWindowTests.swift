@@ -168,6 +168,52 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertLessThanOrEqual(maxAbsolute, 1e-5, "reference cut must start exactly at frame \(referenceFrames)")
     }
 
+    /// A-04 (RF-52): a streamed decode primed with the reference's codes gives
+    /// the quality-first window of `[reference + generated]` in any streaming
+    /// partition, and a cold streamed decode does not.
+    func testAStreamPrimedWithTheReferenceDecodesAsTheQualityFirstWindow() throws {
+        let tokenizer = try makeTinyTokenizer()
+        let referenceFrames = 31
+        let generatedFrames = 40
+        let codes = fixtureCodes(frameCount: referenceFrames + generatedFrames, zeroFrames: [])
+        let expected = Qwen3TTSModel.decodeQualityFirstWindow(
+            tokenizer, codes: codes, referenceFrameCount: referenceFrames
+        ).asArray(Float.self)
+        // Quantizer-major `[1, groups, frames]`, as the prompt's reference
+        // codes and the streamed chunks reach the decoder.
+        let referenceCodes = codes[0..., 0 ..< referenceFrames, 0...].transposed(0, 2, 1)
+        let generatedCodes = codes[0..., referenceFrames..., 0...].transposed(0, 2, 1)
+        func streamed(primed: Bool, piece: Int) throws -> [Float] {
+            tokenizer.decoder.resetStreamingState()
+            defer { tokenizer.decoder.resetStreamingState() }
+            if primed {
+                XCTAssertEqual(try Qwen3TTSModel.primeStreamingDecoder(
+                    tokenizer.decoder, referenceCodes: referenceCodes), referenceFrames)
+            }
+            var output: [Float] = []
+            for start in stride(from: 0, to: generatedFrames, by: piece) {
+                let end = min(generatedFrames, start + piece)
+                output += tokenizer.decoder.streamingStep(generatedCodes[0..., 0..., start ..< end]).asArray(Float.self)
+            }
+            return output
+        }
+        for piece in [4, 8] {
+            let primed = try streamed(primed: true, piece: piece)
+            XCTAssertEqual(primed.count, expected.count)
+            let difference = zip(primed, expected).map { abs($0 - $1) }.max() ?? .infinity
+            XCTAssertLessThanOrEqual(difference, 1e-5, "primed, \(piece)-frame pieces")
+        }
+        let cold = try streamed(primed: false, piece: 4)
+        XCTAssertGreaterThan(zip(cold, expected).map { abs($0 - $1) }.max() ?? 0, 1e-4,
+                             "a cold decoder lacks the reference's history")
+        // Priming in other piece sizes leaves the same state.
+        tokenizer.decoder.resetStreamingState()
+        _ = try Qwen3TTSModel.primeStreamingDecoder(tokenizer.decoder, referenceCodes: referenceCodes, pieceFrames: 7)
+        let sevens = tokenizer.decoder.streamingStep(generatedCodes).asArray(Float.self)
+        tokenizer.decoder.resetStreamingState()
+        XCTAssertLessThanOrEqual(zip(sevens, expected).map { abs($0 - $1) }.max() ?? .infinity, 1e-5)
+    }
+
     // MARK: - Fixtures
 
     private func makeTinyTokenizer() throws -> Qwen3TTSSpeechTokenizer {

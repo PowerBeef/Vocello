@@ -32,19 +32,26 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// RF-54 (`QWENVOICE_DECODER_WINDOW=on`): the speech tokenizer's decoder
     /// applies its configured attention window (72 frames), as upstream does.
     let decoderSlidingWindow: Bool
+    /// RF-52, A-04 (`QWENVOICE_CLONE_DECODER_HISTORY=primed`): a streamed
+    /// transcript-backed clone decodes the reference's codes first and keeps
+    /// none of their samples, as the quality-first path and upstream's ICL
+    /// decode do, instead of starting from a cold decoder.
+    let cloneDecoderPriming: Bool
 
     init(
         talkerKVQuantBits: Int?,
         speechTokenizerResidency: Bool?,
         encoderSplitHalfRotary: Bool = false,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
-        decoderSlidingWindow: Bool = false
+        decoderSlidingWindow: Bool = false,
+        cloneDecoderPriming: Bool = false
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
         self.encoderSplitHalfRotary = encoderSplitHalfRotary
         self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
         self.decoderSlidingWindow = decoderSlidingWindow
+        self.cloneDecoderPriming = cloneDecoderPriming
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
@@ -52,7 +59,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         speechTokenizerResidency: nil,
         encoderSplitHalfRotary: false,
         referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
-        decoderSlidingWindow: false
+        decoderSlidingWindow: false,
+        cloneDecoderPriming: false
     )
 
     static func resolve(
@@ -88,7 +96,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             referenceTrailingSilenceSamples: gatedValue("QWENVOICE_REFERENCE_PADDING") == "half-second"
                 ? Qwen3TTSReferenceAudio.legacyTrailingSilenceSamples
                 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
-            decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on"
+            decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
+            cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") == "primed"
         )
     }
 }

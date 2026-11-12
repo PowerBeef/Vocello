@@ -227,7 +227,8 @@ extension Qwen3TTSModel {
             talker: talkerComponents.talker,
             speakerEncoder: talkerComponents.speakerEncoder,
             talkerKVQuantBits: loadOptions.diagnosticOverrides.talkerKVQuantBits,
-            referenceTrailingSilenceSamples: loadOptions.diagnosticOverrides.referenceTrailingSilenceSamples
+            referenceTrailingSilenceSamples: loadOptions.diagnosticOverrides.referenceTrailingSilenceSamples,
+            streamedCloneDecoderPriming: loadOptions.diagnosticOverrides.cloneDecoderPriming
         )
         model.preparedKey = preparedKey
 

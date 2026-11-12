@@ -278,6 +278,31 @@
             },
             "note": "Not worse beyond any margin. The similarity and error-rate moves are the size of the screen's own noise floor (a1 against s2: similarity -0.015, error rate +0.012), so neither is evidence of a change; the shorter trailing silence lies mostly outside the floor's interval. B's two extra gross failures are English references asked for French (error rates 0.78 and 1.0); the third is a German voice that also failed under the rotary screen. Adopted: the reference is encoded as upstream encodes it, and codecEncodeConditioningVersion moves to icl-ref-unpadded-v3, so every transcript-backed prompt rebuilds once."
           }
+        },
+        "clone-decoder-history-primed": {
+          "recorded": "2026-11-11",
+          "question": "Does decoding a streamed transcript-backed clone with the reference's history (QWENVOICE_CLONE_DECODER_HISTORY=primed: the reference codes are decoded first and their samples discarded, as the quality-first path and upstream's ICL decode do) in place of a cold decoder harm clone takes (A-04, A-26)?",
+          "arms": "A: the build at the commit that adds the key, default (a cold decoder). B: the same build with the key set. Seed set 1 of the clone screen, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The default arm A reproduces arm wa (the default at 1651e871) on every take, so adding the key changed nothing by default. Two B arms on the same seeds are identical on every take. Every paired take has the same length in A and B (requiresSameDuration): priming acts in the decoder only, so the talker's codes cannot move. The clone screen's noise floor (compare-a1-vs-s2.json, passed with --floor) sits inside 0.71 of each margin; because A and B decode the same codes, their paired differences carry no sampling noise and that floor is a conservative bound. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT.",
+          "requiresSameDuration": true,
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Unknown. A cold decoder acts most on a take's first frames; the upstream report of audible harm (QwenLM issue 219) was withdrawn by its author. Priming costs decoding the reference once per take before the first audio; it is reported, not judged.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default, and with the decoder window adopted they prime from only the frames the window reaches (A-26). REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
         }
       },
       "noiseFloor": {

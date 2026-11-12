@@ -220,6 +220,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// none in production since 2026-11-11, as upstream; half a second under
     /// the gated `QWENVOICE_REFERENCE_PADDING=half-second` (A-12, RF-52).
     let referenceTrailingSilenceSamples: Int
+    /// A streamed transcript-backed clone primes the decoder with the
+    /// reference's codes before its own (A-04); off in production, on under
+    /// the gated `QWENVOICE_CLONE_DECODER_HISTORY=primed` (RF-52).
+    let streamedCloneDecoderPriming: Bool
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?
     var tokenizer: Tokenizer?
@@ -1166,12 +1170,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         talker: Qwen3TTSTalkerForConditionalGeneration,
         speakerEncoder: Qwen3TTSSpeakerEncoder?,
         talkerKVQuantBits: Int? = nil,
-        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
+        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
+        streamedCloneDecoderPriming: Bool = false
     ) {
         self.config = config
         self.talker = talker
         self.talkerKVQuantBits = talkerKVQuantBits
         self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
+        self.streamedCloneDecoderPriming = streamedCloneDecoderPriming
         self.speakerEncoder = speakerEncoder
     }
 
@@ -1872,6 +1878,26 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let start = min(available, referenceFrames * rate)
         let end = min(available, max(start, (referenceFrames + generatedFrames) * rate))
         return start ..< end
+    }
+
+    /// A-04 (RF-52): decodes a clone reference's codes `[1, quantizers,
+    /// frames]` through the streaming decoder and keeps none of their samples,
+    /// leaving the decoder with the history a quality-first take's generated
+    /// frames decode with. It decodes in the quality-first path's pieces, so a
+    /// long reference never decodes in one burst; any partition leaves the
+    /// same state (`Qwen3DecoderPartitionTests`). Returns the frames primed.
+    static func primeStreamingDecoder(
+        _ decoder: Qwen3TTSSpeechTokenizerDecoder,
+        referenceCodes: MLXArray,
+        pieceFrames: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
+    ) throws -> Int {
+        let frames = referenceCodes.dim(2)
+        for start in stride(from: 0, to: frames, by: max(1, pieceFrames)) {
+            try Task.checkCancellation()
+            let end = min(frames, start + max(1, pieceFrames))
+            eval(decoder.streamingStep(referenceCodes[0..., 0..., start ..< end]))
+        }
+        return frames
     }
 
     /// Decode `[reference + generated]` codec frames on the bounded
@@ -2595,6 +2621,21 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             if isStreaming {
                 speechTokenizer.decoder.resetStreamingState()
             }
+        }
+        // A-04 (RF-52): the decoder hears the reference before the take, so
+        // the take's first frames decode with the history the quality-first
+        // path and upstream's ICL decode give them. The reference's samples
+        // are discarded; only the decoder's state is kept.
+        if isStreaming, streamedCloneDecoderPriming, let refCodes {
+            let primingStartedAt = ContinuousClock.now
+            let referenceFrames = try Self.primeStreamingDecoder(speechTokenizer.decoder, referenceCodes: refCodes)
+            // The pieces' buffers would otherwise stay cached through prefill.
+            if memoryPolicy.clearCacheOnStreamChunkEmit { clearGenerationCache() }
+            mergePreparationTimingsMS([
+                "qwen_clone_decoder_priming_ms": primingStartedAt.elapsed.roundedMilliseconds,
+                "qwen_clone_decoder_primed_frames": referenceFrames,
+            ])
+            mergePreparationBooleanFlags(["clone_decoder_primed": true])
         }
 
         let suppressTokensWithEOS = suppressTokens + [eosTokenId]

@@ -36,7 +36,7 @@ class RecordTests(unittest.TestCase):
         record = observations.load_record()
         self.assertEqual(record["algorithmVersion"], observations.OBSERVATIONS_ALGORITHM_VERSION)
         self.assertEqual(record["introspectionAlgorithmVersion"], observations.INTROSPECTION_ALGORITHM_VERSION)
-        self.assertEqual(record["fastQCAlgorithmVersion"], audio_qc.FASTQC_V9_ALGORITHM_VERSION)
+        self.assertEqual(record["fastQCAlgorithmVersion"], audio_qc.FASTQC_ALGORITHM_VERSION)
         self.assertEqual(record["status"], "observational")
         self.assertEqual(record["constants"], observations.STAGE0_OBSERVATIONS)
         self.assertEqual(record["introspection"], observations.INTROSPECTION)
@@ -201,11 +201,11 @@ class FastQCMirrorTests(unittest.TestCase):
         import numpy as np
 
         tone = 0.3 * np.sin(2 * np.pi * 440.0 * np.arange(2 * RATE) / RATE)
-        report = audio_qc.fast_qc_v9(tone, seam_offsets=(RATE,))
-        self.assertEqual(report["algorithmVersion"], 9, "the observations leave the Fast QC version")
+        report = audio_qc.fast_qc(tone, seam_offsets=(RATE,))
+        self.assertEqual(report["algorithmVersion"], 10, "the observations leave the Fast QC version")
         self.assertEqual(report["signal"]["seamCount"], 1)
-        self.assertEqual(audio_qc.fast_qc_v9(tone, signal=False).keys() | {"signal"}, report.keys())
-        without = audio_qc.fast_qc_v9(tone, signal=False)
+        self.assertEqual(audio_qc.fast_qc(tone, signal=False).keys() | {"signal"}, report.keys())
+        without = audio_qc.fast_qc(tone, signal=False)
         self.assertEqual({key: report[key] for key in without}, without, "no flag or verdict moves")
         metrics = audio_qc.qc_metrics(report)
         for _, target in audio_qc.QC_SIGNAL_METRIC_MAP:

@@ -1724,6 +1724,9 @@ struct StreamingExecutionContext: Sendable {
         }
         let scratchBuffer = self.scratchBuffer(sampleRate: sampleRate)
         var pcmSamples = [Int16]()
+        // RF-53: only a streamed take can still be stopped; a quality-first
+        // take arrives whole, and its final Fast QC judges it.
+        var runawaySilence = RunawaySilenceTracker()
         let finalWriter: IncrementalPCM16WAVFileWriter
         do {
             finalWriter = try IncrementalPCM16WAVFileWriter(
@@ -1800,6 +1803,13 @@ struct StreamingExecutionContext: Sendable {
                         )
                     }
                     scratchBuffer.convertLimited(chunkSamples, into: &pcmSamples)
+                    if let runaway = runawaySilence.observeChunk(
+                        pcmSamples, streaming: request.shouldStream, sampleRate: sampleRate
+                    ) {
+                        diagnosticEvidenceNotes["runaway_silence_stop_ms"] =
+                            String(runawaySilence.trailingMilliseconds(sampleRate: sampleRate))
+                        throw runaway
+                    }
                     if telemetryActive, let timings = chunk.timings {
                         chunkTimeline.append(
                             makeChunkTelemetry(
@@ -2131,60 +2141,71 @@ struct StreamingExecutionContext: Sendable {
             // exit at the end of a segment) stops here, before marking submits
             // its GPU work; the staging file is discarded like any failure's.
             try Task.checkCancellation()
-            if let markingConfiguration, AudioMarkingPolicy.resolvedEnabled() {
-                await telemetrySampler?.captureBoundary("before_marking")
-                // Zero-peak ordering (the CP-2 gate's design): release the
-                // generation pass's allocator cache BEFORE the marking
-                // weights load, and drop the marking pass's own buffers
-                // after — the resident peak must never stack marking on top
-                // of generation's still-cached working set.
-                Memory.clearCache()
-                // The MLX peak is cumulative since the request began, so the
-                // marking pass raised the take's exact MLX high-water mark
-                // only if the after-marking peak exceeds this one (audit #67).
-                // Taken after the cache release, which moves neither peak nor
-                // active memory, so this stage never adds the end-of-generation
-                // cache to the take's typed `mlxCachePeakMB` maximum.
-                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
-                do {
-                    // DW-03: trace-only sub-interval of `Native Final WAV
-                    // Finish` (no `timingsMS` key), like its manual-writer
-                    // siblings. The marking pass is most of end-of-take time.
-                    let markingSignpost = NativeStreamingSignposts.signposter.beginInterval(
-                        "Native Final WAV Marking",
-                        "\(signpostCorrelation.message, privacy: .public)"
-                    )
-                    defer {
-                        NativeStreamingSignposts.signposter.endInterval(
-                            "Native Final WAV Marking",
-                            markingSignpost,
-                            "\(signpostCorrelation.message, privacy: .public)"
-                        )
-                    }
-                    try AudioPublicationMarker.markStagedWAV(
-                        at: stagingURL,
-                        configuration: markingConfiguration
-                    )
-                } catch {
-                    throw Self.publicationMarkingError(error)
-                }
-                Memory.clearCache()
-                mlxMemorySnapshots["after_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
-                await telemetrySampler?.captureBoundary("after_marking")
-            }
-            await telemetrySampler?.captureBoundary("before_audio_qc")
+            // Fast QC v10: silence is judged on the take as written, before
+            // the watermark, which lifts silent samples over the floor and
+            // cuts silent runs apart (RF-53); `judgePublication` owns the order.
             let spokenText = (try? SpokenTextPlanner.plan(originalText: request.text).spokenText)
                 ?? request.text
-            finalAudioQC = try Self.makePersistedWAVAudioQCReport(
-                at: stagingURL,
-                preWriteMetrics: scratchBuffer.limiterMetrics,
-                expectedPauseCount: Self.expectedPauseCount(in: spokenText),
-                chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil,
-                expectedSampleRate: sampleRate,
-                expectedChannelCount: 1,
-                expectedFrameCount: Int(totalFramesWritten),
-                speakingRateText: spokenText,
-                seamFrameOffsets: seamFrameOffsets
+            finalAudioQC = try await Self.judgePublication(
+                stagingURL: stagingURL,
+                marks: markingConfiguration != nil && AudioMarkingPolicy.resolvedEnabled(),
+                mark: {
+                    guard let markingConfiguration else { return }
+                    await telemetrySampler?.captureBoundary("before_marking")
+                    // Zero-peak ordering (the CP-2 gate's design): release the
+                    // generation pass's allocator cache BEFORE the marking
+                    // weights load, and drop the marking pass's own buffers
+                    // after — the resident peak must never stack marking on top
+                    // of generation's still-cached working set.
+                    Memory.clearCache()
+                    // The MLX peak is cumulative since the request began, so the
+                    // marking pass raised the take's exact MLX high-water mark
+                    // only if the after-marking peak exceeds this one (audit #67).
+                    // Taken after the cache release, which moves neither peak nor
+                    // active memory, so this stage never adds the end-of-generation
+                    // cache to the take's typed `mlxCachePeakMB` maximum.
+                    mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
+                    do {
+                        // DW-03: trace-only sub-interval of `Native Final WAV
+                        // Finish` (no `timingsMS` key), like its manual-writer
+                        // siblings. The marking pass is most of end-of-take time.
+                        let markingSignpost = NativeStreamingSignposts.signposter.beginInterval(
+                            "Native Final WAV Marking",
+                            "\(signpostCorrelation.message, privacy: .public)"
+                        )
+                        defer {
+                            NativeStreamingSignposts.signposter.endInterval(
+                                "Native Final WAV Marking",
+                                markingSignpost,
+                                "\(signpostCorrelation.message, privacy: .public)"
+                            )
+                        }
+                        try AudioPublicationMarker.markStagedWAV(
+                            at: stagingURL,
+                            configuration: markingConfiguration
+                        )
+                    } catch {
+                        throw Self.publicationMarkingError(error)
+                    }
+                    Memory.clearCache()
+                    mlxMemorySnapshots["after_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
+                    await telemetrySampler?.captureBoundary("after_marking")
+                },
+                judge: { unmarkedSilence in
+                    await telemetrySampler?.captureBoundary("before_audio_qc")
+                    return try Self.makePersistedWAVAudioQCReport(
+                        at: stagingURL,
+                        preWriteMetrics: scratchBuffer.limiterMetrics,
+                        unmarkedSilenceMetrics: unmarkedSilence,
+                        expectedPauseCount: Self.expectedPauseCount(in: spokenText),
+                        chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil,
+                        expectedSampleRate: sampleRate,
+                        expectedChannelCount: 1,
+                        expectedFrameCount: Int(totalFramesWritten),
+                        speakingRateText: spokenText,
+                        seamFrameOffsets: seamFrameOffsets
+                    )
+                }
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
@@ -2949,6 +2970,7 @@ struct StreamingExecutionContext: Sendable {
     static func makePersistedWAVAudioQCReport(
         at url: URL,
         preWriteMetrics: PCM16StreamLimiter.Metrics? = nil,
+        unmarkedSilenceMetrics: PCM16StreamLimiter.Metrics? = nil,
         expectedPauseCount: Int,
         chunkQC: [AudioQCChunkReport]? = nil,
         expectedSampleRate: Int? = nil,
@@ -3031,11 +3053,14 @@ struct StreamingExecutionContext: Sendable {
         combined.processedSamples = persisted.processedSamples
         combined.outputSum = persisted.outputSum
         combined.outputSumOfSquares = persisted.outputSumOfSquares
-        combined.longestInteriorSilentRunSamples = persisted.longestInteriorSilentRunSamples
-        combined.longestInteriorSilentRunStartSample = persisted.longestInteriorSilentRunStartSample
-        combined.interiorSilentRunSamples = persisted.interiorSilentRunSamples
-        combined.trailingSilentRunSamples = persisted.trailingSilentRunSamples
-        combined.trailingSilentRunStartSample = persisted.trailingSilentRunStartSample
+        // v10: the silent runs come from the same file before marking when
+        // it was marked; the published bytes keep the level, DC and format.
+        let silence = unmarkedSilenceMetrics ?? persisted
+        combined.longestInteriorSilentRunSamples = silence.longestInteriorSilentRunSamples
+        combined.longestInteriorSilentRunStartSample = silence.longestInteriorSilentRunStartSample
+        combined.interiorSilentRunSamples = silence.interiorSilentRunSamples
+        combined.trailingSilentRunSamples = silence.trailingSilentRunSamples
+        combined.trailingSilentRunStartSample = silence.trailingSilentRunStartSample
 
         return makeAudioQCReport(
             metrics: combined,
@@ -3049,8 +3074,78 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
-    /// The report thresholds of Fast QC v9 (Stage 0). Swift owns them;
-    /// `AudioQCStage0CalibrationTests` asserts they equal the v9 calibration
+    /// The persisted pass's limiter over a WAV as written, for the silent runs
+    /// Fast QC v10 judges before the watermark is laid on the same file. The
+    /// same reading as `makePersistedWAVAudioQCReport`, so the two agree on
+    /// an unmarked file sample for sample.
+    static func persistedLimiterMetrics(at url: URL) throws -> PCM16StreamLimiter.Metrics {
+        let file = try AVAudioFile(forReading: url)
+        let frameCount = Int(file.length)
+        guard frameCount > 0, file.processingFormat.sampleRate > 0 else {
+            throw MLXTTSEngineError.generationFailed(
+                "The finalized WAV contains no readable audio frames."
+            )
+        }
+        let blockFrameCount = min(frameCount, 16_384)
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: file.processingFormat,
+            frameCapacity: AVAudioFrameCount(blockFrameCount)
+        ) else {
+            throw MLXTTSEngineError.generationFailed(
+                "The finalized WAV could not allocate a verification buffer."
+            )
+        }
+        var limiter = PCM16StreamLimiter()
+        var discarded: [Int16] = []
+        discarded.reserveCapacity(blockFrameCount)
+        var read = 0
+        while read < frameCount {
+            buffer.frameLength = 0
+            try file.read(into: buffer, frameCount: AVAudioFrameCount(min(blockFrameCount, frameCount - read)))
+            let count = Int(buffer.frameLength)
+            guard count > 0 else { break }
+            let samples: [Float]
+            if let floats = unsafe buffer.floatChannelData {
+                samples = unsafe Array(UnsafeBufferPointer(start: floats[0], count: count))
+            } else if let integers = unsafe buffer.int16ChannelData {
+                samples = unsafe UnsafeBufferPointer(start: integers[0], count: count).map {
+                    Float($0) / Float(Int16.max)
+                }
+            } else {
+                throw MLXTTSEngineError.generationFailed(
+                    "The finalized WAV uses an unsupported verification format."
+                )
+            }
+            discarded.removeAll(keepingCapacity: true)
+            limiter.append(samples, into: &discarded)
+            read += count
+        }
+        // A short read would cut the silent runs it replaces the full pass's with.
+        guard read == frameCount else {
+            throw MLXTTSEngineError.generationFailed(
+                "The finalized WAV ended before every audio frame could be verified."
+            )
+        }
+        return limiter.metrics
+    }
+
+    /// Fast QC v10's order at publication: when the take will be marked, its
+    /// silent runs are measured on the file as written, then it is marked,
+    /// then it is judged with those runs; unmarked, it is judged as it is.
+    static func judgePublication(
+        stagingURL: URL,
+        marks: Bool,
+        mark: () async throws -> Void,
+        judge: (_ unmarkedSilence: PCM16StreamLimiter.Metrics?) async throws -> AudioQCReport
+    ) async throws -> AudioQCReport {
+        guard marks else { return try await judge(nil) }
+        let unmarked = try persistedLimiterMetrics(at: stagingURL)
+        try await mark()
+        return try await judge(unmarked)
+    }
+
+    /// The report thresholds of Fast QC v10 (Stage 0). Swift owns them;
+    /// `AudioQCStage0CalibrationTests` asserts they equal the v10 calibration
     /// record, `config/audio-qc-stage0-calibration.json` (audit 2026-09-25,
     /// section 5.5), which the Python mirror is pinned to as well. They are
     /// `legacy-unqualified` bounds (A10): changing one is a qualified change
@@ -3593,7 +3688,10 @@ extension GenerationEngineIntrospection {
 
 /// Canonical persisted-output QC entry point for app-level batch validation and
 /// deterministic tests. Generation passes its pre-limiter metrics internally so
-/// the same report also retains upstream instability evidence.
+/// the same report also retains upstream instability evidence. A file on disk
+/// is already marked, so this reads its silent runs on the marked bytes, where
+/// the watermark can split them; publication (v10) read them before the mark,
+/// so a re-check can see shorter silences than the take was judged on.
 public enum PersistedWAVAudioQCAnalyzer {
     public static func evaluate(
         url: URL,
@@ -3614,6 +3712,60 @@ public enum PersistedWAVAudioQCAnalyzer {
     /// excess dropout.
     public static func expectedPauseCount(in text: String) -> Int {
         StreamingExecutionContext.expectedPauseCount(in: text)
+    }
+}
+
+/// RF-53: the trailing silence a streamed take has already written, judged
+/// on the PCM16 Fast QC's persisted pass reads, so a take that keeps running in
+/// silence (no end of speech, toward the frame cap) stops as the failure the
+/// final check would give it, instead of minutes later on an iPhone.
+///
+/// A sample is silent when its magnitude is at most 32: below Fast QC's
+/// 0.001 floor whether read at 1/32767 or 1/32768. Leading silence never
+/// counts, as in Fast QC. Since v10 Fast QC judges silent runs on these same
+/// PCM16 samples, before the publication watermark, so the two agree sample
+/// for sample. The stop is 3 s, above the larger egregious bound (2,000 ms),
+/// so a take that reaches it fails Fast QC whatever follows: as terminal
+/// silence if it stays silent, as an interior dropout if speech resumes. No
+/// take Fast QC accepts can reach it.
+struct RunawaySilenceTracker: Sendable, Equatable {
+    static let silentMagnitude = 32
+    static let stopSeconds = 3.0
+
+    private(set) var sawAudio = false
+    private(set) var trailingSilentSamples = 0
+
+    mutating func observe(_ samples: [Int16]) {
+        for sample in samples {
+            if abs(Int(sample)) > Self.silentMagnitude {
+                sawAudio = true
+                trailingSilentSamples = 0
+            } else if sawAudio {
+                trailingSilentSamples += 1
+            }
+        }
+    }
+
+    func trailingMilliseconds(sampleRate: Int) -> Int {
+        sampleRate > 0 ? trailingSilentSamples * 1000 / sampleRate : 0
+    }
+
+    func shouldStop(sampleRate: Int) -> Bool {
+        sawAudio && sampleRate > 0
+            && Double(trailingSilentSamples) >= Self.stopSeconds * Double(sampleRate)
+    }
+
+    /// What the streaming loop does with a chunk it has limited: a streamed
+    /// take's chunk joins the run, and past the stop the take fails as the
+    /// terminal-silence rejection; a quality-first take, which arrives whole,
+    /// is left to its final check.
+    mutating func observeChunk(_ samples: [Int16], streaming: Bool, sampleRate: Int) -> NativeRuntimeError? {
+        guard streaming else { return nil }
+        observe(samples)
+        guard shouldStop(sampleRate: sampleRate) else { return nil }
+        return StreamingExecutionContext.finalAudioQCRejectionError(
+            flags: ["terminal_silence:\(trailingMilliseconds(sampleRate: sampleRate))ms"]
+        )
     }
 }
 

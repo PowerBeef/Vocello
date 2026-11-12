@@ -1603,7 +1603,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `derivedMetrics` | `[String: Double]?` | Headline KPIs ([§6.8](#68-derived-kpis-derivedmetrics)). Includes `kvCacheEstimatedPeakMB` (2026-07-01, audit P1-2) — the peak of the per-chunk KV-cache footprint estimates, surfaced at row level so regression tooling doesn't walk the chunk timeline. |
 | `mlxMemoryByStage` | `[String: {activeMB, cacheMB, peakMB, stagePeakMB?}]?` | MLX GPU memory at each stage ([§6.9](#69-memory-probes)); `stagePeakMB` only under `QWENVOICE_MLX_STAGE_PEAKS=1`. |
 | `chunkTimeline` | `[GenerationChunkTelemetry]?` | Per-chunk decode substages, with `arrivalNS` (v5) and optional `mimiDecoderBreakdownMS` (v5) ([§6.7](#67-per-chunk-timeline-chunktimeline-streaming-only)). |
-| `audioQC` | `AudioQCReport?` | Versioned reference-free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per-chunk QC. Algorithm v9 (`makeAudioQCReport`; v7 adds warn-only `onset_step_burst`, v8 warn-only `speaking_rate_slow`, v9 failing `speaking_rate_fast`) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request ([§7.7](#77-output-quality-layers)). |
+| `audioQC` | `AudioQCReport?` | Versioned reference-free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per-chunk QC. Algorithm v10 (`makeAudioQCReport`; v7 adds warn-only `onset_step_burst`, v8 warn-only `speaking_rate_slow`, v9 failing `speaking_rate_fast`, v10 judges silent runs before the publication watermark) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request ([§7.7](#77-output-quality-layers)). |
 | `audioQC.signal` | `AudioQCSignalObservations?` | Since 2026-09-26 (AQ-04, additive on QC v8): the Stage 0 observational measures of the persisted WAV (BS.1770 loudness, loudness range and 4x true peak, noise floor, WADA-SNR, effective bandwidth, spectral-flux events, 12.5 Hz codec-frame modulation, seam z-score, repetition stripe) under their own `algorithmVersion`. No flag or verdict reads them; eleven reach the tracked take as `audioQC.metrics`. |
 | `engineIntrospection` | `GenerationEngineIntrospection?` | Since 2026-09-26 (AQ-04, engine rows, success and post-terminal failure): the talker's own signals, from the facade's `VocelloQwen3GenerationIntrospection`: codebook-0 token cycles, per-step entropy (mean, p95, longest run at or above 4 nats), the EOS-probability trajectory and the streaming seam frames. Observational; telemetry only. |
 | `summary` | `TelemetrySummary?` | Owning-process resident/physical-footprint/compressed/headroom/Metal start, end, delta, peak/min and aligned extrema snapshots; total RAM and implied process limit; independent memory/thread/headroom/Metal coverage; sampler cadence/boundaries; and process CPU/page-fault/context-switch/block-I/O deltas. `timeToPeakMS` tracks the physical-footprint peak. |
@@ -2148,7 +2148,18 @@ summaries and baselines remain permitted.
    and not judged), `speaking_rate_slow` (v8, warn-only: a take far longer than its script) and
    `speaking_rate_fast` (v9, a failure: a take far shorter than its script, speech that ended early;
    each bound is half the fastest human corpus clip of its script class, and Japanese, with no human
-   clip yet, is not judged). Surfaced as the summarizer's **`QC`** column.
+   clip yet, is not judged). Surfaced as the summarizer's **`QC`** column. A streamed take that has
+   already written 3 s of trailing silence (on the PCM16 Fast QC judges, after its first speech) stops
+   there as the `terminal_silence` rejection the final check would give it, instead of running to the
+   frame cap (RF-53; the failure row carries `runaway_silence_stop_ms`). 3 s is above the larger
+   egregious bound, so no take Fast QC accepts can reach it. **Silence is judged before the mark**
+   (v10): the watermark lifts silent samples over the floor (on every take of the clone screen, up
+   to 1,731 LSB at speech edges) and cut silent runs apart, so a 611 ms trailing silence once read as
+   38 ms. At publication, dropout, cadence and terminal silence read the take as written; level, DC,
+   clipping and format still read the published, marked bytes. A later re-check of a file on disk
+   (`PersistedWAVAudioQCAnalyzer`, the History quality gate, a long-form resume or its joined file)
+   has only the marked bytes and reads silence there, so it can see shorter silent runs than the
+   publication check did; each segment was already judged at publication.
    Thresholds are conservative + tunable (`makeAudioQCReport`).
    **Dropout is punctuation-aware.** The text's punctuation sets a pause budget. A single interior
    gap fails as `dropout:<N>ms` at 1,200 ms when the text declares no pause and the take is under

@@ -1297,7 +1297,7 @@ cell stamp, and — for any instructed take — the delivery-instruction receipt
 the bench manifest's instruction echo
 ([`docs/reference/telemetry-and-benchmarking.md`](reference/telemetry-and-benchmarking.md#46-delivery--prosody-cells) §4.6). The transport layer records request acceptance, first-chunk,
 session/chunk/order/terminal evidence; the backend records typed stages/timings/counters, final barrier,
-atomic output, process-owned memory, and the audio QC report's (algorithm v9; split since v3) separate pre-limiter-instability and
+atomic output, process-owned memory, and the audio QC report's (algorithm v10; split since v3) separate pre-limiter-instability and
 persisted-WAV written-output verdicts. Schema v8 adds absolute-uptime sample alignment, independent
 memory/thread/headroom/Metal capture success and coverage, total-RAM/implied-process-limit context,
 start/end/delta/peak memory fields, aligned extrema snapshots, and explicit app/engine lifecycle

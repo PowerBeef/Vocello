@@ -77,7 +77,7 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertEqual(opening.stepBurstPeakStartMS, 2)
         XCTAssertTrue(opening.flags.contains("onset_step_burst"), "\(opening.flags)")
         XCTAssertEqual(opening.instabilityVerdict, .warn)
-        XCTAssertEqual(opening.algorithmVersion, 9)
+        XCTAssertEqual(opening.algorithmVersion, 10)
         // The same cluster at the plosive onset (150 ms) is recorded, not judged.
         let later = report(burstAtSample: 3_600)
         XCTAssertEqual(later.stepBurstPeakCount, 11)
@@ -155,7 +155,7 @@ final class AudioQCClickEventTests: XCTestCase {
         XCTAssertEqual(long.clickEventCount, 2)
         XCTAssertEqual(try XCTUnwrap(short.clickEventsPerSecond), 1.0, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(long.clickEventsPerSecond), 0.1, accuracy: 1e-9)
-        XCTAssertEqual(short.algorithmVersion, 9, "observational fields leave the QC version")
+        XCTAssertEqual(short.algorithmVersion, 10, "observational fields leave the QC version")
         // Observational: no flag reads the events; the per-sample bound is unchanged.
         XCTAssertFalse(short.flags.contains("clicks"), "\(short.flags)")
     }
@@ -242,7 +242,7 @@ final class AudioQCSpeakingRateTests: XCTestCase {
 
     func testAnOrdinaryTakeReportsItsRateWithoutAFlag() throws {
         let qc = report(seconds: 6.5, text: Self.mediumScript)
-        XCTAssertEqual(qc.algorithmVersion, 9)
+        XCTAssertEqual(qc.algorithmVersion, 10)
         XCTAssertEqual(qc.speakingRateTextUnits, 91)
         XCTAssertEqual(try XCTUnwrap(qc.secondsPerTextUnit), 6.5 / 91, accuracy: 1e-12)
         XCTAssertFalse(qc.flags.contains("speaking_rate_slow"), "\(qc.flags)")
@@ -459,5 +459,176 @@ final class AudioQCStage0CalibrationTests: XCTestCase {
                 XCTAssertTrue(fast is NSNull, scriptClass.rawValue)
             }
         }
+    }
+}
+
+/// RF-53: a streamed take running on in silence stops as the failure Fast QC
+/// would give it, judged on the PCM16 it already wrote.
+final class RunawaySilenceTrackerTests: XCTestCase {
+    private let rate = 24_000
+
+    func testLeadingSilenceNeverCountsAndSpeechResetsTheRun() {
+        var tracker = RunawaySilenceTracker()
+        tracker.observe([Int16](repeating: 0, count: rate * 5))
+        XCTAssertFalse(tracker.sawAudio)
+        XCTAssertEqual(tracker.trailingSilentSamples, 0, "silence before the first speech is not trailing")
+        XCTAssertFalse(tracker.shouldStop(sampleRate: rate))
+        tracker.observe([1_000] + [Int16](repeating: 0, count: rate * 2))
+        XCTAssertEqual(tracker.trailingMilliseconds(sampleRate: rate), 2_000)
+        tracker.observe([33])
+        XCTAssertEqual(tracker.trailingSilentSamples, 0, "33 is above Fast QC's 0.001 floor")
+        tracker.observe([Int16](repeating: 32, count: 10) + [Int16](repeating: -32, count: 10))
+        XCTAssertEqual(tracker.trailingSilentSamples, 20, "at most 32 is below the floor at either scale")
+    }
+
+    func testTheStopComesOnlyPastThreeSecondsOfTrailingSilence() {
+        var tracker = RunawaySilenceTracker()
+        tracker.observe([5_000])
+        tracker.observe([Int16](repeating: 0, count: rate * 3 - 1))
+        XCTAssertFalse(tracker.shouldStop(sampleRate: rate), "2,999.96 ms: Fast QC still decides")
+        tracker.observe([0])
+        XCTAssertTrue(tracker.shouldStop(sampleRate: rate))
+        XCTAssertEqual(tracker.trailingMilliseconds(sampleRate: rate), 3_000)
+        // Above the larger egregious bound, so no take Fast QC accepts gets here.
+        XCTAssertGreaterThan(RunawaySilenceTracker.stopSeconds * 1_000,
+                             Double(StreamingExecutionContext.AudioQCThresholds.egregiousDeclaredPauseOrLongMS))
+        XCTAssertGreaterThan(RunawaySilenceTracker.stopSeconds * 1_000,
+                             Double(StreamingExecutionContext.AudioQCThresholds.egregiousNoDeclaredPauseMS))
+        XCTAssertFalse(RunawaySilenceTracker().shouldStop(sampleRate: 0))
+    }
+
+    func testOnlyAStreamedTakeStopsAndItStopsWithTheRejection() {
+        let speechThenSilence = [Int16](repeating: 4_000, count: 100) + [Int16](repeating: 0, count: rate * 3)
+        var quality = RunawaySilenceTracker()
+        XCTAssertNil(quality.observeChunk(speechThenSilence, streaming: false, sampleRate: rate))
+        XCTAssertEqual(quality, RunawaySilenceTracker(), "a quality-first take is left to its final check")
+        var streamed = RunawaySilenceTracker()
+        XCTAssertNil(streamed.observeChunk(Array(speechThenSilence.dropLast(1)), streaming: true, sampleRate: rate))
+        let stop = streamed.observeChunk([0], streaming: true, sampleRate: rate)
+        XCTAssertEqual(stop?.failureCode, .audioQualityRejected)
+        XCTAssertEqual(stop?.diagnosticDetail, "terminal_silence:3000ms")
+    }
+
+    /// The tracker and Fast QC share one floor: 32 is silent and 33 is not,
+    /// on the persisted pass that judges a take.
+    func testTheTrackersFloorIsTheOneFastQCJudgesSilenceBy() throws {
+        func report(level: Int16) throws -> (AudioQCReport, RunawaySilenceTracker) {
+            let samples = (0 ..< rate).map { Int16(8_000 * cos(2 * Double.pi * 220 * Double($0) / 24_000)) }
+                + (0 ..< rate * 3).map { $0.isMultiple(of: 2) ? level : -level }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("floor-\(UUID().uuidString).wav")
+            defer { try? FileManager.default.removeItem(at: url) }
+            try AtomicPCM16WAVWriter.write(pcmSamples: samples, sampleRate: rate, outputURL: url)
+            var tracker = RunawaySilenceTracker()
+            tracker.observe(samples)
+            return (try StreamingExecutionContext.makePersistedWAVAudioQCReport(at: url, expectedPauseCount: 0), tracker)
+        }
+        let (silent, silentTracker) = try report(level: 32)
+        XCTAssertEqual(silent.trailingSilenceMS, 3_000)
+        XCTAssertTrue(silentTracker.shouldStop(sampleRate: rate))
+        XCTAssertEqual(silent.verdict, .fail, "both see three seconds of terminal silence")
+        let (audible, audibleTracker) = try report(level: 33)
+        XCTAssertEqual(audible.trailingSilenceMS, 0)
+        XCTAssertFalse(audibleTracker.shouldStop(sampleRate: rate))
+    }
+
+    func testTheStopFailsAsTheTerminalSilenceRejection() {
+        let error = StreamingExecutionContext.finalAudioQCRejectionError(flags: ["terminal_silence:3000ms"])
+        XCTAssertEqual(error.failureCode, .audioQualityRejected)
+        XCTAssertEqual(error.diagnosticDetail, "terminal_silence:3000ms")
+        XCTAssertEqual(GenerationFailurePresentationReason(error), .audioQualityRejected)
+    }
+}
+
+/// Fast QC v10 (RF-53): silent runs are judged on the take as written, before
+/// the publication watermark, which lifts silent samples over the floor and
+/// cuts silent runs apart; the published bytes keep the level and format.
+final class AudioQCUnmarkedSilenceTests: XCTestCase {
+    private let rate = 24_000
+
+    private func wav(_ samples: [Int16]) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("unmarked-silence-\(UUID().uuidString).wav")
+        try AtomicPCM16WAVWriter.write(pcmSamples: samples, sampleRate: rate, outputURL: url)
+        return url
+    }
+
+    private func tone(_ seconds: Double) -> [Int16] {
+        // A cosine never lands within 32 LSB of zero at 220 Hz, so only the
+        // gaps are silent.
+        (0 ..< Int(seconds * Double(rate))).map { Int16(8_000 * cos(2 * Double.pi * 220 * Double($0) / 24_000)) }
+    }
+
+    func testAWatermarkInSilenceNoLongerHidesADropout() throws {
+        // 2.5 s of digital silence between speech: an egregious dropout.
+        let written = tone(1) + [Int16](repeating: 0, count: rate * 5 / 2) + tone(1)
+        // The mark lifts a sample over the floor every 0.4 s of that silence.
+        var marked = written
+        for index in stride(from: rate + 9_600, to: rate * 7 / 2, by: 9_600) { marked[index] = 40 }
+        let unmarkedURL = try wav(written)
+        let markedURL = try wav(marked)
+        defer {
+            try? FileManager.default.removeItem(at: unmarkedURL)
+            try? FileManager.default.removeItem(at: markedURL)
+        }
+        let markedOnly = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: markedURL, expectedPauseCount: 0)
+        XCTAssertEqual(markedOnly.longestSilenceMS, 400, "read on the marked bytes the gap splits")
+        XCTAssertFalse(markedOnly.flags.contains { $0.hasPrefix("dropout:2") }, "\(markedOnly.flags)")
+        let unmarked = try StreamingExecutionContext.persistedLimiterMetrics(at: unmarkedURL)
+        XCTAssertEqual(unmarked.longestInteriorSilentRunSamples, rate * 5 / 2)
+        let report = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: markedURL, unmarkedSilenceMetrics: unmarked, expectedPauseCount: 0)
+        XCTAssertTrue(report.flags.contains("dropout:2500ms"), "\(report.flags)")
+        XCTAssertEqual(report.writtenOutputVerdict, .fail)
+        XCTAssertEqual(report.longestSilenceMS, 2_500)
+        // The level still comes from the published bytes.
+        XCTAssertEqual(report.rmsDBFS, markedOnly.rmsDBFS)
+    }
+
+    /// The publication order itself: measured before the mark, judged after.
+    func testPublicationMeasuresSilenceBeforeTheMarkAndJudgesAfterIt() async throws {
+        let written = tone(1) + [Int16](repeating: 0, count: rate * 5 / 2) + tone(1)
+        let url = try wav(written)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var steps: [String] = []
+        let report = try await StreamingExecutionContext.judgePublication(
+            stagingURL: url,
+            marks: true,
+            mark: {
+                steps.append("mark")
+                var marked = written
+                for index in stride(from: rate + 9_600, to: rate * 7 / 2, by: 9_600) { marked[index] = 40 }
+                try AtomicPCM16WAVWriter.write(pcmSamples: marked, sampleRate: rate, outputURL: url)
+            },
+            judge: { unmarked in
+                steps.append(unmarked == nil ? "judge without" : "judge with")
+                return try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+                    at: url, unmarkedSilenceMetrics: unmarked, expectedPauseCount: 0)
+            }
+        )
+        XCTAssertEqual(steps, ["mark", "judge with"])
+        XCTAssertTrue(report.flags.contains("dropout:2500ms"), "\(report.flags)")
+        steps.removeAll()
+        let unmarked = try await StreamingExecutionContext.judgePublication(
+            stagingURL: url, marks: false, mark: { steps.append("mark") },
+            judge: { silence in
+                steps.append(silence == nil ? "judge without" : "judge with")
+                return try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+                    at: url, unmarkedSilenceMetrics: silence, expectedPauseCount: 0)
+            })
+        XCTAssertEqual(steps, ["judge without"], "an unmarked take is judged as it is")
+        XCTAssertEqual(unmarked.longestSilenceMS, 400, "the spikes split the gap on the file itself")
+    }
+
+    func testOnAnUnmarkedFileBothReadingsAgree() throws {
+        let written = tone(1) + [Int16](repeating: 0, count: rate) + tone(0.5) + [Int16](repeating: 0, count: rate / 2)
+        let url = try wav(written)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let alone = try StreamingExecutionContext.makePersistedWAVAudioQCReport(at: url, expectedPauseCount: 1)
+        let silence = try StreamingExecutionContext.persistedLimiterMetrics(at: url)
+        let withSilence = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: url, unmarkedSilenceMetrics: silence, expectedPauseCount: 1)
+        XCTAssertEqual(alone, withSilence)
+        XCTAssertEqual(withSilence.trailingSilenceMS, 500)
     }
 }

@@ -1186,8 +1186,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// version in `signal`. v9 (RF-53) fails a take far too short for its text
     /// (`speaking_rate_fast`), a verdict change, so the version moves and the
     /// Mac gate bench's baseline (which binds it) must be seeded again before
-    /// the gate bench is next used.
-    public static let currentAlgorithmVersion = 9
+    /// the gate bench is next used. v10 judges silent runs on the take as
+    /// written, before the publication watermark, which cuts them apart.
+    public static let currentAlgorithmVersion = 10
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass

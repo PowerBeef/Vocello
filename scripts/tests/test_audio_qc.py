@@ -136,10 +136,10 @@ class FastQCV8MirrorTests(unittest.TestCase):
         # record, so neither side reads the other's source (audit 2026-09-25, section 5.5).
         record = json.loads((Path(__file__).resolve().parents[2] / "config" / "audio-qc-stage0-calibration.json")
                             .read_text(encoding="utf-8"))
-        self.assertEqual(record["algorithmVersion"], audio_qc.FASTQC_V9_ALGORITHM_VERSION)
+        self.assertEqual(record["algorithmVersion"], audio_qc.FASTQC_ALGORITHM_VERSION)
         self.assertEqual(record["calibration"], "legacy-unqualified")
-        self.assertEqual(audio_qc.FASTQC_V9, record["constants"])
-        self.assertEqual(audio_qc.FASTQC_V9["clickEnvelopeCoefficient"], 1.0 / 240.0)
+        self.assertEqual(audio_qc.FASTQC, record["constants"])
+        self.assertEqual(audio_qc.FASTQC["clickEnvelopeCoefficient"], 1.0 / 240.0)
 
     def test_text_measures(self) -> None:
         self.assertEqual(audio_qc.expected_pause_count("Hello there, world. Bye!"), 2)
@@ -155,20 +155,20 @@ class FastQCV8MirrorTests(unittest.TestCase):
     def test_silence_nonfinite_level_and_dc(self) -> None:
         import numpy as np
 
-        silent = audio_qc.fast_qc_v9(np.zeros(self.RATE))
+        silent = audio_qc.fast_qc(np.zeros(self.RATE))
         self.assertEqual((silent["verdict"], silent["flags"]), ("fail", ["silent"]))
-        tone = audio_qc.fast_qc_v9(self.tone(1.0, amplitude=0.5))
+        tone = audio_qc.fast_qc(self.tone(1.0, amplitude=0.5))
         self.assertEqual((tone["verdict"], tone["flags"]), ("pass", []))
         self.assertAlmostEqual(tone["rmsDBFS"], 20 * np.log10(0.5 / np.sqrt(2)), places=3)
         broken = self.tone(1.0)
         broken[100] = np.nan
-        report = audio_qc.fast_qc_v9(broken)
+        report = audio_qc.fast_qc(broken)
         self.assertEqual((report["verdict"], report["flags"], report["nonFiniteSamples"]),
                          ("fail", ["nonfinite"], 1))
-        quiet = audio_qc.fast_qc_v9(self.tone(1.0, amplitude=0.005))
+        quiet = audio_qc.fast_qc(self.tone(1.0, amplitude=0.005))
         self.assertEqual((quiet["verdict"], quiet["flags"]), ("warn", ["low_level"]))
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(1.0) + 0.1)["flagLevels"], {"dc_offset": "warn"})
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(1.0) + 0.3)["flagLevels"], {"dc_offset": "fail"})
+        self.assertEqual(audio_qc.fast_qc(self.tone(1.0) + 0.1)["flagLevels"], {"dc_offset": "warn"})
+        self.assertEqual(audio_qc.fast_qc(self.tone(1.0) + 0.3)["flagLevels"], {"dc_offset": "fail"})
 
     def test_click_counter_events_and_onset_burst(self) -> None:
         import numpy as np
@@ -176,7 +176,7 @@ class FastQCV8MirrorTests(unittest.TestCase):
         samples = np.zeros(self.RATE)
         for position in (1_000, 1_100, 5_000, 9_000):
             samples[position] = 0.9
-        report = audio_qc.fast_qc_v9(samples)
+        report = audio_qc.fast_qc(samples)
         # One clamp per impulse on a zero background: the return step is exactly the clamp.
         self.assertEqual((report["clickEvents"], report["clickEventCount"], report["lowEnergyClickEventCount"]),
                          (4, 3, 3))
@@ -185,66 +185,66 @@ class FastQCV8MirrorTests(unittest.TestCase):
         self.assertNotIn("clicks", report["flagLevels"])
         warn = self.tone(1.0, amplitude=0.05)
         warn[2_000:2_000 + 20 * 300:300] += 0.9
-        self.assertEqual(audio_qc.fast_qc_v9(warn)["flagLevels"].get("clicks"), "warn")
+        self.assertEqual(audio_qc.fast_qc(warn)["flagLevels"].get("clicks"), "warn")
         fail = self.tone(1.0, amplitude=0.05)
         fail[500:500 + 130 * 150:150] += 0.9
-        self.assertEqual(audio_qc.fast_qc_v9(fail)["flagLevels"].get("clicks"), "fail")
+        self.assertEqual(audio_qc.fast_qc(fail)["flagLevels"].get("clicks"), "fail")
 
     def test_dropout_and_terminal_silence_follow_the_pause_budget(self) -> None:
         import numpy as np
 
         take = np.concatenate([self.tone(1.0), np.zeros(int(1.3 * self.RATE)), self.tone(1.0)])
-        bare = audio_qc.fast_qc_v9(take)
+        bare = audio_qc.fast_qc(take)
         self.assertEqual((bare["longestSilenceMS"], bare["flags"], bare["verdict"]),
                          (1300, ["dropout:1300ms"], "fail"))
-        declared = audio_qc.fast_qc_v9(take, text="Hello there, world.")
+        declared = audio_qc.fast_qc(take, text="Hello there, world.")
         self.assertEqual((declared["expectedPauseCount"], declared["flags"], declared["verdict"]),
                          (1, ["dropout:1300ms"], "warn"))
-        cadence = audio_qc.fast_qc_v9(np.concatenate([self.tone(1.0), np.zeros(int(0.5 * self.RATE)),
+        cadence = audio_qc.fast_qc(np.concatenate([self.tone(1.0), np.zeros(int(0.5 * self.RATE)),
                                                       self.tone(1.0)]))
         self.assertEqual(cadence["flags"], ["cadence:excess1(1/0)"])
-        trailing = audio_qc.fast_qc_v9(np.concatenate([self.tone(1.0), np.zeros(int(2.1 * self.RATE))]))
+        trailing = audio_qc.fast_qc(np.concatenate([self.tone(1.0), np.zeros(int(2.1 * self.RATE))]))
         self.assertEqual((trailing["trailingSilenceMS"], trailing["flags"]), (2100, ["terminal_silence:2100ms"]))
-        leading = audio_qc.fast_qc_v9(np.concatenate([np.zeros(int(2.1 * self.RATE)), self.tone(1.0)]))
+        leading = audio_qc.fast_qc(np.concatenate([np.zeros(int(2.1 * self.RATE)), self.tone(1.0)]))
         self.assertEqual(leading["flags"], [])
 
     def test_clipping_hot_and_speaking_rate(self) -> None:
         tone = self.tone(1.0, amplitude=0.5)
         tone[1_000:1_030] = 1.5
-        self.assertEqual(audio_qc.fast_qc_v9(tone)["flagLevels"].get("clipping"), "fail")
+        self.assertEqual(audio_qc.fast_qc(tone)["flagLevels"].get("clipping"), "fail")
         tone = self.tone(1.0, amplitude=0.5)
         tone[1_000:1_010] = 1.5
-        report = audio_qc.fast_qc_v9(tone)
+        report = audio_qc.fast_qc(tone)
         self.assertEqual((report["flagLevels"].get("clipping"), report["clippedSamples"]), ("warn", 10))
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(1.0, amplitude=0.99))["flagLevels"].get("hot"), "warn")
-        slow = audio_qc.fast_qc_v9(self.tone(4.0), text="abcdefghij klmnopqrst.")
+        self.assertEqual(audio_qc.fast_qc(self.tone(1.0, amplitude=0.99))["flagLevels"].get("hot"), "warn")
+        slow = audio_qc.fast_qc(self.tone(4.0), text="abcdefghij klmnopqrst.")
         self.assertEqual((slow["speakingRateTextUnits"], slow["secondsPerTextUnit"], slow["flags"]),
                          (20, 0.2, ["speaking_rate_slow"]))
-        unjudged = audio_qc.fast_qc_v9(self.tone(4.0), text="abcdefghij klmnopqrs.")
+        unjudged = audio_qc.fast_qc(self.tone(4.0), text="abcdefghij klmnopqrs.")
         self.assertEqual(unjudged["flags"], [])
         # v9: 20 units in 0.4 s is 0.02 s per unit, below the 0.023 bound.
-        fast = audio_qc.fast_qc_v9(self.tone(0.4), text="abcdefghij klmnopqrst.")
+        fast = audio_qc.fast_qc(self.tone(0.4), text="abcdefghij klmnopqrst.")
         self.assertEqual((fast["flags"], fast["flagLevels"], fast["verdict"]),
                          (["speaking_rate_fast"], {"speaking_rate_fast": "fail"}, "fail"))
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(0.5), text="abcdefghij klmnopqrst.")["flags"], [])
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(0.4), text="abcdefghij klmnopqrs.")["flags"], [],
+        self.assertEqual(audio_qc.fast_qc(self.tone(0.5), text="abcdefghij klmnopqrst.")["flags"], [])
+        self.assertEqual(audio_qc.fast_qc(self.tone(0.4), text="abcdefghij klmnopqrs.")["flags"], [],
                          "below the judged minimum")
         # The conservative count, as Swift's AudioSpeakingRateQCTests pins it.
         for text, units in (("公司去年的营业收入是10000000000元", 12), ("회사의 올해 매출은 10000000000원입니다", 13),
                             ("진짜 웃기다ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ", 5), ("1,000 and 2.5", 7),
                             ("Zzzzzzzzzzzzzzzzzzzz, said the sleeping dog quietly.", 28)):
             self.assertEqual(audio_qc.speaking_rate_conservative_units(text), units, text)
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(1.5), text="公司去年的营业收入是10000000000元")["flags"], [])
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(0.8), text="公司去年的营业收入是10000000000元")["flags"],
+        self.assertEqual(audio_qc.fast_qc(self.tone(1.5), text="公司去年的营业收入是10000000000元")["flags"], [])
+        self.assertEqual(audio_qc.fast_qc(self.tone(0.8), text="公司去年的营业收入是10000000000元")["flags"],
                          ["speaking_rate_fast"])
         japanese = "今日は天気がよく、赤い列車が静かな駅を出発して、遠くの町へ向かいます。"
-        self.assertEqual(audio_qc.fast_qc_v9(self.tone(0.3), text=japanese)["flags"], [], "Japanese has no fast bound")
+        self.assertEqual(audio_qc.fast_qc(self.tone(0.3), text=japanese)["flags"], [], "Japanese has no fast bound")
 
     def test_the_mirror_report_folds_into_the_tracked_take(self) -> None:
         samples = self.tone(1.0, amplitude=0.05)
         samples[2_000:2_000 + 20 * 300:300] += 0.9
-        record = audio_qc.qc_record({"audioQC": audio_qc.fast_qc_v9(samples)})
-        self.assertEqual((record["algorithmVersion"], record["verdict"]), (9, "warn"))
+        record = audio_qc.qc_record({"audioQC": audio_qc.fast_qc(samples)})
+        self.assertEqual((record["algorithmVersion"], record["verdict"]), (10, "warn"))
         self.assertIn("clicks", record["warningCodes"])
         self.assertEqual(record["metrics"]["clickEventCount"], 20.0)
         self.assertEqual(audio_qc.flag_family("dropout:1300ms"), "dropout")

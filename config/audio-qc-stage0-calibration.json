@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "record": "audio-qc-stage0-calibration",
-  "algorithmVersion": 9,
+  "algorithmVersion": 10,
   "calibration": "legacy-unqualified",
   "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md, sections 5.5 and 5.6 (A10)",
-  "note": "The Stage 0 constants of Fast QC v9: PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds and AudioSpeakingRateQC. Swift owns them; AudioQCStage0CalibrationTests asserts the Swift values equal this record, and scripts/tests/test_audio_qc.py asserts the Python mirror's FASTQC_V9 does. They are legacy-unqualified bounds (A10), not qualified operating points: a qualified change writes a new record for a new algorithm version and edits Swift, the mirror and the record together.",
+  "note": "The Stage 0 constants of Fast QC v10: PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds and AudioSpeakingRateQC. Swift owns them; AudioQCStage0CalibrationTests asserts the Swift values equal this record, and scripts/tests/test_audio_qc.py asserts the Python mirror's FASTQC does. They are legacy-unqualified bounds (A10), not qualified operating points: a qualified change writes a new record for a new algorithm version and edits Swift, the mirror and the record together.",
   "constants": {
     "ceiling": 0.965,
     "maxSingleSampleStep": 0.42,
@@ -101,5 +101,12 @@
       }
     },
     "replay": "The quality screens' 1,496 distinct judged takes (1,131 alphabetic, 168 Chinese, 197 Korean): it fails one, a full German sentence in 0.32 s (0.0082 s per unit, both recognizers wrong), and no other; the fastest accepted take runs at 0.0412 s per unit with both recognizers exact. The 367 committed benchmark rows that carry a rate run at 0.060 s per unit or slower."
+  },
+  "silenceSource": {
+    "decided": "2026-11-11",
+    "item": "RF-53",
+    "algorithmVersion": 10,
+    "rule": "Silent runs (dropout, cadence and terminal silence) are judged on the take as written, before the publication watermark; level, DC, clipping and format stay judged on the published, marked bytes.",
+    "why": "The watermark lifts samples a take wrote below the 0.001 floor above it on every take of the clone screen (191 of 191, deltas up to 1,731 LSB at speech edges), cutting silent runs apart: one take's 611 ms of trailing silence read as 38 ms on the marked file, another's 313 ms as 5 ms; 125 of 191 longest interior runs read shorter. Since marking shipped (2026-08-07) Fast QC undercounted dropouts and terminal silence; the mirror, which never marks, already measured silence this way."
   }
 }

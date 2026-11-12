@@ -37,6 +37,15 @@ class HybridBuildTests(unittest.TestCase):
         registry = (ROOT / "Sources/QwenVoiceCore/ContractBackedModelRegistry.swift").read_text()
         self.assertIn("revision.count == 40", registry, "the registry's rule this mirrors")
 
+    def test_a_built_artifact_names_qwen3_tts_as_the_runtime_profile_requires(self):
+        # Qwen3TTSRuntimeProfile refuses a model whose folder or repository does not name Qwen3-TTS.
+        folder = "Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn"
+        self.assertEqual(builder.local_repo(folder), f"local/{folder}")
+        self.assertIn("qwen3-tts", builder.local_repo(folder).lower())
+        profile = (ROOT / "Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift").read_text()
+        self.assertIn('descriptor.huggingFaceRepo.localizedCaseInsensitiveContains("Qwen3-TTS")', profile,
+                      "the profile's rule this mirrors")
+
     def test_the_recipes_match_the_engines_selector(self):
         source = (ROOT / "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/"
                   "Qwen3StreamingMemoryTuning.swift").read_text()

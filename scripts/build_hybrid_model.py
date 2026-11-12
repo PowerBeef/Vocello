@@ -124,6 +124,12 @@ def content_revision(files: list[dict]) -> str:
     return hashlib.sha1(canonical.encode()).hexdigest()
 
 
+def local_repo(folder: str) -> str:
+    """A built artifact's repository name: `local/` and its folder, which names Qwen3-TTS, as the
+    runtime profile requires of both (Qwen3TTSRuntimeProfile.validate)."""
+    return f"local/{folder}"
+
+
 def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) -> dict:
     entry = next(model for model in contract["models"] if model["id"] == CONTRACT_IDS[mode])
     speed = next(variant for variant in entry["variants"] if variant["kind"] == "speed")
@@ -187,7 +193,7 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) 
     files = [{"path": relative, "size": (folder / relative).stat().st_size, "sha256": sha256(folder / relative)}
              for relative in sorted(speed["requiredRelativePaths"])]
     revision = content_revision(files)
-    record = dict(four_record, repo=f"local/vocello-hybrid-{recipe}-{MODES[mode]}", revision=revision,
+    record = dict(four_record, repo=local_repo(folder.name), revision=revision,
                   target_folder=folder.name, created_at_utc="1970-01-01T00:00:00Z", files=files)
     (folder / INTEGRITY).write_text(json.dumps(record, indent=1) + "\n")
     return {"mode": mode, "folder": folder.name, "repo": record["repo"], "revision": revision,

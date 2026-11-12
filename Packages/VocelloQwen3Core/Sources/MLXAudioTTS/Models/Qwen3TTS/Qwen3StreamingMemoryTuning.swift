@@ -1,5 +1,36 @@
 import Foundation
 
+/// RF-55: which of the talker's layer tensors a mixed-precision load takes
+/// from the 8-bit sibling. The code predictor is never among them (it has its
+/// own key): it runs fifteen times per frame, so its bytes cost fifteen times
+/// their size in memory traffic, while a talker tensor is read once. Every
+/// recipe keeps q, k and v at one precision, and gate and up at one, so the
+/// fused projections (RF-46) stay fused: a recipe that split them would pay
+/// for three products where one runs today.
+enum Qwen3MixedPrecisionRecipe: String, Sendable, Equatable, CaseIterable {
+    /// The MLP down projection.
+    case down
+    /// All four attention projections and the MLP down projection.
+    case attnDown = "attn-down"
+    /// The three MLP projections.
+    case mlp
+    /// Every tensor of the talker's layers.
+    case talker
+
+    /// Whether the talker module at `path` (`model.layers.3.self_attn.v_proj`)
+    /// comes from the sibling.
+    func selects(_ path: String) -> Bool {
+        guard path.hasPrefix("model.layers.") else { return false }
+        let leaf = path.split(separator: ".").last.map(String.init) ?? ""
+        switch self {
+        case .down: return leaf == "down_proj"
+        case .attnDown: return ["q_proj", "k_proj", "v_proj", "o_proj", "down_proj"].contains(leaf)
+        case .mlp: return ["gate_proj", "up_proj", "down_proj"].contains(leaf)
+        case .talker: return true
+        }
+    }
+}
+
 /// Debug-only load-time behavior, resolved once per model load through
 /// `VocelloQwen3ImplementationDebugGate` and carried as an immutable value.
 /// Request-varying memory behavior belongs exclusively to
@@ -44,6 +75,11 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// record), the rest of the talker staying as installed. nil loads the
     /// model as it is.
     let codePredictorBits: Int?
+    /// RF-55 (`QWENVOICE_MIXED_PRECISION=<recipe>`): the talker tensors the
+    /// recipe names are taken from the installed 8-bit sibling of this model,
+    /// the rest staying as installed, so a mixed-precision model can be
+    /// measured before any artifact is built. nil loads the model as it is.
+    let mixedPrecisionRecipe: Qwen3MixedPrecisionRecipe?
     /// RF-52, A-11: a clone target whose first letter is Han or kana follows
     /// the reference transcript with no separator, as upstream joins them;
     /// every other target keeps its one leading space. On in production since
@@ -67,6 +103,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: Bool = false,
         cloneDecoderPriming: Bool = true,
         codePredictorBits: Int? = nil,
+        mixedPrecisionRecipe: Qwen3MixedPrecisionRecipe? = nil,
         iclTargetSpaceOnlyBeforeSpacedScripts: Bool = true,
         referenceEdgesTrimmed: Bool = false
     ) {
@@ -77,6 +114,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         self.decoderSlidingWindow = decoderSlidingWindow
         self.cloneDecoderPriming = cloneDecoderPriming
         self.codePredictorBits = codePredictorBits
+        self.mixedPrecisionRecipe = mixedPrecisionRecipe
         self.iclTargetSpaceOnlyBeforeSpacedScripts = iclTargetSpaceOnlyBeforeSpacedScripts
         self.referenceEdgesTrimmed = referenceEdgesTrimmed
     }
@@ -89,6 +127,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         decoderSlidingWindow: false,
         cloneDecoderPriming: true,
         codePredictorBits: nil,
+        mixedPrecisionRecipe: nil,
         iclTargetSpaceOnlyBeforeSpacedScripts: true,
         referenceEdgesTrimmed: false
     )
@@ -129,6 +168,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
             cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold",
             codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil,
+            mixedPrecisionRecipe: gatedValue("QWENVOICE_MIXED_PRECISION").flatMap(Qwen3MixedPrecisionRecipe.init(rawValue:)),
             iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") != "every-target",
             referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") == "trimmed"
         )

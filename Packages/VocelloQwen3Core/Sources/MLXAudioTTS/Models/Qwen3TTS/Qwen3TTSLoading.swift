@@ -429,28 +429,38 @@ extension Qwen3TTSModel {
                 talkerWeights.removeValue(forKey: "\(Self.textEmbeddingModuleKey).\(suffix)")
             }
         }
-        // RF-55 (diagnostic): the code predictor from the installed sibling of
-        // this model at another precision, quantized as that sibling is.
+        // RF-55 (diagnostic): parts of the talker from the installed sibling
+        // of this model at another precision, quantized as that sibling is:
+        // the code predictor (`QWENVOICE_CODE_PREDICTOR_BITS=8`) and the layer
+        // tensors a mixed-precision recipe names (`QWENVOICE_MIXED_PRECISION`).
         var codePredictorQuantization: (Int, Int, QuantizationMode)?
-        var usedCodePredictorSibling = false
-        if let bits = loadOptions.diagnosticOverrides.codePredictorBits,
+        var mixedQuantization: (quantization: (Int, Int, QuantizationMode), recipe: Qwen3MixedPrecisionRecipe)?
+        var usedSibling = false
+        let codePredictorBits = loadOptions.diagnosticOverrides.codePredictorBits
+        let mixedRecipe = loadOptions.diagnosticOverrides.mixedPrecisionRecipe
+        if let bits = codePredictorBits ?? (mixedRecipe == nil ? nil : 8),
            let ownBits = config.quantization?.bits, ownBits != bits {
             let sibling = try Self.codePredictorSibling(of: modelDir, config: config, ownBits: ownBits, bits: bits)
             let siblingWeights = try loadWeights(from: sibling.directory, directSafetensorsFileName: "model.safetensors")
-            let prefix = "\(Self.codePredictorModuleKey)."
-            let ownKeys = Set(talkerWeights.keys.filter { $0.hasPrefix(prefix) })
+            let fromSibling: (String) -> Bool = { key in
+                Self.takesFromSibling(weightKey: key, codePredictor: codePredictorBits != nil, recipe: mixedRecipe)
+            }
+            let ownKeys = Set(talkerWeights.keys.filter(fromSibling))
             let siblingKeys = Set(siblingWeights.keys.compactMap { key -> String? in
-                key.hasPrefix("talker.\(prefix)") ? String(key.dropFirst("talker.".count)) : nil
+                guard key.hasPrefix("talker.") else { return nil }
+                let own = String(key.dropFirst("talker.".count))
+                return fromSibling(own) ? own : nil
             })
-            // Every own code-predictor tensor is replaced, none is added: a
-            // sibling converted another way would otherwise mix scales.
+            // Every selected tensor is replaced, none is added: a sibling
+            // converted another way would otherwise mix scales.
             guard !ownKeys.isEmpty, ownKeys == siblingKeys else {
-                throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling's code predictor differs in layout")
+                throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling's selected tensors differ in layout")
             }
             for key in ownKeys { talkerWeights.removeValue(forKey: key) }
             for key in siblingKeys { talkerWeights[key] = siblingWeights["talker.\(key)"] }
-            codePredictorQuantization = sibling.quantization.asTuple
-            usedCodePredictorSibling = true
+            if codePredictorBits != nil { codePredictorQuantization = sibling.quantization.asTuple }
+            if let mixedRecipe { mixedQuantization = (sibling.quantization.asTuple, mixedRecipe) }
+            usedSibling = true
         }
         var talkerPairs = talkerWeights.map { ($0.key, $0.value) }
 
@@ -461,7 +471,8 @@ extension Qwen3TTSModel {
                     path: path,
                     hasScales: talkerWeights["\(path).scales"] != nil,
                     config: config,
-                    codePredictor: codePredictorQuantization
+                    codePredictor: codePredictorQuantization,
+                    mixed: mixedQuantization
                 )
             }
         }
@@ -480,7 +491,7 @@ extension Qwen3TTSModel {
                 ]
             )
         )
-        let talkerVerifyMode: Module.VerifyUpdate = loadOptions.trustPreparedCheckpoint && !usedCodePredictorSibling
+        let talkerVerifyMode: Module.VerifyUpdate = loadOptions.trustPreparedCheckpoint && !usedSibling
             ? .noUnusedKeys
             : .all
 
@@ -536,9 +547,10 @@ extension Qwen3TTSModel {
         talkerTimingsMS["talker_parameter_eval"] = talkerEvalStartedAt.elapsedMilliseconds
 
         let talkerBooleanFlags: [String: Bool] = [
-            "talker_verify_relaxed": loadOptions.trustPreparedCheckpoint && !usedCodePredictorSibling,
-            // RF-55: the code predictor came from the installed 8-bit sibling.
-            "talker_code_predictor_from_sibling": usedCodePredictorSibling,
+            "talker_verify_relaxed": loadOptions.trustPreparedCheckpoint && !usedSibling,
+            // RF-55: what came from the installed 8-bit sibling.
+            "talker_code_predictor_from_sibling": codePredictorQuantization != nil,
+            "talker_mixed_precision_from_sibling": mixedQuantization != nil,
             "talker_eval_chunked": true,
             "talker_text_embedding_from_file": textEmbeddingRows != nil,
             "speaker_encoder_requested": shouldLoadSpeakerEncoder,
@@ -1096,17 +1108,33 @@ extension Qwen3TTSModel {
         path: String,
         hasScales: Bool,
         config: Qwen3TTSModelConfig,
-        codePredictor: (Int, Int, QuantizationMode)?
+        codePredictor: (Int, Int, QuantizationMode)?,
+        mixed: (quantization: (Int, Int, QuantizationMode), recipe: Qwen3MixedPrecisionRecipe)? = nil
     ) -> (Int, Int, QuantizationMode)? {
         guard hasScales else { return nil }
         if let codePredictor, path == codePredictorModuleKey || path.hasPrefix("\(codePredictorModuleKey).") {
             return codePredictor
+        }
+        if let mixed, mixed.recipe.selects(path) {
+            return mixed.quantization
         }
         if let perLayerQuant = config.perLayerQuantization,
            let layerQuant = perLayerQuant.quantization(layer: path) {
             return layerQuant.asTuple
         }
         return config.quantization?.asTuple
+    }
+
+    /// RF-55: whether the talker weight at `weightKey` (a module path and its
+    /// tensor's name, `model.layers.3.mlp.down_proj.scales`) is taken from the
+    /// sibling: every code-predictor tensor under the code-predictor key, and
+    /// every tensor of a module the mixed-precision recipe selects.
+    static func takesFromSibling(weightKey: String, codePredictor: Bool, recipe: Qwen3MixedPrecisionRecipe?) -> Bool {
+        if codePredictor, weightKey.hasPrefix("\(codePredictorModuleKey).") {
+            return true
+        }
+        guard let recipe, let dot = weightKey.lastIndex(of: ".") else { return false }
+        return recipe.selects(String(weightKey[..<dot]))
     }
 
     /// RF-55: the installed sibling of `modelDir` at `bits` (the `-8bit`

@@ -508,15 +508,18 @@ an artifact built on an earlier MLX is rejected at load and rebuilt once from it
   (`config/quality-screens.json`, `reference-preparation-v2`): two runs of it gave 190 identical
   takes of 190 where the old path gave 167 of 191, with no measurable cost in speaker similarity
   (-0.009, interval -0.025 to +0.006) or content errors (+0.003), and 22 ms more trailing silence
-  on average (interval +6 to +40 ms, inside the rule's margin). It is the default; every saved
-  voice's prompt rebuilds once. `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the old
-  path in a diagnostics build.
-- **Two channels are mixed as the sum over the square root of two**, as the asset reader mixed
-  them: version 2 changed one thing. A voice recorded on both channels then comes out 3 dB hotter
-  than its source and clips where it peaked above -3 dBFS. Upstream Qwen3-TTS averages the channels
-  (`librosa.load(mono=True)`, then `np.mean`), as does the Python port (`ffmpeg -ac 1`). Version 3
-  (`QWENVOICE_REFERENCE_PREPARATION=single-call-average`) averages them; the `clone-stereo` screen's
-  rule `reference-mixdown-average` decides whether it becomes the default.
+  on average (interval +6 to +40 ms, inside the rule's margin). Version 3 below keeps this
+  resampling. `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the old path in a
+  diagnostics build.
+- **Two channels are averaged** (version 3, the default since 2026-11-11), as upstream Qwen3-TTS
+  (`librosa.load(mono=True)`, then `np.mean`) and the Python port (`ffmpeg -ac 1`) do. Versions 1
+  and 2 mixed them as the sum over the square root of two, so a voice recorded on both channels came
+  out 3 dB hotter than its source and clipped where it peaked above -3 dBFS. The `clone-stereo`
+  screen (the clone screen's references saved as two-channel WAVs) adopted it under its rule
+  `reference-mixdown-average`: speaker similarity +0.005 (interval -0.010 to +0.021), error rate
+  +0.005 (-0.009 to +0.020), trailing silence +6 ms, gross failures 5 and 4. Not worse, and not
+  shown better. A mono reference prepares to the same samples under versions 2 and 3, but its
+  fingerprint changes, so every saved voice's prompt rebuilds once.
 - **The codec encoder's implementation is still unversioned**, so the A-02 fix must add a version or
   saved voices keep their old reference codes (G-03, RF-52).
 

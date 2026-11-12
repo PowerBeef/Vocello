@@ -445,33 +445,35 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertEqual(crossings, 352, accuracy: 1, "440 Hz over 0.8 s")
     }
 
-    /// The default is the single-call path, adopted by the clone screen's
-    /// recorded rule on 2026-11-11 (RF-52). Changing it changes every
+    /// The default is the averaged single-call path (version 3), adopted by
+    /// the clone-stereo screen's recorded rule on 2026-11-11 after version 2
+    /// was adopted by the clone screen's (RF-52). Changing it changes every
     /// prepared reference that is not already canonical and every saved
     /// voice's prompt, so it is pinned here. The key acts only in an
     /// internal-diagnostics build with the master gate on.
-    func testTheResamplingPathIsTheSingleCallUnlessTheGatedKeySelectsAnother() {
+    func testTheResamplingPathIsTheAveragedSingleCallUnlessTheGatedKeySelectsAnother() {
         typealias Resampling = NativeAudioPreparationService.Resampling
         let key = Resampling.environmentKey
         func resolved(_ environment: [String: String], diagnostics: Bool = true) -> Resampling {
             Resampling.resolved(environment: environment, internalDiagnosticsAvailable: diagnostics)
         }
-        XCTAssertEqual(Resampling.production, .singleCall)
-        XCTAssertEqual(resolved([:]), .singleCall)
-        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1"]), .singleCall)
-        XCTAssertEqual(resolved([key: "asset-reader"]), .singleCall, "not without the master gate")
-        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "asset-reader"], diagnostics: false), .singleCall,
+        XCTAssertEqual(Resampling.production, .singleCallAveraged)
+        XCTAssertEqual(resolved([:]), .singleCallAveraged)
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1"]), .singleCallAveraged)
+        XCTAssertEqual(resolved([key: "single-call"]), .singleCallAveraged, "not without the master gate")
+        XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call"], diagnostics: false), .singleCallAveraged,
                        "not in a build without internal diagnostics")
         XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "asset-reader"]), .assetReader)
         XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call"]), .singleCall)
         XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: "single-call-average"]), .singleCallAveraged)
-        XCTAssertEqual(resolved([key: "single-call-average"]), .singleCall, "not without the master gate")
         for mistyped in ["assetreader", "off", "1", ""] {
-            XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: mistyped]), .singleCall, mistyped)
+            XCTAssertEqual(resolved(["QWENVOICE_DEBUG": "1", key: mistyped]), .singleCallAveraged, mistyped)
         }
-        // Version 2 gives every reference a new fingerprint, so prepared files
-        // and prompts made by the asset reader are not reused (G-13).
-        XCTAssertEqual(Resampling.production.preparationVersion, 2)
+        // Version 3 gives every reference a new fingerprint, so prepared files
+        // and prompts made under versions 1 and 2 are not reused (G-13).
+        XCTAssertEqual(Resampling.production.preparationVersion, 3)
+        XCTAssertEqual(Resampling.production.preparationVersion,
+                       NativeAudioPreparationService.newestCloneReferencePreparationVersion)
         XCTAssertNotEqual(
             NativePreparedCloneConditioningCache.preparationFingerprint(
                 contentDigest: "digest", version: Resampling.production.preparationVersion),

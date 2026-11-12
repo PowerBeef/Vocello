@@ -238,7 +238,73 @@
           "margins": "The clone screen's margins, which are about 1.4 times the widest bound of its noise floor; this screen has the same size and references. It separates a gross regression from no change and nothing finer.",
           "expected": "On duplicate references B's prepared audio equals the mono source, and A's is 3 dB hotter and clipped wherever the source peaked above -3 dBFS. On left-only references B's is 3 dB quieter than A's. The strata are reported, not decided on.",
           "decision": "ADOPT when B is reproducible, the floor condition holds and no guard's interval reaches past its margin on the harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
-          "maximumFloorShareOfMargin": 0.71
+          "maximumFloorShareOfMargin": 0.71,
+          "result": {
+            "decided": "2026-11-11",
+            "verdict": "ADOPT",
+            "commit": "1d97e125",
+            "arms": {
+              "a": "a",
+              "b": "b1",
+              "bTwice": "b1, b2",
+              "floor": "a (seed set 1) against a (seed set 2)"
+            },
+            "bReproducible": "190 of 190 takes identical",
+            "noiseFloor": {
+              "speakerSimilarity": [
+                -0.0145,
+                0.0185
+              ],
+              "errorRateBetterFamily": [
+                -0.0132,
+                0.0082
+              ],
+              "trailingSilenceMS": [
+                -25.0,
+                14.4
+              ],
+              "withinShare": "every bound inside 0.71 of its margin"
+            },
+            "outcomes": {
+              "a": {
+                "generated": 189,
+                "refused": 2,
+                "failed": 1
+              },
+              "b": {
+                "generated": 190,
+                "refused": 1,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 5,
+              "b": 4
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0052,
+              "interval95": [
+                -0.01,
+                0.0208
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0046,
+              "interval95": [
+                -0.009,
+                0.0201
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 5.8,
+              "interval95": [
+                -13.4,
+                27.3
+              ]
+            },
+            "strata": "Report-only. Duplicate references: similarity -0.004 (-0.026 to +0.017), gross failures 3 and 3. Left-only references: similarity +0.015 (-0.010 to +0.038), gross failures 2 and 1.",
+            "note": "Not grossly worse anywhere, and not shown better: the 3 dB of headroom the average restores on duplicate references did not move any metric beyond the noise. It is adopted for parity with upstream and the Python port, and because it never clips a source that did not clip."
+          }
         }
       }
     }

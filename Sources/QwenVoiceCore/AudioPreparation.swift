@@ -259,12 +259,13 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
 
         static let environmentKey = "QWENVOICE_REFERENCE_PREPARATION"
 
-        /// What every build does without the diagnostic key. `singleCall`
-        /// since 2026-11-11: the clone screen's rule
-        /// `reference-preparation-v2` adopted it (RF-52). Changing it changes
-        /// every prepared reference that is not already 24 kHz mono 16-bit
-        /// WAV, and rebuilds every saved voice's prompt once.
-        static let production: Resampling = .singleCall
+        /// What every build does without the diagnostic key, since 2026-11-11:
+        /// `singleCall` (adopted by the clone screen's rule
+        /// `reference-preparation-v2`), then `singleCallAveraged` (adopted by
+        /// the clone-stereo screen's rule `reference-mixdown-average`; RF-52).
+        /// Changing it changes every prepared reference that is not already
+        /// 24 kHz mono 16-bit WAV, and rebuilds every saved voice's prompt once.
+        static let production: Resampling = .singleCallAveraged
 
         /// The path this process uses. Read once: the preparation version is
         /// part of every reference's identity, so it cannot change mid-run.
@@ -273,10 +274,10 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
         )
 
-        /// `QWENVOICE_REFERENCE_PREPARATION=asset-reader` restores the earlier
-        /// path, `single-call-average` selects version 3 and `single-call`
-        /// names the shipped one, honoured only in an internal-diagnostics
-        /// build with the master gate on. Any other
+        /// `QWENVOICE_REFERENCE_PREPARATION=asset-reader` (version 1) or
+        /// `single-call` (version 2) restores an earlier path and
+        /// `single-call-average` names the shipped one, honoured only in an
+        /// internal-diagnostics build with the master gate on. Any other
         /// value is the production path: a screen arm
         /// proves which path it ran from each take's prepared-reference
         /// digest, not from the key having been set.

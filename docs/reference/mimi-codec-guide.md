@@ -70,7 +70,7 @@ into PCM. The encoder runs only to turn a clone reference into codes for in-cont
 | ID | What | Status |
 | --- | --- | --- |
 | A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; selectable behind `QWENVOICE_ENCODER_ROTARY` since 2026-11-11; the Swift clone screen was inconclusive with the direction pointing at harm, so the default stays (RF-52) |
-| A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open (PA-16) |
+| A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open; selectable behind `QWENVOICE_DECODER_WINDOW=on` since 2026-11-11; the `clone-long` screen's rule `decoder-window-72` decides the default (RF-54) |
 | D5 / A-04 | Streamed clones decode from a cold decoder; the reference decodes reference plus generated codes (§5) | open, with A-26 (ER-04) |
 | — | Encoder attention is full causal, as upstream's is (§2.3) | matches; do not add the 250-frame window |
 | — | The codec runs in fp32; Qwen's README setup loads bf16 (§7) | deliberate |
@@ -252,11 +252,12 @@ placeholders the checkpoint overwrites.
 LayerNorm (ε 1e-6), a 4× pointwise MLP with GELU, and a learned per-channel scale on the residual.
 It follows the transposed convolution in each `UpsampleLayer`.
 
-**DecoderTransformer** (`ST:457-510`). RMSNorm, attention with split-half RoPE
+**DecoderTransformer** (`ST:457-533`). RMSNorm, attention with split-half RoPE
 (`decoderRotateHalf`, `ST:355`), layer scale, and a `KVCacheSimple` per layer for incremental decode.
 With more than one new frame it builds a full causal mask over `offset + n` positions and keeps the
-last `n` rows (`ST:490-497`). The config's 72-frame `sliding_window` is decoded but never applied
-(A-03, §5).
+last `n` rows (`ST:503-510`). The config's 72-frame `sliding_window` is decoded but applied only
+behind the diagnostic key (A-03, §5): `slidingWindowMask` (`ST:525`) then lets query `q` see key `k`
+when `k <= q` and `k > q - 72`, upstream's rule, at every offset and chunk size.
 
 **DecoderBlock** (`ST:618-690`). SnakeBeta, then `DecoderBlockUpsample` (a transposed conv with
 kernel `2 × rate` and stride `rate`, trimmed on the right only), then three residual units at
@@ -357,10 +358,16 @@ decoder with no reference history. The cold path is open in ER-04 with A-26: re-
 reference on every quality-first take costs about 65% more decoder work for a 20 s reference on a
 30 s take, so the fix caches the primed decoder state per clone prompt.
 
-**No window (A-03).** The decoder attends causally over the whole take. Its fp32 KV grows by about
-64 KiB per frame: about 48 MiB at 60 s and 128 MiB at the 2,048-frame cap. Restoring the 72-frame
-window and a bounded cache, with a parity fixture against the official 300/25 decode, is PA-16.
-The decoder window must land before the decoder performance levers (audit ordering traps).
+**No window (A-03).** By default the decoder attends causally over the whole take. Its fp32 KV grows
+by about 64 KiB per frame: about 48 MiB at 60 s and 128 MiB at the 2,048-frame cap. Since
+2026-11-11 `QWENVOICE_DECODER_WINDOW=on` (an internal-diagnostics build with `QWENVOICE_DEBUG=1`)
+applies the 72-frame window in every layer; the cache stays unbounded, and bounding it to the
+window is a separate change that keeps the output identical. The window changes only what a frame
+past the 72nd hears, so a take shorter than 5.76 s decodes the same either way, and the talker's
+codes never change: the `clone-long` screen (two four-sentence takes per reference, about 15 to
+20 s) decides it under the rule `decoder-window-72`, recorded before its takes, with the late
+speaker windows (from 6 s) as their own guard (RF-54). The decoder window must land before the
+decoder performance levers (audit ordering traps).
 
 ### 5.3 Partition invariance, within tolerance
 
@@ -370,9 +377,11 @@ within floating-point tolerance. `Qwen3DecoderPartitionTests` checks fixed parti
 difference of 1e-5 and an RMS difference of 1e-6, on a small test configuration
 (`Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift:8-59`).
 
-That is a property of Vocello's unwindowed decoder. It does not make Vocello equal to the reference:
-upstream's windowed layers and 300/25 chunking give different audio, and the PA-16 fixture is what
-will measure the difference.
+The windowed decoder keeps the same property (`testTheAttentionWindowKeepsPartitionInvarianceAndActsOnlyPastTheWindow`:
+any partition equals a one-shot decode, frames inside the first window equal the unwindowed
+transformer's and every later frame differs). Neither makes Vocello equal to the reference:
+upstream's 300/25 chunking restarts positions per chunk and gives different audio, and the PA-16
+fixture is what will measure the difference.
 
 ### 5.4 Upstream fixes and community reports
 

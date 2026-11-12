@@ -126,7 +126,8 @@
       "evidenceClass": "static",
       "upstreamDeltaIDs": [
         "CODEC-001",
-        "CODEC-002"
+        "CODEC-002",
+        "CODEC-003"
       ]
     },
     {

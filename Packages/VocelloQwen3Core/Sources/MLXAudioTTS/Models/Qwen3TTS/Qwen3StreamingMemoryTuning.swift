@@ -29,24 +29,30 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// of zeros appended. The host folds the same key into the clone prompt's
     /// speaker-feature version.
     let referenceTrailingSilenceSamples: Int
+    /// RF-54 (`QWENVOICE_DECODER_WINDOW=on`): the speech tokenizer's decoder
+    /// applies its configured attention window (72 frames), as upstream does.
+    let decoderSlidingWindow: Bool
 
     init(
         talkerKVQuantBits: Int?,
         speechTokenizerResidency: Bool?,
         encoderSplitHalfRotary: Bool = false,
-        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
+        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
+        decoderSlidingWindow: Bool = false
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
         self.encoderSplitHalfRotary = encoderSplitHalfRotary
         self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
+        self.decoderSlidingWindow = decoderSlidingWindow
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
         talkerKVQuantBits: nil,
         speechTokenizerResidency: nil,
         encoderSplitHalfRotary: false,
-        referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
+        referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
+        decoderSlidingWindow: false
     )
 
     static func resolve(
@@ -80,7 +86,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             speechTokenizerResidency: speechTokenizerResidency,
             encoderSplitHalfRotary: gatedValue("QWENVOICE_ENCODER_ROTARY") == "split-half",
             referenceTrailingSilenceSamples: gatedValue("QWENVOICE_REFERENCE_PADDING") == "none"
-                ? 0 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
+                ? 0 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
+            decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on"
         )
     }
 }

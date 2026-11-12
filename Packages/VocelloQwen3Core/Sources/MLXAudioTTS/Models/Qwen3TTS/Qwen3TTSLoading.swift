@@ -48,6 +48,28 @@ private let talkerEvalLayerBatchSize = 4
 private let speechTokenizerEvalBatchSize = 8
 
 extension Qwen3TTSModel {
+    /// The resident speech tokenizer's reuse key. An encoder built with the
+    /// other rotary convention (RF-52) or a decoder built with the attention
+    /// window (RF-54) is another object, so it is never handed to a load that
+    /// asked for the other one; without either key the content identity is
+    /// the key, as it was before them.
+    static func speechTokenizerResidencyIdentity(
+        contentIdentity: String,
+        includeEncoder: Bool,
+        overrides: Qwen3LoadTimeDiagnosticOverrides
+    ) -> String {
+        var key = contentIdentity
+        if includeEncoder && overrides.encoderSplitHalfRotary {
+            key += "|encoder-rope-split-half"
+        }
+        if overrides.decoderSlidingWindow {
+            key += "|decoder-sliding-window"
+        }
+        return key
+    }
+}
+
+extension Qwen3TTSModel {
     // MARK: - fromPretrained
 
     public static func preparePreparedDirectory(_ modelDir: URL) throws {
@@ -772,11 +794,12 @@ extension Qwen3TTSModel {
                     at: speechTokenizerPath,
                     includeEncoder: includeEncoder
                 )
-            // An encoder built with the other rotary convention is another
-            // object: it is never handed to a load that asked for this one.
             let residencyIdentity = contentIdentity.map {
-                includeEncoder && loadOptions.diagnosticOverrides.encoderSplitHalfRotary
-                    ? "\($0)|encoder-rope-split-half" : $0
+                Self.speechTokenizerResidencyIdentity(
+                    contentIdentity: $0,
+                    includeEncoder: includeEncoder,
+                    overrides: loadOptions.diagnosticOverrides
+                )
             }
             if let residencyIdentity,
                let residentBox = Qwen3TTSPreparedComponentCache.shared.residentSpeechTokenizer(
@@ -821,6 +844,7 @@ extension Qwen3TTSModel {
                     trustPreparedCheckpoint: loadOptions.trustPreparedCheckpoint,
                     includeEncoder: includeEncoder,
                     encoderSplitHalfRotary: loadOptions.diagnosticOverrides.encoderSplitHalfRotary,
+                    decoderSlidingWindow: loadOptions.diagnosticOverrides.decoderSlidingWindow,
                     skipSpeechTokenizerEval: loadOptions.skipSpeechTokenizerEval,
                     diagnosticEventSink: diagnosticEventSink,
                     isolation: isolation
@@ -881,6 +905,7 @@ extension Qwen3TTSModel {
                 "speech_tokenizer_component_reused": reusedResidentSpeechTokenizer,
                 "speech_tokenizer_encoder_rope_split_half":
                     includeEncoder && loadOptions.diagnosticOverrides.encoderSplitHalfRotary,
+                "speech_tokenizer_decoder_sliding_window": loadOptions.diagnosticOverrides.decoderSlidingWindow,
             ]
         )
     }
@@ -1072,6 +1097,7 @@ extension Qwen3TTSModel {
         trustPreparedCheckpoint: Bool,
         includeEncoder: Bool,
         encoderSplitHalfRotary: Bool = false,
+        decoderSlidingWindow: Bool = false,
         skipSpeechTokenizerEval: Bool,
         diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?,
         isolation: isolated (any Actor)? = #isolation
@@ -1122,7 +1148,8 @@ extension Qwen3TTSModel {
         let speechTokenizer = Qwen3TTSSpeechTokenizer(
             config: tokenizerConfig,
             includeEncoder: includeEncoder,
-            encoderSplitHalfRotary: encoderSplitHalfRotary
+            encoderSplitHalfRotary: encoderSplitHalfRotary,
+            decoderSlidingWindow: decoderSlidingWindow
         )
 
         // Load weights

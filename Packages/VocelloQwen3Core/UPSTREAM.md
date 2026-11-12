@@ -72,6 +72,7 @@ rotary row were corrected on 2026-11-11 against the
 | mlx-audio `6549fc2`: EOS kept after top-k/top-p | inherited, then removed on 2026-10-20 (D2) |
 | mlx-audio `6549fc2`: ICL repetition-penalty floor 1.5 | not adopted; 1.05 is the reference's value |
 | QwenLM reference: the clone reference is encoded as it is | Vocello appends 0.5 s of zeros before the encode (A-12, its own step, not upstream's); since 2026-11-11 `QWENVOICE_REFERENCE_PADDING=none` encodes it unpadded in a diagnostics build (CLONE-003), pending the clone screen (RF-52) |
+| QwenLM reference: the tokenizer decoder applies its 72-frame sliding window in every layer (`create_sliding_window_causal_mask`) and decodes in 300-frame chunks with 25 frames of left context | Vocello's decoder attends to the whole take (A-03); since 2026-11-11 `QWENVOICE_DECODER_WINDOW=on` applies the window in a diagnostics build (CODEC-003), pending a screen of long takes (RF-54) |
 | mlx-audio `d2d02bf` (MA#882): EOS filtered like any token | matched since 2026-10-20 (D2) |
 | mlx-audio `a730a68`: temperature before top-p/min-p | ported |
 | mlx-audio `90ee81f`: fixes a float32 speaker embedding promoting the prefill and KV to float32 | not affected: Vocello casts the embedding at prefix construction |

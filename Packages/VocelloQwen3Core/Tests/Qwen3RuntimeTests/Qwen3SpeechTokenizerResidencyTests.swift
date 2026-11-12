@@ -14,7 +14,36 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QVOICE_TALKER_KV_QUANT": "8",
         "QWENVOICE_TOKENIZER_RESIDENCY": "off",
         "QWENVOICE_ENCODER_ROTARY": "split-half",
+        "QWENVOICE_DECODER_WINDOW": "on",
     ]
+
+    /// A resident tokenizer is reused only by a load that asked for the same
+    /// encoder rotary and decoder window: each key changes the reuse key, and
+    /// without either the content identity is the key, as before them.
+    func testTheResidencyKeySeparatesEveryDiagnosticBuildOfTheTokenizer() {
+        func key(encoder: Bool, rotary: Bool = false, window: Bool = false) -> String {
+            Qwen3TTSModel.speechTokenizerResidencyIdentity(
+                contentIdentity: "trust:digest",
+                includeEncoder: encoder,
+                overrides: Qwen3LoadTimeDiagnosticOverrides(
+                    talkerKVQuantBits: nil, speechTokenizerResidency: nil,
+                    encoderSplitHalfRotary: rotary, decoderSlidingWindow: window)
+            )
+        }
+        for encoder in [true, false] {
+            XCTAssertEqual(Qwen3TTSModel.speechTokenizerResidencyIdentity(
+                contentIdentity: "trust:digest", includeEncoder: encoder, overrides: .production), "trust:digest")
+            XCTAssertEqual(key(encoder: encoder), "trust:digest")
+            XCTAssertEqual(key(encoder: encoder, window: true), key(encoder: encoder) + "|decoder-sliding-window")
+        }
+        XCTAssertEqual(key(encoder: true, rotary: true), "trust:digest|encoder-rope-split-half")
+        XCTAssertEqual(key(encoder: false, rotary: true), "trust:digest", "no encoder, so its rotary is moot")
+        XCTAssertEqual(key(encoder: true, rotary: true, window: true),
+                       "trust:digest|encoder-rope-split-half|decoder-sliding-window")
+        let keys = [key(encoder: true), key(encoder: true, rotary: true), key(encoder: true, window: true),
+                    key(encoder: true, rotary: true, window: true)]
+        XCTAssertEqual(Set(keys).count, keys.count)
+    }
 
     /// A distribution host (app or CLI) attests no internal diagnostics
     /// capability, so the master gate and every override key are inert.
@@ -67,6 +96,16 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         XCTAssertEqual(internalRun.talkerKVQuantBits, 8)
         XCTAssertEqual(internalRun.speechTokenizerResidency, false)
         XCTAssertTrue(internalRun.encoderSplitHalfRotary)
+        XCTAssertTrue(internalRun.decoderSlidingWindow)
+        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.decoderSlidingWindow)
+        for (value, expected) in [(" On ", true), ("1", false), ("off", false), ("", false)] {
+            var windowed = everyOverrideRequested
+            windowed["QWENVOICE_DECODER_WINDOW"] = value
+            XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: windowed)
+                .decoderSlidingWindow, expected, value)
+            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: windowed)
+                .decoderSlidingWindow, value)
+        }
         XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.encoderSplitHalfRotary)
         for (value, expected) in [(" Split-Half ", true), ("split_half", false), ("on", false), ("", false)] {
             var environment = everyOverrideRequested
@@ -109,6 +148,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
                 config: tokenizerConfig, includeEncoder: true, encoderSplitHalfRotary: splitHalf)
             let encoder = try XCTUnwrap(tokenizer.encoderModel)
             XCTAssertEqual(encoder.transformerConfig.ropeTraditional, !splitHalf)
+            XCTAssertNil(tokenizer.decoder.preTransformer.attentionWindow, "the shipped decoder attends to the whole take")
             let layers = encoder.encoderTransformer.transformer.layers
             XCTAssertFalse(layers.isEmpty)
             let headDim = encoder.transformerConfig.headDim
@@ -126,6 +166,14 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
                 XCTAssertFalse(allClose(applied, other).item(Bool.self), "the two conventions differ")
             }
         }
+    }
+
+    func testTheDecoderWindowIsTheConfiguredOneWhenAskedFor() throws {
+        let config = try JSONDecoder().decode(
+            Qwen3TTSTokenizerConfig.self, from: Data(#"{"decoder_config": {}}"#.utf8))
+        XCTAssertEqual(Qwen3TTSSpeechTokenizer(config: config, includeEncoder: false, decoderSlidingWindow: true)
+            .decoder.preTransformer.attentionWindow, 72)
+        XCTAssertNil(Qwen3TTSSpeechTokenizer(config: config, includeEncoder: false).decoder.preTransformer.attentionWindow)
     }
 
     func testResidencyOverrideGovernsAdoptionOnlyWhenResolved() throws {

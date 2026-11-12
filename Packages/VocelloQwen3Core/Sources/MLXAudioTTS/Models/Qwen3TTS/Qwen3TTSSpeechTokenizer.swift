@@ -461,9 +461,18 @@ final class DecoderTransformer: Module {
     let rotaryEmb: DecoderRotaryEmbedding
     @ModuleInfo(key: "input_proj") var inputProj: Linear
     @ModuleInfo(key: "output_proj") var outputProj: Linear
+    /// RF-54 (A-03): the attention window upstream applies in every layer
+    /// (`create_sliding_window_causal_mask`, `kv > q - window`): a frame
+    /// attends to itself and the `window - 1` frames before it. `nil` attends
+    /// to the whole take, the shipped behaviour, which the weights were not
+    /// trained for beyond the window. The cache stays unbounded either way;
+    /// bounding it is a separate change that keeps the output identical. A
+    /// window below one frame would mask every key, so it counts as none.
+    let attentionWindow: Int?
 
-    init(config: Qwen3TTSTokenizerDecoderConfig) {
+    init(config: Qwen3TTSTokenizerDecoderConfig, attentionWindow: Int? = nil) {
         self.config = config
+        self.attentionWindow = attentionWindow.flatMap { $0 >= 1 ? $0 : nil }
         self.layers = (0 ..< config.numHiddenLayers).map { DecoderTransformerLayer(config: config, layerIdx: $0) }
         _norm.wrappedValue = DecoderRMSNorm(dims: config.hiddenSize, eps: config.rmsNormEps)
         self.rotaryEmb = DecoderRotaryEmbedding(dim: config.headDim, maxPositionEmbeddings: config.maxPositionEmbeddings, base: config.ropeTheta)
@@ -488,7 +497,10 @@ final class DecoderTransformer: Module {
         let posEmb = rotaryEmb(x, positionIds: posIds)
 
         var causalMask = mask
-        if causalMask == nil, seqLen > 1 {
+        if causalMask == nil, let window = attentionWindow, offset + seqLen > window || seqLen > 1 {
+            causalMask = Self.slidingWindowMask(
+                queryStart: offset, queryCount: seqLen, keyCount: offset + seqLen, window: window, dtype: x.dtype)
+        } else if causalMask == nil, seqLen > 1 {
             let totalLen = offset + seqLen
             var fullMask = MultiHeadAttention.createAdditiveCausalMask(totalLen).asType(x.dtype)
             if totalLen > seqLen {
@@ -505,6 +517,18 @@ final class DecoderTransformer: Module {
 
     func makeCache() -> [any KVCache] {
         layers.map { _ in KVCacheSimple() }
+    }
+
+    /// Additive mask over absolute positions: query `q` sees key `k` when
+    /// `k <= q` and `k > q - window`, upstream's rule; others get -1e9, the
+    /// value `createAdditiveCausalMask` uses.
+    static func slidingWindowMask(
+        queryStart: Int, queryCount: Int, keyCount: Int, window: Int, dtype: DType
+    ) -> MLXArray {
+        let queries = MLXArray(Int32(queryStart) ..< Int32(queryStart + queryCount)).reshaped(queryCount, 1)
+        let keys = MLXArray(Int32(0) ..< Int32(keyCount)).reshaped(1, keyCount)
+        let allowed = (keys .<= queries) .&& (keys .> (queries - Int32(window)))
+        return MLX.where(allowed, MLXArray(Float(0)), MLXArray(Float(-1e9))).asType(dtype)
     }
 }
 
@@ -964,11 +988,11 @@ final class Qwen3TTSSpeechTokenizerDecoder: Module {
     @ModuleInfo var upsample: [UpsampleLayer]
     @ModuleInfo var decoder: [Module]
 
-    init(config: Qwen3TTSTokenizerDecoderConfig) {
+    init(config: Qwen3TTSTokenizerDecoderConfig, attentionWindow: Int? = nil) {
         self.config = config
         self.totalUpsample = (config.upsampleRates + config.upsamplingRatios).reduce(1, *)
 
-        _preTransformer.wrappedValue = DecoderTransformer(config: config)
+        _preTransformer.wrappedValue = DecoderTransformer(config: config, attentionWindow: attentionWindow)
         _quantizer.wrappedValue = SplitResidualVectorQuantizer(
             nQ: config.numQuantizers,
             nQSemantic: config.numSemanticQuantizers,
@@ -1135,14 +1159,22 @@ final class Qwen3TTSSpeechTokenizer: Module {
     @ModuleInfo var decoder: Qwen3TTSSpeechTokenizerDecoder
     @ModuleInfo(key: "encoder_model") var encoderModel: Qwen3TTSSpeechTokenizerEncoder?
 
-    init(config: Qwen3TTSTokenizerConfig, includeEncoder: Bool = true, encoderSplitHalfRotary: Bool = false) {
+    init(
+        config: Qwen3TTSTokenizerConfig,
+        includeEncoder: Bool = true,
+        encoderSplitHalfRotary: Bool = false,
+        decoderSlidingWindow: Bool = false
+    ) {
         self.config = config
         self.decodeUpsampleRate = config.decodeUpsampleRate
         let decoderConfig = config.decoderConfig ?? {
             let json = "{}".data(using: .utf8)!
             return try! JSONDecoder().decode(Qwen3TTSTokenizerDecoderConfig.self, from: json)
         }()
-        _decoder.wrappedValue = Qwen3TTSSpeechTokenizerDecoder(config: decoderConfig)
+        _decoder.wrappedValue = Qwen3TTSSpeechTokenizerDecoder(
+            config: decoderConfig,
+            attentionWindow: decoderSlidingWindow ? decoderConfig.slidingWindow : nil
+        )
         if includeEncoder, let encoderConfig = config.encoderConfig {
             _encoderModel.wrappedValue = Qwen3TTSSpeechTokenizerEncoder(
                 config: encoderConfig,

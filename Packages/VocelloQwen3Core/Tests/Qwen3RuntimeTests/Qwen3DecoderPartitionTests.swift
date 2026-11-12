@@ -27,6 +27,88 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
                        matches: cold, label: "primed arm must not contaminate later cold replay")
     }
 
+    /// RF-54: with upstream's attention window a streamed decode still equals
+    /// a one-shot decode in any partition; in the decoder transformer, where
+    /// the window acts, a frame inside the first window equals the unwindowed
+    /// transformer's and every later frame differs from it. The fixture's
+    /// layer scale is raised to 1 so attention is not scaled down to the
+    /// clipped waveform's float noise.
+    func testTheAttentionWindowKeepsPartitionInvarianceAndActsOnlyPastTheWindow() throws {
+        let window = 6
+        var config = try tinyConfig()
+        config.layerScaleInitialScale = 1
+        MLXRandom.seed(0xC0DEC0DE)
+        let windowed = Qwen3TTSSpeechTokenizerDecoder(config: config, attentionWindow: window)
+        MLXRandom.seed(0xC0DEC0DE)
+        let unwindowed = Qwen3TTSSpeechTokenizerDecoder(config: config)
+        XCTAssertEqual(windowed.preTransformer.attentionWindow, window)
+        XCTAssertNil(unwindowed.preTransformer.attentionWindow)
+
+        let codes = fixtureCodes(tokenCount: 60)
+        let oneShot = decode(windowed, codes: codes, partitions: [60], timing: false)
+        for partitions in [[1, 2, 3, 4, 12, 25, 13], repeatedPartitions(total: 60, size: 7), repeatedPartitions(total: 60, size: 1)] {
+            assertWaveform(decode(windowed, codes: codes, partitions: partitions, timing: false),
+                           matches: oneShot, label: "windowed partitions \(partitions.prefix(3))")
+        }
+
+        let frameCount = 40
+        let embeds = MLXRandom.normal([1, frameCount, config.latentDim], key: MLXRandom.key(7))
+        func transformed(_ transformer: DecoderTransformer, partitions: [Int]) -> [[Float]] {
+            let cache = transformer.makeCache()
+            var cursor = 0
+            var pieces: [MLXArray] = []
+            for count in partitions {
+                pieces.append(transformer(embeds[0..., cursor ..< (cursor + count), 0...], cache: cache))
+                cursor += count
+            }
+            XCTAssertEqual(cursor, frameCount)
+            let joined = concatenated(pieces, axis: 1)
+            return (0 ..< frameCount).map { joined[0, $0, 0...].asArray(Float.self) }
+        }
+        func largestDifference(_ lhs: [Float], _ rhs: [Float]) -> Float {
+            zip(lhs, rhs).map { abs($0 - $1) }.max() ?? 0
+        }
+        let windowedFrames = transformed(windowed.preTransformer, partitions: [frameCount])
+        // Multi-frame chunks after an offset, and single frames past the window.
+        for partitions in [[1, 5, 3, 13, 18], repeatedPartitions(total: frameCount, size: 1)] {
+            let streamedFrames = transformed(windowed.preTransformer, partitions: partitions)
+            for frame in 0 ..< frameCount {
+                XCTAssertLessThan(largestDifference(windowedFrames[frame], streamedFrames[frame]), maxAbsoluteTolerance,
+                                  "streamed frame \(frame) of \(partitions.prefix(3))")
+            }
+        }
+        let unwindowedFrames = transformed(unwindowed.preTransformer, partitions: [frameCount])
+        for frame in 0 ..< frameCount {
+            let difference = largestDifference(windowedFrames[frame], unwindowedFrames[frame])
+            if frame < window {
+                XCTAssertLessThan(difference, maxAbsoluteTolerance, "frame \(frame) sees every key in both")
+            } else {
+                // A hundred times the equality tolerance, so float noise
+                // cannot pass for the window's effect.
+                XCTAssertGreaterThan(difference, 1e-3, "frame \(frame) no longer sees key \(frame - window)")
+            }
+        }
+        XCTAssertNil(DecoderTransformer(config: config, attentionWindow: 0).attentionWindow,
+                     "a window below one frame would mask every key")
+    }
+
+    func testTheSlidingWindowMaskIsUpstreamsRule() {
+        let mask = DecoderTransformer.slidingWindowMask(
+            queryStart: 4, queryCount: 3, keyCount: 7, window: 3, dtype: .float32
+        ).asArray(Float.self)
+        // Rows are queries 4, 5, 6; columns keys 0...6; upstream: k <= q and k > q - 3.
+        let allowed: [[Bool]] = [
+            [false, false, true, true, true, false, false],
+            [false, false, false, true, true, true, false],
+            [false, false, false, false, true, true, true],
+        ]
+        for (row, expected) in allowed.enumerated() {
+            for (column, isAllowed) in expected.enumerated() {
+                XCTAssertEqual(mask[row * 7 + column], isAllowed ? 0 : -1e9, "query \(row + 4), key \(column)")
+            }
+        }
+    }
+
     func testFixedAndRandomizedPartitionsAreWaveformInvariant() throws {
         MLXRandom.seed(0xC0DEC0DE)
         let decoder = Qwen3TTSSpeechTokenizerDecoder(config: try tinyConfig())

@@ -397,6 +397,30 @@
       "removalCriteria": "Remove the selection once the clone screen has decided A-02: keep only the adopted convention, with an encoder version in the speaker-feature identifier if the split-half convention becomes the default."
     },
     {
+      "id": "CODEC-003",
+      "title": "Speech-tokenizer decoder attention window, selectable",
+      "category": "codec",
+      "state": "diagnostic",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift"
+      ],
+      "documentation": [
+        "UPSTREAM.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove the selection once a screen of takes longer than the window has decided RF-54; if the window is adopted, bound the decoder's KV cache to the window as a separate, PCM-identical change."
+    },
+    {
       "id": "TEL-001",
       "title": "Typed Qwen3 runtime diagnostics and signpost attribution",
       "category": "telemetry",

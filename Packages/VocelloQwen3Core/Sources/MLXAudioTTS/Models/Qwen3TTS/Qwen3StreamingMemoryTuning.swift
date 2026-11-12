@@ -19,10 +19,22 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// qualification lane's entry point while the adaptive heuristic is dark),
     /// `nil` keeps the device-class policy.
     let speechTokenizerResidency: Bool?
+    /// RF-52, A-02 (`QWENVOICE_ENCODER_ROTARY=split-half`): the speech
+    /// tokenizer's encoder rotates the halves, as the reference encoder does.
+    /// The host folds the same key into the clone prompt's speaker-feature
+    /// version, so a prompt encoded one way is never adopted the other way.
+    let encoderSplitHalfRotary: Bool
+
+    init(talkerKVQuantBits: Int?, speechTokenizerResidency: Bool?, encoderSplitHalfRotary: Bool = false) {
+        self.talkerKVQuantBits = talkerKVQuantBits
+        self.speechTokenizerResidency = speechTokenizerResidency
+        self.encoderSplitHalfRotary = encoderSplitHalfRotary
+    }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
         talkerKVQuantBits: nil,
-        speechTokenizerResidency: nil
+        speechTokenizerResidency: nil,
+        encoderSplitHalfRotary: false
     )
 
     static func resolve(
@@ -53,7 +65,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         }
         return Qwen3LoadTimeDiagnosticOverrides(
             talkerKVQuantBits: talkerKVQuantBits,
-            speechTokenizerResidency: speechTokenizerResidency
+            speechTokenizerResidency: speechTokenizerResidency,
+            encoderSplitHalfRotary: gatedValue("QWENVOICE_ENCODER_ROTARY") == "split-half"
         )
     }
 }

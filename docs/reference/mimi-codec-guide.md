@@ -165,6 +165,12 @@ python3 scripts/encoder_golden_codes.py compare --swift <new dir> --expect adjac
 - **After the A-02 fix** the same command passes with `--expect reference` and fails with
   `--expect adjacent`. `--env NAME=VALUE` passes a diagnostic knob to the encoder's process, so the
   fix can be shown behind its knob before it becomes the default.
+- **The fix behind its knob (2026-11-11, CODEC-002).** `QWENVOICE_ENCODER_ROTARY=split-half`, in a
+  diagnostics build with `QWENVOICE_DEBUG=1`, builds the encoder's transformer with
+  `RoPE(traditional: false)` (`TransformerConfig.ropeTraditional`). The host appends
+  `+mimi-encoder-rope-split-half` to the clone prompt's speaker-feature version, so a stored prompt
+  encoded one way is rebuilt, never adopted, the other way; a resident tokenizer is shared only
+  within one convention. The default is unchanged until the clone screen's rule decides (RF-52).
 - **Limits:** the fixture is synthetic, it runs on the Mac with an installed model, and it pins the
   codes, not what a clone sounds like. `reference` (which needs torch and transformers) reruns only
   when the fixture or the tokenizer changes.

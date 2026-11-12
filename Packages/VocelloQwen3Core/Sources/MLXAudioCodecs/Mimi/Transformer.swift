@@ -28,6 +28,10 @@ public struct TransformerConfig {
     public let kvRepeat: Int
     public let dimFeedforward: Int
     public let convLayout: Bool
+    /// MLX `RoPE(traditional:)`: `true` rotates adjacent pairs (x[2i], x[2i+1]),
+    /// `false` rotates the halves (x[i], x[i + d/2]), the convention of
+    /// transformers' `rotate_half`. The weights decide which is right.
+    public let ropeTraditional: Bool
 
     public init(
         dModel: Int,
@@ -50,7 +54,8 @@ public struct TransformerConfig {
         maxSeqLen: Int,
         kvRepeat: Int,
         dimFeedforward: Int,
-        convLayout: Bool
+        convLayout: Bool,
+        ropeTraditional: Bool = true
     ) {
         self.dModel = dModel
         self.numHeads = numHeads
@@ -73,6 +78,7 @@ public struct TransformerConfig {
         self.kvRepeat = kvRepeat
         self.dimFeedforward = dimFeedforward
         self.convLayout = convLayout
+        self.ropeTraditional = ropeTraditional
     }
 
     public var headDim: Int { dModel / numHeads }
@@ -127,7 +133,7 @@ public final class Attention: Module {
         self.scale = 1.0 / Float(Double(cfg.headDim).squareRoot())
 
         if cfg.positionalEmbedding == "rope" {
-            self._rope = ModuleInfo(wrappedValue: RoPE(dimensions: cfg.headDim, traditional: true, base: Float(cfg.maxPeriod)))
+            self._rope = ModuleInfo(wrappedValue: RoPE(dimensions: cfg.headDim, traditional: cfg.ropeTraditional, base: Float(cfg.maxPeriod)))
         } else {
             self._rope = ModuleInfo(wrappedValue: nil)
         }

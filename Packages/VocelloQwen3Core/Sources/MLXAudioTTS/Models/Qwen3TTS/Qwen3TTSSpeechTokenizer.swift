@@ -852,10 +852,22 @@ final class Qwen3TTSSpeechTokenizerEncoder: Module {
     @ModuleInfo var quantizer: MLXAudioCodecs.SplitResidualVectorQuantizer
 
     let encoderCache: [any KVCache]
+    /// A-02: the tokenizer's checkpoint stores its q and k projections in
+    /// the layout transformers' `rotate_half` expects (split halves), as the
+    /// reference encoder (`MimiModel`) applies them. This port has always
+    /// rotated adjacent pairs, so its reference codes differ from the
+    /// reference encoder's on two codes in three. `true` applies the
+    /// reference convention; it is behind a diagnostic key until the clone
+    /// screen decides (RF-52), and `scripts/encoder_golden_codes.py` pins
+    /// which convention the codes follow.
+    let splitHalfRotary: Bool
+    /// The configuration its transformer was built from.
+    let transformerConfig: TransformerConfig
 
-    init(config: Qwen3TTSTokenizerEncoderConfig, validNumQuantizers: Int) {
+    init(config: Qwen3TTSTokenizerEncoderConfig, validNumQuantizers: Int, splitHalfRotary: Bool = false) {
         self.config = config
         self.validNumQuantizers = validNumQuantizers
+        self.splitHalfRotary = splitHalfRotary
 
         let ratioProduct = config.upsamplingRatios.reduce(1, *)
         let encoderFrameRate = Double(config.samplingRate) / Double(ratioProduct)
@@ -899,8 +911,10 @@ final class Qwen3TTSSpeechTokenizerEncoder: Module {
             maxSeqLen: config.maxPositionEmbeddings,
             kvRepeat: config.numAttentionHeads / config.numKeyValueHeads,
             dimFeedforward: config.intermediateSize,
-            convLayout: true
+            convLayout: true,
+            ropeTraditional: !splitHalfRotary
         )
+        self.transformerConfig = transformerCfg
         let projectedTransformer = MLXAudioCodecs.ProjectedTransformer(
             cfg: transformerCfg,
             inputDim: config.hiddenSize,
@@ -1121,7 +1135,7 @@ final class Qwen3TTSSpeechTokenizer: Module {
     @ModuleInfo var decoder: Qwen3TTSSpeechTokenizerDecoder
     @ModuleInfo(key: "encoder_model") var encoderModel: Qwen3TTSSpeechTokenizerEncoder?
 
-    init(config: Qwen3TTSTokenizerConfig, includeEncoder: Bool = true) {
+    init(config: Qwen3TTSTokenizerConfig, includeEncoder: Bool = true, encoderSplitHalfRotary: Bool = false) {
         self.config = config
         self.decodeUpsampleRate = config.decodeUpsampleRate
         let decoderConfig = config.decoderConfig ?? {
@@ -1132,7 +1146,8 @@ final class Qwen3TTSSpeechTokenizer: Module {
         if includeEncoder, let encoderConfig = config.encoderConfig {
             _encoderModel.wrappedValue = Qwen3TTSSpeechTokenizerEncoder(
                 config: encoderConfig,
-                validNumQuantizers: config.encoderValidNumQuantizers
+                validNumQuantizers: config.encoderValidNumQuantizers,
+                splitHalfRotary: encoderSplitHalfRotary
             )
         }
     }

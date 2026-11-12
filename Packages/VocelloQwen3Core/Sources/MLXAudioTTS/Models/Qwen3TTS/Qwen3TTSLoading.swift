@@ -765,12 +765,18 @@ extension Qwen3TTSModel {
             // The host-attested trust identity (weights + config digests) is
             // preferred; the hard-link inode identity is the fallback for
             // loads without a trusted-checkpoint marker.
-            let residencyIdentity = loadOptions.speechTokenizerContentIdentity
+            let contentIdentity = loadOptions.speechTokenizerContentIdentity
                 .map { "trust:\($0)" }
                 ?? speechTokenizerComponentIdentity(
                     at: speechTokenizerPath,
                     includeEncoder: includeEncoder
                 )
+            // An encoder built with the other rotary convention is another
+            // object: it is never handed to a load that asked for this one.
+            let residencyIdentity = contentIdentity.map {
+                includeEncoder && loadOptions.diagnosticOverrides.encoderSplitHalfRotary
+                    ? "\($0)|encoder-rope-split-half" : $0
+            }
             if let residencyIdentity,
                let residentBox = Qwen3TTSPreparedComponentCache.shared.residentSpeechTokenizer(
                    identityKey: residencyIdentity,
@@ -813,6 +819,7 @@ extension Qwen3TTSModel {
                     path: speechTokenizerPath,
                     trustPreparedCheckpoint: loadOptions.trustPreparedCheckpoint,
                     includeEncoder: includeEncoder,
+                    encoderSplitHalfRotary: loadOptions.diagnosticOverrides.encoderSplitHalfRotary,
                     skipSpeechTokenizerEval: loadOptions.skipSpeechTokenizerEval,
                     diagnosticEventSink: diagnosticEventSink,
                     isolation: isolation
@@ -871,6 +878,8 @@ extension Qwen3TTSModel {
                 "speech_tokenizer_verify_relaxed": loadOptions.trustPreparedCheckpoint,
                 "speech_tokenizer_encoder_loaded": includeEncoder,
                 "speech_tokenizer_component_reused": reusedResidentSpeechTokenizer,
+                "speech_tokenizer_encoder_rope_split_half":
+                    includeEncoder && loadOptions.diagnosticOverrides.encoderSplitHalfRotary,
             ]
         )
     }
@@ -1061,6 +1070,7 @@ extension Qwen3TTSModel {
         path: URL,
         trustPreparedCheckpoint: Bool,
         includeEncoder: Bool,
+        encoderSplitHalfRotary: Bool = false,
         skipSpeechTokenizerEval: Bool,
         diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)?,
         isolation: isolated (any Actor)? = #isolation
@@ -1110,7 +1120,8 @@ extension Qwen3TTSModel {
 
         let speechTokenizer = Qwen3TTSSpeechTokenizer(
             config: tokenizerConfig,
-            includeEncoder: includeEncoder
+            includeEncoder: includeEncoder,
+            encoderSplitHalfRotary: encoderSplitHalfRotary
         )
 
         // Load weights

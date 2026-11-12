@@ -79,6 +79,32 @@ struct ResolvedCloneConditioning: Sendable {
     }
 }
 
+/// A-02 (RF-52): which rotary convention this process's speech tokenizer
+/// encoder uses. The package reads the same diagnostic key at load
+/// (`Qwen3LoadTimeDiagnosticOverrides.encoderSplitHalfRotary`); the host folds
+/// it into the clone prompt's speaker-feature version, which reaches the
+/// persisted prompt's metadata, so a prompt encoded under one convention is
+/// rebuilt, never adopted, under the other.
+enum CloneEncoderRotary {
+    static let environmentKey = "QWENVOICE_ENCODER_ROTARY"
+    static let splitHalfSuffix = "+mimi-encoder-rope-split-half"
+
+    static let speakerFeatureSuffix = speakerFeatureSuffix(
+        environment: ProcessInfo.processInfo.environment,
+        internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+    )
+
+    /// Read as the package reads it: trimmed and lowercased.
+    static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        let requested = RuntimeDebugGate.value(
+            for: environmentKey,
+            environment: environment,
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return requested == "split-half" ? splitHalfSuffix : ""
+    }
+}
+
 actor NativePreparedCloneConditioningCache {
     private let capacity: Int
     private var sourceQualityWarningsByFileState: [String: [String]] = [:]
@@ -304,14 +330,15 @@ actor NativePreparedCloneConditioningCache {
     static func clonePromptIdentity(
         referenceIdentity: GenerationSemantics.CloneReferenceIdentity,
         modelArtifactIdentity: GenerationSemantics.ClonePromptModelArtifactIdentity,
-        runtimeProfileSignature: String?
+        runtimeProfileSignature: String?,
+        encoderRotarySuffix: String = CloneEncoderRotary.speakerFeatureSuffix
     ) -> GenerationSemantics.ClonePromptIdentity {
         GenerationSemantics.ClonePromptIdentity(
             referenceIdentity: referenceIdentity,
             language: clonePromptLanguageKey,
             modelArtifactIdentity: modelArtifactIdentity,
             qwenRuntimeProfileSignature: runtimeProfileSignature,
-            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion
+            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion + encoderRotarySuffix
         )
     }
 

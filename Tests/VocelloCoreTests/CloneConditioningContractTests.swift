@@ -44,6 +44,31 @@ final class CloneConditioningContractTests: XCTestCase {
             referenceIdentity: reference, language: "auto", modelArtifactIdentity: artifact,
             qwenRuntimeProfileSignature: "runtime", speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion)
         XCTAssertEqual(identity, historical)
+        // A-02: the split-half encoder key changes the speaker-feature
+        // version, so no prompt is adopted across the two conventions.
+        typealias Rotary = CloneEncoderRotary
+        XCTAssertEqual(
+            Rotary.speakerFeatureSuffix(environment: [:], internalDiagnosticsAvailable: true), "",
+            "the shipped convention adds nothing")
+        XCTAssertEqual(Rotary.speakerFeatureSuffix(
+            environment: ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: " Split-Half "], internalDiagnosticsAvailable: true),
+            Rotary.splitHalfSuffix)
+        for (environment, diagnostics) in [
+            ([Rotary.environmentKey: "split-half"], true),
+            (["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half"], false),
+            (["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "on"], true),
+        ] as [([String: String], Bool)] {
+            XCTAssertEqual(Rotary.speakerFeatureSuffix(environment: environment, internalDiagnosticsAvailable: diagnostics), "")
+        }
+        let splitHalf = NativePreparedCloneConditioningCache.clonePromptIdentity(
+            referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "runtime",
+            encoderRotarySuffix: Rotary.splitHalfSuffix)
+        XCTAssertEqual(splitHalf.speakerFeatureVersion,
+                       VocelloQwen3CloneArtifactSchema.speakerFeatureVersion + Rotary.splitHalfSuffix)
+        // The persisted prompt's metadata carries this signature, so a prompt
+        // stored under one convention is rebuilt under the other.
+        XCTAssertNotEqual(splitHalf.runtimeContractSignature, identity.runtimeContractSignature)
+        XCTAssertNotEqual(splitHalf, identity)
         XCTAssertNotEqual(identity, NativePreparedCloneConditioningCache.clonePromptIdentity(
             referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "new-runtime"))
         let digest = NativePreparedCloneConditioningCache.clonePromptArtifactDigest(

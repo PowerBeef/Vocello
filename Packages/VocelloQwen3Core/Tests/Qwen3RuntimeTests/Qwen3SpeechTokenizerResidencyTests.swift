@@ -1,4 +1,6 @@
 import Foundation
+import MLX
+import MLXAudioCodecs
 @testable import MLXAudioTTS
 import XCTest
 
@@ -11,6 +13,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_DEBUG": "1",
         "QVOICE_TALKER_KV_QUANT": "8",
         "QWENVOICE_TOKENIZER_RESIDENCY": "off",
+        "QWENVOICE_ENCODER_ROTARY": "split-half",
     ]
 
     /// A distribution host (app or CLI) attests no internal diagnostics
@@ -63,6 +66,16 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         )
         XCTAssertEqual(internalRun.talkerKVQuantBits, 8)
         XCTAssertEqual(internalRun.speechTokenizerResidency, false)
+        XCTAssertTrue(internalRun.encoderSplitHalfRotary)
+        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.encoderSplitHalfRotary)
+        for (value, expected) in [(" Split-Half ", true), ("split_half", false), ("on", false), ("", false)] {
+            var environment = everyOverrideRequested
+            environment["QWENVOICE_ENCODER_ROTARY"] = value
+            XCTAssertEqual(
+                Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: environment)
+                    .encoderSplitHalfRotary,
+                expected, value)
+        }
 
         var unsupported = everyOverrideRequested
         unsupported["QVOICE_TALKER_KV_QUANT"] = "3"
@@ -73,6 +86,46 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         )
         XCTAssertNil(normalized.talkerKVQuantBits)
         XCTAssertEqual(normalized.speechTokenizerResidency, true)
+    }
+
+    /// A-02: the encoder's transformer rotates adjacent pairs unless the
+    /// split-half convention is asked for; nothing else in it changes.
+    func testTheEncoderRotaryConventionReachesItsTransformer() throws {
+        let config = try JSONDecoder().decode(Qwen3TTSTokenizerEncoderConfig.self, from: Data("{}".utf8))
+        let shipped = Qwen3TTSSpeechTokenizerEncoder(config: config, validNumQuantizers: 16)
+        let reference = Qwen3TTSSpeechTokenizerEncoder(config: config, validNumQuantizers: 16, splitHalfRotary: true)
+        XCTAssertTrue(shipped.transformerConfig.ropeTraditional)
+        XCTAssertFalse(reference.transformerConfig.ropeTraditional)
+        XCTAssertEqual(shipped.transformerConfig.headDim, reference.transformerConfig.headDim)
+        XCTAssertEqual(shipped.transformerConfig.maxPeriod, reference.transformerConfig.maxPeriod)
+        XCTAssertEqual(shipped.transformerConfig.numLayers, reference.transformerConfig.numLayers)
+
+        // Through the tokenizer, as the loader constructs it, down to the
+        // rotary module every attention layer applies.
+        let tokenizerConfig = try JSONDecoder().decode(
+            Qwen3TTSTokenizerConfig.self, from: Data(#"{"encoder_config": {}}"#.utf8))
+        for splitHalf in [false, true] {
+            let tokenizer = Qwen3TTSSpeechTokenizer(
+                config: tokenizerConfig, includeEncoder: true, encoderSplitHalfRotary: splitHalf)
+            let encoder = try XCTUnwrap(tokenizer.encoderModel)
+            XCTAssertEqual(encoder.transformerConfig.ropeTraditional, !splitHalf)
+            let layers = encoder.encoderTransformer.transformer.layers
+            XCTAssertFalse(layers.isEmpty)
+            let headDim = encoder.transformerConfig.headDim
+            let input = MLXArray((0..<(4 * headDim)).map { Float($0 % 17) / 17 }, [1, 1, 4, headDim])
+            for layer in layers {
+                let rope = try XCTUnwrap(layer.self_attn.rope)
+                let applied = rope(input, offset: 3)
+                let expected = MLXFast.RoPE(
+                    input, dimensions: headDim, traditional: !splitHalf,
+                    base: Float(encoder.transformerConfig.maxPeriod), scale: 1, offset: 3)
+                let other = MLXFast.RoPE(
+                    input, dimensions: headDim, traditional: splitHalf,
+                    base: Float(encoder.transformerConfig.maxPeriod), scale: 1, offset: 3)
+                XCTAssertTrue(allClose(applied, expected).item(Bool.self), "split-half \(splitHalf)")
+                XCTAssertFalse(allClose(applied, other).item(Bool.self), "the two conventions differ")
+            }
+        }
     }
 
     func testResidencyOverrideGovernsAdoptionOnlyWhenResolved() throws {

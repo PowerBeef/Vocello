@@ -389,6 +389,79 @@
           }
         }
       }
+    },
+    "clone-long": {
+      "version": 1,
+      "kind": "clone",
+      "mode": "clone",
+      "variant": "speed",
+      "languages": {
+        "english": [
+          "libritts-r"
+        ],
+        "french": [
+          "mls"
+        ],
+        "german": [
+          "mls"
+        ],
+        "spanish": [
+          "mls"
+        ],
+        "chinese": [
+          "aishell3-subset"
+        ],
+        "korean": [
+          "zeroth-korean"
+        ]
+      },
+      "referencesPerLanguage": 8,
+      "referenceSeconds": [
+        5.0,
+        10.0,
+        20.0
+      ],
+      "scriptSplit": "calibration",
+      "scriptsPerReference": 2,
+      "sentencesPerTake": 4,
+      "crossLanguageScripts": 0,
+      "crossLanguage": {
+        "english": "french",
+        "default": "english"
+      },
+      "population": "clone",
+      "description": "The clone screen's 48 references, each asked for two long takes in its own language: four sentences of the committed CC0 pool joined into one script (about 15 to 20 seconds), generated as one take. The clone screen's takes average about 4 seconds, shorter than the speech tokenizer decoder's 72-frame attention window (5.76 s at 12.5 Hz), so a change that acts only late in a take is invisible to it. speakerSimilarityLate scores only the speaker windows that start at 6 s or later.",
+      "rules": {
+        "decoder-window-72": {
+          "recorded": "2026-11-11",
+          "question": "Does decoding with upstream's attention window (QWENVOICE_DECODER_WINDOW=on: every decoder layer attends over the current frame and the 71 before it, as Qwen3-TTS's tokenizer decoder does) in place of attention over the whole take harm long clone takes (RF-54, A-03)?",
+          "arms": "A: the build at the commit that adds the key, default (attention over the whole take). B: the same build with the key set. Seed set 1 of this screen, each arm in its own data directory, generated after this rule was recorded. The floor: A under seed set 1 against A under seed set 2.",
+          "requires": "The build's default reproduces the clone screen's arm pa on every take, so adding the key changed nothing by default. Two B arms on the same seeds are identical on every take. Every paired take has the same length in A and B (requiresSameDuration): the window acts in the decoder only, so the talker's codes, and each take's length, cannot move, and a change of length means the change reached the talker. This screen's noise floor (passed with --floor) sits inside 0.71 of each margin; because A and B decode the same codes, their paired differences carry no sampling noise and the cross-seed floor is a conservative bound. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT.",
+          "requiresSameDuration": true,
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 3,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "speakerSimilarityLate": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Unknown. Past 72 frames the shipped decoder attends to keys at distances its weights were never trained on; upstream's decoder never does. The first 72 frames of every take decode identically under both arms.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: the default then decodes with the window, which changes every take longer than 5.76 s, and the decoder's cache is bounded to the window next, a change that keeps the output identical. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+        }
+      }
     }
   }
 }

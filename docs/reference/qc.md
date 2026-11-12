@@ -505,6 +505,13 @@ PY="$(python3 scripts/select_python.py)"
 - **The clone screen (version 1)** is 48 saved voices enrolled from licensed human clips (six
   languages, eight speakers each), each asked for three scripts in its language and one in
   another: 192 takes, about six minutes to generate and fifteen to score on the M6.
+- **The variants** draw the clone screen's references (`population`). `clone-stereo` saves each as a
+  two-channel WAV (half duplicated, half left-only). `clone-long` asks each for two takes of four
+  joined pool sentences (`sentencesPerTake`, about 15 to 20 s), for what acts only late in a take:
+  `speakerSimilarityLate` scores the speaker windows that start at 6 s or later (past the decoder's
+  72-frame reach), `speakerSimilarityWorstWindow` the take's worst window, and a rule with
+  `requiresSameDuration` stays open unless every paired take kept its length (a decoder-only change
+  cannot move the talker's frames).
 - **Its noise floor** (measured 2026-11-11 at `6e934d2c`: the same takes under two seed sets) is
   0.035 in mean speaker similarity, 0.027 in the better family's error rate, 25 ms of trailing
   silence and 3 gross failures. A conditioning change moves every take's sampling as a new seed

@@ -61,6 +61,12 @@ ASR_MODELS = ("asr.qwen3-asr-1.7b", "asr.whisper-large-v3")
 SPEAKER_MODEL = "speaker.redimnet2-plus"
 # Compared by character: no spaces between words, or spacing that varies.
 CHARACTER_LANGUAGES = {"chinese", "japanese", "korean"}
+# Written without spaces: their sentences join with no separator.
+UNSPACED_LANGUAGES = {"chinese", "japanese"}
+# The late part of a take starts here: the speech tokenizer decoder attends
+# over 72 frames at 12.5 Hz (5.76 s), so a speaker window that starts at 6 s
+# lies wholly past what a frame near the start can see (RF-54).
+LATE_FROM_SECONDS = 6.0
 PASS_THROUGH_PREFIXES = ("MLX_", "QWENVOICE_", "QVOICE_")
 BOOTSTRAP_RESAMPLES = 2_000
 
@@ -212,11 +218,23 @@ def select_references(screen: dict, language: str, clips_by_source: dict[str, tu
 
 
 def select_scripts(screen: dict, pool: list[dict], language: str, reference_key: str, count: int) -> list[dict]:
+    """`count` scripts in hash order. A screen with `sentencesPerTake` N joins
+    N pool sentences into each script, in that order, so its takes run long
+    enough for what only acts late in a take; one sentence is the default."""
+    per_take = screen.get("sentencesPerTake", 1)
     entries = [entry for entry in pool if entry["language"] == language and entry["split"] == screen["scriptSplit"]]
     entries.sort(key=lambda entry: rank(f"{population(screen)}|script|{reference_key}|{entry['id']}"))
-    if len(entries) < count:
-        raise ScreenError(f"{language}: the script pool holds fewer than {count} scripts")
-    return entries[:count]
+    if len(entries) < count * per_take:
+        raise ScreenError(f"{language}: the script pool holds fewer than {count * per_take} scripts")
+    if per_take == 1:
+        return entries[:count]
+    return [joined_script(entries[index * per_take:(index + 1) * per_take], language) for index in range(count)]
+
+
+def joined_script(entries: list[dict], language: str) -> dict:
+    separator = "" if language in UNSPACED_LANGUAGES else " "
+    return {"id": "+".join(entry["id"] for entry in entries), "language": language,
+            "text": separator.join(entry["text"] for entry in entries)}
 
 
 def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None) -> dict:
@@ -526,6 +544,7 @@ def score_arm(args: argparse.Namespace) -> Path:
         score = {"speakerSimilarity": None, "errorRate": rates}
         if "outputs" in speaker:
             score["speakerSimilarity"] = cosine(speaker["outputs"]["whole"], speaker["outputs"]["reference"])
+            score.update(window_similarities(speaker["outputs"]))
         else:
             # Too short for a speaker embedding: a take that cannot hold its
             # script, counted as a gross failure rather than dropped.
@@ -536,6 +555,21 @@ def score_arm(args: argparse.Namespace) -> Path:
     return arm_dir / "scores.json"
 
 
+def window_similarities(outputs: dict) -> dict[str, float]:
+    """The take's worst speaker window and the mean of its late windows (those
+    starting at LATE_FROM_SECONDS or later), each as similarity to the
+    reference; a take with no late window has no late value."""
+    reference = outputs.get("reference")
+    windows = [window for window in outputs.get("windows") or [] if window.get("embedding")]
+    if not reference or not windows:
+        return {}
+    values = {"speakerSimilarityWorstWindow": min(cosine(window["embedding"], reference) for window in windows)}
+    late = [cosine(window["embedding"], reference) for window in windows if window["start"] >= LATE_FROM_SECONDS]
+    if late:
+        values["speakerSimilarityLate"] = sum(late) / len(late)
+    return values
+
+
 def is_measured_outcome(result: dict) -> bool:
     """A runner's refusal that says something about the take itself: audio
     too short to embed. Any other runner error is a scoring failure."""
@@ -544,9 +578,10 @@ def is_measured_outcome(result: dict) -> bool:
 
 # ---------------------------------------------------------------- compare
 
-# Higher is worse for every metric here except speaker similarity.
-METRICS = ("speakerSimilarity", "errorRateBetterFamily", "errorRate:" + ASR_MODELS[0], "errorRate:" + ASR_MODELS[1],
-           "trailingSilenceMS", "durationSeconds")
+# Higher is worse for every metric here except the speaker similarities.
+SIMILARITY_METRICS = ("speakerSimilarity", "speakerSimilarityLate", "speakerSimilarityWorstWindow")
+METRICS = (*SIMILARITY_METRICS, "errorRateBetterFamily", "errorRate:" + ASR_MODELS[0],
+           "errorRate:" + ASR_MODELS[1], "trailingSilenceMS", "durationSeconds")
 # A take whose better ASR family misses half of the script says something else.
 GROSS_ERROR_RATE = 0.5
 
@@ -559,8 +594,9 @@ def take_metrics(row: dict, score: dict | None) -> dict[str, float]:
     if silence is not None:
         values["trailingSilenceMS"] = silence
     if score:
-        if score.get("speakerSimilarity") is not None:
-            values["speakerSimilarity"] = score["speakerSimilarity"]
+        for metric in SIMILARITY_METRICS:
+            if score.get(metric) is not None:
+                values[metric] = score[metric]
         rates = {model: rate for model, rate in score["errorRate"].items() if rate is not None}
         for model, rate in rates.items():
             values[f"errorRate:{model}"] = rate
@@ -608,6 +644,11 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
     paired = [take for take in takes
               if a["rows"][take["takeID"]]["outcome"] == "generated" and b["rows"][take["takeID"]]["outcome"] == "generated"]
     identical = sum(a["rows"][take["takeID"]]["pcmSHA256"] == b["rows"][take["takeID"]]["pcmSHA256"] for take in paired)
+    # Equal lengths: the same number of codec frames, so a change meant only
+    # for the decoder left the talker alone.
+    same_duration = sum(a["rows"][take["takeID"]].get("durationSeconds") is not None
+                        and a["rows"][take["takeID"]].get("durationSeconds") == b["rows"][take["takeID"]].get("durationSeconds")
+                        for take in paired)
     metrics = {}
     for metric in METRICS:
         clusters: dict[str, list[float]] = {}
@@ -645,6 +686,7 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
     references = [(a["rows"][take["takeID"]].get("referenceAudioDigest"), b["rows"][take["takeID"]].get("referenceAudioDigest"))
                   for take in paired]
     return {"planned": len(takes), "outcomes": outcomes, "paired": len(paired), "identicalPCM": identical,
+            "sameDuration": same_duration,
             "referenceAudioDiffers": sum(1 for left, right in references if left and right and left != right),
             "grossFailures": {"a": gross(a), "b": gross(b)}, "fastQCWarned": {"a": warned(a), "b": warned(b)},
             "scored": bool(a["scores"]) and bool(b["scores"]), "metrics": metrics}
@@ -694,6 +736,9 @@ def decide(summary: dict, rule: dict, floor: dict | None = None) -> dict:
             harms.append(f"{metric} is worse by more than {guard['margin']}")
         elif worst > guard["margin"]:
             reasons.append(f"{metric}: the interval reaches past the margin of {guard['margin']}")
+    if rule.get("requiresSameDuration") and summary.get("sameDuration") != summary.get("paired"):
+        reasons.append(f"{summary.get('paired', 0) - summary.get('sameDuration', 0)} paired takes changed length, "
+                       "so the change reached the talker")
     reasons += floor_violations(rule, floor)
     verdict = "REJECT" if harms else ("INCONCLUSIVE" if reasons else "ADOPT")
     return {"verdict": verdict, "harms": harms, "open": reasons}
@@ -761,7 +806,8 @@ def compare_arms(args: argparse.Namespace) -> int:
     out = run_dir / f"compare-{args.a}-vs-{args.b}.json"
     write_json(out, report)
     print(json.dumps({"verdict": report["verdict"], "report": str(out.relative_to(ROOT)) if out.is_relative_to(ROOT) else out.name,
-                      **{key: summary[key] for key in ("planned", "outcomes", "paired", "identicalPCM", "grossFailures")}},
+                      **{key: summary[key] for key in ("planned", "outcomes", "paired", "identicalPCM", "sameDuration",
+                                                       "grossFailures")}},
                      indent=1))
     return code
 

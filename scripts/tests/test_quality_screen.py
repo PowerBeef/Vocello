@@ -55,17 +55,23 @@ def view(plan: dict, rows: dict, scores: dict) -> dict:
 
 
 class ConfigTests(unittest.TestCase):
-    def test_the_committed_screen_is_complete_and_a_rule_carries_its_date(self):
-        definition = clone_screen()
-        self.assertEqual(definition["kind"], "clone")
-        self.assertEqual(len(definition["referenceSeconds"]), 3)
-        self.assertIn("default", definition["crossLanguage"])
-        for name, rule in definition["rules"].items():
-            self.assertTrue(rule.get("recorded"), f"{name}: a rule is recorded before its takes exist")
-            self.assertIn("maximumExtraGrossFailures", rule)
-            for metric, guard in rule["guards"].items():
-                self.assertIn(metric, screen.METRICS)
-                self.assertGreaterEqual(guard["margin"], 0)
+    def test_every_committed_screen_is_complete_and_a_rule_carries_its_date(self):
+        names = list(screen.read_json(screen.CONFIG)["screens"])
+        self.assertIn("clone", names)
+        for screen_name in names:
+            definition = screen.load_screen(screen_name)
+            self.assertEqual(definition["kind"], "clone")
+            self.assertEqual(len(definition["referenceSeconds"]), 3)
+            self.assertIn("default", definition["crossLanguage"])
+            self.assertGreaterEqual(definition.get("sentencesPerTake", 1), 1)
+            if definition.get("population"):
+                self.assertIn(definition["population"], names, f"{screen_name}: its population is a screen")
+            for name, rule in definition["rules"].items():
+                self.assertTrue(rule.get("recorded"), f"{name}: a rule is recorded before its takes exist")
+                self.assertIn("maximumExtraGrossFailures", rule)
+                for metric, guard in rule["guards"].items():
+                    self.assertIn(metric, screen.METRICS)
+                    self.assertGreaterEqual(guard["margin"], 0)
         with self.assertRaises(screen.ScreenError):
             screen.load_screen("no-such-screen")
 
@@ -105,6 +111,24 @@ class PlanTests(unittest.TestCase):
         self.assertTrue(screen.same_takes_other_seeds(base, reseeded))
         reseeded["takes"][0]["text"] = "other words"
         self.assertFalse(screen.same_takes_other_seeds(base, reseeded))
+
+    def test_long_takes_join_sentences_in_hash_order_with_the_language_s_separator(self):
+        pool = [{"id": f"{language}-{index}", "language": language, "split": "calibration", "text": f"{language} {index}."}
+                for language in ("english", "chinese") for index in range(6)]
+        single = {"name": "x", "scriptSplit": "calibration"}
+        joined = dict(single, sentencesPerTake=3)
+        order = screen.select_scripts(single, pool, "english", "ref", 6)
+        scripts = screen.select_scripts(joined, pool, "english", "ref", 2)
+        self.assertEqual([script["id"] for script in scripts],
+                         ["+".join(entry["id"] for entry in order[:3]), "+".join(entry["id"] for entry in order[3:])])
+        self.assertEqual(scripts[0]["text"], " ".join(entry["text"] for entry in order[:3]))
+        chinese_order = screen.select_scripts(single, pool, "chinese", "ref", 2)
+        chinese = screen.select_scripts(dict(joined, sentencesPerTake=2), pool, "chinese", "ref", 1)[0]
+        self.assertEqual(chinese["text"], "".join(entry["text"] for entry in chinese_order),
+                         "an unspaced script joins with no separator")
+        self.assertEqual(screen.select_scripts(single, pool, "english", "ref", 2), order[:2], "one sentence stays as it was")
+        with self.assertRaises(screen.ScreenError):
+            screen.select_scripts(joined, pool, "english", "ref", 3)
 
     def test_only_registered_environment_families_reach_an_arm(self):
         self.assertEqual(screen.parse_overrides(["QWENVOICE_X=on", "MLX_Y=2"]), {"QWENVOICE_X": "on", "MLX_Y": "2"})
@@ -198,6 +222,18 @@ class ErrorRateTests(unittest.TestCase):
         # Width and case variants are one character.
         self.assertEqual(screen.error_rate("ＡＢＣ １２３", "abc 123", "english"), 0.0)
 
+    def test_late_and_worst_windows_are_scored_against_the_reference(self):
+        windows = [{"start": float(start), "embedding": embedding} for start, embedding in
+                   ((0, [1.0, 0.0]), (3, [0.0, 1.0]), (6, [1.0, 1.0]), (7, [1.0, 0.0]))]
+        values = screen.window_similarities({"reference": [1.0, 0.0], "windows": windows})
+        self.assertAlmostEqual(values["speakerSimilarityWorstWindow"], 0.0)
+        self.assertAlmostEqual(values["speakerSimilarityLate"], (2 ** -0.5 + 1.0) / 2, msg="windows from 6 s on")
+        short = screen.window_similarities({"reference": [1.0, 0.0], "windows": windows[:2]})
+        self.assertNotIn("speakerSimilarityLate", short, "a take with no late window has no late value")
+        self.assertEqual(screen.window_similarities({"reference": None, "windows": windows}), {})
+        metrics = screen.take_metrics(row("t"), dict(score(0.7, 0.1, 0.2), **values))
+        self.assertAlmostEqual(metrics["speakerSimilarityLate"], values["speakerSimilarityLate"])
+
     def test_cosine(self):
         self.assertAlmostEqual(screen.cosine([1.0, 0.0], [2.0, 0.0]), 1.0)
         self.assertAlmostEqual(screen.cosine([1.0, 0.0], [0.0, 3.0]), 0.0)
@@ -254,6 +290,23 @@ class CompareTests(unittest.TestCase):
         low, high = screen.bootstrap_interval({"x": [0.0, 0.2], "y": [0.4], "z": [-0.2, 0.0]}, random.Random(1))
         self.assertLessEqual(low, high)
         self.assertTrue(-0.2 - 1e-9 <= low and high <= 0.4 + 1e-9)
+
+
+class DurationTests(unittest.TestCase):
+    def test_a_decoder_only_change_must_leave_every_length_alone(self):
+        plan = plan_of(voices=3, per_voice=2)
+        scores = {take["takeID"]: score(0.7, 0.02, 0.01) for take in plan["takes"]}
+        longer = dict(row("v0--s0", digest="q"), durationSeconds=4.08)
+        changed = screen.summarize(plan, view(plan, {}, scores), view(plan, {"v0--s0": longer}, scores))
+        self.assertEqual((changed["paired"], changed["sameDuration"]), (6, 5))
+        same = screen.summarize(plan, view(plan, {}, scores), view(plan, {"v0--s0": row("v0--s0", digest="q")}, scores))
+        self.assertEqual(same["sameDuration"], 6)
+        rule = dict(DecisionTests.RULE, requiresSameDuration=True)
+        decided = screen.decide(dict(DecisionTests().summary((-0.01, 0.01), (0.0, 0.0)), paired=6, sameDuration=5), rule)
+        self.assertEqual(decided["verdict"], "INCONCLUSIVE")
+        self.assertIn("reached the talker", decided["open"][0])
+        kept = screen.decide(dict(DecisionTests().summary((-0.01, 0.01), (0.0, 0.0)), paired=6, sameDuration=6), rule)
+        self.assertEqual(kept["verdict"], "ADOPT")
 
 
 class DecisionTests(unittest.TestCase):

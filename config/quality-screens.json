@@ -388,7 +388,63 @@
             }
           },
           "expected": "Seed set 1 moved speaker similarity +0.060 (+0.052 to +0.068) with every guard inside its margin; this run checks it was not those seeds.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: streamed transcript-backed clones then prime by default. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "dcfa4de6 (executable 08527b4a12474d11, the build of ha and hb1)",
+            "arms": {
+              "a": "ka",
+              "b": "kb",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "sameCodeCount": "190 of 190 paired takes",
+            "outcomes": {
+              "a": {
+                "generated": 190,
+                "refused": 1,
+                "failed": 1
+              },
+              "b": {
+                "generated": 191,
+                "refused": 0,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 4,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0561,
+              "interval95": [
+                0.048,
+                0.0652
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": 0.0578,
+              "interval95": [
+                0.0484,
+                0.0684
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0002,
+              "interval95": [
+                -0.0036,
+                0.0043
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -3.1,
+              "interval95": [
+                -11.9,
+                1.8
+              ]
+            },
+            "note": "Replicates seed set 1 (+0.060): priming a streamed clone's decoder with the reference raises speaker similarity by about 0.056, more than ten times the screen's noise floor shift, with the error rate unchanged and the talker untouched. Adopted: streamed transcript-backed clones prime by default."
+          }
         }
       },
       "noiseFloor": {

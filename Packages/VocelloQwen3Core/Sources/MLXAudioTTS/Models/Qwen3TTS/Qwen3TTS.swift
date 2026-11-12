@@ -221,8 +221,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// the gated `QWENVOICE_REFERENCE_PADDING=half-second` (A-12, RF-52).
     let referenceTrailingSilenceSamples: Int
     /// A streamed transcript-backed clone primes the decoder with the
-    /// reference's codes before its own (A-04); off in production, on under
-    /// the gated `QWENVOICE_CLONE_DECODER_HISTORY=primed` (RF-52).
+    /// reference's codes before its own (A-04, RF-52): on in production since
+    /// 2026-11-12, off under the gated `QWENVOICE_CLONE_DECODER_HISTORY=cold`.
     let streamedCloneDecoderPriming: Bool
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?
@@ -1171,7 +1171,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         speakerEncoder: Qwen3TTSSpeakerEncoder?,
         talkerKVQuantBits: Int? = nil,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
-        streamedCloneDecoderPriming: Bool = false
+        streamedCloneDecoderPriming: Bool = true
     ) {
         self.config = config
         self.talker = talker

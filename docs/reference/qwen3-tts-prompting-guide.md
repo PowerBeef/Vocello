@@ -383,10 +383,11 @@ outside contributor and unreviewed.
   worse beyond any margin), and every stored clone artifact rebuilds once. `QWENVOICE_REFERENCE_PADDING=half-second` restores the
   padding in a diagnostics build.
 - **Codes and decode.** The reference codes come from an encoder with the wrong rotary convention
-  (A-02), and streamed clones decode without the reference's history (D5/A-04). A-02 was measured
-  on 2026-11-11 with no detectable effect on clone output, and no upstream report shows audible
-  harm from the cold decoder (QwenLM#219 was withdrawn by its author). Both are in the
-  [12 Hz tokenizer guide](mimi-codec-guide.md).
+  (A-02; the Swift clone screen was inconclusive, so it stays). Streamed clones decode with the
+  reference's history since 2026-11-12 (D5/A-04): the clone screen measured speaker similarity
+  +0.060 and +0.056 on two seed sets with the error rate unchanged, so a cold decoder had cost
+  clones their likeness even though no upstream report showed it (QwenLM#219 was withdrawn by its
+  author). Both are in the [12 Hz tokenizer guide](mimi-codec-guide.md).
 
 ---
 

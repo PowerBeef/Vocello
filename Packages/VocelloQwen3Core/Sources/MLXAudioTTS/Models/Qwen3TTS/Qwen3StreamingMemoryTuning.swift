@@ -32,10 +32,11 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// RF-54 (`QWENVOICE_DECODER_WINDOW=on`): the speech tokenizer's decoder
     /// applies its configured attention window (72 frames), as upstream does.
     let decoderSlidingWindow: Bool
-    /// RF-52, A-04 (`QWENVOICE_CLONE_DECODER_HISTORY=primed`): a streamed
-    /// transcript-backed clone decodes the reference's codes first and keeps
-    /// none of their samples, as the quality-first path and upstream's ICL
-    /// decode do, instead of starting from a cold decoder.
+    /// RF-52, A-04: a streamed transcript-backed clone decodes the reference's
+    /// codes first and keeps none of their samples, as the quality-first path
+    /// and upstream's ICL decode do (production since 2026-11-12, adopted by
+    /// the clone screen's rule `clone-decoder-history-primed-confirm`).
+    /// `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder.
     let cloneDecoderPriming: Bool
 
     init(
@@ -44,7 +45,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         encoderSplitHalfRotary: Bool = false,
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: Bool = false,
-        cloneDecoderPriming: Bool = false
+        cloneDecoderPriming: Bool = true
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
@@ -60,7 +61,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         encoderSplitHalfRotary: false,
         referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: false,
-        cloneDecoderPriming: false
+        cloneDecoderPriming: true
     )
 
     static func resolve(
@@ -97,7 +98,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
                 ? Qwen3TTSReferenceAudio.legacyTrailingSilenceSamples
                 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
-            cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") == "primed"
+            cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold"
         )
     }
 }

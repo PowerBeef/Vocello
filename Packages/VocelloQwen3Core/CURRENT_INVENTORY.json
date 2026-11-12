@@ -68,12 +68,12 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
-      "sha256": "16de8c1bcb5dca5b56de85c5f5eaedb823e71bd98e0f0c3df6f2f2a10e758abc",
+      "sha256": "5c88ad993e4d03715f1d85e7ed44c2f30c426b0c497356b14cd09b03d7c84d8d",
       "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "aa004e3789e31748af33f7dd460059ded938ae48e2c5d8f9a7a86c6f3c4fb1e1",
+      "sha256": "e30fb3fc629c52eaac192debc259f4ca2b96b5ca06fd161a7d4c42189f164754",
       "upstreamStatus": "modified"
     },
     {
@@ -288,7 +288,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
-      "sha256": "2cd1e7c5947c5a179e540b91060aa5a5c1453275218b3032caf31228a1c63509",
+      "sha256": "e7034e364276d792477743e42ac85b1c3f9ac067a83a9bc193f469ab674eec4e",
       "upstreamStatus": "added"
     },
     {

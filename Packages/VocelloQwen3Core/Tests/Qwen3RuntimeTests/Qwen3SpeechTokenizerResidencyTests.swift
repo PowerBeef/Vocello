@@ -15,7 +15,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_TOKENIZER_RESIDENCY": "off",
         "QWENVOICE_ENCODER_ROTARY": "split-half",
         "QWENVOICE_DECODER_WINDOW": "on",
-        "QWENVOICE_CLONE_DECODER_HISTORY": "primed",
+        "QWENVOICE_CLONE_DECODER_HISTORY": "cold",
     ]
 
     /// A resident tokenizer is reused only by a load that asked for the same
@@ -99,15 +99,16 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         XCTAssertTrue(internalRun.encoderSplitHalfRotary)
         XCTAssertTrue(internalRun.decoderSlidingWindow)
         XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.decoderSlidingWindow)
-        // A-04: priming a streamed clone's decoder with the reference.
-        XCTAssertTrue(internalRun.cloneDecoderPriming)
-        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.cloneDecoderPriming)
-        for (value, expected) in [(" Primed ", true), ("on", false), ("1", false), ("", false)] {
-            var primed = everyOverrideRequested
-            primed["QWENVOICE_CLONE_DECODER_HISTORY"] = value
-            XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: primed)
+        // A-04: a streamed clone's decoder is primed with the reference by
+        // default (adopted 2026-11-12); only the gated key restores it cold.
+        XCTAssertFalse(internalRun.cloneDecoderPriming)
+        XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.production.cloneDecoderPriming)
+        for (value, expected) in [(" Cold ", false), ("primed", true), ("off", true), ("", true)] {
+            var history = everyOverrideRequested
+            history["QWENVOICE_CLONE_DECODER_HISTORY"] = value
+            XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: history)
                 .cloneDecoderPriming, expected, value)
-            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: primed)
+            XCTAssertTrue(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: history)
                 .cloneDecoderPriming, value)
         }
         for (value, expected) in [(" On ", true), ("1", false), ("off", false), ("", false)] {

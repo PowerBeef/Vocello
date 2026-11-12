@@ -675,7 +675,7 @@
     },
     {
       "id": "CLONE-004",
-      "title": "Streamed clone decoder primed with the reference, selectable",
+      "title": "Streamed clone decoder primed with the reference, as upstream; cold restorable",
       "category": "clone-conditioning",
       "state": "diagnostic",
       "files": [
@@ -696,7 +696,7 @@
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
-      "removalCriteria": "Remove the selection once the clone screen has decided A-04; if priming is adopted, it becomes the streamed clone path and, with the decoder window adopted, primes with only the frames the window reaches (A-26)."
+      "removalCriteria": "Production primes since 2026-11-12 (clone-decoder-history-primed-confirm adopted it). Remove the cold restore key once no screen needs it; A-26 then caches the primed state per clone prompt or, with the decoder window adopted, primes from only the frames the window reaches."
     }
   ]
 }

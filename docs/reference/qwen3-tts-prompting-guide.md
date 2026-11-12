@@ -352,9 +352,11 @@ outside contributor and unreviewed.
   blind.
 - **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
   `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends exactly one space to the target
-  (`Qwen3TTSPromptAssembly.swift` L74-79). The tokenizer is byte-level BPE without a prefix space, so the
+  (`Qwen3ICLTargetText.boundaryMarked`). The tokenizer is byte-level BPE without a prefix space, so the
   first target word otherwise glues to the transcript; the space was added after French first words
-  were dropped. It also changes the first tokens of CJK targets. Screen before changing it (ER-04).
+  were dropped. It also changes the first tokens of CJK targets. Since 2026-11-12
+  `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts` (a diagnostics build) drops it before a target
+  whose first letter is Han or kana, and the `clone-cjk` screen's rule `icl-target-space-unspaced-scripts` decides it (RF-52).
 - **`language` names the script's language, never the reference's** (`GenerationSemantics.swift`
   L881-887). `COMMUNITY`: QwenLM#80 reports the wrong speaker in about 20% of takes. That figure
   comes from one user in an all-English setup on vLLM-Omni; the cross-language remark in the same

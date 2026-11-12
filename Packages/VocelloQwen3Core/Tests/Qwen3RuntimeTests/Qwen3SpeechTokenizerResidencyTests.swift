@@ -18,6 +18,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         "QWENVOICE_DECODER_WINDOW": "on",
         "QWENVOICE_CLONE_DECODER_HISTORY": "cold",
         "QWENVOICE_CODE_PREDICTOR_BITS": "8",
+        "QWENVOICE_ICL_TARGET_SPACE": "spaced-scripts",
     ]
 
     /// A resident tokenizer is reused only by a load that asked for the same
@@ -210,6 +211,17 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
                 .decoderSlidingWindow, expected, value)
             XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: windowed)
                 .decoderSlidingWindow, value)
+        }
+        // A-11: the space before a Han or kana target, only for "spaced-scripts".
+        XCTAssertTrue(internalRun.iclTargetSpaceOnlyBeforeSpacedScripts)
+        XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.iclTargetSpaceOnlyBeforeSpacedScripts)
+        for (value, expected) in [(" Spaced-Scripts ", true), ("none", false), ("on", false), ("", false)] {
+            var spacing = everyOverrideRequested
+            spacing["QWENVOICE_ICL_TARGET_SPACE"] = value
+            XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: spacing)
+                .iclTargetSpaceOnlyBeforeSpacedScripts, expected, value)
+            XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: spacing)
+                .iclTargetSpaceOnlyBeforeSpacedScripts, value)
         }
         XCTAssertFalse(Qwen3LoadTimeDiagnosticOverrides.production.encoderSplitHalfRotary)
         for (value, expected) in [(" Split-Half ", true), ("split_half", false), ("on", false), ("", false)] {

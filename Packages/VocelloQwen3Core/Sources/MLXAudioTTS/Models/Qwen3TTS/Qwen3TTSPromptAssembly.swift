@@ -13,6 +13,45 @@ import MLXNN
 import os
 import Tokenizers
 
+/// The clone target's text where it follows the reference transcript (A-11).
+enum Qwen3ICLTargetText {
+    /// The tokenizer is byte-level BPE with `add_prefix_space: false`, and the
+    /// clone layout joins the reference transcript's tokens and the target's
+    /// with no separator, as upstream does. Without a leading space a target's
+    /// first word loses its word-boundary marker and glues to the transcript;
+    /// short French first words (such as "Ce") were dropped, so Vocello puts
+    /// exactly one space before the target (idempotent). With
+    /// `onlyBeforeSpacedScripts` a target whose first letter is Han or kana
+    /// gets none, as upstream's join gives it: those scripts mark no word
+    /// boundary with spaces. Digits and punctuation before the first letter do
+    /// not decide ("3个苹果" joins, "2024 report" keeps its space).
+    static func boundaryMarked(_ text: String, onlyBeforeSpacedScripts: Bool) -> String {
+        let target = text.drop(while: { $0.isWhitespace })
+        if onlyBeforeSpacedScripts,
+           let first = target.first(where: { $0.isLetter }),
+           isUnspacedScript(first) {
+            return String(target)
+        }
+        return " " + target
+    }
+
+    /// Han (its unified ideographs with every extension, the compatibility
+    /// ideographs and 々 〆 〇) and kana (with the halfwidth forms).
+    static func isUnspacedScript(_ character: Character) -> Bool {
+        guard let scalar = character.unicodeScalars.first else {
+            return false
+        }
+        switch scalar.value {
+        case 0x3040 ... 0x30FF, 0x31F0 ... 0x31FF, 0xFF66 ... 0xFF9F,
+             0x3005 ... 0x3007, 0x3400 ... 0x4DBF, 0x4E00 ... 0x9FFF, 0xF900 ... 0xFAFF,
+             0x20000 ... 0x323AF, 0x2F800 ... 0x2FA1F:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 extension Qwen3TTSModel {
     // MARK: - Prepare generation inputs
 
@@ -72,12 +111,10 @@ extension Qwen3TTSModel {
         let refEnd = max(refStart, refCount - 2)
         let refTextIds = refIds[0..., refStart ..< refEnd]
 
-        // The tokenizer is ByteLevel BPE with add_prefix_space:false, and `combinedTextIds` below
-        // concatenates ref + target tokens with no separator. Without a leading space the first
-        // target token lacks its word-boundary marker and glues to the reference transcript, so the
-        // model drops short first words (e.g. FR "Ce"). Normalize exactly one leading space so the
-        // first target token is word-boundary-marked (idempotent if the caller already added one).
-        let boundaryMarkedText = " " + text.drop(while: { $0.isWhitespace })
+        let boundaryMarkedText = Qwen3ICLTargetText.boundaryMarked(
+            text,
+            onlyBeforeSpacedScripts: iclTargetSpaceOnlyBeforeSpacedScripts
+        )
         let targetChatText = "<|im_start|>assistant\n\(boundaryMarkedText)<|im_end|>\n<|im_start|>assistant\n"
         let targetIds = MLXArray(tokenizer.encode(text: targetChatText).map { Int32($0) }).reshaped(1, -1)
         let targetCount = targetIds.dim(1)

@@ -973,6 +973,37 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertEqual(streamedAfter, streamedBefore)
     }
 
+    /// A-11 (RF-52): the key reaches the clone layout. Under it a Han target
+    /// joins the reference transcript one token shorter (no leading space)
+    /// and a Latin target keeps its space; without it both keep the space.
+    func testTheCloneTargetSpaceKeyReachesTheCloneLayout() throws {
+        let tiny = try Self.tinyModelConfig()
+        let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
+        func inputFrames(key: Bool, text: String) throws -> Int {
+            MLXRandom.seed(0x7A1C_E5)
+            let model = Qwen3TTSModel(
+                config: tiny,
+                talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+                speakerEncoder: nil,
+                iclTargetSpaceOnlyBeforeSpacedScripts: key
+            )
+            model.tokenizer = TinyTextTokenizer()
+            eval(model)
+            let refCodes = MLXArray.zeros([1, talkerConfig.numCodeGroups, 4], dtype: .int32)
+            return try model.prepareICLGenerationInputs(
+                text: text, refCodes: refCodes, refText: "abc", speakerEmbedding: nil, language: "auto"
+            ).inputEmbeds.dim(1)
+        }
+        let han = "人人生而自由。"
+        let latin = "Ce matin."
+        let hanProduction = try inputFrames(key: false, text: han)
+        let latinProduction = try inputFrames(key: false, text: latin)
+        XCTAssertEqual(try inputFrames(key: true, text: han), hanProduction - 1)
+        XCTAssertEqual(try inputFrames(key: true, text: latin), latinProduction)
+        XCTAssertEqual(hanProduction - latinProduction, han.count - latin.count,
+                       "both keep one space without the key")
+    }
+
     /// E4-02: a model whose config has no `talker_config` fails its first take
     /// with a typed error instead of trapping on a force-unwrap.
     func testAModelWithoutATalkerConfigFailsTypedInsteadOfTrapping() async throws {

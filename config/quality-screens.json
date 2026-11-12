@@ -1212,6 +1212,57 @@
         },
         "note": "Too wide to decide a margin of 0.04, 0.05 or 0.5 at this size: refusals leave only 18 paired projects. Under Consistent 18 of 32 projects are refused across both seed sets (Expressive 4 of 32), and Japanese 12 of 16 (segments of about 70 s with 2.2 to 2.9 s silent gaps and slow delivery)."
       }
+    },
+    "clone-cjk": {
+      "version": 1,
+      "kind": "clone",
+      "mode": "clone",
+      "variant": "speed",
+      "description": "Voice Clone through saved voices with Chinese references alone: each reference is a human clip of the pinned AISHELL-3 subset, enrolled with its corpus transcript, then asked for three Chinese scripts of the committed CC0 pool and one Japanese one, so every take's target is written in Han or kana (A-11). Its noise floor is the default arm on seed set 1 against seed set 2 of the same build.",
+      "languages": {
+        "chinese": [
+          "aishell3-subset"
+        ]
+      },
+      "referencesPerLanguage": 48,
+      "referenceSeconds": [
+        5.0,
+        10.0,
+        20.0
+      ],
+      "scriptSplit": "calibration",
+      "scriptsPerReference": 3,
+      "crossLanguageScripts": 1,
+      "crossLanguage": {
+        "chinese": "japanese",
+        "default": "english"
+      },
+      "rules": {
+        "icl-target-space-unspaced-scripts": {
+          "recorded": "2026-11-12",
+          "question": "Does a clone target written in Han or kana following the reference transcript with no separator (QWENVOICE_ICL_TARGET_SPACE=spaced-scripts), as upstream Qwen3-TTS joins them, in place of Vocello's one leading space before every target (A-11), harm transcript-backed clones?",
+          "arms": "The clone-cjk screen: 48 Chinese references, each asked for three Chinese scripts and one Japanese one (192 takes, every target in Han or kana), at the build of the commit that records this rule. A: default, on seed sets 1 and 2. B: the key set, on seed set 1. Each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The noise floor (A on seed set 1 against A on seed set 2, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT. The key changes the target's text alone, and every B arm run twice so far reproduced itself take for take, so B is not run twice.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Unknown. The space was added for French first-word drops, a fix for a script that marks word boundaries with spaces; before a Han or kana target it puts a word-boundary token upstream's layout never has, and it changes the target's first tokens.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: a clone target whose first letter is Han or kana then follows the reference transcript with no separator, and every other target keeps its one leading space. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the space stays."
+        }
+      }
     }
   }
 }

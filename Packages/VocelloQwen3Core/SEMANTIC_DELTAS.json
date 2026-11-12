@@ -701,6 +701,34 @@
       "removalCriteria": "Production primes since 2026-11-12 (clone-decoder-history-primed-confirm adopted it), and since A-26 the first streamed take of a reference keeps a copy of the primed state that later streamed takes restore, PCM-identical; quality-first clones still decode the reference every take. Remove the cold restore key once no screen needs it; with the decoder window adopted, priming could keep only the frames the window reaches."
     },
     {
+      "id": "CLONE-005",
+      "title": "Clone target text begins with one space; upstream's join restorable before Han and kana",
+      "category": "clone-conditioning",
+      "state": "diagnostic",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift"
+      ],
+      "documentation": [
+        "UPSTREAM.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "A-11. Production puts one space before every clone target (a fix for French first words that glued to the reference transcript); upstream joins them with no separator. QWENVOICE_ICL_TARGET_SPACE=spaced-scripts drops it before a target whose first letter is Han or kana. The clone-cjk screen's rule icl-target-space-unspaced-scripts decides the default; remove the key once its verdict is applied."
+    },
+    {
       "id": "QUANT-001",
       "title": "Code predictor from the installed 8-bit sibling, selectable",
       "category": "quantization",

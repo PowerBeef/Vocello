@@ -373,6 +373,38 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertEqual(Qwen3TTSPrimedDecoderStateCache.shared.count, 0)
     }
 
+    /// A-11 (RF-52): production puts exactly one space before every clone
+    /// target; under the key a target whose first letter is Han or kana gets
+    /// none, and every other target keeps its one space.
+    func testTheCloneTargetSpaceFollowsTheFirstLettersScriptOnlyUnderTheKey() {
+        let cases: [(text: String, production: String, spacedScriptsOnly: String)] = [
+            ("Ce matin.", " Ce matin.", " Ce matin."),
+            ("  Ce matin.", " Ce matin.", " Ce matin."),
+            ("人人生而自由。", " 人人生而自由。", "人人生而自由。"),
+            (" 人人生而自由。", " 人人生而自由。", "人人生而自由。"),
+            ("「なんでもない」", " 「なんでもない」", "「なんでもない」"),
+            ("ｶﾀｶﾅ", " ｶﾀｶﾅ", "ｶﾀｶﾅ"),
+            ("3个苹果。", " 3个苹果。", "3个苹果。"),
+            ("３月です。", " ３月です。", "３月です。"),
+            ("\u{3000}こんにちは", " こんにちは", "こんにちは"),
+            ("\n\t人人", " 人人", "人人"),
+            ("々木さん", " 々木さん", "々木さん"),
+            ("\u{20000}字", " \u{20000}字", "\u{20000}字"),
+            ("2024 report.", " 2024 report.", " 2024 report."),
+            ("\tCe matin.", " Ce matin.", " Ce matin."),
+            ("안녕하세요.", " 안녕하세요.", " 안녕하세요."),
+            ("Привет.", " Привет.", " Привет."),
+            ("123", " 123", " 123"),
+            ("", " ", " "),
+        ]
+        for item in cases {
+            XCTAssertEqual(Qwen3ICLTargetText.boundaryMarked(item.text, onlyBeforeSpacedScripts: false),
+                           item.production, item.text)
+            XCTAssertEqual(Qwen3ICLTargetText.boundaryMarked(item.text, onlyBeforeSpacedScripts: true),
+                           item.spacedScriptsOnly, item.text)
+        }
+    }
+
     // MARK: - Fixtures
 
     private func makeTinyTokenizer() throws -> Qwen3TTSSpeechTokenizer {

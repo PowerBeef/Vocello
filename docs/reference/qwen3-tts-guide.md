@@ -431,9 +431,10 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
   its own step); the clone screen's rule `reference-padding-none` adopted none: speaker similarity
   +0.019 (interval +0.001 to +0.039), trailing silence -22 ms (-35 to -8), the better family's error
   rate +0.012 (+0.002 to +0.026, the size of the screen's own noise floor), gross failures 2 and 4.
-- **ICL target text** gets exactly one leading space (`Qwen3TTSPromptAssembly.swift:74-79`); upstream joins the
+- **ICL target text** gets exactly one leading space (`Qwen3ICLTargetText.boundaryMarked`); upstream joins the
   reference and target tokens with no separator. Vocello added the space for French first-word drops
-  (A-11, deliberate; screen before changing).
+  (A-11, deliberate). `QWENVOICE_ICL_TARGET_SPACE=spaced-scripts` drops it before a target whose first letter is Han or kana
+  in a diagnostics build since 2026-11-12, decided by the `clone-cjk` screen (RF-52).
 - **ICL layout.** Vocello always lays the reference and target text over the reference's codec frames
   in the non-streaming overlay (mlx-audio lineage, G-14). Upstream's `generate_voice_clone` defaults
   to the streaming layout (WM L478), and a long reference in that layout speeds speech up

@@ -44,6 +44,12 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// record), the rest of the talker staying as installed. nil loads the
     /// model as it is.
     let codePredictorBits: Int?
+    /// RF-52, A-11 (`QWENVOICE_ICL_TARGET_SPACE=spaced-scripts`): a clone
+    /// target whose first letter is Han or kana follows the reference
+    /// transcript with no separator, as upstream joins them; every other target
+    /// keeps its one leading space. Production puts one space before every
+    /// target.
+    let iclTargetSpaceOnlyBeforeSpacedScripts: Bool
 
     init(
         talkerKVQuantBits: Int?,
@@ -52,7 +58,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: Bool = false,
         cloneDecoderPriming: Bool = true,
-        codePredictorBits: Int? = nil
+        codePredictorBits: Int? = nil,
+        iclTargetSpaceOnlyBeforeSpacedScripts: Bool = false
     ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
@@ -61,6 +68,7 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         self.decoderSlidingWindow = decoderSlidingWindow
         self.cloneDecoderPriming = cloneDecoderPriming
         self.codePredictorBits = codePredictorBits
+        self.iclTargetSpaceOnlyBeforeSpacedScripts = iclTargetSpaceOnlyBeforeSpacedScripts
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
@@ -70,7 +78,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
         decoderSlidingWindow: false,
         cloneDecoderPriming: true,
-        codePredictorBits: nil
+        codePredictorBits: nil,
+        iclTargetSpaceOnlyBeforeSpacedScripts: false
     )
 
     static func resolve(
@@ -108,7 +117,8 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
                 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on",
             cloneDecoderPriming: gatedValue("QWENVOICE_CLONE_DECODER_HISTORY") != "cold",
-            codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil
+            codePredictorBits: gatedValue("QWENVOICE_CODE_PREDICTOR_BITS") == "8" ? 8 : nil,
+            iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") == "spaced-scripts"
         )
     }
 }

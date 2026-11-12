@@ -653,8 +653,9 @@ def score_arm(args: argparse.Namespace) -> Path:
             raise ScreenError(f"QC scoring failed (exit {completed.returncode}); nothing was scored for this arm")
 
     def result(model: str, take: dict, variant: bool) -> dict:
-        key = (store.variant_key(take["text"], take["language"], take["referenceSHA256"])
-               if variant and take.get("referenceSHA256") else None)
+        # The store keys a variant model's result by script, language and
+        # reference, the reference absent for Custom and Design.
+        key = store.variant_key(take["text"], take["language"], take.get("referenceSHA256")) if variant else None
         path = QC_RESULTS / model / f"{store.result_stem(take['audioSHA256'], key)}.json"
         if not path.is_file():
             raise ScreenError(f"{take['takeID']}: no {model} result; a take is never scored in part")

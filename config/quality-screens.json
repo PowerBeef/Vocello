@@ -1016,7 +1016,51 @@
             }
           },
           "expected": "Fewer refused projects: the refused Japanese segments ran 70 s and more with 2.2 to 2.9 s silent gaps and slow delivery, past the roughly 60 s envelope long-form delivery was validated at. October's shorter budget (200 for every script) made English and French Consistent projects worse, so this is screened for Japanese alone.",
-          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 (each seed set's report read, the interval of either reaching past the margin making it INCONCLUSIVE): East Asian scripts then plan with a budget of 150 units while every other script keeps 300 (a planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays."
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 (each seed set's report read, the interval of either reaching past the margin making it INCONCLUSIVE): East Asian scripts then plan with a budget of 150 units while every other script keeps 300 (a planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "INCONCLUSIVE",
+            "commit": "126105a3 (executable of the RF-55 key's build; no Swift change since)",
+            "arms": {
+              "a": "ja",
+              "b": "jb1",
+              "bTwice": "jb1, jb2 identical (seed set 1)"
+            },
+            "refusedProjects": {
+              "a": 12,
+              "b": 8,
+              "of": 16
+            },
+            "byVariation": {
+              "expressive": {
+                "a": "4 of 8 generated",
+                "b": "8 of 8 generated"
+              },
+              "consistent": {
+                "a": "0 of 8 generated",
+                "b": "0 of 8 generated"
+              }
+            },
+            "errorRateBetterFamily": {
+              "seedSet1": {
+                "meanDifference": -0.3153,
+                "interval95": [
+                  -0.435,
+                  -0.1955
+                ],
+                "pairs": 2
+              },
+              "seedSet2": {
+                "meanDifference": -0.1183,
+                "interval95": [
+                  -0.2981,
+                  0.0616
+                ],
+                "pairs": 2
+              }
+            },
+            "note": "The primary criterion (B at most half of A's 12) is not met: B refuses 8, because Consistent projects fail in both arms. Under Expressive the shorter budget took Japanese from 4 of 8 projects to 8 of 8, and on paired projects cut the better family's error rate from 0.57 to 0.26 (seed set 1). The budget stays until a confirmation on Expressive Japanese with fresh seeds, recorded before its takes, decides it; Consistent is screened by long-form-consistent-talker."
+          }
         },
         "long-form-consistent-talker": {
           "recorded": "2026-11-12",

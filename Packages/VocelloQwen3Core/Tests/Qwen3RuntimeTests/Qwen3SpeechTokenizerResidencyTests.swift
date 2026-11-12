@@ -137,6 +137,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         let layer = "model.layers.7."
         let expected: [Qwen3MixedPrecisionRecipe: Set<String>] = [
             .down: ["mlp.down_proj"],
+            .attn: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"],
             .attnDown: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj", "mlp.down_proj"],
             .mlp: ["mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"],
             .talker: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",

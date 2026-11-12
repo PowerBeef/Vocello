@@ -10,6 +10,8 @@ import Foundation
 enum Qwen3MixedPrecisionRecipe: String, Sendable, Equatable, CaseIterable {
     /// The MLP down projection.
     case down
+    /// The four attention projections.
+    case attn
     /// All four attention projections and the MLP down projection.
     case attnDown = "attn-down"
     /// The three MLP projections.
@@ -24,6 +26,7 @@ enum Qwen3MixedPrecisionRecipe: String, Sendable, Equatable, CaseIterable {
         let leaf = path.split(separator: ".").last.map(String.init) ?? ""
         switch self {
         case .down: return leaf == "down_proj"
+        case .attn: return ["q_proj", "k_proj", "v_proj", "o_proj"].contains(leaf)
         case .attnDown: return ["q_proj", "k_proj", "v_proj", "o_proj", "down_proj"].contains(leaf)
         case .mlp: return ["gate_proj", "up_proj", "down_proj"].contains(leaf)
         case .talker: return true

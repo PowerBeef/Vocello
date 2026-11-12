@@ -27,7 +27,7 @@
       "gateRequired": true,
       "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
       "releaseBehavior": "unavailable-without-internal-capability",
-      "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics. QWENVOICE_MIXED_PRECISION (RF-55, 2026-11-12) set to down, attn-down, mlp or talker takes the talker layer tensors that recipe names (never the code predictor) from the installed 8-bit sibling of the same model, so a mixed-precision model can be measured before any artifact is built; it is read once per model load, needs both siblings installed, and any other value loads the model as it is.",
+      "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics. QWENVOICE_MIXED_PRECISION (RF-55, 2026-11-12) set to down, attn, attn-down, mlp or talker takes the talker layer tensors that recipe names (never the code predictor) from the installed 8-bit sibling of the same model, so a mixed-precision model can be measured before any artifact is built; it is read once per model load, needs both siblings installed, and any other value loads the model as it is.",
       "keys": [
         "QVOICE_APP_SUPPORT_DIR",
         "QVOICE_DOWNLOAD_ENGINE_PROFILE",

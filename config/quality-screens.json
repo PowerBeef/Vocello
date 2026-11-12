@@ -866,8 +866,97 @@
             }
           },
           "expected": "Unknown. RF-20's content screen (2026-10-16) found no failure in either layout but its full-text arm was under its own minimum size, and it ran before the subtalker fix of 2026-10-19. Single takes adopted full text on 2026-10-20 (RF-21); segments kept trailing text.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: long-form segments then take full-text conditioning, as single takes do. REJECT when a guard's whole interval lies past its margin, or B loses more projects than allowed. Otherwise INCONCLUSIVE, and segments keep trailing text."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: long-form segments then take full-text conditioning, as single takes do. REJECT when a guard's whole interval lies past its margin, or B loses more projects than allowed. Otherwise INCONCLUSIVE, and segments keep trailing text.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "INCONCLUSIVE",
+            "commit": "47614b4f (executable e8eaefe0079e0f87)",
+            "arms": {
+              "a": "fa",
+              "b": "fb1",
+              "bTwice": "fb1, fb2 identical",
+              "floor": "fa (seed set 1) against fs (seed set 2)"
+            },
+            "outcomes": {
+              "a": {
+                "generated": 23,
+                "refused": 9
+              },
+              "b": {
+                "generated": 24,
+                "refused": 8
+              }
+            },
+            "grossFailures": {
+              "a": 11,
+              "b": 8
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": -0.0343,
+              "interval95": [
+                -0.0787,
+                -0.0021
+              ]
+            },
+            "speakerWindowSpread": {
+              "meanDifference": 0.0465,
+              "interval95": [
+                -0.0156,
+                0.126
+              ]
+            },
+            "segmentsWarned": {
+              "meanDifference": -0.0952,
+              "interval95": [
+                -0.4,
+                0.1304
+              ]
+            },
+            "open": [
+              "speakerWindowSpread: the interval reaches past the margin of 0.05",
+              "the screen's own floor exceeds 0.71 of every margin"
+            ],
+            "note": "Full text leaned better (error rate lower, three fewer gross failures) but the screen cannot decide at this size; segments keep trailing text. Full text did not touch the long-form failures under Consistent or in Japanese, which are the larger defect and are screened next."
+          }
         }
+      },
+      "noiseFloor": {
+        "measured": "2026-11-12",
+        "commit": "47614b4f",
+        "method": "Arm fa (seed set 1) against arm fs (seed set 2), the same build and data.",
+        "paired": 18,
+        "outcomes": {
+          "seedSet1": {
+            "generated": 23,
+            "refused": 9
+          },
+          "seedSet2": {
+            "generated": 19,
+            "refused": 13
+          }
+        },
+        "errorRateBetterFamily": {
+          "meanDifference": 0.0137,
+          "interval95": [
+            -0.0156,
+            0.0532
+          ]
+        },
+        "speakerWindowSpread": {
+          "meanDifference": 0.025,
+          "interval95": [
+            -0.0285,
+            0.0862
+          ]
+        },
+        "segmentsWarned": {
+          "meanDifference": 0.2778,
+          "interval95": [
+            0.0625,
+            0.4737
+          ]
+        },
+        "note": "Too wide to decide a margin of 0.04, 0.05 or 0.5 at this size: refusals leave only 18 paired projects. Under Consistent 18 of 32 projects are refused across both seed sets (Expressive 4 of 32), and Japanese 12 of 16 (segments of about 70 s with 2.2 to 2.9 s silent gaps and slow delivery)."
       }
     }
   }

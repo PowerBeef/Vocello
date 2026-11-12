@@ -1171,7 +1171,106 @@
             }
           },
           "expected": "Fewer refused projects and a lower error rate: on seed sets 1 and 2 the budget took Japanese Expressive from 4 of 8 projects to 8 of 8. Chinese runs slower per character than Japanese (median 0.26 s against 0.22), so its 300-character segments overshoot the delivery envelope the same way; Korean runs near 0.2 s per syllable.",
-          "decision": "ADOPT when the control reproduces the defect, B's refused projects are at most half of A's with no failure class A lacks, no language refuses more projects under B than under A, and the better family's error rate is not worse beyond 0.04 in either seed set's report: the planner then budgets East Asian scripts at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays."
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects are at most half of A's with no failure class A lacks, no language refuses more projects under B than under A, and the better family's error rate is not worse beyond 0.04 in either seed set's report: the planner then budgets East Asian scripts at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "INCONCLUSIVE",
+            "commit": "bf400784 (executable 9f6e97d45175cf7f)",
+            "arms": {
+              "a": "ea",
+              "b": "eb",
+              "runs": "long-form-ea-seeds3 and -seeds4"
+            },
+            "notGeneratedProjects": {
+              "a": 10,
+              "b": 10,
+              "of": 24
+            },
+            "outcomes": {
+              "a": {
+                "generated": 14,
+                "refused": 8,
+                "failed": 2
+              },
+              "b": {
+                "generated": 14,
+                "refused": 10,
+                "failed": 0
+              }
+            },
+            "byLanguage": {
+              "chinese": {
+                "a": 4,
+                "b": 2,
+                "of": 8
+              },
+              "japanese": {
+                "a": 0,
+                "b": 0,
+                "of": 8
+              },
+              "korean": {
+                "a": 6,
+                "b": 8,
+                "of": 8
+              }
+            },
+            "errorRateBetterFamily": {
+              "seedSet3": {
+                "meanDifference": -0.178,
+                "interval95": [
+                  -0.367,
+                  -0.043
+                ],
+                "pairs": 5
+              },
+              "seedSet4": {
+                "meanDifference": -0.1352,
+                "interval95": [
+                  -0.2447,
+                  -0.0363
+                ],
+                "pairs": 6
+              },
+              "japanesePairs": {
+                "seedSet3": -0.2235,
+                "seedSet4": -0.1392
+              }
+            },
+            "note": "Two clauses fail: B's projects not generated are not at most half of A's (10 against 10), and Korean refuses more under B (8 against 6). Not REJECT: counting refused and failed projects together, as the primary metric does, B does not lose more than A (by refusals alone B refused 10 against A's 8, A failing 2 more). The budget stays. Korean long-form is mostly refused at either budget (slow delivery, interior silences past 2 s), a defect of its own screened under long-form-korean-full-text; Chinese and Japanese improved, on error rate most of all, and are confirmed apart on fresh seeds under long-form-han-kana-budget."
+          }
+        },
+        "long-form-korean-full-text": {
+          "recorded": "2026-11-12",
+          "question": "Do Korean long-form projects fail less when their segments take the whole text up front (QWENVOICE_FULL_TEXT_CONDITIONING=on, the layout single takes have used since RF-21) in place of trailing text (D1, RF-53)?",
+          "arms": "The long-form screen's custom-korean stratum alone, Expressive and Consistent (runs long-form-korean-seeds5 and -seeds6: four projects per variation), at the build of the commit that records this rule. A: default. B: the key set. Seed sets 5 and 6, which no earlier arm used, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The control reproduces the defect: A refuses at least 4 of its 16 projects across both seed sets (the East Asian screen refused 6 of 8 Korean Expressive projects at the default budget, for slow delivery and interior silences past 2 s).",
+          "primaryMetric": "Refused or failed projects across both seed sets, A against B, overall and per variation, and B's failure classes against A's.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Fewer refused projects. A refused Korean segment ran 89 s at 0.46 s per syllable (Korean's median is about 0.2) with 30 s of interior silence, which fits a talker that has run past its fed text; a shorter segment budget made Korean worse (8 of 8 refused), so length alone is not the cause.",
+          "decision": "ADOPT when the control reproduces the defect, B's refused or failed projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 in either seed set's report: Korean long-form segments then take the whole text up front. REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and segments keep trailing text."
+        },
+        "long-form-han-kana-budget": {
+          "recorded": "2026-11-12",
+          "question": "Confirmation on fresh seeds, Chinese and Japanese only: do long-form segments planned with a 150-unit budget (QWENVOICE_LONG_FORM_DELIVERY_BUDGET=150) in place of 300 cut refused projects without harm in the scripts written in Han and kana (RF-53)?",
+          "arms": "The long-form screen's custom-chinese and custom-japanese strata, Expressive and Consistent (runs long-form-hk-seeds5 and -seeds6: four projects per stratum and variation), at the build of the commit that records this rule. A: default. B: the key set. Seed sets 5 and 6, which no earlier arm used, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "Nothing beyond the arms: either path below can decide. The refusal path needs the control to reproduce the defect (A refuses or fails at least 4 of its 32 projects across both seed sets).",
+          "primaryMetric": "Two, either of which can decide: refused or failed projects across both seed sets, A against B, overall and per language; and the better family's error rate on projects both arms generated, each seed set's report read. B's failure classes are read against A's.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Fewer refused projects. Chosen after the East Asian confirmation, which the budget did not pass as a whole (10 of 24 projects not generated in each arm) because Korean worsened (6 to 8 of 8) while Chinese improved (4 to 2 of 8) and Japanese stayed clean; on seed sets 1 and 2 it took Japanese Expressive from 4 of 8 refused to none, and on seed sets 3 and 4 it lowered the better family's error rate of Japanese projects both arms generated by 0.22 and 0.14 (Chinese by 0.13 on seed set 4). Selecting the languages after the data is why this runs on seeds no arm has used.",
+          "decision": "ADOPT when B has no failure class A lacks, neither language refuses or fails more projects under B than under A, and either (refusal path) the control reproduces the defect and B's refused or failed projects are at most half of A's with the better family's error rate not worse beyond 0.04 in either seed set's report, or (error-rate path) the better family's error rate on paired projects is lower under B with its interval wholly below zero in both seed sets' reports: the planner then budgets text written in Han or kana at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B refuses or fails more projects than A, or its error rate is worse beyond 0.04 in either report. Otherwise INCONCLUSIVE, and the budget stays."
         }
       },
       "noiseFloor": {

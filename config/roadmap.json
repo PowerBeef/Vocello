@@ -495,7 +495,7 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07; G-15's punctuation; waits on RF-50 alone). The review's pre-screen expects the rotary fix to land for parity, not an audible gain. Done 2026-11-11, reproducible reference preparation: e57ddd57 added Resampling.singleCall (preparation version 2) and the rule reference-preparation-v2 before its arms; the rule said ADOPT (two runs identical on 190 of 190 takes against 167 of 191 for the old path; similarity -0.009, interval -0.025 to +0.006; error rate +0.003; trailing silence +22 ms, interval +6 to +40, just inside its margin); a715b2ae made it the default, and the default build reproduces the screened arm on 190 of 190 takes. Evidence: build/artifacts/macos/quality-screen/clone-seeds1 and the rule's result in config/quality-screens.json. Left, in order: the two-channel mixdown, the encoder's rotary, then the rest of the gate."
+      "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07; G-15's punctuation; waits on RF-50 alone). Decided 2026-11-11, each by a rule recorded before its arms (config/quality-screens.json, with results). Reproducible preparation (version 2): ADOPT, default at a715b2ae. Two-channel mixdown by the average (version 3, as upstream): ADOPT on the clone-stereo screen (similarity +0.005, error rate +0.005, gross 5 and 4; not shown better), default at fffcc709, reproduced 190 of 190. Encoder split-half rotary (A-02, e8a25662, key QWENVOICE_ENCODER_ROTARY): INCONCLUSIVE, default stays adjacent. The golden pin shows the key works (98.8% of codes match the reference encoder), but error rate +0.021 (interval +0.005 to +0.041) and gross failures 2 to 5, mostly cross-language clones; G-03 is moot while it stays off. Left: primed decoder history (A-04, A-26), edge trim and padding (A-12, G-07), the leading space (A-11), punctuated transcripts (G-15)."
     },
     {
       "id": "RF-53",
@@ -505,14 +505,14 @@
       "blockedBy": [
         "RF-50"
       ],
-      "gate": "Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take.",
+      "gate": "Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take. A take far too short for its script (speech that ended early) is refused by Fast QC like any other gross failure, with its threshold calibrated on human speech before it is used.",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
         "Sources/QwenVoiceCore/GenerationSemantics.swift"
       ],
       "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-03's open D1 question and ER-05's D6. Both switches exist (QWENVOICE_FULL_TEXT_CONDITIONING, QWENVOICE_CUSTOM_AUTO_LANGUAGE). ICA-15's rule stands: never trim, silently regenerate or substitute a seed."
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up ER-03's open D1 question and ER-05's D6. Both switches exist (QWENVOICE_FULL_TEXT_CONDITIONING, QWENVOICE_CUSTOM_AUTO_LANGUAGE). ICA-15's rule stands: never trim, silently regenerate or substitute a seed. Found 2026-11-11 by the encoder-rotary screen: a clone take of 0.32 s for a full German sentence ended by end of speech and passed Fast QC, which flags takes too slow for their script but none too short (GenerationOutputAdapter, speaking_rate_slow only). Under the shipped default this screen made no such take, but nothing refuses one."
     },
     {
       "id": "RF-54",

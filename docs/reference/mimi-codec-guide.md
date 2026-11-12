@@ -69,7 +69,7 @@ into PCM. The encoder runs only to turn a clone reference into codes for in-cont
 
 | ID | What | Status |
 | --- | --- | --- |
-| A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; ships with G-03's version bump (ER-04); no detectable effect on clone output in the 2026-11-11 pre-screen |
+| A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; selectable behind `QWENVOICE_ENCODER_ROTARY` since 2026-11-11; the Swift clone screen was inconclusive with the direction pointing at harm, so the default stays (RF-52) |
 | A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open (PA-16) |
 | D5 / A-04 | Streamed clones decode from a cold decoder; the reference decodes reference plus generated codes (§5) | open, with A-26 (ER-04) |
 | — | Encoder attention is full causal, as upstream's is (§2.3) | matches; do not add the 250-frame window |
@@ -170,7 +170,12 @@ python3 scripts/encoder_golden_codes.py compare --swift <new dir> --expect adjac
   `RoPE(traditional: false)` (`TransformerConfig.ropeTraditional`). The host appends
   `+mimi-encoder-rope-split-half` to the clone prompt's speaker-feature version, so a stored prompt
   encoded one way is rebuilt, never adopted, the other way; a resident tokenizer is shared only
-  within one convention. The default is unchanged until the clone screen's rule decides (RF-52).
+  within one convention. The clone screen's rule `encoder-rotary-split-half` was INCONCLUSIVE
+  (2026-11-11): with the key, the better ASR family's error rate rose by 0.021 (interval +0.005 to
+  +0.041, past its 0.04 margin) and gross failures went from 2 to 5, mostly French takes from
+  English references and one 0.32-second take; speaker similarity moved by -0.007. The default
+  stays the adjacent-pair convention, against the review's expectation of no change. A-02 stays
+  open; a larger screen would be needed to separate this from seed noise.
 - **Limits:** the fixture is synthetic, it runs on the Mac with an installed model, and it pins the
   codes, not what a clone sounds like. `reference` (which needs torch and transformers) reruns only
   when the fixture or the tokenizer changes.

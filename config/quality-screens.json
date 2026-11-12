@@ -137,7 +137,65 @@
             }
           },
           "expected": "No detectable change: the review's pre-screen in the Python port found +0.004 speaker similarity (interval -0.003 to +0.011) and an identical word error rate on 96 English pairs. The change is for parity with the reference encoder, so later comparisons start from the same codes.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: the default then becomes split-half and the package's speaker-feature version gains an encoder version (G-03), so every transcript-backed prompt rebuilds once. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on the harmful side: the default then becomes split-half and the package's speaker-feature version gains an encoder version (G-03), so every transcript-backed prompt rebuilds once. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the default stays.",
+          "result": {
+            "decided": "2026-11-11",
+            "verdict": "INCONCLUSIVE",
+            "commit": "e8a25662",
+            "arms": {
+              "a": "ra",
+              "b": "rb1",
+              "bTwice": "rb1, rb2"
+            },
+            "requirements": "All held: ra reproduced c1 (a715b2ae) on 190 of 190 takes; rb1 and rb2 were identical on 190 of 190; the golden-codes pin passed --expect reference with the key (98.8% of codes, 99.6% of the first codebook) and --expect adjacent without it; the floor sat inside 0.71 of every margin.",
+            "outcomes": {
+              "a": {
+                "generated": 190,
+                "refused": 1,
+                "failed": 1
+              },
+              "b": {
+                "generated": 190,
+                "refused": 1,
+                "failed": 1
+              }
+            },
+            "grossFailures": {
+              "a": 2,
+              "b": 5
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0072,
+              "interval95": [
+                -0.0232,
+                0.0099
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0209,
+              "interval95": [
+                0.0049,
+                0.0414
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -14.1,
+              "interval95": [
+                -32.5,
+                2.1
+              ]
+            },
+            "durationSeconds": {
+              "meanDifference": -0.099,
+              "interval95": [
+                -0.187,
+                -0.023
+              ]
+            },
+            "grossFailuresOfB": "Two French takes from English references entirely wrong (error rate 1.0), one German take of 0.32 s for a full sentence that passed Fast QC, and the two refused or incomplete takes both arms share in kind.",
+            "toolChange": "Before the verdict, the screen tool was fixed (89d06485) to count a take too short for the speaker model as a gross failure instead of stopping; that made arm B's count stricter, not looser.",
+            "note": "The error-rate interval excludes zero and reaches 0.001 past its margin; the noise floor's own error-rate shift was +0.012 (interval +0.0002 to +0.027), so the screen cannot tell this from seed noise at 0.04. The direction points at harm, chiefly in cross-language clones. The default stays the adjacent-pair convention; A-02 is not adopted."
+          }
         }
       },
       "noiseFloor": {

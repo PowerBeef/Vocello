@@ -32,46 +32,39 @@ session can continue from it alone.
   (`CloneReferenceQuality`) serves every surface and unreadable or silent clips block; every
   transcript takes one shape; template text is NFC; the reference fingerprint carries a preparation
   version. No sample changed: 11 fixed-seed takes are PCM-identical before and after.
-- **RF-57 (done, see its note):** XCTest 8 of 8 repeated runs clean; Python 5 of 5 with one
-  environmental failure (BKL-72); the take lanes were audited and found unfit to decide, so:
-- **RF-50 (clone half done):** `scripts/encoder_golden_codes.py` (`d7d18eda`) pins the Swift encoder
-  against the reference one; `scripts/quality_screen.py` (`6e934d2c`) is the paired screen, described
-  in [qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples). Its noise floor at 192
-  takes is 0.035 similarity, 0.027 error rate, 3 gross failures: it catches gross regressions only.
-- **A defect the screen found in its own self-run:** reference preparation is not reproducible
-  (`AVAssetReader` resamples, and even decodes AAC, differently from run to run). `e57ddd57` adds
-  `Resampling.singleCall` (preparation version 2) behind `QWENVOICE_REFERENCE_PREPARATION=single-call`;
-  it is the default since `a715b2ae` (below).
+- **RF-57 (done, see its note):** the repeated suites are clean apart from one environmental
+  failure (BKL-72); the take lanes were audited and found unfit to decide, so:
+- **RF-50 (clone half done):** `scripts/encoder_golden_codes.py` pins the Swift encoder against the
+  reference one; `scripts/quality_screen.py` is the paired screen
+  ([qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples)). Screens: `clone`
+  (48 saved voices, six languages, 192 takes) and `clone-stereo` (the same references saved as
+  two-channel WAVs). At this size they catch gross regressions only.
 
-**Decided: reference preparation is reproducible (RF-52, first change)**
+**RF-52 decisions, each by a rule recorded before its arms** (rules and results in
+`config/quality-screens.json`; arms under `build/artifacts/macos/quality-screen/`)
 
-- The rule `reference-preparation-v2` (in `config/quality-screens.json`, recorded before its arms,
-  with its result) said ADOPT, and `a715b2ae` made the single-call path the default.
-- Two runs of the new path gave 190 identical takes of 190; the old path twice gave 167 of 191.
-  Against the old path: speaker similarity -0.009 (interval -0.025 to +0.006), error rate +0.003,
-  gross failures 1 and 2, and 22 ms more trailing silence on average (interval +6 to +40 ms, just
-  inside the 40 ms margin). The screen shows it is not grossly worse, not that it is better.
-- The default build reproduces the screened arm on 190 of 190 takes (arm `c1` against `b1`).
-- Every reference that is not already 24 kHz mono 16-bit WAV is prepared anew, and every saved
-  voice's prompt rebuilds once. Arms and comparisons:
-  `build/artifacts/macos/quality-screen/clone-seeds1`.
+| Change | Rule | Verdict | Default |
+|---|---|---|---|
+| Reproducible preparation: audio file reader and one converter call (version 2) | `reference-preparation-v2` | ADOPT: identical 190 of 190 where the old path gave 167 of 191 | `a715b2ae` |
+| Two channels averaged, as upstream (version 3) | `reference-mixdown-average` | ADOPT: not worse, not shown better | `fffcc709` |
+| Encoder split-half rotary (A-02), key `QWENVOICE_ENCODER_ROTARY=split-half` | `encoder-rotary-split-half` | INCONCLUSIVE: error rate +0.021 (+0.005 to +0.041), gross 2 to 5, mostly cross-language | stays adjacent |
+
+Each default build reproduces its screened arm take for take, and adding each key changed nothing
+by default (checked take for take). Every saved voice's prompt rebuilds once on first use after
+these commits. The rotary key stays for a larger screen if the maintainer wants one; G-03 is moot
+while it is off.
 
 **Next, in order (each sample-changing step: a knob, a rule recorded first, then the screen)**
 
-1. **RF-52, the two-channel mixdown:** the asset reader and version 2 both mix as the sum over the
-   square root of two, which clips a loud voice recorded on both channels. The average needs a
-   stratum of two-channel references in the screen (a new screen version) and preparation version 3.
-2. **RF-52, the encoder's rotary (A-02, G-03):** `RoPE(traditional: true)` at
-   `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift:130` should be `false`
-   for the tokenizer's encoder (configured at `Qwen3TTSSpeechTokenizer.swift:881`). Put it behind a
-   key read through the package's gate (`VocelloQwen3ImplementationDebugGate`), prove it with
-   `encoder_golden_codes.py compare --expect reference` (use `swift --env KEY=value`), then screen
-   it; the default flip adds an encoder version to `speakerFeatureVersion`.
-3. **RF-52, the rest of its gate:** primed decoder history for streamed clones (A-04, A-26), edge
-   trim and padding (A-12, G-07), the leading space (A-11), punctuated transcripts (G-15).
-4. **RF-50, the long-form screen**, then **RF-53** (D1, D6, the runaway stop), **RF-54** (the
-   decoder's 72-frame window), **RF-55** (code-predictor precision; publishing an artifact is the
-   maintainer's).
+1. **RF-52, the rest of its gate:** primed decoder history for streamed transcript-backed clones
+   (A-04, A-26), edge trim and fade with the 500 ms padding screened against none (A-12, G-07), the
+   leading space on the clone target per script family (A-11), punctuated recognized transcripts
+   (G-15). The A-12 padding change raises `codecEncodeConditioningVersion`.
+2. **RF-50, the long-form screen**, then **RF-53**: D1 and D6 by screen, the in-loop stop for a
+   runaway ending, and a Fast QC refusal for a take far too short for its script (a 0.32-second
+   German sentence passed Fast QC in the rotary screen's keyed arm).
+3. **RF-54** (the decoder's 72-frame window) and **RF-55** (code-predictor precision; publishing an
+   artifact is the maintainer's).
 
 **Standing limits:** nobody listens; a pin move, a model artifact and any push or tag need the
 maintainer's specific word; device checks queue for an announced phone window (RF-51's note lists

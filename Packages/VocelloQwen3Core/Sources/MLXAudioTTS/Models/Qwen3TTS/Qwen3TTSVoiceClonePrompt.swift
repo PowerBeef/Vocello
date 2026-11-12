@@ -53,11 +53,17 @@ enum Qwen3TTSReferenceAudio {
     /// Canonical `[1, 1, T + pad]` codec-encoder input with the trailing
     /// silence applied. x-vector extraction keeps the unpadded reference.
     static func encoderInputWithTrailingSilence(_ audio: MLXArray) throws -> MLXArray {
+        try encoderInput(audio, trailingSilenceSamples: codecEncodeTrailingSilenceSamples)
+    }
+
+    /// As above with a chosen amount of trailing silence; zero encodes the
+    /// reference as it is, as upstream does (A-12, RF-52).
+    static func encoderInput(_ audio: MLXArray, trailingSilenceSamples: Int) throws -> MLXArray {
         let monoBatch = try canonicalMonoBatch(audio)
-        let silence = MLXArray.zeros(
-            [1, codecEncodeTrailingSilenceSamples],
-            dtype: monoBatch.dtype
-        )
+        guard trailingSilenceSamples > 0 else {
+            return monoBatch.expandedDimensions(axis: 1)
+        }
+        let silence = MLXArray.zeros([1, trailingSilenceSamples], dtype: monoBatch.dtype)
         return concatenated([monoBatch, silence], axis: 1).expandedDimensions(axis: 1)
     }
 }

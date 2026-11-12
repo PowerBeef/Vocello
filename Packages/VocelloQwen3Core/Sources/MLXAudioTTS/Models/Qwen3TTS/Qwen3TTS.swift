@@ -216,6 +216,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     let talker: Qwen3TTSTalkerForConditionalGeneration
     /// Gated load-time diagnostic (`QVOICE_TALKER_KV_QUANT`); nil in production.
     let talkerKVQuantBits: Int?
+    /// Silence appended to a clone reference before the codec encodes it:
+    /// half a second in production, none under the gated
+    /// `QWENVOICE_REFERENCE_PADDING=none` (A-12, RF-52).
+    let referenceTrailingSilenceSamples: Int
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?
     var tokenizer: Tokenizer?
@@ -1025,7 +1029,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     "Qwen3 clone prompt creation requires an initialized speech tokenizer encoder."
                 )
             }
-            let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(refAudio)
+            let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInput(
+                refAudio, trailingSilenceSamples: referenceTrailingSilenceSamples)
             let encoded = try speechTokenizer.encode(refAudioForEncoder)
             // F-07: evaluate the reference encode here, inside the caller's MLX
             // error scope and lease, instead of letting the lazy graph run later
@@ -1160,11 +1165,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         config: Qwen3TTSModelConfig,
         talker: Qwen3TTSTalkerForConditionalGeneration,
         speakerEncoder: Qwen3TTSSpeakerEncoder?,
-        talkerKVQuantBits: Int? = nil
+        talkerKVQuantBits: Int? = nil,
+        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
     ) {
         self.config = config
         self.talker = talker
         self.talkerKVQuantBits = talkerKVQuantBits
+        self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
         self.speakerEncoder = speakerEncoder
     }
 
@@ -1981,7 +1988,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     }
 
     /// Diagnostic codec round trip (audio QC population N2). The encoder sees
-    /// exactly the clone path's reference input (`encoderInputWithTrailingSilence`)
+    /// exactly the clone path's reference input (`encoderInput`, with the model's trailing silence)
     /// and keeps every codebook it produces; the codes then decode through
     /// `replayDecoderArm` on the production non-streaming 25-frame schedule and
     /// sample window, the schedule the replay's `fullAudio` uses. The codes are
@@ -1999,7 +2006,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
         try Task.checkCancellation()
         let (flatCodes, frameCount, groupCount): ([Int32], Int, Int) = try autoreleasepool {
-            let encoderInput = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(MLXArray(samples))
+            let encoderInput = try Qwen3TTSReferenceAudio.encoderInput(
+                MLXArray(samples), trailingSilenceSamples: referenceTrailingSilenceSamples)
             // [1, codebooks, frames] -> [1, frames, codebooks], the codec trace layout.
             let encoded = try speechTokenizer.encode(encoderInput).transposed(0, 2, 1)
             try evalForReadback(encoded)

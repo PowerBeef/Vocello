@@ -235,7 +235,8 @@
       "evidenceClass": "diagnostic",
       "upstreamDeltaIDs": [
         "CLONE-001",
-        "CLONE-002"
+        "CLONE-002",
+        "CLONE-003"
       ]
     },
     {

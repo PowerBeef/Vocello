@@ -29,7 +29,8 @@ extension Qwen3TTSModel {
         refCodes: MLXArray,
         targetTokenCount: Int
     ) {
-        let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(refAudio)
+        let refAudioForEncoder = try Qwen3TTSReferenceAudio.encoderInput(
+            refAudio, trailingSilenceSamples: referenceTrailingSilenceSamples)
         guard let speechTokenizer else {
             throw AudioGenerationError.modelNotInitialized("Speech tokenizer not loaded")
         }

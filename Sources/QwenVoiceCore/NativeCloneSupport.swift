@@ -105,6 +105,55 @@ enum CloneEncoderRotary {
     }
 }
 
+/// Every clone-conditioning diagnostic key this process honours, as the
+/// suffix the clone prompt's speaker-feature version carries.
+enum CloneConditioningDiagnostics {
+    static let speakerFeatureSuffix = speakerFeatureSuffix(
+        environment: ProcessInfo.processInfo.environment,
+        internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+    )
+
+    static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        CloneEncoderRotary.speakerFeatureSuffix(
+            environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable)
+            + CloneReferencePadding.speakerFeatureSuffix(
+                environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable)
+    }
+}
+
+/// A-12 (RF-52): whether this process's package encodes a clone reference
+/// without the half second of trailing zeros. The package reads the same key
+/// at load (`Qwen3LoadTimeDiagnosticOverrides.referenceTrailingSilenceSamples`);
+/// the host folds it into the speaker-feature version, as for the rotary.
+public enum CloneReferencePadding {
+    static let environmentKey = "QWENVOICE_REFERENCE_PADDING"
+    static let unpaddedSuffix = "+icl-ref-unpadded"
+
+    /// How the codec encoder's input was made in this process, for evidence
+    /// that records it (`vocello bench --codec-roundtrip`, reference-primed
+    /// replay).
+    public static var encoderInputLabel: String {
+        speakerFeatureSuffix.isEmpty
+            ? "clone_reference_encoder_input_trailing_silence_500ms"
+            : "clone_reference_encoder_input_unpadded"
+    }
+
+    static let speakerFeatureSuffix = speakerFeatureSuffix(
+        environment: ProcessInfo.processInfo.environment,
+        internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
+    )
+
+    /// Read as the package reads it: trimmed and lowercased.
+    static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        let requested = RuntimeDebugGate.value(
+            for: environmentKey,
+            environment: environment,
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return requested == "none" ? unpaddedSuffix : ""
+    }
+}
+
 actor NativePreparedCloneConditioningCache {
     private let capacity: Int
     private var sourceQualityWarningsByFileState: [String: [String]] = [:]
@@ -331,14 +380,14 @@ actor NativePreparedCloneConditioningCache {
         referenceIdentity: GenerationSemantics.CloneReferenceIdentity,
         modelArtifactIdentity: GenerationSemantics.ClonePromptModelArtifactIdentity,
         runtimeProfileSignature: String?,
-        encoderRotarySuffix: String = CloneEncoderRotary.speakerFeatureSuffix
+        diagnosticSuffix: String = CloneConditioningDiagnostics.speakerFeatureSuffix
     ) -> GenerationSemantics.ClonePromptIdentity {
         GenerationSemantics.ClonePromptIdentity(
             referenceIdentity: referenceIdentity,
             language: clonePromptLanguageKey,
             modelArtifactIdentity: modelArtifactIdentity,
             qwenRuntimeProfileSignature: runtimeProfileSignature,
-            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion + encoderRotarySuffix
+            speakerFeatureVersion: VocelloQwen3CloneArtifactSchema.speakerFeatureVersion + diagnosticSuffix
         )
     }
 

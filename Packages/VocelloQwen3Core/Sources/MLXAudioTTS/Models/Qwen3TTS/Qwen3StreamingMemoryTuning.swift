@@ -24,17 +24,29 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// The host folds the same key into the clone prompt's speaker-feature
     /// version, so a prompt encoded one way is never adopted the other way.
     let encoderSplitHalfRotary: Bool
+    /// RF-52, A-12 (`QWENVOICE_REFERENCE_PADDING=none`): the clone reference
+    /// is encoded as it is, as upstream does, instead of with half a second
+    /// of zeros appended. The host folds the same key into the clone prompt's
+    /// speaker-feature version.
+    let referenceTrailingSilenceSamples: Int
 
-    init(talkerKVQuantBits: Int?, speechTokenizerResidency: Bool?, encoderSplitHalfRotary: Bool = false) {
+    init(
+        talkerKVQuantBits: Int?,
+        speechTokenizerResidency: Bool?,
+        encoderSplitHalfRotary: Bool = false,
+        referenceTrailingSilenceSamples: Int = Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
+    ) {
         self.talkerKVQuantBits = talkerKVQuantBits
         self.speechTokenizerResidency = speechTokenizerResidency
         self.encoderSplitHalfRotary = encoderSplitHalfRotary
+        self.referenceTrailingSilenceSamples = referenceTrailingSilenceSamples
     }
 
     static let production = Qwen3LoadTimeDiagnosticOverrides(
         talkerKVQuantBits: nil,
         speechTokenizerResidency: nil,
-        encoderSplitHalfRotary: false
+        encoderSplitHalfRotary: false,
+        referenceTrailingSilenceSamples: Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
     )
 
     static func resolve(
@@ -66,7 +78,9 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         return Qwen3LoadTimeDiagnosticOverrides(
             talkerKVQuantBits: talkerKVQuantBits,
             speechTokenizerResidency: speechTokenizerResidency,
-            encoderSplitHalfRotary: gatedValue("QWENVOICE_ENCODER_ROTARY") == "split-half"
+            encoderSplitHalfRotary: gatedValue("QWENVOICE_ENCODER_ROTARY") == "split-half",
+            referenceTrailingSilenceSamples: gatedValue("QWENVOICE_REFERENCE_PADDING") == "none"
+                ? 0 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples
         )
     }
 }

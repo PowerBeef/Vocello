@@ -224,7 +224,7 @@ enum BenchCodecReplay {
                 report.referenceWAVSHA256 = referenceDigest
                 report.referenceCodecSHA256 = digest(try CodecRoundTripEvidence.codesData(encoded.codes))
                 report.referenceFrameCount = encoded.codes.count
-                report.referenceEncoderInput = "clone_reference_encoder_input_trailing_silence_500ms"
+                report.referenceEncoderInput = CloneReferencePadding.encoderInputLabel
                 report.referencePrimedArtifactRoot = "reference-primed"
                 try write(report, to: reportURL)
                 let primed = try await loaded.engine.replayStartupReliabilityCodecTrace(

@@ -204,7 +204,8 @@ extension Qwen3TTSModel {
             config: config,
             talker: talkerComponents.talker,
             speakerEncoder: talkerComponents.speakerEncoder,
-            talkerKVQuantBits: loadOptions.diagnosticOverrides.talkerKVQuantBits
+            talkerKVQuantBits: loadOptions.diagnosticOverrides.talkerKVQuantBits,
+            referenceTrailingSilenceSamples: loadOptions.diagnosticOverrides.referenceTrailingSilenceSamples
         )
         model.preparedKey = preparedKey
 

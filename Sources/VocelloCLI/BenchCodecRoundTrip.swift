@@ -42,7 +42,7 @@ enum BenchCodecRoundTrip {
         let installedManifestSHA256: String
         let installedRevision: String
         let modelBinding = "all_installed_file_bytes_match_pinned_catalog"
-        let encoderInput = "clone_reference_encoder_input_trailing_silence_500ms"
+        let encoderInput = CloneReferencePadding.encoderInputLabel
         let decodeSemantics = "production_nonstreaming_25_frame_schedule"
         let trim = "input_sample_count"
         let outputFormat = "pcm16_mono_24000hz_without_output_limiter"

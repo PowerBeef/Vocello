@@ -71,6 +71,7 @@ rotary row were corrected on 2026-11-11 against the
 | mlx-audio `6549fc2`: adds the Mimi encoder with `rope_traditional=False` from the start; it is not a fix of a measured defect | Vocello still applies the adjacent-pair convention by default, as mlx-audio-swift `main` does (A-02, ER-04, with G-03's version bump); since 2026-11-11 `QWENVOICE_ENCODER_ROTARY=split-half` selects the reference convention in a diagnostics build (CODEC-002), pending the clone screen (RF-52). Measured on 2026-11-11: the stored codes match the reference encoder's on 31% of codes, and a pre-screen found no detectable effect on clone output |
 | mlx-audio `6549fc2`: EOS kept after top-k/top-p | inherited, then removed on 2026-10-20 (D2) |
 | mlx-audio `6549fc2`: ICL repetition-penalty floor 1.5 | not adopted; 1.05 is the reference's value |
+| QwenLM reference: the clone reference is encoded as it is | Vocello appends 0.5 s of zeros before the encode (A-12, its own step, not upstream's); since 2026-11-11 `QWENVOICE_REFERENCE_PADDING=none` encodes it unpadded in a diagnostics build (CLONE-003), pending the clone screen (RF-52) |
 | mlx-audio `d2d02bf` (MA#882): EOS filtered like any token | matched since 2026-10-20 (D2) |
 | mlx-audio `a730a68`: temperature before top-p/min-p | ported |
 | mlx-audio `90ee81f`: fixes a float32 speaker embedding promoting the prefill and KV to float32 | not affected: Vocello casts the embedding at prefix construction |

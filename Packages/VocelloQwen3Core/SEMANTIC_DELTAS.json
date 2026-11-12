@@ -306,6 +306,31 @@
       "removalCriteria": "Remove only after the runtime dependency provides numerically equivalent official Qwen speaker features, strict mono reference-audio normalization, validated embeddings, and version-bound artifact invalidation."
     },
     {
+      "id": "CLONE-003",
+      "title": "Clone reference trailing silence, selectable",
+      "category": "clone-conditioning",
+      "state": "diagnostic",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3StreamingMemoryTuning.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests.swift"
+      ],
+      "documentation": [
+        "UPSTREAM.md"
+      ],
+      "evidenceClass": "diagnostic",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "local-only",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove the selection once the clone screen has decided A-12: keep only the adopted padding, raising codecEncodeConditioningVersion if it changes."
+    },
+    {
       "id": "CONC-001",
       "title": "Single-owner generation gate and cancellation transfer",
       "category": "concurrency",

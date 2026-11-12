@@ -516,6 +516,9 @@ PY="$(python3 scripts/select_python.py)"
 - **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
   8-bit model; the arm records it, and two arms on different variants are never one setting. The
   hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models.
+- **Single takes:** a long-form screen whose definition sets `longForm: never` asks for one take of
+  each script instead of planning it into segments. The `single` screen uses it for Built-in Voice
+  and Voice Design takes of two pool sentences, on the long-form screen's strata (RF-55).
 - **A built model, the same takes:** `scripts/build_hybrid_model.py build --recipe R --out DIR`
   assembles a recipe's three artifacts from the installed, verified 4-bit and 8-bit ones, each with
   its own integrity record, and writes a development contract naming them. `run --models-root DIR

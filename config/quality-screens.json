@@ -1821,6 +1821,110 @@
           }
         }
       }
+    },
+    "single": {
+      "version": 1,
+      "kind": "long-form",
+      "variant": "speed",
+      "scriptSplit": "all",
+      "sentencesPerProject": 2,
+      "projectsPerStratum": 24,
+      "variations": [
+        "expressive"
+      ],
+      "longForm": "never",
+      "strata": {
+        "custom-english": {
+          "mode": "custom",
+          "language": "english",
+          "speakers": [
+            "aiden",
+            "ryan"
+          ]
+        },
+        "custom-french": {
+          "mode": "custom",
+          "language": "french",
+          "speakers": [
+            "aiden",
+            "serena"
+          ]
+        },
+        "custom-japanese": {
+          "mode": "custom",
+          "language": "japanese",
+          "speakers": [
+            "ono_anna"
+          ]
+        },
+        "design-english": {
+          "mode": "design",
+          "language": "english",
+          "voiceBriefs": [
+            "A calm man in his forties with a low, warm voice, speaking clearly at an unhurried pace.",
+            "A bright young woman with a clear, friendly voice and lively, natural intonation.",
+            "An older woman with a soft, slightly husky voice who reads in a gentle, measured way."
+          ]
+        },
+        "custom-chinese": {
+          "mode": "custom",
+          "language": "chinese",
+          "speakers": [
+            "vivian",
+            "dylan"
+          ]
+        },
+        "custom-korean": {
+          "mode": "custom",
+          "language": "korean",
+          "speakers": [
+            "sohee"
+          ]
+        }
+      },
+      "description": "Single Built-in Voice and Voice Design takes, as Studio makes them (--long-form never): per stratum 24 scripts of two pool sentences (about 6 to 12 seconds), each one take under Expressive, the one variation the apps keep (RF-58). The long-form screen's strata: Built-in Voice in English, French, Japanese, Chinese and Korean, Voice Design in English. Scored as the long-form screen is: both ASR families over the take and the spread of its speaker windows (no reference).",
+      "rules": {
+        "hybrid-attn-single-vs-speed": {
+          "recorded": "2026-11-12",
+          "question": "Are single Built-in Voice and Voice Design takes from the hybrid recipe attn (QWENVOICE_MIXED_PRECISION=attn on the 4-bit model: the four attention projections of the talker at 8 bits, +176 MB of weights, the code predictor at 4 bits; a built artifact of it reproduces the key's takes, clone 192 of 192 and long-form 21 of 21 PCM-identical) no worse than the 4-bit Speed model's (RF-55)?",
+          "arms": "Seed set 1 of the single screen (run single-seeds1), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm attn (QWENVOICE_MIXED_PRECISION=attn) and arm qv (run --variant quality, the 8-bit model); and arm ss, the 4-bit model on seed set 2 (run single-seeds2), for the screen's noise floor. Each in its own data directory, generated after this rule was recorded. The campaign's long-form scoring ran beside them, so no timing is read from these arms. A: sp. B: attn.",
+          "requires": "The screen's noise floor (sp against ss: compare --expect noise with --b-run, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "No difference beyond the floor against Speed: the probes and the clone and long-form screens found attn no worse, and single takes condition on the whole text, as long-form segments do not.",
+          "decision": "ADOPT (the candidate's single takes are not worse than the 4-bit Speed model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate."
+        },
+        "hybrid-attn-single-vs-quality": {
+          "recorded": "2026-11-12",
+          "question": "Are single Built-in Voice and Voice Design takes from the hybrid recipe attn (QWENVOICE_MIXED_PRECISION=attn on the 4-bit model: the four attention projections of the talker at 8 bits, +176 MB of weights, the code predictor at 4 bits; a built artifact of it reproduces the key's takes, clone 192 of 192 and long-form 21 of 21 PCM-identical) no worse than the 8-bit Quality model's (RF-55)?",
+          "arms": "Seed set 1 of the single screen (run single-seeds1), which no arm has used, at the build of the commit that records this rule: arm sp (the 4-bit model as installed), arm attn (QWENVOICE_MIXED_PRECISION=attn) and arm qv (run --variant quality, the 8-bit model); and arm ss, the 4-bit model on seed set 2 (run single-seeds2), for the screen's noise floor. Each in its own data directory, generated after this rule was recorded. The campaign's long-form scoring ran beside them, so no timing is read from these arms. A: qv. B: attn.",
+          "requires": "The screen's noise floor (sp against ss: compare --expect noise with --b-run, passed with --floor) sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Against Quality, no worse beyond the margins; Quality refused fewer long-form projects, so a refusal gap, if any, shows here as gross failures.",
+          "decision": "ADOPT (the candidate's single takes are not worse than the 8-bit Quality model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate."
+        }
+      }
     }
   }
 }

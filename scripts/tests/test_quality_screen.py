@@ -197,6 +197,21 @@ class LongFormTests(unittest.TestCase):
         self.assertIn("--voice-brief", design)
         self.assertNotIn("--speaker", design)
 
+    def test_a_screen_may_ask_for_single_takes_and_earlier_plans_keep_their_digests(self):
+        plan = screen.build_long_form_plan(self.SCREEN, 1)
+        self.assertNotIn("longForm", plan, "a screen that sets nothing plans as before")
+        single = screen.build_long_form_plan(dict(self.SCREEN, longForm="never"), 1)
+        self.assertEqual(single["longForm"], "never")
+        self.assertNotEqual(single["planSHA256"], plan["planSHA256"])
+        self.assertEqual([take["text"] for take in single["takes"]], [take["text"] for take in plan["takes"]])
+        command = screen.long_form_command(Path("/v"), single, single["takes"][0], Path("/o.wav"), [])
+        self.assertEqual(command[command.index("--long-form") + 1], "never")
+        with self.assertRaises(screen.ScreenError):
+            screen.build_long_form_plan(dict(self.SCREEN, longForm="auto"), 1)
+        configured = screen.read_json(screen.ROOT / "config/quality-screens.json")["screens"]["single"]
+        self.assertEqual((configured["kind"], configured["longForm"], configured["variations"]),
+                         ("long-form", "never", ["expressive"]))
+
     def test_segments_report_how_they_ended_and_a_runaway_is_a_gross_failure(self):
         summary = screen.segment_summary({"longFormSegments": [
             {"finishReason": "end_of_sequence", "qcWarnings": [], "durationSeconds": 5.0},

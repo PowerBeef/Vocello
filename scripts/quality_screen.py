@@ -294,6 +294,8 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
     if unknown:
         raise ScreenError(f"not in the screen: {', '.join(unknown)}")
     per, count = screen["sentencesPerProject"], screen["projectsPerStratum"]
+    if screen.get("longForm", "always") not in LONG_FORM_ROUTES:
+        raise ScreenError(f"longForm must be one of {', '.join(LONG_FORM_ROUTES)}")
     unknown_variations = [name for name in variations or [] if name not in screen["variations"]]
     if unknown_variations:
         raise ScreenError(f"not a variation of the screen: {', '.join(unknown_variations)}")
@@ -324,15 +326,24 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
                 takes.append(take)
     plan = {"schemaVersion": SCHEMA_VERSION, "screen": screen["name"], "screenVersion": screen["version"],
             "kind": "long-form", "variant": screen["variant"], "seedSet": seed_set, "voices": [], "takes": takes}
+    if "longForm" in screen:
+        # Written only when a screen sets it, so earlier plans keep their digests.
+        plan["longForm"] = screen["longForm"]
     plan["planSHA256"] = sha256_text(json.dumps(plan, sort_keys=True, ensure_ascii=False))
     return plan
+
+
+# How a long-form screen's takes are routed: `always` plans each script into
+# segments as the apps route long text; `never` asks for one take of the whole
+# script, a single Built-in Voice or Voice Design take (the `single` screen).
+LONG_FORM_ROUTES = ("always", "never")
 
 
 def long_form_command(vocello: Path, plan: dict, take: dict, wav: Path, common: list[str]) -> list[str]:
     voice = ["--speaker", take["speaker"]] if take["mode"] == "custom" else ["--voice-brief", take["voiceBrief"]]
     return [str(vocello), "generate", "--mode", take["mode"], "--variant", plan["variant"], *voice,
             "--text", take["text"], "--language", take["language"], "--seed", str(take["seed"]),
-            "--variation", take["variation"], "--long-form", "always", "--out", str(wav), *common]
+            "--variation", take["variation"], "--long-form", plan.get("longForm", "always"), "--out", str(wav), *common]
 
 
 def segment_summary(result: dict) -> dict:

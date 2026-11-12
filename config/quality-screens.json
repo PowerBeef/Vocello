@@ -942,6 +942,22 @@
             ],
             "note": "Full text leaned better (error rate lower, three fewer gross failures) but the screen cannot decide at this size; segments keep trailing text. Full text did not touch the long-form failures under Consistent or in Japanese, which are the larger defect and are screened next."
           }
+        },
+        "long-form-japanese-budget": {
+          "recorded": "2026-11-12",
+          "question": "Do shorter Japanese long-form segments (QWENVOICE_LONG_FORM_DELIVERY_BUDGET=150: about 150 characters, 35 to 50 s, in place of the 300-unit budget that lets a Japanese segment run to about 300 characters and 70 to 100 s) cut the projects Fast QC refuses without harm (RF-53)?",
+          "arms": "The long-form screen's custom-japanese stratum alone (runs long-form-ja-seeds1 and long-form-ja-seeds2: four projects each under Expressive and Consistent), at the build of the commit that records this rule. A: default. B: the key set. Seed sets 1 and 2, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The control reproduces the defect: A refuses at least 4 of its 16 projects across both seed sets (the long-form screen refused 12 of 16). Two B arms on the same seeds are identical on every take (checked on seed set 1).",
+          "primaryMetric": "Refused or failed projects across both seed sets, A against B, and B's failure classes against A's.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Fewer refused projects: the refused Japanese segments ran 70 s and more with 2.2 to 2.9 s silent gaps and slow delivery, past the roughly 60 s envelope long-form delivery was validated at. October's shorter budget (200 for every script) made English and French Consistent projects worse, so this is screened for Japanese alone.",
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 (each seed set's report read, the interval of either reaching past the margin making it INCONCLUSIVE): East Asian scripts then plan with a budget of 150 units while every other script keeps 300 (a planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays."
         }
       },
       "noiseFloor": {

@@ -563,6 +563,26 @@
       "notes": "Opened 2026-11-11 at the maintainer's request. Done 2026-11-11. The deterministic suites repeated at a6e501eb: XCTest 8 of 8 runs clean; Python 5 of 5 with one failure that is environmental (BKL-72); BKL-71's test did not fail again. Two read-only audits of the take lanes found them unfit to decide: qc-takes passes when scoring fails, no lane scores both speaker and content, refused takes leave the averages, arms share a data directory, asr.edit_rate_min counts no substitutions, WAV digests include a timestamp. scripts/quality_screen.py replaces them for decisions (RF-50); the lane's resume after a QC refusal is fixed (317bd340). The screen's own evidence reader had a bug its guard exposed (identifier case), fixed. Left for the long-form screen: QC v2 has never scored a long take (the phone model stops at 120 s, Whisper fixes the language from the first 30 s, seam pauses read as dropouts)."
     },
     {
+      "id": "RF-58",
+      "plan": "release-first-3-0-2026-09",
+      "title": "One take variation: the Variation setting is retired and every take samples as the model's reference does",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Neither app's Settings shows a Variation control; a saved Balanced or Consistent preference reads as Expressive; vocello accepts --variation balanced or consistent with a notice and generates as Expressive; History still shows an old take's recorded variation; fixed-seed Expressive takes are PCM-identical before and after (scripts/pcm_identity.py, the three modes); the routed check and the macOS settings UI lane pass; the long-form screen runs one variation. The iPhone settings and control-audit lanes run in the next announced phone window.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "Sources/QwenVoiceCore/SemanticTypes.swift",
+        "Sources/Services/GenerationVariationPreference.swift",
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/iOS/IOSSettingsViews.swift",
+        "Sources/VocelloCLI/Core/CommandModel/VocelloCommandTree.swift",
+        "config/ios-control-audit.json",
+        "config/quality-screens.json"
+      ],
+      "updated": "2026-11-12",
+      "notes": "Opened 2026-11-12 at the maintainer's request. Expressive is the model's reference sampling; Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) lower the talker's temperature. Evidence, long-form projects: seed sets 1 and 2 refused 18 of 32 under Consistent against 4 of 32 under Expressive, and 8 of 32 once Consistent segments sampled as Balanced; Chinese and Japanese on seed sets 5 and 6 generated 2 of 16 against 9 of 16; Korean on the 8-bit model generated 0 of 4 against 3 of 4 (exploratory); RF-18's runaway endings ran only under Consistent. No measurement shows a benefit of either lower setting; single takes were never screened by variation. The enum stays decodable for History and receipts; requests are always Expressive. Removing the setting halves every long-form screen."
+    },
+    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.0.0 for App Review on the maintainer's explicit go",

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 46/80 (58%) |
+| `release-first-3-0-2026-09` | active | release-qa | 46/81 (57%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -79,6 +79,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
 | `RF-55` | planned | Quality remediation, stage 5: code-predictor precision | `RF-50` |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
+| `RF-58` | planned | One take variation: the Variation setting is retired and every take samples as the model's reference does | — |
 
 ### Open items in detail
 
@@ -188,6 +189,9 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
   gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.
+
+- **`RF-58`** (planned) — One take variation: the Variation setting is retired and every take samples as the model's reference does.
+  gate: Neither app's Settings shows a Variation control; a saved Balanced or Consistent preference reads as Expressive; vocello accepts --variation balanced or consistent with a notice and generates as Expressive; History still shows an old take's recorded variation; fixed-seed Expressive takes are PCM-identical before and after (scripts/pcm_identity.py, the three modes); the routed check and the macOS settings UI lane pass; the long-form screen runs one variation. The iPhone settings and control-audit lanes run in the next announced phone window.
 
 ## Specialist-audit remediation
 

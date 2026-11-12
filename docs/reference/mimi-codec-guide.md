@@ -137,7 +137,7 @@ code-parity experiment still has to run in Swift. The fix is for parity with the
 that later comparisons start from the same codes. Expect no audible change from it.
 
 **G-03.** Nothing versions the encoder implementation. The clone identity's speaker-feature version
-is `qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3` (`VC:198-206`): the mel frontend,
+is `qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3` (`VC:207-215`): the mel frontend,
 the ICL reference preprocessing and the MLX build (F-06, since CONV-21). After a RoPE fix alone, every
 saved voice would keep adopting its persisted wrong codes. The fix therefore adds an encoder version
 to that identifier, pinned by a golden-codes test, so transcript-backed artifacts rebuild once
@@ -198,9 +198,9 @@ proposed, would move Vocello away from the reference.
 - **Memory (A-08, A-28, open).** The encoder KV cache is kept between calls and a longer input
   concatenates onto the stale buffer (MEM-1). The SEANet encoder runs on the whole reference: about
   126 MB per activation for a 20 s reference and 740 MB for a 120 s Mac reference.
-- **Reference padding.** Before encoding, Vocello appends 0.5 s of silence to the reference
-  (`VC:15-61`); the x-vector uses the unpadded audio. Upstream pads nothing (A-12). The input rule
-  and its status belong to the [prompting guide §2.3](qwen3-tts-prompting-guide.md).
+- **Reference padding.** The reference is encoded as it is, as upstream does, and the x-vector uses
+  the same audio (`VC:15-66`; since 2026-11-11, A-12). Vocello appended 0.5 s of silence before
+  then. The input rule and its status belong to the [prompting guide §2.3](qwen3-tts-prompting-guide.md).
 
 ---
 
@@ -463,7 +463,7 @@ is open (research question 6).
 
 **Clone-artifact identity.** Persisted clone prompts hold encoder output, so anything that changes
 the encode must change the speaker-feature version (§2.2): the reference preprocessing
-(`icl-ref-silence500ms-v2`, `VC:29`), the MLX build (`mlx-swift-0.32.3`, `VC:206`), and, once A-02 is
+(`icl-ref-unpadded-v3` since 2026-11-11, `VC:36`), the MLX build (`mlx-swift-0.32.3`, `VC:215`), and, once A-02 is
 fixed, the encoder itself (G-03). Audio preparation has no version either (G-13), so its fixes never
 reach cached references; G-13 lands first in ER-04.
 

@@ -426,9 +426,11 @@ for users and the enrollment flow belong to the [prompting guide §2.3](qwen3-tt
 
 - **Both modes** extract the speaker embedding with the speaker encoder (§3.5) from the unpadded
   reference, a finite `float32 [1, D]` vector cast to the talker's dtype only at the prefix slot.
-- **ICL** also encodes the reference with the tokenizer's encoder. Before encoding, Vocello appends
-  0.5 s of silence (`Qwen3TTSVoiceClonePrompt.swift:19-29`, version `icl-ref-silence500ms-v2`); upstream pads
-  nothing, and the code comment's claim of upstream parity is wrong (A-12).
+- **ICL** also encodes the reference with the tokenizer's encoder, as it is, as upstream does (version
+  `icl-ref-unpadded-v3`, since 2026-11-11). Vocello used to append 0.5 s of silence first (A-12,
+  its own step); the clone screen's rule `reference-padding-none` adopted none: speaker similarity
+  +0.019 (interval +0.001 to +0.039), trailing silence -22 ms (-35 to -8), the better family's error
+  rate +0.012 (+0.002 to +0.026, the size of the screen's own noise floor), gross failures 2 and 4.
 - **ICL target text** gets exactly one leading space (`Qwen3TTSPromptAssembly.swift:74-79`); upstream joins the
   reference and target tokens with no separator. Vocello added the space for French first-word drops
   (A-11, deliberate; screen before changing).
@@ -489,7 +491,7 @@ gave it (RF-51, fixed 2026-11-11; the audit's G-08 to G-11):
 A persisted clone prompt is valid only for the identity it was built under (the full key list is in
 [ARCHITECTURE §4.8](../ARCHITECTURE.md#48-voice-cloning-cache)). Its speaker-feature version composes
 the mel frontend version, the ICL reference-encode version and the MLX build
-(`qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:189-206`; F-06), so
+(`qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3`; `Qwen3TTSVoiceClonePrompt.swift:198-215`; F-06), so
 an artifact built on an earlier MLX is rejected at load and rebuilt once from its reference.
 
 - **The host's audio preparation is versioned** (G-13, fixed 2026-11-11, RF-51):
@@ -769,7 +771,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |
 | — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
 | A-11 | ICL target text | no separator after the reference text | exactly one leading space | deliberate (French first-word drops); screen before changing | ER-04 |
-| A-12 | ICL reference padding | none | +0.5 s of silence; its comment wrongly claims parity | open; fix the comment | ER-04 |
+| A-12 | ICL reference padding | none | none since 2026-11-11 (`icl-ref-unpadded-v3`; 0.5 s of silence before) | matches; adopted by the clone screen's rule `reference-padding-none` | RF-52 |
 | G-14 | ICL layout | streaming by default (PR #362, open and unreviewed, proposes non-streaming) | non-streaming overlay | deliberate | ER-03 |
 | — | Repetition penalty scope | talker codebook 0 only | same | matches | — |
 | — | Minimum frames before EOS; special-id suppression | 2; 2048–3071 except EOS | same | matches | — |

@@ -43,26 +43,26 @@ language (prompt creation takes none), so Vocello binds every artifact under the
 The composite runtime-contract signature includes that immutable installed-artifact identity, the
 validated Qwen runtime topology, and the speaker-feature identifier
 (`Qwen3TTSVoiceClonePrompt.speakerFeatureVersion`,
-`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift:198-206`). That identifier joins three versions
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift:207-215`). That identifier joins three versions
 with `+`:
 
 1. the speaker mel frontend, `qwen-speaker-mel-v1`: 24 kHz audio, 1024-point FFT, 256-sample hop,
    384-sample reflect padding, periodic Hann window, magnitude spectrum, 128
    Slaney-scale/Slaney-normalized mel bands, and natural-log scaling;
-2. the ICL reference-encode preprocessing, `icl-ref-silence500ms-v2`: 0.5 s of silence appended to
-   the reference before the speech-tokenizer encode;
+2. the ICL reference-encode preprocessing, `icl-ref-unpadded-v3`: the reference is encoded as it is,
+   as upstream does (since 2026-11-11, RF-52; `icl-ref-silence500ms-v2` appended 0.5 s of silence);
 3. the MLX build that computed the stored tensors, `mlx-swift-<pin>` (since 2026-10-16, F-06;
    currently `mlx-swift-0.32.3`). It moves with the mlx-swift pin, and
    `scripts/qwen3_core_contract.py` fails when the two differ.
 
-The identifier today reads `qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3`. Changed
+The identifier today reads `qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3`. Changed
 weights, a runtime or feature-contract change, or an MLX move invalidates both in-memory and
 persisted prompts, so each saved voice rebuilds its prompt once from its reference audio.
 Schema-2 artifacts predate this binding and are rejected by both the compatibility reader and the
 public `VocelloQwen3Core` facade; they must be rebuilt from their reference audio.
 
 **Known gaps** (engine audit; the parity ledger in
-[`docs/reference/qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md) tracks both):
+[`docs/reference/qwen3-tts-guide.md`](../../docs/reference/qwen3-tts-guide.md) tracks it):
 
 - **A-02, G-03: the encoder's RoPE convention.** The reference codes in transcript-backed artifacts
   come from a speech-tokenizer encoder that applies `RoPE(traditional: true)` (adjacent pairs,
@@ -70,9 +70,6 @@ public `VocelloQwen3Core` facade; they must be rebuilt from their reference audi
   `rotate_half` layout, so they differ from the official tokenizer's codes. mlx-audio fixed the same
   port. The identifier does not name the encoder implementation yet; the fix adds an encoder version
   to it, so every transcript-backed artifact rebuilds once (ER-04).
-- **A-12: the reference padding is Vocello's.** Upstream appends no silence to the reference before
-  encoding. The 0.5 s padding is a Vocello choice, and the source comment that calls it upstream
-  parity is wrong (ER-04).
 
 ## Integrity
 

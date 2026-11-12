@@ -375,12 +375,13 @@ outside contributor and unreviewed.
   QwenLM#341 never mentions a reference that ends abruptly, so the link between abrupt endings and
   echoes is Vocello's own inference, and it is unmeasured (corrected 2026-11-11: this guide used to
   call the hard stop the documented trigger).
-- **Trailing silence (A-12, open, RF-52).** Vocello appends 0.5 s of silence before the codec encode
-  (`Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples`; version `icl-ref-silence500ms-v2`);
-  the x-vector uses the unpadded audio. Upstream pads nothing; the code comment now says the padding
-  is Vocello's own step (corrected 2026-11-11). `QWENVOICE_REFERENCE_PADDING=none` encodes the
-  reference unpadded in a diagnostics build, and the clone screen's rule `reference-padding-none`
-  decides the default.
+- **Trailing silence (A-12, decided 2026-11-11, RF-52).** The reference is encoded as it is, as
+  upstream does (`Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples` is 0; version
+  `icl-ref-unpadded-v3`), and the x-vector uses the same audio. Vocello used to append 0.5 s of
+  silence, its own step; the clone screen's rule `reference-padding-none` adopted none (similarity
+  +0.019, trailing silence -22 ms, error rate +0.012 inside its margin, gross failures 2 and 4; not
+  worse beyond any margin), and every stored clone artifact rebuilds once. `QWENVOICE_REFERENCE_PADDING=half-second` restores the
+  padding in a diagnostics build.
 - **Codes and decode.** The reference codes come from an encoder with the wrong rotary convention
   (A-02), and streamed clones decode without the reference's history (D5/A-04). A-02 was measured
   on 2026-11-11 with no detectable effect on clone output, and no upstream report shows audible

@@ -17,18 +17,23 @@ enum Qwen3TTSReferenceAudio {
     static let sampleRate = 24_000
 
     /// Trailing silence appended to the reference before codec encode on the
-    /// ICL path. This is Vocello's own step: upstream Qwen3-TTS encodes the
-    /// reference as it is given, with no padding. It was added so a clone take
-    /// would not inherit a truncated final phoneme from the reference; that
-    /// effect has not been measured, and the padding against none is one of
-    /// the arms RF-52 screens (A-12, G-07).
-    static let codecEncodeTrailingSilenceSamples = sampleRate / 2
+    /// ICL path: none since 2026-11-11, as upstream Qwen3-TTS encodes the
+    /// reference as it is given. The clone screen's rule
+    /// `reference-padding-none` adopted it (A-12, G-07, RF-52).
+    static let codecEncodeTrailingSilenceSamples = 0
+
+    /// The half second of zeros Vocello appended before then, its own step
+    /// (added so a take would not inherit a truncated final phoneme, never
+    /// measured). The gated `QWENVOICE_REFERENCE_PADDING=half-second` restores
+    /// it for a screen.
+    static let legacyTrailingSilenceSamples = sampleRate / 2
 
     /// Version token for ICL reference-encode preprocessing. It participates
     /// in the persisted clone-artifact conditioning version, so any change to
     /// how the reference is prepared for `speechTokenizer.encode` must change
-    /// this string to force fail-closed artifact and cache rebuilds.
-    static let codecEncodeConditioningVersion = "icl-ref-silence500ms-v2"
+    /// this string to force fail-closed artifact and cache rebuilds. v3: the
+    /// reference is encoded unpadded (v2 appended half a second of zeros).
+    static let codecEncodeConditioningVersion = "icl-ref-unpadded-v3"
 
     /// Accepts only the three mono layouts used by the Qwen clone contract and
     /// returns one canonical `[1, T]` batch. Never selects or truncates a batch
@@ -50,14 +55,10 @@ enum Qwen3TTSReferenceAudio {
         return canonical
     }
 
-    /// Canonical `[1, 1, T + pad]` codec-encoder input with the trailing
-    /// silence applied. x-vector extraction keeps the unpadded reference.
-    static func encoderInputWithTrailingSilence(_ audio: MLXArray) throws -> MLXArray {
-        try encoderInput(audio, trailingSilenceSamples: codecEncodeTrailingSilenceSamples)
-    }
-
-    /// As above with a chosen amount of trailing silence; zero encodes the
-    /// reference as it is, as upstream does (A-12, RF-52).
+    /// Canonical `[1, 1, T + pad]` codec-encoder input with a chosen amount of
+    /// trailing silence; zero, the production value, encodes the reference as
+    /// it is, as upstream does (A-12, RF-52). x-vector extraction always takes
+    /// the reference as it is.
     static func encoderInput(_ audio: MLXArray, trailingSilenceSamples: Int) throws -> MLXArray {
         let monoBatch = try canonicalMonoBatch(audio)
         guard trailingSilenceSamples > 0 else {

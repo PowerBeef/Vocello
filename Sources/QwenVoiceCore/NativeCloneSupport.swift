@@ -122,20 +122,21 @@ enum CloneConditioningDiagnostics {
 }
 
 /// A-12 (RF-52): whether this process's package encodes a clone reference
-/// without the half second of trailing zeros. The package reads the same key
-/// at load (`Qwen3LoadTimeDiagnosticOverrides.referenceTrailingSilenceSamples`);
+/// with the half second of trailing zeros it appended before 2026-11-11
+/// (production now encodes it as it is, as upstream). The package reads the
+/// same key at load (`Qwen3LoadTimeDiagnosticOverrides.referenceTrailingSilenceSamples`);
 /// the host folds it into the speaker-feature version, as for the rotary.
 public enum CloneReferencePadding {
     static let environmentKey = "QWENVOICE_REFERENCE_PADDING"
-    static let unpaddedSuffix = "+icl-ref-unpadded"
+    static let halfSecondSuffix = "+icl-ref-silence500ms"
 
     /// How the codec encoder's input was made in this process, for evidence
     /// that records it (`vocello bench --codec-roundtrip`, reference-primed
     /// replay).
     public static var encoderInputLabel: String {
         speakerFeatureSuffix.isEmpty
-            ? "clone_reference_encoder_input_trailing_silence_500ms"
-            : "clone_reference_encoder_input_unpadded"
+            ? "clone_reference_encoder_input_unpadded"
+            : "clone_reference_encoder_input_trailing_silence_500ms"
     }
 
     static let speakerFeatureSuffix = speakerFeatureSuffix(
@@ -150,7 +151,7 @@ public enum CloneReferencePadding {
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return requested == "none" ? unpaddedSuffix : ""
+        return requested == "half-second" ? halfSecondSuffix : ""
     }
 }
 

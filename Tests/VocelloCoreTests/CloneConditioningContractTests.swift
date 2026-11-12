@@ -69,29 +69,33 @@ final class CloneConditioningContractTests: XCTestCase {
         // stored under one convention is rebuilt under the other.
         XCTAssertNotEqual(splitHalf.runtimeContractSignature, identity.runtimeContractSignature)
         XCTAssertNotEqual(splitHalf, identity)
-        // A-12: the unpadded reference key does the same.
+        // A-12: the key that restores the half second of padding does the same.
         typealias Padding = CloneReferencePadding
         XCTAssertEqual(Padding.speakerFeatureSuffix(environment: [:], internalDiagnosticsAvailable: true), "")
         XCTAssertEqual(Padding.speakerFeatureSuffix(
-            environment: ["QWENVOICE_DEBUG": "1", Padding.environmentKey: " None "], internalDiagnosticsAvailable: true),
-            Padding.unpaddedSuffix)
+            environment: ["QWENVOICE_DEBUG": "1", Padding.environmentKey: " Half-Second "], internalDiagnosticsAvailable: true),
+            Padding.halfSecondSuffix)
         XCTAssertEqual(Padding.speakerFeatureSuffix(
-            environment: ["QWENVOICE_DEBUG": "1", Padding.environmentKey: "none"], internalDiagnosticsAvailable: false), "")
-        XCTAssertEqual(Padding.speakerFeatureSuffix(environment: [Padding.environmentKey: "none"], internalDiagnosticsAvailable: true), "")
-        let unpadded = NativePreparedCloneConditioningCache.clonePromptIdentity(
+            environment: ["QWENVOICE_DEBUG": "1", Padding.environmentKey: "none"], internalDiagnosticsAvailable: true), "",
+            "unpadded is the default now")
+        XCTAssertEqual(Padding.speakerFeatureSuffix(
+            environment: ["QWENVOICE_DEBUG": "1", Padding.environmentKey: "half-second"], internalDiagnosticsAvailable: false), "")
+        XCTAssertEqual(Padding.speakerFeatureSuffix(
+            environment: [Padding.environmentKey: "half-second"], internalDiagnosticsAvailable: true), "")
+        let padded = NativePreparedCloneConditioningCache.clonePromptIdentity(
             referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "runtime",
-            diagnosticSuffix: Padding.unpaddedSuffix)
-        XCTAssertNotEqual(unpadded.runtimeContractSignature, identity.runtimeContractSignature)
-        XCTAssertNotEqual(unpadded.runtimeContractSignature, splitHalf.runtimeContractSignature)
+            diagnosticSuffix: Padding.halfSecondSuffix)
+        XCTAssertNotEqual(padded.runtimeContractSignature, identity.runtimeContractSignature)
+        XCTAssertNotEqual(padded.runtimeContractSignature, splitHalf.runtimeContractSignature)
         // The default suffix composes every key: the identity a stored prompt
         // is checked against follows each of them.
         typealias Diagnostics = CloneConditioningDiagnostics
-        let armed = ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half", Padding.environmentKey: "none"]
+        let armed = ["QWENVOICE_DEBUG": "1", Rotary.environmentKey: "split-half", Padding.environmentKey: "half-second"]
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: true),
-                       Rotary.splitHalfSuffix + Padding.unpaddedSuffix)
+                       Rotary.splitHalfSuffix + Padding.halfSecondSuffix)
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix(environment: armed, internalDiagnosticsAvailable: false), "")
         XCTAssertEqual(Diagnostics.speakerFeatureSuffix, "", "this test run honours no key")
-        XCTAssertEqual(CloneReferencePadding.encoderInputLabel, "clone_reference_encoder_input_trailing_silence_500ms")
+        XCTAssertEqual(CloneReferencePadding.encoderInputLabel, "clone_reference_encoder_input_unpadded")
         XCTAssertNotEqual(identity, NativePreparedCloneConditioningCache.clonePromptIdentity(
             referenceIdentity: reference, modelArtifactIdentity: artifact, runtimeProfileSignature: "new-runtime"))
         let digest = NativePreparedCloneConditioningCache.clonePromptArtifactDigest(

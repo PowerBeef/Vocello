@@ -113,10 +113,10 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         ]
 
         XCTAssertEqual(Qwen3TTSReferenceAudio.sampleRate, 24_000)
-        XCTAssertEqual(Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples, 12_000)
+        XCTAssertEqual(Qwen3TTSReferenceAudio.legacyTrailingSilenceSamples, 12_000)
 
         for audio in layouts {
-            let padded = try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(audio)
+            let padded = try Qwen3TTSReferenceAudio.encoderInput(audio, trailingSilenceSamples: 12_000)
             XCTAssertEqual(padded.shape, [1, 1, samples.count + 12_000])
             XCTAssertEqual(padded.dtype, audio.dtype)
             let values = padded.asArray(Float.self)
@@ -125,31 +125,35 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         }
     }
 
-    /// A-12: with no trailing silence the reference reaches the encoder as it
-    /// is, as upstream encodes it; the default is half a second of zeros.
+    /// A-12: the reference reaches the encoder as it is, as upstream encodes
+    /// it, the default since the clone screen's rule `reference-padding-none`
+    /// adopted it; the gated key restores the half second of zeros.
     func testCodecEncoderInputWithoutTrailingSilenceIsTheReferenceItself() throws {
         let samples: [Float] = [0.25, -0.5, 0.75, -1]
         let unpadded = try Qwen3TTSReferenceAudio.encoderInput(MLXArray(samples), trailingSilenceSamples: 0)
         XCTAssertEqual(unpadded.shape, [1, 1, samples.count])
         XCTAssertEqual(unpadded.asArray(Float.self), samples)
-        XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.production.referenceTrailingSilenceSamples, 12_000)
-        let requested = ["QWENVOICE_DEBUG": "1", "QWENVOICE_REFERENCE_PADDING": " None "]
+        XCTAssertEqual(Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples, 0)
+        XCTAssertEqual(Qwen3LoadTimeDiagnosticOverrides.production.referenceTrailingSilenceSamples, 0)
+        let requested = ["QWENVOICE_DEBUG": "1", "QWENVOICE_REFERENCE_PADDING": " Half-Second "]
         XCTAssertEqual(
             Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: requested)
-                .referenceTrailingSilenceSamples, 0)
+                .referenceTrailingSilenceSamples, 12_000)
         XCTAssertEqual(
             Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: requested)
-                .referenceTrailingSilenceSamples, 12_000)
-        var mistyped = requested
-        mistyped["QWENVOICE_REFERENCE_PADDING"] = "0"
-        XCTAssertEqual(
-            Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: mistyped)
-                .referenceTrailingSilenceSamples, 12_000)
+                .referenceTrailingSilenceSamples, 0)
+        for mistyped in ["none", "0", "500ms", ""] {
+            var environment = requested
+            environment["QWENVOICE_REFERENCE_PADDING"] = mistyped
+            XCTAssertEqual(
+                Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: environment)
+                    .referenceTrailingSilenceSamples, 0, mistyped)
+        }
     }
 
     func testCodecEncoderInputRejectsNonCanonicalLayouts() {
         XCTAssertThrowsError(
-            try Qwen3TTSReferenceAudio.encoderInputWithTrailingSilence(MLXArray.zeros([2, 64]))
+            try Qwen3TTSReferenceAudio.encoderInput(MLXArray.zeros([2, 64]), trailingSilenceSamples: 0)
         )
     }
 
@@ -159,7 +163,7 @@ final class Qwen3SpeakerMelFrontendTests: XCTestCase {
         // prompt caches rebuild.
         XCTAssertEqual(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion,
-            "qwen-speaker-mel-v1+icl-ref-silence500ms-v2+mlx-swift-0.32.3"
+            "qwen-speaker-mel-v1+icl-ref-unpadded-v3+mlx-swift-0.32.3"
         )
         XCTAssertTrue(
             Qwen3TTSVoiceClonePrompt.speakerFeatureVersion

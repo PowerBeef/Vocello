@@ -217,8 +217,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     /// Gated load-time diagnostic (`QVOICE_TALKER_KV_QUANT`); nil in production.
     let talkerKVQuantBits: Int?
     /// Silence appended to a clone reference before the codec encodes it:
-    /// half a second in production, none under the gated
-    /// `QWENVOICE_REFERENCE_PADDING=none` (A-12, RF-52).
+    /// none in production since 2026-11-11, as upstream; half a second under
+    /// the gated `QWENVOICE_REFERENCE_PADDING=half-second` (A-12, RF-52).
     let referenceTrailingSilenceSamples: Int
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?

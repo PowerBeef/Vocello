@@ -24,10 +24,10 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
     /// The host folds the same key into the clone prompt's speaker-feature
     /// version, so a prompt encoded one way is never adopted the other way.
     let encoderSplitHalfRotary: Bool
-    /// RF-52, A-12 (`QWENVOICE_REFERENCE_PADDING=none`): the clone reference
-    /// is encoded as it is, as upstream does, instead of with half a second
-    /// of zeros appended. The host folds the same key into the clone prompt's
-    /// speaker-feature version.
+    /// RF-52, A-12: the clone reference is encoded as it is, as upstream does
+    /// (production since 2026-11-11); `QWENVOICE_REFERENCE_PADDING=half-second`
+    /// restores the half second of zeros Vocello appended before. The host
+    /// folds the same key into the clone prompt's speaker-feature version.
     let referenceTrailingSilenceSamples: Int
     /// RF-54 (`QWENVOICE_DECODER_WINDOW=on`): the speech tokenizer's decoder
     /// applies its configured attention window (72 frames), as upstream does.
@@ -85,8 +85,9 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             talkerKVQuantBits: talkerKVQuantBits,
             speechTokenizerResidency: speechTokenizerResidency,
             encoderSplitHalfRotary: gatedValue("QWENVOICE_ENCODER_ROTARY") == "split-half",
-            referenceTrailingSilenceSamples: gatedValue("QWENVOICE_REFERENCE_PADDING") == "none"
-                ? 0 : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
+            referenceTrailingSilenceSamples: gatedValue("QWENVOICE_REFERENCE_PADDING") == "half-second"
+                ? Qwen3TTSReferenceAudio.legacyTrailingSilenceSamples
+                : Qwen3TTSReferenceAudio.codecEncodeTrailingSilenceSamples,
             decoderSlidingWindow: gatedValue("QWENVOICE_DECODER_WINDOW") == "on"
         )
     }

@@ -923,6 +923,21 @@
             "A bright young woman with a clear, friendly voice and lively, natural intonation.",
             "An older woman with a soft, slightly husky voice who reads in a gentle, measured way."
           ]
+        },
+        "custom-chinese": {
+          "mode": "custom",
+          "language": "chinese",
+          "speakers": [
+            "vivian",
+            "dylan"
+          ]
+        },
+        "custom-korean": {
+          "mode": "custom",
+          "language": "korean",
+          "speakers": [
+            "sohee"
+          ]
         }
       },
       "description": "Long-form projects as the apps run them (--long-form always: planned into segments of up to about 900 characters, each a streaming take, joined): per stratum four scripts of twenty pool sentences drawn from both halves of the pool (about 70 to 100 seconds, two segments or more), each once under the default Expressive variation and once under Consistent, with the same script. Built-in Voice in English, French and Japanese, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
@@ -1077,6 +1092,22 @@
           },
           "expected": "Fewer refused projects in English, French and Voice Design. Japanese may stay refused for its segment length, which long-form-japanese-budget screens apart. The subtalker already keeps the reference sampling under every variation (RF-18, 2026-10-20); October's shorter segments made Consistent worse.",
           "decision": "ADOPT when the control reproduces the defect, B's refused projects across both seed sets are at most half of A's with no failure class A lacks, and the better family's error rate on paired projects is not worse beyond 0.04 in either seed set's report: a long-form segment under Consistent then samples its talker at 0.8 and 0.95. REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE."
+        },
+        "long-form-east-asian-budget": {
+          "recorded": "2026-11-12",
+          "question": "Confirmation on fresh seeds: do East Asian long-form segments planned with a 150-unit budget (QWENVOICE_LONG_FORM_DELIVERY_BUDGET=150, about 150 characters or syllables) in place of 300 cut refused projects under the default Expressive variation without harm, in Japanese, Chinese and Korean (RF-53)?",
+          "arms": "The long-form screen's custom-japanese, custom-chinese and custom-korean strata, Expressive only (runs long-form-ea-seeds3 and -seeds4: four projects per stratum), at the build of the commit that records this rule. A: default. B: the key set. Seed sets 3 and 4, which no earlier arm used, each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The control reproduces the defect: A refuses at least 4 of its 24 projects across both seed sets.",
+          "primaryMetric": "Refused or failed projects across both seed sets, A against B, overall and per language, and B's failure classes against A's.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Fewer refused projects and a lower error rate: on seed sets 1 and 2 the budget took Japanese Expressive from 4 of 8 projects to 8 of 8. Chinese runs slower per character than Japanese (median 0.26 s against 0.22), so its 300-character segments overshoot the delivery envelope the same way; Korean runs near 0.2 s per syllable.",
+          "decision": "ADOPT when the control reproduces the defect, B's refused projects are at most half of A's with no failure class A lacks, no language refuses more projects under B than under A, and the better family's error rate is not worse beyond 0.04 in either seed set's report: the planner then budgets East Asian scripts at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B refuses more projects than A. Otherwise INCONCLUSIVE, and the budget stays."
         }
       },
       "noiseFloor": {

@@ -2940,8 +2940,9 @@ struct StreamingExecutionContext: Sendable {
     ///     would otherwise be judged on its first channel only.
     ///   - expectedFrameCount: frames the writer actually produced; a header
     ///     rewritten to a shorter, consistent length is caught here.
-    ///   - speakingRateText: the spoken request text, for the v8 speaking-rate
-    ///     check; nil skips it (no text is known for a bare persisted file).
+    ///   - speakingRateText: the spoken request text, for the speaking-rate
+    ///     checks (v8 slow, v9 fast); nil skips them (no text is known for a
+    ///     bare persisted file).
     ///   - seamFrameOffsets: frame offsets in the written file where one
     ///     streamed chunk ends and the next begins, for the observational seam
     ///     measure (AQ-04); empty for a bare persisted file.
@@ -3048,8 +3049,8 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
-    /// The report thresholds of Fast QC v8 (Stage 0). Swift owns them;
-    /// `AudioQCStage0CalibrationTests` asserts they equal the v8 calibration
+    /// The report thresholds of Fast QC v9 (Stage 0). Swift owns them;
+    /// `AudioQCStage0CalibrationTests` asserts they equal the v9 calibration
     /// record, `config/audio-qc-stage0-calibration.json` (audit 2026-09-25,
     /// section 5.5), which the Python mirror is pinned to as well. They are
     /// `legacy-unqualified` bounds (A10): changing one is a qualified change
@@ -3261,6 +3262,8 @@ struct StreamingExecutionContext: Sendable {
         }
         // v8: a take far longer than its text can hold (a model run-on or a
         // repeated phrase) passes every amplitude check above. Warn-only.
+        // v9: one far shorter than its text can hold (speech that ended
+        // early) fails, like any other gross failure.
         let speakingRate = speakingRateText.flatMap(AudioSpeakingRateQC.measure)
         let secondsPerTextUnit: Double? = speakingRate.flatMap { measurement -> Double? in
             guard durationSeconds > 0 else { return nil }
@@ -3269,6 +3272,14 @@ struct StreamingExecutionContext: Sendable {
         if let speakingRate, let secondsPerTextUnit,
            AudioSpeakingRateQC.isSlow(secondsPerUnit: secondsPerTextUnit, measurement: speakingRate) {
             flags.append("speaking_rate_slow"); raise(.warn, &instabilityVerdict)
+        }
+        if let speakingRateText, let speakingRate,
+           AudioSpeakingRateQC.isFast(
+               durationSeconds: durationSeconds,
+               conservativeUnits: AudioSpeakingRateQC.conservativeUnits(in: speakingRateText),
+               scriptClass: speakingRate.scriptClass
+           ) {
+            flags.append("speaking_rate_fast"); raise(.fail, &instabilityVerdict)
         }
         let verdict = worst(instabilityVerdict, writtenOutputVerdict)
         var cadenceReasons: [AudioCadenceQCReport.Reason] = []
@@ -3614,7 +3625,8 @@ public enum PersistedWAVAudioQCAnalyzer {
 /// block in Korean. The text's own script picks the band, so it also holds
 /// when the request language is Auto.
 ///
-/// Warn-only. Its bands are Stage 0 constants: a change edits Swift, the Python
+/// The slow band warns; the fast band (v9) fails a take far too short for its
+/// script. The bands are Stage 0 constants: a change edits Swift, the Python
 /// mirror and config/audio-qc-stage0-calibration.json together.
 enum AudioSpeakingRateQC {
     enum ScriptClass: String, Sendable {
@@ -3643,6 +3655,30 @@ enum AudioSpeakingRateQC {
         case .alphabetic: return 0.145
         case .chinese: return 0.45
         case .japanese, .korean: return 0.40
+        }
+    }
+
+    /// Seconds per unit below which a take fails `speaking_rate_fast` (v9,
+    /// RF-53): speech that ended early, such as a full German sentence in
+    /// 0.32 s that ended by end of speech and passed every other check.
+    /// Calibrated on 2026-11-11 on human speech, the pinned QC corpora's clips
+    /// judged on `conservativeUnits` under the same minimum-units rule: the
+    /// fastest of 13,310 alphabetic clips (LibriTTS-R, MLS, Emozionalmente)
+    /// runs at 0.046 s per unit, of 1,191 Chinese clips (AISHELL-3) at 0.170 s
+    /// per character and of 2,279 Korean clips (Zeroth-Korean) at 0.136 s per
+    /// syllable; each bound is half its fastest clip. Japanese has no human clip yet and is not
+    /// judged. Replayed on the quality screens' 1,496 distinct judged takes it
+    /// fails only that truncated one; the fastest accepted take (0.041 s per
+    /// unit, both recognizers exact) sits 1.8 times above its bound. Silence
+    /// at the edges only lengthens a take, so it never pushes one below. The
+    /// bound is judged on `conservativeUnits`, never more than `textUnits`, so
+    /// text that costs little time to say cannot make a take look fast.
+    static func fastSecondsPerUnit(for scriptClass: ScriptClass) -> Double? {
+        switch scriptClass {
+        case .alphabetic: return 0.023
+        case .chinese: return 0.085
+        case .korean: return 0.068
+        case .japanese: return nil
         }
     }
 
@@ -3691,6 +3727,54 @@ enum AudioSpeakingRateQC {
     static func isSlow(secondsPerUnit: Double, measurement: Measurement) -> Bool {
         measurement.textUnits >= minimumJudgedUnits(for: measurement.scriptClass)
             && secondsPerUnit > slowSecondsPerUnit(for: measurement.scriptClass)
+    }
+
+    /// Units of a text that each take real time to say, for the fast bound:
+    /// the letters and digits of `measure`, except that a run of decimal
+    /// digits counts once (a long round number is read in one to three
+    /// syllables, 一百亿 or
+    /// 백억), a run of one repeated letter counts at most twice ("ㅋㅋㅋㅋ",
+    /// "Zzzz") and a lone Hangul compatibility letter (U+3130 to U+318F, the
+    /// ㅋ of a laugh) counts not at all. It never exceeds `textUnits`, so a
+    /// human clip judged on it runs no faster than the calibration measured.
+    static func conservativeUnits(in text: String) -> Int {
+        var units = 0
+        var previous: Character?
+        var repeatRun = 0
+        var inDigitRun = false
+        for character in text {
+            guard character.isLetter || character.isNumber else {
+                previous = nil
+                repeatRun = 0
+                inDigitRun = false
+                continue
+            }
+            if character.unicodeScalars.count == 1,
+               character.unicodeScalars.first?.properties.generalCategory == .decimalNumber {
+                if !inDigitRun { units += 1 }
+                inDigitRun = true
+                previous = nil
+                repeatRun = 0
+                continue
+            }
+            inDigitRun = false
+            if let scalar = character.unicodeScalars.first, (0x3130...0x318F).contains(scalar.value),
+               character.unicodeScalars.count == 1 {
+                previous = nil
+                repeatRun = 0
+                continue
+            }
+            repeatRun = character == previous ? repeatRun + 1 : 1
+            previous = character
+            if repeatRun <= 2 { units += 1 }
+        }
+        return units
+    }
+
+    static func isFast(durationSeconds: Double, conservativeUnits: Int, scriptClass: ScriptClass) -> Bool {
+        guard let bound = fastSecondsPerUnit(for: scriptClass), durationSeconds > 0,
+              conservativeUnits >= minimumJudgedUnits(for: scriptClass) else { return false }
+        return durationSeconds / Double(conservativeUnits) < bound
     }
 }
 

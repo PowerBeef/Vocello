@@ -310,6 +310,8 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             (["empty"], .audioNoSpeech),
             (["clipping", "clicks"], .audioUnstable),
             (["rms_drift"], .audioQualityRejected),
+            // v9: speech that ended early is a generic rejection, never "no speech".
+            (["speaking_rate_fast"], .audioQualityRejected),
         ]
         for (flags, expected) in cases {
             let rejection = StreamingExecutionContext.finalAudioQCRejectionError(flags: flags)

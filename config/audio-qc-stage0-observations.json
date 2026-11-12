@@ -3,10 +3,10 @@
   "record": "audio-qc-stage0-observations",
   "algorithmVersion": 1,
   "introspectionAlgorithmVersion": 1,
-  "fastQCAlgorithmVersion": 8,
+  "fastQCAlgorithmVersion": 9,
   "status": "observational",
   "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md, AQ-F08 to AQ-F12 and AQ-F49 (phase P4), decision 8(a)",
-  "note": "The constants of the Stage 0 observational signal measures (AudioQCSignalObserver, AudioQCReport.signal) and the engine introspection summary (Qwen3GenerationIntrospector, the telemetry row's engineIntrospection). Swift owns them; AudioQCSignalObservationTests and Qwen3GenerationIntrospectionTests assert the Swift values equal this record, and scripts/tests/test_audio_qc_observations.py asserts the Python mirror (scripts/lib/audio_qc_observations.py) does. No flag, verdict or Fast QC version reads these measures: they join QC v8 additively, and a detector that later gates on one needs a qualified record under the threshold-change authority first.",
+  "note": "The constants of the Stage 0 observational signal measures (AudioQCSignalObserver, AudioQCReport.signal) and the engine introspection summary (Qwen3GenerationIntrospector, the telemetry row's engineIntrospection). Swift owns them; AudioQCSignalObservationTests and Qwen3GenerationIntrospectionTests assert the Swift values equal this record, and scripts/tests/test_audio_qc_observations.py asserts the Python mirror (scripts/lib/audio_qc_observations.py) does. No flag, verdict or Fast QC version reads these measures: they joined QC v8 additively and stay so under v9, and a detector that later gates on one needs a qualified record under the threshold-change authority first.",
   "constants": {
     "kWeighting": {
       "shelfFrequencyHz": 1681.974450955533,

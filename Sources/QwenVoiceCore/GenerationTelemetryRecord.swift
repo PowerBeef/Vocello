@@ -1183,8 +1183,11 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// The Stage 0 signal observations (AQ-04: loudness, true peak, noise floor,
     /// WADA-SNR, bandwidth, spectral-flux events, codec-frame modulation, seam
     /// discontinuity and repetition stripe) join v8 the same way, under their own
-    /// version in `signal`.
-    public static let currentAlgorithmVersion = 8
+    /// version in `signal`. v9 (RF-53) fails a take far too short for its text
+    /// (`speaking_rate_fast`), a verdict change, so the version moves and the
+    /// Mac gate bench's baseline (which binds it) must be seeded again before
+    /// the gate bench is next used.
+    public static let currentAlgorithmVersion = 9
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass

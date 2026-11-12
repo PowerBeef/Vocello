@@ -77,7 +77,7 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertEqual(opening.stepBurstPeakStartMS, 2)
         XCTAssertTrue(opening.flags.contains("onset_step_burst"), "\(opening.flags)")
         XCTAssertEqual(opening.instabilityVerdict, .warn)
-        XCTAssertEqual(opening.algorithmVersion, 8)
+        XCTAssertEqual(opening.algorithmVersion, 9)
         // The same cluster at the plosive onset (150 ms) is recorded, not judged.
         let later = report(burstAtSample: 3_600)
         XCTAssertEqual(later.stepBurstPeakCount, 11)
@@ -155,7 +155,7 @@ final class AudioQCClickEventTests: XCTestCase {
         XCTAssertEqual(long.clickEventCount, 2)
         XCTAssertEqual(try XCTUnwrap(short.clickEventsPerSecond), 1.0, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(long.clickEventsPerSecond), 0.1, accuracy: 1e-9)
-        XCTAssertEqual(short.algorithmVersion, 8, "observational fields leave the QC version")
+        XCTAssertEqual(short.algorithmVersion, 9, "observational fields leave the QC version")
         // Observational: no flag reads the events; the per-sample bound is unchanged.
         XCTAssertFalse(short.flags.contains("clicks"), "\(short.flags)")
     }
@@ -242,7 +242,7 @@ final class AudioQCSpeakingRateTests: XCTestCase {
 
     func testAnOrdinaryTakeReportsItsRateWithoutAFlag() throws {
         let qc = report(seconds: 6.5, text: Self.mediumScript)
-        XCTAssertEqual(qc.algorithmVersion, 8)
+        XCTAssertEqual(qc.algorithmVersion, 9)
         XCTAssertEqual(qc.speakingRateTextUnits, 91)
         XCTAssertEqual(try XCTUnwrap(qc.secondsPerTextUnit), 6.5 / 91, accuracy: 1e-12)
         XCTAssertFalse(qc.flags.contains("speaking_rate_slow"), "\(qc.flags)")
@@ -262,6 +262,57 @@ final class AudioQCSpeakingRateTests: XCTestCase {
         XCTAssertFalse(report(seconds: 7.1, text: Self.chineseScript).flags.contains("speaking_rate_slow"))
         // A slow Japanese delivery below twice its median stays unflagged.
         XCTAssertFalse(report(seconds: 11.5, text: Self.japaneseScript).flags.contains("speaking_rate_slow"))
+    }
+
+    /// v9 (RF-53): a take far shorter than its script can be spoken (speech
+    /// that ended early) fails, by script class; the bound is half the fastest
+    /// human clip of the calibration corpora, and Japanese, which has none yet,
+    /// is never judged.
+    func testATakeFarTooShortForItsScriptFails() {
+        let truncated = report(seconds: 0.32, text: Self.mediumScript)
+        XCTAssertTrue(truncated.flags.contains("speaking_rate_fast"), "\(truncated.flags)")
+        XCTAssertEqual(truncated.instabilityVerdict, .fail)
+        XCTAssertEqual(truncated.verdict, .fail)
+        // 91 units: the bound is 0.023 s per unit, 2.093 s.
+        XCTAssertTrue(report(seconds: 2.0, text: Self.mediumScript).flags.contains("speaking_rate_fast"))
+        for seconds in [2.2, 3.73, 6.5] {
+            let qc = report(seconds: seconds, text: Self.mediumScript)
+            XCTAssertFalse(qc.flags.contains("speaking_rate_fast"), "\(seconds): \(qc.flags)")
+            XCTAssertEqual(qc.verdict, .pass, "\(seconds)")
+        }
+        // 27 characters at 0.085 s is 2.295 s; 10 syllables at 0.068 s is 0.68 s.
+        XCTAssertTrue(report(seconds: 2.2, text: Self.chineseScript).flags.contains("speaking_rate_fast"))
+        XCTAssertFalse(report(seconds: 2.4, text: Self.chineseScript).flags.contains("speaking_rate_fast"))
+        XCTAssertTrue(report(seconds: 0.65, text: "안녕하세요 반갑습니다").flags.contains("speaking_rate_fast"))
+        XCTAssertFalse(report(seconds: 0.72, text: "안녕하세요 반갑습니다").flags.contains("speaking_rate_fast"))
+        XCTAssertNil(AudioSpeakingRateQC.fastSecondsPerUnit(for: .japanese))
+        XCTAssertFalse(report(seconds: 0.3, text: Self.japaneseScript).flags.contains("speaking_rate_fast"))
+        // Below the judged minimum the rate is reported, never judged.
+        XCTAssertFalse(report(seconds: 0.05, text: "Hello there.").flags.contains("speaking_rate_fast"))
+        XCTAssertFalse(report(seconds: 0.32, text: nil).flags.contains("speaking_rate_fast"))
+    }
+
+    /// Text that costs little time to say never makes a take look fast: a
+    /// digit run counts once, a repeated letter at most twice and a lone
+    /// Hangul compatibility letter not at all (review of 2026-11-11).
+    func testTheFastBoundCountsOnlyUnitsThatTakeTimeToSay() {
+        let revenue = "公司去年的营业收入是10000000000元"
+        let korean = "회사의 올해 매출은 10000000000원입니다"
+        let laugh = "진짜 웃기다ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ"
+        XCTAssertEqual(AudioSpeakingRateQC.measure(revenue)?.textUnits, 22)
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: revenue), 12)
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: korean), 13)
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: laugh), 5)
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: "Zzzzzzzzzzzzzzzzzzzz, said the sleeping dog quietly."), 28)
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: "1,000 and 2.5"), 7, "punctuation ends a digit run")
+        XCTAssertEqual(AudioSpeakingRateQC.conservativeUnits(in: Self.mediumScript), 91)
+        // 14 syllables read briskly (1.5 s) and a laugh pass; the old count
+        // (22 and 23 units) would have refused the first two.
+        XCTAssertFalse(report(seconds: 1.5, text: revenue).flags.contains("speaking_rate_fast"))
+        XCTAssertTrue(report(seconds: 0.8, text: revenue).flags.contains("speaking_rate_fast"))
+        XCTAssertFalse(report(seconds: 1.2, text: korean).flags.contains("speaking_rate_fast"))
+        XCTAssertTrue(report(seconds: 0.6, text: korean).flags.contains("speaking_rate_fast"))
+        XCTAssertFalse(report(seconds: 0.3, text: laugh).flags.contains("speaking_rate_fast"), "below the judged minimum")
     }
 
     func testVeryShortTextIsReportedButNotJudged() throws {
@@ -400,6 +451,13 @@ final class AudioQCStage0CalibrationTests: XCTestCase {
                 try number("minimumJudgedUnits", in: band).intValue,
                 scriptClass.rawValue
             )
+            // v9: the fast bound, null where the class has no human calibration.
+            let fast = try XCTUnwrap(band["fastSecondsPerUnit"], scriptClass.rawValue)
+            if let bound = AudioSpeakingRateQC.fastSecondsPerUnit(for: scriptClass) {
+                XCTAssertEqual(bound, try XCTUnwrap(fast as? NSNumber).doubleValue, accuracy: 1e-12, scriptClass.rawValue)
+            } else {
+                XCTAssertTrue(fast is NSNull, scriptClass.rawValue)
+            }
         }
     }
 }

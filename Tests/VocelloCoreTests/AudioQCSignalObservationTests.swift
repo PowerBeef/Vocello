@@ -372,7 +372,7 @@ final class AudioQCSignalObservationTests: XCTestCase {
         try AtomicPCM16WAVWriter.write(pcmSamples: pcm, sampleRate: Self.rate, outputURL: url)
 
         let report = try PersistedWAVAudioQCAnalyzer.evaluate(url: url, seamFrameOffsets: [24_000, 36_000])
-        XCTAssertEqual(report.algorithmVersion, 8, "the observations leave the Fast QC version")
+        XCTAssertEqual(report.algorithmVersion, 9, "the observations leave the Fast QC version")
         let signal = try XCTUnwrap(report.signal)
         try assertMatches(signal, try encoded(Self.observe(pcm, seams: [24_000, 36_000])), "persisted WAV")
         let bare = try PersistedWAVAudioQCAnalyzer.evaluate(url: url)

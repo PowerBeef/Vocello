@@ -187,14 +187,14 @@ def history_record_schema_version(takes: list[dict[str, Any]]) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# Fast QC v8 mirror (AQ-03, "measure the present")
+# Fast QC v9 mirror (AQ-03, "measure the present")
 # --------------------------------------------------------------------------- #
 # A float64 NumPy replay of the engine's persisted-WAV Fast QC: the
 # `PCM16StreamLimiter` pass over the model's float output, a second pass over
-# the PCM16 it wrote, and `makeAudioQCReport` (algorithm v8). It exists so the
-# qualification engine can measure the v8 flags on constructed fixtures; the
+# the PCM16 it wrote, and `makeAudioQCReport` (algorithm v9). It exists so the
+# qualification engine can measure the v9 flags on constructed fixtures; the
 # engine's report stays the only product verdict. Swift owns every value in
-# FASTQC_V8: this mirror never reads Swift source. Both sides are pinned to
+# FASTQC_V9: this mirror never reads Swift source. Both sides are pinned to
 # the calibration record config/audio-qc-stage0-calibration.json, Swift by
 # AudioQCStage0CalibrationTests and this dict by test_audio_qc.py. The
 # Swift limiter runs in Float32 and releases its gain sample by sample; this
@@ -214,9 +214,9 @@ def history_record_schema_version(takes: list[dict[str, Any]]) -> int:
 # Chunk QC and WAV-format checks are out of scope (a fixture has neither).
 # NumPy is imported only when the mirror runs.
 
-FASTQC_V8_ALGORITHM_VERSION = 8
-FASTQC_V8_MIRROR = "fastqc-v8-numpy/1"
-FASTQC_V8 = {
+FASTQC_V9_ALGORITHM_VERSION = 9
+FASTQC_V9_MIRROR = "fastqc-v9-numpy/1"
+FASTQC_V9 = {
     # PCM16StreamLimiter
     "ceiling": 0.965,
     "maxSingleSampleStep": 0.42,
@@ -244,29 +244,30 @@ FASTQC_V8 = {
     "cadencePauseMS": {"short": 350, "long": 600},
     "egregiousMS": {"noDeclaredPause": 1_200, "declaredPauseOrLong": 2_000},
     "suspiciousSingleMS": {"noDeclaredPause": 900, "declaredPause": 1_200, "long": 1_500},
-    # AudioSpeakingRateQC: seconds per unit above which a take warns, and the
-    # fewest units a take needs to be judged.
+    # AudioSpeakingRateQC: seconds per unit above which a take warns, the
+    # fewest units a take needs to be judged, and (v9) seconds per unit below
+    # which it fails; None where the class has no human calibration.
     "speakingRateBands": {
-        "alphabetic": {"slowSecondsPerUnit": 0.145, "minimumJudgedUnits": 20},
-        "chinese": {"slowSecondsPerUnit": 0.45, "minimumJudgedUnits": 8},
-        "japanese": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
-        "korean": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
+        "alphabetic": {"slowSecondsPerUnit": 0.145, "minimumJudgedUnits": 20, "fastSecondsPerUnit": 0.023},
+        "chinese": {"slowSecondsPerUnit": 0.45, "minimumJudgedUnits": 8, "fastSecondsPerUnit": 0.085},
+        "japanese": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8, "fastSecondsPerUnit": None},
+        "korean": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8, "fastSecondsPerUnit": 0.068},
     },
 }
 # `StreamingExecutionContext.expectedPauseCount`: pause punctuation runs.
 PAUSE_PUNCTUATION = frozenset(".,;:!?…—。、，；：！？")
-# The flag families of the v8 report and the verdicts each can raise.
-FASTQC_V8_FLAGS = {
+# The flag families of the v9 report and the verdicts each can raise.
+FASTQC_V9_FLAGS = {
     "nonfinite": ("fail",), "empty": ("fail",), "near_silent": ("fail",), "silent": ("fail",),
     "low_level": ("warn",), "dropout": ("warn", "fail"), "cadence": ("warn",),
     "terminal_silence": ("fail",), "clipping": ("warn", "fail"), "clicks": ("warn", "fail"),
     "hot": ("warn",), "onset_step_burst": ("warn",), "dc_offset": ("warn", "fail"),
-    "speaking_rate_slow": ("warn",),
+    "speaking_rate_slow": ("warn",), "speaking_rate_fast": ("fail",),
 }
 
 
 def flag_family(flag: str) -> str:
-    """`dropout:1300ms` -> `dropout`: the family a v8 flag belongs to."""
+    """`dropout:1300ms` -> `dropout`: the family a v9 flag belongs to."""
     return flag.split(":", 1)[0]
 
 
@@ -314,6 +315,33 @@ def speaking_rate_measure(text: str) -> tuple[int, str] | None:
     return units, script_class
 
 
+def speaking_rate_conservative_units(text: str) -> int:
+    """`AudioSpeakingRateQC.conservativeUnits`: the units the v9 fast bound is
+    judged on. A run of decimal digits counts once, a run of one repeated letter at most
+    twice, and a lone Hangul compatibility letter (U+3130 to U+318F) not at all."""
+    units = repeat_run = 0
+    previous: str | None = None
+    in_digits = False
+    for character in text:
+        if not (character.isalpha() or character.isnumeric()):
+            previous, repeat_run, in_digits = None, 0, False
+            continue
+        if character.isdecimal():
+            if not in_digits:
+                units += 1
+            in_digits, previous, repeat_run = True, None, 0
+            continue
+        in_digits = False
+        if 0x3130 <= ord(character) <= 0x318F:
+            previous, repeat_run = None, 0
+            continue
+        repeat_run = repeat_run + 1 if character == previous else 1
+        previous = character
+        if repeat_run <= 2:
+            units += 1
+    return units
+
+
 def _silence_runs(np: Any, silent: Any) -> dict[str, Any]:
     """Interior near-silent runs (closed by audio, after audio) and the open trailing run."""
     result: dict[str, Any] = {
@@ -336,8 +364,8 @@ def _silence_runs(np: Any, silent: Any) -> dict[str, Any]:
         if length > result["longestInteriorSilentRunSamples"]:
             result["longestInteriorSilentRunSamples"] = length
             result["longestInteriorSilentRunStartSample"] = offset + int(start)
-        if (length >= FASTQC_V8["interiorRunRecordFloorSamples"]
-                and len(recorded) < FASTQC_V8["interiorRunRecordCap"]):
+        if (length >= FASTQC_V9["interiorRunRecordFloorSamples"]
+                and len(recorded) < FASTQC_V9["interiorRunRecordCap"]):
             recorded.append(length)
     result["interiorSilentRunSamples"] = recorded
     return result
@@ -345,7 +373,7 @@ def _silence_runs(np: Any, silent: Any) -> dict[str, Any]:
 
 def _limiter_pass(np: Any, raw: Any) -> tuple[dict[str, Any], Any]:
     """One `PCM16StreamLimiter` pass: its metrics and the PCM16 it writes."""
-    constants = FASTQC_V8
+    constants = FASTQC_V9
     ceiling = constants["ceiling"]
     step = constants["maxSingleSampleStep"]
     finite = np.isfinite(raw)
@@ -415,10 +443,10 @@ def _limiter_pass(np: Any, raw: Any) -> tuple[dict[str, Any], Any]:
     return metrics, pcm16
 
 
-def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = None,
+def fast_qc_v9(samples: Any, *, sample_rate: int = 24_000, text: str | None = None,
                expected_pauses: int | None = None, slew_positions: bool = False,
                signal: bool = True, seam_offsets: Any = ()) -> dict[str, Any]:
-    """The v8 `audioQC` report the engine would write for this float output.
+    """The v9 `audioQC` report the engine would write for this float output.
 
     `text` is the spoken request text: it sets the pause budget (unless
     `expected_pauses` is given) and the speaking-rate check, which is skipped
@@ -427,7 +455,7 @@ def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = No
     clamped), for locating what a click alarm responded to. `signal` adds the
     report's observational `signal` block (AQ-04) over the persisted PCM16,
     with `seam_offsets` the streaming seams in the written file; it moves no
-    flag or verdict, so callers that score only the v8 flags may skip it.
+    flag or verdict, so callers that score only the v9 flags may skip it.
     """
     import numpy as np
 
@@ -441,7 +469,7 @@ def fast_qc_v8(samples: Any, *, sample_rate: int = 24_000, text: str | None = No
         combined[key] = persisted[key]
     pauses = expected_pauses if expected_pauses is not None else (expected_pause_count(text) if text else 0)
     duration = raw.size / sample_rate if sample_rate > 0 else 0.0
-    report = fast_qc_v8_report(combined, sample_rate=sample_rate, duration_seconds=duration,
+    report = fast_qc_v9_report(combined, sample_rate=sample_rate, duration_seconds=duration,
                                expected_pauses=pauses, text=text)
     if slew_positions:
         report["slewLimitedSampleIndices"] = list(stream["slewLimitedSampleIndices"])
@@ -458,10 +486,10 @@ def _ms(samples: int, sample_rate: int) -> int:
     return int(samples * 1000 / sample_rate) if sample_rate > 0 else 0
 
 
-def fast_qc_v8_report(metrics: dict[str, Any], *, sample_rate: int, duration_seconds: float,
+def fast_qc_v9_report(metrics: dict[str, Any], *, sample_rate: int, duration_seconds: float,
                       expected_pauses: int, text: str | None = None) -> dict[str, Any]:
-    """`makeAudioQCReport` (v8) over limiter metrics, flags spelled as the engine spells them."""
-    constants = FASTQC_V8
+    """`makeAudioQCReport` (v9) over limiter metrics, flags spelled as the engine spells them."""
+    constants = FASTQC_V9
     count = metrics["processedSamples"]
     rms = math.sqrt(metrics["outputSumOfSquares"] / count) if count > 0 else 0.0
     rms_dbfs = 20.0 * math.log10(rms) if rms > 0 else None
@@ -547,10 +575,15 @@ def fast_qc_v8_report(metrics: dict[str, Any], *, sample_rate: int, duration_sec
         band = constants["speakingRateBands"][measurement[1]]
         if measurement[0] >= band["minimumJudgedUnits"] and seconds_per_unit > band["slowSecondsPerUnit"]:
             raise_to("warn", "instability", "speaking_rate_slow")
+        fast = band["fastSecondsPerUnit"]
+        conservative = speaking_rate_conservative_units(text) if text else 0
+        if (fast is not None and conservative >= band["minimumJudgedUnits"]
+                and duration_seconds / conservative < fast):
+            raise_to("fail", "instability", "speaking_rate_fast")
     verdict = max(verdicts.values(), key=VERDICT_RANK.__getitem__)
     return {
-        "algorithmVersion": FASTQC_V8_ALGORITHM_VERSION,
-        "mirror": FASTQC_V8_MIRROR,
+        "algorithmVersion": FASTQC_V9_ALGORITHM_VERSION,
+        "mirror": FASTQC_V9_MIRROR,
         "verdict": verdict,
         "instabilityVerdict": verdicts["instability"],
         "writtenOutputVerdict": verdicts["written"],

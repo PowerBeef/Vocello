@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "record": "audio-qc-stage0-calibration",
-  "algorithmVersion": 8,
+  "algorithmVersion": 9,
   "calibration": "legacy-unqualified",
   "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md, sections 5.5 and 5.6 (A10)",
-  "note": "The Stage 0 constants of Fast QC v8: PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds and AudioSpeakingRateQC. Swift owns them; AudioQCStage0CalibrationTests asserts the Swift values equal this record, and scripts/tests/test_audio_qc.py asserts the Python mirror's FASTQC_V8 does. They are legacy-unqualified bounds (A10), not qualified operating points: a qualified change writes a new record for a new algorithm version and edits Swift, the mirror and the record together.",
+  "note": "The Stage 0 constants of Fast QC v9: PCM16StreamLimiter, StreamingExecutionContext.AudioQCThresholds and AudioSpeakingRateQC. Swift owns them; AudioQCStage0CalibrationTests asserts the Swift values equal this record, and scripts/tests/test_audio_qc.py asserts the Python mirror's FASTQC_V9 does. They are legacy-unqualified bounds (A10), not qualified operating points: a qualified change writes a new record for a new algorithm version and edits Swift, the mirror and the record together.",
   "constants": {
     "ceiling": 0.965,
     "maxSingleSampleStep": 0.42,
@@ -44,20 +44,62 @@
     "speakingRateBands": {
       "alphabetic": {
         "slowSecondsPerUnit": 0.145,
-        "minimumJudgedUnits": 20
+        "minimumJudgedUnits": 20,
+        "fastSecondsPerUnit": 0.023
       },
       "chinese": {
         "slowSecondsPerUnit": 0.45,
-        "minimumJudgedUnits": 8
+        "minimumJudgedUnits": 8,
+        "fastSecondsPerUnit": 0.085
       },
       "japanese": {
         "slowSecondsPerUnit": 0.4,
-        "minimumJudgedUnits": 8
+        "minimumJudgedUnits": 8,
+        "fastSecondsPerUnit": null
       },
       "korean": {
         "slowSecondsPerUnit": 0.4,
-        "minimumJudgedUnits": 8
+        "minimumJudgedUnits": 8,
+        "fastSecondsPerUnit": 0.068
       }
     }
+  },
+  "speakingRateFastCalibration": {
+    "decided": "2026-11-11",
+    "item": "RF-53",
+    "rule": "A take whose duration over its conservative units (AudioSpeakingRateQC.conservativeUnits: letters and digits, a run of decimal digits once, a run of one repeated letter at most twice, no lone Hangul compatibility letter) falls below fastSecondsPerUnit, with at least minimumJudgedUnits such units, fails speaking_rate_fast (instability). Each bound is half the fastest human clip of its class on the same count; a class with no human clip has none (null) and is not judged.",
+    "humanSpeech": {
+      "alphabetic": {
+        "clips": 13310,
+        "corpora": [
+          "libritts-r",
+          "mls",
+          "emozionalmente"
+        ],
+        "fastestSecondsPerUnit": 0.0464,
+        "p0_1": 0.054
+      },
+      "chinese": {
+        "clips": 1191,
+        "corpora": [
+          "aishell3-subset"
+        ],
+        "fastestSecondsPerUnit": 0.17,
+        "p0_1": 0.1879
+      },
+      "korean": {
+        "clips": 2279,
+        "corpora": [
+          "zeroth-korean"
+        ],
+        "fastestSecondsPerUnit": 0.1361,
+        "p0_1": 0.1445
+      },
+      "japanese": {
+        "clips": 0,
+        "corpora": []
+      }
+    },
+    "replay": "The quality screens' 1,496 distinct judged takes (1,131 alphabetic, 168 Chinese, 197 Korean): it fails one, a full German sentence in 0.32 s (0.0082 s per unit, both recognizers wrong), and no other; the fastest accepted take runs at 0.0412 s per unit with both recognizers exact. The 367 committed benchmark rows that carry a rate run at 0.060 s per unit or slower."
   }
 }

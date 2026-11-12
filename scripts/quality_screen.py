@@ -511,21 +511,35 @@ def score_arm(args: argparse.Namespace) -> Path:
         path = QC_RESULTS / model / f"{store.result_stem(take['audioSHA256'], key)}.json"
         if not path.is_file():
             raise ScreenError(f"{take['takeID']}: no {model} result; a take is never scored in part")
-        value = read_json(path)
-        if "outputs" not in value:
-            raise ScreenError(f"{take['takeID']}: the {model} runner reported an error")
-        return value["outputs"]
+        return read_json(path)
 
     scores = {}
     for take in manifest_takes:
         speaker = result(SPEAKER_MODEL, take, True)
-        rates = {model: error_rate(take["text"], result(model, take, False).get("text") or "", take["language"])
-                 for model in ASR_MODELS}
-        scores[take["takeID"]] = {"speakerSimilarity": cosine(speaker["whole"], speaker["reference"]),
-                                  "errorRate": rates}
+        asr = {model: result(model, take, False) for model in ASR_MODELS}
+        failed = [model for model, value in [(SPEAKER_MODEL, speaker), *asr.items()]
+                  if "outputs" not in value and not is_measured_outcome(value)]
+        if failed:
+            raise ScreenError(f"{take['takeID']}: the {', '.join(failed)} runner reported an error")
+        rates = {model: error_rate(take["text"], (value.get("outputs") or {}).get("text") or "", take["language"])
+                 for model, value in asr.items()}
+        score = {"speakerSimilarity": None, "errorRate": rates}
+        if "outputs" in speaker:
+            score["speakerSimilarity"] = cosine(speaker["outputs"]["whole"], speaker["outputs"]["reference"])
+        else:
+            # Too short for a speaker embedding: a take that cannot hold its
+            # script, counted as a gross failure rather than dropped.
+            score["tooShortToScore"] = True
+        scores[take["takeID"]] = score
     write_json(arm_dir / "scores.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "scores": scores})
     print(json.dumps({"arm": args.arm, "scored": len(scores)}))
     return arm_dir / "scores.json"
+
+
+def is_measured_outcome(result: dict) -> bool:
+    """A runner's refusal that says something about the take itself: audio
+    too short to embed. Any other runner error is a scoring failure."""
+    return result.get("error") == "audio-too-short"
 
 
 # ---------------------------------------------------------------- compare
@@ -545,7 +559,8 @@ def take_metrics(row: dict, score: dict | None) -> dict[str, float]:
     if silence is not None:
         values["trailingSilenceMS"] = silence
     if score:
-        values["speakerSimilarity"] = score["speakerSimilarity"]
+        if score.get("speakerSimilarity") is not None:
+            values["speakerSimilarity"] = score["speakerSimilarity"]
         rates = {model: rate for model, rate in score["errorRate"].items() if rate is not None}
         for model, rate in rates.items():
             values[f"errorRate:{model}"] = rate
@@ -617,8 +632,11 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
         count = 0
         for take in takes:
             row = view["rows"][take["takeID"]]
-            rate = take_metrics(row, view["scores"].get(take["takeID"])).get("errorRateBetterFamily")
-            count += row["outcome"] != "generated" or (rate is not None and rate >= GROSS_ERROR_RATE)
+            score = view["scores"].get(take["takeID"])
+            rate = take_metrics(row, score).get("errorRateBetterFamily")
+            count += (row["outcome"] != "generated"
+                      or bool(score and score.get("tooShortToScore"))
+                      or (rate is not None and rate >= GROSS_ERROR_RATE))
         return count
 
     def warned(view: dict) -> int:

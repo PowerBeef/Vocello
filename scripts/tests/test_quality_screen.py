@@ -219,6 +219,18 @@ class CompareTests(unittest.TestCase):
         # The survivors look the same; only the failure count tells the arms apart.
         self.assertEqual(summary["metrics"]["speakerSimilarity"]["meanDifference"], 0.0)
 
+    def test_a_take_too_short_to_embed_is_a_gross_failure_not_a_scoring_error(self):
+        self.assertTrue(screen.is_measured_outcome({"error": "audio-too-short"}))
+        self.assertFalse(screen.is_measured_outcome({"error": "model-missing"}))
+        self.assertFalse(screen.is_measured_outcome({"outputs": {}}))
+        plan = plan_of(voices=2, per_voice=2)
+        scores = {take["takeID"]: score(0.7, 0.02, 0.01) for take in plan["takes"]}
+        short = dict(scores, **{"v0--s0": {"speakerSimilarity": None, "tooShortToScore": True,
+                                           "errorRate": {QWEN: 0.02, WHISPER: 0.01}}})
+        summary = screen.summarize(plan, view(plan, {}, scores), view(plan, {}, short))
+        self.assertEqual(summary["grossFailures"], {"a": 0, "b": 1})
+        self.assertEqual(summary["metrics"]["speakerSimilarity"]["pairs"], 3, "no similarity is invented for it")
+
     def test_a_take_that_says_something_else_is_a_gross_failure(self):
         plan = plan_of(voices=2, per_voice=2)
         scores = {take["takeID"]: score(0.7, 0.02, 0.01) for take in plan["takes"]}

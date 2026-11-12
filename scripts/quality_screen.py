@@ -414,9 +414,9 @@ def run_arm(args: argparse.Namespace) -> Path:
     data_dir = arm_dir / "data"
     data_dir.mkdir(parents=True)
     (arm_dir / "wav").mkdir()
-    models = DEBUG_ROOT / "models"
+    models = Path(args.models_root).resolve() if getattr(args, "models_root", None) else DEBUG_ROOT / "models"
     if not models.exists():
-        raise ScreenError("the debug model root is missing; run scripts/macos_test.sh models ensure")
+        raise ScreenError(f"the model root {models.name} is missing; run scripts/macos_test.sh models ensure")
     (data_dir / "models").symlink_to(models.resolve(), target_is_directory=True)
     environment = dict(os.environ, **overrides)
     environment["QWENVOICE_DEBUG"] = "1"
@@ -425,8 +425,13 @@ def run_arm(args: argparse.Namespace) -> Path:
            "commit": git_value("rev-parse", "HEAD"), "dirtyPaths": len(git_value("status", "--porcelain").splitlines())}
     if variant:
         arm["variant"] = variant
+    manifest = Path(args.manifest).resolve() if getattr(args, "manifest", None) else None
+    if manifest:
+        # A development contract (a built hybrid, RF-55): its digest names the models the arm ran.
+        arm.update(manifest=manifest.name, manifestSHA256=sha256_file(manifest), modelsRoot=str(models))
     write_json(arm_dir / "arm.json", arm)
-    common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input"]
+    common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input",
+              *(["--manifest", str(manifest)] if manifest else [])]
     if plan.get("kind") == "long-form":
         return run_long_form_arm(args, plan, arm, arm_dir, vocello, environment, common)
 
@@ -957,7 +962,8 @@ def compare_arms(args: argparse.Namespace) -> int:
                              for group in groups}
     same_arm = (a["arm"]["environment"] == b["arm"]["environment"]
                 and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"]
-                and a["arm"].get("variant") == b["arm"].get("variant"))
+                and a["arm"].get("variant") == b["arm"].get("variant")
+                and a["arm"].get("manifestSHA256") == b["arm"].get("manifestSHA256"))
     report = {"schemaVersion": SCHEMA_VERSION, "screen": plan["screen"], "planSHA256": plan["planSHA256"],
               "a": {"arm": args.a, **{key: a["arm"][key] for key in ("environment", "executableSHA256", "commit")},
                     "variant": a["arm"].get("variant") or plan["variant"]},
@@ -1040,6 +1046,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--arm", required=True)
     run.add_argument("--env", action="append", help="KEY=VALUE for this arm's processes; repeatable")
     run.add_argument("--vocello", help="a preserved build (default: build/vocello)")
+    run.add_argument("--models-root", help="a model directory other than the debug root (a built hybrid's)")
+    run.add_argument("--manifest", help="a development qwenvoice_contract.json for every command (a built hybrid's)")
     run.add_argument("--variant", choices=("speed", "quality"),
                      help="run the plan's takes on this installed variant instead of the screen's own")
     run.set_defaults(run_command=lambda args: (run_arm(args), 0)[1])

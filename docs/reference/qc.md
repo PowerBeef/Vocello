@@ -516,6 +516,11 @@ PY="$(python3 scripts/select_python.py)"
 - **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
   8-bit model; the arm records it, and two arms on different variants are never one setting. The
   hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models.
+- **A built model, the same takes:** `scripts/build_hybrid_model.py build --recipe R --out DIR`
+  assembles a recipe's three artifacts from the installed, verified 4-bit and 8-bit ones, each with
+  its own integrity record, and writes a development contract naming them. `run --models-root DIR
+  --manifest CONTRACT` loads them through the normal verified path; the arm records the contract's
+  digest, and an identity proof (`compare --expect identical`) shows they reproduce the key's arm.
 - **Edit rates are bounded at 1 per script unit** (since 2026-11-11): a recognizer that runs away on
   a take inserts without limit, and one such take carried a whole screen's mean once.
 - **The long-form kind** (`long-form`, RF-50) runs projects as the apps do (`--long-form always`):

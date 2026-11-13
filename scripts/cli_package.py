@@ -983,6 +983,90 @@ def _copy_payload(source: Path, target: Path) -> None:
             raise ValueError("CLI payload contains a link or special file")
 
 
+# BKL-72. macOS tags every file a process started from a downloaded app (the Claude desktop app,
+# many terminals) creates with com.apple.provenance, which nothing in that process tree can remove,
+# and copies made by cloning carry it on. pkgbuild archives the attribute as AppleDouble `._`
+# entries whatever its options, so the Bom check refuses the package. A launchd job runs outside
+# that tree: a data-only copy it makes carries no tag. Release runners create untagged files, so
+# they never take this path.
+_PROVENANCE_ATTRIBUTE = "com.apple.provenance"
+_UNTAGGED_COPY = r"""
+import os, shutil, stat, sys
+source, target, status = sys.argv[1:4]
+def copy(src, dst):
+    info = os.lstat(src)
+    if stat.S_ISDIR(info.st_mode):
+        os.mkdir(dst)
+        for name in sorted(os.listdir(src)):
+            copy(os.path.join(src, name), os.path.join(dst, name))
+    elif stat.S_ISREG(info.st_mode):
+        shutil.copyfile(src, dst)
+    else:
+        raise ValueError("not a file or folder")
+    os.chmod(dst, stat.S_IMODE(info.st_mode))
+if not os.path.exists(status):  # launchd may start a submitted job again; copy once
+    try:
+        copy(source, target)
+        result = "ok"
+    except Exception as error:
+        result = type(error).__name__
+    with open(status + ".partial", "w") as handle:
+        handle.write(result)
+    os.replace(status + ".partial", status)
+"""
+
+
+def _creates_tagged_files(directory: Path) -> bool:
+    """Whether a file this process creates in `directory` carries com.apple.provenance."""
+    if sys.platform != "darwin":
+        return False
+    probe = directory / f".provenance-probe-{os.getpid()}"
+    probe.write_bytes(b"")
+    try:
+        listing = subprocess.run(["/usr/bin/xattr", str(probe)], stdin=subprocess.DEVNULL,
+                                 capture_output=True, text=True, timeout=30, check=False)
+        return _PROVENANCE_ATTRIBUTE in listing.stdout.split()
+    finally:
+        probe.unlink()
+
+
+def _untagged_copy(source: Path, target: Path, *, timeout: float = PKG_TOOL_TIMEOUT) -> None:
+    """Recreate `source` at `target` from a launchd job: the same folders, bytes and modes, no
+    extended attribute and no provenance tag (BKL-72)."""
+    label = f"app.vocello.cli-package-copy.{os.getpid()}.{os.urandom(4).hex()}"
+    status = target.parent / f".{target.name}.copy-status"
+    submit = subprocess.run(["/bin/launchctl", "submit", "-l", label, "--", sys.executable, "-I", "-c",
+                             _UNTAGGED_COPY, str(source), str(target), str(status)],
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30, check=False)
+    if submit.returncode != 0:
+        raise ValueError("files created here carry com.apple.provenance and launchd could not run the untagged "
+                         "copy; build the package from Terminal")
+    try:
+        deadline = time.monotonic() + timeout
+        while not status.exists():
+            if time.monotonic() > deadline:
+                raise ValueError("the untagged package copy did not finish")
+            time.sleep(0.1)
+    finally:
+        subprocess.run(["/bin/launchctl", "remove", label], stdin=subprocess.DEVNULL,
+                       capture_output=True, timeout=30, check=False)
+    result = status.read_text(encoding="utf-8")
+    status.unlink()
+    if result != "ok":
+        raise ValueError(f"the untagged package copy failed ({result})")
+
+
+def _untag_package_inputs(base: Path, folders: tuple[str, ...]) -> None:
+    """Replace each of `folders` under `base` with an untagged copy when this process tags its files."""
+    if not _creates_tagged_files(base):
+        return
+    for name in folders:
+        tagged = base / f"{name}.tagged"
+        (base / name).rename(tagged)
+        _untagged_copy(tagged, base / name)
+        shutil.rmtree(tagged)
+
+
 @contextmanager
 def _pkg_workspace(work: Path | None, output: Path) -> Iterator[Path]:
     if work is not None:
@@ -1027,6 +1111,8 @@ def pkg(directory: Path, release: dict, output: Path, *, work: Path | None = Non
         shutil.copyfile(staged / "README.txt", resources / "README.txt")
         shutil.copyfile(staged / "LICENSE", resources / "LICENSE.txt")
         (base / "Distribution.xml").write_bytes(distribution_xml(version, minimum_os))
+        _untag_package_inputs(base, ("root", "scripts", "resources"))
+        verify(staged, release)
         temporary = base / "tmp"
         temporary.mkdir()
         environment = _qualification_environment(str(temporary))

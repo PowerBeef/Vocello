@@ -6037,6 +6037,24 @@
         "commit:9b006d4b",
         "commit:7cd1f808"
       ]
+    },
+    {
+      "id": "BKL-72",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The CLI installer's package test fails where created files carry com.apple.provenance",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes from the Claude desktop app's shell, or the builder strips extended attributes from the staged payload so pkgbuild writes no AppleDouble entries into the Bom.",
+      "sourceOfTruth": [
+        "scripts/cli_package.py",
+        "scripts/tests/test_cli_package.py"
+      ],
+      "updated": "2026-11-13",
+      "notes": "Parked 2026-11-11, found by RF-57's repeated run of the Python suite (5 of 5 runs). Files created from the desktop app's shell carry the com.apple.provenance attribute; pkgbuild then lists ._ entries in the Bom and check_bom refuses the package (fail closed). Not a flake and not the remediation's tooling; whether a release runner is affected is not known. Fixed 2026-11-13 at the maintainer's request. Diagnosis: macOS tags every file a process started from a downloaded app creates with com.apple.provenance; that process tree cannot remove it (xattr -d exits 0 and it stays), clones carry it on, and pkgbuild archives it as AppleDouble entries whatever --preserve-xattr, --filter or COPYFILE_DISABLE say. A launchd job is outside the tree, so its data-only copies are untagged. cli_package.pkg now probes for the tag and, only then, recreates the payload, scripts and resources through a one-shot launchd job (same folders, bytes and modes) before pkgbuild, and re-verifies the payload; release runners never tag, so their path is unchanged. The round trip passes from the desktop app's shell; a test pins the copy.",
+      "evidence": [
+        "file:scripts/cli_package.py",
+        "file:scripts/tests/test_cli_package.py"
+      ]
     }
   ]
 }

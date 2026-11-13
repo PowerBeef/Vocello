@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 22/75 (29%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 23/75 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -624,7 +624,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
 | `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
 | `BKL-71` | parked | The session-start hook's free-space test fails now and then | — |
-| `BKL-72` | parked | The CLI installer's package test fails where created files carry com.apple.provenance | — |
 | `BKL-73` | parked | A cancelled explicit prewarm unloads the model | — |
 | `BKL-74` | parked | The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
@@ -825,10 +824,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-71`** (parked) — The session-start hook's free-space test fails now and then.
   gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-72`** (parked) — The CLI installer's package test fails where created files carry com.apple.provenance.
-  gate: test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes from the Claude desktop app's shell, or the builder strips extended attributes from the staged payload so pkgbuild writes no AppleDouble entries into the Bom.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-73`** (parked) — A cancelled explicit prewarm unloads the model.

@@ -85,7 +85,11 @@ edit is needed for that payload. Model weights remain separate, explicitly insta
 resources, and existing governed license/NOTICE material. It rejects missing/stale resources,
 extra executable code, symlinks, digest drift, or mismatched source/version/build identity. Packaging
 explicitly copies the catalogs because Xcode's tool product does not reliably emit those resource
-files; any present built catalog must match the source before staging.
+files; any present built catalog must match the source before staging. Where files this process
+creates carry macOS's `com.apple.provenance` tag (a shell started from a downloaded app, the Claude
+desktop app included), the installer package's payload, scripts and resources are recreated by a
+one-shot launchd job, whose data-only copies carry no tag: `pkgbuild` would archive the tag as
+AppleDouble `._` entries, which the Bom check refuses. Release runners never take that path (BKL-72).
 `verify_packaged_dmg.sh … --include-cli` also verifies the signed/stapled CLI DMG, copies its folder
 to a path containing spaces, and runs model-free discovery from an unrelated working directory.
 Its command-bound `cli-package-verification.json` is explicitly **not** all-mode generation,

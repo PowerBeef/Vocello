@@ -44,7 +44,7 @@ session can continue from it alone.
 **Done**
 
 - **RF-56 (closed):** document corrections. **RF-57 (done):** the repeated suites are clean apart
-  from one environmental failure (BKL-72).
+  from one environmental failure (BKL-72, fixed on November 13).
 - **RF-51 (code complete; phone checks left):** `b876e29d`, `b308c609`, `a5bf4add`.
 - **RF-50:** the encoder golden-codes pin and the paired screen `scripts/quality_screen.py`
   ([qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples)). Screens: `clone`,

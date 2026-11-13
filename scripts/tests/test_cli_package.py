@@ -1103,6 +1103,36 @@ class CLIInstallerPackageTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == "darwin" and all(
         Path(tool).exists() for tool in ("/usr/bin/pkgbuild", "/usr/bin/productbuild", "/usr/sbin/pkgutil",
                                          "/usr/bin/lsbom", "/usr/bin/ditto")), "needs the macOS packaging tools")
+    def test_package_inputs_are_recreated_untagged_only_where_files_are_tagged(self):
+        """BKL-72: where this process tags its files, the inputs are recreated by a launchd job with
+        the same folders, bytes and modes and no provenance tag; elsewhere nothing moves."""
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "root"
+            (root / "lib").mkdir(parents=True)
+            (root / "vocello").write_bytes(b"binary")
+            (root / "vocello").chmod(0o755)
+            (root / "lib" / "data.bin").write_bytes(b"data")
+            (root / "lib" / "data.bin").chmod(0o644)
+            with mock.patch.object(package, "_creates_tagged_files", return_value=False), \
+                    mock.patch.object(package, "_untagged_copy") as untagged:
+                package._untag_package_inputs(base, ("root",))
+            untagged.assert_not_called()
+            if sys.platform != "darwin" or not package._creates_tagged_files(base):
+                self.skipTest("files created here carry no provenance tag; the launchd copy is not needed")
+            before = {path.relative_to(root): (path.is_dir(), stat.S_IMODE(path.stat().st_mode),
+                                               None if path.is_dir() else path.read_bytes())
+                      for path in [root, *root.rglob("*")]}
+            package._untag_package_inputs(base, ("root",))
+            after = {path.relative_to(root): (path.is_dir(), stat.S_IMODE(path.stat().st_mode),
+                                              None if path.is_dir() else path.read_bytes())
+                     for path in [root, *root.rglob("*")]}
+            self.assertEqual(after, before)
+            self.assertEqual(sorted(path.name for path in base.iterdir()), ["root"], "no tagged copy or status left")
+            for path in [root, *root.rglob("*")]:
+                listing = subprocess.run(["/usr/bin/xattr", str(path)], capture_output=True, text=True, check=False)
+                self.assertNotIn(package._PROVENANCE_ATTRIBUTE, listing.stdout, path.name)
+
     def test_real_package_round_trip_installs_upgrades_and_refuses_without_root(self):
         output = self.root / "dist" / "Vocello-macos26-cli.pkg"
         with mock.patch.object(package, "binary_minimum_os", return_value="26.0"):

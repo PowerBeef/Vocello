@@ -538,13 +538,13 @@
       "blockedBy": [
         "RF-50"
       ],
-      "gate": "A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window); and the maintainer decides on its publication and on the Speed/Quality selector. Publishing an artifact is the maintainer's step.",
+      "gate": "A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window). Publishing an artifact is the maintainer's step; the selector's removal is RF-59.",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "docs/reference/qwen3-tts-guide.md"
       ],
-      "updated": "2026-11-12",
-      "notes": "Opened 2026-11-11 (the review's pre-screen). An 8-bit code predictor costs about 20% on a GPU-bound frame with no repeatable gain (code-predictor-8bit NOT REPEATED; Korean long-form NOT SHOWN). 2026-11-12, maintainer: a custom model may ship, up to 20% slower, and one hybrid model replaces the Speed/Quality selector if it is right. QWENVOICE_MIXED_PRECISION (533da6e3, cbffd309) screens a recipe; scripts/build_hybrid_model.py (958e8d55) builds it. Decided 2026-11-12 (results in config/quality-screens.json; docs/reference/hybrid-model.md): attn, the talker's attention at 8 bits (+176 MB), is the single-model candidate. ADOPT on clones and single takes against both models and on long-form (65 of 72 projects; Speed 56, Quality 68), at RTF x1.05 to x1.06 and MLX peak +168 MB; the built artifact reproduces its arm (192 of 192 clone takes, 21 of 21 projects). It beats Speed everywhere and does not match Quality: clone similarity -0.026, long-form error rate about twice Quality's. Left: the formal speed lane; the iPhone's memory and speed; the maintainer's publication and selector decisions."
+      "updated": "2026-11-13",
+      "notes": "Opened 2026-11-11 (the review's pre-screen). An 8-bit code predictor costs about 20% on a GPU-bound frame with no repeatable gain (code-predictor-8bit NOT REPEATED; Korean long-form NOT SHOWN). QWENVOICE_MIXED_PRECISION (533da6e3, cbffd309) screens a recipe; scripts/build_hybrid_model.py (958e8d55) builds it. Decided 2026-11-12 (config/quality-screens.json; docs/reference/hybrid-model.md): attn, the talker's attention at 8 bits (+176 MB), is the single-model candidate. ADOPT on clones and single takes against both models and on long-form (65 of 72 projects; Speed 56, Quality 68), at RTF x1.05 to x1.06 and MLX peak +168 MB; the built artifact reproduces its arm (192 of 192 clone takes, 21 of 21 projects). It beats Speed everywhere and does not match Quality (clone similarity -0.026, long-form error rate about twice Quality's). 2026-11-13, maintainer: attn replaces both models (RF-59), and Korean long-form gets a caution (RF-60). Left: the formal speed lane; the iPhone's memory and speed; publication."
     },
     {
       "id": "RF-57",
@@ -581,6 +581,40 @@
       ],
       "updated": "2026-11-12",
       "notes": "Opened 2026-11-12 at the maintainer's request. Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) lowered the talker's temperature; long-form projects refused 18 of 32 under Consistent against 4 of 32 under Expressive, and no measurement showed a benefit. Implemented 2026-11-12 (0e248d2c): requests carry no variation and sample as the reference; both Settings pickers, their strings and the take-variation lane are gone; vocello --variation parses and warns (variation_retired); device plans, the control audit (191 takes) and voice reliability (117) run Expressive only; the long-form screen is version 2. Proof: scripts/pcm_identity.py, 14 of 14 fixed-seed takes in three modes PCM-identical between the builds of 734e3766 and 0e248d2c; a generate take keeps its request, session and prewarm identity digests. The macOS localization lane passed (its Audio page and overview show Playback only). Left: the iPhone settings and control-audit lanes in the next phone window; the website and release notes change with the release that ships it."
+    },
+    {
+      "id": "RF-59",
+      "plan": "release-first-3-0-2026-09",
+      "title": "One model: the attn hybrid replaces Speed and Quality, and the model selector is retired",
+      "status": "planned",
+      "blockedBy": [
+        "RF-55"
+      ],
+      "gate": "The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app nor the CLI offers Speed or Quality; a Mac with Speed or Quality installed asks for the new model of that mode and reclaims the old folders once it verifies; vocello accepts --variant speed or quality with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, website copy and benchmark baselines (a new lineage) follow.",
+      "sourceOfTruth": [
+        "docs/reference/hybrid-model.md",
+        "Sources/Resources/qwenvoice_contract.json",
+        "config/model-artifact-receipts.json",
+        "scripts/build_hybrid_model.py",
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
+      ],
+      "updated": "2026-11-13",
+      "notes": "Opened 2026-11-13 at the maintainer's request: the attn hybrid replaces both Speed and Quality, chosen with the Quality gap in view (clone similarity -0.026, long-form error rate about twice Quality's, 65 of 72 projects against Quality's 68) and its cost (RTF x1.05 to x1.06, +176 MB of weights). Publishing the three artifacts (CustomVoice, VoiceDesign, Base, built by scripts/build_hybrid_model.py) is the maintainer's step; receipts and the catalog follow the upload. The code lands data-driven first, so a model that offers one variant shows no selector, and the contract swap lands last: main never names an artifact that is not hosted."
+    },
+    {
+      "id": "RF-60",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Korean long-form: a caution before the project starts, and a documented known limitation",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/LongFormPlanning.swift",
+        "Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift",
+        "docs/reference/qwen3-tts-guide.md"
+      ],
+      "updated": "2026-11-13",
+      "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment."
     },
     {
       "id": "RF-16",
@@ -2487,6 +2521,21 @@
       "updated": "2026-11-12",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-12, seen while reading the prewarm path for RF-52's A-26: the explicit prewarm's catch-all unloads the model, clears clone state and Qwen3 caches on any error, CancellationError included, so a superseded warm costs the next take a full reload. Slower, not wrong: no crash, hang or data loss. Not investigated."
+    },
+    {
+      "id": "BKL-74",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "An incremental macOS build that re-copies Sparkle.framework always runs the prepare phase after Xcode's CodeSign of Sparkle.framework/Versions/B (for example the embed signs nothing on copy and the phase alone signs it inside-out), shown by repeated warm builds.",
+      "sourceOfTruth": [
+        "project.yml",
+        "scripts/prepare_embedded_sparkle.sh"
+      ],
+      "updated": "2026-11-13",
+      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-13, found while verifying RF-60. In two warm builds in a row after Xcode re-copied Sparkle.framework, the phase ran between the copy and Xcode's CodeSign of Versions/B: once lipo met CodeSign's .cstemp file, once CodeSign could not read the framework the phase had just thinned. The next build ordered them correctly and passed. The phase's input is a node CodeSign mutates rather than produces (Xcode warns of a missing creator for a mutated node), so the order is not guaranteed. A failed build ships nothing; whether a cold release build can hit it is not known."
     },
     {
       "id": "ER-01",

@@ -1828,7 +1828,100 @@
             }
           },
           "expected": "B loses fewer projects. Its predecessor long-form-han-kana-budget was INCONCLUSIVE by narrow misses on 32 projects (B lost 11 against A's 21, where the rule asked at most half; the error rate fell by 0.12 and 0.11, one seed set's interval reaching +0.027), with no language worse and no new failure class. This rule keeps the question and the guard and tests the difference on twice the projects, paired, instead of a fixed ratio.",
-          "decision": "ADOPT when the control reproduces the defect, the sign test gives p below 0.05 in B's favour, neither language loses more projects under B than under A, B has no failure class A lacks, and no seed set's report puts the better family's error-rate interval past +0.04: the planner then budgets text written mostly in Han or kana at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B loses more projects than A, or a seed set's error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and the budget stays at 300."
+          "decision": "ADOPT when the control reproduces the defect, the sign test gives p below 0.05 in B's favour, neither language loses more projects under B than under A, B has no failure class A lacks, and no seed set's report puts the better family's error-rate interval past +0.04: the planner then budgets text written mostly in Han or kana at 150 units while every other script keeps 300 (a new planner algorithm version). REJECT when B loses more projects than A, or a seed set's error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and the budget stays at 300.",
+          "result": {
+            "decided": "2026-11-13",
+            "verdict": "INCONCLUSIVE",
+            "toolVerdict": "ADOPT on seed sets 9, 10 and 12; INCONCLUSIVE on 11 (its error-rate interval reaches +0.044); the tool reads guards per seed set, not the pooled sign test",
+            "commit": "0b7465a2 (executable aeab229c63a19f4d)",
+            "arms": {
+              "a": "ha",
+              "b": "hb",
+              "runs": "long-form-hk-seeds9 to -seeds12"
+            },
+            "refusedOrFailedProjects": {
+              "a": 30,
+              "b": 26,
+              "of": 64
+            },
+            "outcomes": {
+              "a": {
+                "generated": 34,
+                "refused": 27,
+                "failed": 3
+              },
+              "b": {
+                "generated": 38,
+                "refused": 26,
+                "failed": 0
+              }
+            },
+            "signTest": {
+              "bGeneratedANot": 13,
+              "aGeneratedBNot": 9,
+              "oneSidedP": 0.2617
+            },
+            "byLanguage": {
+              "chinese": {
+                "a": 18,
+                "b": 14,
+                "of": 32
+              },
+              "japanese": {
+                "a": 12,
+                "b": 12,
+                "of": 32
+              }
+            },
+            "byVariation": {
+              "expressive": {
+                "a": 8,
+                "b": 7,
+                "of": 32
+              },
+              "consistent": {
+                "a": 22,
+                "b": 19,
+                "of": 32
+              }
+            },
+            "errorRateBetterFamily": {
+              "seedSet9": {
+                "meanDifference": -0.0405,
+                "interval95": [
+                  -0.0865,
+                  0.0239
+                ],
+                "pairs": 6
+              },
+              "seedSet10": {
+                "meanDifference": -0.1473,
+                "interval95": [
+                  -0.2435,
+                  -0.0516
+                ],
+                "pairs": 7
+              },
+              "seedSet11": {
+                "meanDifference": -0.0012,
+                "interval95": [
+                  -0.0393,
+                  0.0437
+                ],
+                "pairs": 5
+              },
+              "seedSet12": {
+                "meanDifference": -0.1078,
+                "interval95": [
+                  -0.2078,
+                  -0.0367
+                ],
+                "pairs": 7
+              }
+            },
+            "failureClasses": "A: dropout 6, speaking_rate_slow 3, terminal_silence 1, stopped while streaming 5; B: dropout 7, speaking_rate_slow 5, stopped while streaming 6. B has no class A lacks.",
+            "note": "The control reproduces the defect (A lost 30 of 64) and nothing is worse: neither language loses more projects, B has no new failure class, and no seed set's interval lies wholly past +0.04. But the sign test is far from p < 0.05 (13 against 9), so the budget stays at 300. Most losses fell under Consistent, which RF-58 retired; under Expressive the arms lost 8 and 7 of 32. The attn hybrid, which RF-59 ships, generated 11 of 12 Chinese and 12 of 12 Japanese long-form projects at the default budget (hybrid-attn-long-form), so the question is closed rather than asked a third time."
+          }
         },
         "hybrid-attn-long-form": {
           "recorded": "2026-11-12",
@@ -2704,7 +2797,48 @@
             }
           },
           "expected": "Auto speaks a short non-English script better than English with the English diction sentence; a short English script may be no different. The margin is wider than the clone screen's because an edit rate on one to four words moves in steps of a quarter or more. How many scripts detection misses is not known before the run.",
-          "decision": "ADOPT when every requirement holds, B has no more than 2 extra gross failures on the population (a take lost, or read with more than half of its script wrong) and the better family's error-rate interval does not reach past +0.05: Built-in Voice then falls back to Auto when it cannot detect a script's language. REJECT when that interval lies wholly past +0.05, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the fallback stays English."
+          "decision": "ADOPT when every requirement holds, B has no more than 2 extra gross failures on the population (a take lost, or read with more than half of its script wrong) and the better family's error-rate interval does not reach past +0.05: Built-in Voice then falls back to Auto when it cannot detect a script's language. REJECT when that interval lies wholly past +0.05, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the fallback stays English.",
+          "result": {
+            "decided": "2026-11-13",
+            "verdict": "INCONCLUSIVE",
+            "toolVerdict": "INCONCLUSIVE (the error-rate interval reaches past +0.05)",
+            "commit": "28356ca7 (executable 519bf7de0c299f93)",
+            "arms": {
+              "a": "da",
+              "b": "db",
+              "runs": "custom-short-seeds1",
+              "environment": "QWENVOICE_MIXED_PRECISION=attn in both; B adds QWENVOICE_CUSTOM_AUTO_LANGUAGE=on"
+            },
+            "population": {
+              "takes": 7,
+              "required": 24,
+              "outsidePaired": 185,
+              "outsideIdenticalPCM": 185,
+              "takeIDs": [
+                "english-05",
+                "french-28",
+                "german-15",
+                "italian-07",
+                "portuguese-12",
+                "portuguese-13",
+                "spanish-12"
+              ]
+            },
+            "grossFailures": {
+              "a": 4,
+              "b": 5,
+              "of": 7
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.1667,
+              "interval95": [
+                -0.0952,
+                0.5
+              ],
+              "pairs": 7
+            },
+            "note": "A requirement fails: language detection missed only 7 of the 192 short scripts, against the 24 the rule needs. The key reaches only the fallback (all 185 other takes are PCM-identical). On the 7, Auto read worse, not better (error rate +0.17, one more gross failure), so nothing argues for it; it is not REJECT only because the interval is wide. The fallback stays English. D6 touches about 4% of short Built-in Voice takes, and the screen cannot size it further without a larger corpus of undetectable scripts; the question is closed rather than asked again."
+          }
         }
       }
     }

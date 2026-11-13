@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 46/81 (57%) |
+| `release-first-3-0-2026-09` | active | release-qa | 46/83 (55%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 22/74 (30%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 22/75 (29%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -80,6 +80,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
 | `RF-58` | planned | One take variation: the Variation setting is retired and every take samples as the model's reference does | — |
+| `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
+| `RF-60` | planned | Korean long-form: a caution before the project starts, and a documented known limitation | — |
 
 ### Open items in detail
 
@@ -185,13 +187,19 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.
 
 - **`RF-55`** (planned) — Quality remediation, stage 5: model precision and the hybrid model.
-  gate: A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window); and the maintainer decides on its publication and on the Speed/Quality selector. Publishing an artifact is the maintainer's step.
+  gate: A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window). Publishing an artifact is the maintainer's step; the selector's removal is RF-59.
 
 - **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
   gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.
 
 - **`RF-58`** (planned) — One take variation: the Variation setting is retired and every take samples as the model's reference does.
   gate: Neither app's Settings shows a Variation control; a saved Balanced or Consistent preference reads as Expressive; vocello accepts --variation balanced or consistent with a notice and generates as Expressive; History still shows an old take's recorded variation; fixed-seed Expressive takes are PCM-identical before and after (scripts/pcm_identity.py, the three modes); the routed check and the macOS settings UI lane pass; the long-form screen runs one variation. The iPhone settings and control-audit lanes run in the next announced phone window.
+
+- **`RF-59`** (planned) — One model: the attn hybrid replaces Speed and Quality, and the model selector is retired.
+  gate: The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app nor the CLI offers Speed or Quality; a Mac with Speed or Quality installed asks for the new model of that mode and reclaims the old folders once it verifies; vocello accepts --variant speed or quality with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, website copy and benchmark baselines (a new lineage) follow.
+
+- **`RF-60`** (planned) — Korean long-form: a caution before the project starts, and a documented known limitation.
+  gate: Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.
 
 ## Specialist-audit remediation
 
@@ -622,6 +630,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-71` | parked | The session-start hook's free-space test fails now and then | — |
 | `BKL-72` | parked | The CLI installer's package test fails where created files carry com.apple.provenance | — |
 | `BKL-73` | parked | A cancelled explicit prewarm unloads the model | — |
+| `BKL-74` | parked | The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -828,6 +837,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-73`** (parked) — A cancelled explicit prewarm unloads the model.
   gate: A prewarm that ends in CancellationError leaves a loaded model loaded (and its clone state intact), pinned by a NativeEngineRuntime test; other prewarm failures still unload.
+  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-74`** (parked) — The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework.
+  gate: An incremental macOS build that re-copies Sparkle.framework always runs the prepare phase after Xcode's CodeSign of Sparkle.framework/Versions/B (for example the embed signs nothing on copy and the phase alone signs it inside-out), shown by repeated warm builds.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

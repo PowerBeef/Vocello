@@ -279,6 +279,12 @@ def lint_commands(paths: list[str], *, scoped: bool = False) -> list[list[str]]:
             "(config/toolchain.json pins the version; scripts/install_pinned_tools.sh installs it)",
             file=sys.stderr, flush=True,
         )
+    # 2026-11-13 (RF-59): three pyright findings reached push CI through passing local checks.
+    # A changed Python file runs CI's own baseline gates (new findings fail) for each tool present.
+    if any(p.endswith(".py") and (ROOT / p).is_file() for p in paths):
+        for tool in ("ruff", "pyright"):
+            if _which(tool):
+                commands.append(["python3", "scripts/lint_baseline.py", tool])
     swift = [p for p in paths if p.endswith(".swift") and (ROOT / p).is_file()
              and p.startswith(("Sources/", "Tests/"))]
     if swift and _which("swiftlint"):

@@ -332,12 +332,12 @@ def reference_codes(fixture: Path, tokenizer: Path) -> dict:
             for padding, zeros in PADDINGS.items():
                 wave_in = torch.cat([samples, torch.zeros(zeros)]) if zeros else samples
                 for convention in CONVENTIONS:
-                    mimi.apply_rotary_pos_emb = rotary[convention]
+                    setattr(mimi, "apply_rotary_pos_emb", rotary[convention])
                     with torch.no_grad():
                         encoded = model.encode(wave_in.reshape(1, 1, -1), num_quantizers=CODEBOOKS).audio_codes[0]
                     codes[convention][padding][item["id"]] = encoded.transpose(0, 1).tolist()
     finally:
-        mimi.apply_rotary_pos_emb = stock
+        setattr(mimi, "apply_rotary_pos_emb", stock)
     return {"codes": codes,
             "tokenizer": {"modelSHA256": sha256_file(tokenizer / "model.safetensors")},
             "runtime": {"torch": torch.__version__, "transformers": transformers.__version__}}

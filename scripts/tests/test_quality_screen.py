@@ -404,7 +404,9 @@ class EvidenceTests(unittest.TestCase):
     def test_pairs_whose_reference_audio_differs_are_counted(self):
         plan = plan_of(voices=2, per_voice=2)
         a_rows = {take["takeID"]: dict(row(take["takeID"]), referenceAudioDigest="same") for take in plan["takes"]}
-        b_rows = {take["takeID"]: dict(row(take["takeID"]), referenceAudioDigest="same") for take in plan["takes"]}
+        b_rows: dict[str, dict[str, object]] = {
+            take["takeID"]: dict(row(take["takeID"]), referenceAudioDigest="same") for take in plan["takes"]
+        }
         b_rows["v0--s0"]["referenceAudioDigest"] = "other"
         b_rows["v0--s1"]["referenceAudioDigest"] = None
         summary = screen.summarize(plan, view(plan, a_rows, {}), view(plan, b_rows, {}))

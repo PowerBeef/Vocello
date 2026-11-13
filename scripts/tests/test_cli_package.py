@@ -1133,6 +1133,9 @@ class CLIInstallerPackageTests(unittest.TestCase):
                 listing = subprocess.run(["/usr/bin/xattr", str(path)], capture_output=True, text=True, check=False)
                 self.assertNotIn(package._PROVENANCE_ATTRIBUTE, listing.stdout, path.name)
 
+    @unittest.skipUnless(sys.platform == "darwin" and all(
+        Path(tool).exists() for tool in ("/usr/bin/pkgbuild", "/usr/bin/productbuild", "/usr/sbin/pkgutil",
+                                         "/usr/bin/lsbom", "/usr/bin/ditto")), "needs the macOS packaging tools")
     def test_real_package_round_trip_installs_upgrades_and_refuses_without_root(self):
         output = self.root / "dist" / "Vocello-macos26-cli.pkg"
         with mock.patch.object(package, "binary_minimum_os", return_value="26.0"):

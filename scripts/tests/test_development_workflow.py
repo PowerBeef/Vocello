@@ -73,6 +73,18 @@ class CheckPlanTests(unittest.TestCase):
                 joined = commands(MODULE.check_plan([changed]))
                 self.assertIn(f"./scripts/build_ui_test_bundles.sh {expected}", joined)
 
+    def test_a_python_change_runs_cis_lint_baselines(self) -> None:
+        """RF-59: pyright findings reached push CI through a passing local check."""
+        with mock.patch.object(MODULE, "_which", return_value=True):
+            joined = commands(MODULE.check_plan(["scripts/development_workflow.py"]))
+            self.assertIn("python3 scripts/lint_baseline.py pyright", joined)
+            self.assertIn("python3 scripts/lint_baseline.py ruff", joined)
+            other = commands(MODULE.check_plan(["docs/ROADMAP.md"]))
+            self.assertFalse(any("lint_baseline" in c for c in other), other)
+        with mock.patch.object(MODULE, "_which", return_value=False):
+            absent = commands(MODULE.check_plan(["scripts/development_workflow.py"]))
+            self.assertFalse(any("lint_baseline" in c for c in absent), "a missing tool never blocks")
+
     def test_sources_the_cli_links_build_the_cli(self) -> None:
         """RF-59: the macOS test host never compiles the `vocello` executable's own sources."""
         cli = "./scripts/build.sh cli --version"

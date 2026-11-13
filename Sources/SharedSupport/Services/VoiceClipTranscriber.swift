@@ -101,7 +101,8 @@ enum VoiceClipTranscriber {
 
     struct EnrollmentEvidence: Codable, Sendable, Equatable {
         static let currentSchemaVersion = 1
-        static let currentAlgorithmVersion = "apple-speech-enrollment-v2"
+        /// v3: enrollment passes ask the recognizer for punctuation (G-15, RF-52).
+        static let currentAlgorithmVersion = "apple-speech-enrollment-v3"
 
         var schemaVersion: Int
         var algorithmVersion: String
@@ -402,7 +403,8 @@ enum VoiceClipTranscriber {
                     url: url,
                     candidate: candidates[index],
                     authorizationStatus: authorization,
-                    passIndex: index + 1
+                    passIndex: index + 1,
+                    purpose: .enrollment
                 )
             }
         )
@@ -686,7 +688,8 @@ enum VoiceClipTranscriber {
                 url: url,
                 candidate: selected,
                 authorizationStatus: authorization,
-                passIndex: passIndex
+                passIndex: passIndex,
+                purpose: .verification
             )
             repetitions.append(pass)
             guard shouldContinueVerification(after: repetitions) else { break }
@@ -1326,11 +1329,34 @@ enum VoiceClipTranscriber {
             }
     }
 
+    /// What a recognition pass is for. Enrollment asks the recognizer for punctuation, so a
+    /// newly recognized reference transcript is written as people write it: the
+    /// clone-english screen's rule transcript-punctuation decided ADOPT (G-15, RF-52; no
+    /// guard moved, similarity -0.003 and error rate +0.003 within their margins). Saved
+    /// voices keep their stored transcripts. Verification compares its passes and scores
+    /// edit rates under text normalization v3, so it stays unpunctuated.
+    enum RecognitionPurpose: Sendable {
+        case enrollment
+        case verification
+
+        var addsPunctuation: Bool { self == .enrollment }
+    }
+
+    /// The on-device, final-result-only request every pass sends.
+    static func recognitionRequest(url: URL, purpose: RecognitionPurpose) -> SFSpeechURLRecognitionRequest {
+        let request = SFSpeechURLRecognitionRequest(url: url)
+        request.requiresOnDeviceRecognition = true
+        request.shouldReportPartialResults = false
+        request.addsPunctuation = purpose.addsPunctuation
+        return request
+    }
+
     @concurrent private static func recognizeDetailed(
         url: URL,
         candidate: CandidateLocale,
         authorizationStatus: AuthorizationState,
-        passIndex: Int
+        passIndex: Int,
+        purpose: RecognitionPurpose
     ) async -> RecognitionPass {
         let start = ProcessInfo.processInfo.systemUptime
         guard let recognizer = SFSpeechRecognizer(locale: candidate.locale) else {
@@ -1363,9 +1389,7 @@ enum VoiceClipTranscriber {
             )
         }
 
-        let request = SFSpeechURLRecognitionRequest(url: url)
-        request.requiresOnDeviceRecognition = true
-        request.shouldReportPartialResults = false
+        let request = recognitionRequest(url: url, purpose: purpose)
         let controller = SpeechRecognitionTaskController()
 
         return await withCheckedContinuation { (continuation: CheckedContinuation<RecognitionPass, Never>) in

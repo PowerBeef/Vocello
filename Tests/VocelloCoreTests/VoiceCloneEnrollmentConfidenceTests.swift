@@ -19,7 +19,7 @@ final class VoiceCloneEnrollmentConfidenceTests: XCTestCase {
         XCTAssertEqual(result.text, "Second locale words.")
         XCTAssertEqual(result.evidence.attempts.map(\.averageConfidence), [0, 0.91])
         XCTAssertEqual(result.evidence.bestTranscriptConfidence, 0.91)
-        XCTAssertEqual(result.evidence.algorithmVersion, "apple-speech-enrollment-v2")
+        XCTAssertEqual(result.evidence.algorithmVersion, "apple-speech-enrollment-v3")
     }
 
     func testAllZeroConfidencePassesProduceNoAutomaticTranscript() async {

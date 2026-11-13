@@ -2754,7 +2754,90 @@
             }
           },
           "expected": "Small. Upstream's examples condition on punctuated transcripts and the target script is punctuated, so punctuation may help the talker place the target's prosody; the recognizer's own punctuation (SFSpeechRecognitionRequest.addsPunctuation) would differ from the corpus's in places, so this screens punctuation itself, not the recognizer's. Only English can be screened: the other corpora carry no punctuation.",
-          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on B's harmful side: voice enrollment then asks the recognizer for punctuation, so newly recognized transcripts carry it, and saved voices keep their stored transcripts. REJECT when a guard's whole interval lies past its margin on B's harmful side, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and recognition stays unpunctuated."
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on B's harmful side: voice enrollment then asks the recognizer for punctuation, so newly recognized transcripts carry it, and saved voices keep their stored transcripts. REJECT when a guard's whole interval lies past its margin on B's harmful side, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and recognition stays unpunctuated.",
+          "result": {
+            "decided": "2026-11-13",
+            "verdict": "ADOPT",
+            "toolVerdict": "ADOPT (no guard reaches its margin)",
+            "commit": "28356ca7 (executable 519bf7de0c299f93)",
+            "arms": {
+              "a": "ua (unpunctuated)",
+              "b": "pb (as given)",
+              "floor": "uf (unpunctuated, seed set 2)",
+              "runs": "clone-english-seeds1 and -seeds2",
+              "environment": "QWENVOICE_MIXED_PRECISION=attn in every arm"
+            },
+            "floor": {
+              "speakerSimilarity": {
+                "meanDifference": -0.0029,
+                "interval95": [
+                  -0.0088,
+                  0.0027
+                ],
+                "pairs": 256
+              },
+              "errorRateBetterFamily": {
+                "meanDifference": 0.0028,
+                "interval95": [
+                  -0.0131,
+                  0.0187
+                ],
+                "pairs": 256
+              },
+              "trailingSilenceMS": {
+                "meanDifference": 0.1836,
+                "interval95": [
+                  -4.5742,
+                  5.1523
+                ],
+                "pairs": 256
+              },
+              "shareOfMargin": {
+                "speakerSimilarity": 0.18,
+                "errorRateBetterFamily": 0.47,
+                "trailingSilenceMS": 0.13
+              }
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0026,
+              "interval95": [
+                -0.0081,
+                0.0029
+              ],
+              "pairs": 256
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0035,
+              "interval95": [
+                -0.0082,
+                0.0164
+              ],
+              "pairs": 256
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 2.3125,
+              "interval95": [
+                -2.9531,
+                7.9844
+              ],
+              "pairs": 256
+            },
+            "durationSeconds": {
+              "meanDifference": -0.0963,
+              "interval95": [
+                -0.1495,
+                -0.0424
+              ],
+              "pairs": 256
+            },
+            "identicalPCM": 0,
+            "grossFailures": {
+              "a": 8,
+              "b": 9,
+              "of": 256
+            },
+            "note": "Every requirement holds: the floor sits well inside 0.71 of each margin, B differs from A on all 256 takes, and neither arm ran twice. No guard reaches past its margin on B's harmful side (similarity -0.003, lower bound -0.008; error rate +0.003, upper bound +0.016; trailing silence +2 ms, upper bound +8 ms), and B has 9 gross failures against A's 8 (4 extra allowed). Punctuation is neutral within the margins, as expected; takes run 0.1 s shorter. Adopted: enrollment asks the recognizer for punctuation (VoiceClipTranscriber.RecognitionPurpose, enrollment algorithm v3); verification stays unpunctuated, and saved voices keep their stored transcripts. The screen measured the corpus's punctuation, not the recognizer's."
+          }
         }
       }
     },

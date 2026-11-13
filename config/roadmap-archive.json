@@ -6014,6 +6014,29 @@
       "evidence": [
         "commit:4d516102"
       ]
+    },
+    {
+      "id": "RF-53",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 3: long-form text layout, language fallback and runaway takes",
+      "status": "done",
+      "blockedBy": [
+        "RF-50"
+      ],
+      "gate": "Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take. A take far too short for its script (speech that ended early) is refused by Fast QC like any other gross failure, with its threshold calibrated on human speech before it is used.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
+        "Sources/QwenVoiceCore/GenerationSemantics.swift"
+      ],
+      "updated": "2026-11-13",
+      "notes": "Opened 2026-11-11 at the maintainer's request (ER-03's D1, ER-05's D6). ICA-15 stands: never trim, silently regenerate or substitute a seed. Fast QC v9 (278a11d7) refuses a take far too short for its script; v10 (654c921e) judges silent runs before the publication watermark (611 ms of trailing silence had read as 38 ms); a streamed take with 3 s of trailing silence stops as terminal_silence instead of running to the frame cap. Decided by recorded rules: D1 (full text for long-form segments) INCONCLUSIVE (9b006d4b), then REJECT for Korean; Consistent long-form segments sampled as Balanced (5a7bddce) until RF-58 retired the variation; the Japanese, East Asian and Han/kana budgets INCONCLUSIVE, the Han/kana confirmation too on 64 paired projects (p = 0.26), so the budget stays 300; D6 INCONCLUSIVE (7 undetected short scripts of 192, the rule needs 24), so the fallback stays English (7cd1f808). The Mac gate bench's baseline is seeded again (Fast QC v10) before its next use, on a quiet host.",
+      "evidence": [
+        "commit:278a11d7",
+        "commit:654c921e",
+        "commit:9b006d4b",
+        "commit:7cd1f808"
+      ]
     }
   ]
 }

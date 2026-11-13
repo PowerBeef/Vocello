@@ -494,25 +494,8 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
-      "updated": "2026-11-12",
-      "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07; G-15's punctuation). Decided by rules recorded before their arms (config/quality-screens.json): preparation v2 (a715b2ae) and the two-channel average v3 (fffcc709) ADOPT; encoder split-half rotary (A-02) INCONCLUSIVE, stays adjacent; reference unpadded (A-12, a144a489) ADOPT; streamed clones primed with the reference's history (A-04, 1a308d7e) ADOPT on its confirmation (similarity +0.056, error rate unchanged). A-26 (321d6c77): a decoder keeps a reference's primed state and restores it; on one warm engine 191 of 191 clone takes equal the per-process arm qa, and 144 takes restored it in at most 1 ms against a median 1.07 s to prime from scratch. No space before a Han or kana clone target (A-11): the clone-cjk screen's rule icl-target-space-unspaced-scripts ADOPT (no guard beyond the floor; 2 takes lost against 6), production since 2026-11-12. A transcript-backed reference's edges trimmed and faded (G-07): rule reference-edges-trimmed ADOPT (no guard harmed, trailing silence 15 ms shorter), production since 2026-11-12, conditioning version icl-ref-edges-trimmed-v4. Left: punctuated transcripts (G-15)."
-    },
-    {
-      "id": "RF-53",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Quality remediation, stage 3: long-form text layout, language fallback and runaway takes",
-      "status": "planned",
-      "blockedBy": [
-        "RF-50"
-      ],
-      "gate": "Full-text conditioning for long-form segments (D1) and the Auto fallback for an undetected Built-in Voice language (D6) are each decided by the stage-0 screens. A take that has already produced more trailing silence than Fast QC allows stops as a typed failure instead of running to the frame cap, changing no accepted take. A take far too short for its script (speech that ended early) is refused by Fast QC like any other gross failure, with its threshold calibrated on human speech before it is used.",
-      "sourceOfTruth": [
-        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
-        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
-        "Sources/QwenVoiceCore/GenerationSemantics.swift"
-      ],
-      "updated": "2026-11-11",
-      "notes": "Opened 2026-11-11 at the maintainer's request (the review of 2026-11-11; ER-03's D1, ER-05's D6; switches QWENVOICE_FULL_TEXT_CONDITIONING, QWENVOICE_CUSTOM_AUTO_LANGUAGE). ICA-15 stands: never trim, silently regenerate or substitute a seed. Landed 2026-11-11: Fast QC v9 (278a11d7) refuses a take far too short for its script, each bound half the fastest human corpus clip of its class (Japanese not judged); v10 (654c921e) judges silent runs before the publication watermark, which split them on all 191 clone-screen takes (611 ms of trailing silence read as 38 ms), so dropouts and terminal silence were undercounted since marking shipped; and a streamed take with 3 s of trailing silence stops as the terminal_silence rejection instead of running to the frame cap. No clone-screen verdict changes. The Mac gate bench's baseline is seeded again before its next use. Left: D1 and D6 by screen (the long-form screen kind exists, f16fdee1)."
+      "updated": "2026-11-13",
+      "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07, G-15). Decided by rules recorded before their arms (config/quality-screens.json): preparation v2 (a715b2ae) and the two-channel average v3 (fffcc709) ADOPT; split-half rotary (A-02) INCONCLUSIVE, stays adjacent; reference unpadded (A-12, a144a489) ADOPT; streamed clones primed with the reference's history (A-04, 1a308d7e) ADOPT on its confirmation (similarity +0.056). A-26 (321d6c77): the primed state is kept per prompt; 191 of 191 takes equal the per-process arm, restored in at most 1 ms against 1.07 s to prime. A-11: no space before a Han or kana clone target, ADOPT (0b7465a2). G-07: a transcript-backed reference's edges trimmed and faded, ADOPT (9db958fd; conditioning version icl-ref-edges-trimmed-v4). G-15: enrollment asks the recognizer for punctuation, transcript-punctuation ADOPT on the attn hybrid (similarity -0.003, error rate +0.003, within the margins); enrollment algorithm v3, verification unchanged. Left: one Mac enrollment with recognition (Speech is not allowed for the agent's shell), and the iPhone's in the next phone window."
     },
     {
       "id": "RF-54",

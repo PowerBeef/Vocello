@@ -1,8 +1,24 @@
 import Foundation
 import QwenVoiceCore
+import Speech
 import XCTest
 
 final class VoiceClipEnrollmentEvidenceTests: XCTestCase {
+    /// G-15 (RF-52): enrollment asks for punctuation, verification does not, and both stay
+    /// on-device with final results only.
+    func testOnlyEnrollmentPassesAskForPunctuation() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("clip.wav")
+        let enrollment = VoiceClipTranscriber.recognitionRequest(url: url, purpose: .enrollment)
+        let verification = VoiceClipTranscriber.recognitionRequest(url: url, purpose: .verification)
+        XCTAssertTrue(enrollment.addsPunctuation)
+        XCTAssertFalse(verification.addsPunctuation)
+        for request in [enrollment, verification] {
+            XCTAssertTrue(request.requiresOnDeviceRecognition)
+            XCTAssertFalse(request.shouldReportPartialResults)
+        }
+        XCTAssertEqual(VoiceClipTranscriber.EnrollmentEvidence.currentAlgorithmVersion, "apple-speech-enrollment-v3")
+    }
+
     @concurrent func testStableRecognitionRejectsSamePathContentReplacement() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

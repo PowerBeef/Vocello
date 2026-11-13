@@ -346,10 +346,14 @@ outside contributor and unreviewed.
   `--transcript`, a recognized transcript and a stored one give the same prompt and the same prompt
   identity for the same words. A voice whose stored transcript had such whitespace gets its prompt
   rebuilt once.
-- **Recognized transcripts carry no punctuation.** **G-15 (open, RF-52)**: Apple's recognizer is
-  asked for plain words, while the target script is punctuated text. Whether a punctuated transcript
-  conditions better is a sample-changing question, so it is decided by a screen and not flipped
-  blind.
+- **Recognized transcripts carry punctuation.** **G-15 (adopted 2026-11-13, RF-52)**: enrollment
+  asks Apple's recognizer for punctuation (`addsPunctuation`), as the target script is punctuated
+  text; verification passes stay unpunctuated. The `clone-english` screen's rule
+  `transcript-punctuation` (on the `attn` hybrid, 256 takes per arm) found punctuation neutral within
+  every margin (similarity −0.003, error rate +0.003). It measured the corpus's punctuation, not the
+  recognizer's, and in English only (the other corpora carry none), while the change reaches every
+  language, so Chinese and Japanese full-width marks, Spanish ¿¡ and French spacing now reach prompts
+  unscreened. Saved voices keep the transcripts they were saved with.
 - **The join.** `OFFICIAL`: upstream puts nothing between reference and target text (§1).
   `MEASURED-HERE`, **A-11 (deliberate)**: Vocello prepends one space to a target whose first letter
   is not Han or kana (`Qwen3ICLTargetText.boundaryMarked`). The tokenizer is byte-level BPE without a prefix space, so the

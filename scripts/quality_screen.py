@@ -125,6 +125,50 @@ def corpus_clips(source: str) -> tuple[Path, list[dict]]:
     return manifests[0].parent, read_json(manifests[0])["clips"]
 
 
+TRANSCRIPT_FORMS = ("as-given", "unpunctuated")
+# Marks a recognizer writes as part of a token even with punctuation off.
+KEPT_SIGNS = frozenset("%\u2030&@#/*\\")
+
+
+def _han_or_kana(character: str) -> bool:
+    if not character:
+        return False
+    code = ord(character)
+    return (0x3040 <= code <= 0x30FF or 0x31F0 <= code <= 0x31FF or 0xFF66 <= code <= 0xFF9F
+            or 0x3400 <= code <= 0x4DBF or 0x4E00 <= code <= 0x9FFF or 0xF900 <= code <= 0xFAFF
+            or 0x20000 <= code <= 0x323AF or 0x3005 <= code <= 0x3007)
+
+
+def unpunctuated(text: str) -> str:
+    """A transcript's words as Apple's on-device recognizer gives them with
+    punctuation off (G-15): every punctuation mark removed except an apostrophe
+    or hyphen inside a word, a mark between two digits (3.5, 1,000) and the
+    signs a number or address carries (% & @ # /); letters, digits, symbols and
+    case kept. A mark between two Han or kana characters leaves nothing, any
+    other a space, and whitespace is collapsed."""
+    out: list[str] = []
+    for index, character in enumerate(text):
+        if not unicodedata.category(character).startswith("P") or character in KEPT_SIGNS:
+            out.append(character)
+            continue
+        before = text[index - 1] if index > 0 else ""
+        after = text[index + 1] if index + 1 < len(text) else ""
+        if character in "'\u2019-\u2010" and before.isalnum() and after.isalnum():
+            out.append(character)
+        elif before.isdigit() and after.isdigit():
+            out.append(character)
+        elif not (_han_or_kana(before) and _han_or_kana(after)):
+            out.append(" ")
+    return " ".join("".join(out).split())
+
+
+def enrolled_transcript(transcript: str, form: str) -> str:
+    """The transcript a voice is enrolled with under an arm's transcript form."""
+    if form not in TRANSCRIPT_FORMS:
+        raise ScreenError(f"transcript form '{form}' is not one of {', '.join(TRANSCRIPT_FORMS)}")
+    return unpunctuated(transcript) if form == "unpunctuated" else transcript
+
+
 def population(screen: dict) -> str:
     """The name references and scripts are drawn under: a screen that varies
     another screen's references (`population`) draws the same ones."""
@@ -243,6 +287,8 @@ def build_plan(screen: dict, seed_set: int, languages: list[str] | None = None,
         return build_long_form_plan(screen, seed_set, languages, variations)
     if variations:
         raise ScreenError("--variations applies to a long-form screen")
+    if screen.get("kind") == "custom":
+        return build_custom_plan(screen, seed_set, languages)
     if screen.get("kind") != "clone":
         raise ScreenError(f"screen kind '{screen.get('kind')}' is not implemented")
     pool = read_json(SCRIPT_POOL)["entries"]
@@ -344,6 +390,71 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
 LONG_FORM_ROUTES = ("always", "never")
 
 
+def short_sentence_candidates(lines: list[str], language: str, maximum_words: int) -> list[tuple[str, str]]:
+    """Sentences that pass every rule of the script pool but its length window
+    and hold one to `maximum_words` words: short, well-formed scripts of the
+    kind a person types to try a voice (D6). (line id, text), one per
+    normalized text, in line order."""
+    import audio_qc_script_pool as pool  # imported late: only a custom plan reads sentences
+    numbered = [(number, line) for number, line in enumerate(lines, start=1) if line.strip()]
+    names = pool.name_lexicon([line for _number, line in numbered], language)
+    unique: dict[str, tuple[str, str]] = {}
+    for number, line in numbered:
+        if pool.text_rejection(line, language, names) != "lengthWindow":
+            continue
+        if not 1 <= len(pool.normalized_units(line, language)) <= maximum_words:
+            continue
+        unique.setdefault(pool.normalized_text(line, language), (f"cv-{language}-{number}", line))
+    return list(unique.values())
+
+
+def short_sentences(language: str, maximum_words: int) -> list[tuple[str, str]]:
+    """`short_sentence_candidates` over the pinned Common Voice file the
+    script pool is drawn from (config/audio-qc-script-pool-sources.json)."""
+    import audio_qc_script_pool as pool
+    sources = read_json(pool.SOURCES_PATH)
+    pins = {entry["language"]: entry for entry in sources["languages"]}
+    if language not in pins:
+        raise ScreenError(f"{language}: no pinned sentence file")
+    try:
+        lines = pool.read_source_lines(pool.source_directory(sources) / pins[language]["path"], pins[language])
+    except pool.ScriptPoolError as error:
+        raise ScreenError(str(error)) from None
+    return short_sentence_candidates(lines, language, maximum_words)
+
+
+def build_custom_plan(screen: dict, seed_set: int, languages: list[str] | None = None) -> dict:
+    """Single Built-in Voice takes of short scripts (D6): per language,
+    `scriptsPerLanguage` short sentences (`short_sentences`, at most
+    `maximumWords` words), each spoken once by the next of `speakers` and sent
+    with the request language `requestLanguage`. A script is its own cluster
+    (`voice`)."""
+    order = list(screen["languages"])
+    selected = languages or order
+    unknown = [language for language in selected if language not in order]
+    if unknown:
+        raise ScreenError(f"not in the screen: {', '.join(unknown)}")
+    count, speakers = screen["scriptsPerLanguage"], screen["speakers"]
+    takes = []
+    for language in selected:
+        candidates = short_sentences(language, screen["maximumWords"])
+        candidates.sort(key=lambda candidate: rank(f"{screen['name']}|{language}|script|{candidate[0]}"))
+        if len(candidates) < count:
+            raise ScreenError(f"{language}: fewer than {count} short sentences")
+        offset = order.index(language)
+        for index, (script_id, text) in enumerate(candidates[:count]):
+            take_id = f"{language}-{index + 1:02d}"
+            takes.append({"takeID": take_id, "voice": take_id, "mode": "custom", "language": language,
+                          "requestLanguage": screen["requestLanguage"],
+                          "speaker": speakers[(index + offset) % len(speakers)], "scriptID": script_id,
+                          "text": text, "seed": take_seed(screen, seed_set, take_id)})
+    plan = {"schemaVersion": SCHEMA_VERSION, "screen": screen["name"], "screenVersion": screen["version"],
+            "kind": "custom", "mode": "custom", "variant": screen["variant"], "seedSet": seed_set, "voices": [],
+            "takes": takes}
+    plan["planSHA256"] = sha256_text(json.dumps(plan, sort_keys=True, ensure_ascii=False))
+    return plan
+
+
 def long_form_command(vocello: Path, plan: dict, take: dict, wav: Path, common: list[str]) -> list[str]:
     voice = ["--speaker", take["speaker"]] if take["mode"] == "custom" else ["--voice-brief", take["voiceBrief"]]
     return [str(vocello), "generate", "--mode", take["mode"], "--variant", plan["variant"], *voice,
@@ -427,6 +538,10 @@ def run_arm(args: argparse.Namespace) -> Path:
         raise ScreenError(f"{vocello} is missing; run scripts/build.sh cli-optimized")
     overrides = parse_overrides(args.env or [])
     plan, variant = plan_for_variant(plan, getattr(args, "variant", None))
+    transcript_form = getattr(args, "transcript_form", None) or "as-given"
+    enrolled_transcript("", transcript_form)
+    if transcript_form != "as-given" and plan.get("kind") in ("long-form", "custom"):
+        raise ScreenError("--transcript-form applies to a screen with references")
     data_dir = arm_dir / "data"
     data_dir.mkdir(parents=True)
     (arm_dir / "wav").mkdir()
@@ -441,6 +556,8 @@ def run_arm(args: argparse.Namespace) -> Path:
            "commit": git_value("rev-parse", "HEAD"), "dirtyPaths": len(git_value("status", "--porcelain").splitlines())}
     if variant:
         arm["variant"] = variant
+    if transcript_form != "as-given":
+        arm["transcriptForm"] = transcript_form
     manifest = Path(args.manifest).resolve() if getattr(args, "manifest", None) else None
     if manifest:
         # A development contract (a built hybrid, RF-55): its digest names the models the arm ran.
@@ -450,6 +567,8 @@ def run_arm(args: argparse.Namespace) -> Path:
               *(["--manifest", str(manifest)] if manifest else [])]
     if plan.get("kind") == "long-form":
         return run_long_form_arm(args, plan, arm, arm_dir, vocello, environment, common)
+    if plan.get("kind") == "custom":
+        return run_custom_arm(args, plan, arm, arm_dir, vocello, environment, common)
 
     # A reference that is not the file the plan was made from would fail or
     # change its voice's takes, and the arm would carry the blame.
@@ -460,7 +579,7 @@ def run_arm(args: argparse.Namespace) -> Path:
     for voice in plan["voices"]:
         code, document = invoke([
             str(vocello), "voices", "enroll", "--name", voice["voice"], "--audio", voice["audio"],
-            "--transcript", voice["transcript"], "--language", voice["language"],
+            "--transcript", enrolled_transcript(voice["transcript"], transcript_form), "--language", voice["language"],
             "--on-warnings", "keep", "--confirm-consent", *common], environment)
         enrolled[voice["voice"]] = None if code == 0 and document.get("ok") else (
             (document.get("error") or {}).get("code") or f"exit {code}")
@@ -550,6 +669,46 @@ def run_long_form_arm(args: argparse.Namespace, plan: dict, arm: dict, arm_dir: 
     return arm_dir
 
 
+def run_custom_arm(args: argparse.Namespace, plan: dict, arm: dict, arm_dir: Path, vocello: Path,
+                   environment: dict[str, str], common: list[str]) -> Path:
+    """One Built-in Voice take per planned script, each in its own process,
+    sent with the plan's request language."""
+    rows = []
+    for index, take in enumerate(plan["takes"], start=1):
+        wav = arm_dir / "wav" / f"{take['takeID']}.wav"
+        code, document = invoke([
+            str(vocello), "generate", "--mode", "custom", "--variant", plan["variant"], "--speaker", take["speaker"],
+            "--text", take["text"], "--language", take["requestLanguage"], "--seed", str(take["seed"]),
+            "--long-form", "never", "--out", str(wav), *common], environment)
+        outcome, reason = outcome_of(code, document)
+        row = {"takeID": take["takeID"], "seed": take["seed"], "outcome": outcome, "reason": reason}
+        if outcome == "generated":
+            if not wav.is_file():
+                row.update(outcome="failed", reason="no output file")
+            else:
+                result = document["result"]
+                quality = result.get("audioQC") or {}
+                row.update(wav=str(wav.relative_to(arm_dir)), pcmSHA256=pcm_digest(wav),
+                           generationID=result.get("generationID"), durationSeconds=result.get("durationSeconds"),
+                           finishReason=result.get("finishReason"), wallSeconds=result.get("wallSeconds"),
+                           fastQC={key: quality.get(key) for key in (
+                               "verdict", "flags", "trailingSilenceMS", "longestSilenceMS", "rmsDBFS",
+                               "instabilityVerdict")})
+        rows.append(row)
+        if index % 20 == 0 or index == len(plan["takes"]):
+            write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
+    evidence = arm_evidence(arm_dir / "data/diagnostics/engine/generations.jsonl", rows)
+    write_json(arm_dir / "takes.json", {"schemaVersion": SCHEMA_VERSION, "arm": args.arm, "takes": rows})
+    counts = {kind: sum(row["outcome"] == kind for row in rows) for kind in ("generated", "refused", "failed")}
+    unread = unread_overrides(arm["environment"], evidence["activeOverrideKeys"])
+    write_json(arm_dir / "arm.json", dict(arm, complete=not unread, outcomes=counts,
+                                          activeOverrideKeys=evidence["activeOverrideKeys"], overridesNotRead=unread))
+    print(json.dumps({"arm": args.arm, "outcomes": counts, "activeOverrideKeys": evidence["activeOverrideKeys"]}))
+    if unread:
+        raise ScreenError(f"the engine never read {', '.join(unread)}: this arm ran as the control and is not usable")
+    return arm_dir
+
+
 def refresh_evidence(args: argparse.Namespace) -> int:
     """Reads an arm's evidence again from the telemetry it kept. The takes are
     not touched: this only repeats what `run` does after its last take."""
@@ -587,7 +746,13 @@ def arm_evidence(telemetry: Path, rows: list[dict]) -> dict:
                 continue
             provenance = ((record.get("summary") or {}).get("runEnvironment") or {}).get("runtimeDebugProvenance") or {}
             active.update(provenance.get("activeOverrideKeys") or [])
-            row["referenceAudioDigest"] = (record.get("requestReceipt") or {}).get("normalizedReferenceAudioDigest")
+            receipt = record.get("requestReceipt") or {}
+            row["referenceAudioDigest"] = receipt.get("normalizedReferenceAudioDigest")
+            # The language the engine sent and the one it detected in the
+            # script (absent when detection could not decide).
+            if receipt.get("finalModelLanguage") is not None:
+                row["finalModelLanguage"] = receipt["finalModelLanguage"]
+                row["detectedTargetLanguage"] = receipt.get("detectedTargetLanguage")
             codes = generated_code_count(record)
             if codes is not None:
                 row["generatedCodeCount"] = codes
@@ -666,6 +831,9 @@ def score_arm(args: argparse.Namespace) -> Path:
     takes = {row["takeID"]: row for row in read_json(arm_dir / "takes.json")["takes"]}
     planned = {take["takeID"]: take for take in plan["takes"]}
     voices = {voice["voice"]: voice for voice in plan["voices"]}
+    # A Built-in Voice take of a few words is too short for a speaker
+    # embedding and has no reference: only its words are scored.
+    speaker_scored = plan.get("kind") != "custom"
     store = qc_store()
     manifest_takes = []
     for take_id, row in takes.items():
@@ -690,7 +858,8 @@ def score_arm(args: argparse.Namespace) -> Path:
                                 text=True, capture_output=True, check=True).stdout.strip()
         completed = subprocess.run(
             [python, str(ROOT / "scripts/qc.py"), "run", "--takes", str(manifest_path), "--lane", "quality-screen",
-             "--models", ",".join((*ASR_MODELS, SPEAKER_MODEL))], cwd=ROOT, check=False)
+             "--models", ",".join((*ASR_MODELS, SPEAKER_MODEL) if speaker_scored else ASR_MODELS)],
+            cwd=ROOT, check=False)
         if completed.returncode != 0:
             raise ScreenError(f"QC scoring failed (exit {completed.returncode}); nothing was scored for this arm")
 
@@ -705,7 +874,7 @@ def score_arm(args: argparse.Namespace) -> Path:
 
     scores = {}
     for take in manifest_takes:
-        speaker = result(SPEAKER_MODEL, take, True)
+        speaker = result(SPEAKER_MODEL, take, True) if speaker_scored else {"outputs": {}}
         asr = {model: result(model, take, False) for model in ASR_MODELS}
         failed = [model for model, value in [(SPEAKER_MODEL, speaker), *asr.items()]
                   if "outputs" not in value and not is_measured_outcome(value)]
@@ -895,6 +1064,25 @@ def summarize(plan: dict, a: dict, b: dict, takes: list[dict] | None = None) -> 
             "scored": bool(a["scores"]) and bool(b["scores"]), "metrics": metrics}
 
 
+POPULATIONS = ("undetected-language",)
+
+
+def undetected_language(row: dict) -> bool:
+    """The engine's receipt says it could not tell the script's language (it
+    names the language it sent but none it detected)."""
+    return "finalModelLanguage" in row and row.get("detectedTargetLanguage") is None
+
+
+def population_takes(plan: dict, a: dict, b: dict, name: str) -> list[dict]:
+    """The takes a rule decides on. `undetected-language`: those whose script
+    either arm's receipt found no language in (D6); every other take is
+    outside the change and should be identical in both arms."""
+    if name not in POPULATIONS:
+        raise ScreenError(f"population '{name}' is not one of {', '.join(POPULATIONS)}")
+    return [take for take in plan["takes"]
+            if undetected_language(a["rows"][take["takeID"]]) or undetected_language(b["rows"][take["takeID"]])]
+
+
 def floor_violations(rule: dict, floor: dict | None) -> list[str]:
     """A rule may require the screen's own noise floor to sit well inside its
     margins: a floor report (compare --expect noise of the same population
@@ -979,12 +1167,15 @@ def compare_arms(args: argparse.Namespace) -> int:
     same_arm = (a["arm"]["environment"] == b["arm"]["environment"]
                 and a["arm"]["executableSHA256"] == b["arm"]["executableSHA256"]
                 and a["arm"].get("variant") == b["arm"].get("variant")
-                and a["arm"].get("manifestSHA256") == b["arm"].get("manifestSHA256"))
+                and a["arm"].get("manifestSHA256") == b["arm"].get("manifestSHA256")
+                and a["arm"].get("transcriptForm", "as-given") == b["arm"].get("transcriptForm", "as-given"))
     report = {"schemaVersion": SCHEMA_VERSION, "screen": plan["screen"], "planSHA256": plan["planSHA256"],
               "a": {"arm": args.a, **{key: a["arm"][key] for key in ("environment", "executableSHA256", "commit")},
-                    "variant": a["arm"].get("variant") or plan["variant"]},
+                    "variant": a["arm"].get("variant") or plan["variant"],
+                    "transcriptForm": a["arm"].get("transcriptForm", "as-given")},
               "b": {"arm": args.b, **{key: b["arm"][key] for key in ("environment", "executableSHA256", "commit")},
-                    "variant": b["arm"].get("variant") or plan["variant"]},
+                    "variant": b["arm"].get("variant") or plan["variant"],
+                    "transcriptForm": b["arm"].get("transcriptForm", "as-given")},
               "summary": summary}
     code = 0
     if args.expect == "identical":
@@ -1002,6 +1193,18 @@ def compare_arms(args: argparse.Namespace) -> int:
             raise ScreenError(f"rule '{args.rule}' is not recorded in {CONFIG.name}; a rule is written before its takes")
         if not summary["scored"]:
             raise ScreenError("both arms must be scored before a rule decides")
+        if rule.get("population"):
+            # The rule decides on its population; the whole plan is reported,
+            # and the takes outside the population show whether the change
+            # reached only it.
+            members = population_takes(plan, a, b, rule["population"])
+            inside = {take["takeID"] for take in members}
+            outside = summarize(plan, a, b, [take for take in plan["takes"] if take["takeID"] not in inside])
+            report["wholePlan"] = summary
+            summary = summarize(plan, a, b, members)
+            report["summary"] = summary
+            report["population"] = {"name": rule["population"], "takes": len(members),
+                                    "outsidePaired": outside["paired"], "outsideIdenticalPCM": outside["identicalPCM"]}
         if not same_arm and summary["paired"] and summary["identicalPCM"] == summary["paired"]:
             # Two arms that were meant to differ made the same samples: the
             # knob was not read, or it changes nothing on this population.
@@ -1062,6 +1265,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--arm", required=True)
     run.add_argument("--env", action="append", help="KEY=VALUE for this arm's processes; repeatable")
     run.add_argument("--vocello", help="a preserved build (default: build/vocello)")
+    run.add_argument("--transcript-form", choices=TRANSCRIPT_FORMS, default="as-given",
+                     help="enroll each reference with its transcript as given or unpunctuated, as recognition gives it (G-15)")
     run.add_argument("--models-root", help="a model directory other than the debug root (a built hybrid's)")
     run.add_argument("--manifest", help="a development qwenvoice_contract.json for every command (a built hybrid's)")
     run.add_argument("--variant", choices=("speed", "quality"),

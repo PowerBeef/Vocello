@@ -9,6 +9,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,7 +61,17 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("clone", names)
         for screen_name in names:
             definition = screen.load_screen(screen_name)
-            self.assertIn(definition["kind"], ("clone", "long-form"))
+            self.assertIn(definition["kind"], ("clone", "long-form", "custom"))
+            if definition["kind"] == "custom":
+                self.assertTrue(definition["speakers"])
+                self.assertGreaterEqual(definition["maximumWords"], 1)
+                self.assertGreater(definition["scriptsPerLanguage"], 0)
+                for name, rule in definition["rules"].items():
+                    self.assertTrue(rule.get("recorded"), f"{name}: a rule is recorded before its takes exist")
+                    self.assertIn(rule.get("population", "undetected-language"), screen.POPULATIONS)
+                    for metric in rule["guards"]:
+                        self.assertIn(metric, screen.METRICS)
+                continue
             if definition["kind"] == "long-form":
                 self.assertGreaterEqual(definition["sentencesPerProject"], 2)
                 for stratum in definition["strata"].values():
@@ -143,6 +154,88 @@ class PlanTests(unittest.TestCase):
         self.assertEqual((other["variant"], recorded, other["planSHA256"], other["takes"]),
                          ("quality", "quality", "abc", plan["takes"]))
         self.assertEqual(plan["variant"], "speed", "the plan itself is not changed")
+
+    def test_an_unpunctuated_transcript_keeps_the_words_a_recognizer_writes(self):
+        cases = {
+            "Hello, world! It's fine.": "Hello world It's fine",
+            "Mr. Smith's \"well-known\" plan...": "Mr Smith's well-known plan",
+            "« Bonjour », dit-il.": "Bonjour dit-il",
+            "C'est l'homme \u2014 vraiment ?": "C'est l'homme vraiment",
+            "It cost 3.5 dollars, 10% of 1,000.": "It cost 3.5 dollars 10% of 1,000",
+            "\u4f60\u597d\uff0c\u4e16\u754c\u3002": "\u4f60\u597d\u4e16\u754c",
+            "\u300c\u306a\u3093\u3067\u3082\u306a\u3044\u300d\u3068\u8a00\u3063\u305f\u3002": "\u306a\u3093\u3067\u3082\u306a\u3044\u3068\u8a00\u3063\u305f",
+            "\uc548\ub155\ud558\uc138\uc694. \ubc18\uac11\uc2b5\ub2c8\ub2e4!": "\uc548\ub155\ud558\uc138\uc694 \ubc18\uac11\uc2b5\ub2c8\ub2e4",
+            "already plain words": "already plain words",
+            "": "",
+        }
+        for text, expected in cases.items():
+            self.assertEqual(screen.unpunctuated(text), expected, text)
+            self.assertEqual(screen.unpunctuated(expected), expected, "idempotent")
+        self.assertEqual(screen.enrolled_transcript("Yes, sir.", "as-given"), "Yes, sir.")
+        self.assertEqual(screen.enrolled_transcript("Yes, sir.", "unpunctuated"), "Yes sir")
+        with self.assertRaises(screen.ScreenError):
+            screen.enrolled_transcript("Yes.", "lowercase")
+
+    def test_a_short_script_passes_every_pool_rule_but_the_length_window(self):
+        lines = ["Hello there.", "Hello there.", "lowercase start here.", "What a day!",
+                 "This sentence is long enough to pass the window of the pool.", "", "Too many words in this one."]
+        candidates = screen.short_sentence_candidates(lines, "english", 4)
+        self.assertEqual(candidates, [("cv-english-1", "Hello there."), ("cv-english-4", "What a day!")])
+
+    def test_a_custom_plan_turns_its_speakers_and_asks_for_auto(self):
+        definition = {"name": "cs", "version": 1, "kind": "custom", "variant": "speed",
+                      "languages": ["english", "french"], "speakers": ["aiden", "serena", "dylan"],
+                      "scriptsPerLanguage": 4, "maximumWords": 4, "requestLanguage": "auto"}
+        fake = {language: [(f"cv-{language}-{number}", f"{language} {number}.") for number in range(1, 9)]
+                for language in ("english", "french")}
+        with mock.patch.object(screen, "short_sentences", lambda language, maximum: list(fake[language])):
+            plan = screen.build_plan(definition, 1)
+            self.assertEqual(plan, screen.build_plan(definition, 1))
+            self.assertNotEqual(screen.build_plan(definition, 2)["planSHA256"], plan["planSHA256"])
+            with self.assertRaises(screen.ScreenError):
+                screen.build_plan(definition, 1, ["german"])
+            with self.assertRaises(screen.ScreenError):
+                screen.build_plan(dict(definition, scriptsPerLanguage=9), 1)
+        self.assertEqual((plan["kind"], len(plan["takes"]), plan["voices"]), ("custom", 8, []))
+        english = [take for take in plan["takes"] if take["language"] == "english"]
+        self.assertEqual([take["speaker"] for take in english], ["aiden", "serena", "dylan", "aiden"])
+        french = [take for take in plan["takes"] if take["language"] == "french"]
+        self.assertEqual(french[0]["speaker"], "serena", "each language starts one speaker later")
+        for take in plan["takes"]:
+            self.assertEqual(take["requestLanguage"], "auto")
+            self.assertEqual(take["voice"], take["takeID"])
+            self.assertIn((take["scriptID"], take["text"]), fake[take["language"]])
+
+    def test_the_undetected_language_population_reads_either_arms_receipt(self):
+        plan = {"takes": [{"takeID": name} for name in ("detected", "undetected-a", "undetected-b", "no-evidence")]}
+        a = {"rows": {"detected": {"finalModelLanguage": "french", "detectedTargetLanguage": "french"},
+                      "undetected-a": {"finalModelLanguage": "english", "detectedTargetLanguage": None},
+                      "undetected-b": {"outcome": "refused"},
+                      "no-evidence": {"outcome": "refused"}}}
+        b = {"rows": {"detected": {"finalModelLanguage": "french", "detectedTargetLanguage": "french"},
+                      "undetected-a": {"finalModelLanguage": "auto", "detectedTargetLanguage": None},
+                      "undetected-b": {"finalModelLanguage": "auto", "detectedTargetLanguage": None},
+                      "no-evidence": {"outcome": "refused"}}}
+        self.assertEqual([take["takeID"] for take in screen.population_takes(plan, a, b, "undetected-language")],
+                         ["undetected-a", "undetected-b"])
+        with self.assertRaises(screen.ScreenError):
+            screen.population_takes(plan, a, b, "everything")
+
+    def test_an_arm_records_the_language_its_receipt_sent_and_detected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            telemetry = Path(directory) / "generations.jsonl"
+            telemetry.write_text("\n".join(json.dumps(record) for record in (
+                {"generationID": "AAA", "requestReceipt": {"finalModelLanguage": "english"}},
+                {"generationID": "BBB", "requestReceipt": {"finalModelLanguage": "french",
+                                                           "detectedTargetLanguage": "french"}},
+                {"generationID": "CCC", "requestReceipt": {}},
+            )) + "\n")
+            rows = [{"generationID": "aaa"}, {"generationID": "bbb"}, {"generationID": "ccc"}]
+            screen.arm_evidence(telemetry, rows)
+        self.assertTrue(screen.undetected_language(rows[0]))
+        self.assertEqual((rows[1]["finalModelLanguage"], rows[1]["detectedTargetLanguage"]), ("french", "french"))
+        self.assertFalse(screen.undetected_language(rows[1]))
+        self.assertFalse(screen.undetected_language(rows[2]), "no language evidence is not an undetected language")
 
     def test_only_registered_environment_families_reach_an_arm(self):
         self.assertEqual(screen.parse_overrides(["QWENVOICE_X=on", "MLX_Y=2"]), {"QWENVOICE_X": "on", "MLX_Y": "2"})

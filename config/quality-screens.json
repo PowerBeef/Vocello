@@ -2613,6 +2613,100 @@
           }
         }
       }
+    },
+    "clone-english": {
+      "version": 1,
+      "kind": "clone",
+      "mode": "clone",
+      "variant": "speed",
+      "description": "Voice Clone through saved voices, English references only: 64 human clips (256 takes, so its noise floor fits the rule: at 128 takes the error-rate floor would exceed 0.71 of its margin) of the pinned LibriTTS-R corpus, whose transcripts are punctuated (the clone screen's French, German, Spanish, Chinese and Korean corpora are not), each asked for three English scripts of the committed CC0 pool and one French. For questions about the transcript's written form (G-15).",
+      "languages": {
+        "english": [
+          "libritts-r"
+        ]
+      },
+      "referencesPerLanguage": 64,
+      "referenceSeconds": [
+        5.0,
+        10.0,
+        20.0
+      ],
+      "scriptSplit": "calibration",
+      "scriptsPerReference": 3,
+      "crossLanguageScripts": 1,
+      "crossLanguage": {
+        "english": "french",
+        "default": "english"
+      },
+      "rules": {
+        "transcript-punctuation": {
+          "recorded": "2026-11-12",
+          "question": "Do transcript-backed clones condition at least as well on a transcript that keeps its punctuation, as the corpus writes it, as on the same words unpunctuated, as Apple's on-device recognizer gives them today (G-15, RF-52)?",
+          "arms": "Seed set 1 of the clone-english screen at the build of the commit that records this rule, every arm on the RF-55 single-model candidate (--env QWENVOICE_MIXED_PRECISION=attn on the 4-bit model), so the answer holds for the model expected to ship. A: every reference enrolled with its transcript unpunctuated (run --transcript-form unpunctuated). B: the transcript as given. Floor: A on seed set 1 against A on seed set 2 (both unpunctuated). Each arm in its own data directory, generated after this rule was recorded.",
+          "requires": "The floor sits inside 0.71 of each margin. B differs from A on its takes; arms that should differ and do not are INERT, never ADOPT. Neither arm is run twice: a transcript is fixed text, and every arm run twice so far reproduced itself take for take.",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Small. Upstream's examples condition on punctuated transcripts and the target script is punctuated, so punctuation may help the talker place the target's prosody; the recognizer's own punctuation (SFSpeechRecognitionRequest.addsPunctuation) would differ from the corpus's in places, so this screens punctuation itself, not the recognizer's. Only English can be screened: the other corpora carry no punctuation.",
+          "decision": "ADOPT when every requirement holds and no guard's interval reaches past its margin on B's harmful side: voice enrollment then asks the recognizer for punctuation, so newly recognized transcripts carry it, and saved voices keep their stored transcripts. REJECT when a guard's whole interval lies past its margin on B's harmful side, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and recognition stays unpunctuated."
+        }
+      }
+    },
+    "custom-short": {
+      "version": 1,
+      "kind": "custom",
+      "mode": "custom",
+      "variant": "speed",
+      "description": "Built-in Voice single takes of short scripts sent with language Auto, the case where the script's language detection fails (D6): per language, 32 short sentences of one to four words from the pinned CC0 Common Voice files the script pool is drawn from (every pool rule but its length window), in six Latin-script languages, each spoken once by the next of five speakers. Scored by both ASR families on the script's own language; too short for a speaker score.",
+      "languages": [
+        "english",
+        "french",
+        "german",
+        "spanish",
+        "italian",
+        "portuguese"
+      ],
+      "speakers": [
+        "aiden",
+        "ryan",
+        "serena",
+        "vivian",
+        "dylan"
+      ],
+      "scriptsPerLanguage": 32,
+      "maximumWords": 4,
+      "requestLanguage": "auto",
+      "rules": {
+        "custom-auto-fallback": {
+          "recorded": "2026-11-12",
+          "question": "When a Built-in Voice script is too short or too ambiguous for its language to be detected, does falling back to Auto (QWENVOICE_CUSTOM_AUTO_LANGUAGE=on: no language id and no English diction sentence, as Voice Design, Voice Clone and upstream do) speak it at least as well as falling back to English (D6, RF-53)?",
+          "arms": "The custom-short screen, seed set 1, at the build of the commit that records this rule (192 takes), every arm on the RF-55 single-model candidate (--env QWENVOICE_MIXED_PRECISION=attn on the 4-bit model), so the answer holds for the model expected to ship. A: the candidate as it is. B: the candidate with the key set. Each arm in its own data directory, generated after this rule was recorded.",
+          "population": "undetected-language",
+          "requires": "The decision reads the takes whose language either arm's receipt could not detect; every take outside that population is PCM-identical in both arms (the key reaches only the fallback), and at least 24 takes fall inside it. No floor is required: nothing else differs between the arms on the population, and its interval is read as measured.",
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Auto speaks a short non-English script better than English with the English diction sentence; a short English script may be no different. The margin is wider than the clone screen's because an edit rate on one to four words moves in steps of a quarter or more. How many scripts detection misses is not known before the run.",
+          "decision": "ADOPT when every requirement holds, B has no more than 2 extra gross failures on the population (a take lost, or read with more than half of its script wrong) and the better family's error-rate interval does not reach past +0.05: Built-in Voice then falls back to Auto when it cannot detect a script's language. REJECT when that interval lies wholly past +0.05, or B loses more takes than allowed. Otherwise INCONCLUSIVE, and the fallback stays English."
+        }
+      }
     }
   }
 }

@@ -513,6 +513,12 @@ PY="$(python3 scripts/select_python.py)"
   a rule requires the talker untouched: `requiresSameCodeCount` reads each take's
   `qwen_generated_code_count` from the engine's rows (`requiresSameDuration`, a take's length, is no
   test for clones, whose onset trim reads the decoder's first frames).
+- **The transcript's written form** (G-15): `run --transcript-form unpunctuated` enrolls every
+  reference with its transcript as Apple's on-device recognizer gives it with punctuation off
+  (`unpunctuated`: an apostrophe or hyphen inside a word, a mark between two digits and the signs
+  %, &, @, # and / stay). The arm records the form, and two arms of different forms are never one
+  setting. Only the English corpus is punctuated, so `clone-english` (64 English references,
+  256 takes) carries such questions.
 - **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
   8-bit model; the arm records it, and two arms on different variants are never one setting. The
   hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models;
@@ -525,6 +531,13 @@ PY="$(python3 scripts/select_python.py)"
   its own integrity record, and writes a development contract naming them. `run --models-root DIR
   --manifest CONTRACT` loads them through the normal verified path; the arm records the contract's
   digest, and an identity proof (`compare --expect identical`) shows they reproduce the key's arm.
+- **The custom kind** (`custom-short`, D6) plans single Built-in Voice takes of short scripts (pinned
+  Common Voice sentences of one to four words that pass every rule of the script pool but its length
+  window, in six Latin-script languages, five speakers in turn) sent with language Auto. Each take's receipt gives the language the engine sent and the one it
+  detected, which the arm keeps (`finalModelLanguage`, `detectedTargetLanguage`); a rule may decide
+  on a `population`, here `undetected-language`, the takes whose language either arm could not
+  detect, and the report gives the whole plan and how many takes outside the population stayed
+  identical. Only the two ASR families score these takes; a few words hold no speaker embedding.
 - **Edit rates are bounded at 1 per script unit** (since 2026-11-11): a recognizer that runs away on
   a take inserts without limit, and one such take carried a whole screen's mean once.
 - **The long-form kind** (`long-form`, RF-50) runs projects as the apps do (`--long-form always`):

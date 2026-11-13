@@ -176,10 +176,10 @@ final class CLIRequestTests: XCTestCase {
             "--speaker", resolved.registry.defaultSpeaker.id, "--confirm-consent",
         ], root: root)
         XCTAssertEqual(spelledOut, hello)
-        let otherVariant = try await identity(
-            ["--text", "Hello there.", "--variant", resolved.quality ? "speed" : "quality"], root: root
-        )
-        XCTAssertNotEqual(otherVariant, hello)
+        // RF-59: every mode has one model, so a retired --variant quality is the same request too.
+        let retiredVariant = try await identity(["--text", "Hello there.", "--variant", "quality"], root: root)
+        XCTAssertFalse(resolved.quality)
+        XCTAssertEqual(retiredVariant, hello)
         let relative = try await identity(["--text", "Hello there.", "--out", "take.wav"], root: root)
         let absolute = try await identity(
             ["--text", "Hello there.", "--out", FileManager.default.currentDirectoryPath + "/take.wav"], root: root

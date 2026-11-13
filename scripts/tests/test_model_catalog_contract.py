@@ -119,7 +119,7 @@ class ModelCatalogContractTests(unittest.TestCase):
         result = CATALOG.validate_catalog(REPO_ROOT)
         self.assertTrue(result["ok"], result["errors"])
         self.assertTrue(result["complete"])
-        self.assertEqual(result["coveredArtifacts"], 6)
+        self.assertEqual(result["coveredArtifacts"], 3)
         self.assertEqual(result["missingArtifactIdentities"], [])
         catalog = result["catalog"]
         self.assertEqual(catalog, "Sources/Resources/qwenvoice_production_model_catalog.json")
@@ -128,12 +128,13 @@ class ModelCatalogContractTests(unittest.TestCase):
             f"{artifact['modelID']}:{artifact['variantID']}": artifact["totalBytes"]
             for artifact in document["artifacts"]
         }
-        # Exact 2026.09.14.1 totals (fp32 speech tokenizer restored: the
-        # 2026.08.06.1 totals plus the 341,113,208 bytes the f16 codec had
-        # removed from every artifact).
-        self.assertEqual(totals["pro_custom:quality"], 2_817_779_315)
-        self.assertEqual(totals["pro_design:quality"], 2_817_778_822)
-        self.assertEqual(totals["pro_clone:quality"], 2_841_796_455)
+        # RF-59: one hybrid model per mode (2026.11.13.1), on both platforms, exact totals.
+        self.assertEqual(totals, {
+            "pro_custom:speed": 2_225_870_484,
+            "pro_design:speed": 2_225_869_991,
+            "pro_clone:speed": 2_249_887_307,
+        })
+        self.assertTrue(all(artifact["platforms"] == ["iOS", "macOS"] for artifact in document["artifacts"]))
         self.assertEqual(document["schemaVersion"], 2)
         self.assertEqual(len(document["sharedComponents"]), 1)
         component = document["sharedComponents"][0]

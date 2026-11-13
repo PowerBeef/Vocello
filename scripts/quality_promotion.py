@@ -79,6 +79,11 @@ def model_applicability(contract: dict[str, Any], root: Path) -> dict[str, dict[
             if not isinstance(variants, list) or any(not isinstance(v, dict) for v in variants):
                 raise PromotionError("model applicability variants are malformed")
             selected = [v for v in variants if v.get("kind") == kind]
+            if kind == "quality" and not selected:
+                # RF-59: one model per mode, so no Quality package: the capability applies nowhere.
+                eligible["ios"].append(False)
+                eligible["macos"].append(False)
+                continue
             if len(selected) != 1:
                 raise PromotionError(f"model applicability requires one {kind} variant per mode")
             variant = selected[0]

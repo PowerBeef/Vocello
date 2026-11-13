@@ -311,13 +311,17 @@ class VocelloMacUITestCase: XCTestCase {
     /// every take, and the checker refuses those only after the whole matrix.
     /// The stored per-mode choice survives the take relaunches; the original
     /// visible choice is restored when the session ends. Never toggles "Prefer
-    /// lower-memory models", which clears every stored choice.
+    /// lower-memory models", which clears every stored choice. Since RF-59 a mode
+    /// has one model and shows no switch: that model runs every take, so there is
+    /// nothing to select.
     func selectVisibleSpeedVariant(for modes: [VocelloUIBenchMatrix.Mode]) {
         for mode in modes {
             let screen = Self.studioScreen(for: mode)
             navigate(to: screen)
             let speed = button("\(screen.rawValue)_speedVariantButton")
-            XCTAssertTrue(VocelloUIWait.exists(speed, timeout: 20))
+            guard VocelloUIWait.settles("\(screen.rawValue) package switch", timeout: 3, evaluate: { speed.exists }) else {
+                continue
+            }
             if speed.isSelected { continue }
             let original = Self.variantKinds.first { kind in
                 let candidate = button("\(screen.rawValue)_\(kind)VariantButton")

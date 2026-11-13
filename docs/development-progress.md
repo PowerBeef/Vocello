@@ -26,11 +26,11 @@ session can continue from it alone.
 
 **Next, in order**
 
-1. RF-59's code. The three artifacts are published (revisions in
-   [hybrid-model.md](reference/hybrid-model.md) §5). Next: the receipts
-   (`config/model-artifact-receipts.json`, from the build's integrity records), the catalog rebuild,
-   then a model with one variant shows no selector, installed Speed and Quality folders are reclaimed
-   once a mode's hybrid verifies, `--variant` is accepted with a notice, and the contract swap last.
+1. RF-59's verification. The swap is on `main` (one `speed` variant per mode, the hybrid, on both
+   platforms; [hybrid-model.md](reference/hybrid-model.md) §6). ★ The model-download lifecycle lane
+   into a scratch data root (2.2 GB) proves the install end to end. Never install the hybrid into the
+   canonical models folder casually: once it verifies, the Speed and Quality folders there are
+   reclaimed, and the quality screens and `build_hybrid_model.py` read them.
 2. On a quiet host, lead only: the formal speed lane for `attn` (`scripts/pcm_identity.py`) and the
    Mac gate bench's baseline seeded again (Fast QC v10).
 3. ★ The iPhone's memory and speed for `attn` (a BrowserStack App Automate farm run the maintainer

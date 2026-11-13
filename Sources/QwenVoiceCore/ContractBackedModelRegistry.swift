@@ -188,22 +188,24 @@ public struct ContractBackedModelRegistry: ModelRegistry, Hashable, Sendable {
     /// RF-59: the retired install folders that may be deleted now. A model's `retiredFolders` are
     /// reclaimable once `isVerified` says the model's current artifact is installed and verified, so
     /// a user is never left without a model for a mode. `isVerified` must mean verified against
-    /// the catalog's receipts, not only present. Only directories present under `modelsDirectory`
-    /// are returned, each once, sorted.
+    /// the catalog's receipts, not only present. Only folders present under `modelsDirectory`, or
+    /// with a download still staged for them, are returned, each once, sorted.
     public func retiredFoldersToReclaim(
         in modelsDirectory: URL,
         isVerified: (ModelDescriptor) -> Bool
     ) -> [String] {
-        var folders = Set<String>()
-        for model in models where !model.retiredFolders.isEmpty && isVerified(model) {
-            for folder in model.retiredFolders {
-                let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
-                if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
-                    folders.insert(folder)
-                }
-            }
-        }
-        return folders.sorted()
+        RetiredModelReclamation.folders(of: models, in: modelsDirectory, isVerified: isVerified)
+    }
+
+    /// RF-59: removes the retired folders `retiredFoldersToReclaim` returns, through the shared
+    /// component store. Synchronous and possibly slow: call it off the main actor.
+    public func reclaimRetiredFolders(
+        in modelsDirectory: URL,
+        isVerified: (ModelDescriptor) -> Bool
+    ) -> RetiredModelReclamation {
+        let folders = retiredFoldersToReclaim(in: modelsDirectory, isVerified: isVerified)
+        guard !folders.isEmpty else { return RetiredModelReclamation(removed: [], failed: [:]) }
+        return SharedModelComponentStore(modelsRoot: modelsDirectory).reclaimRetiredFolders(folders)
     }
 
     /// Lists required model files that the manifest declares but cannot be

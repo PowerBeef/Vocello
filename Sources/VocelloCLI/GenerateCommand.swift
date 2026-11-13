@@ -1052,6 +1052,16 @@ public enum GenerateCommand {
         modelsDirectory: URL, settings: DesktopAppSettings,
         deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass()
     ) -> VariantChoice {
+        if explicitQuality == true,
+           let base = registry.model(for: mode), !base.platformVariants(for: .macOS).contains(where: { $0.kind == .quality }) {
+            // RF-59: one model per mode; the Quality package is retired.
+            CLIPresenter.warn(
+                "variant_retired",
+                "--variant quality is retired: \(mode.rawValue) has one model, and the take uses it",
+                detail: ["requested": "quality", "used": "speed"]
+            )
+            return VariantChoice(quality: false, source: "flag")
+        }
         if let explicitQuality { return VariantChoice(quality: explicitQuality, source: "flag") }
         let choice = DesktopModelSelection.resolve(
             registry: registry,

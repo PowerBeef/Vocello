@@ -236,11 +236,12 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(try warnings(["The train left at dawn."]), [])
     }
 
-    /// RF-27: without --variant a take uses the package the Mac app would use for the mode.
+    /// RF-27: without --variant a take uses the package the Mac app would use for the mode (the
+    /// choice logic, on the last two-package contract; RF-59 ships one package per mode).
     func testTakesDefaultToTheAppsPackage() throws {
         let manifest = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+            .appendingPathComponent("Tests/Fixtures/two-package-model-contract.json")
         let registry = try ContractBackedModelRegistry(manifestURL: manifest)
             .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
         let models = FileManager.default.temporaryDirectory.appendingPathComponent("cli-variant-\(UUID().uuidString)")
@@ -270,6 +271,58 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(resolve(nil).quality, true, "the 16 GB recommendation once installed")
         XCTAssertEqual(resolve(nil, ["QwenVoice.PreferSpeedEverywhere": true]).quality, false)
         XCTAssertEqual(resolve(nil, ["QwenVoice.MacModelVariantPreference.custom": "speed"]).quality, false)
+    }
+
+    /// RF-59: the shipped contract offers one package per mode: `--variant quality` warns
+    /// `variant_retired` and the take uses the mode's model; Speed, or no flag, warns about nothing.
+    func testARetiredQualityVariantWarnsAndUsesTheModesModel() throws {
+        let manifest = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let registry = try ContractBackedModelRegistry(manifestURL: manifest)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let models = FileManager.default.temporaryDirectory.appendingPathComponent("cli-retired-\(UUID().uuidString)")
+        func resolve(_ explicit: Bool?) throws -> (GenerateCommand.VariantChoice, [CLIWarning]) {
+            let capture = CLIPresenterCapture()
+            var choice: GenerateCommand.VariantChoice?
+            CLIPresenter.$capture.withValue(capture) {
+                choice = GenerateCommand.resolveVariant(
+                    explicitQuality: explicit, mode: .design, registry: registry, modelsDirectory: models,
+                    settings: DesktopAppSettings(domain: DesktopAppSettings.releaseDomain) { _ in nil },
+                    deviceClass: .mid16GBMac
+                )
+                CLIPresenter.succeed(["done": true])
+            }
+            return (try XCTUnwrap(choice), try XCTUnwrap(capture.report).warnings)
+        }
+        let (quality, qualityWarnings) = try resolve(true)
+        XCTAssertEqual(quality, GenerateCommand.VariantChoice(quality: false, source: "flag"))
+        XCTAssertEqual(qualityWarnings.map(\.code), ["variant_retired"])
+        XCTAssertEqual(try resolve(false).1, [])
+        XCTAssertEqual(try resolve(nil).0.quality, false)
+        XCTAssertEqual(try CLIRuntime.modelID(registry: registry, mode: .design, quality: false), "pro_design_speed")
+        XCTAssertTrue(registry.model(id: "pro_design_speed")?.folder.hasSuffix("-hybrid-attn") ?? false)
+    }
+
+    /// RF-59: `vocello bench` defaults to the packages the contract offers every requested mode:
+    /// Speed alone on the shipped contract, both on the last two-package one.
+    func testBenchDefaultsToTheContractsPackages() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        func registry(_ path: String) throws -> ContractBackedModelRegistry {
+            try ContractBackedModelRegistry(manifestURL: root.appendingPathComponent(path))
+                .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        }
+        let modes = GenerationMode.allCases.map(\.rawValue)
+        let shipped = try registry("Sources/Resources/qwenvoice_contract.json")
+        XCTAssertEqual(try CLIRuntime.offeredVariantKinds(modes: modes, registry: shipped), ["speed"])
+        XCTAssertEqual(
+            try CLIRuntime.offeredVariantKinds(
+                modes: modes, registry: registry("Tests/Fixtures/two-package-model-contract.json")
+            ),
+            ["speed", "quality"]
+        )
+        XCTAssertThrowsError(try CLIRuntime.offeredVariantKinds(modes: ["unknown"], registry: shipped))
     }
 
     /// P15-07 / P02-09: an unknown `--language` is refused before boot instead of

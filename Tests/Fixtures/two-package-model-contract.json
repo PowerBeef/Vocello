@@ -1,0 +1,620 @@
+{
+  "defaultSpeaker": "aiden",
+  "speakers": {
+    "Built-in": [
+      "aiden",
+      "ryan",
+      "vivian",
+      "serena",
+      "uncle_fu",
+      "dylan",
+      "eric",
+      "ono_anna",
+      "sohee"
+    ]
+  },
+  "speakerMetadata": {
+    "aiden": {
+      "displayName": "Aiden",
+      "nativeLanguage": "English",
+      "shortDescription": "English-native sunny American male voice with a clear midrange.",
+      "isEnglishNative": true
+    },
+    "ryan": {
+      "displayName": "Ryan",
+      "nativeLanguage": "English",
+      "shortDescription": "English-native dynamic male voice with strong rhythmic drive \u2014 naturally expressive.",
+      "isEnglishNative": true
+    },
+    "vivian": {
+      "displayName": "Vivian",
+      "nativeLanguage": "Chinese",
+      "shortDescription": "Chinese-native bright, slightly edgy young female voice.",
+      "isEnglishNative": false
+    },
+    "serena": {
+      "displayName": "Serena",
+      "nativeLanguage": "Chinese",
+      "shortDescription": "Chinese-native warm, gentle young female voice.",
+      "isEnglishNative": false
+    },
+    "uncle_fu": {
+      "displayName": "Uncle Fu",
+      "nativeLanguage": "Chinese",
+      "shortDescription": "Chinese-native seasoned male voice with a low, mellow timbre.",
+      "isEnglishNative": false
+    },
+    "dylan": {
+      "displayName": "Dylan",
+      "nativeLanguage": "Chinese",
+      "shortDescription": "Chinese-native youthful male voice with a clear, natural timbre (Beijing dialect).",
+      "isEnglishNative": false
+    },
+    "eric": {
+      "displayName": "Eric",
+      "nativeLanguage": "Chinese",
+      "shortDescription": "Chinese-native lively Chengdu male voice with a slightly husky brightness (Sichuan dialect).",
+      "isEnglishNative": false
+    },
+    "ono_anna": {
+      "displayName": "Ono Anna",
+      "nativeLanguage": "Japanese",
+      "shortDescription": "Japanese-native playful female voice with a light, nimble timbre.",
+      "isEnglishNative": false
+    },
+    "sohee": {
+      "displayName": "Sohee",
+      "nativeLanguage": "Korean",
+      "shortDescription": "Korean-native warm female voice with rich emotion.",
+      "isEnglishNative": false
+    }
+  },
+  "models": [
+    {
+      "id": "pro_custom",
+      "name": "Built-in Voice",
+      "tier": "pro",
+      "mode": "custom",
+      "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "huggingFaceRevision": "50c40b2221344ed2f1bf2c475dffba47ae7896e0",
+      "artifactVersion": "2026.09.14.1",
+      "iosDownloadEligible": false,
+      "estimatedDownloadBytes": 2817779315,
+      "outputSubfolder": "CustomVoice",
+      "requiredRelativePaths": [
+        "README.md",
+        "config.json",
+        "generation_config.json",
+        "marking/audioseal_wm16_generator_fp16.safetensors",
+        "merges.txt",
+        "model.safetensors",
+        "model.safetensors.index.json",
+        "preprocessor_config.json",
+        "speech_tokenizer/config.json",
+        "speech_tokenizer/configuration.json",
+        "speech_tokenizer/model.safetensors",
+        "speech_tokenizer/preprocessor_config.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "variants": [
+        {
+          "id": "speed",
+          "name": "Speed",
+          "kind": "speed",
+          "platforms": [
+            "iOS",
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+          "huggingFaceRevision": "29c4b746cd1e2a916f0233b241019205dffbfbc2",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": true,
+          "estimatedDownloadBytes": 2049696897,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "custom_voice",
+            "supportsInstructionControl": true,
+            "supportsVoiceClone": false,
+            "supportsXVectorOnlyClone": false,
+            "requiresSpeakerEncoder": false,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        },
+        {
+          "id": "quality",
+          "name": "Quality",
+          "kind": "quality",
+          "platforms": [
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+          "huggingFaceRevision": "50c40b2221344ed2f1bf2c475dffba47ae7896e0",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": false,
+          "estimatedDownloadBytes": 2817779315,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "custom_voice",
+            "supportsInstructionControl": true,
+            "supportsVoiceClone": false,
+            "supportsXVectorOnlyClone": false,
+            "requiresSpeakerEncoder": false,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        }
+      ],
+      "qwen3Capabilities": {
+        "modelSize": "pro1b7",
+        "familyType": "custom_voice",
+        "supportsInstructionControl": true,
+        "supportsVoiceClone": false,
+        "supportsXVectorOnlyClone": false,
+        "requiresSpeakerEncoder": false,
+        "tokenizerProfile": {
+          "name": "qwen3_tts_tokenizer_12hz",
+          "sampleRateHz": 24000,
+          "frameRateHz": 12.5,
+          "decoderQuantizers": 16,
+          "encoderValidQuantizers": 16,
+          "encoderConfiguredQuantizers": 32,
+          "codebookSize": 2048,
+          "semanticCodebookSize": 4096
+        },
+        "generationDefaults": {
+          "checkpointMaxNewTokens": 8192,
+          "wrapperFallbackMaxNewTokens": 2048,
+          "appPolicyMaxNewTokens": 2048,
+          "temperature": 0.9,
+          "topP": 1.0,
+          "topK": 50,
+          "doSample": true,
+          "repetitionPenalty": 1.05,
+          "source": "app_policy"
+        },
+        "artifactAvailability": "public_artifact"
+      }
+    },
+    {
+      "id": "pro_design",
+      "name": "Voice Design",
+      "tier": "pro",
+      "mode": "design",
+      "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "huggingFaceRevision": "bb56faf7920923e0ca398798e6b2515b5fcde503",
+      "artifactVersion": "2026.09.14.1",
+      "iosDownloadEligible": false,
+      "estimatedDownloadBytes": 2817778822,
+      "outputSubfolder": "VoiceDesign",
+      "requiredRelativePaths": [
+        "README.md",
+        "config.json",
+        "generation_config.json",
+        "marking/audioseal_wm16_generator_fp16.safetensors",
+        "merges.txt",
+        "model.safetensors",
+        "model.safetensors.index.json",
+        "preprocessor_config.json",
+        "speech_tokenizer/config.json",
+        "speech_tokenizer/configuration.json",
+        "speech_tokenizer/model.safetensors",
+        "speech_tokenizer/preprocessor_config.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "variants": [
+        {
+          "id": "speed",
+          "name": "Speed",
+          "kind": "speed",
+          "platforms": [
+            "iOS",
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+          "huggingFaceRevision": "62f2646e55499e3d5bc73abec274342718220ffe",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": true,
+          "estimatedDownloadBytes": 2049696404,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "voice_design",
+            "supportsInstructionControl": true,
+            "supportsVoiceClone": false,
+            "supportsXVectorOnlyClone": false,
+            "requiresSpeakerEncoder": false,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        },
+        {
+          "id": "quality",
+          "name": "Quality",
+          "kind": "quality",
+          "platforms": [
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+          "huggingFaceRevision": "bb56faf7920923e0ca398798e6b2515b5fcde503",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": false,
+          "estimatedDownloadBytes": 2817778822,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "voice_design",
+            "supportsInstructionControl": true,
+            "supportsVoiceClone": false,
+            "supportsXVectorOnlyClone": false,
+            "requiresSpeakerEncoder": false,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        }
+      ],
+      "qwen3Capabilities": {
+        "modelSize": "pro1b7",
+        "familyType": "voice_design",
+        "supportsInstructionControl": true,
+        "supportsVoiceClone": false,
+        "supportsXVectorOnlyClone": false,
+        "requiresSpeakerEncoder": false,
+        "tokenizerProfile": {
+          "name": "qwen3_tts_tokenizer_12hz",
+          "sampleRateHz": 24000,
+          "frameRateHz": 12.5,
+          "decoderQuantizers": 16,
+          "encoderValidQuantizers": 16,
+          "encoderConfiguredQuantizers": 32,
+          "codebookSize": 2048,
+          "semanticCodebookSize": 4096
+        },
+        "generationDefaults": {
+          "checkpointMaxNewTokens": 8192,
+          "wrapperFallbackMaxNewTokens": 2048,
+          "appPolicyMaxNewTokens": 2048,
+          "temperature": 0.9,
+          "topP": 1.0,
+          "topK": 50,
+          "doSample": true,
+          "repetitionPenalty": 1.05,
+          "source": "app_policy"
+        },
+        "artifactAvailability": "public_artifact"
+      }
+    },
+    {
+      "id": "pro_clone",
+      "name": "Voice Cloning",
+      "tier": "pro",
+      "mode": "clone",
+      "folder": "Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "huggingFaceRevision": "f63ea141cb13df98974a4184cc7c35cb58699af5",
+      "artifactVersion": "2026.09.14.1",
+      "iosDownloadEligible": false,
+      "estimatedDownloadBytes": 2841796455,
+      "outputSubfolder": "Clones",
+      "requiredRelativePaths": [
+        "README.md",
+        "config.json",
+        "generation_config.json",
+        "marking/audioseal_wm16_generator_fp16.safetensors",
+        "merges.txt",
+        "model.safetensors",
+        "model.safetensors.index.json",
+        "preprocessor_config.json",
+        "speech_tokenizer/config.json",
+        "speech_tokenizer/configuration.json",
+        "speech_tokenizer/model.safetensors",
+        "speech_tokenizer/preprocessor_config.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "variants": [
+        {
+          "id": "speed",
+          "name": "Speed",
+          "kind": "speed",
+          "platforms": [
+            "iOS",
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+          "huggingFaceRevision": "47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": true,
+          "estimatedDownloadBytes": 2073713977,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "base_clone",
+            "supportsInstructionControl": false,
+            "supportsVoiceClone": true,
+            "supportsXVectorOnlyClone": true,
+            "requiresSpeakerEncoder": true,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        },
+        {
+          "id": "quality",
+          "name": "Quality",
+          "kind": "quality",
+          "platforms": [
+            "macOS"
+          ],
+          "folder": "Qwen3-TTS-12Hz-1.7B-Base-8bit",
+          "huggingFaceRepo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+          "huggingFaceRevision": "f63ea141cb13df98974a4184cc7c35cb58699af5",
+          "artifactVersion": "2026.09.14.1",
+          "iosDownloadEligible": false,
+          "estimatedDownloadBytes": 2841796455,
+          "requiredRelativePaths": [
+            "README.md",
+            "config.json",
+            "generation_config.json",
+            "marking/audioseal_wm16_generator_fp16.safetensors",
+            "merges.txt",
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "preprocessor_config.json",
+            "speech_tokenizer/config.json",
+            "speech_tokenizer/configuration.json",
+            "speech_tokenizer/model.safetensors",
+            "speech_tokenizer/preprocessor_config.json",
+            "tokenizer_config.json",
+            "vocab.json"
+          ],
+          "qwen3Capabilities": {
+            "modelSize": "pro1b7",
+            "familyType": "base_clone",
+            "supportsInstructionControl": false,
+            "supportsVoiceClone": true,
+            "supportsXVectorOnlyClone": true,
+            "requiresSpeakerEncoder": true,
+            "tokenizerProfile": {
+              "name": "qwen3_tts_tokenizer_12hz",
+              "sampleRateHz": 24000,
+              "frameRateHz": 12.5,
+              "decoderQuantizers": 16,
+              "encoderValidQuantizers": 16,
+              "encoderConfiguredQuantizers": 32,
+              "codebookSize": 2048,
+              "semanticCodebookSize": 4096
+            },
+            "generationDefaults": {
+              "checkpointMaxNewTokens": 8192,
+              "wrapperFallbackMaxNewTokens": 2048,
+              "appPolicyMaxNewTokens": 2048,
+              "temperature": 0.9,
+              "topP": 1.0,
+              "topK": 50,
+              "doSample": true,
+              "repetitionPenalty": 1.05,
+              "source": "app_policy"
+            },
+            "artifactAvailability": "public_artifact"
+          }
+        }
+      ],
+      "qwen3Capabilities": {
+        "modelSize": "pro1b7",
+        "familyType": "base_clone",
+        "supportsInstructionControl": false,
+        "supportsVoiceClone": true,
+        "supportsXVectorOnlyClone": true,
+        "requiresSpeakerEncoder": true,
+        "tokenizerProfile": {
+          "name": "qwen3_tts_tokenizer_12hz",
+          "sampleRateHz": 24000,
+          "frameRateHz": 12.5,
+          "decoderQuantizers": 16,
+          "encoderValidQuantizers": 16,
+          "encoderConfiguredQuantizers": 32,
+          "codebookSize": 2048,
+          "semanticCodebookSize": 4096
+        },
+        "generationDefaults": {
+          "checkpointMaxNewTokens": 8192,
+          "wrapperFallbackMaxNewTokens": 2048,
+          "appPolicyMaxNewTokens": 2048,
+          "temperature": 0.9,
+          "topP": 1.0,
+          "topK": 50,
+          "doSample": true,
+          "repetitionPenalty": 1.05,
+          "source": "app_policy"
+        },
+        "artifactAvailability": "public_artifact"
+      }
+    }
+  ]
+}

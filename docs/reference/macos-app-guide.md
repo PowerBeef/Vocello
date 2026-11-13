@@ -219,7 +219,7 @@ headings use `settings_detail_<category>`, and `settings_backButton` returns to 
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
 | App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads English, which beginSession selects through this control) |
 | Auto-play | `preferences_autoPlayToggle` |
-| Prefer lower-memory models | `settings_preferSpeedEverywhere` |
+| Prefer lower-memory models | `settings_preferSpeedEverywhere` (shown only when a mode offers two packages; since RF-59 each mode has one model, so neither it nor the toolbar's `<prefix>_<kind>VariantButton` switch appears, and a package row reads Model with no badge) |
 | Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; in the Voice Cloning detail page |
 | Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_outputResetButton` / `preferences_outputDirectoryWarning` / `preferences_outputDirectoryIssue` / `preferences_openFinderButton` |
 | Updates | `settings_automaticUpdateChecks` (toggle "Check for updates automatically") / `settings_checkForUpdates` (button "Check for Updates…", the same action as the Vocello menu item; disabled while Sparkle cannot check, for example during a check) |

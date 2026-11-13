@@ -9,18 +9,18 @@
   ],
   "artifacts": [
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit/resolve/f63ea141cb13df98974a4184cc7c35cb58699af5",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn/resolve/5af70b5c61199b060152d80f5b232d7aa1da9618",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "6ea1eb3f0e547c0bce96cda87a453f7615866f964c3d8d97eab4ea6097d9a903",
-          "sizeBytes": 1263
+          "sha256": "92a47ffc4a4a57f83e79302996063597d31fcf7f5b71a3f1fbc5567e1087be28",
+          "sizeBytes": 1896
         },
         {
           "relativePath": "config.json",
-          "sha256": "f8c83f227b1d912dcbe78ae61f958c34ae0885c22be67ae1d2cc4bfbc26f6300",
-          "sizeBytes": 4738
+          "sha256": "82ecd581abb3ec6b1d085e04372e412f2142a47589a08f244166245dc9a6369f",
+          "sizeBytes": 17354
         },
         {
           "relativePath": "generation_config.json",
@@ -39,12 +39,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "457a68428a26479f6f7370ae04947556f2a93cb0a5c2a9278d18f8d2b8c54d57",
-          "sizeBytes": 2125604061
+          "sha256": "53174c002a901d27ea048910467cc716dfc244d51c7dbd3d081f0b4dd2eaea63",
+          "sizeBytes": 1533681664
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "eb2d5305f02e9b0ab75f32236a0b4a3b11fa95b62003e1871d4cf5c8cd1ee761",
+          "sha256": "dce50a1bac5ccbf32a0e773ba91769f716a2bc89682bc05420376e7bbf5d78a2",
           "sizeBytes": 74225
         },
         {
@@ -83,121 +83,33 @@
           "sizeBytes": 2776833
         }
       ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-Base-8bit",
-      "modelID": "pro_clone",
-      "platforms": [
-        "macOS"
-      ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit",
-      "revision": "f63ea141cb13df98974a4184cc7c35cb58699af5",
-      "sharedComponentIDs": [
-        "qwen3-speech-tokenizer-v1"
-      ],
-      "totalBytes": 2841796455,
-      "variantID": "quality"
-    },
-    {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
-      "files": [
-        {
-          "relativePath": "README.md",
-          "sha256": "26e86b0119ef69cce3f7ca8ff2456151cdc26155f231f00bd37357d27eb4542b",
-          "sizeBytes": 1269
-        },
-        {
-          "relativePath": "config.json",
-          "sha256": "1a04f9f9eb4d5398d813aee10e37c5db2e1ba83c05fe0566aef9676bc1e6222c",
-          "sizeBytes": 4738
-        },
-        {
-          "relativePath": "generation_config.json",
-          "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
-          "sizeBytes": 245
-        },
-        {
-          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
-          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
-          "sizeBytes": 29360042
-        },
-        {
-          "relativePath": "merges.txt",
-          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
-          "sizeBytes": 1671839
-        },
-        {
-          "relativePath": "model.safetensors",
-          "sha256": "367d4d07a47ca7cd54fef8989675d838c55a5536942f83a815884302a2975d33",
-          "sizeBytes": 1357521577
-        },
-        {
-          "relativePath": "model.safetensors.index.json",
-          "sha256": "bace8628b0a08b873b10832c94ad4321be25ab5290845bc994620a3726045887",
-          "sizeBytes": 74225
-        },
-        {
-          "relativePath": "preprocessor_config.json",
-          "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
-          "sizeBytes": 127
-        },
-        {
-          "relativePath": "speech_tokenizer/config.json",
-          "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
-          "sizeBytes": 2336
-        },
-        {
-          "relativePath": "speech_tokenizer/configuration.json",
-          "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
-          "sizeBytes": 76
-        },
-        {
-          "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
-          "sizeBytes": 682293092
-        },
-        {
-          "relativePath": "speech_tokenizer/preprocessor_config.json",
-          "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
-          "sizeBytes": 234
-        },
-        {
-          "relativePath": "tokenizer_config.json",
-          "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
-          "sizeBytes": 7344
-        },
-        {
-          "relativePath": "vocab.json",
-          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
-          "sizeBytes": 2776833
-        }
-      ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "folder": "Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn",
       "modelID": "pro_clone",
       "platforms": [
         "iOS",
         "macOS"
       ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit",
-      "revision": "47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn",
+      "revision": "5af70b5c61199b060152d80f5b232d7aa1da9618",
       "sharedComponentIDs": [
         "qwen3-speech-tokenizer-v1"
       ],
-      "totalBytes": 2073713977,
+      "totalBytes": 2249887307,
       "variantID": "speed"
     },
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit/resolve/50c40b2221344ed2f1bf2c475dffba47ae7896e0",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn/resolve/c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "14cdb04c8d51d31146c416f9ab42ec75def21b242aac39c3f998945d11743e81",
-          "sizeBytes": 1291
+          "sha256": "850d09a7f0ca1925f845c18e2f658a89dc3ae1b5536edf6eb66a962529e4d3a0",
+          "sizeBytes": 1945
         },
         {
           "relativePath": "config.json",
-          "sha256": "83ea9d24c50834fdeab36ca504569b4400e91d1d081cf6fc0b44ff306e778812",
-          "sizeBytes": 5158
+          "sha256": "ae6a5039abd3fdeb8ec5eca4fb8814761d506787cec79d27c2efc6cc32514158",
+          "sizeBytes": 17774
         },
         {
           "relativePath": "generation_config.json",
@@ -216,12 +128,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "0b868d14a60879c27ed4403ded040ba521ca5256c31127cdfb1cd3c864036886",
-          "sizeBytes": 2101592453
+          "sha256": "db90384b23d041d5165a75c452fe4d50762a627f905bfb98049fb350ae69377e",
+          "sizeBytes": 1509670352
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "cc5f12fc8acdc4f0db39ca7e21b8c987f047c7d5a19ed43fe5e08db665baefae",
+          "sha256": "0dd2f2416d2cac3f4a32505fbfe3639105aeb99c9f8b1a781ad0c5f7f9baa3bb",
           "sizeBytes": 68245
         },
         {
@@ -260,121 +172,33 @@
           "sizeBytes": 2776833
         }
       ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
-      "modelID": "pro_custom",
-      "platforms": [
-        "macOS"
-      ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
-      "revision": "50c40b2221344ed2f1bf2c475dffba47ae7896e0",
-      "sharedComponentIDs": [
-        "qwen3-speech-tokenizer-v1"
-      ],
-      "totalBytes": 2817779315,
-      "variantID": "quality"
-    },
-    {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/29c4b746cd1e2a916f0233b241019205dffbfbc2",
-      "files": [
-        {
-          "relativePath": "README.md",
-          "sha256": "ba7d73683fe44b5e8d3040ec8b1474f594f525924d5cdf67970bd0f1ffd30401",
-          "sizeBytes": 1297
-        },
-        {
-          "relativePath": "config.json",
-          "sha256": "4c9fca7895e801cac4f56098410895ee945c3ec78b7678fb509dcdc3a9daa0c8",
-          "sizeBytes": 5158
-        },
-        {
-          "relativePath": "generation_config.json",
-          "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
-          "sizeBytes": 245
-        },
-        {
-          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
-          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
-          "sizeBytes": 29360042
-        },
-        {
-          "relativePath": "merges.txt",
-          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
-          "sizeBytes": 1671839
-        },
-        {
-          "relativePath": "model.safetensors",
-          "sha256": "04a7b3790a337de55a7660e1d00e0c1dd0c10794532a924e294ce99978229e3d",
-          "sizeBytes": 1333510029
-        },
-        {
-          "relativePath": "model.safetensors.index.json",
-          "sha256": "a698ad3283e6f79851a4718b11b45ce859cc156d1c5bb497881c5a9e72325e4b",
-          "sizeBytes": 68245
-        },
-        {
-          "relativePath": "preprocessor_config.json",
-          "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
-          "sizeBytes": 127
-        },
-        {
-          "relativePath": "speech_tokenizer/config.json",
-          "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
-          "sizeBytes": 2336
-        },
-        {
-          "relativePath": "speech_tokenizer/configuration.json",
-          "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
-          "sizeBytes": 76
-        },
-        {
-          "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
-          "sizeBytes": 682293092
-        },
-        {
-          "relativePath": "speech_tokenizer/preprocessor_config.json",
-          "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
-          "sizeBytes": 234
-        },
-        {
-          "relativePath": "tokenizer_config.json",
-          "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
-          "sizeBytes": 7344
-        },
-        {
-          "relativePath": "vocab.json",
-          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
-          "sizeBytes": 2776833
-        }
-      ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "folder": "Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
       "modelID": "pro_custom",
       "platforms": [
         "iOS",
         "macOS"
       ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-      "revision": "29c4b746cd1e2a916f0233b241019205dffbfbc2",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
+      "revision": "c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
       "sharedComponentIDs": [
         "qwen3-speech-tokenizer-v1"
       ],
-      "totalBytes": 2049696897,
+      "totalBytes": 2225870484,
       "variantID": "speed"
     },
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit/resolve/bb56faf7920923e0ca398798e6b2515b5fcde503",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn/resolve/6bcae41e75db1312816efae9792661a7e70ba75e",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "39fd8023cf06da4c64c7c14bbf8da5110f96849f5f464088d7ba72b7feca4cff",
-          "sizeBytes": 1291
+          "sha256": "f0f1e7661717ad803d56ed942b53586f3475516c255303287178f5558e689cd9",
+          "sizeBytes": 1945
         },
         {
           "relativePath": "config.json",
-          "sha256": "93ac3b2fbbeec4abac72a4e5992cd06e47ae0b101ee003461d531a0be5b2f54b",
-          "sizeBytes": 4665
+          "sha256": "4d208ad5067d581f4a8972d4c633313ddd4d2cd4ba316d74fbe2c764c298e480",
+          "sizeBytes": 17281
         },
         {
           "relativePath": "generation_config.json",
@@ -393,12 +217,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "288130d9912b07f7f76fd67587d5c39f3d62f19e309d9f667ffb76bddeb5f348",
-          "sizeBytes": 2101592453
+          "sha256": "a9a8ec92321fb221477f46f04dbcc6964e614ddf0dc33cd5b82602c0c016daad",
+          "sizeBytes": 1509670352
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "cc5f12fc8acdc4f0db39ca7e21b8c987f047c7d5a19ed43fe5e08db665baefae",
+          "sha256": "0dd2f2416d2cac3f4a32505fbfe3639105aeb99c9f8b1a781ad0c5f7f9baa3bb",
           "sizeBytes": 68245
         },
         {
@@ -437,106 +261,18 @@
           "sizeBytes": 2776833
         }
       ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
-      "modelID": "pro_design",
-      "platforms": [
-        "macOS"
-      ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
-      "revision": "bb56faf7920923e0ca398798e6b2515b5fcde503",
-      "sharedComponentIDs": [
-        "qwen3-speech-tokenizer-v1"
-      ],
-      "totalBytes": 2817778822,
-      "variantID": "quality"
-    },
-    {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/62f2646e55499e3d5bc73abec274342718220ffe",
-      "files": [
-        {
-          "relativePath": "README.md",
-          "sha256": "2e39ffaa0853bdcd55e18c9cd3de49ebaf4b685d3c409914742927441e17790d",
-          "sizeBytes": 1297
-        },
-        {
-          "relativePath": "config.json",
-          "sha256": "3086bf9bc4ddcb36d83023ed85ea50c2a85fbaa7fce89fa7683d440e530d6afa",
-          "sizeBytes": 4665
-        },
-        {
-          "relativePath": "generation_config.json",
-          "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
-          "sizeBytes": 245
-        },
-        {
-          "relativePath": "marking/audioseal_wm16_generator_fp16.safetensors",
-          "sha256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
-          "sizeBytes": 29360042
-        },
-        {
-          "relativePath": "merges.txt",
-          "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
-          "sizeBytes": 1671839
-        },
-        {
-          "relativePath": "model.safetensors",
-          "sha256": "6dc7f6a505b598c833d00d4a8b548b0fbf28c70081870468700b5f6194a77865",
-          "sizeBytes": 1333510029
-        },
-        {
-          "relativePath": "model.safetensors.index.json",
-          "sha256": "a698ad3283e6f79851a4718b11b45ce859cc156d1c5bb497881c5a9e72325e4b",
-          "sizeBytes": 68245
-        },
-        {
-          "relativePath": "preprocessor_config.json",
-          "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
-          "sizeBytes": 127
-        },
-        {
-          "relativePath": "speech_tokenizer/config.json",
-          "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
-          "sizeBytes": 2336
-        },
-        {
-          "relativePath": "speech_tokenizer/configuration.json",
-          "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
-          "sizeBytes": 76
-        },
-        {
-          "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
-          "sizeBytes": 682293092
-        },
-        {
-          "relativePath": "speech_tokenizer/preprocessor_config.json",
-          "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
-          "sizeBytes": 234
-        },
-        {
-          "relativePath": "tokenizer_config.json",
-          "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
-          "sizeBytes": 7344
-        },
-        {
-          "relativePath": "vocab.json",
-          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
-          "sizeBytes": 2776833
-        }
-      ],
-      "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+      "folder": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn",
       "modelID": "pro_design",
       "platforms": [
         "iOS",
         "macOS"
       ],
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
-      "revision": "62f2646e55499e3d5bc73abec274342718220ffe",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn",
+      "revision": "6bcae41e75db1312816efae9792661a7e70ba75e",
       "sharedComponentIDs": [
         "qwen3-speech-tokenizer-v1"
       ],
-      "totalBytes": 2049696404,
+      "totalBytes": 2225869991,
       "variantID": "speed"
     }
   ],
@@ -585,17 +321,14 @@
       "sourceArtifactIdentities": [
         "pro_custom:speed",
         "pro_design:speed",
-        "pro_clone:speed",
-        "pro_custom:quality",
-        "pro_design:quality",
-        "pro_clone:quality"
+        "pro_clone:speed"
       ]
     }
   ],
   "sourceDigests": {
-    "Sources/Resources/qwenvoice_contract.json": "69f21e603802fbc20e011024f02ec3c95f292d19077820651cf6f9bcaf521662",
-    "Sources/Resources/qwenvoice_ios_model_catalog.json": "c906d6c9a6bcfad369096ae42d0df970913a3e91b5f5f5b3db85bc8a04c5f041",
-    "config/model-artifact-receipts.json": "47acceb9c6cea116fe9c439d0225efc78c86578cc96188209d9619178a6a4b4f",
+    "Sources/Resources/qwenvoice_contract.json": "d4ed447340bb71360ce3d973c60dae62273a438e24541b98744b356972201ec6",
+    "Sources/Resources/qwenvoice_ios_model_catalog.json": "1591c254abf26781173a83f5eed8645822f5ff56f11e8db6f134568d94343427",
+    "config/model-artifact-receipts.json": "fe73eb6f938f54e6f7747673c3e3da93d338040e6179470c1286b0b507ef4ce7",
     "config/model-catalog-schema-v2.json": "17b1a7518060be8ded86473a9be8cc9f734a77e02c29446004947a014b83f693"
   }
 }

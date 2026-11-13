@@ -111,11 +111,15 @@ misbehaving server cannot fill the disk before verification. On the Mac, one pro
 stages a model: a lock file beside the staging tree refuses a concurrent install from the app or the
 CLI (the iPhone's background downloader takes no file lock in its App Group container).
 
-The catalog is `complete`: the bundled iPhone evidence supplies the three Speed variants and
-`config/model-artifact-receipts.json` supplies the three Quality variants. All six packages pin a
-revision plus the exact size and SHA-256 of every required file; no hash or size is inferred.
-Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
-all six artifacts. It gives that component separate content identity (ordered path, size, and
+The catalog is `complete`: since RF-59 (2026-11-13) it holds three artifacts, one hybrid model per
+mode (the `speed` variant, on both platforms; [hybrid-model.md](hybrid-model.md)), whose receipts the
+bundled iPhone catalog supplies; `config/model-artifact-receipts.json` holds Mac-only receipts and is
+empty. Every artifact pins a revision plus the exact size and SHA-256 of every required file; no hash or
+size is inferred. Each model lists the Speed and Quality folders it replaced as `retiredFolders`: a host
+removes them through the shared component store once the model verifies (the Mac after its digest
+pass, the iPhone at launch, `vocello models install`), and the legacy cleanup leaves them alone until
+then. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
+all artifacts (the hybrids keep the shipped tokenizer, so installed copies are reused). It gives that component separate content identity (ordered path, size, and
 SHA-256) and compatibility identity (content plus component schema, loader ABI, runtime profile,
 and encoder capability), along with ordered source artifacts. Schema-v1 catalog documents remain
 read-compatible but cannot claim shared-component reuse.

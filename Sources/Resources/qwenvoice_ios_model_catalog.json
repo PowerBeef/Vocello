@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-08-01T23:56:53Z",
+  "generatedAt": "2026-11-13T06:35:00Z",
   "models": [
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/29c4b746cd1e2a916f0233b241019205dffbfbc2",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn/resolve/c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "ba7d73683fe44b5e8d3040ec8b1474f594f525924d5cdf67970bd0f1ffd30401",
-          "sizeBytes": 1297
+          "sha256": "850d09a7f0ca1925f845c18e2f658a89dc3ae1b5536edf6eb66a962529e4d3a0",
+          "sizeBytes": 1945
         },
         {
           "relativePath": "config.json",
-          "sha256": "4c9fca7895e801cac4f56098410895ee945c3ec78b7678fb509dcdc3a9daa0c8",
-          "sizeBytes": 5158
+          "sha256": "ae6a5039abd3fdeb8ec5eca4fb8814761d506787cec79d27c2efc6cc32514158",
+          "sizeBytes": 17774
         },
         {
           "relativePath": "generation_config.json",
@@ -32,12 +32,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "04a7b3790a337de55a7660e1d00e0c1dd0c10794532a924e294ce99978229e3d",
-          "sizeBytes": 1333510029
+          "sha256": "db90384b23d041d5165a75c452fe4d50762a627f905bfb98049fb350ae69377e",
+          "sizeBytes": 1509670352
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "a698ad3283e6f79851a4718b11b45ce859cc156d1c5bb497881c5a9e72325e4b",
+          "sha256": "0dd2f2416d2cac3f4a32505fbfe3639105aeb99c9f8b1a781ad0c5f7f9baa3bb",
           "sizeBytes": 68245
         },
         {
@@ -77,21 +77,21 @@
         }
       ],
       "modelID": "pro_custom",
-      "totalBytes": 2049696897
+      "totalBytes": 2225870484
     },
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/62f2646e55499e3d5bc73abec274342718220ffe",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn/resolve/6bcae41e75db1312816efae9792661a7e70ba75e",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "2e39ffaa0853bdcd55e18c9cd3de49ebaf4b685d3c409914742927441e17790d",
-          "sizeBytes": 1297
+          "sha256": "f0f1e7661717ad803d56ed942b53586f3475516c255303287178f5558e689cd9",
+          "sizeBytes": 1945
         },
         {
           "relativePath": "config.json",
-          "sha256": "3086bf9bc4ddcb36d83023ed85ea50c2a85fbaa7fce89fa7683d440e530d6afa",
-          "sizeBytes": 4665
+          "sha256": "4d208ad5067d581f4a8972d4c633313ddd4d2cd4ba316d74fbe2c764c298e480",
+          "sizeBytes": 17281
         },
         {
           "relativePath": "generation_config.json",
@@ -110,12 +110,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "6dc7f6a505b598c833d00d4a8b548b0fbf28c70081870468700b5f6194a77865",
-          "sizeBytes": 1333510029
+          "sha256": "a9a8ec92321fb221477f46f04dbcc6964e614ddf0dc33cd5b82602c0c016daad",
+          "sizeBytes": 1509670352
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "a698ad3283e6f79851a4718b11b45ce859cc156d1c5bb497881c5a9e72325e4b",
+          "sha256": "0dd2f2416d2cac3f4a32505fbfe3639105aeb99c9f8b1a781ad0c5f7f9baa3bb",
           "sizeBytes": 68245
         },
         {
@@ -155,21 +155,21 @@
         }
       ],
       "modelID": "pro_design",
-      "totalBytes": 2049696404
+      "totalBytes": 2225869991
     },
     {
-      "artifactVersion": "2026.09.14.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
+      "artifactVersion": "2026.11.13.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn/resolve/5af70b5c61199b060152d80f5b232d7aa1da9618",
       "files": [
         {
           "relativePath": "README.md",
-          "sha256": "26e86b0119ef69cce3f7ca8ff2456151cdc26155f231f00bd37357d27eb4542b",
-          "sizeBytes": 1269
+          "sha256": "92a47ffc4a4a57f83e79302996063597d31fcf7f5b71a3f1fbc5567e1087be28",
+          "sizeBytes": 1896
         },
         {
           "relativePath": "config.json",
-          "sha256": "1a04f9f9eb4d5398d813aee10e37c5db2e1ba83c05fe0566aef9676bc1e6222c",
-          "sizeBytes": 4738
+          "sha256": "82ecd581abb3ec6b1d085e04372e412f2142a47589a08f244166245dc9a6369f",
+          "sizeBytes": 17354
         },
         {
           "relativePath": "generation_config.json",
@@ -188,12 +188,12 @@
         },
         {
           "relativePath": "model.safetensors",
-          "sha256": "367d4d07a47ca7cd54fef8989675d838c55a5536942f83a815884302a2975d33",
-          "sizeBytes": 1357521577
+          "sha256": "53174c002a901d27ea048910467cc716dfc244d51c7dbd3d081f0b4dd2eaea63",
+          "sizeBytes": 1533681664
         },
         {
           "relativePath": "model.safetensors.index.json",
-          "sha256": "bace8628b0a08b873b10832c94ad4321be25ab5290845bc994620a3726045887",
+          "sha256": "dce50a1bac5ccbf32a0e773ba91769f716a2bc89682bc05420376e7bbf5d78a2",
           "sizeBytes": 74225
         },
         {
@@ -233,7 +233,7 @@
         }
       ],
       "modelID": "pro_clone",
-      "totalBytes": 2073713977
+      "totalBytes": 2249887307
     }
   ]
 }

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build and validate Vocello's immutable production model catalog.
 
-The bundled iPhone catalog owns the three Speed receipts and the repository
-receipt document owns the three macOS Quality receipts. This tool projects
-those exact per-file sizes and SHA-256 digests onto the cross-platform model
-contract without inventing values. ``--require-complete`` fails closed if a
+The bundled iPhone catalog owns the receipts of the three models both
+platforms ship (RF-59: one hybrid model per mode, since 2026-11-13), and the
+repository receipt document owns any macOS-only artifact (none today). This
+tool projects those exact per-file sizes and SHA-256 digests onto the
+cross-platform model contract without inventing values. ``--require-complete`` fails closed if a
 production artifact ever loses its exact identity.
 """
 
@@ -46,9 +47,6 @@ SHARED_COMPONENT_SOURCE_ORDER = (
     "pro_custom:speed",
     "pro_design:speed",
     "pro_clone:speed",
-    "pro_custom:quality",
-    "pro_design:quality",
-    "pro_clone:quality",
 )
 
 

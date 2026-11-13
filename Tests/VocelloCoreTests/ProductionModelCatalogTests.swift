@@ -4,7 +4,8 @@ import XCTest
 @testable import QwenVoiceCore
 
 final class ProductionModelCatalogTests: XCTestCase {
-    func testCheckedInSchemaV2CatalogCoversSixArtifactsAndOnlyThreeIOSSpeedArtifacts() throws {
+    /// RF-59: one hybrid model per mode, one artifact each, shipped on both platforms.
+    func testCheckedInSchemaV2CatalogCoversThreeArtifactsOnBothPlatforms() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -16,7 +17,9 @@ final class ProductionModelCatalogTests: XCTestCase {
         )
 
         XCTAssertEqual(catalog.schemaVersion, 2)
-        XCTAssertEqual(catalog.artifacts.count, 6)
+        XCTAssertEqual(catalog.artifacts.count, 3)
+        XCTAssertTrue(catalog.artifacts.allSatisfy { $0.platforms == [.iOS, .macOS] })
+        XCTAssertTrue(catalog.artifacts.allSatisfy { $0.folder.hasSuffix("-hybrid-attn") })
         XCTAssertEqual(catalog.sharedComponents.count, 1)
         XCTAssertEqual(
             catalog.sharedComponents[0].contentIdentity.files.map(\.relativePath),

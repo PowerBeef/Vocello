@@ -208,13 +208,29 @@ enum BenchCommand {
             defaults: GenerationMode.allCases.map(\.rawValue),
             allowed: GenerationMode.allCases.map(\.rawValue)
         )
+        // RF-59: the default is every package the contract offers each requested mode (one,
+        // `speed`, since the hybrid model); a kind a requested mode lacks fails here, before any
+        // model loads, instead of measuring something else.
+        let manifestOverride = args.string("manifest").map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
+        }
+        let offeredVariants = try CLIRuntime.offeredVariantKinds(
+            modes: modes, registry: CLIRuntime.contractRegistry(manifestOverride: manifestOverride)
+        )
         let variants = try parseMatrixAxis(
             args.string("variants"),
             option: "variants",
             wasBareFlag: args.flag("variants"),
-            defaults: ["speed", "quality"],
+            defaults: offeredVariants,
             allowed: ["speed", "quality"]
         )
+        if let unoffered = variants.first(where: { !offeredVariants.contains($0) }) {
+            throw CLIError(
+                .usageError,
+                "invalid --variants value: \(unoffered) (the contract offers "
+                    + "\(offeredVariants.joined(separator: ",")) for the requested modes)"
+            )
+        }
         let lengths = try parseMatrixAxis(
             args.string("lengths"),
             option: "lengths",
@@ -397,9 +413,6 @@ enum BenchCommand {
             explicitOverride: args.string("data-dir"),
             applicationSupportBase: Self.applicationSupportBaseDirectory()
         )
-        let manifestOverride = args.string("manifest").map {
-            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
-        }
         let registryContext = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: resolvedDataDir,
             manifestOverride: manifestOverride
@@ -1724,7 +1737,8 @@ enum BenchCommand {
 
         Options:
           --modes        strict comma list: custom,design,clone (default all)
-          --variants     strict comma list: speed,quality (default both)
+          --variants     strict comma list: speed,quality (default: every package
+                         the contract offers the requested modes; today speed)
           --lengths      strict comma list: short,medium,long (default all)
                          Empty, unknown, and duplicate axis values fail.
           --warm         warm reps per (cell × length); default 3. Zero is

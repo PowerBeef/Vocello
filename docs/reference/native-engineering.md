@@ -64,8 +64,9 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   `config/runtime-debug-knobs.json` and needs the internal-diagnostics build plus `QWENVOICE_DEBUG`.
   Every `@unchecked Sendable` and `nonisolated(unsafe)` is justified in
   `config/concurrency-safety.json`; `scripts/runtime_security_contract.py` checks both.
-- **Catalog activation fails closed.** The generated schema-v2 catalog is complete for all six
-  Speed/Quality artifacts; hosts use exact delivery plans; shared components are reused only after exact
+- **Catalog activation fails closed.** The generated schema-v2 catalog is complete for the three
+  artifacts both platforms ship (RF-59: one hybrid model per mode, each the `speed` variant); hosts
+  use exact delivery plans; shared components are reused only after exact
   store verification and installed as hard links, never symlinks. No live repository enumeration,
   inferred digests or partial catalogs. Model eligibility changes update `scripts/check_ios_catalog.sh`.
 - **RTF is the standard real-time factor.** `derivedMetrics.realTimeFactor` = request wall seconds

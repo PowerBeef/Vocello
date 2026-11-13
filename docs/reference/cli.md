@@ -248,7 +248,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | Option | Meaning |
 |---|---|
 | `--mode` | `custom` (default) · `design` · `clone` |
-| `--variant` | `speed` (4-bit) · `quality` (8-bit); without it, the package the Mac app uses for the mode (its explicit choice, "prefer lower-memory models", or this Mac's recommendation, falling back to an installed package): `vocello models active` shows it, and the result's `variantSource` says `flag` or `app` |
+| `--variant` | `speed` · `quality`; without it, the package the Mac app uses for the mode (its explicit choice, "prefer lower-memory models", or this Mac's recommendation, falling back to an installed package): `vocello models active` shows it, and the result's `variantSource` says `flag` or `app`. Since RF-59 every mode has one model, the `speed` package (the hybrid): `quality` still parses, adds a `variant_retired` warning and uses it, and `models use` or `models prefer-lower-memory` record their setting with the same warning |
 | `--text` / `--text-file` | inline text or a file (`-` reads stdin); with neither, piped stdin is used in text mode (the machine formats and `--no-input` read stdin only for `-`) |
 | `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`); an empty or blank value is refused |
 | `--voice-brief` | (design) plain-language voice description |
@@ -634,7 +634,10 @@ manager does and is refused (`engine_busy`) while the Vocello app or another voc
 either may have the model loaded; a package choice that named the removed model moves to another
 installed package of its mode, or back to the recommendation. Its `freedBytes` is the model folder's
 size; shared components another model still links stay. Installs and removals tell a running app
-(`com.qwenvoice.shared.modelsDidChange`).
+(`com.qwenvoice.shared.modelsDidChange`). After `install` verifies a model, or finds it already
+installed, the Speed and Quality folders that model replaced (RF-59, its contract `retiredFolders`) are
+removed as `remove` does, unless the app or another engine runs; a folder that cannot be removed adds a
+`retired_folders_kept` warning and stays for the next install or the app.
 
 `use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and
 `settings set prefer-lower-memory`; `models active` shows what each mode then resolves to.
@@ -677,7 +680,7 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 
 | Option | Meaning |
 |---|---|
-| `--modes` / `--variants` / `--lengths` | strict comma-list matrix axes: `custom,design,clone` / `speed,quality` / `short,medium,long`; empty, unknown, or duplicate values fail before runtime bootstrap |
+| `--modes` / `--variants` / `--lengths` | strict comma-list matrix axes: `custom,design,clone` / `speed,quality` / `short,medium,long`; empty, unknown, or duplicate values fail before runtime bootstrap. `--variants` defaults to every package the contract offers the requested modes (today `speed`), and a kind one of them lacks fails the same way |
 | `--warm` | warm reps per (cell × length); default 3 |
 | `--voice` / `--voice-brief` | clone voice name / design brief |
 | `--confirm-consent` | required when `clone` is in `--modes`: confirms you own or have permission to clone the saved voice |

@@ -92,6 +92,21 @@ enum ModelsCommand {
         let models: [VerifiedModel]
     }
 
+    /// RF-59: where every mode has one model, a package choice or the lower-memory preference is
+    /// still recorded (an older app or CLI reads it) but changes nothing; say so once. The setting
+    /// is already saved, so a contract that cannot be read only skips the note.
+    @MainActor
+    static func noteSingleModel(_ args: Args, setting: String) {
+        guard let registry = try? CLIRuntime.contractRegistry(
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        ) else { return }
+        let offersChoice = GenerationMode.allCases.contains { mode in
+            (registry.model(for: mode)?.platformVariants(for: .macOS).count ?? 0) > 1
+        }
+        guard !offersChoice else { return }
+        CLIPresenter.warn("variant_retired", "every mode has one model, so \(setting) has no effect")
+    }
+
     /// `action` is the canonical subcommand the parser resolved.
     @MainActor
     static func run(action: String, _ args: Args) async throws {
@@ -109,11 +124,15 @@ enum ModelsCommand {
             guard GenerationMode(rawValue: mode) != nil else {
                 throw CLIError(.invalidInput, "unknown mode '\(mode)'", hint: "use custom, design or clone")
             }
-            SettingsCommand.report(try SettingsCommand.set("variant.\(mode)", to: args.positionals.dropFirst().first ?? ""))
+            let entry = try SettingsCommand.set("variant.\(mode)", to: args.positionals.dropFirst().first ?? "")
+            noteSingleModel(args, setting: "the package choice")
+            SettingsCommand.report(entry)
             return
         }
         if action == "prefer-lower-memory" {
-            SettingsCommand.report(try SettingsCommand.set("prefer-lower-memory", to: args.positionals.first ?? ""))
+            let entry = try SettingsCommand.set("prefer-lower-memory", to: args.positionals.first ?? "")
+            noteSingleModel(args, setting: "the lower-memory preference")
+            SettingsCommand.report(entry)
             return
         }
         if action == "install" {
@@ -352,6 +371,7 @@ enum ModelsCommand {
             let stale = catalog.installedFileSizeMismatches(for: artifact, modelsRoot: ctx.modelsDirectory)
             if stale.isEmpty {
                 note("Already installed: \(modelID)")
+                reclaimRetiredFolders(of: modelID, ctx: ctx)
                 return Installed(modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir))
             }
             repairingStaleInstall = true
@@ -447,9 +467,30 @@ enum ModelsCommand {
         }
 
         DesktopChangeNotice.models.post()
+        reclaimRetiredFolders(of: modelID, ctx: ctx)
         return Installed(
             modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: directorySize(targetDir)
         )
+    }
+
+    /// RF-59: the mode's model is in place (a fresh install verified file by file against the
+    /// catalog; an existing one complete, with every catalog file at its pinned size, the depth of
+    /// the iPhone's launch check), so the Speed and Quality folders it replaced go, as the apps
+    /// remove them; never while the app or another engine runs, since an older one may still load
+    /// them.
+    static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) {
+        guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return }
+        let result = ctx.registry.reclaimRetiredFolders(in: ctx.modelsDirectory) { $0.id == modelID }
+        for folder in result.removed {
+            note("Removed the retired model folder \(folder)")
+        }
+        if !result.failed.isEmpty {
+            CLIPresenter.warn(
+                "retired_folders_kept",
+                "\(result.failed.count) retired model folder(s) could not be removed; the next install or the app retries",
+                detail: ["folders": .array(result.failed.keys.sorted().map { .string($0) })]
+            )
+        }
     }
 
     /// `vocello models install-recommended [--plan]`: installs the package each

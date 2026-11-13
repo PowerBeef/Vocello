@@ -266,7 +266,7 @@ public enum VocelloCommandTree {
         usage: ["vocello bench [--modes custom,design,clone] [--variants speed,quality] [--lengths short,medium,long] [--warm 3] [options]"],
         options: [
             .value("modes", .list(modes), "list", "strict comma list of modes (default all)"),
-            .value("variants", .list(variants), "list", "strict comma list of variants (default both)"),
+            .value("variants", .list(variants), "list", "strict comma list of variants (default: every package the contract offers the requested modes)"),
             .value("lengths", .list(["short", "medium", "long"]), "list", "strict comma list of lengths (default all)"),
             .value("warm", .integer, "n", "warm repetitions per cell and length (default 3)"),
             .flag("no-cold", "with --delivery, skip the Custom/Design cold take"),

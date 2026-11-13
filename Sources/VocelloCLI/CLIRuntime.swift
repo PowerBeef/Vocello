@@ -201,10 +201,7 @@ public struct CLIRuntime {
         if let warm = CLIEngineScope.warm {
             return try warm.registryContext(dataDirectory: dataDirectory, manifestOverride: manifestOverride)
         }
-        let manifestURL = try manifestOverride ?? locateManifestURL()
-        let deviceClass = NativeMemoryPolicyResolver.deviceClass()
-        let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
-            .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
+        let registry = try contractRegistry(manifestOverride: manifestOverride)
         let components = try NativeRuntimeFactory.make(
             registry: registry,
             paths: .rooted(at: dataDirectory),
@@ -213,6 +210,30 @@ public struct CLIRuntime {
             registry: components.modelRegistry,
             modelAssetStore: components.modelAssetStore,
             modelsDirectory: dataDirectory.appendingPathComponent("models", isDirectory: true))
+    }
+
+    /// The contract's registry for this Mac, as every bootstrap expands it, without the runtime:
+    /// no data directory is touched, so a command reads it to validate its arguments first.
+    public static func contractRegistry(manifestOverride: URL?) throws -> ContractBackedModelRegistry {
+        try ContractBackedModelRegistry(manifestURL: manifestOverride ?? locateManifestURL())
+            .expandedForPlatform(.macOS, deviceClass: NativeMemoryPolicyResolver.deviceClass(), includeBaseAliases: true)
+    }
+
+    /// RF-59: the variant kinds (`speed`, `quality`) `registry` offers every one of `modes` on this
+    /// Mac, in that order: `vocello bench`'s default matrix. Throws when the modes share none.
+    public nonisolated static func offeredVariantKinds(
+        modes: [String], registry: ContractBackedModelRegistry
+    ) throws -> [String] {
+        let offered = ["speed", "quality"].filter { kind in
+            modes.allSatisfy { raw in
+                guard let mode = GenerationMode(rawValue: raw) else { return false }
+                return (try? modelID(registry: registry, mode: mode, quality: kind == "quality")) != nil
+            }
+        }
+        guard !offered.isEmpty else {
+            throw CLIError(.configError, "the contract offers no package common to --modes \(modes.joined(separator: ","))")
+        }
+        return offered
     }
 
     /// Resolve a (mode, variant) to the variant-scoped model id the engine loads

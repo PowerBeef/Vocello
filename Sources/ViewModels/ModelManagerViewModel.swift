@@ -312,6 +312,16 @@ final class ModelManagerViewModel {
             }
     }
 
+    /// Whether `mode` offers a package choice. RF-59 ships one model per mode, so the Speed/Quality
+    /// switch and its preference only appear for a contract that offers two.
+    func offersVariantChoice(for mode: GenerationMode) -> Bool {
+        variants(for: mode).count > 1
+    }
+
+    var offersAnyVariantChoice: Bool {
+        GenerationMode.allCases.contains(where: offersVariantChoice)
+    }
+
     /// Legacy helper retained for call sites that still need the original
     /// two-package projection. New UI should use `variants(for:)`.
     func pairedVariants(
@@ -440,6 +450,9 @@ final class ModelManagerViewModel {
     }
 
     func activeVariantLabel(for model: TTSModel) -> String {
+        // RF-59: a mode with one model has no tier to name ("Custom Voice Model", never
+        // "Custom Voice Speed (1.7B 4-bit)").
+        guard offersVariantChoice(for: model.mode) else { return MacInterfaceText.workflowModel }
         let kind = model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)
         let bits = model.variantKind?.bitDepthLabel
         guard let bits, !bits.isEmpty else { return kind }
@@ -1000,10 +1013,33 @@ final class ModelManagerViewModel {
     private func performRefresh() async {
         let modelsDirectory = modelsDirectory
         let startedGenerations = mutationGenerations
+        let manifestURL = TTSContract.manifestURL
         let snapshots = await Task.detached(priority: .utility) { @concurrent in
-            Self.fetchSnapshots(in: modelsDirectory)
+            let snapshots = Self.fetchSnapshots(in: modelsDirectory)
+            Self.reclaimRetiredFolders(in: modelsDirectory, manifestURL: manifestURL, snapshots: snapshots)
+            return snapshots
         }.value
         applySnapshots(snapshots, startedGenerations: startedGenerations)
+    }
+
+    /// RF-59: once a mode's model has verified (the content-digest pass just run), the Speed and
+    /// Quality folders it replaced go through the shared component store. Off the main actor.
+    private nonisolated static func reclaimRetiredFolders(
+        in modelsDirectory: URL, manifestURL: URL?, snapshots: [ModelInfo]
+    ) {
+        let verified = Set(snapshots.filter { $0.deepIntegrityStatus == "verified" }.map(\.id))
+        guard !verified.isEmpty, let manifestURL,
+              let registry = try? ContractBackedModelRegistry(manifestURL: manifestURL)
+                .expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: false) else { return }
+        let result = registry.reclaimRetiredFolders(in: modelsDirectory) { verified.contains($0.id) }
+        for folder in result.removed {
+            ModelManagerLog.logger.info("[ModelManagerViewModel] reclaimed retired model folder \(folder, privacy: .public)")
+        }
+        for (folder, reason) in result.failed.sorted(by: { $0.key < $1.key }) {
+            ModelManagerLog.logger.error(
+                "[ModelManagerViewModel] retired model folder \(folder, privacy: .public) kept: \(reason, privacy: .private)"
+            )
+        }
     }
 
     /// The only content-digest pass: detached, off the main actor. The launch

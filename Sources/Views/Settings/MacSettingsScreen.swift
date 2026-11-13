@@ -57,7 +57,9 @@ struct MacSettingsScreen: View {
                         case .appLanguage:
                             interfaceSection
                         case .modelsFiles:
-                            performanceSection
+                            if viewModel.offersAnyVariantChoice {
+                                performanceSection
+                            }
                             modelsSection.onAppear { focusHighlighted(using: proxy) }
                             storageSection
                         case .cloning:

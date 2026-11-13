@@ -500,6 +500,23 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
         )
     }
 
+    /// RF-59: removes the retired folders of every model whose install verifies at `depth`
+    /// (on the iPhone, at launch: its files were verified against the catalog when downloaded).
+    /// Synchronous and possibly slow: call it off the main actor.
+    public func reclaimRetiredFolders(depth: ModelAssetIntegrityDepth = .manifestSizes) -> RetiredModelReclamation {
+        var verified = Set<String>()
+        for descriptor in descriptors where !descriptor.model.retiredFolders.isEmpty {
+            if case .verified = deepIntegrity(for: descriptor, depth: depth) {
+                verified.insert(descriptor.model.id)
+            }
+        }
+        let folders = RetiredModelReclamation.folders(
+            of: descriptors.map(\.model), in: rootDirectory, isVerified: { verified.contains($0.id) }
+        )
+        guard !folders.isEmpty else { return RetiredModelReclamation(removed: [], failed: [:]) }
+        return SharedModelComponentStore(modelsRoot: rootDirectory).reclaimRetiredFolders(folders)
+    }
+
     private static func cleanupLegacyInstallFolders(
         at rootDirectory: URL,
         activeInstallFolders: Set<String>,

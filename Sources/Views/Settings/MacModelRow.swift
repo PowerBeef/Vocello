@@ -213,7 +213,10 @@ struct MacModelPackageLine: View {
 
     @ViewBuilder
     private var packageBadge: some View {
-        if viewModel.isHardwareRisky(model) {
+        if !viewModel.offersVariantChoice(for: model.mode) {
+            // One model per mode (RF-59): nothing to recommend between.
+            EmptyView()
+        } else if viewModel.isHardwareRisky(model) {
             Text(MacInterfaceText.settingsHeavy)
                 .macType(.badge)
                 .foregroundStyle(MacTheme.Status.guarded)
@@ -229,6 +232,8 @@ struct MacModelPackageLine: View {
     }
 
     private var compactVariantLabel: String {
+        // RF-59: a mode with one model has no tier to name.
+        guard viewModel.offersVariantChoice(for: model.mode) else { return MacInterfaceText.workflowModel }
         let kind = model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)
         guard let depth = model.variantKind?.depthLabel else {
             return kind
@@ -338,8 +343,16 @@ private struct MacModelPackageAction: View {
         }
         .buttonStyle(packageStyle(tint: modeTint))
         .background(NSViewHostAccessor(holder: manageHostHolder))
-        .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)))
+        .help(MacInterfaceText.settingsManageHelp(manageHelpSubject))
         .accessibilityIdentifier("settings_manage_\(model.id)")
+    }
+
+    /// RF-59: a mode with one model names the mode, not a tier.
+    private var manageHelpSubject: String {
+        guard viewModel.offersVariantChoice(for: model.mode), let kind = model.variantKind else {
+            return MacInterfaceText.modeName(model.mode)
+        }
+        return kind.displayName
     }
 
     private var modeTint: Color {

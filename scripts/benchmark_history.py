@@ -1709,7 +1709,15 @@ def default_models(record: dict[str, Any], *, allow_superseded: bool = False) ->
                 break
         folder = str(selected.get("folder", definition.get("folder", "")))
         quantization_match = re.search(r"-(\d+)bit$", folder, re.IGNORECASE)
-        expected_quantization = f"{quantization_match.group(1)}-bit" if quantization_match else "unquantized"
+        # As the runtime reads it (Qwen3TTSRuntimeProfile.quantizationTier): the folder's -Nbit
+        # suffix, else config.json's top-level bits. A hybrid (RF-59, `-hybrid-<recipe>`) keeps the
+        # 4-bit model's config, with its 8-bit modules listed per layer, so it reads 4-bit.
+        if quantization_match:
+            expected_quantization = f"{quantization_match.group(1)}-bit"
+        elif re.search(r"-hybrid-[a-z0-9-]+$", folder, re.IGNORECASE):
+            expected_quantization = "4-bit"
+        else:
+            expected_quantization = "unquantized"
         expected_repository = str(selected.get("huggingFaceRepo", definition.get("huggingFaceRepo", "")))
         expected_revision = str(selected.get("huggingFaceRevision", definition.get("huggingFaceRevision", "")))
         expected_artifact = str(selected.get("artifactVersion", definition.get("artifactVersion", "")))

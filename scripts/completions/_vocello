@@ -846,7 +846,7 @@ _vocello() {
     bench)
       options=(
         '--modes:strict comma list of modes (default all)'
-        '--variants:strict comma list of variants (default both)'
+        '--variants:strict comma list of variants (default\: every package the contract offers the requested modes)'
         '--lengths:strict comma list of lengths (default all)'
         '--warm:warm repetitions per cell and length (default 3)'
         '--no-cold:with --delivery, skip the Custom/Design cold take'

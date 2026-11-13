@@ -153,7 +153,11 @@ struct ContentView: View {
                     }
                 }
                 .toolbar {
-                    MacWindowToolbar(selectedItem: appModel.selectedItem)
+                    MacWindowToolbar(
+                        selectedItem: appModel.selectedItem,
+                        offersVariantChoice: appModel.selectedItem?.generationMode
+                            .map(modelManager.offersVariantChoice(for:)) ?? false
+                    )
                 }
         }
         .navigationSplitViewStyle(.balanced)

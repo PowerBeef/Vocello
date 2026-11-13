@@ -7,12 +7,37 @@ import VocelloDesktopCore
 
 /// RF-26: the CLI resolves each mode's package the way the Mac app does: the
 /// explicit choice, then the lower-memory preference, then the hardware
-/// recommendation; a take falls back to the first installed package.
+/// recommendation; a take falls back to the first installed package. Since RF-59
+/// the shipped contract offers one package per mode, so the choice logic runs on
+/// the last two-package contract (Tests/Fixtures/two-package-model-contract.json).
 final class DesktopModelSelectionTests: XCTestCase {
-    private func registry(_ deviceClass: NativeDeviceMemoryClass) throws -> ContractBackedModelRegistry {
+    /// RF-59: the shipped contract offers one package per mode, on every memory tier: Speed,
+    /// the hybrid, whatever the stored choice or the lower-memory preference says.
+    func testTheShippedContractOffersOnePackagePerMode() throws {
         let manifest = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        for deviceClass in [NativeDeviceMemoryClass.floor8GBMac, .mid16GBMac, .highMemoryMac] {
+            let registry = try ContractBackedModelRegistry(manifestURL: manifest)
+                .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
+            let choices = DesktopModelSelection.resolve(
+                registry: registry, explicitVariantID: { _ in "quality" }, prefersLowerMemory: false,
+                deviceClass: deviceClass, isInstalled: { _ in true }
+            )
+            XCTAssertEqual(choices.count, 3)
+            for choice in choices {
+                XCTAssertEqual(choice.variants, ["speed"], "\(deviceClass) \(choice.mode)")
+                XCTAssertEqual(choice.activeVariant, "speed")
+                XCTAssertEqual(choice.activeModelID, "pro_\(choice.mode)_speed")
+                XCTAssertTrue(registry.model(id: "pro_\(choice.mode)_speed")?.folder.hasSuffix("-hybrid-attn") ?? false)
+            }
+        }
+    }
+
+    private func registry(_ deviceClass: NativeDeviceMemoryClass) throws -> ContractBackedModelRegistry {
+        let manifest = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Tests/Fixtures/two-package-model-contract.json")
         return try ContractBackedModelRegistry(manifestURL: manifest)
             .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
     }
@@ -129,7 +154,7 @@ final class DesktopModelInventoryTests: XCTestCase {
     func testAnInstallIsCompleteOnlyWithEveryRequiredFile() throws {
         let manifest = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+            .appendingPathComponent("Tests/Fixtures/two-package-model-contract.json")
         let registry = try ContractBackedModelRegistry(manifestURL: manifest)
             .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
         let descriptor = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
@@ -163,7 +188,7 @@ final class DesktopModelRemovalTests: XCTestCase {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let registry = try ContractBackedModelRegistry(
-            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+            manifestURL: repository.appendingPathComponent("Tests/Fixtures/two-package-model-contract.json")
         ).expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
         let descriptor = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
         let models = FileManager.default.temporaryDirectory.appendingPathComponent("models-\(UUID().uuidString)")
@@ -193,7 +218,7 @@ final class DesktopModelRemovalTests: XCTestCase {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let registry = try ContractBackedModelRegistry(
-            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+            manifestURL: repository.appendingPathComponent("Tests/Fixtures/two-package-model-contract.json")
         ).expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
         let quality = try XCTUnwrap(registry.model(id: "pro_custom_quality"))
         let speed = try XCTUnwrap(registry.model(id: "pro_custom_speed"))
@@ -240,7 +265,7 @@ final class DesktopEngineHostTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         let runtime = try NativeRuntimeFactory.make(
-            manifestURL: repository.appendingPathComponent("Sources/Resources/qwenvoice_contract.json"),
+            manifestURL: repository.appendingPathComponent("Tests/Fixtures/two-package-model-contract.json"),
             paths: .rooted(at: root), storeVersionSeed: "rf27-host-fixture"
         )
         defer { runtime.engine.stop() }

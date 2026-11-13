@@ -1622,6 +1622,30 @@ public struct RetiredModelReclamation: Equatable, Sendable {
     public let removed: [String]
     /// Folders left for the next pass, each with the error's description.
     public let failed: [String: String]
+
+    /// The retired folders of `models` that may go now: those of a model `isVerified` accepts
+    /// (its current artifact installed and verified, so a user is never left without a model for
+    /// a mode), present as directories under `modelsDirectory` or with a download staged for them
+    /// (a retired download never finished), each once, sorted.
+    static func folders(
+        of models: [ModelDescriptor],
+        in modelsDirectory: URL,
+        isVerified: (ModelDescriptor) -> Bool
+    ) -> [String] {
+        func isDirectory(_ url: URL) -> Bool {
+            (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        }
+        var folders = Set<String>()
+        for model in models where !model.retiredFolders.isEmpty && isVerified(model) {
+            for folder in model.retiredFolders {
+                let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
+                if isDirectory(url) || isDirectory(HuggingFaceDownloader.stagingRoot(forTargetDirectory: url)) {
+                    folders.insert(folder)
+                }
+            }
+        }
+        return folders.sorted()
+    }
 }
 
 extension SharedModelComponentStore {
@@ -1635,8 +1659,10 @@ extension SharedModelComponentStore {
                 failed[folder] = "not a model install folder name"
                 continue
             }
+            // Staging sits beside the install folders (`<models>/.qwenvoice-downloads/<folder>`),
+            // not under the component store's own folder.
             HuggingFaceDownloader.discardStaging(
-                forTargetDirectory: storeRoot.appendingPathComponent(folder, isDirectory: true)
+                forTargetDirectory: modelsRoot.appendingPathComponent(folder, isDirectory: true)
             )
             do {
                 try deleteModel(modelFolder: folder)

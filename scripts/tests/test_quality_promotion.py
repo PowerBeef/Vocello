@@ -246,18 +246,18 @@ class QualityPromotionTests(unittest.TestCase):
             ],
         }
         required = PROMOTION.required_evidence(contract, impact, "macos")
+        # RF-59: one model per mode, no Quality package, so Quality generation applies on neither
+        # platform and asks for no evidence.
         self.assertEqual(required, [
             "macos-delivery-benchmark",
             "macos-language-benchmark",
-            "macos-quality-engine-benchmark",
             "macos-ui-benchmark",
         ])
         self.assertFalse(any(identity.startswith("ios-") for identity in required))
         coverage, unsupported = PROMOTION.capability_coverage(contract, impact, "macos")
-        self.assertEqual(
-            coverage["quality-generation"]["requiredEvidence"],
-            ["macos-quality-engine-benchmark"],
-        )
+        self.assertEqual(coverage["quality-generation"]["requiredEvidence"], [])
+        self.assertEqual(coverage["quality-generation"]["platformApplicability"]["status"], "unsupported")
+        self.assertIn("quality-generation:platform-macos", unsupported)
         self.assertIn("multilingual-output:independent-generation-cohorts", unsupported)
         self.assertIn("delivery-evaluation:independent-holdout-calibration", unsupported)
 
@@ -365,14 +365,15 @@ class QualityPromotionTests(unittest.TestCase):
             with self.assertRaises(PROMOTION.PromotionError):
                 PROMOTION.validate_contract(contract, root=self.root)
     def test_new_ios_quality_or_partial_support_requires_contract_migration(self) -> None:
+        # RF-59 retired the Quality packages; bringing one back, for one mode or all three,
+        # needs a contract migration before promotion accepts it.
         for count in (1, 3):
             with self.subTest(supported_modes=count):
                 path = self.root / PROMOTION.MODEL_CONTRACT_PATH
                 source = json.loads((REPO_ROOT / PROMOTION.MODEL_CONTRACT_PATH).read_text())
                 for model in source["models"][:count]:
-                    variant = next(v for v in model["variants"] if v["kind"] == "quality")
-                    variant["platforms"].append("iOS")
-                    variant["iosDownloadEligible"] = True
+                    speed = next(v for v in model["variants"] if v["kind"] == "speed")
+                    model["variants"].append({**speed, "id": "quality", "kind": "quality"})
                 self.write_json(path, source)
                 contract = PROMOTION.load_contract(self.root)
                 contract["modelApplicabilitySource"]["sha256"] = PROMOTION.file_digest(path)
@@ -386,7 +387,10 @@ class QualityPromotionTests(unittest.TestCase):
         for definition in contract["capabilities"].values():
             definition.pop("platformApplicability", None)
             definition.pop("notApplicable", None)
-        contract["capabilities"]["quality-generation"]["evidenceByPlatform"]["ios"] = ["ios-quality-engine-benchmark"]
+        # The v2 contracts predate RF-59: both platforms carried Quality evidence.
+        contract["capabilities"]["quality-generation"]["evidenceByPlatform"] = {
+            "macos": ["macos-quality-engine-benchmark"], "ios": ["ios-quality-engine-benchmark"],
+        }
         contract["capabilities"]["delivery-evaluation"]["evidenceByPlatform"]["ios"] = ["ios-delivery-benchmark"]
         self.write_json(self.root / PROMOTION.CONTRACT_PATH, contract)
         PROMOTION.validate_contract(contract, root=self.root)

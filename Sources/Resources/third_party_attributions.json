@@ -276,8 +276,8 @@
   "generatedFrom": {
     "applicationPackageResolutionSHA256": "925d49ee1e34ca36aed94f4b360628af1f94eadda04d3dc90a5441a59cc2b4dd",
     "ownedRuntimePackageResolutionSHA256": "f0d6902e9f07a0a68b597a4f3dff097f6baff57cb0c0b2a48144490363799068",
-    "policySHA256": "c17641236a7595263c57a3e4edbd9560d6989d1320079e4250960a71e1c29def",
-    "productionModelCatalogSHA256": "f8e97b8ab1bb042348da771ac42c76c1bec2f571b66aa9c057749fafe8c21eb8"
+    "policySHA256": "f3b0c12dab8b6492ce058d3b129a44538881bf8a58628935c31bf37ee0c7ba5c",
+    "productionModelCatalogSHA256": "fd2bd3b9b82b54d4cac593acb2327e961a2f7d9905d6c7810616bf9d47217c8d"
   },
   "licenses": [
     {
@@ -298,94 +298,52 @@
   ],
   "modelArtifacts": [
     {
-      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
-      "baseRevision": "e7dd0585652209fa0d7783659aad4e8a324de11c",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-Base-8bit",
-      "id": "pro_clone-quality",
-      "licenseID": "Apache-2.0",
-      "modelCardSHA256": "6ea1eb3f0e547c0bce96cda87a453f7615866f964c3d8d97eab4ea6097d9a903",
-      "modelID": "pro_clone",
-      "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit",
-      "revision": "f63ea141cb13df98974a4184cc7c35cb58699af5",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-8bit/tree/f63ea141cb13df98974a4184cc7c35cb58699af5",
-      "variantID": "quality"
-    },
-    {
       "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit",
       "baseRevision": "37e955a1deb861c088ae5f3a67043185f3d1a60c",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn",
       "id": "pro_clone-speed",
       "licenseID": "Apache-2.0",
-      "modelCardSHA256": "26e86b0119ef69cce3f7ca8ff2456151cdc26155f231f00bd37357d27eb4542b",
+      "modelCardSHA256": "92a47ffc4a4a57f83e79302996063597d31fcf7f5b71a3f1fbc5567e1087be28",
       "modelID": "pro_clone",
       "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit",
-      "revision": "47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/tree/47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn",
+      "revision": "5af70b5c61199b060152d80f5b232d7aa1da9618",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn/tree/5af70b5c61199b060152d80f5b232d7aa1da9618",
       "variantID": "speed"
-    },
-    {
-      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
-      "baseRevision": "41d3337e8b7f2843a75841595fc14e4b9a7a4b96",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
-      "id": "pro_custom-quality",
-      "licenseID": "Apache-2.0",
-      "modelCardSHA256": "14cdb04c8d51d31146c416f9ab42ec75def21b242aac39c3f998945d11743e81",
-      "modelID": "pro_custom",
-      "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
-      "revision": "50c40b2221344ed2f1bf2c475dffba47ae7896e0",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit/tree/50c40b2221344ed2f1bf2c475dffba47ae7896e0",
-      "variantID": "quality"
     },
     {
       "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
       "baseRevision": "f35faf19b0cc2160865af64ecf0f22f83d335135",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
       "id": "pro_custom-speed",
       "licenseID": "Apache-2.0",
-      "modelCardSHA256": "ba7d73683fe44b5e8d3040ec8b1474f594f525924d5cdf67970bd0f1ffd30401",
+      "modelCardSHA256": "850d09a7f0ca1925f845c18e2f658a89dc3ae1b5536edf6eb66a962529e4d3a0",
       "modelID": "pro_custom",
       "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-      "revision": "29c4b746cd1e2a916f0233b241019205dffbfbc2",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/tree/29c4b746cd1e2a916f0233b241019205dffbfbc2",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
+      "revision": "c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn/tree/c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
       "variantID": "speed"
-    },
-    {
-      "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
-      "baseRevision": "f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
-      "id": "pro_design-quality",
-      "licenseID": "Apache-2.0",
-      "modelCardSHA256": "39fd8023cf06da4c64c7c14bbf8da5110f96849f5f464088d7ba72b7feca4cff",
-      "modelID": "pro_design",
-      "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
-      "revision": "bb56faf7920923e0ca398798e6b2515b5fcde503",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit/tree/bb56faf7920923e0ca398798e6b2515b5fcde503",
-      "variantID": "quality"
     },
     {
       "baseRepo": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
       "baseRevision": "5c390979e4b93af5f2932f90742ca99c7dd04687",
-      "displayName": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
+      "displayName": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn",
       "id": "pro_design-speed",
       "licenseID": "Apache-2.0",
-      "modelCardSHA256": "2e39ffaa0853bdcd55e18c9cd3de49ebaf4b685d3c409914742927441e17790d",
+      "modelCardSHA256": "f0f1e7661717ad803d56ed942b53586f3475516c255303287178f5558e689cd9",
       "modelID": "pro_design",
       "redistributionDecision": "pending-qualified-review",
-      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
-      "revision": "62f2646e55499e3d5bc73abec274342718220ffe",
-      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/tree/62f2646e55499e3d5bc73abec274342718220ffe",
+      "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn",
+      "revision": "6bcae41e75db1312816efae9792661a7e70ba75e",
+      "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn/tree/6bcae41e75db1312816efae9792661a7e70ba75e",
       "variantID": "speed"
     }
   ],
   "schemaVersion": 1,
   "summary": {
     "componentCount": 20,
-    "modelArtifactCount": 6,
+    "modelArtifactCount": 3,
     "pendingContentRightsCount": 4
   }
 }

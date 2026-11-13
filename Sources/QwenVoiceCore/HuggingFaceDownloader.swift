@@ -3402,7 +3402,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return effective
     }
 
-    private static func stagingRoot(forTargetDirectory targetDir: URL) -> URL {
+    static func stagingRoot(forTargetDirectory targetDir: URL) -> URL {
         targetDir
             .deletingLastPathComponent()
             .appendingPathComponent(".qwenvoice-downloads", isDirectory: true)

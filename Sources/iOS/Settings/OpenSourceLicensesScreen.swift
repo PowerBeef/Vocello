@@ -114,7 +114,7 @@ struct OpenSourceLicensesScreen: View {
                             NavigationLink {
                                 IOSAttributionDetailScreen(
                                     title: model.displayName,
-                                    subtitle: "\(model.variantID) · \(model.revision.prefix(12))",
+                                    subtitle: String(model.revision.prefix(12)),
                                     sourceURL: model.sourceURL,
                                     licenseID: model.licenseID,
                                     copyrightNotice: nil,
@@ -126,14 +126,14 @@ struct OpenSourceLicensesScreen: View {
                                 IOSSettingsNavigationRow(
                                     symbol: "waveform",
                                     title: model.displayName,
-                                    subtitle: model.variantID.capitalized,
+                                    subtitle: String(model.revision.prefix(12)),
                                     value: model.licenseID
                                 )
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("iosModelAttributionRow_\(model.id)")
                             .accessibilityLabel(model.displayName)
-                            .accessibilityValue("\(model.variantID), \(model.licenseID)")
+                            .accessibilityValue(model.licenseID)
                             .accessibilityHint(IOSAppLanguage.shared.localized(localized: "vocello.licenses.detail_hint"))
 
                             if index < manifest.modelArtifacts.count - 1 {

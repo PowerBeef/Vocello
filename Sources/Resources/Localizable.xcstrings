@@ -18920,67 +18920,67 @@
       }
     },
     "vocello.ui.installDetail": {
-      "comment": "Onboarding explanation of separately downloaded models; Speed is the model-tier name.",
+      "comment": "Onboarding explanation of separately downloaded models; \"the model\" is Built-in Voice's model, and Voice Design and Voice Cloning are mode names.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download the 4-bit Speed model, about 2 GB, to start generating. Voice Design and Voice Cloning each have their own model of about 2 GB; install them later in Settings."
+            "value": "Download the model, about 2.2 GB, to start generating. Voice Design and Voice Cloning each have their own model of about 2.2 GB; install them later in Settings."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Téléchargez le modèle Speed 4 bits, d’environ 2 Go, pour commencer. La création et le clonage de voix ont chacun leur propre modèle d’environ 2 Go, à installer ensuite dans Réglages."
+            "value": "Téléchargez le modèle, d’environ 2,2 Go, pour commencer. La création et le clonage de voix ont chacun leur propre modèle d’environ 2,2 Go, à installer ensuite dans Réglages."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descarga el modelo Speed de 4 bits, de unos 2 GB, para empezar a generar. Diseño de voz y Clonación de voz tienen sus propios modelos, de unos 2 GB cada uno; puedes instalarlos después en Ajustes."
+            "value": "Descarga el modelo, de unos 2,2 GB, para empezar a generar. Diseño de voz y Clonación de voz tienen sus propios modelos, de unos 2,2 GB cada uno; puedes instalarlos después en Ajustes."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lade das 4-Bit-Speed-Modell mit etwa 2 GB, um loszulegen. Stimmdesign und Stimmklonen haben jeweils ein eigenes Modell mit etwa 2 GB; installiere sie später in den Einstellungen."
+            "value": "Lade das Modell mit etwa 2,2 GB, um loszulegen. Stimmdesign und Stimmklonen haben jeweils ein eigenes Modell mit etwa 2,2 GB; installiere sie später in den Einstellungen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scarica il modello Speed a 4 bit, di circa 2 GB, per iniziare. Design vocale e Clonazione vocale hanno ciascuno il proprio modello di circa 2 GB; potrai installarli in seguito in Impostazioni."
+            "value": "Scarica il modello, di circa 2,2 GB, per iniziare. Design vocale e Clonazione vocale hanno ciascuno il proprio modello di circa 2,2 GB; potrai installarli in seguito in Impostazioni."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baixe o modelo Speed de 4 bits, com cerca de 2 GB, para começar. Criação de voz e Clonagem de voz têm seus próprios modelos, com cerca de 2 GB cada; instale-os depois nos Ajustes."
+            "value": "Baixe o modelo, com cerca de 2,2 GB, para começar. Criação de voz e Clonagem de voz têm seus próprios modelos, com cerca de 2,2 GB cada; instale-os depois nos Ajustes."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下载约 2 GB 的 4 位 Speed 模型即可开始生成。声音设计和声音克隆各有约 2 GB 的独立模型，可稍后在设置中安装。"
+            "value": "下载约 2.2 GB 的模型即可开始生成。声音设计和声音克隆各有约 2.2 GB 的独立模型，可稍后在设置中安装。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "約2 GBの4ビット Speed モデルをダウンロードして始めましょう。ボイスデザインとボイスクローンにはそれぞれ約2 GBの専用モデルがあり、後で設定からインストールできます。"
+            "value": "約2.2 GBのモデルをダウンロードして始めましょう。ボイスデザインとボイスクローンにはそれぞれ約2.2 GBの専用モデルがあり、後で設定からインストールできます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "약 2GB인 4비트 Speed 모델을 다운로드해 시작하세요. 음성 디자인과 음성 복제는 각각 약 2GB의 별도 모델이 있으며 나중에 설정에서 설치할 수 있습니다."
+            "value": "약 2.2GB인 모델을 다운로드해 시작하세요. 음성 디자인과 음성 복제는 각각 약 2.2GB의 별도 모델이 있으며 나중에 설정에서 설치할 수 있습니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Загрузите 4-битную модель Speed размером около 2 ГБ, чтобы начать генерацию. Дизайн и клонирование голоса используют отдельные модели, около 2 ГБ каждая; их можно установить позже в настройках."
+            "value": "Загрузите модель размером около 2,2 ГБ, чтобы начать генерацию. Дизайн и клонирование голоса используют отдельные модели, около 2,2 ГБ каждая; их можно установить позже в настройках."
           }
         }
       }

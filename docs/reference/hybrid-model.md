@@ -176,16 +176,32 @@ The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is stil
 view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its scope:
 
 - the catalog goes from six artifacts to three, with receipts and the regenerated catalog;
-- the Mac and CLI `--variant` are accepted with a notice and resolve to the hybrid;
+- the Mac and CLI `--variant quality` is accepted with a notice and resolves to the hybrid;
 - memory bands in `NativeMemoryPolicyResolver` re-derived from the hybrid's measured peak, and prewarm
   and idle-unload timings re-measured;
 - `config/public-product-facts.json` and the website copy;
 - benchmark baselines reseeded as a new lineage; the Mac gate bench reseeded.
 
-The code lands data-driven first: a model that offers one variant shows no Speed/Quality choice, and
-installed folders of a variant the catalog no longer offers are reclaimed once that mode's model
-verifies. The contract swap lands last, after ★ publication, so `main` never names an artifact that is
-not hosted. RF-58 (one take variation, Expressive) landed first.
+**Landed on 2026-11-13, after publication:**
+
+- **The contract.** Each mode keeps one variant, `speed`, on both platforms, and its top-level
+  artifact is the hybrid too, so no fallback can reach an 8-bit artifact. The id and kind stay `speed`
+  because six places treat a variant's id and kind as one string, and every Speed-only gate (the
+  iPhone's preferred variant, the memory-qualification pins, `check_ios_catalog.sh`) keeps holding.
+  The receipts live in the bundled iPhone catalog; the production catalog holds three artifacts.
+- **Retired folders.** Each model lists the Speed and Quality folders it replaced. They are removed
+  through the shared component store only once the mode's model verifies: the Mac after its digest
+  pass, the iPhone at launch, `vocello models install` after an install. Until then the legacy cleanup
+  leaves the 8-bit folders alone.
+- **The selector.** A mode with one model shows no Speed/Quality switch, no "Prefer lower-memory
+  models" toggle, and a package row that reads Model. `--variant quality`, `models use … quality` and
+  `models prefer-lower-memory` parse, warn `variant_retired` and change nothing.
+- **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
+  top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
+
+**Left:** the iPhone's memory and speed, the formal speed lane, the memory bands and benchmark
+baselines from those measurements, and `config/public-product-facts.json`, the README and the website
+with the release that ships the change. RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution
 

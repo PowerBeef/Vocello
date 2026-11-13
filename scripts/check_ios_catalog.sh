@@ -183,7 +183,7 @@ def validate_descriptor($entries):
    + (if ($catalogModels | length) == 0 then ["catalog at " + $url + " returned no models"] else [] end)
   ) as $errors
 | {
-    ok: ($errors | length) == 0,
+    ok: (($errors | length) == 0),
     catalog_url: $url,
     checked_models: ($checked | map(.modelID)),
     error_count: ($errors | length),

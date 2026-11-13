@@ -19,13 +19,14 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
 
     /// A model whose manifest records `manifestSHA` for `weights.bin`, while the file
     /// on disk has the right size but different bytes. Only a content pass can tell.
-    private func install(bytes: Data, manifestSize: Int64? = nil, manifestSHA: String)
+    private func install(bytes: Data, manifestSize: Int64? = nil, manifestSHA: String, retiredFolders: [String] = [])
         throws -> (LocalModelAssetStore, ModelAssetDescriptor, URL) {
         let folder = "model-\(UUID().uuidString.prefix(8))"
         let model = ModelDescriptor(
             id: folder, name: folder, tier: "speed", folder: folder, mode: .custom,
             huggingFaceRepo: "org/model", artifactVersion: "1", iosDownloadEligible: false,
-            estimatedDownloadBytes: nil, outputSubfolder: "out", requiredRelativePaths: ["weights.bin"]
+            estimatedDownloadBytes: nil, outputSubfolder: "out", requiredRelativePaths: ["weights.bin"],
+            retiredFolders: retiredFolders
         )
         let descriptor = ModelAssetDescriptor(
             model: model, version: "test",
@@ -46,6 +47,44 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
     }
 
     private let otherSHA = String(repeating: "ab", count: 32)
+
+    /// RF-59: the iPhone's launch pass removes a mode's retired folders only once its model passes
+    /// the manifest-and-size check (the depth it uses: contents are the Mac's digest pass); a model
+    /// without a manifest, or with a file of the wrong size, keeps them.
+    func testTheLaunchReclaimWaitsForTheModelToVerify() throws {
+        let retired = "Old-Custom-4bit"
+        let retiredURL = root.appendingPathComponent(retired, isDirectory: true)
+        try FileManager.default.createDirectory(at: retiredURL, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: retiredURL.appendingPathComponent("model.safetensors"))
+        // A retired download that never finished: no folder, only its staging.
+        let staged = "Old-Custom-8bit"
+        let staging = root.appendingPathComponent(".qwenvoice-downloads/\(staged)", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        try Data("partial".utf8).write(to: staging.appendingPathComponent("model.safetensors.partial"))
+        let retiring = [retired, staged]
+        let bytes = Data("weights".utf8)
+        let none = RetiredModelReclamation(removed: [], failed: [:])
+
+        let (wrongSize, _, _) = try install(
+            bytes: bytes, manifestSize: Int64(bytes.count + 1), manifestSHA: otherSHA, retiredFolders: retiring
+        )
+        XCTAssertEqual(wrongSize.reclaimRetiredFolders(), none)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: retiredURL.path))
+
+        let (noManifest, _, weights) = try install(bytes: bytes, manifestSHA: otherSHA, retiredFolders: retiring)
+        try FileManager.default.removeItem(
+            at: weights.deletingLastPathComponent().appendingPathComponent(ModelAssetIntegrityManifest.filename)
+        )
+        XCTAssertEqual(noManifest.reclaimRetiredFolders(), none)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: retiredURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staging.path))
+
+        let (verified, _, _) = try install(bytes: bytes, manifestSHA: otherSHA, retiredFolders: retiring)
+        XCTAssertEqual(verified.reclaimRetiredFolders(), RetiredModelReclamation(removed: retiring.sorted(), failed: [:]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: retiredURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
+        XCTAssertEqual(verified.reclaimRetiredFolders(), none, "nothing left to reclaim")
+    }
 
     /// RF-59: a legacy 8-bit folder the contract lists as retired is left for the verified
     /// reclamation; one it does not list is cleaned up when the store opens, as before.

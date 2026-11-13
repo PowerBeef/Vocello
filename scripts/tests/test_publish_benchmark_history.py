@@ -47,6 +47,24 @@ def source_fixture() -> dict:
     }
 
 
+MODEL_CONTRACT = json.loads(
+    (SCRIPT.parent.parent / "Sources/Resources/qwenvoice_contract.json").read_text(encoding="utf-8")
+)
+
+
+def speed_identity(model_id: str) -> dict[str, str]:
+    """The contract's current Speed package for `model_id`, as a take's runtime identity reports it,
+    so the fixtures follow an artifact swap (RF-59) instead of pinning one."""
+    model = next(item for item in MODEL_CONTRACT["models"] if item["id"] == model_id)
+    speed = next(variant for variant in model["variants"] if variant["kind"] == "speed")
+    return {
+        "modelRepository": speed["huggingFaceRepo"],
+        "huggingFaceRevision": speed["huggingFaceRevision"],
+        "artifactVersion": speed["artifactVersion"],
+        "quantization": "4-bit",
+    }
+
+
 def engine_row(generation_id: str, *, run_id: str = "run-one", cell: str = "custom/speed/medium/warm#0", qc: str = "pass") -> dict:
     return {
         "schemaVersion": 7,
@@ -56,10 +74,7 @@ def engine_row(generation_id: str, *, run_id: str = "run-one", cell: str = "cust
         "modelID": "pro_custom_speed",
         "modelRuntimeIdentity": {
             "resolvedModelID": "pro_custom_speed",
-            "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-            "huggingFaceRevision": "29c4b746cd1e2a916f0233b241019205dffbfbc2",
-            "artifactVersion": "2026.09.14.1",
-            "quantization": "4-bit",
+            **speed_identity("pro_custom"),
             "integrityManifestDigest": "f" * 64,
             "runtimeProfileSignature": "pro_custom_speed:fixture-v1",
         },
@@ -1694,10 +1709,7 @@ class PublisherTests(unittest.TestCase):
         row["modelID"] = "pro_design_speed"
         row["modelRuntimeIdentity"] = {
             "resolvedModelID": "pro_design_speed",
-            "modelRepository": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
-            "huggingFaceRevision": "62f2646e55499e3d5bc73abec274342718220ffe",
-            "artifactVersion": "2026.09.14.1",
-            "quantization": "4-bit",
+            **speed_identity("pro_design"),
             "integrityManifestDigest": "c" * 64,
             "runtimeProfileSignature": "pro_design_speed:profile-v2",
             "fixtureDigest": "d" * 64,
@@ -2949,11 +2961,8 @@ class PublisherTests(unittest.TestCase):
         models = captured["manifest"]["historyRecord"]["models"]
         self.assertEqual(len(models), 1)
         self.assertEqual(models[0]["mode"], "custom")
-        self.assertEqual(
-            models[0]["modelID"],
-            "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
-        )
-        self.assertEqual(models[0]["revision"], "29c4b746cd1e2a916f0233b241019205dffbfbc2")
+        self.assertEqual(models[0]["modelID"], speed_identity("pro_custom")["modelRepository"])
+        self.assertEqual(models[0]["revision"], speed_identity("pro_custom")["huggingFaceRevision"])
         invalid = json.loads(verdict.read_text())
         invalid["summary"]["results"]["off"]["pcmSHA256"]["r1-t1"] = (
             publisher.hashlib.sha256(b"").hexdigest()

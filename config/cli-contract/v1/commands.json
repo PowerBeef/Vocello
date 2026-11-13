@@ -1658,7 +1658,7 @@
           ],
           "name": "variants",
           "placeholder": "list",
-          "summary": "strict comma list of variants (default both)",
+          "summary": "strict comma list of variants (default: every package the contract offers the requested modes)",
           "takesValue": true,
           "type": "list",
           "valueOptional": false

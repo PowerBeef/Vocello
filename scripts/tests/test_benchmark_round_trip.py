@@ -75,7 +75,12 @@ def contract_identity(mode: str, variant: str = "speed") -> dict:
         "modelRepository": selected.get("huggingFaceRepo", definition.get("huggingFaceRepo")),
         "huggingFaceRevision": selected.get("huggingFaceRevision", definition.get("huggingFaceRevision")),
         "artifactVersion": selected.get("artifactVersion", definition.get("artifactVersion")),
-        "quantization": f"{bits.group(1)}-bit" if bits else "unquantized",
+        # As the runtime stamps it: a hybrid (RF-59) reads its 4-bit config's top-level bits.
+        "quantization": (
+            f"{bits.group(1)}-bit" if bits
+            else "4-bit" if re.search(r"-hybrid-[a-z0-9-]+$", folder, re.IGNORECASE)
+            else "unquantized"
+        ),
         "integrityManifestDigest": "b" * 64,
         "runtimeProfileSignature": f"pro_{mode}_{variant}:fixture-v1",
     }

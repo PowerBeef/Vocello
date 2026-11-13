@@ -9,6 +9,8 @@ import SwiftUI
 /// field re-renders the field and the History screen, never the shell.
 struct MacWindowToolbar: ToolbarContent {
     let selectedItem: SidebarItem?
+    /// The selected Studio mode offers a Speed/Quality choice (RF-59: not with one model per mode).
+    var offersVariantChoice = false
 
     var body: some ToolbarContent {
         // The toolbar is attached to the detail column and no title fills the
@@ -34,7 +36,7 @@ struct MacWindowToolbar: ToolbarContent {
         // The Studio screens carry no title row — the sidebar names the mode,
         // as the phone's capsule does — so the desktop's Speed/Quality switch
         // lives in the window chrome with the other per-destination controls.
-        if let mode = selectedItem?.generationMode, let prefix = selectedItem?.accessibilityPrefix {
+        if let mode = selectedItem?.generationMode, let prefix = selectedItem?.accessibilityPrefix, offersVariantChoice {
             ToolbarItem(placement: .primaryAction) {
                 MacStudioToolbarControls(mode: mode, accessibilityPrefix: prefix)
             }

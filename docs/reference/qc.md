@@ -519,15 +519,21 @@ PY="$(python3 scripts/select_python.py)"
   %, &, @, # and / stay). The arm records the form, and two arms of different forms are never one
   setting. Only the English corpus is punctuated, so `clone-english` (64 English references,
   256 takes) carries such questions.
-- **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
-  8-bit model; the arm records it, and two arms on different variants are never one setting. The
+- **Another variant, the same takes:** `run --variant quality` runs a plan's takes on another
+  package; the arm records it, and two arms on different variants are never one setting. Since
+  RF-59 the shipped contract offers one model per mode, so an arm refuses a package its contract
+  does not offer (the CLI would run the hybrid with only a warning): the 3.0 Speed (4-bit) and
+  Quality (8-bit) packages run with `run --stock`, which loads them from the research folder
+  `~/Library/Application Support/QwenVoice-Research/models` through the last two-package contract
+  (`Tests/Fixtures/two-package-model-contract.json`) and records both. They live outside the app's
+  models folder because the app's first verified hybrid removes every 3.0 folder there. The
   hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models;
   their verdicts and what they mean are in [hybrid-model.md](hybrid-model.md).
 - **Single takes:** a long-form screen whose definition sets `longForm: never` asks for one take of
   each script instead of planning it into segments. The `single` screen uses it for Built-in Voice
   and Voice Design takes of two pool sentences, on the long-form screen's strata (RF-55).
 - **A built model, the same takes:** `scripts/build_hybrid_model.py build --recipe R --out DIR`
-  assembles a recipe's three artifacts from the installed, verified 4-bit and 8-bit ones, each with
+  assembles a recipe's three artifacts from the verified 4-bit and 8-bit ones in the research folder, each with
   its own integrity record, and writes a development contract naming them. `run --models-root DIR
   --manifest CONTRACT` loads them through the normal verified path; the arm records the contract's
   digest, and an identity proof (`compare --expect identical`) shows they reproduce the key's arm.

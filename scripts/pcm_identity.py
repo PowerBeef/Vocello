@@ -35,7 +35,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from telemetry_overhead import (  # noqa: E402
     DEBUG_ROOT,
+    RESEARCH_MODELS_ROOT,
     ROOT,
+    STOCK_CONTRACT,
     load_bench_results,
     managed_output_path,
     pcm_digest,
@@ -85,10 +87,12 @@ def take_key(take: dict) -> str:
     return f"{take['cell']}"
 
 
-def prepare_data_dir(data_dir: Path, modes: list[str]) -> None:
-    source_models = DEBUG_ROOT / "models"
+def prepare_data_dir(data_dir: Path, modes: list[str], stock: bool = False) -> None:
+    # RF-59: `--stock` measures the 3.0 Speed and Quality packages, kept in the research folder.
+    source_models = RESEARCH_MODELS_ROOT if stock else DEBUG_ROOT / "models"
     if not source_models.exists():
-        raise RuntimeError("the debug model root is missing; run scripts/macos_test.sh models ensure")
+        hint = "move the 3.0 packages there" if stock else "run scripts/macos_test.sh models ensure"
+        raise RuntimeError(f"the model root {source_models} is missing; {hint}")
     data_dir.mkdir(parents=True)
     (data_dir / "models").symlink_to(source_models.resolve(), target_is_directory=True)
     if "clone" in modes:
@@ -115,7 +119,7 @@ def capture(args: argparse.Namespace) -> Path:
         managed_output_path("QVOICE_ARTIFACTS_MACOS") / "pcm-identity" / f"{args.label}-{utc_stamp()}"
     )
     data_dir = run_dir / "data"
-    prepare_data_dir(data_dir, modes)
+    prepare_data_dir(data_dir, modes, stock=args.stock)
 
     command = [
         str(vocello), "bench",
@@ -123,6 +127,7 @@ def capture(args: argparse.Namespace) -> Path:
         "--warm", str(args.warm), "--seed", str(args.seed),
         "--telemetry", "off", "--data-dir", str(data_dir), "--no-summary",
         "--label", args.label,
+        *(["--manifest", str(STOCK_CONTRACT)] if args.stock else []),
     ]
     if args.delivery:
         # Instruct-bearing takes: they build their prompt on another path.
@@ -182,6 +187,7 @@ def capture(args: argparse.Namespace) -> Path:
         "lengths": args.lengths.split(","),
         "warm": args.warm,
         "delivery": args.delivery,
+        "stock": args.stock,
         "environmentOverrides": overrides,
         "qosClamp": args.clamp,
         "source": {
@@ -279,7 +285,9 @@ def main() -> int:
     capture_parser.add_argument("--label", required=True)
     capture_parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     capture_parser.add_argument("--modes", default="custom,design,clone")
-    capture_parser.add_argument("--variants", default="speed", help="speed, quality or both")
+    capture_parser.add_argument("--variants", default="speed", help="speed, quality or both (quality needs --stock)")
+    capture_parser.add_argument("--stock", action="store_true",
+                                help="the 3.0 Speed and Quality packages from the research folder (RF-59)")
     capture_parser.add_argument("--lengths", default="short,medium")
     capture_parser.add_argument("--warm", type=int, default=2)
     capture_parser.add_argument(

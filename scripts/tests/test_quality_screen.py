@@ -155,6 +155,18 @@ class PlanTests(unittest.TestCase):
                          ("quality", "quality", "abc", plan["takes"]))
         self.assertEqual(plan["variant"], "speed", "the plan itself is not changed")
 
+    def test_an_arm_never_runs_a_package_its_contract_does_not_offer(self):
+        """RF-59: the shipped contract offers one package per mode; a retired Quality arm would run
+        the hybrid with only a CLI warning, so the screen refuses it and points at --stock."""
+        screen.require_variant_offered(screen.SHIPPED_CONTRACT, "speed")
+        with self.assertRaises(screen.ScreenError) as refused:
+            screen.require_variant_offered(screen.SHIPPED_CONTRACT, "quality")
+        self.assertIn("--stock", str(refused.exception))
+        for variant in ("speed", "quality"):
+            screen.require_variant_offered(screen.STOCK_CONTRACT, variant)
+        self.assertEqual(screen.RESEARCH_MODELS_ROOT.name, "models")
+        self.assertEqual(screen.RESEARCH_MODELS_ROOT.parent.name, "QwenVoice-Research")
+
     def test_an_unpunctuated_transcript_keeps_the_words_a_recognizer_writes(self):
         cases = {
             "Hello, world! It's fine.": "Hello world It's fine",

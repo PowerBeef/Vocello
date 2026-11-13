@@ -50,7 +50,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from telemetry_overhead import DEBUG_ROOT, ROOT, managed_output_path, pcm_digest  # noqa: E402
+from telemetry_overhead import (  # noqa: E402
+    DEBUG_ROOT, RESEARCH_MODELS_ROOT, ROOT, SHIPPED_CONTRACT, STOCK_CONTRACT, managed_output_path, pcm_digest,
+)
 
 SCHEMA_VERSION = 1
 CONFIG = ROOT / "config/quality-screens.json"
@@ -498,6 +500,21 @@ def plan_for_variant(plan: dict, variant: str | None) -> tuple[dict, str | None]
     return dict(plan, variant=variant), variant
 
 
+def require_variant_offered(contract_path: Path, variant: str) -> None:
+    """RF-59: the shipped contract offers one package per mode, and the CLI runs a retired
+    `--variant quality` on that one model with only a warning; an arm must never measure another
+    model than it names, so it refuses a package its contract does not offer."""
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    for model in contract.get("models", []):
+        offered = {variant_entry.get("id") for variant_entry in model.get("variants", [])
+                   if "macOS" in variant_entry.get("platforms", [])}
+        if variant not in offered:
+            raise ScreenError(
+                f"{contract_path.name} offers no '{variant}' package for {model.get('id')}; "
+                "the 3.0 Speed and Quality packages run with --stock"
+            )
+
+
 def git_value(*arguments: str) -> str:
     completed = subprocess.run(["git", *arguments], cwd=ROOT, text=True, capture_output=True, check=False)
     return completed.stdout.strip() if completed.returncode == 0 else ""
@@ -545,9 +562,16 @@ def run_arm(args: argparse.Namespace) -> Path:
     data_dir = arm_dir / "data"
     data_dir.mkdir(parents=True)
     (arm_dir / "wav").mkdir()
-    models = Path(args.models_root).resolve() if getattr(args, "models_root", None) else DEBUG_ROOT / "models"
+    stock = bool(getattr(args, "stock", False))
+    if stock and (getattr(args, "models_root", None) or getattr(args, "manifest", None)):
+        raise ScreenError("--stock names its own model root and contract")
+    if getattr(args, "models_root", None):
+        models = Path(args.models_root).resolve()
+    else:
+        models = RESEARCH_MODELS_ROOT if stock else DEBUG_ROOT / "models"
     if not models.exists():
-        raise ScreenError(f"the model root {models.name} is missing; run scripts/macos_test.sh models ensure")
+        hint = "move the 3.0 packages there (docs/reference/qc.md)" if stock else "run scripts/macos_test.sh models ensure"
+        raise ScreenError(f"the model root {models} is missing; {hint}")
     (data_dir / "models").symlink_to(models.resolve(), target_is_directory=True)
     environment = dict(os.environ, **overrides)
     environment["QWENVOICE_DEBUG"] = "1"
@@ -558,9 +582,16 @@ def run_arm(args: argparse.Namespace) -> Path:
         arm["variant"] = variant
     if transcript_form != "as-given":
         arm["transcriptForm"] = transcript_form
-    manifest = Path(args.manifest).resolve() if getattr(args, "manifest", None) else None
+    if getattr(args, "manifest", None):
+        manifest: Path | None = Path(args.manifest).resolve()
+    else:
+        manifest = STOCK_CONTRACT if stock else None
+    require_variant_offered(manifest or SHIPPED_CONTRACT, plan["variant"])
+    if stock:
+        arm["stock"] = True
     if manifest:
-        # A development contract (a built hybrid, RF-55): its digest names the models the arm ran.
+        # A development or stock contract (a built hybrid, RF-55; the 3.0 packages, RF-59): its
+        # digest names the models the arm ran.
         arm.update(manifest=manifest.name, manifestSHA256=sha256_file(manifest), modelsRoot=str(models))
     write_json(arm_dir / "arm.json", arm)
     common = ["--data-dir", str(data_dir), "--json", "--quiet", "--no-input",
@@ -1271,6 +1302,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--manifest", help="a development qwenvoice_contract.json for every command (a built hybrid's)")
     run.add_argument("--variant", choices=("speed", "quality"),
                      help="run the plan's takes on this installed variant instead of the screen's own")
+    run.add_argument("--stock", action="store_true",
+                     help="run the 3.0 Speed and Quality packages from the research folder (RF-59)")
     run.set_defaults(run_command=lambda args: (run_arm(args), 0)[1])
     score = commands.add_parser("score", help="score an arm with the QC v2 runners")
     score.add_argument("--run", required=True)

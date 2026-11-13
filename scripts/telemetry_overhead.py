@@ -24,6 +24,12 @@ from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEBUG_ROOT = Path.home() / "Library" / "Application Support" / "QwenVoice-Debug"
+# RF-59: the 3.0 Speed (4-bit) and Quality (8-bit) packages, kept out of the app's models folder,
+# where the first verified hybrid would remove them, for the paired screens' stock arms, the speed
+# lane's baseline and the hybrid builder. They load through the last two-package contract.
+RESEARCH_MODELS_ROOT = Path.home() / "Library" / "Application Support" / "QwenVoice-Research" / "models"
+STOCK_CONTRACT = ROOT / "Tests" / "Fixtures" / "two-package-model-contract.json"
+SHIPPED_CONTRACT = ROOT / "Sources" / "Resources" / "qwenvoice_contract.json"
 MODES = ("off", "lightweight", "verbose")
 TELEMETRY_SCHEMA_VERSION = 8
 MODEL_ID = "pro_custom_speed"

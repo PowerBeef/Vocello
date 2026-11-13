@@ -32,8 +32,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACT = ROOT / "Sources/Resources/qwenvoice_contract.json"
-DEFAULT_MODELS = Path.home() / "Library/Application Support/QwenVoice-Debug/models"
+# RF-59: the sources are the 3.0 Speed (4-bit) and Quality (8-bit) packages, which the shipped contract
+# no longer names: the last two-package contract does, and they live in the research folder.
+CONTRACT = ROOT / "Tests/Fixtures/two-package-model-contract.json"
+DEFAULT_MODELS = Path.home() / "Library/Application Support/QwenVoice-Research/models"
 INTEGRITY = ".qwenvoice-model-integrity.json"
 SHARED = ".qwenvoice-shared-components.json"
 MODES = {"custom": "CustomVoice", "design": "VoiceDesign", "base": "Base"}

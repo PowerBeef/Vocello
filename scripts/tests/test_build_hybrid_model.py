@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import json
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +16,17 @@ SPEC.loader.exec_module(builder)
 class HybridBuildTests(unittest.TestCase):
     def test_the_synthetic_build_takes_exactly_the_recipes_tensors_and_is_deterministic(self):
         self.assertEqual(builder.self_test(), 0)
+
+    def test_the_sources_are_the_3_0_packages_in_the_research_folder(self):
+        """RF-59: the shipped contract names only the hybrids; the builder reads the 4-bit and 8-bit
+        sources from the last two-package contract and the research folder."""
+        contract = json.loads(builder.CONTRACT.read_text())
+        for model_id in builder.CONTRACT_IDS.values():
+            entry = next(model for model in contract["models"] if model["id"] == model_id)
+            speed = next(variant for variant in entry["variants"] if variant["kind"] == "speed")
+            self.assertTrue(speed["folder"].endswith("-4bit"), speed["folder"])
+            self.assertTrue(entry["folder"].endswith("-8bit"), entry["folder"])
+        self.assertEqual(builder.DEFAULT_MODELS.parent.name, "QwenVoice-Research")
 
     def test_a_recipe_selects_talker_layer_modules_only(self):
         self.assertEqual(builder.selected_module("talker.model.layers.27.self_attn.o_proj.weight", "attn"),

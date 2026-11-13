@@ -58,7 +58,12 @@ python3 scripts/build_hybrid_model.py build --recipe attn --out build/artifacts/
 python3 scripts/build_hybrid_model.py self-test
 ```
 
-- **Inputs are verified.** Each mode's installed 4-bit and 8-bit folders must match their integrity
+- **Inputs are the 3.0 packages.** The builder reads them from the research folder
+  (`~/Library/Application Support/QwenVoice-Research/models`, `--models` otherwise) through the last
+  two-package contract (`Tests/Fixtures/two-package-model-contract.json`), since the shipped one
+  names only the hybrids and the app's first verified hybrid removes every 3.0 folder from its own
+  models folder.
+- **Inputs are verified.** Each mode's 4-bit and 8-bit folders must match their integrity
   record (size and SHA-256 of every file), and that record must name the contract's repository and
   revision. Anything else is refused; nothing is requantized.
 - **Output is deterministic.** One `model.safetensors` per mode, tensors in sorted key order with an
@@ -115,7 +120,9 @@ verdict below was read by hand against its rule's decision text.
 | `attn` | 0.499 (×1.05) | 0.297 (×1.06) | 176 MB | 3,765 MB (+168) |
 | Quality | 0.610 (×1.28) | 0.390 (×1.39) | 768 MB | 4,330 MB (+733) |
 
-The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is still owed.
+The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is still owed: the hybrid
+installed in the debug root for one capture, `capture --stock` (the 3.0 Speed packages from the
+research folder) for its baseline.
 
 **Known limits: `attn` beats Speed and does not match Quality.**
 - **Clone likeness stays at Speed's level.** `attn` does not recover Quality's speaker-similarity

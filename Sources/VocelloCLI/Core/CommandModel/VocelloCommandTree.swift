@@ -5,6 +5,8 @@ import Foundation
 public enum VocelloCommandTree {
     static let modes = ["custom", "design", "clone"]
     static let variants = ["speed", "quality"]
+    /// The spellings `--variation` still accepts. Every take samples as
+    /// Expressive since RF-58; the other two only add a `variation_retired` warning.
     static let variations = ["expressive", "balanced", "consistent"]
 
     static let consent = CLIOptionSpec.flag(
@@ -43,7 +45,7 @@ public enum VocelloCommandTree {
         .value("delivery-cell", .text, "preset.intensity", "(custom) a preset cell such as calm.normal (see `vocello deliveries`)"),
         .flag("app-delivery", "with no delivery given, send the apps' default (Neutral) delivery, as a new Studio draft does"),
         .value("seed", .unsignedInteger, "n", "deterministic sampling seed: the same request and seed reproduce the take"),
-        .value("variation", .choice(variations), "variation", "expressive | balanced | consistent (default: the app's setting)"),
+        .value("variation", .choice(variations), "variation", "retired: every take samples as expressive (balanced and consistent warn)"),
     ]
 
     static let generate = CLICommandSpec(
@@ -346,7 +348,7 @@ public enum VocelloCommandTree {
             CLICommandSpec(
                 name: "set", summary: "Change one setting, as the app's Settings do",
                 discussion: """
-                autoplay and prefer-lower-memory take true or false; variation expressive, balanced or consistent; \
+                autoplay and prefer-lower-memory take true or false; \
                 output-folder an existing folder or default; variant.custom, variant.design and variant.clone \
                 speed, quality or automatic. Consent and the interface language belong to the app.
                 """,

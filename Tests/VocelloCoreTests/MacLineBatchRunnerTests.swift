@@ -63,7 +63,6 @@ final class MacLineBatchRunnerTests: XCTestCase {
             refText: refText,
             preparedVoiceID: preparedVoiceID,
             displayVoiceName: "Ryan",
-            variation: .consistent,
             batchSeed: batchSeed,
             lineSeeds: lineSeeds
         )
@@ -156,7 +155,7 @@ final class MacLineBatchRunnerTests: XCTestCase {
 
     // MARK: - Engine requests
 
-    func testCustomLineRequestCarriesTheBatchSeedVariationLanguageAndDelivery() throws {
+    func testCustomLineRequestCarriesTheBatchSeedLanguageAndDelivery() throws {
         let generationID = UUID()
         let request = try XCTUnwrap(
             makeRequest(mode: .custom).generationRequest(line: "Line one", outputPath: "/tmp/line1.wav", generationID: generationID)
@@ -167,7 +166,6 @@ final class MacLineBatchRunnerTests: XCTestCase {
         XCTAssertEqual(request.outputPath, "/tmp/line1.wav")
         XCTAssertEqual(request.generationID, generationID)
         XCTAssertEqual(request.seed, 42)
-        XCTAssertEqual(request.variation, .consistent)
         XCTAssertEqual(request.languageHint, Qwen3SupportedLanguage.french.rawValue)
         XCTAssertTrue(request.shouldStream)
         XCTAssertEqual(request.deliveryInstructionCellID, "happy.strong")
@@ -228,7 +226,6 @@ final class MacLineBatchRunnerTests: XCTestCase {
             refText: nil,
             preparedVoiceID: nil,
             displayVoiceName: "Ryan",
-            variation: nil,
             batchSeed: 42
         )
         XCTAssertEqual(request.language, .german)
@@ -331,7 +328,7 @@ final class MacLineBatchRunnerTests: XCTestCase {
             supportsInstructionControl: true, lines: ["Line one"], voice: nil, emotion: nil,
             deliveryInstructionCellID: nil, language: .french, voiceDescription: nil,
             refAudio: "/voices/Voice.wav", refText: nil, preparedVoiceID: "Voice", ignoresStoredTranscript: true,
-            displayVoiceName: "Voice", variation: nil, batchSeed: 7)
+            displayVoiceName: "Voice", batchSeed: 7)
         guard case .clone(let audioOnlyReference)? = audioOnly.generationRequest(line: "Line one", outputPath: "/tmp/1.wav")?.payload else {
             return XCTFail("Expected a clone payload")
         }

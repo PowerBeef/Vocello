@@ -817,7 +817,7 @@ actor NativeEngineRuntime {
         let generationID = request.generationID ?? UUID()
         // Resolve a complete immutable policy once at the host boundary. The
         // effective seed is always present and the package owns a fresh MLX
-        // random state for the request; no process-global RNG or variation
+        // random state for the request; no process-global RNG or sampling
         // override is mutated here.
         let samplingConfiguration = fixedSamplingConfiguration
             ?? Qwen3TalkerSamplingOverride.samplingConfiguration(for: request)
@@ -1321,7 +1321,8 @@ actor NativeEngineRuntime {
                 var failureNotes = GenerationTelemetryPrivacy.failureNotes(
                     message: error.localizedDescription
                 ).merging(BenchRunContext.telemetryNotes()) { current, _ in current }
-                failureNotes["samplingVariation"] = (request.variation ?? .expressive).rawValue
+                // Every take samples as Expressive (RF-58); the note stays for older readers.
+                failureNotes["samplingVariation"] = Qwen3SamplingVariation.expressive.rawValue
                 failureNotes["samplingAlgorithmVersion"] = String(
                     samplingConfiguration.algorithmVersion
                 )

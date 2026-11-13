@@ -26,7 +26,10 @@ SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DELIVERY = re.compile(r"^(neutral|happy|sad|angry|fearful|surprised|calm|whisper)\.(normal|strong)$")
 SPEAKERS = {"aiden", "ryan", "vivian", "serena", "uncle_fu", "dylan", "eric", "ono_anna", "sohee"}
 LANGUAGES = {"auto", "english", "chinese", "japanese", "korean", "french", "german", "spanish", "portuguese", "russian", "italian"}
-VARIATIONS = {"expressive", "balanced", "consistent"}
+# A plan asks only for Expressive, the only variation since RF-58; a receipt
+# retained from before it may still name a retired one.
+PLAN_VARIATIONS = {"expressive"}
+RECEIPT_VARIATIONS = {"expressive", "balanced", "consistent"}
 PREPARATIONS = {"production", "full_runtime_unload", "prepared_cache_clear", "prewarm_disabled"}
 CLASSIFICATIONS = {"success", "pre_audio_startup", "post_generation_qc", "timeout", "cancelled", "memory_failure", "crash", "unmaterialized_unknown"}
 BOUNDARIES = {"request_validated", "memory_admitted", "model_load_started", "model_loaded", "prewarm_started", "prewarm_completed", "generation_reserved", "audio_consumer_claimed", "session_directory_created", "engine_opened", "first_model_token", "first_audio_code_group", "first_decoded_audio_frame", "first_published_stream_chunk"}
@@ -99,7 +102,7 @@ def load_plan(path: Path) -> dict[str, Any]:
             raise ContractError(f"take {position} has an unknown speaker")
         if not isinstance(take["deliveryID"], str) or not DELIVERY.fullmatch(take["deliveryID"]):
             raise ContractError(f"take {position} has an invalid delivery cell")
-        if take["language"] not in LANGUAGES or take["variation"] not in VARIATIONS:
+        if take["language"] not in LANGUAGES or take["variation"] not in PLAN_VARIATIONS:
             raise ContractError(f"take {position} has an invalid language or variation")
         if not isinstance(take["seed"], int) or take["seed"] < 0 or take["seed"] > 2**64 - 1:
             raise ContractError(f"take {position} has an invalid seed")
@@ -243,7 +246,7 @@ def validate_receipt(value: Any, field: str) -> None:
     delivery = value.get("deliveryID")
     if delivery is not None and (not isinstance(delivery, str) or not DELIVERY.fullmatch(delivery)):
         raise ContractError(f"{field}.deliveryID is invalid")
-    if value["language"] not in LANGUAGES or value["variation"] not in VARIATIONS:
+    if value["language"] not in LANGUAGES or value["variation"] not in RECEIPT_VARIATIONS:
         raise ContractError(f"{field} has invalid language or variation")
     for key in ("storedLanguageSelection", "detectedTargetLanguage", "referenceTranscriptLanguage", "finalModelLanguage"):
         child = value.get(key)

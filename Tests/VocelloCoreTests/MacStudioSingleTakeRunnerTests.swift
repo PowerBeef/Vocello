@@ -365,8 +365,7 @@ final class MacStudioSingleTakeRunnerTests: XCTestCase {
                 speakerID: "aiden",
                 deliveryStyle: nil,
                 deliveryInstructionCellID: nil,
-                seed: 41,
-                variation: nil
+                seed: 41
             ),
             modelTier: "speed",
             historyVoice: "aiden",

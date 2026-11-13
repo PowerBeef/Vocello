@@ -33,12 +33,11 @@ public struct IOSStartupReliabilityTake: Codable, Hashable, Sendable {
         }
     }
 
-    public var resolvedVariation: Qwen3SamplingVariation {
-        get throws {
-            guard let variation = Qwen3SamplingVariation(rawValue: variation) else {
-                throw IOSStartupReliabilityPlanError.invalidVariation(self.variation)
-            }
-            return variation
+    /// A take samples as Expressive, the only variation since RF-58; a plan that
+    /// asks for another is refused rather than run as something it did not ask for.
+    public func validateVariation() throws {
+        guard Qwen3SamplingVariation(rawValue: variation) == .expressive else {
+            throw IOSStartupReliabilityPlanError.invalidVariation(variation)
         }
     }
 }
@@ -116,7 +115,7 @@ public struct IOSStartupReliabilityLaunchSpec: Codable, Hashable, Sendable {
             }
             _ = try take.deliveryCell
             _ = try take.resolvedLanguage
-            _ = try take.resolvedVariation
+            try take.validateVariation()
             predecessor = take.takeID
         }
     }
@@ -173,7 +172,7 @@ public enum IOSStartupReliabilityPlanError: LocalizedError, Equatable, Sendable 
         case .invalidPredecessor(let value): "Startup reliability predecessor is invalid for \(value)."
         case .invalidSpeaker(let value): "Startup reliability speaker is invalid: \(value)."
         case .invalidLanguage(let value): "Startup reliability language is invalid: \(value)."
-        case .invalidVariation(let value): "Startup reliability variation is invalid: \(value)."
+        case .invalidVariation(let value): "Startup reliability variation must be expressive (RF-58): \(value)."
         }
     }
 }

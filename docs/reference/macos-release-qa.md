@@ -276,7 +276,7 @@ French once and to System Default once (Settings, `settings_appLanguage`); the a
    resume it, regenerate one segment; the dock behind the sheet shows the live card.
 6. **History, Saved Voices, Settings**: sort and search in the toolbar, the long-form segments
    toggle, Save As and Reveal; the enroll and record sheets; the recommended-setup summary, the
-   per-mode Speed and Quality rows with their actions, prefer-speed, variation, the output folder,
+   per-mode Speed and Quality rows with their actions, prefer-speed, the output folder,
    Application data and clone consent; the Updates category's automatic-check toggle and its
    Check for Updates button beside the app's name and version (`settings_checkForUpdates`, which
    opens Sparkle's window); Cmd+, opens the same screen in its own window.

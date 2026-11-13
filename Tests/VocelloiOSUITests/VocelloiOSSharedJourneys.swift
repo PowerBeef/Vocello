@@ -62,11 +62,6 @@ extension VocelloiOSUITestCase {
     /// documents it.
     func runLongFormProjectJourney() {
         assertVisibleModelReadiness()
-        // RF-18 C-03: Take variation is a persisted setting, and both failing
-        // October smokes inherited Consistent. Pin Expressive, the default, so
-        // the journey measures the default path; the session restores the
-        // original. Consistent's long-form stalls are a 3.0 known limitation.
-        pinVariationForSession("expressive")
         prepare(mode: .custom)
 
         // Natural, deterministic speech. Ownership comes from a before/after

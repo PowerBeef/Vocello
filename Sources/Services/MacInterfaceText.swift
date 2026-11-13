@@ -1476,10 +1476,6 @@ enum MacInterfaceText {
             defaultValue: "Downloading %1$@ %2$@ · %3$@ of %4$@ complete",
             comment: "macOS interface: recommended setup progress; %1$@ mode name, %2$@ variant label, %3$@ done, %4$@ total. Presentation only."), mode, variant, count, total)
     }
-    static var settingsGeneration: String {
-        localization.string(localized: "vocello.mac.settings.generation", defaultValue: "Generation",
-               comment: "macOS interface: Settings section header. Presentation only.")
-    }
     static var settingsHeavy: String {
         localization.string(localized: "vocello.mac.settings.heavy", defaultValue: "Heavy",
                comment: "macOS interface: package badge for a variant that strains this Mac. Presentation only.")
@@ -1565,26 +1561,6 @@ enum MacInterfaceText {
     static var settingsUpdateHelp: String {
         localization.string(localized: "vocello.mac.settings.updateHelp", defaultValue: "Download the updated model package",
                comment: "macOS interface: tooltip of the update action. Presentation only.")
-    }
-    static var settingsVariation: String {
-        localization.string(localized: "vocello.mac.settings.variation", defaultValue: "Variation",
-               comment: "macOS interface: Settings picker label for sampling variation. Presentation only.")
-    }
-    static var settingsVariationBalanced: String {
-        localization.string(localized: "vocello.mac.settings.variationBalanced", defaultValue: "Balanced",
-               comment: "macOS interface: Settings variation picker option between Expressive and Consistent. Presentation only.")
-    }
-    static var settingsVariationConsistent: String {
-        localization.string(localized: "vocello.mac.settings.variationConsistent", defaultValue: "Consistent",
-               comment: "macOS interface: Settings variation picker option with the steadiest takes. Presentation only.")
-    }
-    static var settingsVariationExpressive: String {
-        localization.string(localized: "vocello.mac.settings.variationExpressive", defaultValue: "Expressive",
-               comment: "macOS interface: Settings variation picker option, the model's official sampling. Presentation only.")
-    }
-    static var settingsVariationHelp: String {
-        localization.string(localized: "vocello.mac.settings.variationHelp", defaultValue: "How much takes vary when regenerating the same text. Expressive is the model's official sampling (liveliest); Balanced and Consistent trade some liveliness for steadier, more repeatable takes.",
-               comment: "macOS interface: Settings footer under the Variation picker. Expressive, Balanced and Consistent are the picker's option names. Presentation only.")
     }
     static var settingsVoiceCloning: String {
         localization.string(localized: "vocello.mac.settings.voiceCloning", defaultValue: "Voice cloning",
@@ -2053,15 +2029,6 @@ enum MacInterfaceText {
 
     // MARK: - Model-driven labels
 
-    /// Sampling variation names for the Settings picker; `Qwen3SamplingVariation.rawValue`
-    /// stays the stored preference and the engine identity.
-    static func settingsVariationName(_ variation: Qwen3SamplingVariation) -> String {
-        switch variation {
-        case .expressive: settingsVariationExpressive
-        case .balanced: settingsVariationBalanced
-        case .consistent: settingsVariationConsistent
-        }
-    }
     // Hand-maintained: each branch reads a catalog entry above, so enum cases and
     // engine activity labels reach the interface language without leaving the owner.
 

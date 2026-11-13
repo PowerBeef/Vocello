@@ -572,7 +572,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
         "Sources/QwenVoiceCore/SemanticTypes.swift",
-        "Sources/Services/GenerationVariationPreference.swift",
+        "Sources/VocelloCLI/GenerateCommand.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift",
         "Sources/iOS/IOSSettingsViews.swift",
         "Sources/VocelloCLI/Core/CommandModel/VocelloCommandTree.swift",

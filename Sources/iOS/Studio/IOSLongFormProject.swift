@@ -10,9 +10,8 @@ import QwenVoiceCore
 /// engine + app QC, bounded assembly into one joined WAV, fail-closed manifest
 /// v4, one joined History row per project). Everything model-free is shared
 /// QwenVoiceCore machinery; this file owns only the execution shell. The
-/// platform-specific side effects (sampling variation preference, waveform
-/// seed, diagnostics mirror, export, haptics, presentation copy) go through
-/// `IOSLongFormPlatformHooks`, so the macOS app compiles this file by path
+/// platform-specific side effects (waveform seed, diagnostics mirror, export,
+/// haptics, presentation copy) go through `IOSLongFormPlatformHooks`, so the macOS app compiles this file by path
 /// with its own adapter (`MacStudioLongFormPlatformHooks`) and the iOS adapter
 /// (`IOSStudioLongFormPlatformHooks`) keeps the iOS behavior unchanged. The
 /// shared player and the collaborators both apps share (timeline, History,
@@ -82,15 +81,13 @@ struct LongFormHeatPause: Sendable {
 /// Platform side effects of the long-form runner, the long-form twin of
 /// `IOSSingleTakeGenerationExecutionHooks`. The iOS adapter calls exactly what
 /// the runner used to call inline; the macOS adapter substitutes the desktop
-/// equivalents (Settings variation, `MacStableVisualHash`, telemetry merge,
-/// History library events) and no-ops the haptics.
+/// equivalents (`MacStableVisualHash`, telemetry merge, History library
+/// events) and no-ops the haptics.
 @MainActor
 protocol IOSLongFormPlatformHooks: AnyObject {
     /// Copy for progress and failure messages, resolved by the platform's
     /// interface-language owner.
     var presentation: VocelloPresentationText { get }
-    /// Sampling variation stamped on every segment request.
-    func requestVariation() -> Qwen3SamplingVariation?
     /// Decorative waveform seed for the live and joined cards.
     func waveformSeed(for text: String) -> Int
     /// Live card and streaming title of one segment (`index` is zero-based).
@@ -372,7 +369,6 @@ struct IOSLongFormProjectRequest {
         segmentIndex: Int,
         outputPath: String,
         generationID: UUID,
-        variation: Qwen3SamplingVariation?,
         seedOverride: UInt64? = nil
     ) -> GenerationRequest {
         let line = lines[segmentIndex]
@@ -410,7 +406,6 @@ struct IOSLongFormProjectRequest {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: variation,
             deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil,
             longFormSegment: true
         )
@@ -1018,7 +1013,6 @@ final class IOSLongFormProjectRunner {
                         segmentIndex: index,
                         outputPath: outputPath,
                         generationID: generationID,
-                        variation: hooks.requestVariation(),
                         seedOverride: seed
                     )
                 )
@@ -1288,7 +1282,6 @@ final class IOSLongFormProjectRunner {
                     segmentIndex: segmentIndex,
                     outputPath: outputPath,
                     generationID: generationID,
-                    variation: hooks.requestVariation(),
                     seedOverride: replacementSeed
                 )
             )

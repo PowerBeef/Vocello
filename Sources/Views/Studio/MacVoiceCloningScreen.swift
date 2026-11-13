@@ -1045,8 +1045,7 @@ struct MacVoiceCloningScreen: View {
             referenceTranscript: currentDraft.trimmedReferenceTranscript,
             preparedVoiceID: currentDraft.selectedSavedVoiceID,
             ignoresStoredTranscript: true,
-            seed: currentDraft.pinnedSeed,
-            variation: GenerationVariationPreference.requestValue()
+            seed: currentDraft.pinnedSeed
         ) else {
             // Defensive: the checks above already guarantee a reference and a script.
             coordinator.rejectStart(MacInterfaceText.cloningReferenceRequired)

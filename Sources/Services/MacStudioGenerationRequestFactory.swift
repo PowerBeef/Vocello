@@ -3,7 +3,7 @@ import QwenVoiceCore
 
 /// Pure request-boundary assembly shared by the macOS Studio coordinators and their
 /// deterministic tests. Keeping this outside SwiftUI makes the exact language, Clone
-/// conditioning, seed, and variation values observable before the engine call. Every
+/// conditioning and seed values observable before the engine call. Every
 /// mode streams on the app interval, like the iOS views, long-form segments and the
 /// warm request for the same draft (A14-06).
 enum MacStudioGenerationRequestFactory {
@@ -15,7 +15,6 @@ enum MacStudioGenerationRequestFactory {
         voiceDescription: String,
         deliveryStyle: String,
         seed: UInt64?,
-        variation: Qwen3SamplingVariation?,
         generationID: UUID = UUID()
     ) -> GenerationRequest {
         GenerationRequest(
@@ -31,8 +30,7 @@ enum MacStudioGenerationRequestFactory {
                 deliveryStyle: deliveryStyle
             ),
             generationID: generationID,
-            seed: seed,
-            variation: variation
+            seed: seed
         )
     }
 
@@ -46,7 +44,6 @@ enum MacStudioGenerationRequestFactory {
         preparedVoiceID: String?,
         ignoresStoredTranscript: Bool,
         seed: UInt64?,
-        variation: Qwen3SamplingVariation?,
         generationID: UUID = UUID()
     ) -> GenerationRequest? {
         guard let referenceAudioPath else { return nil }
@@ -69,8 +66,7 @@ enum MacStudioGenerationRequestFactory {
                 )
             ),
             generationID: generationID,
-            seed: seed,
-            variation: variation
+            seed: seed
         )
     }
 
@@ -87,7 +83,6 @@ enum MacStudioGenerationRequestFactory {
         deliveryStyle: String?,
         deliveryInstructionCellID: String?,
         seed: UInt64?,
-        variation: Qwen3SamplingVariation?,
         generationID: UUID = UUID()
     ) -> GenerationRequest {
         GenerationRequest(
@@ -102,7 +97,6 @@ enum MacStudioGenerationRequestFactory {
             payload: .custom(speakerID: speakerID, deliveryStyle: deliveryStyle),
             generationID: generationID,
             seed: seed,
-            variation: variation,
             deliveryInstructionCellID: deliveryStyle == nil ? nil : deliveryInstructionCellID
         )
     }

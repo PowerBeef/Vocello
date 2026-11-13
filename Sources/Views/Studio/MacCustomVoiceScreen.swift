@@ -331,8 +331,7 @@ struct MacCustomVoiceScreen: View {
             speakerID: speaker,
             deliveryStyle: model.supportsInstructionControl ? draft.emotion : nil,
             deliveryInstructionCellID: draft.resolvedDeliveryProfile.instructionCellID,
-            seed: draft.pinnedSeed,
-            variation: GenerationVariationPreference.requestValue()
+            seed: draft.pinnedSeed
         )
         let plan: IOSSingleTakeGenerationPlan
         do {

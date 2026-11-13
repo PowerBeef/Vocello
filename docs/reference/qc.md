@@ -527,8 +527,10 @@ PY="$(python3 scripts/select_python.py)"
 - **Edit rates are bounded at 1 per script unit** (since 2026-11-11): a recognizer that runs away on
   a take inserts without limit, and one such take carried a whole screen's mean once.
 - **The long-form kind** (`long-form`, RF-50) runs projects as the apps do (`--long-form always`):
-  per stratum (Built-in Voice in English, French and Japanese; Voice Design in English) six scripts
-  of ten pool sentences, each under the Expressive and the Consistent variation on the same script.
+  per stratum (Built-in Voice in English, French, Japanese, Chinese and Korean; Voice Design in
+  English) four scripts of twenty pool sentences, each under the Expressive variation. Version 1 of
+  the screen also ran each script under Consistent; version 2 (RF-58, which retired every other
+  variation) runs Expressive only, and the tool refuses to plan a retired variation.
   It scores both ASR families over the joined output, the spread of the speaker windows (no
   reference), each segment's end reason (one that ran to the frame cap is a gross failure) and the
   segments' Fast QC warnings; strata are reported by stratum and by variation.

@@ -49,8 +49,7 @@ final class ClonePrimingAndWarmLanguageTests: XCTestCase {
             speakerID: "aiden",
             deliveryStyle: nil,
             deliveryInstructionCellID: nil,
-            seed: nil,
-            variation: nil
+            seed: nil
         )
         func warm(languageHint: String) throws -> GenerationRequest {
             let decision = warmupCoordinator().warmupDecision(for: .init(
@@ -96,8 +95,7 @@ final class ClonePrimingAndWarmLanguageTests: XCTestCase {
             language: .auto,
             voiceDescription: brief,
             deliveryStyle: "",
-            seed: nil,
-            variation: nil
+            seed: nil
         )
         let resolved = MacWarmLanguageResolution.takeLanguageHint(mode: .design, selectedLanguage: .auto, script: script)
         let decision = warmupCoordinator().warmupDecision(for: .init(

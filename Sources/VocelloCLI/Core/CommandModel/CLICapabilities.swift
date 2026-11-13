@@ -200,7 +200,8 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
         generation = Generation(
             modes: VocelloCommandTree.modes,
             variants: VocelloCommandTree.variants,
-            variations: VocelloCommandTree.variations,
+            // What a take samples: Expressive only since RF-58.
+            variations: [Qwen3SamplingVariation.expressive.rawValue],
             languages: Qwen3SupportedLanguage.allCases.map(\.rawValue),
             deliveryCells: EmotionPreset.all.filter { $0.id != "neutral" }.flatMap { preset in
                 EmotionIntensity.allCases.compactMap { intensity in

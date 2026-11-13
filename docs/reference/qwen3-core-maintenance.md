@@ -60,11 +60,11 @@ with a fresh upstream tree. Direct SwiftPM work uses
 
 - Custom, Design and Clone use the bounded streaming pipeline. Non-final chunk evaluation may
   overlap token generation; the final chunk is synchronized before terminal completion.
-- Sampling: the code predictor (subtalker) samples at the reference's 0.9 / top-k 50 / top-p 1.0
-  for every variation, and the talker filters EOS like any token (D2); both follow the reference
-  since the RF-18 follow-up screen (2026-10-20). The talker uses the official values only under the
-  default Expressive variation; Balanced and Consistent narrow it on purpose. Both stages sample from
-  float32 logits (D3). An explicit internal-diagnostics override can change any of these.
+- Sampling: both the talker and the code predictor (subtalker) sample at the reference's 0.9 /
+  top-k 50 / top-p 1.0 for every take (the take variation is retired, RF-58), and the talker filters
+  EOS like any token (D2), as the reference does since the RF-18 follow-up screen (2026-10-20). Both
+  stages sample from float32 logits (D3). An explicit internal-diagnostics override can change any
+  of these.
 - `maxTokens` is a quality failure, not a successful truncated result.
 - MLX work runs inside the facade's error scopes and surfaces as typed failures
   ([`mlx-guide.md` §2.6](mlx-guide.md#26-errors-and-error-scopes)).

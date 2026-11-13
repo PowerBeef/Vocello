@@ -44,7 +44,6 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
             generationID: generationID,
             seed: 32_060_828,
-            variation: .expressive,
             deliveryInstructionCellID: cell.id
         )
         let receipt = GenerationRequestReceipt(
@@ -94,7 +93,6 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
             generationID: generationID,
             seed: 38_112_001,
-            variation: .balanced,
             deliveryInstructionCellID: cell.id
         )
         let receipt = GenerationRequestReceipt(
@@ -142,8 +140,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
                 conditioningMode: .transcriptBacked("Bonjour, ceci est la référence.")
             )),
             generationID: generationID,
-            seed: 8,
-            variation: .consistent
+            seed: 8
         )
         let receipt = GenerationRequestReceipt(
             request: request,
@@ -282,7 +279,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .clone(reference: CloneReference(
                 audioPath: "/private/reference.wav",
                 conditioningMode: .transcriptBacked("texte de référence privé")
-            )), seed: UInt64.max, variation: .consistent
+            )), seed: UInt64.max
         )
         let sampling = Qwen3SamplingPolicy(
             algorithmVersion: 2, effectiveSeed: UInt64.max,
@@ -326,8 +323,7 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
                 deliveryStyle: "Speak calmly with measured pacing."
             ),
             generationID: generationID,
-            seed: 9,
-            variation: .consistent
+            seed: 9
         )
         let instruction = GenerationSemantics.designInstruction(
             voiceDescription: "A warm, clear narrator.",
@@ -366,7 +362,6 @@ final class GenerationStartupDiagnosticsTests: XCTestCase {
             payload: .custom(speakerID: "vivian", deliveryStyle: cell.instruction),
             generationID: generationID,
             seed: 38_112_001,
-            variation: .consistent,
             deliveryInstructionCellID: cell.id
         )
         let first = GenerationRequestReceipt(

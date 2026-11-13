@@ -503,11 +503,11 @@
       "title": "About 60 s single takes drift into silences of 2 s or more late in the take; long-form fails in ordinary use",
       "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
       "tests": [
-        "VocelloCoreTests/RequestLocalSamplingPolicyTests/testSubtalkerKeepsReferenceSamplingWhateverTheVariation"
+        "VocelloCoreTests/RequestLocalSamplingPolicyTests/testEveryTakeSamplesAsTheReference"
       ],
       "status": "partial",
       "remaining": [
-        "The RF-18 follow-up screen's adopted subtalker and EOS changes cut Consistent's failed long-form projects from 9 to 2 of 56 on the Mac; the rest stays a 3.0 known limitation naming Consistent, and the iOS long-form smoke is the device proof."
+        "Consistent, whose long-form projects failed most, is retired (RF-58): every take samples as Expressive. The long-form refusals left under Expressive, mostly East Asian, are RF-55's subject, and the iOS long-form smoke is the device proof."
       ]
     },
     {
@@ -526,9 +526,11 @@
       "severity": "S2",
       "title": "The iPhone long-form smoke was not hermetic: it inherited the phone's variation",
       "source": "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Fixed in the smoke itself (6efc4f8a pins Expressive and restores it), which runs only on the paired iPhone; no deterministic test fails if the pin is removed."
+      "tests": [
+        "VocelloCoreTests/RequestLocalSamplingPolicyTests/testEveryTakeSamplesAsTheReference"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "C-04",

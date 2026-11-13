@@ -232,7 +232,7 @@ assert take_path.read_bytes()==original
         let request = GenerationRequest(mode: .custom, modelID: "pro_custom",
             text: "First sentence. Second sentence.", outputPath: "/fixture/output.wav", shouldStream: true,
             languageHint: "english", payload: .custom(speakerID: "aiden", deliveryStyle: nil),
-            generationID: id, seed: UInt64.max, variation: .consistent,
+            generationID: id, seed: UInt64.max,
             deliveryInstructionCellID: "neutral.normal")
         return GenerationRequestReceipt(request: request, generationID: id, effectiveSeed: UInt64.max,
             warmState: .cold, predecessorIdentityDigest: nil, retryAttempt: 0, operationGeneration: 1)

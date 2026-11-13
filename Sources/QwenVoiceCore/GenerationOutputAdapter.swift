@@ -2939,7 +2939,8 @@ struct StreamingExecutionContext: Sendable {
     /// the persisted WAV digest plus planned/observed seed agreement fields.
     static func samplingTelemetryNotes(for request: GenerationRequest) -> [String: String] {
         var notes = [
-            "samplingVariation": (request.variation ?? .expressive).rawValue,
+            // Every take samples as Expressive (RF-58); the note stays for older readers.
+            "samplingVariation": Qwen3SamplingVariation.expressive.rawValue,
         ]
         if let seed = request.seed {
             notes["samplingPlannedSeed"] = String(seed)

@@ -156,9 +156,10 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertThrowsError(try GenerateCommand.parseSeed(generate(["--seed=-1"])))
         XCTAssertThrowsError(try GenerateCommand.parseSeed(generate(["--seed", "1.5"])))
 
-        XCTAssertNil(try GenerateCommand.parseVariation(generate([])))
-        XCTAssertEqual(try GenerateCommand.parseVariation(generate(["--variation", "Balanced"])), .balanced)
-        XCTAssertThrowsError(try GenerateCommand.parseVariation(generate(["--variation", "wild"])))
+        // --variation is retired (RF-58): it still parses, and an unknown value is still refused.
+        XCTAssertNil(try GenerateCommand.noteRetiredVariation(generate([])))
+        XCTAssertEqual(try GenerateCommand.noteRetiredVariation(generate(["--variation", "Balanced"])), .balanced)
+        XCTAssertThrowsError(try GenerateCommand.noteRetiredVariation(generate(["--variation", "wild"])))
 
         XCTAssertEqual(try GenerateCommand.resolveMode(generate([])), .custom)
         XCTAssertEqual(try GenerateCommand.resolveMode(generate(["--mode", "CLONE"])), .clone)
@@ -192,9 +193,27 @@ final class CLIArgumentsTests: XCTestCase {
         ))
     }
 
-    /// RF-27: without --variant a take uses the package the Mac app would use for the
-    /// mode; without --variation, the app's variation (nil for expressive, as the app sends it).
-    func testTakesDefaultToTheAppsPackageAndVariation() throws {
+    /// RF-58: a retired --variation still parses and says, as a warning, that the
+    /// take samples as Expressive; Expressive, or no option, warns about nothing.
+    func testARetiredVariationWarnsAndExpressiveDoesNot() throws {
+        func warnings(_ arguments: [String]) throws -> [CLIWarning] {
+            let capture = CLIPresenterCapture()
+            try CLIPresenter.$capture.withValue(capture) {
+                _ = try GenerateCommand.noteRetiredVariation(generate(arguments))
+                CLIPresenter.succeed(["done": true])
+            }
+            return try XCTUnwrap(capture.report).warnings
+        }
+        XCTAssertEqual(try warnings(["--variation", "Consistent"]), [CLIWarning(
+            code: "variation_retired", message: "--variation consistent is retired: every take samples as expressive",
+            detail: ["requested": "consistent", "sampled": "expressive"]
+        )])
+        XCTAssertEqual(try warnings(["--variation", "expressive"]), [])
+        XCTAssertEqual(try warnings([]), [])
+    }
+
+    /// RF-27: without --variant a take uses the package the Mac app would use for the mode.
+    func testTakesDefaultToTheAppsPackage() throws {
         let manifest = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
@@ -227,9 +246,6 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(resolve(nil).quality, true, "the 16 GB recommendation once installed")
         XCTAssertEqual(resolve(nil, ["QwenVoice.PreferSpeedEverywhere": true]).quality, false)
         XCTAssertEqual(resolve(nil, ["QwenVoice.MacModelVariantPreference.custom": "speed"]).quality, false)
-
-        XCTAssertNil(GenerateCommand.appVariation(settings([:])), "expressive is sent as no variation")
-        XCTAssertEqual(GenerateCommand.appVariation(settings(["generationVariation": "balanced"])), .balanced)
     }
 
     /// P15-07 / P02-09: an unknown `--language` is refused before boot instead of

@@ -84,9 +84,11 @@ public struct Qwen3ReferenceParity: Hashable, Sendable {
 /// same source: version 2 samples from float32 logits since 2026-10-13 (RF-14
 /// D3), and since 2026-10-20 filters EOS like any token (D2) with a subtalker that
 /// keeps the reference sampling (RF-18) and gives a single streamed Custom or
-/// Design take its whole text up front (D1, RF-21), and since 2026-11-12 samples
-/// a Consistent long-form segment's talker as Balanced does (RF-53), so one
-/// seed's takes differ across those changes.
+/// Design take its whole text up front (D1, RF-21), so one seed's takes differ
+/// across those changes. Since 2026-11-12 every take samples as the reference
+/// (RF-58 retired the Balanced and Consistent talkers): a seed that ran under
+/// either now gives its Expressive take, while the algorithm stays version 2
+/// because no Expressive take changes.
 public struct Qwen3RequestSamplingPolicy: Hashable, Sendable {
     public static let currentAlgorithmVersion = 2
 

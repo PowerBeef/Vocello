@@ -99,7 +99,6 @@ HEAVY_LANE_IDS = {
     "ui-enroll-clone-fixture",
     "ui-saved-voice-lifecycle",
     "ui-screen-protection",
-    "ui-take-variation",
     "ui-auto-language",
     "ui-purchase",
     "release",

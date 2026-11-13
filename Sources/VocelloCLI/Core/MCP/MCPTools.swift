@@ -375,7 +375,7 @@ enum MCPTools {
                 ]),
                 "description": "A deterministic sampling seed, preferably as a decimal string.",
             ]),
-            "variation": choice(VocelloCommandTree.variations, "Absent, the app's Variation setting."),
+            "variation": choice(VocelloCommandTree.variations, "Retired: every take samples as expressive; balanced or consistent add a warning."),
             "out": string("The .wav file to write."),
             "longForm": choice(
                 ["auto", "always", "never"],

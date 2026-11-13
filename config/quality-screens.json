@@ -1059,15 +1059,14 @@
       }
     },
     "long-form": {
-      "version": 1,
+      "version": 2,
       "kind": "long-form",
       "variant": "speed",
       "scriptSplit": "all",
       "sentencesPerProject": 20,
       "projectsPerStratum": 4,
       "variations": [
-        "expressive",
-        "consistent"
+        "expressive"
       ],
       "strata": {
         "custom-english": {
@@ -1118,7 +1117,7 @@
           ]
         }
       },
-      "description": "Long-form projects as the apps run them (--long-form always: planned into segments of up to about 900 characters, each a streaming take, joined): per stratum four scripts of twenty pool sentences drawn from both halves of the pool (about 70 to 100 seconds, two segments or more), each once under the default Expressive variation and once under Consistent, with the same script. Built-in Voice in English, French and Japanese, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
+      "description": "Long-form projects as the apps run them (--long-form always: planned into segments of up to about 900 characters, each a streaming take, joined): per stratum four scripts of twenty pool sentences drawn from both halves of the pool (about 70 to 100 seconds, two segments or more), each under the Expressive variation, the only one since RF-58 (version 1 also ran each script under Consistent). Built-in Voice in English, French, Japanese, Chinese and Korean, and Voice Design in English. Scored by both ASR families over the joined output, the spread of its speaker windows (no reference), the segments' end reasons (a segment that ran to the frame cap is a gross failure) and their Fast QC warnings.",
       "rules": {
         "long-form-full-text": {
           "recorded": "2026-11-12",
@@ -1688,7 +1687,8 @@
             0.4737
           ]
         },
-        "note": "Too wide to decide a margin of 0.04, 0.05 or 0.5 at this size: refusals leave only 18 paired projects. Under Consistent 18 of 32 projects are refused across both seed sets (Expressive 4 of 32), and Japanese 12 of 16 (segments of about 70 s with 2.2 to 2.9 s silent gaps and slow delivery)."
+        "note": "Too wide to decide a margin of 0.04, 0.05 or 0.5 at this size: refusals leave only 18 paired projects. Under Consistent 18 of 32 projects are refused across both seed sets (Expressive 4 of 32), and Japanese 12 of 16 (segments of about 70 s with 2.2 to 2.9 s silent gaps and slow delivery).",
+        "screenVersion": 1
       }
     },
     "clone-cjk": {

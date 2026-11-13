@@ -10,7 +10,23 @@ final class IOSStartupReliabilityPlanTests: XCTestCase {
         XCTAssertEqual(spec.plan.takes.count, 2)
         XCTAssertEqual(try spec.plan.takes[0].deliveryCell.id, "calm.strong")
         XCTAssertEqual(try spec.plan.takes[0].resolvedLanguage, .english)
-        XCTAssertEqual(try spec.plan.takes[0].resolvedVariation, .balanced)
+        XCTAssertNoThrow(try spec.plan.takes[0].validateVariation())
+    }
+
+    /// RF-58: every take samples as Expressive, so a plan asking for another
+    /// variation is refused before it runs rather than run as something else.
+    func testAPlanAskingForARetiredVariationIsRefused() throws {
+        for variation in ["balanced", "consistent", "wild"] {
+            var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(makeRawSpec().utf8)) as? [String: Any])
+            var plan = try XCTUnwrap(object["plan"] as? [String: Any])
+            var takes = try XCTUnwrap(plan["takes"] as? [[String: Any]])
+            takes[1]["variation"] = variation
+            plan["takes"] = takes
+            object["plan"] = plan
+            XCTAssertThrowsError(try IOSStartupReliabilityLaunchSpec.decodeAndValidate(json(object)), variation) {
+                XCTAssertEqual($0 as? IOSStartupReliabilityPlanError, .invalidVariation(variation))
+            }
+        }
     }
 
     func testDigestMismatchDuplicateTakeAndPredecessorDriftFailClosed() throws {
@@ -81,13 +97,13 @@ final class IOSStartupReliabilityPlanTests: XCTestCase {
                     [
                         "takeIndex": 1, "takeID": "cold-1", "speakerID": "vivian",
                         "deliveryID": "calm.strong", "language": "english",
-                        "seed": 38_112_001, "variation": "balanced", "streaming": true,
+                        "seed": 38_112_001, "variation": "expressive", "streaming": true,
                         "preparation": "full_runtime_unload",
                     ],
                     [
                         "takeIndex": 2, "takeID": "warm-1", "speakerID": "vivian",
                         "deliveryID": "calm.strong", "language": "english",
-                        "seed": 38_112_001, "variation": "balanced", "streaming": false,
+                        "seed": 38_112_001, "variation": "expressive", "streaming": false,
                         "preparation": "production", "predecessorTakeID": "cold-1",
                     ],
                 ],

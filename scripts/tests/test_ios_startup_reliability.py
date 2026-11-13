@@ -32,10 +32,10 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             "takes": [
                 {"takeIndex": 1, "takeID": "cold-1", "speakerID": "vivian",
                  "deliveryID": "calm.strong", "language": "english", "seed": 38112001,
-                 "variation": "balanced", "streaming": True, "preparation": "full_runtime_unload"},
+                 "variation": "expressive", "streaming": True, "preparation": "full_runtime_unload"},
                 {"takeIndex": 2, "takeID": "warm-1", "speakerID": "vivian",
                  "deliveryID": "calm.strong", "language": "english", "seed": 38112001,
-                 "variation": "balanced", "streaming": False, "preparation": "production",
+                 "variation": "expressive", "streaming": False, "preparation": "production",
                  "predecessorTakeID": "cold-1"},
             ],
         }
@@ -938,7 +938,7 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         log.write_text(
             "VOCELLO-STARTUP-PARITY-UI-MANIFEST runID=run-1 "
             f"generationID={generation} speakerID=vivian deliveryID=calm.strong "
-            "language=english variation=balanced streaming=true seedSource=generated\n"
+            "language=english variation=expressive streaming=true seedSource=generated\n"
         )
         encoded_generation = generation.upper()
         row = {
@@ -947,7 +947,7 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 "generationID": encoded_generation, "speakerID": "vivian", "deliveryID": "calm.strong",
                 "instructionDigest": "a" * 64, "instructionCharacters": 42,
                 "language": "english", "seed": 99, "seedSource": "generated",
-                "variation": "balanced", "streaming": True, "retryAttempt": 0,
+                "variation": "expressive", "streaming": True, "retryAttempt": 0,
             },
             "stageMarks": [{"stage": "startup.first_decoded_audio_frame", "tMS": 12}],
         }

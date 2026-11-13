@@ -155,39 +155,6 @@ final class VocelloiOSScreenProtectionUITests: XCTestCase {
     }
 }
 
-/// Explicit operator recovery of the Take variation preference, isolated from
-/// every acceptance journey (scripts/ui_test.sh ios take-variation). It reads the
-/// Settings root's Audio row value (the Audio page when that names none) and, only
-/// when the lane names a different value, selects it through the visible control, e.g. after a journey that pinned Expressive
-/// could not restore the original.
-@MainActor
-final class VocelloiOSTakeVariationUITests: VocelloiOSUITestCase {
-    func testConfiguredTakeVariation() throws {
-        let requested = ProcessInfo.processInfo.environment["QVOICE_IOS_TAKE_VARIATION"] ?? ""
-        guard ["inspect", "expressive", "balanced", "consistent"].contains(requested) else {
-            XCTFail("Use the explicit take-variation lane; the requested value is missing")
-            return
-        }
-        beginSession()
-        let before = selectedVariationID()
-        if requested != "inspect", before != requested {
-            selectVariation(requested)
-        }
-        let after = selectedVariationID()
-        let attachment = XCTAttachment(
-            data: try JSONSerialization.data(
-                withJSONObject: ["schemaVersion": 1, "requested": requested, "before": before, "after": after],
-                options: [.sortedKeys]
-            ),
-            uniformTypeIdentifier: "public.json"
-        )
-        attachment.name = "take-variation.json"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        XCTAssertEqual(after, requested == "inspect" ? before : requested)
-    }
-}
-
 /// Physical-device smoke journeys and the scenarios `scripts/ui_test.sh ios smoke
 /// --scenario` selects. Full smoke runs four: `testPhysicalDeviceSmokeJourney` (one
 /// app session that cancels one active streamed Custom generation, then completes
@@ -284,17 +251,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             assertAboveTabDock(autoplay, named: "Play generated audio", category: category.name)
             assertAccessibilityControl(autoplay, named: "Play generated audio", category: category.name)
             VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-autoplay")
-            openSettingsPage(for: "iosSettings_variationRow")
-            let variation = element("iosSettings_variationRow")
             XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_audio"), timeout: 20))
-            XCTAssertTrue(VocelloUIWait.exists(autoplay, timeout: 20))
-            XCTAssertTrue(VocelloUIWait.exists(variation, timeout: 20))
-            assertAboveTabDock(variation, named: "Take variation", category: category.name)
-            assertAccessibilityControl(variation, named: "Take variation", category: category.name)
-            if category.name == "French-Default" {
-                XCTAssertTrue(["Expressif", "Équilibré", "Cohérent"].contains(variation.value as? String ?? ""),
-                              "Variation must expose its French display name without changing the saved value")
-            }
             VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-landing")
 
             openSettingsPage(for: "iosSettings_versionLabel")

@@ -178,18 +178,18 @@ enum BatchCommand {
         // reproduces it (community testing also reports a fixed seed reduces
         // cross-segment timbre drift; GitHub #30/#47).
         let seed = try GenerateCommand.parseSeed(args)
-        let variation = try GenerateCommand.parseVariation(args) ?? GenerateCommand.appVariation(settings)
+        try GenerateCommand.noteRetiredVariation(args)
         if args.flag("long-form") {
             try await runLongForm(
                 args: args, lines: lines, mode: mode, modelID: modelID, quality: quality,
                 runtime: runtime, payload: payload, deliveryInstructionCellID: deliveryInstructionCellID,
-                outDir: outDir, filenamePrefix: stamp, seed: seed, variation: variation
+                outDir: outDir, filenamePrefix: stamp, seed: seed
             )
             return
         }
         let requests = CLIBatchExecution.makeRequests(
             lines: lines, mode: mode, modelID: modelID, outputDirectory: outDir,
-            filenamePrefix: stamp, payload: payload, seed: seed, variation: variation,
+            filenamePrefix: stamp, payload: payload, seed: seed,
             deliveryInstructionCellID: deliveryInstructionCellID, captureCodecTrace: captureCodecTrace
         )
 
@@ -269,7 +269,7 @@ enum BatchCommand {
     private static func runLongForm(
         args: Args, lines: [String], mode: GenerationMode, modelID: String, quality: Bool,
         runtime: CLIRuntime, payload: GenerationRequest.Payload, deliveryInstructionCellID: String?,
-        outDir: URL, filenamePrefix: String, seed: UInt64?, variation: Qwen3SamplingVariation?
+        outDir: URL, filenamePrefix: String, seed: UInt64?
     ) async throws {
         var plans: [LongFormPlan] = []
         for (lineIndex, line) in lines.enumerated() {
@@ -306,7 +306,7 @@ enum BatchCommand {
             }
             let outcome = await CLILongFormProject.run(
                 plan, mode: mode, modelID: modelID, runtime: runtime, payload: payload,
-                deliveryInstructionCellID: deliveryInstructionCellID, variation: variation,
+                deliveryInstructionCellID: deliveryInstructionCellID,
                 // Batch has no --language: Auto, resolved over each project's script as the apps do.
                 languageHint: nil, directory: projectFolder,
                 projectIndex: index, projectCount: plans.count

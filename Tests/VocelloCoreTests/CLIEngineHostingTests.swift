@@ -126,7 +126,7 @@ final class CLIEngineHostingTests: XCTestCase {
             DesktopLongFormRequest(
                 mode: .custom, modelID: try runtime.modelID(mode: .custom, quality: false), plan: plan,
                 payload: .custom(speakerID: runtime.defaultSpeakerID, deliveryStyle: nil),
-                deliveryInstructionCellID: nil, languageHint: nil, variation: nil, directory: folder
+                deliveryInstructionCellID: nil, languageHint: nil, directory: folder
             ),
             defaultSpeakerID: runtime.defaultSpeakerID
         ) { event in
@@ -187,7 +187,7 @@ final class DesktopLongFormDriverTests: XCTestCase {
             engine: engine, host: host,
             request: DesktopLongFormRequest(
                 mode: .custom, modelID: model.id, plan: plan, payload: .custom(speakerID: "aiden", deliveryStyle: nil),
-                deliveryInstructionCellID: nil, languageHint: "english", variation: nil, directory: folder
+                deliveryInstructionCellID: nil, languageHint: "english", directory: folder
             ),
             folder: folder
         )

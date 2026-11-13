@@ -143,7 +143,9 @@ public struct GenerationRequestReceipt: Hashable, Codable, Sendable {
             resolvedCustomInstruction: instruction
         ).digest
         let promptDigest = Self.sha256(normalizedTargetText)
-        let variation = (request.variation ?? .expressive).rawValue
+        // Every take samples as Expressive (RF-58). The value stays in the request
+        // identity, so a receipt's digest is the one an Expressive take always had.
+        let variation = Qwen3SamplingVariation.expressive.rawValue
         let requestSerialization = Self.lengthFramed([
             request.modelID,
             request.mode.rawValue,

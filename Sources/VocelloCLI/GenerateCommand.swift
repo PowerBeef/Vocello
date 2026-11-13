@@ -26,8 +26,7 @@ public enum GenerateCommand {
         /// Mac app would use for the mode).
         let variantSource: String
         /// The take's effective seed as a decimal string; passing it back as
-        /// --seed, with the same `variant` and variation
-        /// (`completionReceipt.request.variation`), reproduces the take.
+        /// --seed, with the same `variant`, reproduces the take.
         /// `completionReceipt` is the engine's own receipt and keeps its numeric fields.
         let seed: String?
         let deliveryInstructionChars: Int?
@@ -224,7 +223,6 @@ public enum GenerateCommand {
         public let consent: VoiceCloningConsentPolicy
         let language: Qwen3SupportedLanguage?
         let seed: UInt64?
-        let variation: Qwen3SamplingVariation?
         let appDelivery: Bool
         let deliveryInstructionCellID: String?
         let variant: VariantChoice
@@ -280,7 +278,7 @@ public enum GenerateCommand {
         // Planned before boot, so a script the apps would refuse never costs a model load.
         let longFormPlan = routesToLongForm ? try CLILongFormProject.plan(text, seed: seed) : nil
         let settings = DesktopAppSettings()
-        let variation = try parseVariation(args) ?? appVariation(settings)
+        try noteRetiredVariation(args)
         let appDelivery = try parseAppDelivery(args)
         try validatePayloadOptions(args, mode: mode)
         let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
@@ -318,7 +316,7 @@ public enum GenerateCommand {
         }
         return PreparedTake(
             args: args, text: text, mode: mode, consent: consent, language: language, seed: seed,
-            variation: variation, appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
+            appDelivery: appDelivery, deliveryInstructionCellID: deliveryInstructionCellID,
             variant: variant, generationID: generationID, output: output, streaming: streaming,
             dataDirectory: dataDir, manifestOverride: manifestOverride, registry: registryContext.registry,
             modelsDirectory: registryContext.modelsDirectory, longFormPlan: longFormPlan, lineBatch: lineBatch,
@@ -358,9 +356,9 @@ public enum GenerateCommand {
     /// `clientRequestID`): the take as the caller asked for it, not how it was
     /// spelled. The text counts by its digest wherever it came from (an argument,
     /// a file or stdin), paths are absolute, parsed options take their canonical
-    /// form, and omitted options count as what they resolve to (the package and
-    /// variation the app's settings choose at run time, the default speaker, Auto
-    /// language, streaming), so a `generate` command line and the same `run`
+    /// form, and omitted options count as what they resolve to (the package the
+    /// app's settings choose at run time, the default speaker, Auto language,
+    /// streaming), so a `generate` command line and the same `run`
     /// request are one request, and an omitted setting the app has since changed
     /// is a different one. The data folder is not part of it: the ledger lives there.
     static func identity(of take: PreparedTake) throws -> CLIJSONValue {
@@ -383,7 +381,8 @@ public enum GenerateCommand {
             "textDigest": .string(sha256(Data(take.text.utf8))),
             "variant": .string(take.quality ? "quality" : "speed"),
             "seed": take.seed.map { .string(String($0)) } ?? .null,
-            "variation": .string((take.variation ?? .expressive).rawValue),
+            // Every take samples as Expressive (RF-58); the field keeps earlier ledger identities.
+            "variation": .string(Qwen3SamplingVariation.expressive.rawValue),
             "speaker": take.mode == .custom
                 ? .string(try explicitSpeaker(args) ?? take.registry.defaultSpeaker.id) : .null,
             "language": take.language.flatMap { $0 == .auto ? nil : CLIJSONValue.string($0.rawValue) } ?? .null,
@@ -412,7 +411,7 @@ public enum GenerateCommand {
             modelInstalled: take.registry.model(id: modelID)
                 .map { DesktopModelInventory.isComplete($0, modelsDirectory: take.modelsDirectory) } ?? false,
             language: (take.language ?? .auto).rawValue, seed: take.seed.map { String($0) },
-            variation: (take.variation ?? .expressive).rawValue, characters: take.text.count, streaming: take.streaming,
+            variation: Qwen3SamplingVariation.expressive.rawValue, characters: take.text.count, streaming: take.streaming,
             outputPath: take.lineOutputDirectory?.path ?? take.output.path, longForm: take.longFormPlan != nil,
             segments: take.longFormPlan?.segments.count, lineByLine: take.lineBatch != nil, lines: take.lineBatch?.count
         )
@@ -534,7 +533,6 @@ public enum GenerateCommand {
             languageHint: take.language?.rawValue,
             payload: payload, generationID: generationID,
             seed: take.seed,
-            variation: take.variation,
             deliveryInstructionCellID: take.deliveryInstructionCellID)
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
         CLIPresenter.event(.generationStarted, generationID: generationID, data: [
@@ -707,7 +705,7 @@ public enum GenerateCommand {
         let batch = DesktopLineBatch(
             mode: take.mode, model: model, lines: lines, payload: payload,
             deliveryInstructionCellID: take.deliveryInstructionCellID, language: take.language,
-            variation: take.variation, batchSeed: take.seed
+            batchSeed: take.seed
         )
         let prefix = "\(defaultOutputStamp(Date()))_\(take.mode.rawValue)_\(take.generationID.uuidString.lowercased().prefix(8))"
         var requests: [GenerationRequest] = []
@@ -796,7 +794,7 @@ public enum GenerateCommand {
         let started = ContinuousClock.now
         let outcome = await CLILongFormProject.run(
             plan, mode: take.mode, modelID: modelID, runtime: runtime, payload: payload,
-            deliveryInstructionCellID: take.deliveryInstructionCellID, variation: take.variation,
+            deliveryInstructionCellID: take.deliveryInstructionCellID,
             languageHint: take.language?.rawValue, directory: projectFolder
         )
         func keepOrDiscardSegments() {
@@ -877,12 +875,22 @@ public enum GenerateCommand {
         return seed
     }
 
-    /// `--variation expressive|balanced|consistent` — talker sampling
-    /// shaping (default expressive = official checkpoint sampling).
-    public static func parseVariation(_ args: Args) throws -> Qwen3SamplingVariation? {
+    /// `--variation`, retired by RF-58: every take samples as Expressive, the
+    /// model's reference sampling. The option still parses so existing scripts
+    /// run; Balanced or Consistent adds a `variation_retired` warning, and an
+    /// unknown value is refused as before. Returns the parsed value.
+    @discardableResult
+    public static func noteRetiredVariation(_ args: Args) throws -> Qwen3SamplingVariation? {
         guard let raw = args.string("variation") else { return nil }
         guard let variation = Qwen3SamplingVariation(rawValue: raw.lowercased()) else {
             throw CLIError(.invalidInput, "invalid --variation '\(raw)' (use expressive | balanced | consistent)")
+        }
+        if variation != .expressive {
+            CLIPresenter.warn(
+                "variation_retired",
+                "--variation \(variation.rawValue) is retired: every take samples as expressive",
+                detail: ["requested": .string(variation.rawValue), "sampled": .string(Qwen3SamplingVariation.expressive.rawValue)]
+            )
         }
         return variation
     }
@@ -1053,12 +1061,6 @@ public enum GenerateCommand {
         ).first { $0.mode == mode.rawValue }
         let variant = choice?.generationVariant ?? choice?.activeVariant
         return VariantChoice(quality: variant == ModelVariantKind.quality.rawValue, source: "app")
-    }
-
-    /// The app's variation setting as a request sends it: nil for expressive,
-    /// exactly as the app's `GenerationVariationPreference.requestValue()`.
-    public static func appVariation(_ settings: DesktopAppSettings) -> Qwen3SamplingVariation? {
-        settings.variation == .expressive ? nil : settings.variation
     }
 
     /// Build the payload for a (mode, args) pair. For clone this resolves the

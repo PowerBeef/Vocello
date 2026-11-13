@@ -132,8 +132,6 @@ private final class LongFormFixtureHooks: IOSLongFormPlatformHooks {
 
     var presentation: VocelloPresentationText { IOSAppLanguage.shared.presentation }
 
-    func requestVariation() -> Qwen3SamplingVariation? { nil }
-
     func waveformSeed(for text: String) -> Int { text.count }
 
     func segmentTitle(index: Int, total: Int) -> String { "Segment \(index + 1) of \(total)" }
@@ -1180,7 +1178,7 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
                 ignoresStoredTranscript: ignores)
             for index in request.lines.indices {
                 let segment = request.makeGenerationRequest(
-                    segmentIndex: index, outputPath: "/tmp/segment-\(index).wav", generationID: UUID(), variation: nil)
+                    segmentIndex: index, outputPath: "/tmp/segment-\(index).wav", generationID: UUID())
                 guard case .clone(let reference) = segment.payload else { return XCTFail("Expected a clone payload") }
                 XCTAssertEqual(reference.ignoresStoredTranscript, ignores)
                 XCTAssertEqual(reference.bypassesStoredTranscript, ignores)
@@ -1221,13 +1219,12 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
             auto.makeGenerationRequest(
                 segmentIndex: index,
                 outputPath: "/tmp/segment-\(index).wav",
-                generationID: UUID(),
-                variation: nil
+                generationID: UUID()
             ).languageHint
         }
         XCTAssertEqual(hints, Array(repeating: Qwen3SupportedLanguage.japanese.rawValue, count: auto.lines.count))
         XCTAssertEqual(
-            auto.makeGenerationRequest(segmentIndex: 0, outputPath: "/tmp/segment-0.wav", generationID: UUID(), variation: nil)
+            auto.makeGenerationRequest(segmentIndex: 0, outputPath: "/tmp/segment-0.wav", generationID: UUID())
                 .longFormSegment,
             true,
             "A segment keeps the trailing-text layout (RF-21)"

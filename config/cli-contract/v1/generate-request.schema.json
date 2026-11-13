@@ -79,7 +79,7 @@
         "balanced",
         "consistent"
       ],
-      "description": "Absent, the app's Variation setting."
+      "description": "Retired: every take samples as expressive; balanced or consistent add a warning."
     },
     "out": {
       "type": "string",

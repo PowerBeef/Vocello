@@ -63,7 +63,8 @@ class IOSControlAuditContractTests(unittest.TestCase):
         second = audit.generate_plan(self.contract, self.source_identity)
         self.assertEqual(first, second)
         self.assertEqual(first["schemaVersion"], 3)
-        self.assertEqual(first["takeCount"], 201)
+        # 191 since RF-58 left one take variation (201 with three).
+        self.assertEqual(first["takeCount"], 191)
         self.assertLessEqual(first["takeCount"], self.contract["generationMatrix"]["maxRows"])
 
         resolved = audit.catalogs()
@@ -112,8 +113,9 @@ class IOSControlAuditContractTests(unittest.TestCase):
             str(base + plan["takeCount"] - 1),
         )
 
+        # The retained v1 plan was generated from the frozen September 4 contract.
         historical = audit.generate_plan(
-            self.contract,
+            audit.load_json(audit.LEGACY_CONTRACT_PATH),
             "32d406df2d2a8f5b237754ff906cf705a60543873a67d238af0748149169fc83",
             schema_version=1,
         )

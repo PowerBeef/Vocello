@@ -35,7 +35,7 @@ DIGEST = re.compile(r"^[0-9a-f]{64}$")
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 VALIDATOR_VERSION = "ios-clone-conditioning-v1"
 EXPECTED_SEED = 19_790_615
-EXPECTED_VARIATION = "consistent"
+EXPECTED_VARIATION = "expressive"  # the only variation since RF-58
 EXPECTED_TAKES = (
     {
         "takeIndex": 1,

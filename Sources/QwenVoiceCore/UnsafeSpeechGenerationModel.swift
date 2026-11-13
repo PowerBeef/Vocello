@@ -96,58 +96,30 @@ enum Qwen3TalkerSamplingOverride {
         return value
     }
 
-    /// A generation request's policy: its seed and variation, and what its kind
-    /// of take keeps (a long-form segment trailing text and, under Consistent,
-    /// Balanced's talker sampling).
+    /// A generation request's policy: its seed, and what its kind of take keeps
+    /// (a long-form segment keeps trailing text).
     static func samplingConfiguration(for request: GenerationRequest) -> VocelloQwen3SamplingConfiguration {
         samplingConfiguration(
             requestedSeed: request.seed,
-            variation: request.variation,
             longFormSegment: request.longFormSegment == true
         )
     }
 
+    /// Every take samples as the model's reference does (RF-58: the Balanced and
+    /// Consistent variations, lower talker temperatures, are retired). Only the
+    /// registered diagnostics keys move a stage, for screens.
     static func samplingConfiguration(
         requestedSeed: UInt64?,
-        variation: Qwen3SamplingVariation?,
         longFormSegment: Bool
     ) -> VocelloQwen3SamplingConfiguration {
         let official = Qwen3GenerationConfiguration.officialQualityDefault
-        var temperature = official.temperature
-        var topP = official.topP
-        switch variation {
-        case .balanced:
-            temperature = 0.8
-            topP = 0.95
-        case .consistent where longFormSegment:
-            // RF-53: a long-form segment under Consistent samples its talker as
-            // Balanced does. At 0.7 / 0.9 the long-form screen refused 18 of 32
-            // Consistent projects, mostly for silent gaps past 2 s; at 0.8 / 0.95
-            // it refused 8 (rule long-form-consistent-talker). A single take
-            // keeps Consistent's own sampling.
-            temperature = 0.8
-            topP = 0.95
-        case .consistent:
-            temperature = 0.7
-            topP = 0.9
-        case .expressive, nil:
-            break
-        }
-        if let envTemperature { temperature = envTemperature }
-        if let envTopP { topP = envTopP }
         let talker = VocelloQwen3SamplingStage(
-            temperature: temperature,
-            topP: topP,
+            temperature: envTemperature ?? official.temperature,
+            topP: envTopP ?? official.topP,
             topK: envTopK ?? official.topK,
             minP: envMinP ?? 0
         )
-        // The subtalker keeps the reference's own sampling (0.9, top-p 1.0, top-k
-        // 50) whatever the variation, which shapes only the talker. Following the
-        // talker down under Balanced or Consistent was the divergence ER-05 tracked
-        // (model research, item 7): the RF-18 follow-up screen's pre-registered C1
-        // arm cut Consistent's failed long-form projects from 9 to 2 of 56 with no
-        // new failure class (2026-10-17, adopted with D2 on 2026-10-20). Expressive
-        // is unchanged.
+        // The subtalker samples as the reference does too (0.9, top-p 1.0, top-k 50).
         let subtalker = VocelloQwen3SamplingStage(
             temperature: envSubtalkerTemperature ?? official.temperature,
             topP: envSubtalkerTopP ?? official.topP,
@@ -236,7 +208,6 @@ final class UnsafeSpeechGenerationModel: Sendable {
     var samplingConfiguration: VocelloQwen3SamplingConfiguration {
         requestSampling ?? Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: nil,
             longFormSegment: false
         )
     }

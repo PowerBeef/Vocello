@@ -28,8 +28,8 @@ import VocelloQwen3Core
 /// behaves like Auto. `scripts/ios_device.sh lang-bench` sets it per matrix cell.
 /// `QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED=<UInt64>` pins the MLX sampling stream for
 /// predeclared diagnostic cohorts; an invalid value fails before generation.
-/// `QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION=expressive|balanced|consistent`
-/// explicitly pins the sampling policy; otherwise the current iOS preference applies.
+/// `QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION` may only name `expressive`: every take samples
+/// as Expressive since RF-58, and any other value fails before generation.
 ///
 /// Clone diagnostics additionally require `QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID`
 /// to identify the exact prepared voice. They never select an arbitrary saved voice or
@@ -646,9 +646,9 @@ enum IOSDeviceDiagnosticsRunner {
             }
             record.fixtureDigest = try fixtureDigest(for: payload)
             let seed = try diagnosticsSeed()
-            let variation = try diagnosticsVariation()
+            try validateDiagnosticsVariation()
             record.seed = seed
-            record.samplingVariation = (variation ?? .expressive).rawValue
+            record.samplingVariation = Qwen3SamplingVariation.expressive.rawValue
             let loadedModelID = engine.loadState.currentModelID
             record.preGenerationModelID = loadedModelID
             record.preGenerationWarmState = loadedModelID == model.id ? "warm" : "cold"
@@ -670,7 +670,6 @@ enum IOSDeviceDiagnosticsRunner {
                 payload: payload,
                 generationID: generationID,
                 seed: seed,
-                variation: variation,
                 captureCodecTrace: ProcessInfo.processInfo.environment[
                     voiceReliabilityCodecTraceEnvironmentKey
                 ] == "1"
@@ -1098,8 +1097,7 @@ enum IOSDeviceDiagnosticsRunner {
                     languageHint: Qwen3SupportedLanguage.english.rawValue,
                     payload: .clone(reference: plan.reference),
                     generationID: generationID,
-                    seed: seed,
-                    variation: .consistent
+                    seed: seed
                 )
                 let promptAssemblyDigest = try digest(
                     GenerationSemantics.qwen3PromptAssembly(for: request, capabilities: capabilities)
@@ -1240,7 +1238,7 @@ enum IOSDeviceDiagnosticsRunner {
                 startedAt: startedAt,
                 finishedAt: ISO8601DateFormatter().string(from: Date()),
                 seed: seed,
-                samplingVariation: Qwen3SamplingVariation.consistent.rawValue,
+                samplingVariation: Qwen3SamplingVariation.expressive.rawValue,
                 voiceIDDigest: sha256Hex(forText: voice.id),
                 referenceAudioSHA256: expectedAudioSHA256,
                 referenceTranscriptSHA256: expectedTranscriptSHA256,
@@ -1358,8 +1356,7 @@ enum IOSDeviceDiagnosticsRunner {
                     languageHint: nil,
                     payload: payload,
                     generationID: generationID,
-                    seed: plan.seed,
-                    variation: nil
+                    seed: plan.seed
                 )
 
                 var appTimelineSubmitted = false
@@ -1595,16 +1592,13 @@ enum IOSDeviceDiagnosticsRunner {
         return seed
     }
 
-    private static func diagnosticsVariation() throws -> Qwen3SamplingVariation? {
-        guard let raw = trimmedEnvironmentValue(variationEnvKey) else {
-            return IOSGenerationVariationPreference.requestValue()
+    /// Every take samples as Expressive (RF-58); a cohort that asks for another
+    /// variation fails instead of running as something it did not ask for.
+    private static func validateDiagnosticsVariation() throws {
+        guard let raw = trimmedEnvironmentValue(variationEnvKey) else { return }
+        guard Qwen3SamplingVariation(rawValue: raw.lowercased()) == .expressive else {
+            throw DiagnosticsError("\(variationEnvKey) must be expressive (RF-58)")
         }
-        guard let variation = Qwen3SamplingVariation(rawValue: raw.lowercased()) else {
-            throw DiagnosticsError(
-                "\(variationEnvKey) must be expressive, balanced, or consistent"
-            )
-        }
-        return variation == .expressive ? nil : variation
     }
 
     private static func languageHintSource(for requestedHint: String?) -> String {

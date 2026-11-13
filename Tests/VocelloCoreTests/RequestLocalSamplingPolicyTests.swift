@@ -3,21 +3,19 @@ import XCTest
 import VocelloQwen3Core
 
 final class RequestLocalSamplingPolicyTests: XCTestCase {
-    func testRequestedSeedAndVariationResolveIntoOneImmutablePolicy() throws {
+    func testRequestedSeedResolvesIntoOneImmutablePolicy() throws {
         let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: 19_790_615,
-            variation: .balanced,
             longFormSegment: false
         )
 
         XCTAssertEqual(policy.algorithmVersion, 2)
         XCTAssertEqual(policy.effectiveSeed, 19_790_615)
         XCTAssertEqual(policy.seed, 19_790_615)
-        XCTAssertEqual(policy.talker.temperature, 0.8, accuracy: 0.0001)
-        XCTAssertEqual(policy.talker.topP, 0.95, accuracy: 0.0001)
-        XCTAssertEqual(policy.talker.topK, 50)
-        // The subtalker keeps the reference sampling (RF-18 C1, ER-05).
-        XCTAssertEqual(policy.subtalker, VocelloQwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0))
+        // Both stages sample as the reference does (RF-58; the subtalker since RF-18 C1).
+        let reference = VocelloQwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
+        XCTAssertEqual(policy.talker, reference)
+        XCTAssertEqual(policy.subtalker, reference)
         // Shipped default; a different value requires the Stage 0.4 bench A/B
         // to win on deterministic QC first.
         XCTAssertEqual(policy.repetitionPenalty, 1.05, accuracy: 0.0001)
@@ -101,40 +99,15 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
         XCTAssertNil(Qwen3TalkerSamplingOverride.samplingConfiguration(for: request(longFormSegment: false)).referenceParity)
     }
 
-    /// RF-18 C1 (ER-05): the variation shapes only the talker. The subtalker keeps
-    /// the reference sampling for every variation, so Expressive, whose talker is
-    /// the reference, leaves both stages equal.
-    func testSubtalkerKeepsReferenceSamplingWhateverTheVariation() {
+    /// RF-58: every take samples as the reference does. A long-form segment and
+    /// a single take share the talker and subtalker stages; they differ only in
+    /// text layout (above).
+    func testEveryTakeSamplesAsTheReference() {
         let reference = VocelloQwen3SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
-        let talkers: [(Qwen3SamplingVariation?, Float, Float)] = [
-            (.expressive, 0.9, 1), (nil, 0.9, 1), (.balanced, 0.8, 0.95), (.consistent, 0.7, 0.9),
-        ]
-        for (variation, temperature, topP) in talkers {
-            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
-                requestedSeed: 7, variation: variation, longFormSegment: false
-            )
-            let name = String(describing: variation)
-            XCTAssertEqual(policy.talker.temperature, temperature, accuracy: 0.0001, name)
-            XCTAssertEqual(policy.talker.topP, topP, accuracy: 0.0001, name)
-            XCTAssertEqual(policy.subtalker, reference, name)
-        }
-    }
-
-    /// RF-53 (rule long-form-consistent-talker): a long-form segment under
-    /// Consistent samples its talker as Balanced does; a single Consistent take
-    /// and every other variation keep their own talker in a segment too.
-    func testALongFormSegmentUnderConsistentSamplesItsTalkerAsBalanced() {
-        let expected: [(Qwen3SamplingVariation?, Bool, Float, Float)] = [
-            (.consistent, true, 0.8, 0.95), (.consistent, false, 0.7, 0.9),
-            (.balanced, true, 0.8, 0.95), (.expressive, true, 0.9, 1), (nil, true, 0.9, 1),
-        ]
-        for (variation, segment, temperature, topP) in expected {
-            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(
-                requestedSeed: 7, variation: variation, longFormSegment: segment
-            )
-            let name = "\(String(describing: variation)) segment \(segment)"
-            XCTAssertEqual(policy.talker.temperature, temperature, accuracy: 0.0001, name)
-            XCTAssertEqual(policy.talker.topP, topP, accuracy: 0.0001, name)
+        for segment in [false, true] {
+            let policy = Qwen3TalkerSamplingOverride.samplingConfiguration(requestedSeed: 7, longFormSegment: segment)
+            XCTAssertEqual(policy.talker, reference, "segment \(segment)")
+            XCTAssertEqual(policy.subtalker, reference, "segment \(segment)")
         }
     }
 
@@ -153,12 +126,10 @@ final class RequestLocalSamplingPolicyTests: XCTestCase {
     func testUnseededRequestStillReceivesReplayableEffectiveSeed() {
         let first = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: .expressive,
             longFormSegment: false
         )
         let second = Qwen3TalkerSamplingOverride.samplingConfiguration(
             requestedSeed: nil,
-            variation: .expressive,
             longFormSegment: false
         )
 

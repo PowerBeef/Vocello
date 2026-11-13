@@ -354,9 +354,9 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   comes before the truncation filters (ported from mlx-audio `a730a68`).
 - **EOS** is filtered like any token since 2026-10-20 (D2, the RF-18 follow-up screen);
   `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion after the filters.
-- **Values.** The code predictor samples at the reference's 0.9 / top-k 50 / top-p 1.0 for every
-  variation since 2026-10-20 and never applies the repetition penalty; the talker's values per
-  variation are [`qwen3-tts-guide.md`](qwen3-tts-guide.md)'s.
+- **Values.** Both stages sample at the reference's 0.9 / top-k 50 / top-p 1.0 for every take (the
+  code predictor since 2026-10-20, the talker since RF-58 retired the take variation), and only the
+  talker applies the repetition penalty; [`qwen3-tts-guide.md`](qwen3-tts-guide.md) §9 owns them.
 - **Seeds (F-02, accepted).** MLX #4177's inverse-CDF categorical applies to `[1, V]` logits, which
   is every Vocello draw, so a seed from mlx-swift 0.31.x does not reproduce its take; the release
   notes say so. `testSeededSamplerGoldenTokens` pins the 0.32.3 draws; re-record it only with a

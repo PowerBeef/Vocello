@@ -274,7 +274,7 @@ actor MacLineBatchCancellationState {
 
 extension MacLineBatchRequest {
     /// The sheet's constructor: scalar model facts from the active package,
-    /// the display name the dock shows, and the Settings variation.
+    /// and the display name the dock shows.
     /// `batchSeed` is the pinned Studio seed or the retried batch's (U11); nil
     /// mints one for this run. `lineSeeds` are a retry's own seeds per line.
     init(
@@ -311,7 +311,6 @@ extension MacLineBatchRequest {
             preparedVoiceID: preparedVoiceID,
             ignoresStoredTranscript: ignoresStoredTranscript,
             displayVoiceName: displayVoiceName,
-            variation: GenerationVariationPreference.requestValue(),
             batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max),
             lineSeeds: lineSeeds
         )

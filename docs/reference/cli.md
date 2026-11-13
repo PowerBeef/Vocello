@@ -254,7 +254,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--app-delivery` | with no `--delivery`/`--delivery-cell`, send the apps' default delivery (the Neutral preset instruction) on Custom and Design, as `batch --app-delivery` does |
 | `--language` | `auto` or a Qwen3 language (`chinese`, `english`, `japanese`, `korean`, `german`, `french`, `russian`, `portuguese`, `spanish`, `italian`) by name or code, a region subtag ignored (`ja-JP`, `es-MX`); omitted = Auto; any other value is refused before boot |
 | `--seed` | deterministic sampling seed: the same request + seed reproduces the same take bit-for-bit |
-| `--variation` | `expressive` (official sampling) · `balanced` · `consistent`, which trade take-to-take liveliness for repeatability; without it, the app's Variation setting |
+| `--variation` | retired (RF-58): every take samples as `expressive`, the model's reference sampling; `balanced` or `consistent` still parse and add a `variation_retired` warning (stderr in text mode, `warnings` in JSON), and any other value is refused |
 | `--out` | output `.wav` file (any case); a folder, a trailing `/` or another extension is refused before boot, and a missing folder is created; default → `<data>/outputs/cli/<yyyyMMdd_HHmmss>_<mode>_<generation id>.wav`, unique per run |
 | `--long-form` | `auto` (default): a script longer than one take (900 characters, East Asian characters counting three) runs as a long-form project, as the apps route it · `always`: any script does · `never`: such a script is refused (`text_too_long`) |
 | `--line-by-line` | one take per line, as the Mac app's line batch runs them (see below); `--out-dir <folder>` names their folder (default `<data>/outputs/cli`) |
@@ -294,7 +294,7 @@ without `--mode` defaults to `custom` (no prompt). `vocello modes` lists the mod
 Prints the output WAV path on stdout (or, with `--json`, the envelope whose `result` carries `audioPath`, `durationSeconds`, `wallSeconds`,
 `realtimeFactor` (standard RTF: `wallSeconds ÷ durationSeconds`, lower is faster, below 1.0 is faster than
 real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, `seed` (the
-effective seed as a decimal string: pass it back as `--seed`, with the same variant and variation, to
+effective seed as a decimal string: pass it back as `--seed`, with the same variant, to
 reproduce the take), and, when `--stream`, `firstChunkMS` and `chunks`).
 
 **Long-form projects.** A script past one take is planned, before any model work, by the apps'
@@ -351,7 +351,7 @@ through **one loaded model**, far faster than repeated `generate` calls. Reads s
 omitted or `-` (in the machine formats only for `-`). Prints one output WAV path per line (or, with
 `--json`, the envelope whose `result` is the batch summary). Also accepts
 `--seed` (applied to every item: re-running the batch reproduces it, and a fixed seed steadies
-cross-segment character) and `--variation`, like `generate`.
+cross-segment character) and the retired `--variation`, like `generate`.
 
 Each item is an ordinary single-take engine request. Batch index, total, progress and outcome
 accounting belong to the CLI; engine-only batch fields must not be passed to `generate`.
@@ -403,8 +403,9 @@ the id's digest and private to the user. The same id with the same request repla
 failed request keeps nothing, so a retry runs again. "The same request" means the same take: the text
 counts by its content wherever it came from (`--text`, a file or stdin), paths count as absolute paths,
 option spellings count as what they mean (`--variant fast` is `speed`), an omitted option counts as what
-it resolves to at run time (the package and variation the app's settings and installed packages choose,
-the default speaker),
+it resolves to at run time (the package the app's settings and installed packages choose, the
+default speaker; every take samples as Expressive, so `variation` never tells two requests apart, and
+a stored request from before RF-58 that asked for Balanced or Consistent is a different request),
 and neither consent nor how a command reports counts, so a `generate` command line and the same `run`
 request are one request, while one whose omitted setting has since resolved differently (a changed
 app setting, a package installed or removed) is not. A
@@ -483,16 +484,17 @@ Deleting, clearing and recovery come with the cross-process History lock (RF-30)
 ### `settings`: read and change the app's settings
 
 `vocello settings [list|get <name>] [--json]` reads the Mac app's preferences (`com.qwenvoice.app`):
-`autoplay`, `output-folder`, `variation`, `prefer-lower-memory`, `variant.custom|design|clone`
+`autoplay`, `output-folder`, `prefer-lower-memory`, `variant.custom|design|clone`
 (`automatic` when unset) and `interface-language` (read-only). Each row says whether it is the app's
 default. Voice-cloning consent is never a CLI setting.
 
 `vocello settings set <name> <value>` changes one as the app's Settings do and reports its new row:
-`autoplay` and `prefer-lower-memory` take `true` or `false` (`on`/`off`, `yes`/`no` too); `variation`
-`expressive`, `balanced` or `consistent`; `output-folder` an existing folder or `default`;
+`autoplay` and `prefer-lower-memory` take `true` or `false` (`on`/`off`, `yes`/`no` too);
+`output-folder` an existing folder or `default`;
 `variant.<mode>` `speed`, `quality` or `automatic` (`automatic` removes the choice, `default` the folder);
 turning `prefer-lower-memory` on clears every per-mode choice, as the app's toggle does. A bad
-value or name is `invalid_input`; `interface-language` stays the app's. The app reads each value when
+value or name is `invalid_input` (`variation`, retired by RF-58, is no longer a setting);
+`interface-language` stays the app's. The app reads each value when
 it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidChange`).
 
 **A running app hears every change.** Each write posts a distributed notification named for its store

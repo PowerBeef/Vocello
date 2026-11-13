@@ -28,7 +28,7 @@ final class CLIExecutionTests: XCTestCase {
             let requests = CLIBatchExecution.makeRequests(
                 lines: ["First clip.", "Second clip."], mode: mode, modelID: "pro_\(mode.rawValue)_speed",
                 outputDirectory: root, filenamePrefix: "fixed", payload: payload,
-                seed: 30_000_005, variation: .consistent, deliveryInstructionCellID: nil
+                seed: 30_000_005, deliveryInstructionCellID: nil
             )
             XCTAssertEqual(requests.count, 2)
             XCTAssertEqual(Set(requests.compactMap(\.generationID)).count, 2)
@@ -39,7 +39,6 @@ final class CLIExecutionTests: XCTestCase {
                 XCTAssertTrue(request.outputPath.hasSuffix(unsafe "_\(String(format: "%03d", index)).wav"))
                 XCTAssertEqual(request.payload, payload)
                 XCTAssertEqual(request.seed, 30_000_005)
-                XCTAssertEqual(request.variation, .consistent)
                 XCTAssertFalse(request.shouldStream)
                 XCTAssertNil(request.languageHint)
                 XCTAssertNil(request.batchIndex)
@@ -67,16 +66,15 @@ final class CLIExecutionTests: XCTestCase {
         let request = CLIBatchExecution.makeRequests(
             lines: ["Exact text."], mode: .custom, modelID: "custom",
             outputDirectory: root, filenamePrefix: "run", payload: .custom(speakerID: "ryan", deliveryStyle: style),
-            seed: nil, variation: nil, deliveryInstructionCellID: "custom-fixture"
+            seed: nil, deliveryInstructionCellID: "custom-fixture"
         )[0]
         XCTAssertEqual(request.deliveryInstructionCellID, "custom-fixture")
         XCTAssertEqual(request.payload.deliveryInstructionText, style)
         XCTAssertNil(request.seed)
-        XCTAssertNil(request.variation)
         XCTAssertEqual(request.outputPath, root.appendingPathComponent("run_custom_000.wav").path)
         XCTAssertTrue(CLIBatchExecution.makeRequests(lines: [], mode: .custom, modelID: "custom",
             outputDirectory: root, filenamePrefix: "run", payload: request.payload,
-            seed: nil, variation: nil, deliveryInstructionCellID: nil).isEmpty)
+            seed: nil, deliveryInstructionCellID: nil).isEmpty)
     }
 
     func testAppDeliveryDefaultsSendTheNeutralPresetOnlyWhereNobodyStyledTheItem() {
@@ -98,7 +96,7 @@ final class CLIExecutionTests: XCTestCase {
         let custom = CLIBatchExecution.makeLongFormSegmentRequest(
             mode: .custom, modelID: "custom", text: "One segment.", outputPath: "/fixture/project_segment_000.wav",
             payload: .custom(speakerID: "ryan", deliveryStyle: nil), generationID: identifier, subseed: 42,
-            variation: nil, deliveryInstructionCellID: "custom-fixture"
+            deliveryInstructionCellID: "custom-fixture"
         )
         XCTAssertTrue(custom.shouldStream)
         XCTAssertEqual(custom.streamingInterval, GenerationSemantics.appStreamingInterval)
@@ -109,7 +107,7 @@ final class CLIExecutionTests: XCTestCase {
         let design = CLIBatchExecution.makeLongFormSegmentRequest(
             mode: .design, modelID: "design", text: "One segment.", outputPath: "/fixture/project_segment_000.wav",
             payload: .design(voiceDescription: "A calm narrator.", deliveryStyle: nil), generationID: UUID(),
-            subseed: 7, variation: nil, deliveryInstructionCellID: "custom-fixture"
+            subseed: 7, deliveryInstructionCellID: "custom-fixture"
         )
         XCTAssertNil(design.deliveryInstructionCellID)
     }
@@ -559,7 +557,7 @@ final class CLIExecutionTests: XCTestCase {
         CLIBatchExecution.makeRequests(lines: ["test"], mode: .custom, modelID: "fixture",
             outputDirectory: root, filenamePrefix: "fixture-\(index)",
             payload: .custom(speakerID: "aiden", deliveryStyle: nil), seed: UInt64(index),
-            variation: nil, deliveryInstructionCellID: nil)[0]
+            deliveryInstructionCellID: nil)[0]
     }
     private func result(_ request: GenerationRequest) -> GenerationResult {
         GenerationResult(audioPath: request.outputPath, durationSeconds: 1, streamSessionDirectory: nil, usedStreaming: false)

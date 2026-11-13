@@ -171,7 +171,7 @@ public enum CLILongFormProject {
     @MainActor
     public static func run(
         _ plan: LongFormPlan, mode: GenerationMode, modelID: String, runtime: CLIRuntime,
-        payload: GenerationRequest.Payload, deliveryInstructionCellID: String?, variation: Qwen3SamplingVariation?,
+        payload: GenerationRequest.Payload, deliveryInstructionCellID: String?,
         languageHint: String?, directory: URL, projectIndex: Int = 0, projectCount: Int = 1
     ) async -> Outcome {
         var outcome = Outcome(baseSeed: plan.configuration.baseSeed, planDigest: plan.evidence.planDigest)
@@ -187,7 +187,7 @@ public enum CLILongFormProject {
             DesktopLongFormRequest(
                 mode: mode, modelID: modelID, plan: plan, payload: payload,
                 deliveryInstructionCellID: deliveryInstructionCellID, languageHint: languageHint,
-                variation: variation, directory: directory
+                directory: directory
             ),
             defaultSpeakerID: runtime.defaultSpeakerID
         ) { event in

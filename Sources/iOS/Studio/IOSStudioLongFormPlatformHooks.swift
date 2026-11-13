@@ -11,10 +11,6 @@ final class IOSStudioLongFormPlatformHooks: IOSLongFormPlatformHooks {
 
     var presentation: VocelloPresentationText { IOSAppLanguage.shared.presentation }
 
-    func requestVariation() -> Qwen3SamplingVariation? {
-        IOSGenerationVariationPreference.requestValue()
-    }
-
     func waveformSeed(for text: String) -> Int {
         IOSStableVisualHash.int(text)
     }

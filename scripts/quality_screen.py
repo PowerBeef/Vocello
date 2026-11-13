@@ -286,8 +286,8 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
                          variations: list[str] | None = None) -> dict:
     """Long-form projects (RF-50): per stratum, `projectsPerStratum` scripts of
     `sentencesPerProject` pool sentences, each run once per variation with the
-    same script, so a project's variations pair within it. A project, not a
-    take, is the unit the interval resamples (its `voice`)."""
+    same script (Expressive only since RF-58). A project, not a take, is the
+    unit the interval resamples (its `voice`)."""
     pool = read_json(SCRIPT_POOL)["entries"]
     selected = strata or list(screen["strata"])
     unknown = [name for name in selected if name not in screen["strata"]]
@@ -296,6 +296,11 @@ def build_long_form_plan(screen: dict, seed_set: int, strata: list[str] | None =
     per, count = screen["sentencesPerProject"], screen["projectsPerStratum"]
     if screen.get("longForm", "always") not in LONG_FORM_ROUTES:
         raise ScreenError(f"longForm must be one of {', '.join(LONG_FORM_ROUTES)}")
+    retired = [name for name in screen["variations"] if name != "expressive"]
+    if retired:
+        # The CLI samples every take as Expressive since RF-58, so such a take
+        # would carry a label it was not generated under.
+        raise ScreenError(f"retired variation (RF-58): {', '.join(retired)}")
     unknown_variations = [name for name in variations or [] if name not in screen["variations"]]
     if unknown_variations:
         raise ScreenError(f"not a variation of the screen: {', '.join(unknown_variations)}")

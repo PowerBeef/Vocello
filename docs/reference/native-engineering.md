@@ -122,9 +122,10 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   Line batch loops the same executor through `MacLineBatchRunner`; long-form runs the iOS
   `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`; both are owned by `MacAppModel` and
   the batch sheet (`MacBatchGenerationSheet`) only projects their state.
-- **Requests are built by `MacStudioGenerationRequestFactory`** so language, identity, seed, variation
-  and prompt are testable before the engine call. Reference language is conditioning metadata only:
-  Clone Auto follows the target script, an explicit Studio language wins.
+- **Requests are built by `MacStudioGenerationRequestFactory`** so language, identity, seed and
+  prompt are testable before the engine call (every take samples as Expressive, RF-58). Reference
+  language is conditioning metadata only: Clone Auto follows the target script, an explicit Studio
+  language wins.
 - **Saved-voice review is shared and typed** (`ReferenceTranscriptionReviewState`); Save stays blocked
   while recognition is unresolved; user edits win; persisted metadata comes only from
   `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`.
@@ -141,8 +142,8 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   cancelled take never lands in History.
 - **One short-form executor** (`IOSSingleTakeGenerationExecutor`) owns timeline, engine, cleanup,
   playback, persistence and export; long-form projects run sequential streaming takes through
-  `IOSLongFormProjectRunner`, whose platform side effects (variation, waveform seed, diagnostics
-  mirror, export, haptics, presentation copy) go through `IOSLongFormPlatformHooks`
+  `IOSLongFormProjectRunner`, whose platform side effects (waveform seed, diagnostics mirror,
+  export, haptics, presentation copy) go through `IOSLongFormPlatformHooks`
   (`IOSStudioLongFormPlatformHooks` on iOS; macOS compiles the file by path with its own adapter);
   the player and the shared timeline, History and output location go through
   `IOSLongFormAudioPlayback` and `IOSLongFormProjectServices` (`IOSLongFormProductionServices` in both

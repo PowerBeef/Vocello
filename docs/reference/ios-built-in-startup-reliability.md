@@ -142,9 +142,9 @@ It selects Vivian, Calm / Strong, and English through the real Studio sheets, ve
 chips, enters the script through the production composer, and generates with the ordinary streaming
 path. The host correlates the completed player’s genuine generation UUID with the engine receipt
 and requires matching speaker, canonical delivery ID (which also proves the exact shipped
-instruction resolved), instruction digest, language, generated seed source, Balanced variation,
-streaming mode, and decoded-audio boundary. There is no hidden route, app-seeded script, Simulator,
-or alternate UI driver.
+instruction resolved), instruction digest, language, generated seed source, Expressive variation
+(the only one since RF-58), streaming mode, and decoded-audio boundary. There is no hidden route,
+app-seeded script, Simulator, or alternate UI driver.
 
 An XCUITest automation bootstrap timeout is a separate host classification, not a product result.
 It qualifies only when the `.xcresult` reports zero launched tests and the log proves there was no

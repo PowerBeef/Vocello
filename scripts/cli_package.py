@@ -450,7 +450,7 @@ def qualify_batch(binary: str, work: Path, runtime: Path, outputs: Path,
     destination.mkdir()
     result = generation_runner([
         binary, "batch", "--mode", "custom", "--variant", "speed",
-        "--speaker", "aiden", "--seed", "30000005", "--variation", "consistent",
+        "--speaker", "aiden", "--seed", "30000005",
         "--file", str(source), "--out-dir", str(destination),
         "--data-dir", str(runtime), "--json",
     ], work, environment, 900)
@@ -584,7 +584,7 @@ def qualify(
             argv = [
                 binary, "generate", "--mode", specification["mode"],
                 "--variant", "speed", "--language", specification["language"],
-                "--seed", specification["seed"], "--variation", "consistent",
+                "--seed", specification["seed"],
                 "--text", specification["text"], "--out", str(output),
                 "--data-dir", str(runtime), "--json", *specification["extra"],
             ]
@@ -644,7 +644,7 @@ def qualify(
         cancellation = cancellation_runner([
             binary, "generate", "--mode", "custom", "--variant", "speed",
             "--speaker", "aiden", "--language", "english", "--seed", "30000004",
-            "--variation", "consistent", "--text", long_text,
+            "--text", long_text,
             "--out", str(cancellation_output), "--data-dir", str(runtime), "--ndjson",
         ], work, environment, 900)
         # Qualification observes cleanup; it must never perform it for the CLI.

@@ -334,7 +334,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-overview")
         openSettingsCategory("audio")
         VocelloUILayoutAssert.assertFullyWithinWindow(element("preferences_autoPlayToggle"), of: app)
-        VocelloUILayoutAssert.assertFullyWithinWindow(element("settings_generationVariation"), of: app)
+        XCTAssertFalse(element("settings_generationVariation").exists, "the Variation setting is retired (RF-58)")
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-audio")
         assertSavedVoicesLayoutIntact()
         let voiceID = VocelloUIBenchMatrix.cloneVoiceID

@@ -248,13 +248,6 @@ import QwenVoiceCore
             defaultValue: "Version %1$@ (%2$@)", comment: "Installed app version and build; never hardcode release numbers."), version, build)
     }
 
-    static func variationName(_ variation: Qwen3SamplingVariation) -> String {
-        switch variation {
-        case .expressive: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.expressive", defaultValue: "Expressive")
-        case .balanced: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.balanced", defaultValue: "Balanced")
-        case .consistent: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.consistent", defaultValue: "Consistent")
-        }
-    }
     static var audio: String { IOSAppLanguage.shared.presentation.settingsAudio }
     static var audioSummary: String { IOSAppLanguage.shared.presentation.settingsAudioSummary }
     static var modelsFiles: String { IOSAppLanguage.shared.presentation.settingsModelsFiles }
@@ -395,18 +388,6 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.permissionsHint", defaultValue: "Leaves Vocello and opens iOS Settings",
                comment: "Settings permissionsHint; preserve product and consent meaning.")
     }
-    static var variation: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variation", defaultValue: "Take variation",
-               comment: "Settings variation; preserve product and consent meaning.")
-    }
-    static var variationDetail: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variationDetail", defaultValue: "Choose how much finished takes vary.",
-               comment: "Settings variationDetail; preserve product and consent meaning.")
-    }
-    static var variationHint: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.variationHint", defaultValue: "Choose Expressive, Balanced, or Consistent",
-               comment: "Settings variationHint; preserve product and consent meaning.")
-    }
     static var version: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.version", defaultValue: "Version",
                comment: "Settings version; preserve product and consent meaning.")
@@ -512,7 +493,6 @@ struct SettingsScreen: View {
 
     @AppStorage("autoPlay") private var autoPlay = true
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
-    @AppStorage(IOSGenerationVariationPreference.key) private var generationVariation = IOSGenerationVariationPreference.defaultValue
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var reduceMotionEnabled = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var reduceTransparencyEnabled = false
     @AppStorage(IOSSavedOutputsDestination.displayNameKey) private var savedOutputsName = ""
@@ -640,12 +620,10 @@ struct SettingsScreen: View {
 
     private func categorySummary(_ category: IOSSettingsCategory) -> String {
         switch category {
-        case .audio:
-            IOSSettingsText.variationName(Qwen3SamplingVariation(rawValue: generationVariation) ?? .expressive)
         case .appLanguage: selectedLanguageName
         case .modelsFiles: modelReadinessSummary
         case .about: IOSSettingsText.versionIdentity(IOSSettingsSupportInfo.version, build: IOSSettingsSupportInfo.build)
-        case .privacyPermissions, .accessibility: category.subtitle
+        case .audio, .privacyPermissions, .accessibility: category.subtitle
         }
     }
 
@@ -793,9 +771,6 @@ struct SettingsScreen: View {
                 accessibilityIdentifier: "iosSettings_autoPlayToggle",
                 isOn: $autoPlay
             )
-
-            IOSSettingsDivider()
-            IOSSettingsPickerRow(selection: $generationVariation)
         }
     }
 

@@ -97,7 +97,7 @@ private final class IOSControlAuditRecorder {
     // scripts/ios_control_audit.py rejects drift in either direction.
     static let ownedControlFamilies = [
         "root-tabs", "studio-modes", "composer", "speaker-options", "speaker-previews", "speaker-filters",
-        "delivery-options", "delivery-editor", "language-options", "variation-options",
+        "delivery-options", "delivery-editor", "language-options",
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
         "saved-voice-rows", "history-surface", "history-unqueued", "startup-recovery", "history-rows",
         "settings-preferences", "settings-leftover-audio",
@@ -188,7 +188,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private var generationAuditVoiceName: String?
     private var playerEvidence: [String: String] = [:]
     private var pendingSettingsToggleRestoration: [String: Bool] = [:]
-    private var pendingSettingsVariationRestoration: String?
 
     override func endSession() {
         guard session != nil else { return }
@@ -197,7 +196,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let failurePolicy = continueAfterFailure
         continueAfterFailure = true
         defer { continueAfterFailure = failurePolicy }
-        if !pendingSettingsToggleRestoration.isEmpty || pendingSettingsVariationRestoration != nil {
+        if !pendingSettingsToggleRestoration.isEmpty {
             if app.state == .runningForeground {
                 for identifier in pendingSettingsToggleRestoration.keys.sorted() {
                     guard let original = pendingSettingsToggleRestoration[identifier] else { continue }
@@ -208,12 +207,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                         pendingSettingsToggleRestoration.removeValue(forKey: identifier)
                     }
                 }
-                if let original = pendingSettingsVariationRestoration {
-                    restoreVariation(original)
-                    if selectedVariationID() == original { pendingSettingsVariationRestoration = nil }
-                }
             }
-            XCTAssertTrue(pendingSettingsToggleRestoration.isEmpty && pendingSettingsVariationRestoration == nil,
+            XCTAssertTrue(pendingSettingsToggleRestoration.isEmpty,
                           "Settings restoration incomplete; retain this run and do not resume blindly")
         }
         super.endSession()
@@ -381,7 +376,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         for identifier in toggleIDs {
             mutateAndRestoreToggle(identifier)
         }
-        auditVariationOptions()
         recorder.record(
             scenario: "stateful", controlID: "settings-preferences",
             expected: "Every reversible setting changes once and returns to its original value",
@@ -551,7 +545,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                 assertAccessibleTarget(element(identifier), category: name)
             }
             select(tab: .settings)
-            for identifier in ["iosSettings_autoPlayToggle", "iosSettings_variationRow"] {
+            for identifier in ["iosSettings_autoPlayToggle"] {
                 openSettingsPage(for: identifier)
                 let target = element(identifier)
                 XCTAssertTrue(revealSettingsElement(target, swipingUp: true))
@@ -589,7 +583,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
     private func runGenerationAudit(plan: IOSControlAuditPlan) {
         beginAuditSession()
         defer { endSession() }
-        let originalVariation = selectedVariationID()
         let originalMode = selectedMode()
         let originalStudio = captureStudioSnapshot()
         let environment = ProcessInfo.processInfo.environment
@@ -637,7 +630,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
                     }
                 }
             }
-            restoreVariation(originalVariation)
             if let originalMode {
                 select(mode: originalMode)
             }
@@ -681,8 +673,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             }
 
             prepare(take: take, mode: mode)
-            selectVariation(take.variation)
-            var selections = ["mode": selectedMode()?.rawValue ?? "unknown", "variation": selectedVariationID()]
+            // Every take samples as Expressive (RF-58): the plan's variation is recorded, never selected.
+            var selections = ["mode": selectedMode()?.rawValue ?? "unknown"]
             if let speaker = take.speaker { selections["speaker"] = selectSpeaker(speaker) }
             if let delivery = take.delivery, element("studioChip_delivery").exists {
                 selections["delivery"] = selectDelivery(delivery)
@@ -1278,27 +1270,6 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             )
         }
         selectLanguage("english")
-    }
-
-    private func auditVariationOptions() {
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        let original = selectedVariationID()
-        guard original != "unknown" else { return }
-        pendingSettingsVariationRestoration = original
-        for value in ["expressive", "balanced", "consistent"] {
-            selectVariation(value)
-            recorder.record(
-                scenario: "stateful", controlID: "variation-options:\(value)",
-                expected: "Variation becomes selected", actual: "Selected \(value) through Settings"
-            )
-        }
-        restoreVariation(original)
-        XCTAssertEqual(selectedVariationID(), original)
-        pendingSettingsVariationRestoration = nil
-        select(tab: .studio)
     }
 
     private func auditCustomDeliveryEditor() {

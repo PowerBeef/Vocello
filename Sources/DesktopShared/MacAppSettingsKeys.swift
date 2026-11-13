@@ -9,8 +9,6 @@ enum MacAppSettingsKeys {
     static let autoPlay = "autoPlay"
     /// The folder new takes are written to; empty for the default outputs folder.
     static let outputDirectory = "outputDirectory"
-    /// The sampling variation (`Qwen3SamplingVariation` raw value; default expressive).
-    static let generationVariation = "generationVariation"
     /// "Prefer lower-memory models" (the legacy key name is kept for existing preferences).
     static let preferSpeedEverywhere = "QwenVoice.PreferSpeedEverywhere"
     /// A mode's explicit model package choice (`speed`, `quality`); absent means automatic.

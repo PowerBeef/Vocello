@@ -2938,8 +2938,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 }
                 // Subtalker (code-predictor) sampling is explicitly request
                 // owned and never inherits the talker's repetition penalty. The
-                // host gives it the reference values whatever the variation
-                // (RF-18 C1); only the generic `official` helper copies the talker.
+                // host gives it the reference values (RF-18 C1); only the
+                // generic `official` helper copies the talker.
                 let nextCode = Self.sampleToken(
                     codeLogits,
                     temperature: subtalkerSampling.temperature,

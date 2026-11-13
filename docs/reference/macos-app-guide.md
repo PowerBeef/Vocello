@@ -204,7 +204,7 @@ The overview groups Audio, App Language and Models & Files, then Voice Cloning (
 consent destination) and Updates. Shared `VocelloSettingsGroup` and
 `VocelloSettingsNavigationRow` provide the
 same quiet surfaces as iOS, with desktop typography. The sidebar and Cmd+, window host the same
-screen. Audio owns playback/variation; Models & Files owns memory preference, model management
+screen. Audio owns playback; Models & Files owns memory preference, model management
 and storage. Studio installation links open Models & Files and focus the requested mode. Updates
 (RF-23) mirrors Sparkle's automatic-check preference and checks on demand, beside the app's name
 and version, which is also the category row's subtitle.
@@ -219,7 +219,6 @@ headings use `settings_detail_<category>`, and `settings_backButton` returns to 
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
 | App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads English, which beginSession selects through this control) |
 | Auto-play | `preferences_autoPlayToggle` |
-| Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
 | Prefer lower-memory models | `settings_preferSpeedEverywhere` |
 | Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; in the Voice Cloning detail page |
 | Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_outputResetButton` / `preferences_outputDirectoryWarning` / `preferences_outputDirectoryIssue` / `preferences_openFinderButton` |

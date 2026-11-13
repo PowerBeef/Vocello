@@ -22,7 +22,7 @@ public struct DesktopLineBatch: Sendable {
     /// `batchSeed` nil draws one, as the app does without a pinned seed.
     public init(
         mode: GenerationMode, model: ModelDescriptor, lines: [String], payload: GenerationRequest.Payload,
-        deliveryInstructionCellID: String?, language: Qwen3SupportedLanguage?, variation: Qwen3SamplingVariation?,
+        deliveryInstructionCellID: String?, language: Qwen3SupportedLanguage?,
         batchSeed: UInt64?
     ) {
         var voice: String?
@@ -47,7 +47,7 @@ public struct DesktopLineBatch: Sendable {
             preparedVoiceID: reference?.preparedVoiceID,
             ignoresStoredTranscript: reference?.ignoresStoredTranscript ?? false,
             displayVoiceName: voice ?? mode.rawValue,
-            variation: variation, batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
+            batchSeed: batchSeed ?? UInt64.random(in: UInt64.min ... UInt64.max)
         )
     }
 

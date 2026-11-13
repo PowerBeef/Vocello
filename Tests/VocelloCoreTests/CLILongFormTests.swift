@@ -286,7 +286,7 @@ final class CLILongFormTests: XCTestCase {
         ]
         let batch = DesktopLineBatch(
             mode: .custom, model: custom, lines: lines, payload: .custom(speakerID: "ryan", deliveryStyle: nil),
-            deliveryInstructionCellID: nil, language: nil, variation: .balanced, batchSeed: 5
+            deliveryInstructionCellID: nil, language: nil, batchSeed: 5
         )
         XCTAssertEqual(batch.language, .english, "Auto resolves once over the script")
         XCTAssertEqual(batch.seed(forLineAt: 0), 5)
@@ -295,7 +295,6 @@ final class CLILongFormTests: XCTestCase {
         let request = try XCTUnwrap(batch.request(forLineAt: 1, outputPath: "/tmp/1.wav", generationID: UUID()))
         XCTAssertTrue(request.shouldStream)
         XCTAssertEqual(request.seed, batch.seed(forLineAt: 1))
-        XCTAssertEqual(request.variation, .balanced)
         XCTAssertEqual(Qwen3SupportedLanguage.normalized(request.languageHint), .english)
         if custom.supportsInstructionControl {
             XCTAssertEqual(request.payload.deliveryInstructionText, EmotionPreset.neutralPresetInstruction,
@@ -305,7 +304,7 @@ final class CLILongFormTests: XCTestCase {
 
         let styled = DesktopLineBatch(
             mode: .custom, model: custom, lines: lines, payload: .custom(speakerID: "ryan", deliveryStyle: "Whisper."),
-            deliveryInstructionCellID: nil, language: .french, variation: nil, batchSeed: nil
+            deliveryInstructionCellID: nil, language: .french, batchSeed: nil
         )
         XCTAssertEqual(styled.language, .french, "an explicit language is kept")
         let styledRequest = try XCTUnwrap(styled.request(forLineAt: 0, outputPath: "/tmp/0.wav", generationID: UUID()))

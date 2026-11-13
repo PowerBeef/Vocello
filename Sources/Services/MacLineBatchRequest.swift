@@ -138,7 +138,6 @@ struct MacLineBatchRequest {
     /// The Studio dock and inline card name for the voice (speaker display
     /// name, brief-derived name or saved voice / reference file name).
     let displayVoiceName: String
-    let variation: Qwen3SamplingVariation?
     /// One sampling seed shared by every line of the batch (GitHub #30): the
     /// lines of one batch keep a steadier character and pacing than fully
     /// independent draws. The pinned Studio seed when there is one (U11);
@@ -166,7 +165,6 @@ struct MacLineBatchRequest {
         preparedVoiceID: String?,
         ignoresStoredTranscript: Bool = false,
         displayVoiceName: String,
-        variation: Qwen3SamplingVariation?,
         batchSeed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max),
         lineSeeds: [UInt64]? = nil
     ) {
@@ -188,7 +186,6 @@ struct MacLineBatchRequest {
         self.preparedVoiceID = preparedVoiceID
         self.ignoresStoredTranscript = ignoresStoredTranscript
         self.displayVoiceName = displayVoiceName
-        self.variation = variation
         self.batchSeed = batchSeed
         self.lineSeeds = lineSeeds?.count == lines.count ? lineSeeds : nil
     }
@@ -282,7 +279,7 @@ struct MacLineBatchRequest {
     private static let retrySeedSalt: UInt64 = 0x5245_5452_5953_4544 // "RETRYSED"
 
     /// The engine request for one line through `MacStudioGenerationRequestFactory`
-    /// (streaming, the line's seed, the Settings variation, a fresh generation
+    /// (streaming, the line's seed, a fresh generation
     /// identity). `lineIndex` is the line's position in the batch, which picks
     /// its seed (`seed(forLineAt:)`); without one the line takes the batch
     /// seed. Nil only for a clone line without a reference or a custom line
@@ -306,7 +303,6 @@ struct MacLineBatchRequest {
                 deliveryStyle: supportsInstructionControl ? (emotion ?? EmotionPreset.neutralPresetInstruction) : nil,
                 deliveryInstructionCellID: deliveryInstructionCellID,
                 seed: lineSeed,
-                variation: variation,
                 generationID: generationID
             )
         case .design:
@@ -318,7 +314,6 @@ struct MacLineBatchRequest {
                 voiceDescription: voiceDescription ?? "",
                 deliveryStyle: emotion ?? EmotionPreset.neutralPresetInstruction,
                 seed: lineSeed,
-                variation: variation,
                 generationID: generationID
             )
         case .clone:
@@ -332,7 +327,6 @@ struct MacLineBatchRequest {
                 preparedVoiceID: preparedVoiceID,
                 ignoresStoredTranscript: ignoresStoredTranscript,
                 seed: lineSeed,
-                variation: variation,
                 generationID: generationID
             )
         }

@@ -549,9 +549,9 @@ described in [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (�
 
 | Knob | Upstream `generation_config.json` | Vocello |
 | --- | --- | --- |
-| `do_sample` / `temperature` / `top_k` / `top_p` | true / 0.9 / 50 / 1.0 | same (Expressive) |
+| `do_sample` / `temperature` / `top_k` / `top_p` | true / 0.9 / 50 / 1.0 | same, for every take |
 | `repetition_penalty` (talker codebook 0 only) | 1.05 | 1.05 |
-| `subtalker_*` sampling | true / 0.9 / 50 / 1.0 | same, for every variation |
+| `subtalker_*` sampling | true / 0.9 / 50 / 1.0 | same, for every take |
 | `max_new_tokens` | 8,192 | 2,048 |
 
 Upstream's precedence is an explicit argument, then `generation_config.json`, then the wrapper's own
@@ -561,25 +561,25 @@ fallback (2,048; `model.generate` alone uses 4,096). Qwen's README examples and 
 (`Sources/QwenVoiceBackendCore/QwenVoiceBackendCore.swift:12-42`) and the contract's
 `generationDefaults`.
 
-### 9.2 Take variations
+### 9.2 One sampling for every take
 
-The user-facing **take variation** changes only the talker
-(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift:101-173`):
+Every take samples as the reference does (`Qwen3TalkerSamplingOverride.samplingConfiguration`,
+`UnsafeSpeechGenerationModel.swift:101-146`):
 
-| Variation | Talker temperature / top-p | Subtalker | Repetition penalty |
-| --- | --- | --- | --- |
-| Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
-| Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
-| Consistent | 0.7 / 0.9; a long-form segment 0.8 / 0.95 | 0.9 / top-k 50 / 1.0 | 1.05, talker only |
+| Stage | Temperature / top-p / top-k | Repetition penalty |
+| --- | --- | --- |
+| Talker | 0.9 / 1.0 / 50 | 1.05 |
+| Subtalker (code predictor) | 0.9 / 1.0 / 50 | none |
 
-Top-k is 50 for both stages. Until 2026-10-20 the subtalker copied the talker, so Balanced and
-Consistent narrowed it too. The RF-18 follow-up screen's C1 arm restored the reference subtalker and
-cut Consistent's failed long-form projects from 9 to 2 of 56 (§11.2), and it shipped in `7a125aaf`.
-Since 2026-11-12 a long-form segment under Consistent samples its talker as Balanced does: the
-long-form screen refused 18 of 32 Consistent projects at 0.7 / 0.9, mostly for silent gaps past
-2 s, and 8 at 0.8 / 0.95 (rule `long-form-consistent-talker`, RF-53).
+Until 2026-11-12 a **take variation** setting could lower the talker: Balanced 0.8 / 0.95 and
+Consistent 0.7 / 0.9 (and, until 2026-10-20, the subtalker with it). RF-58 retired it, with
+Expressive, the reference, as the only sampling: the lower settings refused far more long-form
+projects (18 of 32 under Consistent against 4 of 32 under Expressive; 8 of 32 even after a
+Consistent segment sampled as Balanced, rule `long-form-consistent-talker`), RF-18's runaway
+endings ran only under Consistent, and no measurement showed a benefit of either. Old settings,
+plans and `--variation` arguments still decode, and the CLI warns that it samples as Expressive.
 The internal-diagnostics knobs (`QWENVOICE_TALKER_*`, `QWENVOICE_SUBTALKER_*`) can still override
-either stage.
+either stage for a screen.
 
 ### 9.3 Decoding
 
@@ -640,7 +640,9 @@ reproduce takes across these changes (this list is the one the other guides link
   changes every streamed Built-in Voice and Voice Design take; long-form segments keep the
   trailing-text layout;
 - RF-53's Consistent long-form talker (2026-11-12, rule `long-form-consistent-talker`), which
-  samples a long-form segment under Consistent at 0.8 / 0.95 and changes only those segments.
+  sampled a long-form segment under Consistent at 0.8 / 0.95 and changed only those segments;
+- RF-58's single sampling (2026-11-12), which retires Balanced and Consistent: a seed that ran
+  under either now gives the Expressive take, and Expressive takes do not change.
 
 The refresh also moved mlx-swift-lm to 3.32.3, swift-transformers to 1.3.5 and swift-huggingface to
 1.0.0. The pins are in [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins) and the refresh's notes in
@@ -662,8 +664,9 @@ technical report's 4-token packet. Chunk policy, live preview and the preview kn
 The long-form planner fills each segment up to a 300-unit budget (`LongFormPlanning.swift:131`; about
 867 characters, about 60 s; C-02), and each segment is one streamed take, so long segments meet A-01's
 text exhaustion. The RF-18 screens kept that budget: a 200-unit budget (C2) failed 15 of 56 projects
-under Consistent against 9 for the control, so C-02 was not adopted. Consistent's remaining
-long-form failures are a 3.0 known limitation (§11.2). Shipping behavior is in
+under Consistent against 9 for the control, so C-02 was not adopted. Consistent is retired (RF-58);
+the long-form refusals left under Expressive, mostly in Chinese, Japanese and Korean, are RF-55's
+subject (§11.2). Shipping behavior is in
 [`long-form-generation.md`](long-form-generation.md).
 
 ---
@@ -720,8 +723,9 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
 
 ### 11.2 Vocello's known limitations
 
-- **Consistent long-form takes can still stall (3.0 known limitation).** About one-minute segments
-  under Consistent can pause for seconds or never reach end of speech; Fast QC refuses the segment.
+- **Consistent long-form takes stalled; the variation is retired (RF-58).** About one-minute
+  segments under Consistent could pause for seconds or never reach end of speech, and Fast QC
+  refused the segment. Every take samples as Expressive since 2026-11-12. The record that led there,
   RF-18's follow-up screen (pre-registered, Mac CLI on mlx-swift 0.32.3, 56 long-form projects per
   arm; engine audit [A2](../audits/2026-10-16-engine-runtime-audit.md#a2-rf-18-long-form-pacing-due-oct-22)):
 
@@ -742,7 +746,8 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
   twenty sentences, Fast QC v10) still refused 18 of 32 Consistent projects, mostly for silent gaps
   past 2 s and slow delivery; sampling the talker as Balanced does (0.8 / 0.95) refused 8, with the
   error rate flat, and shipped for long-form segments on 2026-11-12 (rule
-  `long-form-consistent-talker`, RF-53). Japanese stays the weakest (6 of 8 refused).
+  `long-form-consistent-talker`, RF-53) until RF-58 retired the variation the same day. Under
+  Expressive, East Asian long-form projects are still refused most (RF-55).
 - **Single takes see their whole text (D1, adopted 2026-10-20, RF-21).** With the streaming text
   layout, a short take that opened with a sigh or a long pause could feed its whole script before
   speech started; the talker then saw only `tts_pad` and whispered or mumbled (a French take ran to
@@ -783,7 +788,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | D1 / A-01 | Text layout of streamed Custom and Design takes | whole text up front; audio streamed | the same for single takes; long-form segments trail one text token per frame, then `tts_pad` | **adopted for single takes** 2026-10-20 (RF-21, §11.2); long-form kept streaming by RF-18; `QWENVOICE_FULL_TEXT_CONDITIONING=off` restores trailing text, `=on` extends full text to long-form | ER-03 |
 | D2 | EOS after top-k/top-p | filtered like any token | filtered | **adopted** 2026-10-20; `QWENVOICE_TALKER_FILTER_EOS=off` restores re-insertion | — |
 | D3 | Sampling precision | float32 logits | float32 logits | **adopted** 2026-10-13 | — |
-| — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every variation | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
+| — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every take | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
 | D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | primed with the reference since 2026-11-12 | matches; adopted by `clone-decoder-history-primed-confirm`; the primed state is reused since A-26 | RF-52 |
 | D6 | Custom with no detected language | `nothink`, no language id | English plus the English diction sentence | open, by design; `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` is the A/B arm | ER-05 |
 | A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump; measured 2026-11-11 with no detectable effect on clone output (below) | ER-04 |
@@ -840,7 +845,7 @@ in the research report [§6](../audits/2026-10-17-qwen3-tts-model-research.md#6-
 | --- | --- |
 | `Sources/Resources/qwenvoice_contract.json` | Models, variants, repositories and revisions, capabilities, tokenizer profile, generation defaults, speaker roster |
 | `Sources/QwenVoiceBackendCore/QwenVoiceBackendCore.swift` | `Qwen3GenerationConfiguration` defaults and the upstream provenance |
-| `Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift` | Request sampling: take variations, the subtalker stage, the diagnostics knobs and reference-parity arms |
+| `Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift` | Request sampling: the reference's stages, the diagnostics knobs and reference-parity arms |
 | `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Generation.swift`, `…/VocelloQwen3Core/Contracts.swift` | `Qwen3ReferenceParity.production` and the sampling policy types |
 | `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift` | Prefill, the generate loop, the sampler, clone prompts, prewarm |
 | `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift`, `Qwen3TTSCodePredictor.swift`, `Qwen3TTSConfig.swift` | Talker, code predictor and config defaults |

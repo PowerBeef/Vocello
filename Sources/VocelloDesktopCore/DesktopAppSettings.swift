@@ -92,11 +92,6 @@ public struct DesktopAppSettings: Sendable {
                 }
                 stored = folder.path
             }
-        case "variation":
-            guard let variation = Qwen3SamplingVariation(rawValue: value.lowercased()) else {
-                throw SetError.invalidValue(name: name, value: raw, accepted: "expressive | balanced | consistent")
-            }
-            stored = variation.rawValue
         case "variant.custom", "variant.design", "variant.clone":
             switch value.lowercased() {
             case "automatic", "auto": stored = nil
@@ -134,7 +129,6 @@ public struct DesktopAppSettings: Sendable {
         switch name {
         case "autoplay": MacAppSettingsKeys.autoPlay
         case "output-folder": MacAppSettingsKeys.outputDirectory
-        case "variation": MacAppSettingsKeys.generationVariation
         case "prefer-lower-memory": MacAppSettingsKeys.preferSpeedEverywhere
         default: MacAppSettingsKeys.variantPreference(for: GenerationMode(rawValue: String(name.dropFirst("variant.".count))) ?? .custom)
         }
@@ -150,7 +144,7 @@ public struct DesktopAppSettings: Sendable {
 
     /// The CLI names, in display order.
     public static let names = [
-        "autoplay", "output-folder", "variation", "prefer-lower-memory",
+        "autoplay", "output-folder", "prefer-lower-memory",
         "variant.custom", "variant.design", "variant.clone", "interface-language",
     ]
 
@@ -164,9 +158,6 @@ public struct DesktopAppSettings: Sendable {
             let stored = (read(MacAppSettingsKeys.outputDirectory) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let isDefault = stored?.isEmpty ?? true
             return Entry(name: name, value: isDefault ? "default" : stored!, isDefault: isDefault, settable: true)
-        case "variation":
-            let stored = (read(MacAppSettingsKeys.generationVariation) as? String).flatMap { Qwen3SamplingVariation(rawValue: $0)?.rawValue }
-            return Entry(name: name, value: stored ?? Qwen3SamplingVariation.expressive.rawValue, isDefault: stored == nil, settable: true)
         case "prefer-lower-memory":
             return bool(name, key: MacAppSettingsKeys.preferSpeedEverywhere, default: false)
         case "variant.custom", "variant.design", "variant.clone":
@@ -192,11 +183,6 @@ public struct DesktopAppSettings: Sendable {
 
     /// The app's "Prefer lower-memory models" setting.
     public var prefersLowerMemory: Bool { boolValue(read(MacAppSettingsKeys.preferSpeedEverywhere)) ?? false }
-
-    /// The app's sampling variation.
-    public var variation: Qwen3SamplingVariation {
-        (read(MacAppSettingsKeys.generationVariation) as? String).flatMap(Qwen3SamplingVariation.init(rawValue:)) ?? .expressive
-    }
 
     private func bool(_ name: String, key: String, default fallback: Bool) -> Entry {
         let stored = boolValue(read(key))

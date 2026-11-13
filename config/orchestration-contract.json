@@ -337,19 +337,6 @@
         "ui-preflight"
       ]
     },
-    "ui-ios-take-variation": {
-      "producer": "scripts/ui_test.sh",
-      "requiredSteps": [
-        "source-provenance",
-        "crash-baseline",
-        "xcuitest",
-        "crash-delta"
-      ],
-      "optionalSteps": [
-        "result-retention",
-        "ui-preflight"
-      ]
-    },
     "ui-ios-control-audit": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

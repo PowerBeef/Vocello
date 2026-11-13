@@ -165,13 +165,14 @@ final class CLIRequestTests: XCTestCase {
         let accumulated = try await identity(["--text", "Hello there.", "--no-stream"], root: root)
         XCTAssertNotEqual(accumulated, hello)
 
-        // Review S1: an omitted option is what it resolves to (the app's package
-        // and variation, the default speaker), so spelling the default out is the
-        // same request; consent never tells two takes apart.
+        // Review S1: an omitted option is what it resolves to (the app's package,
+        // the default speaker), so spelling the default out is the same request;
+        // consent never tells two takes apart. Every take samples as Expressive
+        // (RF-58), so a retired --variation is the same request too.
         let resolved = try await take(["--text", "Hello there."], root: root)
         let spelledOut = try await identity([
             "--text", "Hello there.", "--variant", resolved.quality ? "quality" : "speed",
-            "--variation", (resolved.variation ?? .expressive).rawValue,
+            "--variation", "consistent",
             "--speaker", resolved.registry.defaultSpeaker.id, "--confirm-consent",
         ], root: root)
         XCTAssertEqual(spelledOut, hello)

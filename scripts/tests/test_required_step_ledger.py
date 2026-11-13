@@ -38,7 +38,7 @@ class RequiredStepLedgerTests(unittest.TestCase):
 
     def test_operator_setting_lanes_are_explicit_and_ledger_bound(self) -> None:
         contract = json.loads(CONTRACT.read_text())
-        for workflow in ("ui-ios-screen-protection", "ui-ios-take-variation"):
+        for workflow in ("ui-ios-screen-protection",):
             with self.subTest(workflow=workflow):
                 lane = contract["workflows"][workflow]
                 self.assertEqual(lane["producer"], "scripts/ui_test.sh")

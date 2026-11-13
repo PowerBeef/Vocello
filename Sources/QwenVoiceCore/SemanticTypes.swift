@@ -1570,24 +1570,17 @@ public enum CloneReferenceContextResolver {
     }
 }
 
-/// User-facing sampling variation for a generation (GitHub #47). Maps to
-/// talker temperature/top-p in the engine: `expressive` is the official
-/// checkpoint default (most take-to-take variety); the other two trade
-/// liveliness for consistency across regenerations. Note from the 2026-06-11
-/// listening A/Bs: official defaults sounded best — this is a consistency
-/// control, not a quality ladder, and `expressive` stays the default.
+/// The take variation a generation once chose (GitHub #47): `expressive`, the
+/// model's reference sampling, or a lower talker temperature (`balanced` 0.8 /
+/// 0.95, `consistent` 0.7 / 0.9). Retired by RF-58 (maintainer decision
+/// 2026-11-12): every take samples as the reference does, because the lower
+/// settings refused far more long-form projects and no measurement showed a
+/// benefit. The enum stays so the CLI's `--variation`, device plans and
+/// receipts can still name the retired values; nothing maps it to sampling.
 public enum Qwen3SamplingVariation: String, Codable, Hashable, Sendable, CaseIterable {
     case expressive
     case balanced
     case consistent
-
-    public var displayName: String {
-        switch self {
-        case .expressive: return "Expressive"
-        case .balanced: return "Balanced"
-        case .consistent: return "Consistent"
-        }
-    }
 }
 
 public struct GenerationRequest: Hashable, Codable, Sendable {
@@ -1632,9 +1625,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     /// Optional + synthesized `Codable` keeps the IPC wire back-compatible.
     /// (GitHub #47/#30)
     public let seed: UInt64?
-    /// Sampling variation (talker temperature/top-p shaping). nil/expressive
-    /// = official defaults. Wire-back-compatible like `seed`.
-    public let variation: Qwen3SamplingVariation?
     /// Long-form v4 segments stream for flat memory but must not publish live
     /// preview audio to the frontend. `true` keeps streaming execution while
     /// suppressing preview-chunk publication. Optional + synthesized `Codable`
@@ -1651,9 +1641,8 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
     public let deliveryInstructionCellID: String?
     /// One segment of a long-form project. A segment keeps the streaming
     /// trailing-text layout, which RF-18 qualified for long segments; every
-    /// other streamed take sees its whole text up front (RF-21). Under the
-    /// Consistent variation a segment also samples its talker as Balanced
-    /// does (RF-53). Optional synthesized Codable preserves older IPC payloads.
+    /// other streamed take sees its whole text up front (RF-21). Optional
+    /// synthesized Codable preserves older IPC payloads.
     public let longFormSegment: Bool?
 
     public init(
@@ -1670,7 +1659,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         payload: Payload,
         generationID: UUID? = nil,
         seed: UInt64? = nil,
-        variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
         captureCodecTrace: Bool? = nil,
         deliveryInstructionCellID: String? = nil,
@@ -1689,7 +1677,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         self.payload = payload
         self.generationID = generationID
         self.seed = seed
-        self.variation = variation
         self.suppressStreamingPreview = suppressStreamingPreview
         self.captureCodecTrace = captureCodecTrace
         self.deliveryInstructionCellID = deliveryInstructionCellID
@@ -1709,7 +1696,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
         payload: Payload,
         generationID: UUID? = nil,
         seed: UInt64? = nil,
-        variation: Qwen3SamplingVariation? = nil,
         suppressStreamingPreview: Bool? = nil,
         captureCodecTrace: Bool? = nil,
         deliveryInstructionCellID: String? = nil,
@@ -1739,7 +1725,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
             deliveryInstructionCellID: deliveryInstructionCellID,
@@ -1770,7 +1755,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
             deliveryInstructionCellID: deliveryInstructionCellID,
@@ -1795,7 +1779,6 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             payload: payload,
             generationID: generationID,
             seed: seed,
-            variation: variation,
             suppressStreamingPreview: suppressStreamingPreview,
             captureCodecTrace: captureCodecTrace,
             deliveryInstructionCellID: deliveryInstructionCellID,

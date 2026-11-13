@@ -451,7 +451,7 @@ measurement in §2.3), and upstream defaults Custom and Design to the full-text 
   change and EOS filtering shipped (§7). Consistent's remaining failures are a documented 3.0 known
   limitation; on 2026-11-12 a long-form segment under Consistent began sampling its talker as
   Balanced does, which cut the November screen's refused Consistent projects from 18 to 8 of 32
-  (RF-53).
+  (RF-53), and the same day RF-58 retired the variation: every take samples as Expressive.
 
 The planner still fills each segment to about 60 s (C-02); shorter segments need their own screen.
 Long-form behaviour is in [`long-form-generation.md`](long-form-generation.md).
@@ -849,20 +849,16 @@ instruction-following numbers were measured at.
 [`qwenvoice_contract.json`](../../Sources/Resources/qwenvoice_contract.json) records temperature 0.9,
 top-p 1.0, top-k 50, repetition penalty 1.05 and the 2,048-token app cap, and
 `Qwen3GenerationConfiguration` carries them in code. The subtalker's values are not in the contract;
-they come from code. The take **variation** narrows only the talker
-(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift` L101-173):
+they come from code. Every take samples with those values in both stages
+(`Qwen3TalkerSamplingOverride.samplingConfiguration`, `UnsafeSpeechGenerationModel.swift` L101-146):
+the talker at 0.9 / top-p 1.0 and the subtalker (code predictor) at 0.9 / top-k 50 / top-p 1.0.
 
-| Variation | Talker temperature / top-p | Subtalker (code predictor) |
-| --- | --- | --- |
-| Expressive (default) | 0.9 / 1.0 | 0.9 / top-k 50 / top-p 1.0 |
-| Balanced | 0.8 / 0.95 | 0.9 / top-k 50 / top-p 1.0 |
-| Consistent | 0.7 / 0.9; a long-form segment 0.8 / 0.95 (RF-53) | 0.9 / top-k 50 / top-p 1.0 |
-
-The runtime keeps the subtalker as its own sampling stage (`Qwen3RequestSamplingPolicy.subtalker`),
-and since RF-18 (2026-10-20) production fills it with upstream's values whatever the variation, as
-upstream does. Before that, Balanced and Consistent lowered the subtalker with the talker; restoring
-the reference values cut Consistent's failed long-form projects from 9 to 2 of 56 (§3.1). Only
-internal-diagnostics knobs change the subtalker now.
+Until 2026-11-12 a take **variation** could lower the talker (Balanced 0.8 / 0.95, Consistent
+0.7 / 0.9, and before RF-18 on 2026-10-20 the subtalker with it; restoring the reference subtalker cut
+Consistent's failed long-form projects from 9 to 2 of 56, §3.1). RF-58 retired both lower settings,
+which refused far more long-form projects than Expressive. The runtime keeps the subtalker as its own
+sampling stage (`Qwen3RequestSamplingPolicy.subtalker`); only internal-diagnostics knobs change
+either stage now.
 
 `MEASURED-HERE`. Two more sampling facts that change audio, both reference parity. The talker's EOS
 goes through top-k and top-p like any other token (D2, adopted 2026-10-20; mlx-audio removed the same
@@ -923,7 +919,7 @@ both tiers.
 | Subtalker sampler | its own stage, at upstream's 0.9 / 50 / 1.0 for every variation since 2026-10-20 |
 | EOS | filtered like any token since 2026-10-20 (D2) |
 | Decode budget | fixed constant, not text-derived |
-| Sampling defaults | Expressive matches the checkpoint; Balanced and Consistent narrow the talker only |
+| Sampling defaults | every take matches the checkpoint (the take variation is retired, RF-58) |
 | `think`/`nothink` branch | implemented; Design and Clone fall back to `nothink`, Custom to English (D6) |
 | Design merge template | `Voice character: … Delivery: …`, a repo invention |
 | English diction sentence | appended conditionally — see below |

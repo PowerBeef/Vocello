@@ -89,7 +89,7 @@ def make_payload(outputs: Path) -> dict:
         "startedAt": "2026-07-15T12:00:00Z",
         "finishedAt": "2026-07-15T12:05:00Z",
         "seed": 19_790_615,
-        "samplingVariation": "consistent",
+        "samplingVariation": "expressive",
         "voiceIDDigest": hashlib.sha256(VOICE_ID.encode()).hexdigest(),
         "referenceAudioSHA256": AUDIO_DIGEST,
         "referenceTranscriptSHA256": TRANSCRIPT_DIGEST,

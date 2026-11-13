@@ -246,7 +246,6 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(Set(entries.keys), Set(DesktopAppSettings.names))
         XCTAssertEqual(entries["autoplay"]?.value, "false")
         XCTAssertEqual(entries["autoplay"]?.isDefault, false)
-        XCTAssertEqual(entries["variation"]?.value, "consistent")
         XCTAssertEqual(entries["output-folder"]?.value, "default", "a blank folder is the default")
         XCTAssertEqual(entries["variant.clone"]?.value, "quality")
         XCTAssertEqual(entries["variant.design"]?.value, "automatic", "an unknown variant reads as automatic")
@@ -254,11 +253,11 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(entries["interface-language"]?.value, "fr", "the app keeps it in the release domain")
         XCTAssertEqual(entries["prefer-lower-memory"]?.value, "true", "a string Boolean reads as UserDefaults reads it")
         XCTAssertTrue(settings.prefersLowerMemory)
-        XCTAssertEqual(settings.variation, .consistent)
         XCTAssertEqual(settings.explicitVariantID(for: .clone), "quality")
         XCTAssertEqual(settings.explicitVariantID(for: .design), "turbo", "any stored id counts; the resolution skips it")
         XCTAssertNil(settings.explicitVariantID(for: .custom))
         XCTAssertNil(settings.entry("consent"), "consent is never a CLI setting")
+        XCTAssertNil(settings.entry("variation"), "the Variation setting is retired (RF-58)")
         XCTAssertEqual(DesktopAppSettings(debug: false).domain, "com.qwenvoice.app")
     }
 
@@ -293,8 +292,6 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(stored("autoPlay") as? Bool, false, "a Boolean, as UserDefaults stores it")
         XCTAssertEqual(try settings.set("prefer-lower-memory", to: "YES").value, "true")
         XCTAssertEqual(stored("QwenVoice.PreferSpeedEverywhere") as? Bool, true)
-        XCTAssertEqual(try settings.set("variation", to: " Consistent ").value, "consistent")
-        XCTAssertEqual(stored("generationVariation") as? String, "consistent")
         XCTAssertEqual(try settings.set("variant.design", to: "hq").value, "quality")
         XCTAssertEqual(stored("QwenVoice.MacModelVariantPreference.design") as? String, "quality")
         // Turning prefer-lower-memory on clears every per-mode choice, as the app's toggle does;
@@ -326,6 +323,8 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(code("autoplay", "maybe"), .invalidValue(name: "autoplay", value: "maybe", accepted: "true | false"))
         XCTAssertEqual(code("interface-language", "fr"), .notSettable("interface-language"))
         XCTAssertEqual(code("consent", "true"), .unknownSetting("consent"), "consent is never a CLI setting")
+        XCTAssertEqual(code("variation", "consistent"), .unknownSetting("variation"), "retired by RF-58")
+        XCTAssertEqual(stored("generationVariation") as? String, "balanced", "an old stored value is left alone")
 
         let readOnly = DesktopAppSettings(domain: DesktopAppSettings.debugDomain, read: { _ in nil })
         XCTAssertThrowsError(try readOnly.set("autoplay", to: "true")) {

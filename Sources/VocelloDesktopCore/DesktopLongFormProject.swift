@@ -19,13 +19,12 @@ public struct DesktopLongFormRequest: Sendable {
     public let deliveryInstructionCellID: String?
     /// The language selection; nil or Auto resolves over the whole script.
     public let languageHint: String?
-    public let variation: Qwen3SamplingVariation?
     /// Where segment takes, the joined output and the manifest are written.
     public let directory: URL
 
     public init(
         mode: GenerationMode, modelID: String, plan: LongFormPlan, payload: GenerationRequest.Payload,
-        deliveryInstructionCellID: String?, languageHint: String?, variation: Qwen3SamplingVariation?,
+        deliveryInstructionCellID: String?, languageHint: String?,
         directory: URL
     ) {
         self.mode = mode
@@ -34,7 +33,6 @@ public struct DesktopLongFormRequest: Sendable {
         self.payload = payload
         self.deliveryInstructionCellID = deliveryInstructionCellID
         self.languageHint = languageHint
-        self.variation = variation
         self.directory = directory
     }
 }
@@ -191,7 +189,7 @@ extension DesktopEngineHost {
             preparedVoiceID: request.payload.cloneReference?.preparedVoiceID,
             ignoresStoredTranscript: request.payload.cloneReference?.ignoresStoredTranscript ?? false
         )
-        let hooks = HeadlessLongFormHooks(presentation: presentation, variation: request.variation)
+        let hooks = HeadlessLongFormHooks(presentation: presentation)
         let services = HeadlessLongFormServices(directory: request.directory, total: request.plan.segments.count, events: events)
         let studio = StudioGenerationCoordinator(mode: request.mode, presentation: { presentation }, announce: { _ in })
         // A fresh coordinator has no attempt running, so it always starts one.
@@ -282,14 +280,11 @@ extension DesktopEngineHost {
 @MainActor
 private final class HeadlessLongFormHooks: IOSLongFormPlatformHooks {
     let presentation: VocelloPresentationText
-    private let variation: Qwen3SamplingVariation?
 
-    init(presentation: VocelloPresentationText, variation: Qwen3SamplingVariation?) {
+    init(presentation: VocelloPresentationText) {
         self.presentation = presentation
-        self.variation = variation
     }
 
-    func requestVariation() -> Qwen3SamplingVariation? { variation }
     func waveformSeed(for text: String) -> Int { 0 }
     func segmentTitle(index: Int, total: Int) -> String { "Segment \(index + 1) of \(total)" }
     var longFormModeLabel: String { "" }

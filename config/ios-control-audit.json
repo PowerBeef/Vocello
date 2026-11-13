@@ -122,8 +122,8 @@
       "path": "Sources/iOS/IOSSettingsViews.swift",
       "screen": "Settings and model rows",
       "scenario": "stateful",
-      "reason": "Variation, model lifecycle, progress, version, and dynamic model actions are identified.",
-      "interactiveOccurrenceCount": 4
+      "reason": "Model lifecycle, progress, version, and dynamic model actions are identified.",
+      "interactiveOccurrenceCount": 3
     },
     {
       "path": "Sources/iOS/IOSVoicesView.swift",
@@ -434,22 +434,6 @@
       "availability": "required"
     },
     {
-      "id": "variation-options",
-      "identifierPattern": "iosSettings_variationOption_{value}",
-      "sourceToken": "iosSettings_variationOption_",
-      "expandFrom": "variations",
-      "screen": "Settings Audio",
-      "prerequisite": "Settings tab",
-      "role": "picker option",
-      "action": "Select every variation",
-      "expectedResult": "Picker value updates and can be restored",
-      "expectedSemantics": "Variation label and selected value",
-      "minimumTargetPoints": 44,
-      "mutationClass": "reversible",
-      "scenario": "stateful",
-      "availability": "required"
-    },
-    {
       "id": "studio-chips",
       "identifierPattern": "studioChip_(voice|voiceBrief|reference|delivery|language|bankDelivery|seedPin)",
       "sourceToken": "studioChip_",
@@ -556,11 +540,11 @@
     },
     {
       "id": "settings-preferences",
-      "identifierPattern": "iosSettings_(autoPlayToggle|variationRow|savedOutputsRow|savedOutputsFolderFailureDismiss|reduceMotionToggle|reduceTransparencyToggle|voiceModelsRow)",
+      "identifierPattern": "iosSettings_(autoPlayToggle|savedOutputsRow|savedOutputsFolderFailureDismiss|reduceMotionToggle|reduceTransparencyToggle|voiceModelsRow)",
       "sourceToken": "iosSettings_autoPlayToggle",
       "screen": "Settings",
       "prerequisite": "Settings tab",
-      "role": "toggle, picker, and navigation",
+      "role": "toggle and navigation",
       "action": "Mutate and restore every preference",
       "expectedResult": "Value changes once and original value is restored",
       "expectedSemantics": "Setting label, value, hint, and enabled state",
@@ -722,7 +706,7 @@
             "@languages"
           ],
           "variation": [
-            "@variations"
+            "expressive"
           ],
           "length": [
             "short",
@@ -733,7 +717,7 @@
           "speaker": "aiden",
           "delivery": "neutral",
           "language": "english",
-          "variation": "balanced",
+          "variation": "expressive",
           "length": "short"
         }
       },
@@ -766,9 +750,7 @@
             "italian"
           ],
           "variation": [
-            "expressive",
-            "balanced",
-            "consistent"
+            "expressive"
           ],
           "length": [
             "short",
@@ -779,7 +761,7 @@
           "brief": "starter",
           "delivery": "neutral",
           "language": "english",
-          "variation": "balanced",
+          "variation": "expressive",
           "length": "short"
         }
       },
@@ -802,9 +784,7 @@
             "italian"
           ],
           "variation": [
-            "expressive",
-            "balanced",
-            "consistent"
+            "expressive"
           ],
           "length": [
             "short",
@@ -814,7 +794,7 @@
         "coldSentinel": {
           "reference": "transcript-backed",
           "language": "english",
-          "variation": "balanced",
+          "variation": "expressive",
           "length": "short"
         }
       }

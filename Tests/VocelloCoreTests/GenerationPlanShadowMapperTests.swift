@@ -269,8 +269,7 @@ final class GenerationPlanShadowMapperTests: XCTestCase {
             languageHint: "english",
             payload: payload,
             generationID: generationID,
-            seed: effectiveSeed,
-            variation: .expressive
+            seed: effectiveSeed
         )
         let stage = SamplingStage(temperature: 0.9, topP: 1, topK: 50, minP: 0)
         return GenerationPlanShadowInputs(

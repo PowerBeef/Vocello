@@ -129,8 +129,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             outputPath: "/tmp/sample.wav",
             shouldStream: true,
             payload: .custom(speakerID: "aiden", deliveryStyle: nil),
-            seed: UInt64.max,
-            variation: .consistent
+            seed: UInt64.max
         )
 
         XCTAssertEqual(
@@ -138,7 +137,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             [
                 "samplingPlannedSeed": String(UInt64.max),
                 "samplingSeed": String(UInt64.max),
-                "samplingVariation": "consistent",
+                "samplingVariation": "expressive",
             ]
         )
     }

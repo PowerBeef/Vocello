@@ -17,8 +17,6 @@ struct MacSettingsScreen: View {
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
     private var cloneConsentAcknowledged = false
     @AppStorage(MacAppSettingsKeys.outputDirectory, store: AppDefaults.store) private var outputDirectory = ""
-    @AppStorage(GenerationVariationPreference.key, store: AppDefaults.store)
-    private var generationVariation = GenerationVariationPreference.defaultValue
 
     private enum Category: String {
         case audio, appLanguage, modelsFiles, cloning, updates
@@ -56,7 +54,6 @@ struct MacSettingsScreen: View {
                         switch selectedCategory {
                         case .audio:
                             playbackSection
-                            generationSection
                         case .appLanguage:
                             interfaceSection
                         case .modelsFiles:
@@ -286,29 +283,6 @@ struct MacSettingsScreen: View {
                 accessibilityIdentifier: "preferences_autoPlayToggle",
                 isOn: $autoPlay
             )
-        }
-    }
-
-    private var generationSection: some View {
-        MacSettingsSection(title: MacInterfaceText.settingsGeneration) {
-            MacSettingsRow(symbol: "dial.medium", title: MacInterfaceText.settingsVariation) {
-                MacSettingsDetailText(MacInterfaceText.settingsVariationHelp)
-
-                Picker(MacInterfaceText.settingsVariation, selection: $generationVariation) {
-                    ForEach(Qwen3SamplingVariation.allCases, id: \.rawValue) { variation in
-                        Text(MacInterfaceText.settingsVariationName(variation)).tag(variation.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .tint(MacTheme.accent)
-                .frame(maxWidth: 360)
-                .padding(.top, MacTheme.Spacing.xs)
-                .accessibilityIdentifier("settings_generationVariation")
-                .accessibilityLabel(MacInterfaceText.settingsVariation)
-            } trailing: {
-                EmptyView()
-            }
         }
     }
 

@@ -3979,204 +3979,6 @@
         }
       }
     },
-    "vocello.settings.polish.expressive": {
-      "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressive"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressif"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expresiva"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausdrucksstark"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Espressiva"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressiva"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表现力强"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表現豊か"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "표현력 있게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выразительно"
-          }
-        }
-      }
-    },
-    "vocello.settings.polish.balanced": {
-      "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Balanced"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Équilibré"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equilibrada"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgewogen"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bilanciata"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equilibrada"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "均衡"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "バランス"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "균형 있게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сбалансированно"
-          }
-        }
-      }
-    },
-    "vocello.settings.polish.consistent": {
-      "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consistent"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cohérent"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Constante"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Konstant"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Costante"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consistente"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "稳定"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "安定"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "일관되게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Стабильно"
-          }
-        }
-      }
-    },
     "vocello.settings.polish.builtIn": {
       "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
       "extractionState": "manual",
@@ -7682,61 +7484,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Playback and take variation"
+            "value": "Playback"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lecture automatique et variations"
+            "value": "Lecture"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reproducción y variación entre tomas"
+            "value": "Reproducción"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wiedergabe und Aufnahmevariation"
+            "value": "Wiedergabe"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riproduzione e variazione dei take"
+            "value": "Riproduzione"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reprodução e variação das tomadas"
+            "value": "Reprodução"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "播放与生成变化"
+            "value": "播放"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "再生とテイクの変化"
+            "value": "再生"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "재생 및 테이크 변화"
+            "value": "재생"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Воспроизведение и вариативность дублей"
+            "value": "Воспроизведение"
           }
         }
       }
@@ -10311,204 +10113,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Выходит из Vocello и открывает настройки iOS"
-          }
-        }
-      }
-    },
-    "vocello.settings.refinement.variation": {
-      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Take variation"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variation des prises"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variación entre tomas"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahmevariation"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variazione dei take"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variação das tomadas"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "生成变化"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "テイクの変化"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "테이크 변화"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Вариативность дублей"
-          }
-        }
-      }
-    },
-    "vocello.settings.refinement.variationDetail": {
-      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose how much finished takes vary."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choisissez le degré de variation des prises terminées."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige cuánto varían las tomas terminadas."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wähle, wie stark fertige Aufnahmen variieren."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli quanto variano i take finiti."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escolha quanto as tomadas finalizadas variam."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择每次生成结果的变化程度。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成するテイクの変化の大きさを選びます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "완성된 테이크의 변화 정도를 선택하세요."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выберите, насколько будут различаться готовые дубли."
-          }
-        }
-      }
-    },
-    "vocello.settings.refinement.variationHint": {
-      "comment": "Settings refinement: preserve consent, free functionality and product meaning. No placeholder prices.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose Expressive, Balanced, or Consistent"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choisissez Expressif, Équilibré ou Cohérent"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige Expresiva, Equilibrada o Constante"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wähle Ausdrucksstark, Ausgewogen oder Konstant"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli Espressiva, Bilanciata o Costante"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escolha Expressiva, Equilibrada ou Consistente"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择表现力强、均衡或稳定"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表現豊か、バランス、安定から選択"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "표현력 있게, 균형 있게, 일관되게 중 선택"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выберите «Выразительно», «Сбалансированно» или «Стабильно»"
           }
         }
       }
@@ -42793,204 +42397,6 @@
         }
       }
     },
-    "vocello.mac.settings.variation": {
-      "comment": "macOS interface: Settings picker label for sampling variation. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variation"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variation"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variación"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variation"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variazione"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Variação"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "变化程度"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "変化"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "변화"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Вариативность"
-          }
-        }
-      }
-    },
-    "vocello.mac.settings.variationHelp": {
-      "comment": "macOS interface: Settings footer under the Variation picker. Expressive, Balanced and Consistent are the picker's option names. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "How much takes vary when regenerating the same text. Expressive is the model's official sampling (liveliest); Balanced and Consistent trade some liveliness for steadier, more repeatable takes."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Degré de variation des prises lorsque le même texte est régénéré. Expressif est l’échantillonnage officiel du modèle (le plus vivant) ; Équilibré et Constant échangent un peu de vivacité contre des prises plus stables et reproductibles."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cuánto varían las tomas al regenerar el mismo texto. Expresiva usa el muestreo oficial del modelo (más vivaz); Equilibrada y Constante reducen algo la vivacidad para lograr tomas más estables y repetibles."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wie stark Aufnahmen beim erneuten Erzeugen desselben Texts variieren. Ausdrucksstark nutzt das offizielle Sampling des Modells (am lebhaftesten); Ausgewogen und Konstant tauschen etwas Lebhaftigkeit gegen stabilere, besser reproduzierbare Aufnahmen."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quanto variano i take rigenerando lo stesso testo. Espressiva usa il campionamento ufficiale del modello (più vivace); Bilanciata e Costante sacrificano un po’ di vivacità per take più stabili e ripetibili."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quanto as tomadas variam ao gerar novamente o mesmo texto. Expressiva usa a amostragem oficial do modelo (mais viva); Equilibrada e Consistente trocam um pouco de vivacidade por tomadas mais estáveis e reproduzíveis."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新生成同一文本时，各次结果的变化程度。“表现力强”使用模型官方采样（最生动）；“均衡”和“稳定”以部分生动性换取更稳定、可重复的结果。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同じテキストを再生成したときの変化の大きさです。「表現豊か」はモデル公式のサンプリングで最も生き生きとし、「バランス」と「安定」は表現力を少し抑えて安定性と再現性を高めます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "같은 텍스트를 다시 생성할 때 테이크가 달라지는 정도입니다. 표현력 있게는 모델의 공식 샘플링으로 가장 생동감 있고, 균형 있게와 일관되게는 생동감을 조금 줄여 안정성과 재현성을 높입니다."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Насколько различаются дубли одного текста. «Выразительно» использует официальную выборку модели (самую живую); «Сбалансированно» и «Стабильно» немного снижают живость ради более ровных и повторяемых дублей."
-          }
-        }
-      }
-    },
-    "vocello.mac.settings.generation": {
-      "comment": "macOS interface: Settings section header. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generation"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Génération"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generación"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generierung"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generazione"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Geração"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "生成"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "生成"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "생성"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Генерация"
-          }
-        }
-      }
-    },
     "vocello.mac.settings.preferLowerMemory": {
       "comment": "macOS interface: Settings toggle title. Presentation only.",
       "extractionState": "manual",
@@ -66567,204 +65973,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Как в системе"
-          }
-        }
-      }
-    },
-    "vocello.mac.settings.variationBalanced": {
-      "comment": "macOS interface: Settings variation picker option between Expressive and Consistent. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Balanced"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Équilibré"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equilibrada"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgewogen"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bilanciata"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equilibrada"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "均衡"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "バランス"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "균형 있게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сбалансированно"
-          }
-        }
-      }
-    },
-    "vocello.mac.settings.variationConsistent": {
-      "comment": "macOS interface: Settings variation picker option with the steadiest takes. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consistent"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cohérent"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Constante"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Konstant"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Costante"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consistente"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "稳定"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "安定"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "일관되게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Стабильно"
-          }
-        }
-      }
-    },
-    "vocello.mac.settings.variationExpressive": {
-      "comment": "macOS interface: Settings variation picker option, the model's official sampling. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressive"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressif"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expresiva"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausdrucksstark"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Espressiva"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expressiva"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表现力强"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表現豊か"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "표현력 있게"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выразительно"
           }
         }
       }

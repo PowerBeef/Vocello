@@ -412,7 +412,6 @@ final class GenerationSemanticsLanguageTests: XCTestCase {
             languageHint: language,
             payload: .custom(speakerID: speaker, deliveryStyle: cell.instruction),
             seed: 32_060_828,
-            variation: .expressive,
             deliveryInstructionCellID: cell.id
         )
     }

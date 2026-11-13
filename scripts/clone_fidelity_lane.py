@@ -225,7 +225,6 @@ def generation_command(vocello, item, out_dir):
     command = [
         vocello, "generate", "--mode", item["mode"], "--variant", "speed",
         "--text", FIXED_TEXT, "--seed", str(item["seed"]),
-        "--variation", "consistent",
         "--out", os.path.join(out_dir, item["name"]),
     ]
     if item["mode"] == "clone":

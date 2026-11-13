@@ -359,7 +359,7 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                                     expectedStoredLanguage="auto" if selection == "auto" else script["language"],
                                     expectedFinalLanguage=script["language"], tokenizerArm=tokenizer,
                                     expectedTokenizerDigest=contract["tokenizerArms"][tokenizer]["sha256"],
-                                    seed=seed, variation=contract["clone"]["primaryVariation"],
+                                    seed=seed, variation=contract["clone"]["variation"],
                                     warmState="observed", blockedPrerequisite=blocked,
                                 ))
 
@@ -380,7 +380,7 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                 languageSelection="explicit", expectedStoredLanguage=script["language"],
                 expectedFinalLanguage=script["language"], tokenizerArm="current-fp32",
                 expectedTokenizerDigest=contract["tokenizerArms"]["current-fp32"]["sha256"],
-                seed=seeds[0], variation=contract["clone"]["sentinelVariation"],
+                seed=seeds[0], variation=contract["clone"]["variation"],
                 warmState=warm_state,
                 blockedPrerequisite="reviewed-transcript-missing" if transcript is None else None,
             ))
@@ -412,7 +412,7 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                             expectedInstructionLanguage="english",
                             tokenizerArm=tokenizer,
                             expectedTokenizerDigest=contract["tokenizerArms"][tokenizer]["sha256"],
-                            seed=seed, variation=design["primaryVariation"], warmState="observed",
+                            seed=seed, variation=design["variation"], warmState="observed",
                             blockedPrerequisite=blocked,
                         ))
     for script_id in design["scriptIDs"]:
@@ -435,7 +435,7 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                 expectedInstructionLanguage="english",
                 tokenizerArm="current-fp32",
                 expectedTokenizerDigest=contract["tokenizerArms"]["current-fp32"]["sha256"],
-                seed=seeds[0], variation=design["sentinelVariation"], warmState=warm_state,
+                seed=seeds[0], variation=design["variation"], warmState=warm_state,
                 blockedPrerequisite=None,
             ))
 
@@ -549,14 +549,13 @@ def build_device_plan(
         for alias in clone["coreReferenceAliases"]:
             for script_id in clone["scriptIDs"]:
                 for selection in clone["languageSelections"]:
-                    add_clone(alias, script_id, selection, seeds[0], clone["primaryVariation"])
+                    add_clone(alias, script_id, selection, seeds[0], clone["variation"])
     else:
         for alias in clone["coreReferenceAliases"]:
             for script_id in clone["scriptIDs"]:
                 for seed in seeds:
-                    add_clone(alias, script_id, "auto", seed, clone["primaryVariation"])
-                add_clone(alias, script_id, "explicit", seeds[0], clone["primaryVariation"])
-            add_clone(alias, clone["scriptIDs"][0], "explicit", seeds[0], clone["sentinelVariation"])
+                    add_clone(alias, script_id, "auto", seed, clone["variation"])
+                add_clone(alias, script_id, "explicit", seeds[0], clone["variation"])
 
     design = contract["voiceDesign"]
     def add_design(script_id: str, selection: str, arm: str, seed: int, variation: str) -> None:
@@ -591,18 +590,13 @@ def build_device_plan(
                     else design["deliveryArms"]
                 )
                 for arm in arms:
-                    add_design(script_id, selection, arm, seeds[0], design["primaryVariation"])
+                    add_design(script_id, selection, arm, seeds[0], design["variation"])
     else:
         for script_id in design["scriptIDs"]:
             for arm in design["deliveryArms"]:
                 for seed in seeds:
-                    add_design(script_id, "auto", arm, seed, design["primaryVariation"])
-                add_design(script_id, "explicit", arm, seeds[0], design["primaryVariation"])
-        for arm in design["deliveryArms"]:
-            add_design(
-                design["scriptIDs"][1], "explicit", arm, seeds[0],
-                design["sentinelVariation"],
-            )
+                    add_design(script_id, "auto", arm, seed, design["variation"])
+                add_design(script_id, "explicit", arm, seeds[0], design["variation"])
 
     body = {
         "schemaVersion": 2,
@@ -645,7 +639,8 @@ def validate_device_plan(
     expected_count = (
         14 if profile == "closure"
         else 26 if profile == "focused"
-        else 122 if profile == "characterization"
+        # 117 since RF-58 retired the variation sentinels (122 before).
+        else 117 if profile == "characterization"
         else None
     )
     if (

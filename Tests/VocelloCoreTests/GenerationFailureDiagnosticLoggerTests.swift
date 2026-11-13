@@ -82,8 +82,7 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
                 deliveryStyle: try DeliveryInstructionCell.resolveStrict("calm.strong").instruction
             ),
             generationID: generationID,
-            seed: 38_112_001,
-            variation: .balanced
+            seed: 38_112_001
         )
         let receipt = GenerationRequestReceipt(
             request: request,

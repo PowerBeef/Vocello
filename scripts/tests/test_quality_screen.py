@@ -153,38 +153,41 @@ class PlanTests(unittest.TestCase):
 
 class LongFormTests(unittest.TestCase):
     SCREEN = {"name": "lf", "version": 1, "kind": "long-form", "variant": "speed", "scriptSplit": "calibration",
-              "sentencesPerProject": 3, "projectsPerStratum": 2, "variations": ["expressive", "consistent"],
+              "sentencesPerProject": 3, "projectsPerStratum": 2, "variations": ["expressive"],
               "strata": {"custom-english": {"mode": "custom", "language": "english", "speakers": ["aiden", "ryan"]},
                          "design-english": {"mode": "design", "language": "english", "voiceBriefs": ["A calm voice."]}}}
 
-    def test_a_project_runs_once_per_variation_on_one_script_and_is_one_cluster(self):
+    def test_a_project_is_one_take_of_its_script_and_one_cluster(self):
         plan = screen.build_long_form_plan(self.SCREEN, 1)
-        self.assertEqual(len(plan["takes"]), 8)
-        first, second = plan["takes"][0], plan["takes"][1]
-        self.assertEqual((first["variation"], second["variation"]), ("expressive", "consistent"))
-        self.assertEqual(first["text"], second["text"])
-        self.assertEqual(first["voice"], second["voice"], "the interval resamples projects, not takes")
-        self.assertNotEqual(first["seed"], second["seed"])
+        self.assertEqual(len(plan["takes"]), 4)
+        first = plan["takes"][0]
+        self.assertEqual((first["takeID"], first["variation"]), ("custom-english-01--expressive", "expressive"))
+        self.assertEqual(first["voice"], "custom-english-01", "the interval resamples projects")
         self.assertEqual(first["text"].count(" "), sum(entry["text"].count(" ") for entry in screen.read_json(
             screen.SCRIPT_POOL)["entries"] if entry["id"] in first["scriptID"].split("+")) + 2,
                          "three sentences joined by two spaces")
         self.assertEqual(len(first["scriptID"].split("+")), 3)
-        self.assertEqual([take["speaker"] for take in plan["takes"][:4:2]], ["aiden", "ryan"])
+        self.assertEqual([take["speaker"] for take in plan["takes"][:2]], ["aiden", "ryan"])
         design = [take for take in plan["takes"] if take["mode"] == "design"]
         self.assertTrue(all(take["voiceBrief"] == "A calm voice." and "speaker" not in take for take in design))
         self.assertEqual(plan["kind"], "long-form")
         reseeded = screen.build_long_form_plan(self.SCREEN, 2)
         self.assertTrue(screen.same_takes_other_seeds(plan, reseeded))
-        consistent = screen.build_long_form_plan(self.SCREEN, 1, variations=["consistent"])
-        self.assertEqual(len(consistent["takes"]), 4)
-        self.assertTrue(all(take["variation"] == "consistent" for take in consistent["takes"]))
-        self.assertEqual({take["seed"] for take in consistent["takes"]},
-                         {take["seed"] for take in plan["takes"] if take["variation"] == "consistent"},
-                         "the same takes, the same seeds")
+        expressive = screen.build_long_form_plan(self.SCREEN, 1, variations=["expressive"])
+        self.assertEqual(expressive["planSHA256"], plan["planSHA256"], "the same takes, the same seeds")
         with self.assertRaises(screen.ScreenError):
-            screen.build_long_form_plan(self.SCREEN, 1, variations=["balanced"])
+            screen.build_long_form_plan(self.SCREEN, 1, variations=["consistent"])
         with self.assertRaises(screen.ScreenError):
             screen.build_long_form_plan(self.SCREEN, 1, ["no-such-stratum"])
+
+    def test_a_screen_naming_a_retired_variation_is_refused(self):
+        # RF-58: the CLI samples every take as Expressive, so a Consistent take
+        # would carry a label it was not generated under.
+        for variations in (["expressive", "consistent"], ["balanced"]):
+            with self.assertRaises(screen.ScreenError):
+                screen.build_long_form_plan(dict(self.SCREEN, variations=variations), 1)
+        configured = screen.read_json(screen.ROOT / "config/quality-screens.json")["screens"]["long-form"]
+        self.assertEqual((configured["version"], configured["variations"]), (2, ["expressive"]))
 
     def test_a_project_is_asked_for_as_the_apps_route_long_text(self):
         plan = screen.build_long_form_plan(self.SCREEN, 1)

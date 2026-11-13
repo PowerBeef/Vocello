@@ -136,7 +136,7 @@
           ],
           "name": "variation",
           "placeholder": "variation",
-          "summary": "expressive | balanced | consistent (default: the app's setting)",
+          "summary": "retired: every take samples as expressive (balanced and consistent warn)",
           "takesValue": true,
           "type": "choice",
           "valueOptional": false
@@ -371,7 +371,7 @@
           ],
           "name": "variation",
           "placeholder": "variation",
-          "summary": "expressive | balanced | consistent (default: the app's setting)",
+          "summary": "retired: every take samples as expressive (balanced and consistent warn)",
           "takesValue": true,
           "type": "choice",
           "valueOptional": false

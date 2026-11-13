@@ -374,8 +374,7 @@ struct MacVoiceDesignScreen: View {
             language: draft.selectedLanguage,
             voiceDescription: voiceDescription,
             deliveryStyle: emotion,
-            seed: draft.pinnedSeed,
-            variation: GenerationVariationPreference.requestValue()
+            seed: draft.pinnedSeed
         )
         let plan: IOSSingleTakeGenerationPlan
         do {

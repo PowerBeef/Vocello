@@ -25,7 +25,7 @@ public enum CLIBatchExecution {
     public static func makeRequests(
         lines: [String], mode: GenerationMode, modelID: String,
         outputDirectory: URL, filenamePrefix: String,
-        payload: GenerationRequest.Payload, seed: UInt64?, variation: Qwen3SamplingVariation?,
+        payload: GenerationRequest.Payload, seed: UInt64?,
         deliveryInstructionCellID: String?, captureCodecTrace: Bool = false
     ) -> [GenerationRequest] {
         lines.enumerated().map { index, text in
@@ -34,7 +34,7 @@ public enum CLIBatchExecution {
                 mode: mode, modelID: modelID, text: text,
                 outputPath: outputDirectory.appendingPathComponent(name).path,
                 shouldStream: false,
-                payload: payload, generationID: UUID(), seed: seed, variation: variation,
+                payload: payload, generationID: UUID(), seed: seed,
                 captureCodecTrace: captureCodecTrace ? true : nil,
                 deliveryInstructionCellID: deliveryInstructionCellID
             )
@@ -47,13 +47,13 @@ public enum CLIBatchExecution {
     public static func makeLongFormSegmentRequest(
         mode: GenerationMode, modelID: String, text: String, outputPath: String,
         payload: GenerationRequest.Payload, generationID: UUID, subseed: UInt64,
-        variation: Qwen3SamplingVariation?, deliveryInstructionCellID: String?
+        deliveryInstructionCellID: String?
     ) -> GenerationRequest {
         GenerationRequest(
             mode: mode, modelID: modelID, text: text, outputPath: outputPath,
             shouldStream: true,
             streamingInterval: GenerationSemantics.appStreamingInterval,
-            payload: payload, generationID: generationID, seed: subseed, variation: variation,
+            payload: payload, generationID: generationID, seed: subseed,
             deliveryInstructionCellID: mode == .custom ? deliveryInstructionCellID : nil,
             longFormSegment: true
         )

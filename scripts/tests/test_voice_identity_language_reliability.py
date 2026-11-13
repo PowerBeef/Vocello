@@ -375,13 +375,12 @@ else:
             plan, self.contract, expected_source_identity="9" * 64
         )
 
-        self.assertEqual(plan["takeCount"], 122)
+        self.assertEqual(plan["takeCount"], 117)
         self.assertEqual({row["seed"] for row in plan["takes"]}, set(self.contract["fixedSeeds"]))
-        self.assertEqual(sum(row["mode"] == "clone" for row in plan["takes"]), 38)
-        self.assertEqual(sum(row["mode"] == "design" for row in plan["takes"]), 84)
-        self.assertEqual(
-            sum(row["variation"] == "expressive" for row in plan["takes"]), 5
-        )
+        self.assertEqual(sum(row["mode"] == "clone" for row in plan["takes"]), 36)
+        self.assertEqual(sum(row["mode"] == "design" for row in plan["takes"]), 81)
+        # Every take samples as Expressive (RF-58): no take of another variation.
+        self.assertEqual({row["variation"] for row in plan["takes"]}, {"expressive"})
 
     def test_closure_device_plan_excludes_experimental_design_arms(self):
         plan = VLR.build_device_plan(

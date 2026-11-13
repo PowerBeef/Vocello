@@ -58,7 +58,7 @@ final class LanguageSelectionPresentationTests: XCTestCase {
             modelID: "design-model", text: LanguageFixtures.french,
             outputPath: "/tmp/design.wav", language: .german,
             voiceDescription: editedBrief, deliveryStyle: customDelivery,
-            seed: 7, variation: .balanced
+            seed: 7
         )
         guard case .design(let description, let delivery) = request.payload else {
             return XCTFail("Expected Voice Design payload")
@@ -75,7 +75,7 @@ final class LanguageSelectionPresentationTests: XCTestCase {
         let authored = "Une voix avec un accent britannique."
         let request = MacStudioGenerationRequestFactory.voiceDesign(
             modelID: "design-model", text: LanguageFixtures.french, outputPath: "/tmp/design.wav",
-            language: .french, voiceDescription: authored, deliveryStyle: "", seed: 7, variation: nil
+            language: .french, voiceDescription: authored, deliveryStyle: "", seed: 7
         )
         guard case .design(let brief, _) = request.payload else { return XCTFail("Expected Design") }
         XCTAssertEqual(brief, authored)
@@ -90,7 +90,7 @@ final class LanguageSelectionPresentationTests: XCTestCase {
                 modelID: "custom-model", text: LanguageFixtures.french,
                 outputPath: "/tmp/custom.wav", language: language, speakerID: "aiden",
                 deliveryStyle: profile.finalInstruction, deliveryInstructionCellID: profile.instructionCellID,
-                seed: 7, variation: .balanced
+                seed: 7
             )
             guard case .custom(_, let instruction) = request.payload else {
                 return XCTFail("Expected CustomVoice payload")

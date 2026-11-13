@@ -24,8 +24,6 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
         defer { endSession() }
 
         assertBuiltInModelReady()
-        let originalVariation = selectBalancedVariationThroughVisibleSettings()
-        defer { restoreVariationThroughVisibleSettings(originalVariation) }
         prepare(mode: .custom)
         selectVivian()
         selectCalmStrong()
@@ -42,7 +40,7 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
             "VOCELLO-STARTUP-PARITY-UI-MANIFEST "
                 + "runID=\(runID) generationID=\(generationID) "
                 + "speakerID=vivian deliveryID=calm.strong language=english "
-                + "variation=balanced streaming=true seedSource=generated"
+                + "variation=expressive streaming=true seedSource=generated"
         )
     }
 
@@ -53,51 +51,6 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.value(status, contains: "Ready", timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("iosModelDelete_pro_custom"), timeout: 60))
         leaveVoiceModels()
-    }
-
-    private func selectBalancedVariationThroughVisibleSettings() -> String {
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        let original = (picker.value as? String) ?? "Expressive"
-        if !original.localizedCaseInsensitiveContains("Balanced") {
-            chooseVariation(rawValue: "balanced", displayName: "Balanced")
-        }
-        XCTAssertTrue(VocelloUIWait.value(picker, contains: "Balanced", timeout: 20))
-        select(tab: .studio)
-        return original
-    }
-
-    private func restoreVariationThroughVisibleSettings(_ original: String) {
-        guard app.state == .runningForeground else { return }
-        let choices = [
-            (rawValue: "expressive", displayName: "Expressive"),
-            (rawValue: "balanced", displayName: "Balanced"),
-            (rawValue: "consistent", displayName: "Consistent"),
-        ]
-        guard let choice = choices.first(where: {
-            original.localizedCaseInsensitiveContains($0.displayName)
-        }), choice.rawValue != "balanced" else { return }
-        select(tab: .settings)
-        chooseVariation(rawValue: choice.rawValue, displayName: choice.displayName)
-    }
-
-    private func chooseVariation(rawValue: String, displayName: String) {
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
-        let identifiedOption = element("iosSettings_variationOption_\(rawValue)")
-        let labelledOption = app.buttons[displayName]
-        XCTAssertTrue(
-            VocelloUIWait.condition("\(displayName) variation option", timeout: 20) {
-                (identifiedOption.exists && identifiedOption.isHittable)
-                    || (labelledOption.exists && labelledOption.isHittable)
-            }
-        )
-        let option = identifiedOption.exists ? identifiedOption : labelledOption
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
-        XCTAssertTrue(VocelloUIWait.value(picker, contains: displayName, timeout: 20))
     }
 
     private func selectVivian() {

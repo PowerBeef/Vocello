@@ -67,8 +67,7 @@
     "transcriptArms": ["reviewed", "corrected", "audio-only"],
     "scriptIDs": ["english-medium", "french-medium"],
     "languageSelections": ["auto", "explicit"],
-    "primaryVariation": "consistent",
-    "sentinelVariation": "expressive"
+    "variation": "expressive"
   },
   "voiceDesign": {
     "voiceBrief": "A warm, friendly narrator with a clear, natural voice and measured pacing.",
@@ -80,8 +79,7 @@
       "diagnostic-no-delivery": null,
       "calm-strong-control": "calm.strong"
     },
-    "primaryVariation": "consistent",
-    "sentinelVariation": "expressive"
+    "variation": "expressive"
   },
   "privacy": {
     "trackedReportsMayContain": [

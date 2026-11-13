@@ -502,7 +502,6 @@ struct IOSCustomVoiceView: View {
                         ),
                         generationID: generationID,
                         seed: draft.pinnedSeed,
-                        variation: IOSGenerationVariationPreference.requestValue(),
                         deliveryInstructionCellID: model.supportsInstructionControl
                             ? draft.resolvedDeliveryProfile.instructionCellID
                             : nil
@@ -1394,8 +1393,7 @@ struct IOSVoiceDesignView: View {
                             deliveryStyle: draft.resolvedDeliveryInstruction
                         ),
                         generationID: generationID,
-                        seed: draft.pinnedSeed,
-                        variation: IOSGenerationVariationPreference.requestValue()
+                        seed: draft.pinnedSeed
                     ),
                     modelTier: model.tier,
                     historyVoice: draft.voiceDescription,
@@ -2146,7 +2144,6 @@ struct IOSVoiceCloningView: View {
         let currentDraft = draft
         let currentPrompt = promptText
         let currentVoiceName = selectedVoice?.name
-        let currentVariation = IOSGenerationVariationPreference.requestValue()
         if scriptLimitState.routesToLongForm {
             guard let refPath = draft.referenceAudioPath else {
                 coordinator.rejectStart(IOSAppLanguage.shared.presentation.referenceAudioRequired)
@@ -2203,8 +2200,7 @@ struct IOSVoiceCloningView: View {
                         languageHint: currentDraft.selectedLanguage.rawValue,
                         payload: .clone(reference: reference),
                         generationID: generationID,
-                        seed: currentDraft.pinnedSeed,
-                        variation: currentVariation
+                        seed: currentDraft.pinnedSeed
                     ),
                     modelTier: model.tier,
                     historyVoice: voiceName,

@@ -21,7 +21,6 @@ class VocelloiOSUITestCase: XCTestCase {
     private var pendingInterfaceLanguageRestore: String?
     /// The App Language the session last chose, so a restore to the same choice is skipped.
     private var selectedInterfaceLanguage: String?
-    private var pendingVariationRestore: String?
     /// RF-15: the session drives the installed distribution candidate black-box.
     private(set) var isCandidateSession = false
     /// RF-15 first launch: the maintainer authorized walking a fresh install's onboarding.
@@ -45,7 +44,6 @@ class VocelloiOSUITestCase: XCTestCase {
         VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
-        pendingVariationRestore = nil
         pendingJourneyRestores = []
         isCandidateSession = false
         isFirstLaunchAuthorized = false
@@ -86,7 +84,6 @@ class VocelloiOSUITestCase: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         pendingAutoplayPreferenceRestore = nil
-        pendingVariationRestore = nil
         pendingJourneyRestores = []
         isCandidateSession = true
         isFirstLaunchAuthorized = firstLaunch
@@ -101,8 +98,7 @@ class VocelloiOSUITestCase: XCTestCase {
 
     /// XCTest's stop-on-failure abort bypasses Swift `defer`, which is how most
     /// journeys end their session. Releasing it here (idempotent) restores the
-    /// Auto-play, interface-language and pinned Take variation preferences on
-    /// every exit path.
+    /// Auto-play and interface-language preferences on every exit path.
     override func tearDown() async throws {
         attachFailureScreenshotIfFailed()
         endSession()
@@ -122,7 +118,6 @@ class VocelloiOSUITestCase: XCTestCase {
             pendingAutoplayPreferenceRestore = nil
             pendingInterfaceLanguageRestore = nil
             selectedInterfaceLanguage = nil
-            pendingVariationRestore = nil
             pendingJourneyRestores = []
         }
         // The software keyboard covers the floating tab dock, so a journey that
@@ -138,9 +133,6 @@ class VocelloiOSUITestCase: XCTestCase {
             restores.reversed().forEach { $0() }
         }
         restorePendingAutoplayPreference()
-        if let original = pendingVariationRestore, session != nil {
-            restoreVariation(original)
-        }
         // A phone already on the pinned language needs no trip back to App Language.
         if let original = pendingInterfaceLanguageRestore, original != selectedInterfaceLanguage, session != nil {
             let previousTab = VocelloiOSTab.allCases.first { element($0.identifier).isSelected }
@@ -300,7 +292,6 @@ class VocelloiOSUITestCase: XCTestCase {
         VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
         assertToggleNormalizerContract()
         pendingAutoplayPreferenceRestore = nil
-        pendingVariationRestore = nil
         isCandidateSession = false
         session = VocelloUIApplicationSession()
         launchProcess(additionalEnvironment: ["QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE": "1"])
@@ -446,7 +437,7 @@ class VocelloiOSUITestCase: XCTestCase {
     func openSettingsPage(for identifier: String) {
         let category: String
         switch identifier {
-        case "iosSettings_autoPlayToggle", "iosSettings_variationRow": category = "audio"
+        case "iosSettings_autoPlayToggle": category = "audio"
         case "iosSettings_voiceModelsRow", "iosSettings_savedOutputsRow": category = "modelsFiles"
         case "voiceCloning_consentAcknowledgment", "iosSettings_privacyPolicyRow", "iosSettings_openIOSSettingsRow": category = "privacyPermissions"
         case "iosSettings_reduceMotionToggle", "iosSettings_reduceTransparencyToggle": category = "accessibility"
@@ -531,7 +522,6 @@ class VocelloiOSUITestCase: XCTestCase {
 
         for identifier in [
             "iosSettings_autoPlayToggle",
-            "iosSettings_variationRow",
             "iosSettings_voiceModelsRow",
             "iosSettings_savedOutputsRow",
             "iosSettings_reduceMotionToggle",
@@ -689,66 +679,6 @@ class VocelloiOSUITestCase: XCTestCase {
 
     func revealSettingsElement(_ target: XCUIElement, swipingUp: Bool) -> Bool {
         VocelloUISettingsReveal.perform(target, in: app, swipingUp: swipingUp)
-    }
-
-    /// RF-18 C-03: a journey whose outcome depends on Take variation pins it
-    /// through the visible Settings control instead of inheriting whatever the
-    /// device persisted; the session restores the original on every exit path.
-    func pinVariationForSession(_ id: String) {
-        let original = selectedVariationID()
-        guard original != "unknown" else { return }
-        if pendingVariationRestore == nil {
-            pendingVariationRestore = original
-        }
-        if original != id {
-            selectVariation(id)
-        }
-        XCTAssertEqual(selectedVariationID(), id, "Take variation must be pinned before the journey")
-    }
-
-    func selectVariation(_ id: String) {
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        XCTAssertTrue(revealSettingsElement(picker, swipingUp: false))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
-        let option = element("iosSettings_variationOption_\(id)")
-        XCTAssertTrue(VocelloUIWait.exists(option, timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
-        select(tab: .studio)
-    }
-
-    func selectedVariationID() -> String {
-        // The Settings root's Audio row names the variation in its value: one read, no
-        // page push. Its Audio page is the fallback when the value names none.
-        openSettingsRoot()
-        let audioRow = element("iosSettings_audioRow")
-        if VocelloUIWait.exists(audioRow, timeout: 20) {
-            let summary = ((audioRow.value as? String) ?? "").lowercased()
-            if let id = ["balanced", "consistent", "expressive"].first(where: { summary.contains($0) }) {
-                select(tab: .studio)
-                return id
-            }
-        }
-        select(tab: .settings)
-        openSettingsPage(for: "iosSettings_variationRow")
-        let picker = element("iosSettings_variationRow")
-        XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        let value = ((picker.value as? String) ?? picker.label).lowercased()
-        select(tab: .studio)
-        if value.contains("balanced") { return "balanced" }
-        if value.contains("consistent") { return "consistent" }
-        if value.contains("expressive") { return "expressive" }
-        XCTFail("Variation control did not expose a known selection")
-        return "unknown"
-    }
-
-    func restoreVariation(_ id: String) {
-        guard app.state == .runningForeground else { return }
-        if selectedVariationID() != id {
-            selectVariation(id)
-        }
     }
 
     /// AUD-09: smoke and the clone benchmark use the benchmark clone voice but

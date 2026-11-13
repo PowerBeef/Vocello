@@ -101,13 +101,12 @@ class CloneFidelityLaneTests(unittest.TestCase):
             with self.subTest(named=named, count=count), self.assertRaisesRegex(ValueError, message):
                 resolve_cross_clones("Target", named, count)
 
-    def test_clone_command_uses_saved_voice_and_consistent_variation(self):
+    def test_clone_command_uses_saved_voice_and_the_one_sampling(self):
         item = build_take_plan("VoiceX", 1, 0, 7)[0]
         command = generation_command("/repo/build/vocello", item, "/tmp/run")
         self.assertIn("--voice", command)
         self.assertIn("VoiceX", command)
-        self.assertIn("--variation", command)
-        self.assertIn("consistent", command)
+        self.assertNotIn("--variation", command, "every take samples as Expressive (RF-58)")
         self.assertIn(FIXED_TEXT, command)
         self.assertNotIn("--speaker", command)
 

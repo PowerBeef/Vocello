@@ -242,7 +242,7 @@ enum IOSStartupReliabilityRunner {
             )
             let delivery = try take.deliveryCell
             let language = try take.resolvedLanguage
-            let variation = try take.resolvedVariation
+            try take.validateVariation()
             let request = GenerationRequest(
                 mode: .custom,
                 modelID: model.id,
@@ -254,7 +254,6 @@ enum IOSStartupReliabilityRunner {
                 payload: .custom(speakerID: take.speakerID, deliveryStyle: delivery.instruction),
                 generationID: generationID,
                 seed: take.seed,
-                variation: variation,
                 captureCodecTrace: true,
                 deliveryInstructionCellID: delivery.id
             )

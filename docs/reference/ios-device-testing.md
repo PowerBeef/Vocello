@@ -142,22 +142,6 @@ unknown. Retain raw readbacks privately. Do not start another device lane after 
 If this route fails, stop unattended device work and report that protection still requires
 operator action.
 
-### Restoring Take variation
-
-A journey that pins Take variation (the long-form journey pins Expressive) restores the original
-on exit. When that cleanup cannot run, as when an interruption left the History search keyboard
-covering the tab dock on 2026-10-20, restore it explicitly:
-
-```sh
-scripts/ui_test.sh ios take-variation --scenario inspect
-scripts/ui_test.sh ios take-variation --scenario consistent
-```
-
-The default `inspect` reads the selection through the visible Settings control and changes
-nothing. A named value (`expressive`, `balanced` or `consistent`) selects it through the same
-control and verifies the readback; the retained `take-variation.json` records the value before
-and after. It never runs as part of another lane.
-
 ## Explicit XCUITest lanes
 
 Shared `VocelloiOSUITestCase` journeys select English using process-local launch arguments so
@@ -344,10 +328,9 @@ Reference panel must review it and follow an edit:
 scripts/ui_test.sh ios smoke --scenario studio-layout
 ```
 
-**Long-form project (RF-18).** It takes about 15 minutes. It pins Take
-variation to Expressive through Settings and restores the original afterwards, so a persisted
-Consistent setting no longer decides the outcome (Consistent's long-form stalls are a 3.0 known
-limitation). It has no memory-pressure gate, because only the full smoke forces that event:
+**Long-form project (RF-18).** It takes about 15 minutes. Every take samples as Expressive (the
+Take variation setting is retired, RF-58), so no persisted setting decides the outcome. It has no
+memory-pressure gate, because only the full smoke forces that event:
 
 ```sh
 scripts/ui_test.sh ios smoke --scenario long-form
@@ -474,7 +457,7 @@ on a candidate phone shares only its name with the development phone's benchmark
 their clone takes.
 
 What a run leaves on the phone. Restored while the app is still running at the end: App Language,
-Take variation, each mode's Studio language, and the `RF15 Candidate Voice` throwaway (also removed
+each mode's Studio language, and the `RF15 Candidate Voice` throwaway (also removed
 at the start of the next voice-lifecycle run). Left changed: Clone consent, each mode's script, the
 Design brief, Clone's reference (the benchmark voice), the new takes and long-form project in History,
 and the completed project in Studio.

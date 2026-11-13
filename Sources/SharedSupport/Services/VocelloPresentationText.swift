@@ -18,7 +18,7 @@ struct VocelloPresentationText: Sendable {
                comment: "Settings audio; preserve product and consent meaning.")
     }
     var settingsAudioSummary: String {
-        localization.string(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback and take variation",
+        localization.string(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback",
                comment: "Settings audioSummary; preserve product and consent meaning.")
     }
     var settingsModelsFiles: String {

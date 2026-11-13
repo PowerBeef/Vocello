@@ -2,21 +2,16 @@ import Foundation
 import QwenVoiceCore
 
 /// macOS adapter of `IOSLongFormPlatformHooks` (the long-form twin of
-/// `MacStudioSingleTakeGenerationHooks`): the Settings variation preference,
-/// the desktop waveform hash, the two-layer telemetry merge instead of the
-/// devicectl diagnostics mirror, the History library event instead of the
-/// iOS notification and Files export, the interface language selected in
-/// Settings, and no haptics.
+/// `MacStudioSingleTakeGenerationHooks`): the desktop waveform hash, the
+/// two-layer telemetry merge instead of the devicectl diagnostics mirror, the
+/// History library event instead of the iOS notification and Files export, the
+/// interface language selected in Settings, and no haptics.
 @MainActor
 final class MacStudioLongFormPlatformHooks: IOSLongFormPlatformHooks {
     init() {}
 
     var presentation: VocelloPresentationText {
         VocelloPresentationText(localization: MacInterfaceLanguage.current)
-    }
-
-    func requestVariation() -> Qwen3SamplingVariation? {
-        GenerationVariationPreference.requestValue()
     }
 
     func waveformSeed(for text: String) -> Int {

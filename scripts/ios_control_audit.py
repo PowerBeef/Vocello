@@ -494,24 +494,28 @@ def validate_plan(contract: dict[str, Any], plan: dict[str, Any]) -> None:
         and plan.get("contractDigest") in LEGACY_PLAN_V1_CONTRACT_DIGESTS
         and plan.get("planDigest") in LEGACY_PLAN_V1_PLAN_DIGESTS
     ):
-        _validate_legacy_plan_v1(contract, plan)
+        _validate_legacy_plan_v1(plan)
         return
     raise AuditError("control-audit plan does not match the deterministic source-bound plan")
 
 
-def _validate_legacy_plan_v1(contract: dict[str, Any], plan: dict[str, Any]) -> None:
+def _validate_legacy_plan_v1(plan: dict[str, Any]) -> None:
     """Validate retained v1 bytes without rewriting historical evidence.
 
     The old contract digest is allowlisted, but public SHA-256 fields are not
     signatures: accepting an arbitrary self-rehashed row would weaken the
     source-bound plan contract. Reconstruct the complete historical plan from
-    its frozen source identity and the one known v1 semantic difference
-    (post-sentinel rows declared `warm` instead of `observed`), then require
+    the frozen September 4 contract (the live one has moved on: RF-58 left one
+    take variation), its frozen source identity and the one known v1 semantic
+    difference (post-sentinel rows declared `warm` instead of `observed`), then require
     byte-for-byte decoded equality. This is a compatibility decoder, not
     permission to produce new schema-v1 plans.
     """
+    legacy = load_json(LEGACY_CONTRACT_PATH)
+    if digest(legacy) != LEGACY_CONTRACT_DIGEST:
+        raise AuditError("historical control-audit contract digest mismatch")
     expected = generate_plan(
-        contract,
+        legacy,
         plan["sourceIdentity"],
         schema_version=1,
     )
@@ -1143,7 +1147,9 @@ def validate_device_evidence(
         artifacts: list[dict[str, Any]] = []
         if observation.get("schemaVersion") == 2:
             selections = observation.get("observedSelections") or {}
-            for key in ("mode", "speaker", "delivery", "language", "variation"):
+            # No visible variation since RF-58: the receipt below proves the
+            # take sampled as the plan's (Expressive) variation.
+            for key in ("mode", "speaker", "delivery", "language"):
                 if take.get(key) is not None and selections.get(key) != take[key]:
                     issues.append(f"visible_{key}_mismatch")
             if take["mode"] == "clone" and not selections.get("referenceRowID"):

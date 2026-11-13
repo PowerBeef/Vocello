@@ -326,11 +326,11 @@ actors that own the heavy, isolated work:
 - `GenerationMode { custom, design, clone }`
 - `GenerationRequest` — `mode`, `modelID`, `text`, `outputPath`, `shouldStream`,
   `streamingInterval`, `languageHint`, `payload`, `generationID`, `seed`,
-  `variation`, plus batch (`batchIndex`/`batchTotal`), `streamingTitle`,
+  plus batch (`batchIndex`/`batchTotal`), `streamingTitle`,
   `suppressStreamingPreview` (request-local silent generation), `captureCodecTrace`
   (diagnostics only), `deliveryInstructionCellID` and `longFormSegment` (one segment of a
-  long-form project, which keeps the streaming trailing-text layout and, under Consistent, samples
-  its talker as Balanced does).
+  long-form project, which keeps the streaming trailing-text layout). The retired take variation
+  (RF-58) is no longer a field; an older encoded request that carries one still decodes.
   - `GenerationRequest.Payload`:
     - `.custom(speakerID:deliveryStyle:)`
     - `.design(voiceDescription:deliveryStyle:)`
@@ -430,11 +430,12 @@ fresh `MLXRandom.RandomState`, while talker/subtalker stages and per-request cac
 travel with the request instead of mutating process-global generation state.
 
 **Sampling and text layout.** `Qwen3TalkerSamplingOverride.samplingConfiguration`
-(`UnsafeSpeechGenerationModel.swift`) resolves each request's sampling: the take variation sets the
-talker only, and the subtalker keeps the reference values. The reference-parity arms (D1 full-text
-single takes, D2 EOS filtering, D3 float32 sampling) reach the runtime only as request-local
+(`UnsafeSpeechGenerationModel.swift`) resolves each request's sampling: both stages take the
+reference values, the only sampling since the take variation was retired (RF-58). The
+reference-parity arms (D1 full-text single takes, D2 EOS filtering, D3 float32 sampling) reach the
+runtime only as request-local
 `VocelloQwen3ReferenceParity` values: a long-form segment (`GenerationRequest.longFormSegment`)
-turns D1 off (and under Consistent takes Balanced's talker sampling, RF-53), registered internal-diagnostics knobs turn any arm on or off, and a request that
+turns D1 off, registered internal-diagnostics knobs turn any arm on or off, and a request that
 departs from production names its arms on the engine row (`reference_parity`). The values, the
 arms and the text layouts per take kind are owned by
 [`qwen3-tts-guide.md` §9](reference/qwen3-tts-guide.md#9-generation-parameters).

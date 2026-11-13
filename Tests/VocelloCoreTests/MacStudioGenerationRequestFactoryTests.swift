@@ -16,7 +16,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 preparedVoiceID: "reviewed-reference",
                 ignoresStoredTranscript: true,
                 seed: 32_060_828,
-                variation: .consistent,
                 generationID: generationID
             )
         )
@@ -27,7 +26,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         XCTAssertEqual(request.languageHint, Qwen3SupportedLanguage.auto.rawValue)
         XCTAssertEqual(request.generationID, generationID)
         XCTAssertEqual(request.seed, 32_060_828)
-        XCTAssertEqual(request.variation, .consistent)
         XCTAssertTrue(request.shouldStream)
         XCTAssertEqual(
             GenerationSemantics.qwenLanguageHint(
@@ -57,8 +55,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceTranscript: LanguageFixtures.english,
                 preparedVoiceID: nil,
                 ignoresStoredTranscript: true,
-                seed: nil,
-                variation: nil
+                seed: nil
             )
         )
 
@@ -79,8 +76,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceTranscript: nil,
                 preparedVoiceID: nil,
                 ignoresStoredTranscript: true,
-                seed: nil,
-                variation: nil
+                seed: nil
             )
         )
         XCTAssertNil(
@@ -93,8 +89,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
                 referenceTranscript: nil,
                 preparedVoiceID: nil,
                 ignoresStoredTranscript: true,
-                seed: nil,
-                variation: nil
+                seed: nil
             )
         )
     }
@@ -109,7 +104,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             voiceDescription: "A warm, mature narrator.",
             deliveryStyle: "Speak calmly.",
             seed: 7,
-            variation: .balanced,
             generationID: generationID
         )
 
@@ -121,7 +115,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         )
         XCTAssertEqual(request.generationID, generationID)
         XCTAssertEqual(request.seed, 7)
-        XCTAssertEqual(request.variation, .balanced)
 
         guard case .design(let voiceDescription, let deliveryStyle) = request.payload else {
             return XCTFail("Expected Voice Design payload")
@@ -141,7 +134,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             deliveryStyle: "Calm and steady",
             deliveryInstructionCellID: "calm/strong",
             seed: 42,
-            variation: .balanced,
             generationID: generationID
         )
         XCTAssertEqual(request.mode, .custom)
@@ -149,7 +141,6 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         XCTAssertEqual(request.languageHint, "auto")
         XCTAssertEqual(request.generationID, generationID)
         XCTAssertEqual(request.seed, 42)
-        XCTAssertEqual(request.variation, .balanced)
         XCTAssertEqual(request.deliveryInstructionCellID, "calm/strong")
         XCTAssertTrue(request.shouldStream)
         XCTAssertEqual(request.streamingTitle, "Bonjour tout le monde.")
@@ -169,8 +160,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             speakerID: "ryan",
             deliveryStyle: nil,
             deliveryInstructionCellID: "calm/strong",
-            seed: nil,
-            variation: nil
+            seed: nil
         )
         XCTAssertNil(request.deliveryInstructionCellID)
         XCTAssertEqual(request.languageHint, "english")
@@ -192,8 +182,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             language: .english,
             voiceDescription: "A warm narrator.",
             deliveryStyle: "Speak calmly.",
-            seed: nil,
-            variation: nil
+            seed: nil
         )
         let clone = try XCTUnwrap(MacStudioGenerationRequestFactory.voiceClone(
             modelID: "clone-model",
@@ -204,8 +193,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             referenceTranscript: "Reference.",
             preparedVoiceID: nil,
             ignoresStoredTranscript: true,
-            seed: nil,
-            variation: nil
+            seed: nil
         ))
         let custom = MacStudioGenerationRequestFactory.customVoice(
             modelID: "custom-model",
@@ -215,8 +203,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             speakerID: "ryan",
             deliveryStyle: nil,
             deliveryInstructionCellID: nil,
-            seed: nil,
-            variation: nil
+            seed: nil
         )
 
         for request in [design, clone, custom] {
@@ -235,7 +222,7 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
             let request = try XCTUnwrap(MacStudioGenerationRequestFactory.voiceClone(
                 modelID: "clone-model", text: "Hello there.", outputPath: "/tmp/clone.wav", language: .english,
                 referenceAudioPath: "/voices/Voice.wav", referenceTranscript: nil, preparedVoiceID: "Voice",
-                ignoresStoredTranscript: ignores, seed: nil, variation: nil))
+                ignoresStoredTranscript: ignores, seed: nil))
             guard case .clone(let reference) = request.payload else { return XCTFail("Expected a clone payload") }
             XCTAssertEqual(reference.ignoresStoredTranscript, ignores)
             XCTAssertEqual(reference.bypassesStoredTranscript, ignores)

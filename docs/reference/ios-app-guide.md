@@ -40,7 +40,7 @@ Four tabs across the bottom (`rootTab_*`), with **Studio** as the default surfac
 | Studio | `rootTab_studio` | Compose + generate (three modes — see below) |
 | Voices | `rootTab_voices` | Browse built-in speakers + saved (cloned/designed) voices |
 | History | `rootTab_history` | Past generations: replay, export, delete, search |
-| Settings | `rootTab_settings` | Voice models, clone consent, playback/variation/accessibility prefs |
+| Settings | `rootTab_settings` | Voice models, clone consent, playback and accessibility prefs |
 
 Three generation modes (Studio segmented control `generateSection_*`):
 
@@ -328,7 +328,7 @@ Each has `screen_settings_<category>` and a 44-point `iosSettings_<category>Back
 The hub uses the shared Settings group and destination-row presentation with macOS. The tab dock
 keeps its identifiers and layout, but its Dynamic Type growth is capped at the first accessibility
 size (ISU-5) so Settings rows stay reachable at AX-XXXL; its icon is hidden from VoiceOver.
-Its secondary lines show current variation, interface language, model readiness and app version;
+Its secondary lines show the playback summary, interface language, model readiness and app version;
 full explanations remain in the detail pages and accessibility hints. Values wrap below titles
 instead of competing for a narrow trailing column.
 No nested navigation stack is introduced. App Language adds a UI-only persisted preference,
@@ -339,8 +339,8 @@ language of generated speech. The observable app-lifetime owner updates typed di
 replacing runtime dependencies; system dialogs may retain the OS language. The localization lane's
 ten-language walk and full AX-XXXL/pseudo layout have not yet run on the phone (ASR-12/ISU-4).
 
-Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
-`iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and
+Audio retains `iosSettings_autoPlayToggle` (default on); the Take variation menu
+(`iosSettings_variationRow`) is retired with the setting (RF-58). Models & Files owns `iosSettings_voiceModelsRow` and
 `iosSettings_savedOutputsRow`, including the existing History/folder picker and bookmark behavior.
 It also offers, once, the audio earlier History clears left in the private `outputs/` (PA-30;
 `IOSLeftoverAudioCleanup`): `iosSettings_leftoverAudioRow` shows the file count and total size of
@@ -357,7 +357,7 @@ Privacy & Permissions retains `voiceCloning_consentAcknowledgment`, its full leg
 `iosSettings_supportRow`, `iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the
 dynamic, non-interactive `iosSettings_versionLabel`. Support and Source Code retain their URLs.
 Rows use decorative symbols, wrapping labels and subordinate trailing values at ordinary sizes;
-values and the variation picker reflow below their labels at accessibility sizes. No forced
+values reflow below their labels at accessibility sizes. No forced
 Dynamic Type limit or fixed-width value column is used. Models & Files and Accessibility have
 short contextual introductions. About starts with a compact Vocello identity, local-voice tagline
 and the installed bundle's version/build, rather than a duplicate version row. The unchanged
@@ -374,8 +374,8 @@ purchase states, disabling rules and explicit post-purchase export retry remain 
 If product information cannot load while verified export access is already unlocked, the notice
 explicitly confirms that exports remain available. Product availability does not revoke access.
 New Settings/purchase presentation copy is typed and has catalog entries in all ten interface languages.
-Settings variation names and model names/actions/statuses are localized display values; saved
-variation raw values, model IDs, installation behavior and purchase policy remain unchanged.
+Model names, actions and statuses are localized display values; model IDs, installation behavior
+and purchase policy remain unchanged.
 The existing Settings localization walk includes a French-Default pass alongside the four
 English layout configurations. Shared lifecycle tests explicitly select English in the app's
 process-local launch arguments; localization walks may override it, and the phone's persisted
@@ -603,10 +603,10 @@ final model language, think/no-think token mode, and conditioning mode separatel
 ### Cross-cutting
 
 - **Speed vs Quality** — iOS is Speed-only (smaller, faster, lower memory). Quality (8-bit) is macOS-only.
-- **Reproducible takes** — Settings → `iosSettings_variationRow`: **Expressive** (most variety,
-  default) / **Balanced** / **Consistent** (most stable). Each generation records its effective
-  seed in History (schema v6); "Pin seed" on a History row reproduces that take on demand and the
-  Studio Seed chip shows/unpins the state (DP-15). Batch
+- **Reproducible takes** — every take samples as the model's reference does (the Take variation
+  setting is retired, RF-58). Each generation records its effective seed in History (schema v6);
+  "Pin seed" on a History row reproduces that take on demand and the Studio Seed chip shows/unpins
+  the state (DP-15). Batch
   generation is intentionally absent from iOS.
 - **Script length** — Studio shows `textInput_longFormIndicator` above 900 characters (a Han,
   kana or Hangul character counts three, so about 300 in Chinese or Japanese), where

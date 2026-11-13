@@ -478,6 +478,7 @@ enum ModelsCommand {
     /// the iPhone's launch check), so the Speed and Quality folders it replaced go, as the apps
     /// remove them; never while the app or another engine runs, since an older one may still load
     /// them.
+    @MainActor
     static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) {
         guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return }
         let result = ctx.registry.reclaimRetiredFolders(in: ctx.modelsDirectory) { $0.id == modelID }

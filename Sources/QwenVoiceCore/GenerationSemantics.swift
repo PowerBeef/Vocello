@@ -1194,6 +1194,21 @@ public enum GenerationSemantics {
         detectedQwenLanguage(in: text) ?? .auto
     }
 
+    /// Whether an Auto request for `text` is sent as Korean by the East Asian
+    /// branch of `detectedQwenLanguage(in:)`, on the same script units (digits
+    /// do not count, a Latin run is one word). It skips the recognizer that
+    /// branch falls back to, which reads the whole text and is too slow for a
+    /// view to call per render, so a text whose East Asian characters are not
+    /// the majority is never Korean here. Korean long-form projects stop at a
+    /// failed segment far more often than any other language (RF-60: on the
+    /// Mac, of 12 seed-set projects Speed generated 3, the `attn` hybrid 6 and
+    /// Quality 9), so both apps warn before one starts and `vocello` adds a
+    /// `long_form_korean` warning.
+    public static func resolvesToKorean(_ text: String) -> Bool {
+        let units = ScriptUnits(counting: text)
+        return units.eastAsian * 2 > units.total && eastAsianLanguage(of: units) == .korean
+    }
+
     static func detectedQwenLanguage(in text: String) -> Qwen3SupportedLanguage? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

@@ -614,7 +614,7 @@
         "docs/reference/qwen3-tts-guide.md"
       ],
       "updated": "2026-11-13",
-      "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment."
+      "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment. Implemented 2026-11-13: GenerationSemantics.resolvesToKorean (Auto's East Asian branch, so digits do not count and a Latin run is one word) drives a caution under the Studio script on both apps, hidden while a take runs, and before Generate All in the Mac batch sheet, in all ten interface languages; vocello adds long_form_korean (generate before boot; batch names its lines). Left: the iPhone view in the next announced phone window."
     },
     {
       "id": "RF-16",

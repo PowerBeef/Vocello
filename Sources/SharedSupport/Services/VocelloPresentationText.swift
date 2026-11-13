@@ -128,6 +128,13 @@ struct VocelloPresentationText: Sendable {
                comment: "User-facing longFormGuidance message.")
     }
 
+    /// Shown before a Korean long-form project starts (RF-60). It wraps; keep
+    /// it near two caption lines on the iPhone.
+    var longFormKoreanCaution: String {
+        localization.string(localized: "vocello.presentation.longFormKoreanCaution", defaultValue: "Long Korean scripts often fail a quality check partway through. Shorter scripts are more reliable.",
+               comment: "Caution under a long Korean script before its long-form project starts. Keep it to two short sentences.")
+    }
+
     var longFormLimit: String {
         localization.string(localized: "vocello.presentation.longFormLimit", defaultValue: "At the single-take limit; keep typing for a long-form project.",
                comment: "User-facing longFormLimit message.")

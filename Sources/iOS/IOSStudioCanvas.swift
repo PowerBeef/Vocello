@@ -206,7 +206,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     // exactly this reason). The meta row sits flush below the editor
     // with the mode label on the left and the counter on the right.
     private var composerPad: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // One measure of the script per render, for both long-form indicators.
+        let limitState = IOSGenerationTextLimitPolicy.state(for: script, mode: mode)
+        return VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 if script.isEmpty {
                     Text(placeholder)
@@ -246,7 +248,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                         HStack {
                             clearScriptButton
                             Spacer()
-                            longFormIndicator
+                            longFormIndicator(limitState)
                         }
                     }
                 } else {
@@ -254,12 +256,14 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                         modeMetaText
                         Spacer()
                         clearScriptButton
-                        longFormIndicator
+                        longFormIndicator(limitState)
                     }
                 }
             }
             .padding(.top, 4)
             .padding(.bottom, 10)
+
+            koreanLongFormCaution(limitState)
         }
         .padding(.horizontal, 20)
         .padding(.top, 4)
@@ -294,8 +298,8 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     }
 
     @ViewBuilder
-    private var longFormIndicator: some View {
-        if IOSGenerationTextLimitPolicy.state(for: script, mode: mode).routesToLongForm {
+    private func longFormIndicator(_ limitState: IOSGenerationTextLimitPolicy.State) -> some View {
+        if limitState.routesToLongForm {
             Label(IOSInterfaceText.longForm, systemImage: "text.alignleft")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(tint)
@@ -303,6 +307,27 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityHint(IOSAppLanguage.shared.presentation.longFormGuidance)
                 .accessibilityIdentifier("textInput_longFormIndicator")
+        }
+    }
+
+    /// Shown before a Korean long-form project starts (RF-60), and hidden
+    /// while a take runs: those projects stop at a failed segment far more
+    /// often than any other language.
+    @ViewBuilder
+    private func koreanLongFormCaution(_ limitState: IOSGenerationTextLimitPolicy.State) -> some View {
+        if limitState.warnsKoreanLongForm, !isGenerationActive {
+            Label {
+                Text(IOSAppLanguage.shared.presentation.longFormKoreanCaution)
+                    .foregroundStyle(Theme.Text.secondary)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 10)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("textInput_koreanLongFormCaution")
         }
     }
 

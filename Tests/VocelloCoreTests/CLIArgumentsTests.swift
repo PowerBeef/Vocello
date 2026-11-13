@@ -212,6 +212,30 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertEqual(try warnings([]), [])
     }
 
+    /// RF-60: a long-form project Auto sends as Korean warns; a batch names its
+    /// Korean lines, even a batch of one, and other scripts warn about nothing.
+    func testKoreanLongFormProjectsWarn() throws {
+        func warnings(_ scripts: [String], namesLines: Bool = false) throws -> [CLIWarning] {
+            let capture = CLIPresenterCapture()
+            CLIPresenter.$capture.withValue(capture) {
+                CLILongFormProject.warnIfKorean(scripts, namesLines: namesLines)
+                CLIPresenter.succeed(["done": true])
+            }
+            return try XCTUnwrap(capture.report).warnings
+        }
+        let message = "long Korean scripts often fail a quality check partway through; shorter scripts are more reliable"
+        XCTAssertEqual(try warnings(["기차는 새벽에 역을 떠났다."]), [CLIWarning(code: "long_form_korean", message: message, detail: nil)])
+        XCTAssertEqual(
+            try warnings(["The train left at dawn.", "기차는 새벽에 역을 떠났다.", "列車は夜明けに駅を出発した。"], namesLines: true),
+            [CLIWarning(code: "long_form_korean", message: message, detail: ["lines": .array([.integer(2)])])]
+        )
+        XCTAssertEqual(
+            try warnings(["2026년 11월 13일에 출시된 3.0 버전"], namesLines: true),
+            [CLIWarning(code: "long_form_korean", message: message, detail: ["lines": .array([.integer(1)])])]
+        )
+        XCTAssertEqual(try warnings(["The train left at dawn."]), [])
+    }
+
     /// RF-27: without --variant a take uses the package the Mac app would use for the mode.
     func testTakesDefaultToTheAppsPackage() throws {
         let manifest = URL(fileURLWithPath: #filePath)

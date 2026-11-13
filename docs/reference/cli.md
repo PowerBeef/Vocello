@@ -311,8 +311,11 @@ passed, and never after a signal. The result adds `longForm: true`, `longFormBas
 pause, seed, generation id, path, duration, finish reason and QC warnings) and `longFormAssembly`;
 `finishReason` is `max_tokens` when any segment was truncated. A rejected segment or join fails with
 `qc_rejected` (`detail.segment` names the segment); a stopped project keeps its completed segments and
-says where (warning `long_form_segments_kept`). Projects write no History rows until the History lock
-lands (RF-30). `--no-stream` does not apply to a project and is refused with one.
+says where (warning `long_form_segments_kept`). A project Auto sends as Korean adds the warning
+`long_form_korean` before any model work, as the apps warn before such a project starts: Korean
+long-form projects stop at a failed segment far more often than any other language (RF-60; in a
+`batch --long-form`, `detail.lines` names the 1-based lines). Projects write no History rows until the
+History lock lands (RF-30). `--no-stream` does not apply to a project and is refused with one.
 
 **Line by line.** `--line-by-line` runs the script as the Mac app's line batch does (`DesktopLineBatch`
 over `MacLineBatchRequest`): one take per trimmed line that has something to speak (blank lines and

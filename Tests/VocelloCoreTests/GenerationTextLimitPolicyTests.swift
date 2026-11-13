@@ -78,6 +78,32 @@ final class GenerationTextLimitPolicyTests: XCTestCase {
         }
     }
 
+    /// RF-60: a script Auto sends as Korean that runs as a long-form project
+    /// gets the caution on both apps, dates and product names included; a
+    /// Korean single take, a long Japanese or English project and an English
+    /// script with a few Korean words do not.
+    func testKoreanLongFormScriptsGetTheCaution() {
+        let korean = "기차는 새벽에 역을 떠났다. "
+        let japanese = "列車は夜明けに駅を出発した。"
+        let english = "The narrator kept a steady, unhurried pace through the winding chapters. "
+        let cases: [(String, routes: Bool, warns: Bool)] = [
+            (String(repeating: korean, count: 30), true, true),
+            (String(repeating: "2026년 11월 13일에 Vocello 3.0 버전이 MLX 기반으로 출시되었습니다. ", count: 20), true, true),
+            (String(repeating: korean, count: 5), false, false),
+            (String(String(repeating: japanese, count: 60).prefix(700)), true, false),
+            (String(String(repeating: english, count: 13).prefix(901)), true, false),
+            (String(repeating: english, count: 13) + "안녕하세요", true, false),
+        ]
+        for (text, routes, warns) in cases {
+            let label = "\(text.prefix(12))… (\(text.count))"
+            let state = GenerationTextLimitPolicy.state(for: text, mode: .custom)
+            XCTAssertEqual(state.routesToLongForm, routes, label)
+            XCTAssertEqual(state.warnsKoreanLongForm, warns, label)
+        }
+        XCTAssertTrue(GenerationTextLimitPolicy.warnsKoreanLongForm(String(repeating: korean, count: 5)),
+                      "the batch sheet runs any length as a project, so the helper does not route")
+    }
+
     /// The counter speaks in the script's own characters: 300 for a Chinese
     /// single take, 900 for an English one.
     func testCounterStateUsesTheScriptsOwnCharacters() {

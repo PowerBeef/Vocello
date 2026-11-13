@@ -282,6 +282,7 @@ enum BatchCommand {
                 )
             }
         }
+        CLILongFormProject.warnIfKorean(lines, namesLines: true)
         let segmentCount = plans.reduce(0) { $0 + $1.segments.count }
         note("loading \(modelID)…")
         note("generating \(plans.count) long-form project(s), \(segmentCount) segment(s), one model load…")

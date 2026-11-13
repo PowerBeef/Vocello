@@ -70,6 +70,29 @@ final class CLILongFormTests: XCTestCase {
         }
     }
 
+    /// RF-60: `generate` warns before any engine work when it plans a project
+    /// Auto sends as Korean; a short Korean take, an English project and a
+    /// Korean line batch do not.
+    @MainActor
+    func testAKoreanProjectWarnsBeforeAnyEngineWork() async throws {
+        func koreanWarnings(_ argv: [String]) async throws -> Int {
+            let capture = CLIPresenterCapture()
+            try await CLIPresenter.$capture.withValue(capture) {
+                _ = try await prepare(argv)
+                CLIPresenter.succeed(["done": true])
+            }
+            return try XCTUnwrap(capture.report).warnings.filter { $0.code == "long_form_korean" }.count
+        }
+        let sentence = "2026년 11월 13일에 기차는 새벽에 역을 떠나 서울에 도착했다."
+        let korean = Array(repeating: sentence, count: 20).joined(separator: " ")
+        let project = try await koreanWarnings(["--text", korean, "--seed", "7"])
+        let take = try await koreanWarnings(["--text", sentence])
+        let english = try await koreanWarnings(["--text", Self.story, "--seed", "7"])
+        let lines = Array(repeating: sentence, count: 3).joined(separator: "\n")
+        let lineBatch = try await koreanWarnings(["--text", lines, "--line-by-line"])
+        XCTAssertEqual([project, take, english, lineBatch], [1, 0, 0, 0])
+    }
+
     @MainActor
     func testGeneratePlansALongScriptBeforeAnyEngineWork() async throws {
         let long = try await prepare(["--text", Self.story, "--seed", "7"])

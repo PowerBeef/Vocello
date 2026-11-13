@@ -81,6 +81,20 @@ public enum CLILongFormProject {
         return plan
     }
 
+    /// RF-60: Korean long-form projects stop at a failed segment far more often
+    /// than any other language. The apps warn before one starts; vocello adds
+    /// one `long_form_korean` warning for the projects Auto sends as Korean,
+    /// naming the 1-based lines of a batch (`namesLines`).
+    public static func warnIfKorean(_ scripts: [String], namesLines: Bool) {
+        let lines = scripts.indices.filter { GenerationSemantics.resolvesToKorean(scripts[$0]) }
+        guard !lines.isEmpty else { return }
+        CLIPresenter.warn(
+            "long_form_korean",
+            "long Korean scripts often fail a quality check partway through; shorter scripts are more reliable",
+            detail: namesLines ? ["lines": .array(lines.map { .integer($0 + 1) })] : nil
+        )
+    }
+
     /// The apps refuse a plan of more segments than `CLILimits.longFormMaximumSegments`.
     static func admit(segmentCount: Int) throws {
         guard segmentCount <= CLILimits.longFormMaximumSegments else {

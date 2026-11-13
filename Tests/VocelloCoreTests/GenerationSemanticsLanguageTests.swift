@@ -3,6 +3,24 @@ import Foundation
 import XCTest
 
 final class GenerationSemanticsLanguageTests: XCTestCase {
+    /// RF-60: the Korean caution follows Auto's East Asian branch: digits do
+    /// not count and a Latin term is one word, so Korean full of dates and
+    /// product names is Korean; a Korean name in Chinese prose, Japanese, and a
+    /// few Korean words in English are not.
+    func testKoreanResolutionFollowsAutosEastAsianBranch() {
+        let korean = ["2026년 11월 13일에 출시된 3.0 버전", "Vocello는 MLX 기반의 로컬 TTS 앱입니다", "기차는 새벽에 역을 떠났다."]
+        for text in korean {
+            XCTAssertTrue(GenerationSemantics.resolvesToKorean(text), text)
+            XCTAssertEqual(GenerationSemantics.autoDetectedLanguage(in: text), .korean, text)
+        }
+        for text in ["金正恩今天在平壤会见了代表团。김정은", "列車は夜明けに駅を出発した。"] {
+            XCTAssertFalse(GenerationSemantics.resolvesToKorean(text), text)
+            XCTAssertNotEqual(GenerationSemantics.autoDetectedLanguage(in: text), .korean, text)
+        }
+        XCTAssertFalse(GenerationSemantics.resolvesToKorean("The train left the station at dawn, 안녕하세요."))
+        XCTAssertFalse(GenerationSemantics.resolvesToKorean(""))
+    }
+
     func testAngryMandarinRoutingRequiresBothNativeSpeakerAndChineseOutput() throws {
         let vivianChinese = try Self.angryRequest(speaker: "vivian", language: "chinese")
         let localized = GenerationSemantics.resolvedDeliveryInstruction(

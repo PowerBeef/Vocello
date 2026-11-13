@@ -96,7 +96,7 @@ setup chips wrap when the actual available width cannot fit them.
 | Speaker chip | `customVoice_speakerPicker` (menu anchored to the chip; the selected speaker is its accessibility value; "Recommended for your script" section from the detected language) inside `customVoice_voiceSetup` |
 | Language chip | `customVoice_languagePicker` inside `customVoice_languageSetup`; native-speaker hint `customVoice_languageHint` |
 | Delivery chip | `delivery_tonePicker` inside `customVoice_toneSpeed`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised) and Custom; a hint shows `delivery_hintAdvisory`, Custom shows the field `delivery_toneField` (duration advisory `delivery_durationAdvisory`); the chip writes the draft's `DeliveryInputState` as the iPhone controls do, so one selection sends one instruction on both apps and a blank Custom tone sends none (P02-07); `customVoice_deliveryUnsupported` when the package has no delivery control |
-| Script editor | `textInput_textEditor` / `textInput_longFormIndicator` (localized Long-form above 900 characters, a CJK character counting three, or Line-by-line while explicitly selected; absent for ordinary short drafts) / `textInput_clearButton` / `textInput_modeMetaLabel` |
+| Script editor | `textInput_textEditor` / `textInput_longFormIndicator` (localized Long-form above 900 characters, a CJK character counting three, or Line-by-line while explicitly selected; absent for ordinary short drafts) / `textInput_clearButton` / `textInput_modeMetaLabel` / `textInput_koreanLongFormCaution` (a caution under a long-form script that Auto sends as Korean, RF-60) |
 | Readiness | `customVoice_readiness` (value "Ready" or "Waiting"), one caption after the mode label in the meta line, where the phone puts it |
 | Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
 | Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
@@ -265,6 +265,7 @@ selected segmentation, with its existing review, Generate all, cancel and recove
 | Editor | `batch_textEditor` |
 | Generate all | `batch_generateAllButton` / `batch_cancelButton` / `batch_doneButton` |
 | Item status | `batch_itemStatusList` / `batch_regenerateSegment_<index>` (long-form, per accepted segment) / `batch_errorLine` (the attempt's failure, a rejected replacement included) |
+| Korean caution | `batch_koreanLongFormCaution` (before Generate All, for a script Auto sends as Korean, RF-60) |
 | Long-form resume | `batch_resumeLongFormButton` (shown when a stopped project has reusable takes) |
 | Delivery summary | `batch_deliverySummary` |
 

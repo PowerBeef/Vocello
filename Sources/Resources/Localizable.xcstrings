@@ -1987,6 +1987,72 @@
         }
       }
     },
+    "vocello.presentation.longFormKoreanCaution": {
+      "comment": "Caution under a long Korean script before its long-form project starts. Keep it to two short sentences.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long Korean scripts often fail a quality check partway through. Shorter scripts are more reliable."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les longs textes coréens échouent souvent à un contrôle de qualité en cours de route. Les textes plus courts sont plus fiables."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los guiones largos en coreano suelen fallar una comprobación de calidad a mitad de camino. Los más cortos son más fiables."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lange koreanische Texte scheitern oft unterwegs an einer Qualitätsprüfung. Kürzere Texte sind zuverlässiger."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I testi lunghi in coreano spesso non superano un controllo di qualità a metà strada. Quelli più brevi sono più affidabili."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Textos longos em coreano costumam falhar em uma verificação de qualidade no meio do caminho. Textos mais curtos são mais confiáveis."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较长的韩语文本常在中途未通过质量检查。较短的文本更可靠。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長い韓国語の原稿は、途中で品質チェックに合格しないことがよくあります。短い原稿のほうが安定します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "긴 한국어 원고는 중간에 품질 검사를 통과하지 못하는 경우가 많습니다. 짧은 원고가 더 안정적입니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Длинные корейские тексты часто не проходят проверку качества на полпути. Короткие тексты надёжнее."
+          }
+        }
+      }
+    },
     "vocello.presentation.longFormLimit": {
       "comment": "Complete user-facing longFormLimit message. Preserve substitutions.",
       "extractionState": "manual",

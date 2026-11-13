@@ -38,6 +38,11 @@ struct GenerationTextLimitPolicy {
         /// punctuation, symbols or emoji keeps Generate disabled like an empty
         /// one, because the model ends such a take before any audio.
         let hasSpeakableText: Bool
+        /// A script that runs as a long-form project and that Auto sends as
+        /// Korean: both apps warn before it starts, because Korean long-form
+        /// projects stop at a failed segment far more often than any other
+        /// language (RF-60). Measured only for a long-form script.
+        let warnsKoreanLongForm: Bool
 
         /// Characters left for a single take, in the script's own characters:
         /// Chinese or Japanese characters for a CJK script, letters otherwise.
@@ -78,7 +83,8 @@ struct GenerationTextLimitPolicy {
             singleTakeLength: measure.singleTakeLength,
             countsEastAsianCharacters: measure.eastAsianCharacters * 2 > measure.characters,
             trimmedIsEmpty: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            hasSpeakableText: measure.hasSpeakableContent
+            hasSpeakableText: measure.hasSpeakableContent,
+            warnsKoreanLongForm: measure.exceedsSingleTake && GenerationSemantics.resolvesToKorean(text)
         )
     }
 
@@ -87,6 +93,13 @@ struct GenerationTextLimitPolicy {
     /// the CLI (`SingleTakeScriptBudget`).
     static func exceedsSingleTake(_ text: String) -> Bool {
         SingleTakeScriptBudget.exceedsSingleTake(text)
+    }
+
+    /// Whether a long-form project of `text` gets the Korean caution (RF-60):
+    /// Auto sends it as Korean. The caller decides that the script runs as a
+    /// long-form project (the Mac batch sheet runs any length as one).
+    static func warnsKoreanLongForm(_ text: String) -> Bool {
+        GenerationSemantics.resolvesToKorean(text)
     }
 
     /// Whether a script has anything to speak (U29).

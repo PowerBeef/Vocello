@@ -247,7 +247,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// Design's secondary brief field does. Declined: the reference world
     /// deliberately has none, and the brief outranks the reviewer.
     private var composerPad: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // One routing measure of the script per render, for both indicators.
+        let batchMode = LongTextGenerationRouter.batchMode(for: script, lineByLine: lineByLine)
+        return VStack(alignment: .leading, spacing: 0) {
             MacScriptTextEditor(
                 text: $script,
                 placeholder: placeholder,
@@ -292,10 +294,17 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                     .accessibilityIdentifier("textInput_clearButton")
                 }
 
-                generationModeIndicator
+                generationModeIndicator(batchMode)
                     .fixedSize()
             }
             .padding(.top, MacTheme.Spacing.xs)
+            .padding(.bottom, MacTheme.Spacing.snug)
+
+            MacKoreanLongFormCaution(
+                script: script,
+                isLongForm: batchMode == .longForm,
+                accessibilityIdentifier: "textInput_koreanLongFormCaution"
+            )
             .padding(.bottom, MacTheme.Spacing.snug)
         }
         // The cap covers the meta line as well as the editor, so the indicator
@@ -342,8 +351,8 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     @ViewBuilder
-    private var generationModeIndicator: some View {
-        if let batchMode = LongTextGenerationRouter.batchMode(for: script, lineByLine: lineByLine) {
+    private func generationModeIndicator(_ batchMode: MacBatchSegmentationMode?) -> some View {
+        if let batchMode {
             Label(
                 batchMode == .longForm ? MacInterfaceText.batchLongFormMode : MacInterfaceText.batchLineByLine,
                 systemImage: batchMode == .longForm ? "text.alignleft" : "list.bullet.rectangle"
@@ -580,6 +589,31 @@ struct MacStudioBatchButton: View {
                 endPoint: .bottom
             )
         )
+    }
+}
+
+/// Shown before a Korean long-form project starts (RF-60), under the Studio
+/// script and in the batch sheet: those projects stop at a failed segment far
+/// more often than any other language.
+struct MacKoreanLongFormCaution: View {
+    let script: String
+    let isLongForm: Bool
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        if isLongForm, GenerationTextLimitPolicy.warnsKoreanLongForm(script) {
+            Label {
+                Text(MacInterfaceText.presentation.longFormKoreanCaution)
+                    .foregroundStyle(MacTheme.Text.secondary)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(MacTheme.Status.guarded)
+            }
+            .macType(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(accessibilityIdentifier)
+        }
     }
 }
 

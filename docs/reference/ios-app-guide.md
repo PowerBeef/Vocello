@@ -101,7 +101,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 | Element | Identifier | Notes |
 |---|---|---|
 | Mode segment | `generateSection_custom\|design\|clone` | Tap to switch mode (keeps its id — not shadowed) |
-| Script composer | `textInput_textEditor`, count `textInput_lengthCount` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold (a Han, kana or Hangul character counts three, `SingleTakeScriptBudget`) and is absent for shorter scripts. Editor retains the shared 30,000-character ceiling. |
+| Script composer | `textInput_textEditor`, count `textInput_lengthCount` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold (a Han, kana or Hangul character counts three, `SingleTakeScriptBudget`) and is absent for shorter scripts; `textInput_koreanLongFormCaution` warns under a long-form script that Auto sends as Korean, hidden while a take runs (RF-60). Editor retains the shared 30,000-character ceiling. |
 | **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed; enabled once the script is ready (Design also needs a brief, Clone a reference and consent) |
 | **Install CTA** | `textInput_installModelButton` | Shown instead of Generate when the model is **missing** (see §3) |
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |

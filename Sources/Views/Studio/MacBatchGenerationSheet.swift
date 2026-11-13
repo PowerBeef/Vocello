@@ -267,6 +267,14 @@ struct MacBatchGenerationSheet: View {
                 .accessibilityIdentifier("batch_errorLine")
         }
 
+        if !isProcessing {
+            MacKoreanLongFormCaution(
+                script: batchText,
+                isLongForm: isLongForm,
+                accessibilityIdentifier: "batch_koreanLongFormCaution"
+            )
+        }
+
         HStack {
             Button(MacInterfaceText.cancel) {
                 if isProcessing {

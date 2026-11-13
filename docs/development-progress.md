@@ -26,6 +26,10 @@ session can continue from it alone.
 
 **Next, in order**
 
+0. Read [the RF-59 implementation review](audits/2026-11-13-rf59-implementation-review.md)
+   (November 13): two defects (a failed update download restarts at every launch on the iPhone;
+   the Mac has no failure memory or free-space check), the verification owed, and ordered
+   follow-ups. ★ Push `main` so CI compiles the unpushed commits.
 1. RF-59's verification. The swap is on `main` (`b3b09d3c`, `d50e860b`, `dbe59080`; one `speed`
    variant per mode, the hybrid, on both platforms; [hybrid-model.md](reference/hybrid-model.md) §6).
    The model update for 3.0 users is on `main` too: the modes an earlier build installed read Update

@@ -124,16 +124,32 @@ The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is stil
   to 0.15 on Speed, 0.05 to 0.10 on `attn` and about 0.03 on Quality; the voice's spread across a
   project's windows follows (0.34 to 0.40, 0.23 to 0.25, 0.16). The rule's margin allows it. The gap
   is measured by machine screens, not heard: nobody has listened.
-- **Korean long-form still refuses half its projects** (6 of 12), against Quality's 3 of 12.
+- **Korean long-form still refuses half its projects** (6 of 12), against Quality's 3 of 12. The
+  maintainer chose on 2026-11-13 to document it and warn before such a project starts (RF-60;
+  [qwen3-tts-guide.md §11.2](qwen3-tts-guide.md#112-vocellos-known-limitations)), not a richer recipe.
 - **The iPhone is unmeasured.** Expected on the iPhone 15 Pro: peak about Speed's 2.5 GB plus 0.18 GB,
   and up to the byte growth in time (about +12%) where memory bandwidth bounds a frame. Measure before
   publication (§5).
 
 ## 5. Delivery (the maintainer's decisions are marked ★)
 
-1. ★ **Publish three artifacts**, one per mode, under names that keep "Qwen3-TTS" (for example
-   `<owner>/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid`). Upload from the maintainer's terminal; the build
-   output is the content. Publication gives each a 40-character Hugging Face revision.
+1. ★ **Publish three artifacts**, one per mode, under names that keep "Qwen3-TTS" (proposed:
+   `<owner>/Qwen3-TTS-12Hz-1.7B-<mode>-hybrid-attn`, the build's folder names). `--publish-as <owner>`
+   writes the published card (licence, both sources at their revisions, the recipe, AudioSeal's MIT
+   licence); the weights are byte-identical to a development build's. The upload runs from the
+   maintainer's terminal; the dot-files are local install records and stay behind:
+
+   ```sh
+   python3 scripts/build_hybrid_model.py build --recipe attn --publish-as <owner> \
+     --out build/artifacts/macos/hybrid-models/attn-publish
+   for mode in CustomVoice VoiceDesign Base; do
+     hf upload "<owner>/Qwen3-TTS-12Hz-1.7B-$mode-hybrid-attn" \
+       "build/artifacts/macos/hybrid-models/attn-publish/Qwen3-TTS-12Hz-1.7B-$mode-hybrid-attn" . \
+       --repo-type model --no-private --exclude ".*" --commit-message "Vocello hybrid attn (RF-59)"
+   done
+   ```
+
+   Publication gives each a 40-character Hugging Face revision (`hf models info <repo>`).
 2. **Receipts:** each file's exact size and SHA-256 at that revision in
    `config/model-artifact-receipts.json` (and the iPhone catalog for the iPhone's artifacts), then
    `python3 scripts/model_catalog_contract.py rebuild` and `validate --require-complete`. The speech
@@ -147,8 +163,8 @@ The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is stil
 
 ## 6. One model: what specialising the backend means
 
-§4 passed on 2026-11-12. This opens as its own release item only when ★ the maintainer confirms it,
-with the Quality gap above in view, along with its scope and the migration for users who installed Quality:
+§4 passed on 2026-11-12. On 2026-11-13 the maintainer confirmed it, with the Quality gap above in
+view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its scope:
 
 - the catalog goes from six artifacts to three, with receipts and the regenerated catalog;
 - the Mac and CLI `--variant` are accepted with a notice and resolve to the hybrid;
@@ -157,7 +173,10 @@ with the Quality gap above in view, along with its scope and the migration for u
 - `config/public-product-facts.json` and the website copy;
 - benchmark baselines reseeded as a new lineage; the Mac gate bench reseeded.
 
-RF-58 (one take variation, Expressive) is independent and lands first.
+The code lands data-driven first: a model that offers one variant shows no Speed/Quality choice, and
+installed folders of a variant the catalog no longer offers are reclaimed once that mode's model
+verifies. The contract swap lands last, after ★ publication, so `main` never names an artifact that is
+not hosted. RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution
 

@@ -46,6 +46,19 @@ class HybridBuildTests(unittest.TestCase):
         self.assertIn('descriptor.huggingFaceRepo.localizedCaseInsensitiveContains("Qwen3-TTS")', profile,
                       "the profile's rule this mirrors")
 
+    def test_a_published_card_names_its_licence_sources_and_recipe(self):
+        card = builder.model_card(
+            "owner", "Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn", "attn", 28, 176_000_000,
+            ("owner/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", "a" * 40),
+            ("owner/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit", "b" * 40))
+        front, body = card.split("---\n")[1], card.split("---\n")[2]
+        self.assertIn("license: apache-2.0", front)
+        self.assertIn("- owner/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit\n- owner/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit", front)
+        self.assertTrue(body.startswith("# owner/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn\n"))
+        for text in ("a" * 40, "b" * 40, "`self_attn.v_proj`", "28 layers", "176 MB", "AudioSeal", "MIT", "nobody listened"):
+            self.assertIn(text, body)
+        self.assertNotIn("Development build", card)
+
     def test_the_recipes_match_the_engines_selector(self):
         source = (ROOT / "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/"
                   "Qwen3StreamingMemoryTuning.swift").read_text()

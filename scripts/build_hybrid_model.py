@@ -11,7 +11,12 @@ integrity record (size and SHA-256) and that record names the contract's reposit
 
 usage:
   build_hybrid_model.py build --recipe attn --out <dir> [--models <installed models dir>] [--modes custom,design,base]
+                              [--publish-as <owner>]
   build_hybrid_model.py self-test
+
+`--publish-as <owner>` writes the model card a published artifact carries, naming `<owner>/<folder>` and
+its two sources; without it the card says the build is a development build. The weights are the same
+either way. Publishing (the upload) is the maintainer's step (RF-59, docs/reference/hybrid-model.md §5).
 """
 from __future__ import annotations
 
@@ -130,7 +135,37 @@ def local_repo(folder: str) -> str:
     return f"local/{folder}"
 
 
-def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) -> dict:
+def model_card(owner: str, folder: str, recipe: str, layers: int, added_bytes: int,
+               four: tuple[str, str], eight: tuple[str, str]) -> str:
+    """The card a published artifact carries: licence, sources at their exact revisions, the recipe and
+    what the screens measured, in the shape of the shipped 8-bit artifacts' cards."""
+    modules = ", ".join(f"`{module}`" for module in RECIPES[recipe])
+    return (
+        "---\nlicense: apache-2.0\ntags:\n- mlx\n- text-to-speech\n- tts\n- vocello\nlibrary_name: mlx-audio\n"
+        f"base_model:\n- {four[0]}\n- {eight[0]}\n---\n"
+        f"# {owner}/{folder}\n\n"
+        "Vocello production artifact: a mixed-precision derivative of Qwen3-TTS (Apache-2.0), assembled tensor\n"
+        "by tensor from two Vocello artifacts of the same MLX conversion, with no requantization:\n\n"
+        f"- every tensor of [`{four[0]}`](https://huggingface.co/{four[0]}) at revision `{four[1]}`\n"
+        "  (affine 4-bit, group size 64);\n"
+        f"- except the talker's {modules} in each of its {layers} layers, taken from\n"
+        f"  [`{eight[0]}`](https://huggingface.co/{eight[0]}) at revision `{eight[1]}` (affine 8-bit,\n"
+        f"  group size 64), {added_bytes / 1e6:.0f} MB more weights.\n\n"
+        "`config.json` names each of those modules under `quantization`. Every other tensor, the code\n"
+        "predictor's included, is the 4-bit artifact's own, and so is every file but this card, `config.json`\n"
+        "and the index: the speech tokenizer, and `marking/`, which holds Meta's AudioSeal generator (MIT\n"
+        "licence), unchanged.\n\n"
+        "Chosen by machine screens recorded before their takes, on a Mac with fixed seeds (nobody listened):\n"
+        "better than the 4-bit model on voice clones, single takes and long-form projects, at about 5% more\n"
+        "generation time; not as good as the all-8-bit model on clone similarity and long-form error rate.\n"
+        "Measurements live in the [Vocello repository](https://github.com/PowerBeef/Vocello)\n"
+        "(`docs/reference/hybrid-model.md`).\n\n"
+        "These files are consumed by Vocello's fail-closed model catalog, which pins this repository at an exact\n"
+        "revision with per-file SHA-256 digests.\n"
+    )
+
+
+def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict, owner: str | None = None) -> dict:
     entry = next(model for model in contract["models"] if model["id"] == CONTRACT_IDS[mode])
     speed = next(variant for variant in entry["variants"] if variant["kind"] == "speed")
     four, eight = models / speed["folder"], models / entry["folder"]
@@ -172,7 +207,12 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) 
     (folder / "config.json").write_text(json.dumps(config, indent=2) + "\n")
     index = {"metadata": {"total_size": total}, "weight_map": {key: "model.safetensors" for key in sorted(sources)}}
     (folder / "model.safetensors.index.json").write_text(json.dumps(index, indent=2) + "\n")
+    added = total - (four / "model.safetensors").stat().st_size + four_start
     (folder / "README.md").write_text(
+        model_card(owner, folder.name, recipe, len({module.split(".")[2] for module in modules}), added,
+                   (speed["huggingFaceRepo"], speed["huggingFaceRevision"]),
+                   (entry["huggingFaceRepo"], entry["huggingFaceRevision"]))
+        if owner else
         f"# Vocello hybrid ({recipe}) — Qwen3-TTS-12Hz-1.7B-{MODES[mode]}\n\n"
         "A derivative of Qwen/Qwen3-TTS (Apache-2.0) made by Vocello: the 4-bit model with the talker's "
         f"{', '.join(RECIPES[recipe])} taken from the 8-bit model of the same conversion. Development build; not published.\n")
@@ -198,7 +238,7 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict) 
     (folder / INTEGRITY).write_text(json.dumps(record, indent=1) + "\n")
     return {"mode": mode, "folder": folder.name, "repo": record["repo"], "revision": revision,
             "bytes": sum(item["size"] for item in files), "selectedModules": len(modules),
-            "weightsBytes": total, "addedWeightBytes": total - (four / "model.safetensors").stat().st_size + four_start}
+            "weightsBytes": total, "addedWeightBytes": added}
 
 
 def development_contract(contract: dict, built: list[dict], out: Path, recipe: str) -> Path:
@@ -222,7 +262,7 @@ def build(args: argparse.Namespace) -> int:
         raise BuildError(f"unknown recipe {args.recipe}")
     out, models = Path(args.out).resolve(), Path(args.models).resolve()
     contract = json.loads(CONTRACT.read_text())
-    built = [build_mode(mode, args.recipe, models, out, contract) for mode in args.modes.split(",")]
+    built = [build_mode(mode, args.recipe, models, out, contract, args.publish_as) for mode in args.modes.split(",")]
     # The installed Quality folders, linked so the development data root still offers them.
     for mode in args.modes.split(","):
         entry = next(model for model in contract["models"] if model["id"] == CONTRACT_IDS[mode])
@@ -282,6 +322,7 @@ def main() -> int:
     run.add_argument("--out", required=True)
     run.add_argument("--models", default=str(DEFAULT_MODELS))
     run.add_argument("--modes", default="custom,design,base")
+    run.add_argument("--publish-as", metavar="OWNER", help="write the published artifact's model card naming OWNER/<folder>")
     commands.add_parser("self-test")
     args = parser.parse_args()
     try:

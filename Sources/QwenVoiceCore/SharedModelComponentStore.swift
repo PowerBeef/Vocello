@@ -1615,18 +1615,21 @@ private enum SharedComponentFileSystem {
 /// hybrid model per mode replaced) as every removal does (RF-28): the folder's download staging
 /// first, whose reuse pins would otherwise keep the blobs the removal releases, then the folder
 /// through `deleteModel`, so shared files another model still lists stay. The caller decides which
-/// folders are retired and safe to remove (`ContractBackedModelRegistry.retiredFoldersToReclaim`),
-/// refuses while another engine may have one loaded, and runs this off the main actor: a removal
-/// can move gigabytes under the publication lock.
+/// folders are retired and safe to remove (`ContractBackedModelRegistry.retiredFoldersToReclaim`)
+/// and runs this off the main actor: a removal can move gigabytes under the publication lock. The
+/// CLI also refuses while the app or another engine runs; the Mac app reads no engine leases until
+/// RF-30.
 public struct RetiredModelReclamation: Equatable, Sendable {
     public let removed: [String]
     /// Folders left for the next pass, each with the error's description.
     public let failed: [String: String]
 
-    /// The retired folders of `models` that may go now: those of a model `isVerified` accepts
-    /// (its current artifact installed and verified, so a user is never left without a model for
-    /// a mode), present as directories under `modelsDirectory` or with a download staged for them
-    /// (a retired download never finished), each once, sorted.
+    /// The retired folders of `models` that may go now: every model's, once `isVerified` accepts
+    /// any one of `models` (its current artifact installed and verified). No current model reads a
+    /// retired folder, and one verified model shows this version is in use with a working model,
+    /// so a mode whose new model is never installed does not keep its old one forever (maintainer
+    /// decision 2026-11-13). Folders present as directories under `modelsDirectory` or with a
+    /// download staged for them (a retired download never finished), each once, sorted.
     static func folders(
         of models: [ModelDescriptor],
         in modelsDirectory: URL,
@@ -1635,16 +1638,14 @@ public struct RetiredModelReclamation: Equatable, Sendable {
         func isDirectory(_ url: URL) -> Bool {
             (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
         }
-        var folders = Set<String>()
-        for model in models where !model.retiredFolders.isEmpty && isVerified(model) {
-            for folder in model.retiredFolders {
-                let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
-                if isDirectory(url) || isDirectory(HuggingFaceDownloader.stagingRoot(forTargetDirectory: url)) {
-                    folders.insert(folder)
-                }
-            }
+        let present = Set(models.flatMap(\.retiredFolders)).filter { folder in
+            let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
+            return isDirectory(url) || isDirectory(HuggingFaceDownloader.stagingRoot(forTargetDirectory: url))
         }
-        return folders.sorted()
+        // Verification only when something is left to free, and lazily: a host that verifies on
+        // demand stops at the first verified model.
+        guard !present.isEmpty, models.contains(where: isVerified) else { return [] }
+        return present.sorted()
     }
 }
 

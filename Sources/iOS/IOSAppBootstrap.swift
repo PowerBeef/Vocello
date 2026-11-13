@@ -185,7 +185,7 @@ extension QVoiceiOSApp {
             rootDirectory: AppPaths.modelsDir,
             storeVersionSeed: modelAssetStoreSeed()
         )
-        // RF-59: the Speed folder a verified hybrid replaced goes, off the launch path.
+        // RF-59: once any hybrid verifies, every retired Speed folder goes, off the launch path.
         Task.detached(priority: .utility) { @concurrent in
             _ = modelAssetStore.reclaimRetiredFolders()
         }

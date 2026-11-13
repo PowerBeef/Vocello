@@ -428,8 +428,8 @@ public struct ModelDescriptor: Identifiable, Hashable, Sendable, Codable {
     public let variants: [ModelVariantDescriptor]
     public let qwen3Capabilities: Qwen3TTSModelCapabilities?
     /// Install folders of artifacts this model replaced (RF-59: the Speed and Quality packages
-    /// the one hybrid model per mode replaced). Once the model's current artifact is installed and
-    /// verified, a host deletes these through `SharedModelComponentStore.reclaimRetiredFolders`
+    /// the one hybrid model per mode replaced). Once any model's current artifact is installed and
+    /// verified, a host deletes every model's through `SharedModelComponentStore.reclaimRetiredFolders`
     /// and nothing else. Absent in older contracts.
     public let retiredFolders: [String]
 

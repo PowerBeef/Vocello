@@ -48,8 +48,8 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
 
     private let otherSHA = String(repeating: "ab", count: 32)
 
-    /// RF-59: the iPhone's launch pass removes a mode's retired folders only once its model passes
-    /// the manifest-and-size check (the depth it uses: contents are the Mac's digest pass); a model
+    /// RF-59: the iPhone's launch pass removes retired folders only once a model passes the
+    /// manifest-and-size check (the depth it uses: contents are the Mac's digest pass); a model
     /// without a manifest, or with a file of the wrong size, keeps them.
     func testTheLaunchReclaimWaitsForTheModelToVerify() throws {
         let retired = "Old-Custom-4bit"
@@ -84,6 +84,38 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: retiredURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertEqual(verified.reclaimRetiredFolders(), none, "nothing left to reclaim")
+    }
+
+    /// RF-59 (maintainer decision 2026-11-13): one verified model frees every mode's retired
+    /// folders, including those of a mode whose new model was never installed.
+    func testOneVerifiedModelFreesEveryModesRetiredFolders() throws {
+        let custom = "Old-Custom-4bit", design = "Old-Design-8bit"
+        for folder in [custom, design] {
+            try FileManager.default.createDirectory(
+                at: root.appendingPathComponent(folder, isDirectory: true), withIntermediateDirectories: true
+            )
+        }
+        let (_, installedDescriptor, _) = try install(
+            bytes: Data("weights".utf8), manifestSHA: otherSHA, retiredFolders: [custom]
+        )
+        let absent = ModelDescriptor(
+            id: "design-absent", name: "design-absent", tier: "speed", folder: "design-absent", mode: .design,
+            huggingFaceRepo: "org/design", artifactVersion: "1", iosDownloadEligible: false,
+            estimatedDownloadBytes: nil, outputSubfolder: "out", requiredRelativePaths: ["weights.bin"],
+            retiredFolders: [design]
+        )
+        let absentDescriptor = ModelAssetDescriptor(
+            model: absent, version: "test",
+            artifacts: [ModelAssetArtifact(relativePath: "weights.bin", scope: .modelSpecific)]
+        )
+        let none = RetiredModelReclamation(removed: [], failed: [:])
+        XCTAssertEqual(LocalModelAssetStore(rootDirectory: root, descriptors: [absentDescriptor]).reclaimRetiredFolders(),
+                       none, "no model verified")
+        let both = LocalModelAssetStore(rootDirectory: root, descriptors: [absentDescriptor, installedDescriptor])
+        XCTAssertEqual(both.reclaimRetiredFolders(), RetiredModelReclamation(removed: [custom, design], failed: [:]))
+        for folder in [custom, design] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(folder).path), folder)
+        }
     }
 
     /// RF-59: a legacy 8-bit folder the contract lists as retired is left for the verified

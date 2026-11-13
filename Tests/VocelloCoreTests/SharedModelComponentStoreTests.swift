@@ -70,7 +70,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
     }
 
     /// RF-59: the contract's retired folders decode, stay out of every current install folder, and
-    /// become reclaimable only once their model's current artifact is verified.
+    /// become reclaimable, every model's, once any model's current artifact is verified.
     func testRetiredFoldersDecodeValidateAndWaitForTheCurrentModel() throws {
         let root = try temporaryDirectory("retired-contract")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -98,8 +98,24 @@ final class SharedModelComponentStoreTests: XCTestCase {
             at: modelsDirectory.appendingPathComponent("Old-Custom-4bit"), withIntermediateDirectories: true
         )
         XCTAssertEqual(retiring.retiredFoldersToReclaim(in: modelsDirectory) { _ in false }, [],
-                       "a model not yet verified keeps its retired folders")
+                       "while no model is verified, every retired folder stays")
         XCTAssertEqual(retiring.retiredFoldersToReclaim(in: modelsDirectory) { $0.id == current.id }, ["Old-Custom-4bit"])
+        let other = try XCTUnwrap(retiring.models.last)
+        XCTAssertNotEqual(other.mode, current.mode)
+        XCTAssertEqual(retiring.retiredFoldersToReclaim(in: modelsDirectory) { $0.id == other.id }, ["Old-Custom-4bit"],
+                       "another mode's verified model frees them too (maintainer decision 2026-11-13)")
+        // Every launch after the cleanup: folders listed, none left on disk, so nothing is verified.
+        let emptyModels = root.appendingPathComponent("empty-models", isDirectory: true)
+        try FileManager.default.createDirectory(at: emptyModels, withIntermediateDirectories: true)
+        for registry in [plain, retiring] {
+            XCTAssertEqual(
+                registry.retiredFoldersToReclaim(in: emptyModels) { _ in
+                    XCTFail("nothing is verified when no retired folder is left")
+                    return true
+                },
+                []
+            )
+        }
         XCTAssertEqual(
             retiring.expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: true).models
                 .filter { $0.mode == current.mode }.map(\.retiredFolders).first,

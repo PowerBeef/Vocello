@@ -30,11 +30,12 @@ session can continue from it alone.
    mode, the hybrid, on both platforms; [hybrid-model.md](reference/hybrid-model.md) §6). The Mac
    install is proven: `vocello models install pro_custom_speed` into a scratch data folder downloaded
    and verified the 14 files in 38 s, reclaimed a seeded retired 4-bit folder and a staged 8-bit
-   download, kept Voice Design's old folder, and a seeded take passed Fast QC v10. The iPhone's
-   download lane waits for the phone. ★ Policy for retired folders of a mode whose new model is never
-   installed (kept today). Never install the hybrid into the canonical models folder casually: once
-   it verifies, the Speed and Quality folders there are reclaimed, and the quality screens and
-   `build_hybrid_model.py` read them.
+   download, and a seeded take passed Fast QC v10. Maintainer decision (November 13): every mode's
+   retired folders go once any mode's model verifies; a rerun on the same folder then removed Voice
+   Design's old folder too. The iPhone's download lane waits for the phone. Never install the hybrid
+   into the canonical models folder casually (`scripts/macos_test.sh models install|ensure` and the
+   Mac app's Download button do): once one model verifies, all six Speed and Quality folders there
+   are reclaimed, and the quality screens and `build_hybrid_model.py` read them.
 2. On a quiet host, lead only: the formal speed lane for `attn` (`scripts/pcm_identity.py`) and the
    Mac gate bench's baseline seeded again (Fast QC v10).
 3. ★ The iPhone's memory and speed for `attn` (a BrowserStack App Automate farm run the maintainer

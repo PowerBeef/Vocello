@@ -475,9 +475,9 @@ enum ModelsCommand {
 
     /// RF-59: the mode's model is in place (a fresh install verified file by file against the
     /// catalog; an existing one complete, with every catalog file at its pinned size, the depth of
-    /// the iPhone's launch check), so the Speed and Quality folders it replaced go, as the apps
-    /// remove them; never while the app or another engine runs, since an older one may still load
-    /// them.
+    /// the iPhone's launch check), so every retired Speed and Quality folder goes, every mode's,
+    /// as the apps remove them; never while the app or another engine runs, since an older one may
+    /// still load them.
     @MainActor
     static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) {
         guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return }

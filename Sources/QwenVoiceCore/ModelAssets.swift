@@ -265,7 +265,7 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                 }
             )
         }
-        // RF-59: a folder some model lists as retired waits for that model's verified install and
+        // RF-59: a folder some model lists as retired waits until any model's install verifies and
         // goes through the shared component store (`RetiredModelReclamation`), never here.
         Self.cleanupLegacyInstallFolders(
             at: rootDirectory,
@@ -500,19 +500,17 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
         )
     }
 
-    /// RF-59: removes the retired folders of every model whose install verifies at `depth`
+    /// RF-59: removes every model's retired folders once any model's install verifies at `depth`
     /// (on the iPhone, at launch: its files were verified against the catalog when downloaded).
-    /// Synchronous and possibly slow: call it off the main actor.
+    /// Checks nothing when no retired folder is left. Synchronous and possibly slow: call it off
+    /// the main actor.
     public func reclaimRetiredFolders(depth: ModelAssetIntegrityDepth = .manifestSizes) -> RetiredModelReclamation {
-        var verified = Set<String>()
-        for descriptor in descriptors where !descriptor.model.retiredFolders.isEmpty {
-            if case .verified = deepIntegrity(for: descriptor, depth: depth) {
-                verified.insert(descriptor.model.id)
-            }
+        let descriptorsByID = Dictionary(descriptors.map { ($0.model.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let folders = RetiredModelReclamation.folders(of: descriptors.map(\.model), in: rootDirectory) { model in
+            guard let descriptor = descriptorsByID[model.id],
+                  case .verified = deepIntegrity(for: descriptor, depth: depth) else { return false }
+            return true
         }
-        let folders = RetiredModelReclamation.folders(
-            of: descriptors.map(\.model), in: rootDirectory, isVerified: { verified.contains($0.id) }
-        )
         guard !folders.isEmpty else { return RetiredModelReclamation(removed: [], failed: [:]) }
         return SharedModelComponentStore(modelsRoot: rootDirectory).reclaimRetiredFolders(folders)
     }

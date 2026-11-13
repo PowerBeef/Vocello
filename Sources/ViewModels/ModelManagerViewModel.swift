@@ -1022,8 +1022,8 @@ final class ModelManagerViewModel {
         applySnapshots(snapshots, startedGenerations: startedGenerations)
     }
 
-    /// RF-59: once a mode's model has verified (the content-digest pass just run), the Speed and
-    /// Quality folders it replaced go through the shared component store. Off the main actor.
+    /// RF-59: once any mode's model has verified (the content-digest pass just run), every retired
+    /// Speed and Quality folder goes through the shared component store. Off the main actor.
     private nonisolated static func reclaimRetiredFolders(
         in modelsDirectory: URL, manifestURL: URL?, snapshots: [ModelInfo]
     ) {

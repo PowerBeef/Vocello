@@ -635,7 +635,7 @@ either may have the model loaded; a package choice that named the removed model 
 installed package of its mode, or back to the recommendation. Its `freedBytes` is the model folder's
 size; shared components another model still links stay. Installs and removals tell a running app
 (`com.qwenvoice.shared.modelsDidChange`). After `install` verifies a model, or finds it already
-installed, the Speed and Quality folders that model replaced (RF-59, its contract `retiredFolders`) are
+installed, every mode's retired Speed and Quality folders (RF-59, the contract's `retiredFolders`) are
 removed as `remove` does, unless the app or another engine runs; a folder that cannot be removed adds a
 `retired_folders_kept` warning and stays for the next install or the app.
 

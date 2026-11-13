@@ -116,9 +116,9 @@ mode (the `speed` variant, on both platforms; [hybrid-model.md](hybrid-model.md)
 bundled iPhone catalog supplies; `config/model-artifact-receipts.json` holds Mac-only receipts and is
 empty. Every artifact pins a revision plus the exact size and SHA-256 of every required file; no hash or
 size is inferred. Each model lists the Speed and Quality folders it replaced as `retiredFolders`: a host
-removes them through the shared component store once the model verifies (the Mac after its digest
-pass, the iPhone at launch, `vocello models install`), and the legacy cleanup leaves them alone until
-then. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
+removes every model's through the shared component store once any model verifies (the Mac after its
+digest pass, the iPhone at launch, `vocello models install`; maintainer decision 2026-11-13), and the
+legacy cleanup leaves them alone until then. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
 all artifacts (the hybrids keep the shipped tokenizer, so installed copies are reused). It gives that component separate content identity (ordered path, size, and
 SHA-256) and compatibility identity (content plus component schema, loader ABI, runtime profile,
 and encoder capability), along with ordered source artifacts. Schema-v1 catalog documents remain

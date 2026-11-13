@@ -185,9 +185,9 @@ public struct ContractBackedModelRegistry: ModelRegistry, Hashable, Sendable {
         )
     }
 
-    /// RF-59: the retired install folders that may be deleted now. A model's `retiredFolders` are
-    /// reclaimable once `isVerified` says the model's current artifact is installed and verified, so
-    /// a user is never left without a model for a mode. `isVerified` must mean verified against
+    /// RF-59: the retired install folders that may be deleted now: every model's `retiredFolders`,
+    /// once `isVerified` says any model's current artifact is installed and verified (no current
+    /// model reads them; maintainer decision 2026-11-13). `isVerified` must mean verified against
     /// the catalog's receipts, not only present. Only folders present under `modelsDirectory`, or
     /// with a download still staged for them, are returned, each once, sorted.
     public func retiredFoldersToReclaim(

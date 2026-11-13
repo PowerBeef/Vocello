@@ -190,9 +190,10 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
   iPhone's preferred variant, the memory-qualification pins, `check_ios_catalog.sh`) keeps holding.
   The receipts live in the bundled iPhone catalog; the production catalog holds three artifacts.
 - **Retired folders.** Each model lists the Speed and Quality folders it replaced. They are removed
-  through the shared component store only once the mode's model verifies: the Mac after its digest
-  pass, the iPhone at launch, `vocello models install` after an install. Until then the legacy cleanup
-  leaves the 8-bit folders alone.
+  through the shared component store, every mode's at once, as soon as any mode's model verifies:
+  the Mac after its digest pass, the iPhone at launch, `vocello models install` after an install. No
+  current model reads them, so a mode whose new model is never installed does not keep its old one
+  (maintainer decision 2026-11-13). Until then the legacy cleanup leaves the 8-bit folders alone.
 - **The selector.** A mode with one model shows no Speed/Quality switch, no "Prefer lower-memory
   models" toggle, and a package row that reads Model. `--variant quality`, `models use … quality` and
   `models prefer-lower-memory` parse, warn `variant_retired` and change nothing.

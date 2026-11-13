@@ -47,6 +47,37 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
 
     private let otherSHA = String(repeating: "ab", count: 32)
 
+    /// RF-59: a legacy 8-bit folder the contract lists as retired is left for the verified
+    /// reclamation; one it does not list is cleaned up when the store opens, as before.
+    func testALegacyFolderListedAsRetiredWaitsForReclamation() throws {
+        let legacy = "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit"
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        func store(retiring: [String]) throws {
+            try FileManager.default.createDirectory(
+                at: root.appendingPathComponent(legacy, isDirectory: true), withIntermediateDirectories: true
+            )
+            var contract = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: source)) as? [String: Any])
+            var models = try XCTUnwrap(contract["models"] as? [[String: Any]])
+            for index in models.indices {
+                // A contract that no longer installs into the legacy folder at all.
+                models[index]["folder"] = "Current-\(index)"
+                models[index]["variants"] = (models[index]["variants"] as? [[String: Any]] ?? [])
+                    .filter { ($0["folder"] as? String) != legacy }
+                models[index]["retiredFolders"] = index == 0 ? retiring : []
+            }
+            contract["models"] = models
+            let url = root.appendingPathComponent("contract-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: contract).write(to: url)
+            let registry = try ContractBackedModelRegistry(manifestURL: url)
+            _ = LocalModelAssetStore(modelRegistry: registry, rootDirectory: root, storeVersionSeed: "test")
+        }
+        try store(retiring: [legacy])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(legacy).path))
+        try store(retiring: [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(legacy).path))
+    }
+
     func testManifestSizesDepthNeverReadsContents() throws {
         let (store, descriptor, _) = try install(bytes: Data("real bytes".utf8), manifestSHA: otherSHA)
         // Same size, wrong content: the shallow depth cannot see it, which proves it did not hash.

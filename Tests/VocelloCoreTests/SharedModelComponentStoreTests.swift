@@ -30,6 +30,105 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(profileChange.satisfies(decoder))
     }
 
+    /// RF-59: a retired package's folder goes through the store: the blob only it listed goes with
+    /// it, the shared file the current model still lists stays linked, and a folder that cannot be
+    /// removed is reported without stopping the others.
+    func testRetiredFoldersAreReclaimedAndSharedFilesTheCurrentModelListsStay() throws {
+        let root = try temporaryDirectory("retired")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let sharedBytes = Data("speech-tokenizer".utf8)
+        let ownBytes = Data("only-the-retired-package".utf8)
+        let shared = try identity(path: "speech_tokenizer/model.safetensors", bytes: sharedBytes)
+        let own = try identity(path: "speech_tokenizer/old-only.bin", bytes: ownBytes)
+        let store = SharedModelComponentStore(modelsRoot: models)
+        for (folder, files) in [("old-4bit", [(shared, sharedBytes), (own, ownBytes)]), ("hybrid", [(shared, sharedBytes)])] {
+            let model = models.appendingPathComponent(folder, isDirectory: true)
+            for (file, bytes) in files {
+                try write(bytes, to: model.appendingPathComponent(file.relativePath))
+            }
+            try write(Data("weights-\(folder)".utf8), to: model.appendingPathComponent("model.safetensors"))
+            let content = try SharedComponentContentIdentity(files: files.map(\.0))
+            let manifest = try SharedComponentInstalledModelManifest(
+                modelIdentity: folder, contentIdentity: content,
+                compatibilityIdentity: try compatibility(content: content, capability: .encoderAndDecoder)
+            )
+            _ = try store.migrate(try SharedComponentMigrationPlan(modelFolder: folder, manifest: manifest)) { _ in }
+        }
+        let ownBlob = try store.blobURL(for: own.sha256)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: ownBlob.path))
+
+        let result = store.reclaimRetiredFolders(["../escape", "old-4bit"])
+        XCTAssertEqual(result.removed, ["old-4bit"], "the failure listed first stops nothing")
+        XCTAssertEqual(Array(result.failed.keys), ["../escape"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: models.appendingPathComponent("old-4bit").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ownBlob.path), "the store released its own blob")
+        let kept = models.appendingPathComponent("hybrid/\(shared.relativePath)")
+        XCTAssertEqual(try Data(contentsOf: kept), sharedBytes)
+        XCTAssertTrue(try sameFile(try store.blobURL(for: shared.sha256), kept))
+        XCTAssertEqual(try store.audit(modelFolder: "hybrid").state, .healthy)
+    }
+
+    /// RF-59: the contract's retired folders decode, stay out of every current install folder, and
+    /// become reclaimable only once their model's current artifact is verified.
+    func testRetiredFoldersDecodeValidateAndWaitForTheCurrentModel() throws {
+        let root = try temporaryDirectory("retired-contract")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        func registry(_ edit: (inout [[String: Any]]) -> Void) throws -> ContractBackedModelRegistry {
+            var contract = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: source)) as? [String: Any])
+            var models = try XCTUnwrap(contract["models"] as? [[String: Any]])
+            for index in models.indices { models[index].removeValue(forKey: "retiredFolders") }
+            edit(&models)
+            contract["models"] = models
+            let url = root.appendingPathComponent("contract-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: contract).write(to: url)
+            return try ContractBackedModelRegistry(manifestURL: url)
+        }
+
+        let plain = try registry { _ in }
+        XCTAssertTrue(plain.models.allSatisfy(\.retiredFolders.isEmpty), "absent in an older contract")
+
+        let retiring = try registry { models in models[0]["retiredFolders"] = ["Old-Custom-4bit"] }
+        let current = try XCTUnwrap(retiring.models.first)
+        XCTAssertEqual(current.retiredFolders, ["Old-Custom-4bit"])
+        let modelsDirectory = root.appendingPathComponent("models", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: modelsDirectory.appendingPathComponent("Old-Custom-4bit"), withIntermediateDirectories: true
+        )
+        XCTAssertEqual(retiring.retiredFoldersToReclaim(in: modelsDirectory) { _ in false }, [],
+                       "a model not yet verified keeps its retired folders")
+        XCTAssertEqual(retiring.retiredFoldersToReclaim(in: modelsDirectory) { $0.id == current.id }, ["Old-Custom-4bit"])
+        XCTAssertEqual(
+            retiring.expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: true).models
+                .filter { $0.mode == current.mode }.map(\.retiredFolders).first,
+            ["Old-Custom-4bit"], "a resolved descriptor keeps them"
+        )
+
+        for bad in ["../models", "nested/folder", ".hidden", "", "with space", "Modèle"] {
+            XCTAssertThrowsError(try registry { models in models[0]["retiredFolders"] = [bad] }, bad)
+        }
+        let currentFolder = try XCTUnwrap(plain.models.first?.folder)
+        let variantFolder = try XCTUnwrap(plain.models.dropFirst().first?.variants.first?.folder)
+        for current in [currentFolder, currentFolder.lowercased(), variantFolder, variantFolder.uppercased()] {
+            XCTAssertThrowsError(try registry { models in models[2]["retiredFolders"] = [current] },
+                                 "a current model or variant folder is never retired, in any case: \(current)")
+        }
+
+        // Only directories present on disk are returned.
+        let presence = try registry { models in models[0]["retiredFolders"] = ["Old-Present", "Old-Absent", "Old-File"] }
+        try FileManager.default.createDirectory(
+            at: modelsDirectory.appendingPathComponent("Old-Present"), withIntermediateDirectories: true
+        )
+        try Data().write(to: modelsDirectory.appendingPathComponent("Old-File"))
+        XCTAssertEqual(presence.retiredFoldersToReclaim(in: modelsDirectory) { _ in true }, ["Old-Present"])
+        XCTAssertThrowsError(try registry { models in
+            models[0]["retiredFolders"] = ["Twice"]
+            models[1]["retiredFolders"] = ["twice"]
+        }, "listed twice, whatever the case")
+    }
+
     func testIdentityValidationRejectsTraversalDuplicateAndTamperedDigest() throws {
         XCTAssertThrowsError(try SharedComponentFileIdentity(
             relativePath: "../weights.bin",

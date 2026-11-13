@@ -265,9 +265,12 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                 }
             )
         }
+        // RF-59: a folder some model lists as retired waits for that model's verified install and
+        // goes through the shared component store (`RetiredModelReclamation`), never here.
         Self.cleanupLegacyInstallFolders(
             at: rootDirectory,
             activeInstallFolders: Set(descriptors.map(\.installFolder))
+                .union(modelRegistry.models.flatMap(\.retiredFolders))
         )
     }
 

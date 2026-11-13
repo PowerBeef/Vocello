@@ -1313,6 +1313,14 @@ public actor SharedModelComponentStoreCoordinator {
     }
 }
 
+/// The one rule for a model install folder's name, shared by the store's removals and the
+/// contract's retired folders (RF-59), so a name the contract accepts is one `deleteModel` accepts.
+enum ModelInstallFolderName {
+    static func isSafe(_ value: String) -> Bool {
+        SharedComponentIdentityValidation.isSafeFolder(value)
+    }
+}
+
 private enum SharedComponentIdentityValidation {
     static func isSHA256(_ value: String) -> Bool {
         value.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
@@ -1600,5 +1608,43 @@ private enum SharedComponentFileSystem {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         return try encoder.encode(value)
+    }
+}
+
+/// RF-59: removing the install folders of retired artifacts (the Speed and Quality packages one
+/// hybrid model per mode replaced) as every removal does (RF-28): the folder's download staging
+/// first, whose reuse pins would otherwise keep the blobs the removal releases, then the folder
+/// through `deleteModel`, so shared files another model still lists stay. The caller decides which
+/// folders are retired and safe to remove (`ContractBackedModelRegistry.retiredFoldersToReclaim`),
+/// refuses while another engine may have one loaded, and runs this off the main actor: a removal
+/// can move gigabytes under the publication lock.
+public struct RetiredModelReclamation: Equatable, Sendable {
+    public let removed: [String]
+    /// Folders left for the next pass, each with the error's description.
+    public let failed: [String: String]
+}
+
+extension SharedModelComponentStore {
+    /// Deletes each of `folders`; a folder that fails stays for the next pass and never stops the
+    /// others.
+    public func reclaimRetiredFolders(_ folders: [String]) -> RetiredModelReclamation {
+        var removed: [String] = []
+        var failed: [String: String] = [:]
+        for folder in folders {
+            guard ModelInstallFolderName.isSafe(folder) else {
+                failed[folder] = "not a model install folder name"
+                continue
+            }
+            HuggingFaceDownloader.discardStaging(
+                forTargetDirectory: storeRoot.appendingPathComponent(folder, isDirectory: true)
+            )
+            do {
+                try deleteModel(modelFolder: folder)
+                removed.append(folder)
+            } catch {
+                failed[folder] = String(describing: error)
+            }
+        }
+        return RetiredModelReclamation(removed: removed, failed: failed)
     }
 }

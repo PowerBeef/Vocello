@@ -185,6 +185,27 @@ public struct ContractBackedModelRegistry: ModelRegistry, Hashable, Sendable {
         )
     }
 
+    /// RF-59: the retired install folders that may be deleted now. A model's `retiredFolders` are
+    /// reclaimable once `isVerified` says the model's current artifact is installed and verified, so
+    /// a user is never left without a model for a mode. `isVerified` must mean verified against
+    /// the catalog's receipts, not only present. Only directories present under `modelsDirectory`
+    /// are returned, each once, sorted.
+    public func retiredFoldersToReclaim(
+        in modelsDirectory: URL,
+        isVerified: (ModelDescriptor) -> Bool
+    ) -> [String] {
+        var folders = Set<String>()
+        for model in models where !model.retiredFolders.isEmpty && isVerified(model) {
+            for folder in model.retiredFolders {
+                let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
+                if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                    folders.insert(folder)
+                }
+            }
+        }
+        return folders.sorted()
+    }
+
     /// Lists required model files that the manifest declares but cannot be
     /// found under the supplied root. Callers use this to surface missing
     /// assets at app launch instead of discovering the gap deep inside a
@@ -231,6 +252,29 @@ public struct ContractBackedModelRegistry: ModelRegistry, Hashable, Sendable {
 
         for model in manifest.models {
             try validate(model: model, context: model.id)
+        }
+        try validateRetiredFolders(manifest.models)
+    }
+
+    /// RF-59: a retired folder is a name the store's removal accepts (`ModelInstallFolderName`),
+    /// listed once, and never a folder any model or variant of this contract installs into, so its
+    /// reclamation can only remove what the contract no longer ships. Names compare without case,
+    /// as the Mac's volume does.
+    private static func validateRetiredFolders(_ models: [ModelDescriptor]) throws {
+        let current = Set(models.flatMap { model in [model.folder] + model.variants.map(\.folder) }.map { $0.lowercased() })
+        var seen = Set<String>()
+        for model in models {
+            for folder in model.retiredFolders {
+                guard ModelInstallFolderName.isSafe(folder) else {
+                    throw Error.invalidModel(id: model.id, reason: "retired folder '\(folder)' is not a model install folder name")
+                }
+                guard seen.insert(folder.lowercased()).inserted else {
+                    throw Error.invalidModel(id: model.id, reason: "retired folder '\(folder)' is listed twice")
+                }
+                guard !current.contains(folder.lowercased()) else {
+                    throw Error.invalidModel(id: model.id, reason: "retired folder '\(folder)' is a current install folder")
+                }
+            }
         }
     }
 

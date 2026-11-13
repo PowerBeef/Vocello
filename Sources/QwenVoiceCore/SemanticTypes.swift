@@ -427,6 +427,11 @@ public struct ModelDescriptor: Identifiable, Hashable, Sendable, Codable {
     public let requiredRelativePaths: [String]
     public let variants: [ModelVariantDescriptor]
     public let qwen3Capabilities: Qwen3TTSModelCapabilities?
+    /// Install folders of artifacts this model replaced (RF-59: the Speed and Quality packages
+    /// the one hybrid model per mode replaced). Once the model's current artifact is installed and
+    /// verified, a host deletes these through `SharedModelComponentStore.reclaimRetiredFolders`
+    /// and nothing else. Absent in older contracts.
+    public let retiredFolders: [String]
 
     public init(
         id: String,
@@ -442,7 +447,8 @@ public struct ModelDescriptor: Identifiable, Hashable, Sendable, Codable {
         outputSubfolder: String,
         requiredRelativePaths: [String],
         variants: [ModelVariantDescriptor] = [],
-        qwen3Capabilities: Qwen3TTSModelCapabilities? = nil
+        qwen3Capabilities: Qwen3TTSModelCapabilities? = nil,
+        retiredFolders: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -458,6 +464,34 @@ public struct ModelDescriptor: Identifiable, Hashable, Sendable, Codable {
         self.requiredRelativePaths = requiredRelativePaths
         self.variants = variants
         self.qwen3Capabilities = qwen3Capabilities
+        self.retiredFolders = retiredFolders
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, tier, folder, mode, huggingFaceRepo, huggingFaceRevision, artifactVersion
+        case iosDownloadEligible, estimatedDownloadBytes, outputSubfolder, requiredRelativePaths
+        case variants, qwen3Capabilities, retiredFolders
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(String.self, forKey: .id),
+            name: try values.decode(String.self, forKey: .name),
+            tier: try values.decode(String.self, forKey: .tier),
+            folder: try values.decode(String.self, forKey: .folder),
+            mode: try values.decode(GenerationMode.self, forKey: .mode),
+            huggingFaceRepo: try values.decode(String.self, forKey: .huggingFaceRepo),
+            huggingFaceRevision: try values.decodeIfPresent(String.self, forKey: .huggingFaceRevision),
+            artifactVersion: try values.decode(String.self, forKey: .artifactVersion),
+            iosDownloadEligible: try values.decode(Bool.self, forKey: .iosDownloadEligible),
+            estimatedDownloadBytes: try values.decodeIfPresent(Int64.self, forKey: .estimatedDownloadBytes),
+            outputSubfolder: try values.decode(String.self, forKey: .outputSubfolder),
+            requiredRelativePaths: try values.decode([String].self, forKey: .requiredRelativePaths),
+            variants: try values.decode([ModelVariantDescriptor].self, forKey: .variants),
+            qwen3Capabilities: try values.decodeIfPresent(Qwen3TTSModelCapabilities.self, forKey: .qwen3Capabilities),
+            retiredFolders: try values.decodeIfPresent([String].self, forKey: .retiredFolders) ?? []
+        )
     }
 
     public func installDirectory(in modelsDirectory: URL) -> URL {
@@ -541,7 +575,8 @@ public struct ModelDescriptor: Identifiable, Hashable, Sendable, Codable {
             outputSubfolder: outputSubfolder,
             requiredRelativePaths: variant.requiredRelativePaths,
             variants: variants,
-            qwen3Capabilities: variant.qwen3Capabilities ?? qwen3Capabilities
+            qwen3Capabilities: variant.qwen3Capabilities ?? qwen3Capabilities,
+            retiredFolders: retiredFolders
         )
     }
 }

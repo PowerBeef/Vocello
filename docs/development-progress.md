@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-11
+reviewed: 2026-11-13
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,68 +17,85 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 11–12: quality remediation under way (resume here)
+### November 11–13: the quality remediation's decisions, and one hybrid model (resume here)
 
-The remediation the maintainer asked for on November 11 (RF-50 to RF-57). Nothing is pushed: `main`
-is ahead of `origin/main` (`f4edb60a`) by every commit named here, and a push needs the maintainer's
+The remediation the maintainer asked for on November 11 (RF-50 to RF-60). Nothing is pushed: `main`
+is ahead of `origin/main` (`f4edb60a`) by every commit since then, and a push needs the maintainer's
 word. The phone is not available, so everything ran on the Mac. This entry is written so another
 session can continue from it alone.
 
+**Next, in order**
+
+1. RF-59's code. The three artifacts are published (revisions in
+   [hybrid-model.md](reference/hybrid-model.md) §5). Next: the receipts
+   (`config/model-artifact-receipts.json`, from the build's integrity records), the catalog rebuild,
+   then a model with one variant shows no selector, installed Speed and Quality folders are reclaimed
+   once a mode's hybrid verifies, `--variant` is accepted with a notice, and the contract swap last.
+2. On a quiet host, lead only: the formal speed lane for `attn` (`scripts/pcm_identity.py`) and the
+   Mac gate bench's baseline seeded again (Fast QC v10).
+3. ★ The iPhone's memory and speed for `attn` (a BrowserStack App Automate farm run the maintainer
+   runs, or an announced phone window), with the queued phone checks of RF-51, RF-52 (a punctuated
+   enrollment), RF-58 and RF-60.
+4. ★ One Mac enrollment with recognition (G-15): Speech is not allowed for the agent's shell, so the
+   maintainer runs `build/vocello voices enroll … --transcribe always` once; the transcript should
+   carry punctuation, its coverage stay whole on a complete clip and its confidence near the same
+   clip's unpunctuated one (nothing shows how Speech times punctuation in its segments).
+
 **Done**
 
-- **RF-56 (closed):** document corrections.
-- **RF-51 (code complete; phone checks left):** `b876e29d`, `b308c609`, `a5bf4add` (audio-only
-  honoured, transcript coverage, one reference check, preparation version in the fingerprint).
-- **RF-57 (done):** the repeated suites are clean apart from one environmental failure (BKL-72).
+- **RF-56 (closed):** document corrections. **RF-57 (done):** the repeated suites are clean apart
+  from one environmental failure (BKL-72).
+- **RF-51 (code complete; phone checks left):** `b876e29d`, `b308c609`, `a5bf4add`.
 - **RF-50:** the encoder golden-codes pin and the paired screen `scripts/quality_screen.py`
-  ([qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples)). Screens: `clone`
-  (192 takes, six languages), `clone-stereo`, `clone-long` (four-sentence takes) and `long-form`
-  (projects of twenty sentences that span segments; Built-in Voice in English, French and Japanese,
-  Voice Design in English; Expressive and Consistent). The tool bounds per-take edit rates at 1 and
-  tests a decoder-only change by the talker's own code count (`requiresSameCodeCount`).
-- **RF-53:** Fast QC v9 (`278a11d7`) refuses a take far too short for its script; v10 (`654c921e`)
-  judges silent runs before the publication watermark, which split them on every clone-screen take
-  (611 ms of trailing silence read as 38 ms); a streamed take with 3 s of trailing silence stops as
-  the terminal-silence rejection instead of running to the frame cap. The Mac gate bench's baseline
-  binds the QC version and must be seeded again (a measured lane on a quiet host) before its next use.
+  ([qc.md](reference/qc.md#paired-screens-for-a-change-that-alters-samples)). Screens: `clone`,
+  `clone-stereo`, `clone-long`, `clone-cjk`, `clone-english` (64 LibriTTS-R references), `long-form`
+  (version 2, Expressive only), `single` (Built-in Voice and Voice Design single takes) and
+  `custom-short` (short Built-in Voice scripts in six Latin languages). An arm may run another
+  installed variant (`--variant`), a built model (`--models-root`, `--manifest`) or another transcript
+  form (`--transcript-form`).
+- **RF-53 (closed):** Fast QC v9 (`278a11d7`) and v10 (`654c921e`); D1 and D6 decided. The Mac gate
+  bench's baseline binds the QC version and must be seeded again (a measured lane on a quiet host)
+  before its next use.
+- **RF-58 (code complete; phone lanes left):** the Variation setting is retired and every take samples
+  as Expressive (`0e248d2c`); fixed-seed Expressive takes are PCM-identical before and after.
+- **RF-60 (code complete; the iPhone view left):** a long-form script that Auto sends as Korean gets a
+  caution on both apps and a `long_form_korean` CLI warning (`a3311c09`).
 
-**Decisions, each by a rule recorded before its arms** (`config/quality-screens.json`; arms under
-`build/artifacts/macos/quality-screen/`)
+**Decisions, each by a rule recorded before its arms** (`config/quality-screens.json`, which holds
+every number; arms under `build/artifacts/macos/quality-screen/`)
 
 | Change | Rule | Verdict | Default |
 |---|---|---|---|
-| Reproducible reference preparation (version 2) | `reference-preparation-v2` | ADOPT | `a715b2ae` |
-| Two channels averaged, as upstream (version 3) | `reference-mixdown-average` | ADOPT | `fffcc709` |
+| Reproducible reference preparation (v2), two channels averaged (v3) | `reference-preparation-v2`, `reference-mixdown-average` | ADOPT, ADOPT | `a715b2ae`, `fffcc709` |
 | Encoder split-half rotary (A-02) | `encoder-rotary-split-half` | INCONCLUSIVE | stays adjacent |
 | Reference encoded unpadded (A-12) | `reference-padding-none` | ADOPT | `a144a489` |
-| Decoder 72-frame window (A-03, RF-54) | `decoder-window-72` | INCONCLUSIVE (one runaway transcription, the screen's own trailing-silence floor) | stays unwindowed |
-| Streamed clones primed with the reference (A-04) | `clone-decoder-history-primed` then `-confirm` | first INCONCLUSIVE on a length proxy, then ADOPT: speaker similarity +0.056 | `1a308d7e` |
+| Decoder 72-frame window (A-03, RF-54) | `decoder-window-72` | INCONCLUSIVE | stays unwindowed |
+| Streamed clones primed with the reference (A-04), primed state kept per prompt (A-26) | `clone-decoder-history-primed-confirm` | ADOPT (similarity +0.056) | `1a308d7e`, `321d6c77` |
+| No space before a Han or kana clone target (A-11) | `icl-target-space-unspaced-scripts` | ADOPT | `0b7465a2` |
+| A transcript-backed reference's edges trimmed and faded (G-07) | `reference-edges-trimmed` | ADOPT | `9db958fd` |
+| Full-text conditioning for long-form segments (D1) | `long-form-full-text`, `long-form-korean-full-text` | INCONCLUSIVE, then REJECT for Korean | off |
+| Japanese, East Asian and Han/kana segment budgets | `long-form-*-budget`, `long-form-han-kana-budget-confirm` | INCONCLUSIVE each (the confirmation: sign test p = 0.26 on 64 paired projects) | 300, closed |
+| 8-bit code predictor (RF-55) | `code-predictor-8bit`, `long-form-korean-code-predictor-8bit` | NOT REPEATED, NOT SHOWN | 4-bit |
+| The hybrid `attn` against Speed and Quality (RF-55) | `hybrid-attn-*`, `hybrid-single-model` | ADOPT on every rule; the single-model choice is `attn` | RF-59 |
+| Built-in Voice falls back to Auto when it cannot detect a language (D6) | `custom-auto-fallback` | INCONCLUSIVE (7 undetected takes of 192, the rule needs 24) | English, closed |
+| Enrollment transcripts keep their punctuation (G-15) | `transcript-punctuation` | ADOPT (neutral within every margin) | enrollment asks for punctuation; verification unchanged |
 
-Each adopted default reproduces its screened arm take for take (the last: `kd` against `kb`, 191 of
-191). Every saved voice's prompt rebuilds once on first use after these commits.
+Each adopted default reproduces its screened arm take for take. Every saved voice's prompt rebuilds
+once on first use after these commits. Consistent long-form segments sampled as Balanced
+(`5a7bddce`, `long-form-consistent-talker` ADOPT) until RF-58 retired the variation the same day.
 
-**In flight:** the `long-form` screen at `47614b4f`: arms `fa`, `fs` (floor) and `fb1`, `fb2` with
-`QWENVOICE_FULL_TEXT_CONDITIONING=on` are generated; scoring and the rule `long-form-full-text`
-(D1) follow. Found while generating: long-form projects fail Fast QC far more often under
-Consistent (18 of 32 refused across both seed sets, against 4 of 32 under Expressive) and in
-Japanese (12 of 16 refused; ~70 s segments, 2.2-2.9 s silent gaps, `speaking_rate_slow`). Full
-text did not change that (24 of 32 against 23).
+**The hybrid model (RF-55 decided, RF-59 open).** `attn` (the talker's attention at 8 bits, +176 MB,
+about 5% slower) beats Speed everywhere and does not match Quality (clone similarity −0.026,
+long-form error rate about twice Quality's; 65 of 72 long-form projects against Speed's 56 and
+Quality's 68). On November 13 the maintainer decided that it replaces both Speed and Quality, and that
+Korean long-form (6 of 12 projects) is documented and warned about up front (RF-60). Its guide is
+[hybrid-model.md](reference/hybrid-model.md). At the maintainer's request the three artifacts were
+published the same day from the publication build (`--publish-as`, weights identical to the screened
+build); every published file matches it.
 
-**Next, in order (each sample-changing step: a knob, a rule recorded first, then the screen)**
-
-1. Read the D1 verdict and record it; then screen the long-form failures: Japanese segment
-   planning (its segments overshoot the ~60 s delivery envelope), and Consistent's long-form
-   sampling (talker 0.7 / top-p 0.9). October's shorter-segment arm (budget 200) made Consistent
-   worse, so do not repeat it as such.
-2. RF-55: a diagnostic load-time key that takes the code predictor's weights from the installed,
-   verified 8-bit sibling of the same model (no new artifact on disk); measure its speed, then
-   screen its similarity gain. Publishing an artifact is the maintainer's.
-3. RF-52's rest: A-26 (cache the primed decoder state per prompt), G-07, A-11, G-15. RF-53's D6.
-4. Re-seed the Mac gate bench baseline on a quiet host (Fast QC v10).
-
-**Standing limits:** nobody listens; a pin move, a model artifact and any push or tag need the
-maintainer's specific word; device checks queue for an announced phone window (RF-51's note lists
-them); at most four agents, and none during a measured run.
+**Standing limits:** nobody listens; a pin move, a model artifact, its publication and any push or tag
+need the maintainer's specific word; device checks queue for an announced phone window (RF-51's note
+lists them); at most four agents, and none during a measured run.
 
 ### November 11: the overhaul measured on the iPhone 17 Pro
 

@@ -150,6 +150,15 @@ The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is stil
    ```
 
    Publication gives each a 40-character Hugging Face revision (`hf models info <repo>`).
+
+   **Published 2026-11-13** at the maintainer's request, public, each repository's 14 files equal to
+   the local build (sizes and SHA-256; the small files by Git blob id):
+
+   | Mode | Repository | Revision |
+   |---|---|---|
+   | Built-in Voice | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn` | `c36e22eddb74ed1ae3c9f054b961b1173f7c093f` |
+   | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn` | `6bcae41e75db1312816efae9792661a7e70ba75e` |
+   | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn` | `5af70b5c61199b060152d80f5b232d7aa1da9618` |
 2. **Receipts:** each file's exact size and SHA-256 at that revision in
    `config/model-artifact-receipts.json` (and the iPhone catalog for the iPhone's artifacts), then
    `python3 scripts/model_catalog_contract.py rebuild` and `validate --require-complete`. The speech

@@ -101,7 +101,7 @@ private final class IOSControlAuditRecorder {
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
         "saved-voice-rows", "history-surface", "history-unqueued", "startup-recovery", "history-rows",
         "settings-preferences", "settings-leftover-audio",
-        "settings-links", "model-rows", "player-controls", "recording-controls",
+        "settings-links", "model-rows", "model-update-prompt", "player-controls", "recording-controls",
         "attribution-controls", "onboarding-controls", "sheet-navigation",
     ]
 

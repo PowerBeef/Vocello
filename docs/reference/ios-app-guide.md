@@ -457,6 +457,19 @@ comes from `qwenvoice_ios_model_catalog.json`.
 | Incomplete | `iosModelRepair_<id>` ("Repair") plus `iosModelDelete_<id>` ("Remove") | Repair revalidates the incomplete package; Remove discards it through the named confirmation |
 | Installed | `iosModelStatus_<id>` ("Ready") plus `iosModelDelete_<id>` ("Remove") | Ready to generate; removal is visible without opening an overflow menu |
 | Update available | `iosModelUpdate_<id>` ("Update") plus `iosModelDelete_<id>` ("Remove") | Installed and still usable, but the pinned catalog identity moved on; Update re-downloads the changed files through the authenticated delivery path |
+| Update required (RF-59) | `iosModelUpdate_<id>` ("Update") | An earlier Vocello installed this mode's model, which this build replaces; nothing usable is installed, so the mode cannot generate. Update asks first ("Update [mode]?") |
+
+**Model update after an app update (RF-59).** When an earlier build's models are on the phone, the
+first launch asks once for all of them (`iosModelUpdatePromptConfirm` / `iosModelUpdatePromptLater`):
+the reason, the total size and the allowed networks (RF-41). Update records the consent for exactly
+those artifacts and queues every model; later launches resume without asking, never under Low Data
+Mode, and never a model the user cancelled or postponed with Later (it stays "Update required" until
+Update, and no launch asks again) or one whose download failed (Retry). The consent is cleared once
+nothing is left to update, so a later set of models asks again. On a
+phone without the space to keep the earlier models meanwhile, the alert says they are removed first
+(their shared blobs pinned, so the tokenizer is still reused). A banner above every tab counts the
+models ready (`iosModelUpdateBanner`), then notes the space the earlier models freed
+(`iosModelUpdateBanner_done`, dismissed with a tap). Studio's install button reads "Update [mode]".
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession.
@@ -685,8 +698,10 @@ in-session Studio mode, and the Studio selector changes the composer in place.
 - Full smoke and the benchmark never install or delete models: they visibly assert that Custom,
   Design and Clone Speed are Ready before generating. Three routes change model state (§3):
   `scripts/ui_test.sh ios model-download`, the isolated lifecycle proof and the only one that
-  cancels and removes; `smoke --scenario update-models`, which on explicit request taps each
-  installed model's Update and waits for Ready; and the candidate `first-launch` row
+  cancels and removes; `smoke --scenario update-models`, which on explicit request accepts the
+  RF-59 model update prompt that follows an update from an earlier Vocello (or else taps each
+  installed model's Update) and waits for the updated models to read Ready; and the candidate
+  `first-launch` row
   (`smoke --preinstalled-candidate ... --scenario first-launch`), which installs the missing
   shipping models on a fresh install.
 - They use a prepared non-PII benchmark clone voice and enable the persistent

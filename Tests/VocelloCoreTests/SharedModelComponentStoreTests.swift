@@ -30,6 +30,44 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(profileChange.satisfies(decoder))
     }
 
+    /// RF-59: on a nearly full iPhone the earlier models go before a new one is installed; the update
+    /// pins keep the shared blobs they held, so the new model still reuses them, until released.
+    func testUpdatePinsKeepSharedBlobsThroughAnEarlyRemovalUntilReleased() throws {
+        let root = try temporaryDirectory("update-pins")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let sharedBytes = Data("speech-tokenizer".utf8)
+        let shared = try identity(path: "speech_tokenizer/model.safetensors", bytes: sharedBytes)
+        let store = SharedModelComponentStore(modelsRoot: models)
+        let model = models.appendingPathComponent("old-4bit", isDirectory: true)
+        try write(sharedBytes, to: model.appendingPathComponent(shared.relativePath))
+        try write(Data("weights".utf8), to: model.appendingPathComponent("model.safetensors"))
+        let content = try SharedComponentContentIdentity(files: [shared])
+        let manifest = try SharedComponentInstalledModelManifest(
+            modelIdentity: "old-4bit", contentIdentity: content,
+            compatibilityIdentity: try compatibility(content: content, capability: .encoderAndDecoder)
+        )
+        _ = try store.migrate(try SharedComponentMigrationPlan(modelFolder: "old-4bit", manifest: manifest)) { _ in }
+        let blob = try store.blobURL(for: shared.sha256)
+
+        XCTAssertEqual(store.pinSharedComponents(ofModelFolders: ["old-4bit", "absent"]), 1)
+        // Every file the folder holds alone: all of them but the shared file, which the store links.
+        let ownBytes = try FileManager.default.subpathsOfDirectory(atPath: model.path)
+            .filter { $0 != shared.relativePath }
+            .map { model.appendingPathComponent($0) }
+            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+            .reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
+        let result = store.reclaimRetiredFolders(["old-4bit"])
+        XCTAssertEqual(result.removed, ["old-4bit"])
+        XCTAssertEqual(result.freedBytes, ownBytes, "a file another link holds frees nothing")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path), "the pin keeps the blob through the removal")
+        XCTAssertTrue(try store.containsVerified(content), "a new model still reuses it")
+
+        store.releaseUpdatePins()
+        _ = try store.reclaimUnreferencedComponents(gracePeriod: 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path), "released, nothing holds it")
+    }
+
     /// RF-59: a retired package's folder goes through the store: the blob only it listed goes with
     /// it, the shared file the current model still lists stays linked, and a folder that cannot be
     /// removed is reported without stopping the others.

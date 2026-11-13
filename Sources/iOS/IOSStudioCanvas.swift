@@ -40,6 +40,8 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     let canGenerate: Bool
     let modelInstalled: Bool
     let modelDisplayName: String
+    /// RF-59: the install button reads "Update" for an earlier Vocello's model.
+    let modelNeedsUpdate: Bool
     let setupChips: SetupChips
     let onGenerate: () -> Void
     let onCancel: () -> Void
@@ -66,6 +68,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         canGenerate: Bool,
         modelInstalled: Bool,
         modelDisplayName: String,
+        modelNeedsUpdate: Bool = false,
         @ViewBuilder setupChips: () -> SetupChips,
         onGenerate: @escaping () -> Void,
         onCancel: @escaping () -> Void,
@@ -86,6 +89,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.canGenerate = canGenerate
         self.modelInstalled = modelInstalled
         self.modelDisplayName = modelDisplayName
+        self.modelNeedsUpdate = modelNeedsUpdate
         self.setupChips = setupChips()
         self.onGenerate = onGenerate
         self.onCancel = onCancel
@@ -382,8 +386,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var installCTA: some View {
         IOSPrimaryCTAButton(
-            title: IOSInterfaceText.installModel(modelDisplayName),
-            symbol: "arrow.down.circle.fill",
+            title: modelNeedsUpdate
+                ? IOSInterfaceText.updateModel(modelDisplayName)
+                : IOSInterfaceText.installModel(modelDisplayName),
+            symbol: modelNeedsUpdate ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.down.circle.fill",
             tint: tint,
             isEnabled: true,
             action: onInstallModel

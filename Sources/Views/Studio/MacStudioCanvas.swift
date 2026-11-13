@@ -106,6 +106,8 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let canGenerate: Bool
     let canRunBatch: Bool
     let modelInstalled: Bool
+    /// RF-59: the mode's model needs its update (or is updating): the install button says so.
+    let modelUpdate: ModelManagerViewModel.StudioModelUpdate?
     let setupChips: SetupChips
     /// Rows under the chip row (custom tone field, hints, warnings). Empty on
     /// a ready Built-in Voice screen, which is why that screen renders exactly
@@ -136,6 +138,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         canRunBatch: Bool,
         lineByLine: Binding<Bool>,
         modelInstalled: Bool,
+        modelUpdate: ModelManagerViewModel.StudioModelUpdate? = nil,
         @ViewBuilder setupChips: () -> SetupChips,
         @ViewBuilder footer: () -> Footer,
         onGenerate: @escaping () -> Void,
@@ -156,6 +159,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         self.canGenerate = canGenerate
         self.canRunBatch = canRunBatch
         self.modelInstalled = modelInstalled
+        self.modelUpdate = modelUpdate
         self.setupChips = setupChips()
         self.footer = footer()
         self.onGenerate = onGenerate
@@ -416,13 +420,28 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
     private var installCTA: some View {
         MacPrimaryCTAButton(
-            title: MacInterfaceText.shellModelMissingHint,
-            symbol: "arrow.down.circle.fill",
+            title: installCTATitle,
+            symbol: modelUpdate == nil ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath.circle.fill",
             tint: tint,
             size: .dock,
             action: onInstallModel
         )
         .accessibilityIdentifier("textInput_installModelButton")
+    }
+
+    private var installCTATitle: String {
+        switch modelUpdate {
+        case nil:
+            return MacInterfaceText.shellModelMissingHint
+        case .required:
+            return MacInterfaceText.studioUpdateInSettings
+        case .updating(fraction: nil):
+            return MacInterfaceText.readinessUpdatingModel
+        case .updating(let fraction?):
+            return MacInterfaceText.studioUpdatingModel(
+                fraction.formatted(.percent.precision(.fractionLength(0)).locale(MacInterfaceLanguage.current.locale))
+            )
+        }
     }
 
     /// The phone's error bar: one capsule the height of the CTA that retries

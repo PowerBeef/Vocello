@@ -145,6 +145,10 @@ class VocelloMacUITestCase: XCTestCase {
         var environment = [
             "QWENVOICE_DEBUG": "1",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "verbose",
+            // RF-59: the debug root's models folder links the host's real one, which may hold an
+            // earlier Vocello's folders; the model update never starts on its own in a lane unless
+            // a journey turns it on (test15, on an isolated profile).
+            "QWENVOICE_MODEL_UPDATE_AUTOSTART": "off",
         ]
         for (key, value) in additionalEnvironment {
             environment[key] = value

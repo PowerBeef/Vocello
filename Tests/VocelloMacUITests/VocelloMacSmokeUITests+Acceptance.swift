@@ -99,6 +99,86 @@ extension VocelloMacSmokeUITests {
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-long-form-recovery-discarded")
     }
 
+    /// RF-59: a user of an earlier Vocello opens this build, on an isolated profile holding that
+    /// build's Built-in Voice (Speed) and Voice Cloning (Quality) folders as an earlier install
+    /// leaves them (an integrity manifest naming the folder, tiny weights). With automatic start off
+    /// (the registered QWENVOICE_MODEL_UPDATE_AUTOSTART, which every lane launch sets), nothing
+    /// downloads: those modes read Update
+    /// required with Update, Voice Design (never installed) still offers Download, Studio's button
+    /// says Update in Settings, and the banner offers the update. With automatic start on, the update
+    /// starts by itself; Cancel stops it (recorded in the profile's ledger, staging discarded), the
+    /// rows offer Update again, and a relaunch leaves it stopped with no banner asking again.
+    func test15_ModelUpdateFromAnEarlierVocello() throws {
+        beginSession()
+        defer { endSession() }
+        let artifacts = try XCTUnwrap(ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"])
+        let profile = URL(fileURLWithPath: artifacts).appendingPathComponent("model-update-profile")
+        let models = profile.appendingPathComponent("models", isDirectory: true)
+        for folder in ["Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", "Qwen3-TTS-12Hz-1.7B-Base-8bit"] {
+            let directory = models.appendingPathComponent(folder, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data("earlier".utf8).write(to: directory.appendingPathComponent("model.safetensors"))
+            let manifest = """
+            {"schema_version": 2, "repo": "mlx-community/\(folder)", "revision": "earlier", \
+            "target_folder": "\(folder)", "created_at_utc": "2026-09-14T00:00:00Z", \
+            "files": [{"path": "model.safetensors", "size": 7, "sha256": "\(String(repeating: "ab", count: 32))"}]}
+            """
+            try Data(manifest.utf8).write(to: directory.appendingPathComponent(".qwenvoice-model-integrity.json"))
+        }
+
+        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": profile.path])
+        XCTAssertTrue(VocelloUIWait.exists(element("macModelUpdateBanner"), timeout: 30))
+        XCTAssertTrue(button("macModelUpdateBanner_update").exists, "the banner offers the update")
+        navigate(to: .customVoice)
+        let studioButton = button("textInput_installModelButton")
+        XCTAssertTrue(VocelloUIWait.exists(studioButton, timeout: 30))
+        XCTAssertTrue(studioButton.label.contains("Update"), "Studio says Update, not Install: \(studioButton.label)")
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-studio")
+        openSettingsCategory("modelsFiles")
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 30))
+        XCTAssertTrue(button("settings_update_pro_clone_speed").exists)
+        XCTAssertTrue(button("settings_download_pro_design_speed").exists, "a mode never installed stays a first install")
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-required")
+
+        // Automatic start on, as shipped (the lane's launch turns it off everywhere else).
+        let automatic = ["QWENVOICE_APP_SUPPORT_DIR": profile.path, "QWENVOICE_MODEL_UPDATE_AUTOSTART": "on"]
+        relaunchApp(additionalEnvironment: automatic)
+        openSettingsCategory("modelsFiles")
+        XCTAssertTrue(
+            VocelloUIWait.exists(button("settings_cancelRecommendedSetup"), timeout: 60),
+            "the update starts by itself on an unmetered network"
+        )
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-running")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_cancelRecommendedSetup"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 60))
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_clone_speed"), timeout: 60))
+        let ledger = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: models.appendingPathComponent(".qwenvoice-model-update.json"))
+        ) as? [String: Any]
+        let entries = (ledger?["entries"] as? [[String: Any]]) ?? []
+        XCTAssertEqual(Set(entries.compactMap { $0["mode"] as? String }), ["custom", "clone"])
+        XCTAssertTrue(entries.allSatisfy { $0["paused"] as? Bool == true }, "Cancel is recorded as stopped")
+        let staged = (try? FileManager.default.contentsOfDirectory(
+            atPath: models.appendingPathComponent(".qwenvoice-downloads").path
+        )) ?? []
+        XCTAssertEqual(staged.filter { !$0.hasPrefix(".") }, [], "no partial download stays behind")
+
+        relaunchApp(additionalEnvironment: automatic)
+        navigate(to: .customVoice)
+        XCTAssertTrue(VocelloUIWait.exists(button("textInput_installModelButton"), timeout: 30))
+        XCTAssertFalse(element("macModelUpdateBanner").exists, "a stopped update is not asked about again")
+        openSettingsCategory("modelsFiles")
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 30))
+        XCTAssertFalse(
+            VocelloUIWait.settles("a stopped update to restart", timeout: 10) {
+                self.button("settings_cancelRecommendedSetup").exists
+            },
+            "a stopped update never restarts on its own"
+        )
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-stopped")
+        relaunchApp(additionalEnvironment: additionalLaunchEnvironment)
+    }
+
     /// BKL-15: Saved Voices' empty and error states lay out inside the window,
     /// as History's do since F-16, whose minimum-size pass had laid an empty
     /// History out about 3,900 pt tall and off screen. Both run on isolated

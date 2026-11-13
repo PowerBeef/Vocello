@@ -305,6 +305,12 @@ enum IOSModelDeliverySupport {
         min(planBytes, max(0, totalBytes - receivedBytes))
     }
 
+    /// The free space a transfer of `requiredBytes` needs: twice the bytes (staged, then installed),
+    /// and never less than the bytes plus a 256 MB margin.
+    static func minimumFreeBytes(forFetching requiredBytes: Int64) -> Int64 {
+        max(requiredBytes * 2, requiredBytes + Int64(256 * 1_024 * 1_024))
+    }
+
     static func ensureSufficientDiskSpace(
         requiredBytes: Int64,
         at rootURL: URL,
@@ -312,8 +318,7 @@ enum IOSModelDeliverySupport {
     ) throws {
         let values = try rootURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         let availableBytes = Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-        let safetyBuffer = Int64(256 * 1_024 * 1_024)
-        let minimumRequired = max(requiredBytes * 2, requiredBytes + safetyBuffer)
+        let minimumRequired = minimumFreeBytes(forFetching: requiredBytes)
         guard availableBytes >= minimumRequired else {
             throw IOSModelDeliveryError.insufficientDiskSpace(
                 requiredBytes: minimumRequired,

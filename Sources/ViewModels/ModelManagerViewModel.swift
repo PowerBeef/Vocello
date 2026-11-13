@@ -50,6 +50,9 @@ final class ModelManagerViewModel {
         case downloading(progress: DownloadProgress)
         case repairAvailable(sizeBytes: Int, missingRequiredPaths: [String], message: String?)
         case updateAvailable(sizeBytes: Int, stalePaths: [String])
+        /// RF-59: the mode's model from an earlier Vocello must be replaced; nothing usable is
+        /// installed (`ModelUpdatePlan`). Unlike `updateAvailable`, the mode cannot generate.
+        case updateRequired(message: String?)
         case downloaded(sizeBytes: Int)
     }
 
@@ -59,6 +62,7 @@ final class ModelManagerViewModel {
         case notInstalled
         case needsRepair
         case updateAvailable
+        case updateRequired
         case downloading
     }
 
@@ -80,7 +84,14 @@ final class ModelManagerViewModel {
         }
     }
 
+    enum SetupKind: Equatable, Sendable {
+        case install
+        /// RF-59: replacing the models of an earlier Vocello.
+        case update
+    }
+
     struct RecommendedSetupProgress: Equatable {
+        let kind: SetupKind
         let completedCount: Int
         let totalCount: Int
         let currentModelID: String?
@@ -138,6 +149,19 @@ final class ModelManagerViewModel {
     /// explicit package choice resolves to its Speed package.
     private(set) var prefersLowerMemoryModels: Bool
     private(set) var recommendedSetupProgress: RecommendedSetupProgress?
+    /// RF-59: the modes whose model from an earlier Vocello needs its update (`ModelUpdateLedger`).
+    private(set) var updatePlan: ModelUpdatePlan = .empty
+    /// RF-59: set once every mode's update is done in this session: the bytes the removal of the
+    /// earlier models freed. The banner shows it until dismissed.
+    private(set) var modelUpdateCompletion: Int64?
+    @ObservationIgnored private var modelUpdateFreedBytes: Int64 = 0
+    @ObservationIgnored private var sessionHadModelUpdate = false
+    /// The modes the plan held at launch: the banner counts the finished ones against them.
+    @ObservationIgnored private var sessionUpdateModeCount = 0
+    @ObservationIgnored private var modelUpdateCompletionShown = false
+    /// The bundled contract's registry for this Mac (no base aliases), for the update plan and the
+    /// retired-folder reclamation.
+    @ObservationIgnored private let updateRegistry: ContractBackedModelRegistry?
 
     private let fileManager: FileManager
     private let modelsDirectory: URL
@@ -184,11 +208,21 @@ final class ModelManagerViewModel {
         self.modelsDirectory = modelsDirectory
         self.deviceClass = deviceClass
         self.prefersLowerMemoryModels = MacModelVariantPreferences.preferSpeedEverywhere()
+        self.updateRegistry = Self.makeUpdateRegistry(manifestURL: TTSContract.manifestURL)
 
         for model in TTSModel.all {
-            let info = localModelInfo(for: model)
-            modelInfoByID[model.id] = info
-            statuses[model.id] = status(for: info, failureMessage: nil)
+            modelInfoByID[model.id] = localModelInfo(for: model)
+        }
+        // RF-59: recorded before the first frame, so a mode an earlier Vocello installed reads
+        // "Update required" from the start (a few small files, never model weights).
+        let installed = Set(TTSModel.all.filter { modelInfoByID[$0.id]?.complete == true }.map(\.id))
+        updatePlan = Self.reconcileUpdatePlan(
+            registry: updateRegistry, in: modelsDirectory, installed: installed, change: .none
+        )
+        sessionHadModelUpdate = !updatePlan.isEmpty
+        sessionUpdateModeCount = updatePlan.modes.count
+        for model in TTSModel.all {
+            statuses[model.id] = status(for: model, info: info(for: model), failureMessage: nil)
         }
     }
 
@@ -440,6 +474,12 @@ final class ModelManagerViewModel {
                 label: MacInterfaceText.modelsUpdateAvailable,
                 detail: MacInterfaceText.modelsUpdateAvailableDetail
             )
+        case .updateRequired(let message):
+            return ModelPackagePresentation(
+                kind: .updateRequired,
+                label: MacInterfaceText.modelsUpdateRequired,
+                detail: message ?? MacInterfaceText.modelsUpdateRequiredDetail(MacInterfaceText.modeName(model.mode))
+            )
         case .downloaded:
             return ModelPackagePresentation(
                 kind: .ready,
@@ -474,7 +514,7 @@ final class ModelManagerViewModel {
             return MacInterfaceText.download
         case .needsRepair:
             return MacInterfaceText.modelsRepair
-        case .updateAvailable:
+        case .updateAvailable, .updateRequired:
             return MacInterfaceText.modelsUpdate
         case .downloading:
             return presentation.label
@@ -541,7 +581,7 @@ final class ModelManagerViewModel {
              .updateAvailable(let sizeBytes, _):
             guard sizeBytes > 0 else { return nil }
             return Self.formattedFileSize(Int64(sizeBytes))
-        case .notDownloaded:
+        case .notDownloaded, .updateRequired:
             guard let estimated = model.estimatedDownloadBytes, estimated > 0 else {
                 return nil
             }
@@ -552,11 +592,17 @@ final class ModelManagerViewModel {
     }
 
     func setUpRecommendedModels() {
+        runSetup(candidates: recommendedSetupCandidates(), kind: .install)
+    }
+
+    /// Downloads `candidates` through the bounded queue and reports their aggregate progress in the
+    /// Settings summary (a recommended setup, or the RF-59 model update).
+    private func runSetup(candidates: [TTSModel], kind: SetupKind) {
         guard recommendedSetupTask == nil else { return }
-        let candidates = recommendedSetupCandidates()
         guard !candidates.isEmpty else { return }
 
         recommendedSetupProgress = RecommendedSetupProgress(
+            kind: kind,
             completedCount: 0,
             totalCount: candidates.count,
             currentModelID: candidates.first?.id
@@ -589,6 +635,7 @@ final class ModelManagerViewModel {
                     !isAvailable($0) && isDownloadActive($0.id)
                 }.count
                 recommendedSetupProgress = RecommendedSetupProgress(
+                    kind: kind,
                     completedCount: completedCount,
                     totalCount: candidates.count,
                     currentModelID: candidates.first { !isAvailable($0) }?.id
@@ -623,6 +670,130 @@ final class ModelManagerViewModel {
         recommendedSetupTask = nil
         recommendedSetupProgress = nil
         recommendedSetupID = nil
+    }
+
+    // MARK: - Model update (RF-59)
+
+    /// What the model update banner shows: nothing, a running update, an update that has not started
+    /// or was stopped, or the note once every mode is updated.
+    enum ModelUpdateBanner: Equatable {
+        case updating(completed: Int, total: Int, fraction: Double)
+        case needed
+        case done(freedBytes: Int64)
+    }
+
+    /// What Studio's install button shows for a mode whose model needs its update.
+    enum StudioModelUpdate: Equatable {
+        case required
+        case updating(fraction: Double?)
+    }
+
+    /// `QWENVOICE_MODEL_UPDATE_AUTOSTART=off` (registered, internal diagnostics only) keeps the
+    /// update from starting on its own, so a UI test can see the states before any download.
+    private static let automaticModelUpdateDisabled: Bool = {
+        RuntimeDebugGate.value(for: "QWENVOICE_MODEL_UPDATE_AUTOSTART")?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "off"
+    }()
+
+    /// The models the update still has to install, one per mode in the plan.
+    private var modelUpdateCandidates: [TTSModel] {
+        updatePlan.modes.compactMap(recommendedVariant(for:)).filter { !isAvailable($0) }
+    }
+
+    func needsModelUpdate(_ model: TTSModel) -> Bool {
+        updatePlan.needsUpdate(model.mode) && !isAvailable(model)
+    }
+
+    /// Starts the update on its own after launch, for the modes the user has not stopped, when the
+    /// network is unmetered (`NetworkPathCost`). Otherwise the banner offers it.
+    func startModelUpdateIfNeeded() async {
+        guard !Self.automaticModelUpdateDisabled, recommendedSetupTask == nil else { return }
+        let candidates = modelUpdateCandidates.filter { !updatePlan.isPaused($0.mode) && !isDownloadActive($0.id) }
+        guard !candidates.isEmpty, await NetworkPathCost.current().allowsAutomaticDownloads else { return }
+        runSetup(candidates: candidates, kind: .update)
+    }
+
+    /// The banner's Update Now: resumes every stopped mode and updates them all.
+    func startModelUpdate() async {
+        if updatePlan.modes.contains(where: updatePlan.isPaused) {
+            await changeUpdatePlan(.resumeAll)
+        }
+        runSetup(candidates: modelUpdateCandidates.filter { !isDownloadActive($0.id) }, kind: .update)
+    }
+
+    /// Nothing while every remaining mode was stopped by the user: the rows and Studio still offer
+    /// the update, but the banner no longer asks.
+    var modelUpdateBanner: ModelUpdateBanner? {
+        if let freed = modelUpdateCompletion { return .done(freedBytes: freed) }
+        let remaining = modelUpdateCandidates
+        let running = remaining.filter { isDownloadActive($0.id) }
+        guard !running.isEmpty else {
+            return remaining.contains(where: { !updatePlan.isPaused($0.mode) }) ? .needed : nil
+        }
+        // The modes updated since launch, plus the ones still updating (a stopped mode is not counted).
+        let completed = max(0, sessionUpdateModeCount - remaining.count)
+        let total = completed + remaining.filter { !updatePlan.isPaused($0.mode) || isDownloadActive($0.id) }.count
+        let inFlight = running.reduce(0.0) { sum, model in
+            guard case .downloading(let progress) = statuses[model.id],
+                  let total = progress.totalBytes, total > 0 else { return sum }
+            return sum + min(1, Double(progress.downloadedBytes) / Double(total))
+        }
+        return .updating(
+            completed: completed, total: total,
+            fraction: (Double(completed) + inFlight) / Double(total)
+        )
+    }
+
+    func studioModelUpdate(for mode: GenerationMode) -> StudioModelUpdate? {
+        guard let model = recommendedVariant(for: mode), needsModelUpdate(model) else { return nil }
+        guard case .downloading(let progress) = statuses[model.id] else { return .required }
+        guard let total = progress.totalBytes, total > 0 else { return .updating(fraction: nil) }
+        return .updating(fraction: min(1, Double(progress.downloadedBytes) / Double(total)))
+    }
+
+    /// Studio's readiness title and detail while the mode has no usable model.
+    func missingModelReadiness(for mode: GenerationMode, displayName: String) -> (title: String, detail: String) {
+        switch studioModelUpdate(for: mode) {
+        case .updating:
+            return (MacInterfaceText.readinessUpdatingModel, MacInterfaceText.readinessUpdatingModelDetail)
+        case .required:
+            return (MacInterfaceText.readinessUpdateModel,
+                    MacInterfaceText.modelsUpdateRequiredDetail(MacInterfaceText.modeName(mode)))
+        case nil:
+            return (MacInterfaceText.readinessInstallActiveModel,
+                    MacInterfaceText.readinessInstallActiveModelDetail(displayName))
+        }
+    }
+
+    func dismissModelUpdateCompletion() {
+        modelUpdateCompletion = nil
+    }
+
+    /// The banner's Not Now: stops every remaining mode, as Cancel would; the rows and Studio still
+    /// offer the update.
+    func postponeModelUpdate() async {
+        for mode in updatePlan.modes where !updatePlan.isPaused(mode) {
+            await changeUpdatePlan(.pause(mode))
+        }
+    }
+
+    private func changeUpdatePlan(_ change: ModelUpdateLedger.Change) async {
+        let registry = updateRegistry
+        let modelsDirectory = modelsDirectory
+        let installed = Set(TTSModel.all.filter { info(for: $0).complete }.map(\.id))
+        updatePlan = await Task.detached(priority: .userInitiated) { @concurrent in
+            Self.reconcileUpdatePlan(registry: registry, in: modelsDirectory, installed: installed, change: change)
+        }.value
+        // A download in flight owns its row; every other row follows the new plan.
+        for model in TTSModel.all where !isDownloadActive(model.id) {
+            statuses[model.id] = status(for: model, info: info(for: model), failureMessage: lastFailureMessages[model.id])
+        }
+    }
+
+    private func noteModelUpdateCompletionIfDone() {
+        guard sessionHadModelUpdate, updatePlan.isEmpty, !modelUpdateCompletionShown else { return }
+        modelUpdateCompletionShown = true
+        modelUpdateCompletion = modelUpdateFreedBytes
     }
 
     private func downloadDetail(for progress: DownloadProgress) -> String? {
@@ -684,6 +855,9 @@ final class ModelManagerViewModel {
             }
             return MacInterfaceText.modelsRepairToKeepUsing(displayName, MacInterfaceText.modeName(model.mode))
         }
+        if updatePlan.needsUpdate(model.mode) {
+            return MacInterfaceText.modelsUpdateRequiredDetail(MacInterfaceText.modeName(model.mode))
+        }
         return MacInterfaceText.modelsInstallToEnable(displayName, MacInterfaceText.modeName(model.mode))
     }
 
@@ -693,6 +867,11 @@ final class ModelManagerViewModel {
     func download(_ model: TTSModel) async {
         let modelID = model.id
         guard !isDownloadActive(modelID) else { return }
+        if updatePlan.isPaused(model.mode) {
+            await changeUpdatePlan(.resume(model.mode))
+            // A second click, or a setup, may have queued it while the ledger was written.
+            guard !isDownloadActive(modelID) else { return }
+        }
 
         lastFailureMessages.removeValue(forKey: modelID)
         statuses[modelID] = .downloading(progress: .initial)
@@ -729,7 +908,8 @@ final class ModelManagerViewModel {
             // Reuse the last full snapshot: a fresh main-actor snapshot is size-only
             // and would hide a digest failure the background pass already found.
             statuses[modelID] = status(
-                for: modelInfoByID[modelID] ?? localModelInfo(for: model),
+                for: model,
+                info: modelInfoByID[modelID] ?? localModelInfo(for: model),
                 failureMessage: error.localizedDescription
             )
             startPendingDownloads()
@@ -888,6 +1068,10 @@ final class ModelManagerViewModel {
     /// Cancel an in-flight download and discard its staged partial so the next download
     /// starts fresh from zero (a true cancel — no paused state, no silent resume).
     func cancelDownload(_ model: TTSModel) async {
+        // RF-59: a stopped update stays stopped across launches until the user updates again.
+        if updatePlan.needsUpdate(model.mode) {
+            await changeUpdatePlan(.pause(model.mode))
+        }
         await stopAndClear(for: model.id)
         HuggingFaceDownloader.discardStaging(forTargetDirectory: model.installDirectory(in: modelsDirectory))
         await handleMutationCompletion(for: model.id)
@@ -1013,24 +1197,30 @@ final class ModelManagerViewModel {
     private func performRefresh() async {
         let modelsDirectory = modelsDirectory
         let startedGenerations = mutationGenerations
-        let manifestURL = TTSContract.manifestURL
-        let snapshots = await Task.detached(priority: .utility) { @concurrent in
+        let registry = updateRegistry
+        let (snapshots, plan, reclaimed) = await Task.detached(priority: .utility) { @concurrent in
             let snapshots = Self.fetchSnapshots(in: modelsDirectory)
-            Self.reclaimRetiredFolders(in: modelsDirectory, manifestURL: manifestURL, snapshots: snapshots)
-            return snapshots
+            // RF-59: the plan first (the retired folders are its only evidence), then the reclaim.
+            let plan = Self.reconcileUpdatePlan(
+                registry: registry, in: modelsDirectory,
+                installed: Set(snapshots.filter(\.complete).map(\.id)), change: .none
+            )
+            let reclaimed = Self.reclaimRetiredFolders(in: modelsDirectory, registry: registry, snapshots: snapshots)
+            return (snapshots, plan, reclaimed)
         }.value
+        updatePlan = plan
+        modelUpdateFreedBytes += reclaimed.freedBytes
         applySnapshots(snapshots, startedGenerations: startedGenerations)
+        noteModelUpdateCompletionIfDone()
     }
 
     /// RF-59: once any mode's model has verified (the content-digest pass just run), every retired
     /// Speed and Quality folder goes through the shared component store. Off the main actor.
     private nonisolated static func reclaimRetiredFolders(
-        in modelsDirectory: URL, manifestURL: URL?, snapshots: [ModelInfo]
-    ) {
+        in modelsDirectory: URL, registry: ContractBackedModelRegistry?, snapshots: [ModelInfo]
+    ) -> RetiredModelReclamation {
         let verified = Set(snapshots.filter { $0.deepIntegrityStatus == "verified" }.map(\.id))
-        guard !verified.isEmpty, let manifestURL,
-              let registry = try? ContractBackedModelRegistry(manifestURL: manifestURL)
-                .expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: false) else { return }
+        guard !verified.isEmpty, let registry else { return .nothing }
         let result = registry.reclaimRetiredFolders(in: modelsDirectory) { verified.contains($0.id) }
         for folder in result.removed {
             ModelManagerLog.logger.info("[ModelManagerViewModel] reclaimed retired model folder \(folder, privacy: .public)")
@@ -1039,6 +1229,34 @@ final class ModelManagerViewModel {
             ModelManagerLog.logger.error(
                 "[ModelManagerViewModel] retired model folder \(folder, privacy: .public) kept: \(reason, privacy: .private)"
             )
+        }
+        return result
+    }
+
+    /// The bundled contract's registry for this Mac without base aliases, the one the model ids of
+    /// `TTSModel.all` come from.
+    private nonisolated static func makeUpdateRegistry(manifestURL: URL?) -> ContractBackedModelRegistry? {
+        guard let manifestURL else { return nil }
+        return try? ContractBackedModelRegistry(manifestURL: manifestURL)
+            .expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: false)
+    }
+
+    /// RF-59: the update plan reconciled with the models `installed` (complete current installs),
+    /// or the recorded plan when the ledger cannot be written.
+    private nonisolated static func reconcileUpdatePlan(
+        registry: ContractBackedModelRegistry?, in modelsDirectory: URL,
+        installed: Set<String>, change: ModelUpdateLedger.Change
+    ) -> ModelUpdatePlan {
+        guard let registry else { return ModelUpdateLedger.read(in: modelsDirectory) }
+        do {
+            return try registry.reconcileModelUpdatePlan(in: modelsDirectory, change: change) {
+                installed.contains($0.id)
+            }
+        } catch {
+            ModelManagerLog.logger.error(
+                "[ModelManagerViewModel] model update plan not recorded: \(String(describing: error), privacy: .private)"
+            )
+            return ModelUpdateLedger.read(in: modelsDirectory)
         }
     }
 
@@ -1069,11 +1287,11 @@ final class ModelManagerViewModel {
                 lastFailureMessages.removeValue(forKey: id)
                 persistInstallMetadata(for: model, snapshot: snapshot)
             }
-            statuses[id] = status(for: snapshot, failureMessage: failureMessage)
+            statuses[id] = status(for: model, info: snapshot, failureMessage: failureMessage)
         }
     }
 
-    private func status(for info: ModelInfo, failureMessage: String?) -> ModelStatus {
+    private func status(for model: TTSModel, info: ModelInfo, failureMessage: String?) -> ModelStatus {
         if info.updateAvailable {
             return .updateAvailable(sizeBytes: info.sizeBytes, stalePaths: info.staleCatalogPaths)
         }
@@ -1086,6 +1304,9 @@ final class ModelManagerViewModel {
                 missingRequiredPaths: info.missingRequiredPaths,
                 message: failureMessage ?? info.deepIntegrityMessage
             )
+        }
+        if updatePlan.needsUpdate(model.mode) {
+            return .updateRequired(message: failureMessage)
         }
         return .notDownloaded(message: failureMessage)
     }
@@ -1250,7 +1471,8 @@ final class ModelManagerViewModel {
             removeInstallMetadata(for: model)
         }
         statuses[model.id] = status(
-            for: snapshot,
+            for: model,
+            info: snapshot,
             failureMessage: lastFailureMessages[model.id]
         )
     }

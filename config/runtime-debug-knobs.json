@@ -27,7 +27,7 @@
       "gateRequired": true,
       "compileCondition": "VOCELLO_INTERNAL_DIAGNOSTICS",
       "releaseBehavior": "unavailable-without-internal-capability",
-      "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics. QWENVOICE_MIXED_PRECISION (RF-55, 2026-11-12) set to down, attn, attn-down, mlp or talker takes the talker layer tensors that recipe names (never the code predictor) from the installed 8-bit sibling of the same model, so a mixed-precision model can be measured before any artifact is built; it is read once per model load, needs both siblings installed, and any other value loads the model as it is.",
+      "purpose": "Isolated storage, catalog, sampler, streaming, lifecycle, and memory-policy diagnostics. QWENVOICE_MIXED_PRECISION (RF-55, 2026-11-12) set to down, attn, attn-down, mlp or talker takes the talker layer tensors that recipe names (never the code predictor) from the installed 8-bit sibling of the same model, so a mixed-precision model can be measured before any artifact is built; it is read once per model load, needs both siblings installed, and any other value loads the model as it is. QWENVOICE_MODEL_UPDATE_AUTOSTART=off (RF-59, 2026-11-13) keeps the Mac's model update from starting on its own after an app update from an earlier Vocello, so a UI test can see the update states before any download; any other value is the shipped behavior, which starts it on an unmetered network.",
       "keys": [
         "QVOICE_APP_SUPPORT_DIR",
         "QVOICE_DOWNLOAD_ENGINE_PROFILE",
@@ -61,6 +61,7 @@
         "QWENVOICE_MARKING",
         "QWENVOICE_MIXED_PRECISION",
         "QWENVOICE_MLX_STAGE_PEAKS",
+        "QWENVOICE_MODEL_UPDATE_AUTOSTART",
         "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB",
         "QWENVOICE_STREAMING_OUTPUT_POLICY",
         "QWENVOICE_STREAMING_PREVIEW_DATA",

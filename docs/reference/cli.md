@@ -637,7 +637,10 @@ size; shared components another model still links stay. Installs and removals te
 (`com.qwenvoice.shared.modelsDidChange`). After `install` verifies a model, or finds it already
 installed, every mode's retired Speed and Quality folders (RF-59, the contract's `retiredFolders`) are
 removed as `remove` does, unless the app or another engine runs; a folder that cannot be removed adds a
-`retired_folders_kept` warning and stays for the next install or the app.
+`retired_folders_kept` warning and stays for the next install or the app. The model update plan is
+recorded first (`.qwenvoice-model-update.json`), so `models list` marks a mode whose earlier model was
+installed and whose new one is not with `↑ … update required` (`updateRequired` in the JSON rows), and
+the app updates it.
 
 `use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and
 `settings set prefer-lower-memory`; `models active` shows what each mode then resolves to.

@@ -159,7 +159,7 @@ struct MacGenerationVariantSelector: View {
             return MacInterfaceText.workflowVariantNotInstalled(kind.bitDepthLabel)
         case .needsRepair:
             return MacInterfaceText.workflowVariantNeedsRepair(kind.bitDepthLabel)
-        case .updateAvailable:
+        case .updateAvailable, .updateRequired:
             return MacInterfaceText.workflowVariantUpdateAvailable(kind.bitDepthLabel)
         case .checking, .downloading:
             return "\(kind.bitDepthLabel), \(status)"

@@ -80,7 +80,10 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: staging.path))
 
         let (verified, _, _) = try install(bytes: bytes, manifestSHA: otherSHA, retiredFolders: retiring)
-        XCTAssertEqual(verified.reclaimRetiredFolders(), RetiredModelReclamation(removed: retiring.sorted(), failed: [:]))
+        let reclaimed = verified.reclaimRetiredFolders()
+        XCTAssertEqual(reclaimed.removed, retiring.sorted())
+        XCTAssertEqual(reclaimed.failed, [:])
+        XCTAssertEqual(reclaimed.freedBytes, Int64("old".utf8.count + "partial".utf8.count), "the files each held alone")
         XCTAssertFalse(FileManager.default.fileExists(atPath: retiredURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertEqual(verified.reclaimRetiredFolders(), none, "nothing left to reclaim")
@@ -112,7 +115,7 @@ final class LocalModelAssetStoreIntegrityTests: XCTestCase {
         XCTAssertEqual(LocalModelAssetStore(rootDirectory: root, descriptors: [absentDescriptor]).reclaimRetiredFolders(),
                        none, "no model verified")
         let both = LocalModelAssetStore(rootDirectory: root, descriptors: [absentDescriptor, installedDescriptor])
-        XCTAssertEqual(both.reclaimRetiredFolders(), RetiredModelReclamation(removed: [custom, design], failed: [:]))
+        XCTAssertEqual(both.reclaimRetiredFolders().removed, [custom, design])
         for folder in [custom, design] {
             XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(folder).path), folder)
         }

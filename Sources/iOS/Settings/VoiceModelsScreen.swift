@@ -22,7 +22,7 @@ struct VoiceModelsScreen: View {
             switch effectiveStatus(for: model) {
             case .installed(let bytes), .updateAvailable(let bytes, _), .incomplete(_, let bytes):
                 total += Int64(bytes)
-            case .checking, .notInstalled, .error:
+            case .checking, .notInstalled, .updateRequired, .error:
                 break
             }
         }
@@ -37,7 +37,7 @@ struct VoiceModelsScreen: View {
             switch effectiveStatus(for: model) {
             case .installed, .updateAvailable:
                 count += 1
-            case .checking, .notInstalled, .incomplete, .error:
+            case .checking, .notInstalled, .updateRequired, .incomplete, .error:
                 break
             }
         }
@@ -226,7 +226,10 @@ struct VoiceModelsScreen: View {
     }
 
     private func presentDownloadConfirmation(for model: TTSModel) {
-        downloadPromptTitle = IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
+        // RF-59: replacing an earlier Vocello's model reads as an update, not a first download.
+        downloadPromptTitle = effectiveStatus(for: model) == .updateRequired
+            ? IOSSettingsText.updateModelTitle(IOSSettingsText.modeName(model.mode))
+            : IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
         modelPendingDownload = model
     }
 
@@ -237,7 +240,7 @@ struct VoiceModelsScreen: View {
             return true
         case .idle:
             switch effectiveStatus(for: model) {
-            case .notInstalled, .updateAvailable:
+            case .notInstalled, .updateAvailable, .updateRequired:
                 return true
             case .checking, .installed, .incomplete, .error:
                 return false

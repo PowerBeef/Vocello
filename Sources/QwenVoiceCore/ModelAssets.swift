@@ -234,6 +234,28 @@ public protocol ModelAssetStore: Sendable {
     func state(for descriptor: ModelAssetDescriptor) -> ModelAssetState
 }
 
+extension ModelAssetStore {
+    /// RF-59: the recorded model update plan (`ModelUpdateLedger`), read without a lock.
+    public func modelUpdatePlan() -> ModelUpdatePlan {
+        ModelUpdateLedger.read(in: rootDirectory)
+    }
+
+    /// RF-59: records every mode whose earlier model is on disk, drops every mode whose current model
+    /// is available, applies `change`, and returns the plan written.
+    @discardableResult
+    public func reconcileModelUpdatePlan(change: ModelUpdateLedger.Change = .none) throws -> ModelUpdatePlan {
+        try ModelUpdateLedger.reconcile(
+            models: descriptors.map(\.model), in: rootDirectory,
+            isInstalled: { model in
+                guard let descriptor = descriptor(id: model.id),
+                      case .available = state(for: descriptor) else { return false }
+                return true
+            },
+            change: change
+        )
+    }
+}
+
 public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
     static let legacyInstallFolderNames: Set<String> = [
         "Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
@@ -500,19 +522,46 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
         )
     }
 
-    /// RF-59: removes every model's retired folders once any model's install verifies at `depth`
-    /// (on the iPhone, at launch: its files were verified against the catalog when downloaded).
-    /// Checks nothing when no retired folder is left. Synchronous and possibly slow: call it off
-    /// the main actor.
+    /// RF-59: records the model update plan, then removes every model's retired folders once any
+    /// model's install verifies at `depth` (on the iPhone, at launch and after each install: its files
+    /// were verified against the catalog when downloaded). Checks nothing when no retired folder is
+    /// left. Synchronous and possibly slow: call it off the main actor.
     public func reclaimRetiredFolders(depth: ModelAssetIntegrityDepth = .manifestSizes) -> RetiredModelReclamation {
+        RetiredModelReclamation.reclaim(
+            models: descriptors.map(\.model), in: rootDirectory, isVerified: verifier(depth: depth)
+        )
+    }
+
+    /// RF-59, a nearly full iPhone whose user agreed to remove the earlier models first: pins the
+    /// shared components those folders hold (the new models reuse them), records the plan, then
+    /// removes every retired folder now. `releaseModelUpdatePins()` drops the pins once a new model is
+    /// installed. Synchronous and possibly slow: call it off the main actor.
+    public func removeRetiredFoldersBeforeUpdate(
+        depth: ModelAssetIntegrityDepth = .manifestSizes
+    ) -> RetiredModelReclamation {
+        let models = descriptors.map(\.model)
+        let store = SharedModelComponentStore(modelsRoot: rootDirectory)
+        store.pinSharedComponents(ofModelFolders: RetiredModelReclamation.presentFolders(of: models, in: rootDirectory))
+        let result = RetiredModelReclamation.reclaim(
+            models: models, in: rootDirectory, force: true, isVerified: verifier(depth: depth)
+        )
+        // Nothing went (the plan could not be recorded): the earlier models still hold the blobs.
+        if result.removed.isEmpty { store.releaseUpdatePins() }
+        return result
+    }
+
+    public func releaseModelUpdatePins() {
+        SharedModelComponentStore(modelsRoot: rootDirectory).releaseUpdatePins()
+    }
+
+    /// Whether a model's install verifies at `depth`, checked lazily per model.
+    private func verifier(depth: ModelAssetIntegrityDepth) -> (ModelDescriptor) -> Bool {
         let descriptorsByID = Dictionary(descriptors.map { ($0.model.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let folders = RetiredModelReclamation.folders(of: descriptors.map(\.model), in: rootDirectory) { model in
+        return { model in
             guard let descriptor = descriptorsByID[model.id],
                   case .verified = deepIntegrity(for: descriptor, depth: depth) else { return false }
             return true
         }
-        guard !folders.isEmpty else { return RetiredModelReclamation(removed: [], failed: [:]) }
-        return SharedModelComponentStore(modelsRoot: rootDirectory).reclaimRetiredFolders(folders)
     }
 
     private static func cleanupLegacyInstallFolders(

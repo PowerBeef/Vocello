@@ -147,6 +147,10 @@ struct ContentView: View {
             )
         } detail: {
             detailContent
+                // RF-59: the model update after an app update from an earlier Vocello.
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    MacModelUpdateBanner(appModel: appModel)
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if sidebarColumnVisibility == .detailOnly {
                         MacPlaybackFooter(isSidebar: false)
@@ -393,6 +397,8 @@ struct ContentView: View {
         await modelManager.refresh()
         didCompleteInitialAvailabilityRefresh = true
         scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem, allowClonePrime: false)
+        // RF-59: models an earlier Vocello installed update on their own, on an unmetered network.
+        await modelManager.startModelUpdateIfNeeded()
     }
 
     private func handleSelectionChange(_ newValue: SidebarItem?) {

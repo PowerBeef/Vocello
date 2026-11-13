@@ -91,6 +91,7 @@ class RunMetadataTests(LaneDataCase):
             ("macos", "clone-reference", "focused-smoke", ["clone"]),
             ("macos", "line-batch", "focused-smoke", ["custom"]),
             ("macos", "saved-voices-states", "focused-smoke", []),
+            ("macos", "model-update", "focused-smoke", []),
             ("ios", "background-warmup", "focused-smoke", ["clone", "custom"]),
             ("ios", "long-form", "focused-smoke", ["custom"]),
             ("ios", "record-then-play", "focused-smoke", []),

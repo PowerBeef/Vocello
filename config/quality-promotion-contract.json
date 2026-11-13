@@ -397,7 +397,9 @@
           "scripts/model_catalog_contract.py",
           "Sources/iOSSupport/Models/TTSContract.swift",
           "Sources/iOSSupport/Models/TTSModel.swift",
-          "Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift"
+          "Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift",
+          "Sources/iOSSupport/Services/IOSModelUpdateAutoStartPolicy.swift",
+          "Sources/QwenVoiceCore/ModelUpdateLedger.swift"
         ],
         "requiredEvidence": [
           "macos-model-download-lifecycle",

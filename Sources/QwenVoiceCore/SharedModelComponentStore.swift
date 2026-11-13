@@ -1623,6 +1623,55 @@ public struct RetiredModelReclamation: Equatable, Sendable {
     public let removed: [String]
     /// Folders left for the next pass, each with the error's description.
     public let failed: [String: String]
+    /// Bytes the removed folders held alone, measured before removal: a file with another link (a
+    /// shared component's blob in the store) is not counted, even when the removal also frees that
+    /// blob, so this is a floor. For the "freed" note.
+    public let freedBytes: Int64
+
+    public init(removed: [String], failed: [String: String], freedBytes: Int64 = 0) {
+        self.removed = removed
+        self.failed = failed
+        self.freedBytes = freedBytes
+    }
+
+    public static let nothing = RetiredModelReclamation(removed: [], failed: [:])
+
+    /// The one entry every host uses (RF-59). Records the model update plan first
+    /// (`ModelUpdateLedger`: the retired folders are the only evidence of which modes a user had),
+    /// then removes the folders `folders(of:in:isVerified:)` returns, or with `force` every retired
+    /// folder present (the iPhone's "remove old models first" on a nearly full phone, which the user
+    /// agreed to). Fails closed: a plan that cannot be recorded removes nothing. Synchronous and
+    /// possibly slow: call it off the main actor.
+    ///
+    /// `isInstalled` (default: `isVerified`) says which modes the plan drops: a host whose gate is one
+    /// model (the CLI after installing it) passes the installs it can see.
+    public static func reclaim(
+        models: [ModelDescriptor],
+        in modelsDirectory: URL,
+        force: Bool = false,
+        isInstalled: ((ModelDescriptor) -> Bool)? = nil,
+        isVerified: (ModelDescriptor) -> Bool
+    ) -> RetiredModelReclamation {
+        let folders = force
+            ? presentFolders(of: models, in: modelsDirectory)
+            : Self.folders(of: models, in: modelsDirectory, isVerified: isVerified)
+        guard !folders.isEmpty else { return .nothing }
+        do {
+            // A verified model is installed; one installed but not yet verified stays recorded until
+            // its host's own reconcile drops it.
+            if let isInstalled {
+                try ModelUpdateLedger.reconcile(models: models, in: modelsDirectory, isInstalled: isInstalled)
+            } else {
+                try ModelUpdateLedger.reconcile(models: models, in: modelsDirectory, isInstalled: isVerified)
+            }
+        } catch {
+            let reason = "the model update plan could not be recorded: \(error)"
+            return RetiredModelReclamation(
+                removed: [], failed: Dictionary(uniqueKeysWithValues: folders.map { ($0, reason) })
+            )
+        }
+        return SharedModelComponentStore(modelsRoot: modelsDirectory).reclaimRetiredFolders(folders)
+    }
 
     /// The retired folders of `models` that may go now: every model's, once `isVerified` accepts
     /// any one of `models` (its current artifact installed and verified). No current model reads a
@@ -1635,26 +1684,38 @@ public struct RetiredModelReclamation: Equatable, Sendable {
         in modelsDirectory: URL,
         isVerified: (ModelDescriptor) -> Bool
     ) -> [String] {
-        func isDirectory(_ url: URL) -> Bool {
-            (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
-        }
-        let present = Set(models.flatMap(\.retiredFolders)).filter { folder in
-            let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
-            return isDirectory(url) || isDirectory(HuggingFaceDownloader.stagingRoot(forTargetDirectory: url))
-        }
+        let present = presentFolders(of: models, in: modelsDirectory)
         // Verification only when something is left to free, and lazily: a host that verifies on
         // demand stops at the first verified model.
         guard !present.isEmpty, models.contains(where: isVerified) else { return [] }
-        return present.sorted()
+        return present
+    }
+
+    /// Every retired folder of `models` present as a directory or with a download staged for it,
+    /// each once, sorted.
+    public static func presentFolders(of models: [ModelDescriptor], in modelsDirectory: URL) -> [String] {
+        func isDirectory(_ url: URL) -> Bool {
+            (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        }
+        return Set(models.flatMap(\.retiredFolders)).filter { folder in
+            let url = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
+            return isDirectory(url) || isDirectory(HuggingFaceDownloader.stagingRoot(forTargetDirectory: url))
+        }.sorted()
     }
 }
 
 extension SharedModelComponentStore {
+    /// Where `pinSharedComponents(ofModelFolders:)` keeps its links.
+    var updatePinsRoot: URL {
+        storeRoot.appendingPathComponent("pins/model-update", isDirectory: true)
+    }
+
     /// Deletes each of `folders`; a folder that fails stays for the next pass and never stops the
-    /// others.
-    public func reclaimRetiredFolders(_ folders: [String]) -> RetiredModelReclamation {
+    /// others. Hosts go through `RetiredModelReclamation.reclaim`, which records the update plan first.
+    func reclaimRetiredFolders(_ folders: [String]) -> RetiredModelReclamation {
         var removed: [String] = []
         var failed: [String: String] = [:]
+        var freedBytes: Int64 = 0
         for folder in folders {
             guard ModelInstallFolderName.isSafe(folder) else {
                 failed[folder] = "not a model install folder name"
@@ -1662,16 +1723,57 @@ extension SharedModelComponentStore {
             }
             // Staging sits beside the install folders (`<models>/.qwenvoice-downloads/<folder>`),
             // not under the component store's own folder.
-            HuggingFaceDownloader.discardStaging(
-                forTargetDirectory: modelsRoot.appendingPathComponent(folder, isDirectory: true)
-            )
+            let target = modelsRoot.appendingPathComponent(folder, isDirectory: true)
+            let staging = HuggingFaceDownloader.stagingRoot(forTargetDirectory: target)
+            let held = Self.bytesHeldAlone(under: target) + Self.bytesHeldAlone(under: staging)
+            HuggingFaceDownloader.discardStaging(forTargetDirectory: target)
             do {
                 try deleteModel(modelFolder: folder)
                 removed.append(folder)
+                freedBytes += held
             } catch {
                 failed[folder] = String(describing: error)
             }
         }
-        return RetiredModelReclamation(removed: removed, failed: failed)
+        return RetiredModelReclamation(removed: removed, failed: failed, freedBytes: freedBytes)
+    }
+
+    /// RF-59: hard-links under the store every shared component file the given install folders
+    /// list, so removing them before a new model is installed (a nearly full iPhone) keeps the
+    /// blobs that model reuses: automatic reclamation never removes a blob another link holds.
+    /// Returns how many files are pinned. `releaseUpdatePins()` drops them.
+    @discardableResult
+    public func pinSharedComponents(ofModelFolders folders: [String]) -> Int {
+        var pinned = 0
+        for folder in folders where ModelInstallFolderName.isSafe(folder) {
+            let modelURL = modelsRoot.appendingPathComponent(folder, isDirectory: true)
+            guard let manifest = try? readManifest(modelURL: modelURL) else { continue }
+            for file in manifest.contentIdentity.files
+            where pinStoredComponent(file, at: updatePinsRoot.appendingPathComponent(file.sha256)) {
+                pinned += 1
+            }
+        }
+        return pinned
+    }
+
+    /// Drops the links `pinSharedComponents(ofModelFolders:)` made; the next reclamation removes a
+    /// blob nothing else holds.
+    public func releaseUpdatePins() {
+        try? FileManager.default.removeItem(at: updatePinsRoot)
+    }
+
+    /// Bytes of the regular files under `root` that no other link holds.
+    static func bytesHeldAlone(under root: URL) -> Int64 {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .linkCountKey]
+        guard let enumerator = FileManager.default.enumerator(
+            at: root, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true }
+        ) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                  values.isRegularFile == true, (values.linkCount ?? 1) <= 1 else { continue }
+            total += Int64(values.fileSize ?? 0)
+        }
+        return total
     }
 }

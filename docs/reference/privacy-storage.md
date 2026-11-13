@@ -54,6 +54,14 @@ Maintained macOS subtrees and preferences:
   in `cache/native_mlx/prepared_models/`, never in the model folder, and is removed with its model.
   A rebuild stages in `<model folder>.tmp.<UUID>/` beside it; each engine start removes one a crash
   interrupted once untouched for an hour (CORE-15).
+- `.qwenvoice-model-update.json` (RF-59) records which modes an earlier Vocello installed whose
+  model still needs its update: per mode, the earlier folders found, when, and whether the user
+  stopped the update. It holds no paths outside the models folder and no user content; it is
+  written durably under `.qwenvoice-model-update.lock` before any earlier folder is removed and
+  deleted once every mode is updated. A damaged one is kept as
+  `.qwenvoice-model-update.unreadable.json`. On a nearly full iPhone whose user agreed to remove
+  the earlier models first, `.qwenvoice-components-v1/pins/model-update/` holds a hard link to each
+  shared blob they held (no extra space) until a new model is installed.
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and completed-range sidecars while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB. A failure is its typed error summary, so error text, raw URLs and absolute paths are excluded (see [Diagnostics](#diagnostics)).
 - `diagnostics/metrickit-memory-exit-summaries.json` and `diagnostics/crashes/` hold MetricKit's delayed daily field diagnostics when the system delivers them (DW-03, `MacMetricKitReporter`): the same bounded, allowlisted memory/exit and responsiveness document the iPhone keeps (64 records, no raw payload, call stack, path or identity), and each crash or hang payload with its exception text and path-bearing crash metadata redacted (see [Diagnostics](#diagnostics)). A launch under an app-support override (a UI or benchmark lane) does not subscribe, so a payload is never lost with a lane's temporary root. Local only.

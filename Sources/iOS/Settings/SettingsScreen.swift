@@ -125,6 +125,50 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.updateAvailable", defaultValue: "Update Available",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
+    static var updateRequired: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.updateRequired", defaultValue: "Update Required",
+               comment: "Voice Models row status when the mode's model from an earlier Vocello must be replaced by the current one (RF-59); localized display only.")
+    }
+    static func updateModelTitle(_ name: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.updateModelTitle", defaultValue: "Update %1$@?",
+               comment: "Voice Models confirmation before the update of one model starts (RF-59, RF-41 Guideline 4.2.3(ii)); %1$@ is the localized mode name."), name)
+    }
+    static var modelUpdatePromptTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.promptTitle", defaultValue: "Update Voice Models?",
+               comment: "iOS alert asking before the model update downloads (RF-59, RF-41 Guideline 4.2.3(ii)). Presentation only.")
+    }
+    static var modelUpdatePromptReason: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.promptReason", defaultValue: "Vocello now uses one improved model per mode. Your earlier models are replaced, then removed.",
+               comment: "iOS model update alert, first paragraph (RF-59); followed by the download size and network line. Presentation only.")
+    }
+    static var modelUpdatePromptReasonLowSpace: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.promptReasonLowSpace", defaultValue: "Vocello now uses one improved model per mode. To make room, your earlier models are removed first.",
+               comment: "iOS model update alert, first paragraph when the phone lacks space to keep the earlier models during the update (RF-59). Presentation only.")
+    }
+    static var modelUpdateConfirm: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.update", defaultValue: "Update",
+               comment: "iOS model update alert button that starts the update (RF-59). Presentation only.")
+    }
+    static var modelUpdateLater: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.later", defaultValue: "Later",
+               comment: "iOS model update alert button that leaves the update for later (RF-59). Presentation only.")
+    }
+    static var modelUpdateBannerTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.bannerTitle", defaultValue: "Updating Voice Models",
+               comment: "iOS banner title while the model update runs (RF-59). Presentation only.")
+    }
+    static func modelUpdateBannerProgress(_ completed: String, _ total: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.bannerProgress", defaultValue: "%1$@ of %2$@ ready. Generation in a mode resumes as soon as its model is ready.",
+               comment: "iOS banner detail while the model update runs (RF-59); %1$@ models done, %2$@ total. Presentation only."), completed, total)
+    }
+    static var modelUpdateDoneTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.doneTitle", defaultValue: "Voice Models Updated",
+               comment: "iOS banner title once every model is updated (RF-59). Presentation only.")
+    }
+    static func modelUpdateDoneMessage(_ size: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.doneMessage", defaultValue: "Your earlier models were removed, freeing %1$@.",
+               comment: "iOS banner detail once every model is updated (RF-59); %1$@ is the disk space freed, already formatted."), size)
+    }
     static var repairNeeded: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.repairNeeded", defaultValue: "Repair Needed",
                comment: "Settings and model management presentation; no change to stored identities.")

@@ -444,6 +444,14 @@ struct IOSModelRow: View {
                 removalAction
             case .checking:
                 EmptyView()
+            case .updateRequired:
+                // RF-59: nothing usable is installed, so there is nothing to remove yet.
+                actionButton(
+                    IOSSettingsText.update,
+                    symbol: "arrow.triangle.2.circlepath",
+                    id: "iosModelUpdate_\(model.id)",
+                    action: requestDownload
+                )
             case .notInstalled:
                 actionButton(
                     IOSSettingsText.install,
@@ -558,7 +566,7 @@ struct IOSModelRow: View {
             switch status {
             case .checking: return 0
             case .updateAvailable, .incomplete: return 2
-            case .installed, .notInstalled, .error: return 1
+            case .installed, .notInstalled, .updateRequired, .error: return 1
             }
         case .installed, .available, .queued, .waitingForConnectivity,
              .downloading, .retrying:
@@ -646,6 +654,7 @@ struct IOSModelRow: View {
             case .notInstalled: return IOSSettingsText.notInstalled
             case .installed: return IOSAppLanguage.shared.presentation.status(.ready)
             case .updateAvailable: return IOSSettingsText.updateAvailable
+            case .updateRequired: return IOSSettingsText.updateRequired
             case .incomplete: return IOSSettingsText.repairNeeded
             case .error: return IOSSettingsText.retryNeeded
             }
@@ -684,7 +693,7 @@ struct IOSModelRow: View {
             case .checking: return "magnifyingglass"
             case .notInstalled: return "arrow.down.circle"
             case .installed: return "checkmark.circle"
-            case .updateAvailable: return "arrow.triangle.2.circlepath.circle"
+            case .updateAvailable, .updateRequired: return "arrow.triangle.2.circlepath.circle"
             case .incomplete: return "wrench.and.screwdriver"
             case .error: return "exclamationmark.arrow.triangle.2.circlepath"
             }
@@ -705,7 +714,7 @@ struct IOSModelRow: View {
         case .idle:
             switch status {
             case .installed: return Theme.Status.healthy
-            case .updateAvailable: return Theme.Status.guarded
+            case .updateAvailable, .updateRequired: return Theme.Status.guarded
             case .incomplete, .error: return Theme.Status.critical
             case .checking, .notInstalled: return Theme.Brand.silver
             }

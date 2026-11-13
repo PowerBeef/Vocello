@@ -1109,6 +1109,74 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.models.updateAvailableDetail", defaultValue: "A newer model package is pinned. Update to download it.",
                comment: "macOS interface: model package detail when a newer package is pinned. Presentation only.")
     }
+    static var modelsUpdateRequired: String {
+        localization.string(localized: "vocello.mac.models.updateRequired", defaultValue: "Update required",
+               comment: "macOS interface: model package status when the mode's model from an earlier Vocello must be replaced by the current one (RF-59). Presentation only.")
+    }
+    static func modelsUpdateRequiredDetail(_ mode: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.models.updateRequiredDetail",
+            defaultValue: "Vocello now uses one improved model per mode. Update to keep using %@.",
+            comment: "macOS interface: detail of the Update required status and the Studio readiness detail (RF-59); %@ is the mode name (Built-in Voice, Voice Design or Voice Cloning). Presentation only."), mode)
+    }
+    static func settingsUpdatingProgress(_ mode: String, _ count: String, _ total: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.settings.updatingProgress",
+            defaultValue: "Updating %1$@ · %2$@ of %3$@ complete",
+            comment: "macOS interface: Settings > Models summary while the model update runs (RF-59); %1$@ mode name, %2$@ models done, %3$@ total. Presentation only."), mode, count, total)
+    }
+    static var studioUpdateInSettings: String {
+        localization.string(localized: "vocello.mac.studio.updateInSettings", defaultValue: "Update in Settings",
+               comment: "macOS interface: Studio button in place of Generate while the mode's model needs its update (RF-59); opens Settings > Models. Presentation only.")
+    }
+    static func studioUpdatingModel(_ percent: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.studio.updatingModel",
+            defaultValue: "Updating · %@",
+            comment: "macOS interface: Studio button while the mode's model update downloads (RF-59); %@ is the percentage, already formatted. Presentation only."), percent)
+    }
+    static var readinessUpdateModel: String {
+        localization.string(localized: "vocello.mac.readiness.updateModel", defaultValue: "Update the model",
+               comment: "macOS interface: Studio readiness title when the mode's model needs its update (RF-59). Presentation only.")
+    }
+    static var readinessUpdatingModel: String {
+        localization.string(localized: "vocello.mac.readiness.updatingModel", defaultValue: "Updating the model",
+               comment: "macOS interface: Studio readiness title while the mode's model update downloads (RF-59). Presentation only.")
+    }
+    static var readinessUpdatingModelDetail: String {
+        localization.string(localized: "vocello.mac.readiness.updatingModelDetail", defaultValue: "You can generate again as soon as the new model is ready.",
+               comment: "macOS interface: Studio readiness detail while the mode's model update downloads (RF-59). Presentation only.")
+    }
+    static var modelUpdateTitle: String {
+        localization.string(localized: "vocello.mac.modelUpdate.title", defaultValue: "Updating your voice models",
+               comment: "macOS interface: title of the model update banner while the update runs (RF-59). Presentation only.")
+    }
+    static var modelUpdateNeededTitle: String {
+        localization.string(localized: "vocello.mac.modelUpdate.neededTitle", defaultValue: "Your voice models need an update",
+               comment: "macOS interface: title of the model update banner when the update has not started or was stopped (RF-59). Presentation only.")
+    }
+    static var modelUpdateMessage: String {
+        localization.string(localized: "vocello.mac.modelUpdate.message", defaultValue: "Vocello now uses one improved model per mode. Your earlier models are removed once the new ones are ready.",
+               comment: "macOS interface: body of the model update banner (RF-59). Presentation only.")
+    }
+    static var modelUpdateUpdateNow: String {
+        localization.string(localized: "vocello.mac.modelUpdate.updateNow", defaultValue: "Update Now",
+               comment: "macOS interface: model update banner button that starts the update (RF-59). Presentation only.")
+    }
+    static var modelUpdateNotNow: String {
+        localization.string(localized: "vocello.mac.modelUpdate.notNow", defaultValue: "Not Now",
+               comment: "macOS interface: model update banner button that leaves the update for later; the models stay offered in Settings and Studio (RF-59). Presentation only.")
+    }
+    static var modelUpdateShowInSettings: String {
+        localization.string(localized: "vocello.mac.modelUpdate.showInSettings", defaultValue: "Show in Settings",
+               comment: "macOS interface: model update banner button that opens Settings > Models (RF-59). Presentation only.")
+    }
+    static var modelUpdateDoneTitle: String {
+        localization.string(localized: "vocello.mac.modelUpdate.doneTitle", defaultValue: "Voice models updated",
+               comment: "macOS interface: title of the model update banner once every model is updated (RF-59). Presentation only.")
+    }
+    static func modelUpdateDoneMessage(_ size: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.modelUpdate.doneMessage",
+            defaultValue: "Your earlier models were removed, freeing %@.",
+            comment: "macOS interface: body of the model update banner once every model is updated (RF-59); %@ is the disk space freed, already formatted. Presentation only."), size)
+    }
     static var ok: String {
         localization.string(localized: "vocello.mac.common.ok", defaultValue: "OK",
                comment: "macOS interface: acknowledge an alert. Presentation only.")

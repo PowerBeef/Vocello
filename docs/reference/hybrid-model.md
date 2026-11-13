@@ -194,6 +194,14 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
   the Mac after its digest pass, the iPhone at launch, `vocello models install` after an install. No
   current model reads them, so a mode whose new model is never installed does not keep its old one
   (maintainer decision 2026-11-13). Until then the legacy cleanup leaves the 8-bit folders alone.
+- **Model update for 3.0 users.** The modes an earlier build installed are recorded before any
+  folder goes (`.qwenvoice-model-update.json`) and read "Update required", not "Not installed".
+  The Mac starts their update on its own on an unmetered network, with a banner over every
+  destination and "Update in Settings" on Studio's button; the iPhone asks once (total size,
+  networks; on a nearly full phone the earlier models go first, their shared blobs pinned) and
+  resumes at later launches. Cancel, the Mac's Not Now and the iPhone's Later stop it until the
+  user taps Update, and nothing asks again; a done note says how much space the earlier models
+  freed.
 - **The selector.** A mode with one model shows no Speed/Quality switch, no "Prefer lower-memory
   models" toggle, and a package row that reads Model. `--variant quality`, `models use … quality` and
   `models prefer-lower-memory` parse, warn `variant_retired` and change nothing.

@@ -33,7 +33,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
-  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states] [--long-form-segments N]
+  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states|model-update] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh macos auto-language
@@ -273,8 +273,8 @@ elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" 
       || "$scenario_argument" == "generation-errors" || "$scenario_argument" == "design-enrollment" \
       || "$scenario_argument" == "clone-reference" || "$scenario_argument" == "long-form" \
       || "$scenario_argument" == "line-batch" || "$scenario_argument" == "long-form-recovery" \
-      || "$scenario_argument" == "saved-voices-states" ]] \
-    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, line-batch, long-form-recovery, or saved-voices-states"
+      || "$scenario_argument" == "saved-voices-states" || "$scenario_argument" == "model-update" ]] \
+    || die "macos smoke --scenario must be layout, studio-content, generation-errors, design-enrollment, clone-reference, long-form, line-batch, long-form-recovery, saved-voices-states, or model-update"
 elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   scenario_argument="${scenario_argument:-lifecycle}"
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
@@ -1591,6 +1591,7 @@ elif [[ "$platform" == "macos" ]]; then
       line-batch) only_test+="/test07_LineBatchJourney" ;;
       long-form-recovery) only_test+="/test13_LongFormRecoveryDiscard" ;;
       saved-voices-states) only_test+="/test14_SavedVoicesEmptyAndErrorStates" ;;
+      model-update) only_test+="/test15_ModelUpdateFromAnEarlierVocello" ;;
     esac
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"

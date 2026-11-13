@@ -18,6 +18,8 @@ enum ModelsCommand {
         let estimatedDownloadBytes: Int64?
         let updateAvailable: Bool
         let stalePaths: [String]
+        /// RF-59: an earlier Vocello installed this mode's model, which must be replaced.
+        let updateRequired: Bool
     }
 
     /// Installed-but-stale probe against the production catalog: files whose on-disk byte
@@ -155,6 +157,7 @@ enum ModelsCommand {
         let onlyID = args.positionals.first  // optional `status <id>` / `list <id>` filter
         let catalog = try? ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
 
+        let updatePlan = ModelUpdateLedger.read(in: ctx.modelsDirectory)
         var rows: [ModelJSON] = []
         for m in ctx.registry.models {
             if let onlyID, m.id != onlyID { continue }
@@ -174,7 +177,8 @@ enum ModelsCommand {
                 installedBytes: directorySize(m.installDirectory(in: ctx.modelsDirectory)),
                 estimatedDownloadBytes: m.estimatedDownloadBytes,
                 updateAvailable: !stale.isEmpty,
-                stalePaths: stale))
+                stalePaths: stale,
+                updateRequired: !installed && updatePlan.needsUpdate(m.mode)))
         }
         if let onlyID, rows.isEmpty {
             throw CLIError(.modelUnknown, "no model '\(onlyID)' in the contract", hint: "see `vocello models list` for the ids")
@@ -187,12 +191,15 @@ enum ModelsCommand {
 
         guard !rows.isEmpty else { print("(no models in contract)"); return }
         for r in rows {
-            let mark = r.updateAvailable ? "↑" : (r.installed ? "✓" : (r.missingPaths.isEmpty ? "?" : "✗"))
+            let mark = r.updateAvailable || r.updateRequired
+                ? "↑" : (r.installed ? "✓" : (r.missingPaths.isEmpty ? "?" : "✗"))
             var size = r.installed
                 ? humanBytes(r.installedBytes)
                 : (r.estimatedDownloadBytes.map { "~\(humanBytes($0)) to download" } ?? "not installed")
             if r.updateAvailable {
                 size += " · update available (models install \(r.id))"
+            } else if r.updateRequired {
+                size += " · update required (models install \(r.id))"
             }
             print("\(mark) \(r.id)\t[\(r.mode)]\t\(size)")
             if detailed {
@@ -481,7 +488,16 @@ enum ModelsCommand {
     @MainActor
     static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) {
         guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return }
-        let result = ctx.registry.reclaimRetiredFolders(in: ctx.modelsDirectory) { $0.id == modelID }
+        let modelsDirectory = ctx.modelsDirectory
+        let registry = ctx.registry
+        let result = registry.reclaimRetiredFolders(
+            in: modelsDirectory,
+            isInstalled: { model in
+                if case .available = registry.availability(forModelID: model.id, in: modelsDirectory) { return true }
+                return false
+            },
+            isVerified: { $0.id == modelID }
+        )
         for folder in result.removed {
             note("Removed the retired model folder \(folder)")
         }

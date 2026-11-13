@@ -28,7 +28,27 @@ final class IOSModelInstallerViewModel {
         case failed(String)
     }
 
+    /// RF-59: the alert that asks once before the model update downloads (Guideline 4.2.3(ii)).
+    struct ModelUpdatePrompt: Equatable {
+        let modelIDs: [String]
+        let totalBytes: Int64
+        /// The phone lacks space to keep the earlier models meanwhile, so they go first.
+        let makesRoomFirst: Bool
+    }
+
     private(set) var states: [String: OperationState] = [:]
+    private(set) var modelUpdatePrompt: ModelUpdatePrompt?
+    /// RF-59: the recorded update plan, reloaded where it can change (never read in a view body).
+    private(set) var updatePlan: ModelUpdatePlan = .empty
+    /// RF-59: set once every mode's update is done in this session; the banner shows the space the
+    /// earlier models freed until dismissed.
+    private(set) var modelUpdateCompletion: Int64?
+    @ObservationIgnored private var modelUpdateFreedBytes: Int64 = 0
+    @ObservationIgnored private var sessionHadModelUpdate = false
+    /// The modes the plan held at launch: the banner counts the finished ones against them.
+    @ObservationIgnored private var sessionUpdateModeCount = 0
+    /// Modes stopped this session, honored even when the ledger could not record it.
+    @ObservationIgnored private var sessionPausedModes = Set<GenerationMode>()
     /// A model whose removal the engine refused because it was busy; the Voice
     /// Models screen explains it in the localized busy alert (A5-01).
     private(set) var blockedDeletionModelID: String?
@@ -73,9 +93,190 @@ final class IOSModelInstallerViewModel {
         )
         self.coordinator = coordinator
 
+        updatePlan = modelAssetStore.modelUpdatePlan()
+        sessionHadModelUpdate = !updatePlan.isEmpty
+        sessionUpdateModeCount = updatePlan.modes.count
         Task {
             await refreshModelInventory(modelID: nil, event: "initial-refresh")
             await coordinator.restoreInFlightDownloadsIfNeeded()
+            // RF-59: strictly after the restore, so a resumed request is seen as running.
+            await startModelUpdateIfNeeded()
+        }
+    }
+
+    // MARK: - Model update (RF-59)
+
+    /// The models the update still has to install, one per mode in the plan.
+    private func modelUpdateCandidates() -> [TTSModel] {
+        TTSModel.all.filter { updatePlan.needsUpdate($0.mode) && !modelManager.isAvailable($0) }
+    }
+
+    /// The consent covers exactly the artifacts the user agreed to download, never a later set.
+    private static func consentKey(_ model: TTSModel) -> String {
+        "\(model.id)@\(model.artifactVersion)"
+    }
+
+    /// Disk facts the launch decision reads, gathered off the main actor.
+    private struct UpdateDiskFacts: Sendable {
+        let plan: ModelUpdatePlan
+        let availableBytes: Int64?
+        let holdsEarlierModels: Bool
+    }
+
+    /// At launch: asks once, then resumes on its own (`IOSModelUpdateAutoStartPolicy`).
+    func startModelUpdateIfNeeded() async {
+        guard let modelAssetStore else { return }
+        let facts = await Task.detached(priority: .utility) { @concurrent in
+            UpdateDiskFacts(
+                plan: modelAssetStore.modelUpdatePlan(),
+                availableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
+                    forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+                ).volumeAvailableCapacityForImportantUsage).map { Int64($0) },
+                holdsEarlierModels: !RetiredModelReclamation.presentFolders(
+                    of: modelAssetStore.descriptors.map(\.model), in: modelAssetStore.rootDirectory
+                ).isEmpty
+            )
+        }.value
+        updatePlan = facts.plan
+        let models = modelUpdateCandidates()
+        let candidates = models.map { model in
+            IOSModelUpdateAutoStartPolicy.Candidate(
+                modelID: model.id,
+                estimatedBytes: model.estimatedDownloadBytes ?? 0,
+                paused: updatePlan.isPaused(model.mode) || sessionPausedModes.contains(model.mode),
+                active: isTransferring(states[model.id]),
+                failed: { if case .failed = states[model.id] { return true }; return false }()
+            )
+        }
+        guard !candidates.isEmpty else { return }
+        let consented = Set(IOSAppDefaults.modelUpdateConsentedArtifacts)
+        // Only the models this launch would start must be covered by the consent.
+        let ready = zip(models, candidates).filter { !$1.paused && !$1.active && !$1.failed }.map(\.0)
+        let network = await NetworkPathCost.current()
+        let decision = IOSModelUpdateAutoStartPolicy.decide(
+            candidates: candidates,
+            consented: ready.allSatisfy { consented.contains(Self.consentKey($0)) },
+            lowDataMode: network.isConstrained,
+            availableBytes: facts.availableBytes,
+            holdsEarlierModels: facts.holdsEarlierModels
+        )
+        switch decision {
+        case .none:
+            return
+        case .ask(let modelIDs, let totalBytes, let makesRoomFirst):
+            modelUpdatePrompt = ModelUpdatePrompt(modelIDs: modelIDs, totalBytes: totalBytes, makesRoomFirst: makesRoomFirst)
+        case .start(let modelIDs):
+            await runModelUpdate(modelIDs: modelIDs, makingRoomFirst: false)
+        }
+    }
+
+    /// The alert's Update, with the prompt the alert presented (SwiftUI may clear the binding
+    /// before the action runs). The consent names these artifacts, for later launches.
+    func confirmModelUpdate(_ prompt: ModelUpdatePrompt) {
+        modelUpdatePrompt = nil
+        let models = TTSModel.all.filter { prompt.modelIDs.contains($0.id) }
+        IOSAppDefaults.modelUpdateConsentedArtifacts = Array(
+            Set(IOSAppDefaults.modelUpdateConsentedArtifacts).union(models.map(Self.consentKey))
+        ).sorted()
+        Task { await runModelUpdate(modelIDs: prompt.modelIDs, makingRoomFirst: prompt.makesRoomFirst) }
+    }
+
+    /// The alert's Later: those modes stop, so no later launch asks again; their rows and Studio
+    /// keep offering the update.
+    func postponeModelUpdate(_ prompt: ModelUpdatePrompt?) {
+        modelUpdatePrompt = nil
+        guard let prompt else { return }
+        Task {
+            for model in TTSModel.all where prompt.modelIDs.contains(model.id) {
+                await changeModelUpdatePlan(.pause(model.mode))
+            }
+        }
+    }
+
+    func dismissModelUpdateCompletion() {
+        modelUpdateCompletion = nil
+    }
+
+    private func runModelUpdate(modelIDs: [String], makingRoomFirst: Bool) async {
+        guard let modelAssetStore else { return }
+        if makingRoomFirst {
+            let result = await Task.detached(priority: .userInitiated) { @concurrent in
+                modelAssetStore.removeRetiredFoldersBeforeUpdate()
+            }.value
+            modelUpdateFreedBytes += result.freedBytes
+        }
+        for model in TTSModel.all where modelIDs.contains(model.id) {
+            if updatePlan.isPaused(model.mode) {
+                await changeModelUpdatePlan(.resume(model.mode))
+            }
+            install(model)
+        }
+    }
+
+    /// Writes `change` off the main actor. A pause that cannot be recorded is still honored for
+    /// this session, and the failure is recorded.
+    private func changeModelUpdatePlan(_ change: ModelUpdateLedger.Change) async {
+        guard let modelAssetStore else { return }
+        let outcome: Result<ModelUpdatePlan, any Error> = await Task.detached(priority: .userInitiated) { @concurrent in
+            Result { try modelAssetStore.reconcileModelUpdatePlan(change: change) }
+        }.value
+        switch outcome {
+        case .success(let plan):
+            updatePlan = plan
+        case .failure(let error):
+            diagnosticsStore.recordFailure(classification: "model-update-plan", error: error)
+        }
+        switch change {
+        case .pause(let mode): sessionPausedModes.insert(mode)
+        case .resume(let mode): sessionPausedModes.remove(mode)
+        case .resumeAll: sessionPausedModes.removeAll()
+        case .none: break
+        }
+    }
+
+    /// After a verified install: every retired folder goes once one new model is in place; the
+    /// update pins go once no update download is left; the done note follows the last mode.
+    private func reclaimAfterInstall() async {
+        guard let modelAssetStore else { return }
+        let updateStillDownloading = TTSModel.all.contains {
+            updatePlan.needsUpdate($0.mode) && isTransferring(states[$0.id])
+        }
+        let result = await Task.detached(priority: .utility) { @concurrent in
+            let result = modelAssetStore.reclaimRetiredFolders()
+            if !updateStillDownloading { modelAssetStore.releaseModelUpdatePins() }
+            return result
+        }.value
+        modelUpdateFreedBytes += result.freedBytes
+        await modelManager.refresh()
+        updatePlan = await Task.detached(priority: .utility) { @concurrent in
+            modelAssetStore.modelUpdatePlan()
+        }.value
+        if sessionHadModelUpdate, updatePlan.isEmpty, modelUpdateCompletion == nil {
+            sessionHadModelUpdate = false
+            modelUpdateCompletion = modelUpdateFreedBytes
+            // Nothing is left to update: a later set of models asks again.
+            IOSAppDefaults.modelUpdateConsentedArtifacts = []
+        }
+    }
+
+    /// RF-59: the banner's progress while the update runs: the modes updated since launch, of
+    /// those plus the ones still updating (a mode the user stopped is not counted).
+    var modelUpdateProgress: (completed: Int, total: Int)? {
+        let remaining = modelUpdateCandidates()
+        guard remaining.contains(where: { isTransferring(states[$0.id]) }) else { return nil }
+        let completed = max(0, sessionUpdateModeCount - remaining.count)
+        let updating = remaining.filter {
+            isTransferring(states[$0.id]) || !(updatePlan.isPaused($0.mode) || sessionPausedModes.contains($0.mode))
+        }
+        return (completed, completed + updating.count)
+    }
+
+    private func isTransferring(_ state: OperationState?) -> Bool {
+        switch state {
+        case .queued, .waitingForConnectivity, .downloading, .retrying, .verifying, .installing:
+            return true
+        default:
+            return false
         }
     }
 
@@ -91,6 +292,13 @@ final class IOSModelInstallerViewModel {
 
         switch modelManager.statuses[model.id] {
         case .installed, .updateAvailable:
+            return .idle
+        case .updateRequired:
+            // The row's Update starts a new download: the same eligibility as Install.
+            guard let descriptor = modelAssetStore?.descriptor(id: model.id)?.model,
+                  IOSNativeDeviceFeatureGate.allowsModelDownloads(for: descriptor) else {
+                return .unavailable(IOSInterfaceText.modelUnavailable)
+            }
             return .idle
         case .checking:
             return .idle
@@ -135,6 +343,9 @@ final class IOSModelInstallerViewModel {
 
         Task {
             do {
+                if updatePlan.isPaused(model.mode) {
+                    await changeModelUpdatePlan(.resume(model.mode))
+                }
                 try await coordinator.install(model: model)
             } catch {
                 let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
@@ -157,6 +368,10 @@ final class IOSModelInstallerViewModel {
     func cancel(_ model: TTSModel) {
         guard let coordinator else { return }
         Task {
+            // RF-59: a stopped update stays stopped across launches until the user updates again.
+            if updatePlan.needsUpdate(model.mode) {
+                await changeModelUpdatePlan(.pause(model.mode))
+            }
             await coordinator.cancel(modelID: model.id)
             await refreshModelInventory(modelID: model.id, event: "cancel-refresh")
         }
@@ -324,6 +539,7 @@ final class IOSModelInstallerViewModel {
             let modelID = snapshot.modelID
             Task {
                 await refreshModelInventory(modelID: modelID, event: "installed-refresh")
+                await reclaimAfterInstall()
             }
         case .deleting:
             states[snapshot.modelID] = .deleting

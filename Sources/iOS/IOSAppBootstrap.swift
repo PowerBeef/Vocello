@@ -185,7 +185,10 @@ extension QVoiceiOSApp {
             rootDirectory: AppPaths.modelsDir,
             storeVersionSeed: modelAssetStoreSeed()
         )
-        // RF-59: once any hybrid verifies, every retired Speed folder goes, off the launch path.
+        // RF-59: records which modes an earlier Vocello installed (a few small files, never model
+        // weights) before the first statuses, so those modes read "Update Required"; then, off the
+        // launch path, every retired Speed folder goes once any new model verifies.
+        _ = try? modelAssetStore.reconcileModelUpdatePlan()
         Task.detached(priority: .utility) { @concurrent in
             _ = modelAssetStore.reclaimRetiredFolders()
         }

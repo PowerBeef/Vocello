@@ -626,15 +626,32 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     }
 
     /// Maintenance on the paired iPhone, on explicit request only
-    /// (`smoke --scenario update-models`): taps each installed model's genuine
-    /// Update control and waits until every model reads Ready. No generation.
+    /// (`smoke --scenario update-models`): updates every model that offers it
+    /// and waits until each reads Ready. After an update from an earlier Vocello
+    /// (RF-59) the app asks once at launch for every model together; the test
+    /// accepts that genuine prompt. Otherwise it taps each row's Update and
+    /// confirms. No generation.
     func testUpdateInstalledModels() {
         beginSession()
         defer { endSession() }
-        openVoiceModels()
         let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
         var updated: [String] = []
+        let prompt = app.buttons["iosModelUpdatePromptConfirm"]
+        let promptAccepted = VocelloUIWait.settles("model update prompt", timeout: 15, evaluate: { prompt.exists })
+        if promptAccepted {
+            VocelloUIScreenshot.attach(app, named: "ios-update-models-prompt")
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: prompt, timeout: 10))
+        }
+        openVoiceModels()
         for modelID in modelIDs {
+            if promptAccepted {
+                // The prompt started this model's update if its row now offers Cancel.
+                let cancel = element("iosModelCancel_\(modelID)")
+                if VocelloUIWait.settles("\(modelID) update started", timeout: 10, evaluate: { cancel.exists }) {
+                    updated.append(modelID)
+                }
+                continue
+            }
             let update = element("iosModelUpdate_\(modelID)")
             guard update.waitForExistence(timeout: 10) else { continue }
             XCTAssertTrue(revealSettingsElement(update, swipingUp: true))
@@ -642,8 +659,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             confirmModelDownload()
             updated.append(modelID)
         }
+        XCTAssertFalse(promptAccepted && updated.isEmpty, "the update prompt started no model")
         VocelloUIScreenshot.attach(app, named: "ios-update-models-started")
-        for modelID in modelIDs {
+        // A mode an earlier Vocello never installed stays Not Installed: only updated models are awaited.
+        for modelID in updated.isEmpty ? modelIDs : updated {
             let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
             var lastKeepAlive = Date()
             XCTAssertTrue(

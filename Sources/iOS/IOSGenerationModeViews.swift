@@ -228,6 +228,7 @@ struct IOSCustomVoiceView: View {
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
             modelDisplayName: IOSSettingsText.builtIn,
+            modelNeedsUpdate: modelManager.needsModelUpdate(.custom),
             setupChips: { customModeChips },
             onGenerate: generate,
             onCancel: {
@@ -1131,6 +1132,7 @@ struct IOSVoiceDesignView: View {
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
             modelDisplayName: IOSSettingsText.design,
+            modelNeedsUpdate: modelManager.needsModelUpdate(.design),
             setupChips: { designModeChips },
             onGenerate: generate,
             onCancel: {
@@ -1783,6 +1785,7 @@ struct IOSVoiceCloningView: View {
                 canGenerate: canGenerateInCurrentRuntime,
                 modelInstalled: isModelAvailable,
                 modelDisplayName: IOSSettingsText.clone,
+                modelNeedsUpdate: modelManager.needsModelUpdate(.clone),
                 setupChips: { cloneModeChips },
                 onGenerate: generate,
                 onCancel: {

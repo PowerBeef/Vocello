@@ -691,6 +691,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
       # RF-19 (E-01): the iPhone install and start claims taken before any await.
       - path: Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift
+      - path: Sources/iOSSupport/Services/IOSModelUpdateAutoStartPolicy.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
@@ -800,6 +801,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
       # RF-19 (E-01): the iPhone install and start claims taken before any await.
       - path: Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift
+      - path: Sources/iOSSupport/Services/IOSModelUpdateAutoStartPolicy.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift

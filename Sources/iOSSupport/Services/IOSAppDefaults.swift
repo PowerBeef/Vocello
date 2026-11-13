@@ -19,6 +19,9 @@ public enum IOSAppDefaults {
     public static let reduceMotionEnabledKey = "vocello.ios.reduceMotionEnabled"
     public static let reduceTransparencyEnabledKey = "vocello.ios.reduceTransparencyEnabled"
     public static let cellularModelDownloadsKey = "vocello.ios.cellularModelDownloads"
+    /// RF-59: the artifacts (`modelID@artifactVersion`) the user agreed to download to update the
+    /// models an earlier Vocello installed.
+    public static let modelUpdateConsentKey = "vocello.modelUpdate.consentedArtifacts"
 
     /// True once the user has dismissed the first-run onboarding flow.
     /// Skipped automatically when any model is already installed (returning
@@ -48,5 +51,12 @@ public enum IOSAppDefaults {
     public static var cellularModelDownloadsAllowed: Bool {
         get { defaults.bool(forKey: cellularModelDownloadsKey) }
         set { defaults.set(newValue, forKey: cellularModelDownloadsKey) }
+    }
+
+    /// RF-59: the model update asks once (Guideline 4.2.3(ii)) for these artifacts; after that a
+    /// launch resumes it. Cleared once nothing is left to update, so a later set asks again.
+    public static var modelUpdateConsentedArtifacts: [String] {
+        get { defaults.stringArray(forKey: modelUpdateConsentKey) ?? [] }
+        set { defaults.set(newValue, forKey: modelUpdateConsentKey) }
     }
 }

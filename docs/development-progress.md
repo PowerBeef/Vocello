@@ -26,16 +26,18 @@ session can continue from it alone.
 
 **Next, in order**
 
-1. RF-59's verification. The swap is on `main` (`b3b09d3c`, `d50e860b`: one `speed` variant per
-   mode, the hybrid, on both platforms; [hybrid-model.md](reference/hybrid-model.md) §6). The Mac
-   install is proven: `vocello models install pro_custom_speed` into a scratch data folder downloaded
-   and verified the 14 files in 38 s, reclaimed a seeded retired 4-bit folder and a staged 8-bit
-   download, and a seeded take passed Fast QC v10. Maintainer decision (November 13): every mode's
-   retired folders go once any mode's model verifies; a rerun on the same folder then removed Voice
-   Design's old folder too. The iPhone's download lane waits for the phone. Never install the hybrid
-   into the canonical models folder casually (`scripts/macos_test.sh models install|ensure` and the
-   Mac app's Download button do): once one model verifies, all six Speed and Quality folders there
-   are reclaimed, and the quality screens and `build_hybrid_model.py` read them.
+1. RF-59's verification. The swap is on `main` (`b3b09d3c`, `d50e860b`, `dbe59080`; one `speed`
+   variant per mode, the hybrid, on both platforms; [hybrid-model.md](reference/hybrid-model.md) §6).
+   The model update for 3.0 users is on `main` too: the modes an earlier build installed read Update
+   required and update themselves (the Mac on an unmetered network, the iPhone after one consent
+   alert), proven on an APFS clone of real 3.0 Mac data (76 s, tokenizer reused, History and voices
+   intact, a passing take per mode) and by `ui_test.sh macos smoke --scenario model-update`. The
+   iPhone flow (`smoke --scenario update-models` on a phone holding a 3.0 TestFlight install) waits
+   for a phone window. ★ **Before launching this build normally on the maintainer's Mac:** the real
+   models folder holds the six 3.0 folders the quality screens and `build_hybrid_model.py` read, and
+   a normal launch (or `scripts/macos_test.sh models install|ensure`) updates it, downloading the
+   three hybrids and removing all six. Decide first whether to move them to a research folder; until
+   then launch with `QWENVOICE_DEBUG=1 QWENVOICE_MODEL_UPDATE_AUTOSTART=off` (every UI lane does).
 2. On a quiet host, lead only: the formal speed lane for `attn` (`scripts/pcm_identity.py`) and the
    Mac gate bench's baseline seeded again (Fast QC v10).
 3. ★ The iPhone's memory and speed for `attn` (a BrowserStack App Automate farm run the maintainer

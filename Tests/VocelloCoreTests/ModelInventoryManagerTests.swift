@@ -92,6 +92,7 @@ final class ModelInventoryManagerTests: XCTestCase {
             (.installed(sizeBytes: 1), true),
             (.updateAvailable(sizeBytes: 1, stalePaths: ["model.safetensors"]), true),
             (.notInstalled, false),
+            (.updateRequired, false),
             (.incomplete(message: "missing", sizeBytes: 1), false),
             (.error(message: "failed"), false),
             (nil, false),
@@ -136,7 +137,7 @@ final class ModelInventoryManagerTests: XCTestCase {
         XCTAssertEqual(provider.refreshCount, 2, "A later refresh runs a new pass")
     }
 
-    func testAssetStatesMapToInventoryStatuses() {
+    func testAssetStatesMapToInventoryStatuses() throws {
         func integrity(missing: [String], size: Int64) -> AssetIntegrity {
             AssetIntegrity(
                 status: missing.isEmpty ? .verified : .incomplete,
@@ -154,6 +155,30 @@ final class ModelInventoryManagerTests: XCTestCase {
         }
 
         XCTAssertEqual(status(.notInstalled), .notInstalled)
+
+        // RF-59: a mode an earlier Vocello installed reads "Update Required" while nothing usable is
+        // installed; every other status, and every other mode, is left as it is.
+        func descriptor(_ mode: GenerationMode) -> TTSModel {
+            TTSModel(
+                id: "pro_\(mode.rawValue)", name: mode.rawValue, tier: "speed", folder: "\(mode.rawValue)-hybrid",
+                mode: mode, huggingFaceRepo: "org/model", artifactVersion: "1", iosDownloadEligible: true,
+                estimatedDownloadBytes: nil, outputSubfolder: "out", requiredRelativePaths: ["model.safetensors"]
+            )
+        }
+        let model = descriptor(.clone)
+        let other = descriptor(.custom)
+        let plan = ModelUpdatePlan(entries: [
+            .clone: .init(mode: .clone, retiredFolders: ["old"], detectedAtUTC: "2026-11-13T00:00:00Z", paused: false)
+        ])
+        XCTAssertEqual(LocalModelStatusProvider.applying(plan, to: .notInstalled, of: model), .updateRequired)
+        XCTAssertEqual(LocalModelStatusProvider.applying(plan, to: .notInstalled, of: other), .notInstalled)
+        XCTAssertEqual(
+            LocalModelStatusProvider.applying(plan, to: .installed(sizeBytes: 1), of: model), .installed(sizeBytes: 1)
+        )
+        XCTAssertEqual(
+            LocalModelStatusProvider.applying(plan, to: .incomplete(message: "m", sizeBytes: 1), of: model),
+            .incomplete(message: "m", sizeBytes: 1), "a partial new install reads as needing repair"
+        )
         XCTAssertEqual(
             status(.available(integrity(missing: [], size: 1_234))),
             .installed(sizeBytes: 1_234)
@@ -183,6 +208,30 @@ final class ModelInventoryManagerTests: XCTestCase {
             LocalModelStatusProvider.status(from: .incomplete(integrity(missing: ["a", "b"], size: 9)), presentation: french),
             .incomplete(message: "Installation incomplète : 2 fichiers requis manquants.", sizeBytes: 9)
         )
+    }
+
+    /// RF-59: the iPhone's provider over a real models folder. A mode an earlier Vocello installed
+    /// reads Update Required at the refresh, which records the plan off the main actor; a mode it
+    /// never installed stays Not Installed; the next launch's inventory reads the recorded plan.
+    func testLocalProviderReadsAnEarlierInstallAsUpdateRequired() async throws {
+        let registry = try makeRegistry()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ModelUpdate-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let assetStore = LocalModelAssetStore(modelRegistry: registry, rootDirectory: root, storeVersionSeed: "rf59-update")
+        let clone = try XCTUnwrap(registry.models.first { $0.mode == .clone })
+        let custom = try XCTUnwrap(registry.models.first { $0.mode == .custom })
+        let earlier = root.appendingPathComponent(try XCTUnwrap(clone.retiredFolders.first), isDirectory: true)
+        try FileManager.default.createDirectory(at: earlier, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: earlier.appendingPathComponent("model.safetensors"))
+
+        let provider = LocalModelStatusProvider(modelAssetStore: assetStore)
+        XCTAssertEqual(provider.initialStatuses(for: [clone])[clone.id], .notInstalled, "nothing recorded yet")
+        let refreshed = await provider.refreshStatuses(for: [clone, custom])
+        XCTAssertEqual(refreshed[clone.id], .updateRequired)
+        XCTAssertEqual(refreshed[custom.id], .notInstalled)
+        XCTAssertEqual(provider.initialStatuses(for: [clone])[clone.id], .updateRequired, "the next launch reads the plan")
     }
 
     func testLocalProviderInventoriesARealModelDirectory() async throws {

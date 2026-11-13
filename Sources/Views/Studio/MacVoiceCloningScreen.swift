@@ -182,7 +182,8 @@ struct MacVoiceCloningScreen: View {
             referenceAudioPath: draft.referenceAudioPath,
             hasReferenceTranscript: draft.trimmedReferenceTranscript != nil,
             text: draft.text,
-            contextStatus: cloneContextStatus
+            contextStatus: cloneContextStatus,
+            missingModelReadiness: modelManager.missingModelReadiness(for: .clone, displayName: modelDisplayName)
         )
     }
 
@@ -243,6 +244,7 @@ struct MacVoiceCloningScreen: View {
                 canRunBatch: canRunBatch,
                 lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
+                modelUpdate: modelManager.studioModelUpdate(for: .clone),
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,

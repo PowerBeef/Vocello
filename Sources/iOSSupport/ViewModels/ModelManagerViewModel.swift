@@ -10,6 +10,9 @@ enum ModelInventoryStatus: Equatable {
     /// Installed and usable, but the pinned catalog identity moved on —
     /// re-downloading through the authenticated delivery path updates it.
     case updateAvailable(sizeBytes: Int, stalePaths: [String])
+    /// RF-59: the mode's model from an earlier Vocello must be replaced; nothing usable is
+    /// installed (`ModelUpdatePlan`). Unlike `updateAvailable`, the mode cannot generate.
+    case updateRequired
     case incomplete(message: String, sizeBytes: Int)
     case error(message: String)
 }
@@ -68,6 +71,7 @@ final class LocalModelStatusProvider: ModelStatusProviding {
 
     func initialStatuses(for models: [TTSModel]) -> [String: ModelInventoryStatus] {
         let text = presentation()
+        let plan = modelAssetStore.modelUpdatePlan()
         return Dictionary(uniqueKeysWithValues: models.map { model in
             let status: ModelInventoryStatus
             guard let descriptor = modelAssetStore.descriptor(id: model.id) else {
@@ -80,12 +84,18 @@ final class LocalModelStatusProvider: ModelStatusProviding {
             default:
                 status = Self.status(from: modelAssetStore.state(for: descriptor), presentation: text)
             }
-            return (model.id, status)
+            return (model.id, Self.applying(plan, to: status, of: model))
         })
     }
 
     func refreshStatuses(for models: [TTSModel]) async -> [String: ModelInventoryStatus] {
         let text = presentation()
+        // RF-59: drops a mode whose new model is now installed, then reads the rest, off the main
+        // actor (a lock and a few small files; a pass that changes nothing writes nothing).
+        let store = modelAssetStore
+        let plan = await Task.detached(priority: .utility) { @concurrent in
+            (try? store.reconcileModelUpdatePlan()) ?? store.modelUpdatePlan()
+        }.value
         return Dictionary(uniqueKeysWithValues: models.map { model in
             let status: ModelInventoryStatus
             guard let descriptor = modelAssetStore.descriptor(id: model.id) else {
@@ -99,8 +109,14 @@ final class LocalModelStatusProvider: ModelStatusProviding {
                     return (model.id, .updateAvailable(sizeBytes: sizeBytes, stalePaths: stale))
                 }
             }
-            return (model.id, status)
+            return (model.id, Self.applying(plan, to: status, of: model))
         })
+    }
+
+    /// RF-59: a mode an earlier Vocello installed reads "Update required", not "Not installed".
+    static func applying(_ plan: ModelUpdatePlan, to status: ModelInventoryStatus, of model: TTSModel) -> ModelInventoryStatus {
+        guard case .notInstalled = status, plan.needsUpdate(model.mode) else { return status }
+        return .updateRequired
     }
 
     func isLikelyInstalled(_ model: TTSModel) -> Bool {
@@ -204,13 +220,18 @@ final class ModelManagerViewModel {
         refreshTask = nil
     }
 
+    /// RF-59: the mode's model from an earlier Vocello needs its update.
+    func needsModelUpdate(_ mode: GenerationMode) -> Bool {
+        models.contains { $0.mode == mode && statuses[$0.id] == .updateRequired }
+    }
+
     func isAvailable(_ model: TTSModel) -> Bool {
         switch statuses[model.id] {
         case .installed, .updateAvailable:
             return true
         case .checking:
             return statusProvider.isLikelyInstalled(model)
-        case .notInstalled, .incomplete, .error, .none:
+        case .notInstalled, .updateRequired, .incomplete, .error, .none:
             return false
         }
     }

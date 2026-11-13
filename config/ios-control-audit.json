@@ -52,8 +52,8 @@
       "path": "Sources/iOS/App/RootView.swift",
       "screen": "App root and system alerts",
       "scenario": "stateful",
-      "reason": "Root-owned alerts and permission recovery are observed through their visible labels.",
-      "interactiveOccurrenceCount": 5
+      "reason": "Root-owned alerts and permission recovery are observed through their visible labels; the RF-59 model update prompt (Update, Later) appears once after an app update from an earlier Vocello.",
+      "interactiveOccurrenceCount": 8
     },
     {
       "path": "Sources/iOS/IOSAppBootstrap.swift",
@@ -609,6 +609,21 @@
       "action": "Install, observe, cancel, retry, and remove",
       "expectedResult": "Model state, durable bytes, action set, and relaunch state agree",
       "expectedSemantics": "Non-color status, exact progress, phase, and destructive action",
+      "minimumTargetPoints": 44,
+      "mutationClass": "isolated-model",
+      "scenario": "stateful",
+      "availability": "conditional"
+    },
+    {
+      "id": "model-update-prompt",
+      "identifierPattern": "iosModelUpdate(PromptConfirm|PromptLater|Banner|Banner_done)",
+      "sourceToken": "iosModelUpdatePromptConfirm",
+      "screen": "App root (RF-59 model update)",
+      "prerequisite": "Isolated model root holding an earlier Vocello's model (a retired folder with its integrity manifest)",
+      "role": "alert buttons and status banner",
+      "action": "Answer the one-time update prompt (Later on one isolated profile, Update on another) and watch the banner until the done note, then dismiss it",
+      "expectedResult": "Later stops those modes: their rows keep Update Required and no later launch asks again; Update starts every model without another prompt, the banner counts them, and the earlier folders are gone once one model verifies",
+      "expectedSemantics": "Prompt names the total size and the networks; banner progress is text, not color; the done note is dismissible",
       "minimumTargetPoints": 44,
       "mutationClass": "isolated-model",
       "scenario": "stateful",

@@ -71,6 +71,11 @@ struct MacModelSetupSummaryRow: View {
     private func setupProgressText(_ progress: ModelManagerViewModel.RecommendedSetupProgress) -> String {
         if let modelID = progress.currentModelID,
            let model = TTSModel.model(id: modelID) {
+            if progress.kind == .update {
+                return MacInterfaceText.settingsUpdatingProgress(
+                    MacInterfaceText.modeName(model.mode), String(progress.completedCount), String(progress.totalCount)
+                )
+            }
             return MacInterfaceText.settingsDownloadingProgress(
                 MacInterfaceText.modeName(model.mode), viewModel.activeVariantLabel(for: model),
                 String(progress.completedCount), String(progress.totalCount)
@@ -183,11 +188,13 @@ struct MacModelPackageLine: View {
 
             // Dynamic detail only (repair reasons, download specifics).
             if let detail = presentation.detail {
+                // RF-59: the update explanation is a sentence to read whole, not a status line.
                 Text(detail)
                     .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
-                    .lineLimit(1)
+                    .lineLimit(presentation.kind == .updateRequired ? 3 : 1)
                     .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: presentation.kind == .updateRequired)
             }
 
             if case .downloading(let progress) = status,
@@ -259,7 +266,7 @@ struct MacModelPackageLine: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(MacTheme.Status.guarded)
                 .macType(.badge)
-        case .updateAvailable:
+        case .updateAvailable, .updateRequired:
             Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                 .foregroundStyle(MacTheme.accent)
                 .macType(.badge)
@@ -270,7 +277,7 @@ struct MacModelPackageLine: View {
         switch kind {
         case .ready: MacTheme.Status.healthy
         case .needsRepair: MacTheme.Status.guarded
-        case .updateAvailable: MacTheme.accent
+        case .updateAvailable, .updateRequired: MacTheme.accent
         case .checking, .downloading, .notInstalled: MacTheme.Text.secondary
         }
     }
@@ -331,6 +338,15 @@ private struct MacModelPackageAction: View {
 
                 manageButton
             }
+
+        case .updateRequired:
+            // RF-59: nothing usable is installed, so there is nothing to manage yet.
+            Button(MacInterfaceText.settingsUpdate) {
+                Task { await viewModel.download(model) }
+            }
+            .buttonStyle(packageStyle(tint: modeTint, prominence: .primary))
+            .help(downloadHelp)
+            .accessibilityIdentifier("settings_update_\(model.id)")
 
         case .downloaded:
             manageButton

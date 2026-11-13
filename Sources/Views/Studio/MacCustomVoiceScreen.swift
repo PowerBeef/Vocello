@@ -104,7 +104,8 @@ struct MacCustomVoiceScreen: View {
             isModelAvailable: isModelAvailable,
             hasText: draft.hasText,
             isGenerating: isGenerationActive,
-            modelDisplayName: modelDisplayName
+            modelDisplayName: modelDisplayName,
+            missingModelReadiness: modelManager.missingModelReadiness(for: .custom, displayName: modelDisplayName)
         )
     }
 
@@ -152,6 +153,7 @@ struct MacCustomVoiceScreen: View {
                 canRunBatch: canRunBatch,
                 lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
+                modelUpdate: modelManager.studioModelUpdate(for: .custom),
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
@@ -374,7 +376,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         isModelAvailable: Bool,
         hasText: Bool,
         isGenerating: Bool,
-        modelDisplayName: String
+        modelDisplayName: String,
+        missingModelReadiness: (title: String, detail: String)? = nil
     ) -> CustomVoiceReadinessPresentation {
         if isGenerating {
             return CustomVoiceReadinessPresentation(
@@ -399,8 +402,9 @@ struct CustomVoiceReadinessPresentation: Equatable {
         guard isModelAvailable else {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: MacInterfaceText.readinessInstallActiveModel,
-                detail: MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
+                // RF-59: an earlier Vocello's model reads "Update the model", not "Install".
+                title: missingModelReadiness?.title ?? MacInterfaceText.readinessInstallActiveModel,
+                detail: missingModelReadiness?.detail ?? MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
                 trailingText: nil,
                 isBusy: false
             )

@@ -25,6 +25,7 @@ struct RootView: View {
 
     @Environment(AppModel.self) private var appModel
     @Environment(IOSExternalImportInbox.self) private var externalImports
+    @Environment(IOSModelInstallerViewModel.self) private var modelInstaller
     @State private var performanceGate: IOSGenerationPerformanceGateModel
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
@@ -73,6 +74,8 @@ struct RootView: View {
         .iosAppAnimation(Theme.Motion.easeOut, value: appModel.tab)
         .iosAppAnimation(Theme.Motion.modePillSlide, value: appModel.studioMode)
         .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
+        // RF-59: the model update after an app update from an earlier Vocello.
+        .safeAreaInset(edge: .top, spacing: 0) { IOSModelUpdateBanner() }
         // The dock is the only persistent bottom chrome. Playback is
         // presented inline in Studio or through IOSPlayerSheet.
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -196,6 +199,23 @@ struct RootView: View {
             isRootOnScreen = false
             externalImportWaiter?.cancel()
         }
+        // RF-59: asks once before the model update downloads (RF-41, Guideline 4.2.3(ii)).
+        .alert(
+            IOSSettingsText.modelUpdatePromptTitle,
+            isPresented: Binding(
+                get: { modelInstaller.modelUpdatePrompt != nil },
+                // Dismissal clears the prompt only; each button acts on the prompt it was shown with.
+                set: { if !$0 { modelInstaller.postponeModelUpdate(nil) } }
+            ),
+            presenting: modelInstaller.modelUpdatePrompt
+        ) { prompt in
+            Button(IOSSettingsText.modelUpdateConfirm) { modelInstaller.confirmModelUpdate(prompt) }
+                .accessibilityIdentifier("iosModelUpdatePromptConfirm")
+            Button(IOSSettingsText.modelUpdateLater, role: .cancel) { modelInstaller.postponeModelUpdate(prompt) }
+                .accessibilityIdentifier("iosModelUpdatePromptLater")
+        } message: { prompt in
+            Text(modelUpdatePromptMessage(prompt))
+        }
         .alert(
             IOSInterfaceText.importFailed,
             isPresented: Binding(
@@ -222,6 +242,17 @@ struct RootView: View {
             \.iosGenerationPerformanceGate,
             IOSDisplayCapability.isFixedRefreshDisplay && performanceGate.isActive
         )
+    }
+
+    private func modelUpdatePromptMessage(_ prompt: IOSModelInstallerViewModel.ModelUpdatePrompt) -> String {
+        let size = IOSSettingsFormatters.fileSize(prompt.totalBytes)
+        let reason = prompt.makesRoomFirst
+            ? IOSSettingsText.modelUpdatePromptReasonLowSpace
+            : IOSSettingsText.modelUpdatePromptReason
+        let network = IOSAppDefaults.cellularModelDownloadsAllowed
+            ? IOSSettingsText.downloadModelDetailCellular(size)
+            : IOSSettingsText.downloadModelDetailWiFi(size)
+        return reason + "\n\n" + network
     }
 
     // MARK: - Tab routing

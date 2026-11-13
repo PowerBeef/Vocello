@@ -117,7 +117,7 @@ def run_metadata(values: dict[str, str], directory: Path) -> dict[str, Any]:
         if scenario in ("design-enrollment", "clone-reference", "long-form", "line-batch"):
             mode = {"design-enrollment": "design", "clone-reference": "clone"}.get(scenario, "custom")
             _focus(payload, scenario, "focused-smoke", [mode])
-        if scenario in ("long-form-recovery", "saved-voices-states"):
+        if scenario in ("long-form-recovery", "saved-voices-states", "model-update"):
             _focus(payload, scenario, "focused-smoke", [])
     if platform == "ios" and lane == "smoke":
         if scenario == "foreground-exit":

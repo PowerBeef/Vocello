@@ -197,15 +197,28 @@ public struct ContractBackedModelRegistry: ModelRegistry, Hashable, Sendable {
         RetiredModelReclamation.folders(of: models, in: modelsDirectory, isVerified: isVerified)
     }
 
-    /// RF-59: removes the retired folders `retiredFoldersToReclaim` returns, through the shared
-    /// component store. Synchronous and possibly slow: call it off the main actor.
+    /// RF-59: records the model update plan, then removes the retired folders
+    /// `retiredFoldersToReclaim` returns, through the shared component store
+    /// (`RetiredModelReclamation.reclaim`). Synchronous and possibly slow: call it off the main actor.
     public func reclaimRetiredFolders(
         in modelsDirectory: URL,
+        isInstalled: ((ModelDescriptor) -> Bool)? = nil,
         isVerified: (ModelDescriptor) -> Bool
     ) -> RetiredModelReclamation {
-        let folders = retiredFoldersToReclaim(in: modelsDirectory, isVerified: isVerified)
-        guard !folders.isEmpty else { return RetiredModelReclamation(removed: [], failed: [:]) }
-        return SharedModelComponentStore(modelsRoot: modelsDirectory).reclaimRetiredFolders(folders)
+        RetiredModelReclamation.reclaim(
+            models: models, in: modelsDirectory, isInstalled: isInstalled, isVerified: isVerified
+        )
+    }
+
+    /// RF-59: the model update plan for `modelsDirectory`, reconciled with what is installed
+    /// (`ModelUpdateLedger.reconcile`).
+    @discardableResult
+    public func reconcileModelUpdatePlan(
+        in modelsDirectory: URL,
+        change: ModelUpdateLedger.Change = .none,
+        isInstalled: (ModelDescriptor) -> Bool
+    ) throws -> ModelUpdatePlan {
+        try ModelUpdateLedger.reconcile(models: models, in: modelsDirectory, isInstalled: isInstalled, change: change)
     }
 
     /// Lists required model files that the manifest declares but cannot be

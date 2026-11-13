@@ -1320,6 +1320,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.installModel", defaultValue: "Install %1$@",
                    comment: "Studio install button; substitution is the localized model display name."), name)
     }
+    static func updateModel(_ name: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ios.modelUpdate.updateModel", defaultValue: "Update %1$@",
+               comment: "iOS Studio dock button when the mode's model needs its update (RF-59); %1$@ is the localized model display name. Presentation only."), name)
+    }
 }
 
 enum IOSAppTab: String, CaseIterable, Identifiable {

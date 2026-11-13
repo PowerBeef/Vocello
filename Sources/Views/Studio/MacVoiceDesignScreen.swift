@@ -121,7 +121,7 @@ struct MacVoiceDesignScreen: View {
         if isGenerationActive { return MacInterfaceText.customGeneratingFinalAudio }
         if canGenerate { return MacInterfaceText.readinessReadyToGenerate }
         if !ttsEngineStore.isReady { return MacInterfaceText.readinessEngineStarting }
-        if !isModelAvailable { return MacInterfaceText.readinessInstallActiveModel }
+        if !isModelAvailable { return modelManager.missingModelReadiness(for: .design, displayName: modelDisplayName).title }
         if !draft.hasVoiceDescription { return MacInterfaceText.designAddVoiceBrief }
         if !draft.hasText { return MacInterfaceText.readinessAddScript }
         return MacInterfaceText.designReviewTake
@@ -130,7 +130,7 @@ struct MacVoiceDesignScreen: View {
     private var readinessDetail: String {
         if isGenerationActive { return MacInterfaceText.customGeneratingFinalAudioDetail }
         if !ttsEngineStore.isReady { return MacInterfaceText.readinessEngineStartingDetail }
-        if !isModelAvailable { return MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName) }
+        if !isModelAvailable { return modelManager.missingModelReadiness(for: .design, displayName: modelDisplayName).detail }
         if !draft.hasVoiceDescription { return MacInterfaceText.designDescribeVoiceDetail }
         if !draft.hasText { return MacInterfaceText.designBriefUsedDetail }
         switch GenerationEnginePresentation.modelWarmPath(snapshot: ttsEngineStore.snapshot, activeModelID: activeModel?.id) {
@@ -166,6 +166,7 @@ struct MacVoiceDesignScreen: View {
                 canRunBatch: canRunBatch,
                 lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
+                modelUpdate: modelManager.studioModelUpdate(for: .design),
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,

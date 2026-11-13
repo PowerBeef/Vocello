@@ -213,7 +213,8 @@ headings use `settings_detail_<category>`, and `settings_backButton` returns to 
 
 | Element | Identifier |
 |---|---|
-| Model summary | `settings_modelDownloadsSummary`; recommended setup `settings_downloadRecommendedModels` / `settings_cancelRecommendedSetup` / `settings_recommendedSetupProgress` |
+| Model summary | `settings_modelDownloadsSummary`; recommended setup `settings_downloadRecommendedModels` / `settings_cancelRecommendedSetup` / `settings_recommendedSetupProgress` (during the RF-59 model update it reads "Updating [mode] · n of m complete", and Cancel stops the update) |
+| Model update (RF-59) | After an update from an earlier Vocello, the modes it installed read Update required (`settings_update_<id>`) and update on their own on an unmetered network (`QWENVOICE_MODEL_UPDATE_AUTOSTART=off` keeps them waiting in a debug session); `macModelUpdateBanner` above every destination shows the progress (`macModelUpdateBanner_progress`) and links Settings (`macModelUpdateBanner_showInSettings`), offers Update Now (`macModelUpdateBanner_update`) or Not Now (`macModelUpdateBanner_notNow`, which stops it like Cancel) when it has not started, asks nothing once the user stopped every remaining mode, and ends with the space the earlier models freed (`macModelUpdateBanner_dismiss`); Studio's `textInput_installModelButton` reads "Update in Settings" or "Updating · n%" |
 | Mode row | `settings_mode_<mode>` (scrolled to and flashed from a Studio installation link) |
 | Package row | `settings_package_<modelID>` / `settings_packageBadge_<modelID>` (Recommended or Heavy) / `settings_packageStatus_<modelID>` / `settings_downloadProgress_<modelID>` |
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |

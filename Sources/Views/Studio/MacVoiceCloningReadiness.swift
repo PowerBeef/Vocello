@@ -14,7 +14,8 @@ enum MacVoiceCloningReadiness {
         referenceAudioPath: String?,
         hasReferenceTranscript: Bool,
         text: String,
-        contextStatus: VoiceCloningContextStatus?
+        contextStatus: VoiceCloningContextStatus?,
+        missingModelReadiness: (title: String, detail: String)? = nil
     ) -> VoiceCloningReadinessDescriptor {
         if !engineReady {
             return VoiceCloningReadinessDescriptor(
@@ -26,10 +27,12 @@ enum MacVoiceCloningReadiness {
         }
 
         if !isModelAvailable {
+            // RF-59: an earlier Vocello's model reads "Update the model", not "Install".
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: MacInterfaceText.readinessInstallActiveModel,
-                detail: MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
+                title: missingModelReadiness?.title ?? MacInterfaceText.readinessInstallActiveModel,
+                detail: missingModelReadiness?.detail
+                    ?? MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
                 trailingText: nil
             )
         }

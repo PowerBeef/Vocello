@@ -117,8 +117,14 @@ bundled iPhone catalog supplies; `config/model-artifact-receipts.json` holds Mac
 empty. Every artifact pins a revision plus the exact size and SHA-256 of every required file; no hash or
 size is inferred. Each model lists the Speed and Quality folders it replaced as `retiredFolders`: a host
 removes every model's through the shared component store once any model verifies (the Mac after its
-digest pass, the iPhone at launch, `vocello models install`; maintainer decision 2026-11-13), and the
-legacy cleanup leaves them alone until then. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
+digest pass, the iPhone at launch and after each install, `vocello models install`; maintainer
+decision 2026-11-13), and the legacy cleanup leaves them alone until then. Before it deletes, the
+host records the model update plan (`ModelUpdateLedger`, `.qwenvoice-model-update.json`): the modes
+whose earlier model was installed, so they read "Update required" and update even after their
+folders are gone; a plan it cannot record removes nothing, and a newer build's ledger is left
+alone. The apps start that update themselves: the Mac on an unmetered network after its first
+refresh (a banner otherwise offers it), the iPhone after one consent alert naming the total size
+(RF-41), resumed silently at later launches; a mode the user stopped stays stopped. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
 all artifacts (the hybrids keep the shipped tokenizer, so installed copies are reused). It gives that component separate content identity (ordered path, size, and
 SHA-256) and compatibility identity (content plus component schema, loader ABI, runtime profile,
 and encoder capability), along with ordered source artifacts. Schema-v1 catalog documents remain

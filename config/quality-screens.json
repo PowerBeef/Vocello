@@ -633,7 +633,64 @@
             }
           },
           "expected": "Against Speed, a small gain in speaker similarity (all 8-bit gave +0.025 in the review's pre-screen) and nothing worse.",
-          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "sp",
+              "b": "attn",
+              "run": "clone-hybrid-seeds3",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "bDiffers": "no take identical (0 of 192 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0017,
+              "interval95": [
+                -0.0136,
+                0.0094
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": -0.0012,
+              "interval95": [
+                -0.0129,
+                0.0097
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0074,
+              "interval95": [
+                -0.0058,
+                0.0224
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -0.1,
+              "interval95": [
+                -15.1,
+                15.3
+              ]
+            },
+            "note": "Every requirement holds and no guard's interval reaches past its margin: speaker similarity -0.002 [-0.014, +0.009], error rate +0.007 [-0.006, +0.022], trailing silence -0.1 ms [-15.1, +15.3]. Gross failures 3 against 1, inside the 4 allowed. Not worse than Speed on clones, and not shown better."
+          }
         },
         "hybrid-attn-vs-quality": {
           "recorded": "2026-11-12",
@@ -657,7 +714,64 @@
             }
           },
           "expected": "Against Quality, a small loss in speaker similarity at most, inside the margin.",
-          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "qv",
+              "b": "attn",
+              "run": "clone-hybrid-seeds3",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "bDiffers": "no take identical (0 of 192 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0258,
+              "interval95": [
+                -0.0386,
+                -0.0144
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": -0.0305,
+              "interval95": [
+                -0.0419,
+                -0.0197
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0094,
+              "interval95": [
+                -0.004,
+                0.0252
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 5.3,
+              "interval95": [
+                -8.7,
+                20.4
+              ]
+            },
+            "note": "Inside every margin, but speaker similarity is lower than Quality's with its interval excluding zero (-0.026 [-0.039, -0.014]): attn keeps Speed's clone likeness, not Quality's. Error rate +0.009 [-0.004, +0.025]."
+          }
         },
         "hybrid-attn-down-vs-speed": {
           "recorded": "2026-11-12",
@@ -681,7 +795,64 @@
             }
           },
           "expected": "Against Speed, a small gain in speaker similarity (all 8-bit gave +0.025 in the review's pre-screen) and nothing worse.",
-          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+          "decision": "ADOPT (the candidate is not worse than the 4-bit Speed model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "sp",
+              "b": "attn-down",
+              "run": "clone-hybrid-seeds3",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "bDiffers": "no take identical (0 of 191 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 191,
+                "refused": 1,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 5
+            },
+            "speakerSimilarity": {
+              "meanDifference": 0.0024,
+              "interval95": [
+                -0.007,
+                0.0109
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": 0.0031,
+              "interval95": [
+                -0.0054,
+                0.0116
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0073,
+              "interval95": [
+                -0.005,
+                0.0217
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": -2.5,
+              "interval95": [
+                -19.1,
+                14.9
+              ]
+            },
+            "note": "Inside every margin: speaker similarity +0.002 [-0.007, +0.011], error rate +0.007 [-0.005, +0.022]. Gross failures 5 against 1 (one take refused), at the 4 extra allowed."
+          }
         },
         "hybrid-attn-down-vs-quality": {
           "recorded": "2026-11-12",
@@ -705,7 +876,64 @@
             }
           },
           "expected": "Against Quality, a small loss in speaker similarity at most, inside the margin.",
-          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it."
+          "decision": "ADOPT (the candidate is not worse than the 8-bit Quality model on clones) when every requirement holds and no guard's interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: a candidate becomes the single model only by hybrid-single-model, which reads it.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "qv",
+              "b": "attn-down",
+              "run": "clone-hybrid-seeds3",
+              "floor": "a1 (seed set 1) against s2 (seed set 2)"
+            },
+            "bDiffers": "no take identical (0 of 191 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 192,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 191,
+                "refused": 1,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 1,
+              "b": 5
+            },
+            "speakerSimilarity": {
+              "meanDifference": -0.0218,
+              "interval95": [
+                -0.0302,
+                -0.0137
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanDifference": -0.0264,
+              "interval95": [
+                -0.0351,
+                -0.0182
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.009,
+              "interval95": [
+                -0.0013,
+                0.0214
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanDifference": 3.0,
+              "interval95": [
+                -12.5,
+                17.5
+              ]
+            },
+            "note": "Inside every margin; speaker similarity lower than Quality's with its interval excluding zero (-0.022 [-0.030, -0.014]). Error rate +0.009 [-0.001, +0.021]."
+          }
         }
       },
       "noiseFloor": {
@@ -1616,7 +1844,151 @@
             }
           },
           "expected": "More projects than Speed, most of all in Chinese, Japanese and Korean, and within a few of Quality. Exploratory probes on seed sets 5 and 6 (24 East Asian Expressive projects; they decide nothing) generated 11 on Speed, 22 on Quality, 19 with attn-down, 17 with attn, 14 with mlp and 8 with down.",
-          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model."
+          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "sp",
+              "b": "attn",
+              "quality": "qv",
+              "runs": "long-form-hybrid-seeds13 to -seeds15"
+            },
+            "generatedProjects": {
+              "sp": 56,
+              "b": 65,
+              "qv": 68,
+              "of": 72
+            },
+            "againstSpeed": {
+              "gained": 11,
+              "lost": 2,
+              "signTestP": 0.0112
+            },
+            "byStratum": {
+              "builtin-chinese": {
+                "sp": 9,
+                "b": 11,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-english": {
+                "sp": 12,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-french": {
+                "sp": 11,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-japanese": {
+                "sp": 9,
+                "b": 12,
+                "qv": 11,
+                "of": 12
+              },
+              "builtin-korean": {
+                "sp": 3,
+                "b": 6,
+                "qv": 9,
+                "of": 12
+              },
+              "design-english": {
+                "sp": 12,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              }
+            },
+            "failureClasses": {
+              "sp": {
+                "classes": [
+                  "dropout",
+                  "speaking_rate_slow",
+                  "stopped-streaming",
+                  "terminal_silence"
+                ],
+                "projectsWithAnEngineRow": 13,
+                "projectsNotGenerated": 16
+              },
+              "b": {
+                "classes": [
+                  "dropout",
+                  "speaking_rate_slow"
+                ],
+                "projectsWithAnEngineRow": 6,
+                "projectsNotGenerated": 7
+              },
+              "source": "the Fast QC flags of each failed segment's engine row; a segment stopped while streaming has no Fast QC record"
+            },
+            "errorRateBetterFamily": {
+              "againstSpeed": {
+                "seedSet13": {
+                  "meanDifference": -0.0823,
+                  "interval95": [
+                    -0.1398,
+                    -0.0328
+                  ],
+                  "pairs": 18
+                },
+                "seedSet14": {
+                  "meanDifference": -0.0529,
+                  "interval95": [
+                    -0.12,
+                    0.0202
+                  ],
+                  "pairs": 19
+                },
+                "seedSet15": {
+                  "meanDifference": -0.0689,
+                  "interval95": [
+                    -0.1574,
+                    -0.0046
+                  ],
+                  "pairs": 17
+                }
+              },
+              "againstQuality": {
+                "seedSet13": {
+                  "meanDifference": 0.0311,
+                  "interval95": [
+                    0.0111,
+                    0.0554
+                  ],
+                  "pairs": 19
+                },
+                "seedSet14": {
+                  "meanDifference": 0.0702,
+                  "interval95": [
+                    0.0258,
+                    0.1235
+                  ],
+                  "pairs": 22
+                },
+                "seedSet15": {
+                  "meanDifference": 0.0346,
+                  "interval95": [
+                    0.0125,
+                    0.061
+                  ],
+                  "pairs": 21
+                }
+              }
+            },
+            "clauses": {
+              "controlReproduces": true,
+              "signTest": true,
+              "withinFiveOfQuality": true,
+              "noStratumTwoFewer": true,
+              "noNewFailureClass": true,
+              "noErrorIntervalWhollyPast": true
+            },
+            "note": "Read by hand: every clause of the decision holds (see clauses). The tool printed REJECT against Quality in seed sets 14 and 15 from its gross-failure count, which here is Quality's extra generated projects (B 8, Quality 4 over the three sets, nearly all refusals), and from the interval's reach; the decision allows up to 5 fewer projects than Quality and fails only an interval wholly past +0.04. The levels behind it: the better family's error rate per seed set is 0.12 to 0.15 on Speed, 0.05 to 0.10 on attn and about 0.03 on Quality; against Quality attn is higher in every set (+0.031, +0.070, +0.035, each excluding zero). The speaker spread across a project's windows follows (Speed 0.34 to 0.40, attn 0.23 to 0.25, Quality 0.16), and attn's projects run about 8 s longer than Quality's. attn closes most of Speed's long-form gap, not all of it."
+          }
         },
         "hybrid-attn-down-long-form": {
           "recorded": "2026-11-12",
@@ -1632,7 +2004,151 @@
             }
           },
           "expected": "More projects than Speed, most of all in Chinese, Japanese and Korean, and within a few of Quality. Exploratory probes on seed sets 5 and 6 (24 East Asian Expressive projects; they decide nothing) generated 11 on Speed, 22 on Quality, 19 with attn-down, 17 with attn, 14 with mlp and 8 with down.",
-          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model."
+          "decision": "ADOPT (the candidate passes long-form) when the control reproduces the defect; the sign test against sp gives p below 0.05 in B's favour; B generates at most 5 fewer projects than qv; no stratum generates 2 or more fewer projects under B than under sp; B has no failure class sp lacks; and no seed set's report puts the better family's error-rate interval wholly past +0.04 against sp or against qv. REJECT when B generates fewer projects than sp, or such an interval lies wholly past +0.04. Otherwise INCONCLUSIVE. This rule alone changes nothing: see hybrid-single-model.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "arms": {
+              "a": "sp",
+              "b": "attn-down",
+              "quality": "qv",
+              "runs": "long-form-hybrid-seeds13 to -seeds15"
+            },
+            "generatedProjects": {
+              "sp": 56,
+              "b": 63,
+              "qv": 68,
+              "of": 72
+            },
+            "againstSpeed": {
+              "gained": 8,
+              "lost": 1,
+              "signTestP": 0.0195
+            },
+            "byStratum": {
+              "builtin-chinese": {
+                "sp": 9,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-english": {
+                "sp": 12,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-french": {
+                "sp": 11,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              },
+              "builtin-japanese": {
+                "sp": 9,
+                "b": 12,
+                "qv": 11,
+                "of": 12
+              },
+              "builtin-korean": {
+                "sp": 3,
+                "b": 3,
+                "qv": 9,
+                "of": 12
+              },
+              "design-english": {
+                "sp": 12,
+                "b": 12,
+                "qv": 12,
+                "of": 12
+              }
+            },
+            "failureClasses": {
+              "sp": {
+                "classes": [
+                  "dropout",
+                  "speaking_rate_slow",
+                  "stopped-streaming",
+                  "terminal_silence"
+                ],
+                "projectsWithAnEngineRow": 13,
+                "projectsNotGenerated": 16
+              },
+              "b": {
+                "classes": [
+                  "dropout",
+                  "stopped-streaming"
+                ],
+                "projectsWithAnEngineRow": 9,
+                "projectsNotGenerated": 9
+              },
+              "source": "the Fast QC flags of each failed segment's engine row; a segment stopped while streaming has no Fast QC record"
+            },
+            "errorRateBetterFamily": {
+              "againstSpeed": {
+                "seedSet13": {
+                  "meanDifference": -0.0722,
+                  "interval95": [
+                    -0.1443,
+                    0.001
+                  ],
+                  "pairs": 18
+                },
+                "seedSet14": {
+                  "meanDifference": -0.0646,
+                  "interval95": [
+                    -0.1268,
+                    -0.0079
+                  ],
+                  "pairs": 20
+                },
+                "seedSet15": {
+                  "meanDifference": -0.0879,
+                  "interval95": [
+                    -0.1641,
+                    -0.0289
+                  ],
+                  "pairs": 17
+                }
+              },
+              "againstQuality": {
+                "seedSet13": {
+                  "meanDifference": 0.0284,
+                  "interval95": [
+                    0.0043,
+                    0.0669
+                  ],
+                  "pairs": 19
+                },
+                "seedSet14": {
+                  "meanDifference": 0.0577,
+                  "interval95": [
+                    0.0126,
+                    0.1305
+                  ],
+                  "pairs": 21
+                },
+                "seedSet15": {
+                  "meanDifference": 0.0085,
+                  "interval95": [
+                    0.0004,
+                    0.0176
+                  ],
+                  "pairs": 21
+                }
+              }
+            },
+            "clauses": {
+              "controlReproduces": true,
+              "signTest": true,
+              "withinFiveOfQuality": true,
+              "noStratumTwoFewer": true,
+              "noNewFailureClass": true,
+              "noErrorIntervalWhollyPast": true
+            },
+            "note": "Read by hand: every clause holds, two at their limit: 5 fewer projects than Quality, and Korean 3 of 12, the same as Speed (8 dropout refusals). Error rate against Quality +0.028, +0.058, +0.008, none wholly past +0.04; against Speed lower in every set."
+          }
         },
         "hybrid-single-model": {
           "recorded": "2026-11-12",
@@ -1648,7 +2164,61 @@
             }
           },
           "expected": "At least one candidate passes. Exploratory single Korean takes put attn at 1.06 times Speed's real-time factor, attn-down at 1.15 and Quality at 1.63, and refused 0, 2 and 0 of 52 takes against Speed's 4.",
-          "decision": "A candidate QUALIFIES when its three rules are ADOPT (or its rule against Speed on clones is ADOPT and its rule against Quality is no worse than INCONCLUSIVE with a mean similarity loss under 0.02) and it is inside both ceilings. With one qualifier, it is the single-model candidate. With several, the one with the fewest added weights, unless a richer one generates at least 4 more long-form projects of 72 or is better on clone similarity with its interval excluding zero. With none, no single model is chosen and the recipes are revised. The chosen candidate then goes to: a built artifact per mode proven PCM-identical to its key's arm, Voice Design and Built-in Voice single takes, the iPhone's memory and speed (a farm run or a phone window), and the maintainer's publication decision. Nothing ships from this rule alone."
+          "decision": "A candidate QUALIFIES when its three rules are ADOPT (or its rule against Speed on clones is ADOPT and its rule against Quality is no worse than INCONCLUSIVE with a mean similarity loss under 0.02) and it is inside both ceilings. With one qualifier, it is the single-model candidate. With several, the one with the fewest added weights, unless a richer one generates at least 4 more long-form projects of 72 or is better on clone similarity with its interval excluding zero. With none, no single model is chosen and the recipes are revised. The chosen candidate then goes to: a built artifact per mode proven PCM-identical to its key's arm, Voice Design and Built-in Voice single takes, the iPhone's memory and speed (a farm run or a phone window), and the maintainer's publication decision. Nothing ships from this rule alone.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "attn",
+            "commit": "4ef80685 (executable 5fb945d80dbb784f)",
+            "candidates": {
+              "attn": {
+                "clone": [
+                  "ADOPT",
+                  "ADOPT"
+                ],
+                "longForm": "ADOPT",
+                "addedWeightsMB": 176
+              },
+              "attn-down": {
+                "clone": [
+                  "ADOPT",
+                  "ADOPT"
+                ],
+                "longForm": "ADOPT",
+                "addedWeightsMB": 352
+              }
+            },
+            "cost": {
+              "sp": {
+                "cloneRTFMedian": 0.476,
+                "cloneTakes": 192,
+                "longFormSegmentRTFMedian": 0.281,
+                "longFormSegments": 50,
+                "mlxPeakMBClone": 3597
+              },
+              "attn": {
+                "cloneRTFMedian": 0.499,
+                "cloneTakes": 192,
+                "longFormSegmentRTFMedian": 0.297,
+                "longFormSegments": 77,
+                "mlxPeakMBClone": 3765
+              },
+              "attn-down": {
+                "cloneRTFMedian": 0.506,
+                "cloneTakes": 191,
+                "longFormSegmentRTFMedian": 0.299,
+                "longFormSegments": 72,
+                "mlxPeakMBClone": 3933
+              },
+              "qv": {
+                "cloneRTFMedian": 0.61,
+                "cloneTakes": 192,
+                "longFormSegmentRTFMedian": 0.39,
+                "longFormSegments": 81,
+                "mlxPeakMBClone": 4330
+              }
+            },
+            "note": "Both candidates qualify: their three rules are ADOPT, their median real-time factor is at most 1.07 times Speed's on clones and long-form segments (ceiling 1.20), and their added weights (176 and 352 MB) are under 560 MB. With two qualifiers the one with the fewest added weights is chosen, attn, because attn-down generated fewer long-form projects (63 against 65), not 4 more, and was not better on clone similarity (+0.004 [-0.008, +0.016] against attn). The decision's next steps: the built artifact's identity (done: 192 of 192 clone takes and 21 of 21 long-form projects PCM-identical), Voice Design and Built-in Voice single takes (done: hybrid-attn-single-vs-speed and -vs-quality ADOPT, better than Speed and within the margins of Quality), the iPhone's memory and speed, and the maintainer's publication decision. attn beats Speed and does not match Quality: it keeps Speed's clone likeness, roughly halves Speed's long-form error rate, which stays about twice Quality's, and comes within 0.007 of Quality's error rate on single takes. Replacing Quality is the maintainer's call, made with that gap in view."
+          }
         }
       },
       "noiseFloor": {
@@ -1902,7 +2472,66 @@
             }
           },
           "expected": "No difference beyond the floor against Speed: the probes and the clone and long-form screens found attn no worse, and single takes condition on the whole text, as long-form segments do not.",
-          "decision": "ADOPT (the candidate's single takes are not worse than the 4-bit Speed model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate."
+          "decision": "ADOPT (the candidate's single takes are not worse than the 4-bit Speed model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "734e3766 (executable 923c421884051277)",
+            "arms": {
+              "a": "sp",
+              "b": "attn",
+              "run": "single-seeds1",
+              "floor": "sp (seed set 1) against ss (seed set 2)"
+            },
+            "noiseFloor": {
+              "errorRateBetterFamily": {
+                "meanDifference": -0.004,
+                "interval95": [
+                  -0.0167,
+                  0.0099
+                ]
+              },
+              "speakerWindowSpread": {
+                "meanDifference": 0.0032,
+                "interval95": [
+                  -0.0151,
+                  0.0219
+                ]
+              }
+            },
+            "bDiffers": "no take identical (0 of 144 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 144,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 144,
+                "refused": 0,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 2,
+              "b": 0
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": -0.0158,
+              "interval95": [
+                -0.0287,
+                -0.005
+              ]
+            },
+            "speakerWindowSpread": {
+              "meanDifference": -0.0357,
+              "interval95": [
+                -0.0508,
+                -0.0223
+              ]
+            },
+            "note": "Every requirement holds: the noise floor (sp against ss) reaches 0.017 on error rate and 0.022 on window spread, inside 0.71 of each margin; no take identical. attn is better than Speed on single takes, each interval excluding zero: error rate -0.016 [-0.029, -0.005], window spread -0.036 [-0.051, -0.022], takes 1.9 s shorter [-2.5, -1.3]. No take refused or failed (Speed 2 gross failures, attn 0)."
+          }
         },
         "hybrid-attn-single-vs-quality": {
           "recorded": "2026-11-12",
@@ -1922,7 +2551,66 @@
             }
           },
           "expected": "Against Quality, no worse beyond the margins; Quality refused fewer long-form projects, so a refusal gap, if any, shows here as gross failures.",
-          "decision": "ADOPT (the candidate's single takes are not worse than the 8-bit Quality model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate."
+          "decision": "ADOPT (the candidate's single takes are not worse than the 8-bit Quality model's) when every requirement holds, no guard's interval reaches past its margin on B's harmful side, and B refuses or fails at most 2 more takes than A. REJECT when a guard's whole interval lies past its margin, or B loses more takes than allowed. Otherwise INCONCLUSIVE. This rule alone changes nothing: it is the single-take step that hybrid-single-model sets for its chosen candidate.",
+          "result": {
+            "decided": "2026-11-12",
+            "verdict": "ADOPT",
+            "commit": "734e3766 (executable 923c421884051277)",
+            "arms": {
+              "a": "qv",
+              "b": "attn",
+              "run": "single-seeds1",
+              "floor": "sp (seed set 1) against ss (seed set 2)"
+            },
+            "noiseFloor": {
+              "errorRateBetterFamily": {
+                "meanDifference": -0.004,
+                "interval95": [
+                  -0.0167,
+                  0.0099
+                ]
+              },
+              "speakerWindowSpread": {
+                "meanDifference": 0.0032,
+                "interval95": [
+                  -0.0151,
+                  0.0219
+                ]
+              }
+            },
+            "bDiffers": "no take identical (0 of 144 paired)",
+            "outcomes": {
+              "a": {
+                "generated": 144,
+                "refused": 0,
+                "failed": 0
+              },
+              "b": {
+                "generated": 144,
+                "refused": 0,
+                "failed": 0
+              }
+            },
+            "grossFailures": {
+              "a": 0,
+              "b": 0
+            },
+            "errorRateBetterFamily": {
+              "meanDifference": 0.0071,
+              "interval95": [
+                0.0002,
+                0.0148
+              ]
+            },
+            "speakerWindowSpread": {
+              "meanDifference": 0.0103,
+              "interval95": [
+                0.0047,
+                0.0155
+              ]
+            },
+            "note": "Every requirement holds and both guards stay inside their margins, with small measured costs against Quality: error rate +0.007 [+0.000, +0.015], window spread +0.010 [+0.005, +0.016], takes 0.6 s longer. No take refused or failed in either arm."
+          }
         }
       }
     }

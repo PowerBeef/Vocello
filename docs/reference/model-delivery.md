@@ -149,6 +149,9 @@ artifacts, `Sources/Resources/qwenvoice_ios_model_catalog.json` (`scripts/model_
 - **Shared codec.** `speech_tokenizer/model.safetensors` is fp32 and byte-identical to Qwen's release.
 - **Marking.** `marking/audioseal_wm16_generator_fp16.safetensors` is Meta's AudioSeal generator (MIT).
 - **`generation_config.json`** is upstream's, unchanged.
+- **A hybrid candidate (RF-55, not published).** `scripts/build_hybrid_model.py` assembles a
+  mixed-precision artifact per mode from the installed, verified 4-bit and 8-bit ones; its recipe,
+  identity proof, screens and delivery steps are in [hybrid-model.md](hybrid-model.md).
 - **`artifactVersion` history.** 2026.04.05.2 → 2026.05.25.1 → 2026.07.26.1 (8-bit text embedding) →
   2026.08.01.1 (f16 codec, withdrawn) → 2026.08.06.1 (AudioSeal) → 2026.09.14.1 (fp32 codec restored
   after a burst in the first 50 ms of streamed clone takes).

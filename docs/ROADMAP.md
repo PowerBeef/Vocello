@@ -77,7 +77,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-52` | planned | Quality remediation, stage 2: clone conditioning parity | `RF-50` |
 | `RF-53` | planned | Quality remediation, stage 3: long-form text layout, language fallback and runaway takes | `RF-50` |
 | `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
-| `RF-55` | planned | Quality remediation, stage 5: code-predictor precision | `RF-50` |
+| `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
 | `RF-58` | planned | One take variation: the Variation setting is retired and every take samples as the model's reference does | — |
 
@@ -184,8 +184,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-54`** (planned) — Quality remediation, stage 4: the decoder's 72-frame attention window.
   gate: The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.
 
-- **`RF-55`** (planned) — Quality remediation, stage 5: code-predictor precision.
-  gate: The speed and memory cost of an 8-bit code predictor under the 4-bit talker is measured on the Mac, unclamped and on the efficiency cores; the pre-screen's similarity gain is repeated in Swift on more voices and languages; and the maintainer decides on a new Speed artifact from those numbers. Publishing an artifact is the maintainer's step.
+- **`RF-55`** (planned) — Quality remediation, stage 5: model precision and the hybrid model.
+  gate: A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window); and the maintainer decides on its publication and on the Speed/Quality selector. Publishing an artifact is the maintainer's step.
 
 - **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
   gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.

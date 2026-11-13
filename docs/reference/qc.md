@@ -515,7 +515,8 @@ PY="$(python3 scripts/select_python.py)"
   test for clones, whose onset trim reads the decoder's first frames).
 - **Another variant, the same takes:** `run --variant quality` runs a plan's takes on the installed
   8-bit model; the arm records it, and two arms on different variants are never one setting. The
-  hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models.
+  hybrid-model rules (`hybrid-*`, RF-55) compare a mixed-precision recipe with both shipped models;
+  their verdicts and what they mean are in [hybrid-model.md](hybrid-model.md).
 - **Single takes:** a long-form screen whose definition sets `longForm: never` asks for one take of
   each script instead of planning it into segments. The `single` screen uses it for Built-in Voice
   and Voice Design takes of two pool sentences, on the long-form screen's strata (RF-55).

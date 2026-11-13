@@ -533,18 +533,18 @@
     {
       "id": "RF-55",
       "plan": "release-first-3-0-2026-09",
-      "title": "Quality remediation, stage 5: code-predictor precision",
+      "title": "Quality remediation, stage 5: model precision and the hybrid model",
       "status": "planned",
       "blockedBy": [
         "RF-50"
       ],
-      "gate": "The speed and memory cost of an 8-bit code predictor under the 4-bit talker is measured on the Mac, unclamped and on the efficiency cores; the pre-screen's similarity gain is repeated in Swift on more voices and languages; and the maintainer decides on a new Speed artifact from those numbers. Publishing an artifact is the maintainer's step.",
+      "gate": "A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window); and the maintainer decides on its publication and on the Speed/Quality selector. Publishing an artifact is the maintainer's step.",
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "docs/reference/qwen3-tts-guide.md"
       ],
       "updated": "2026-11-12",
-      "notes": "Opened 2026-11-11 (the review's pre-screen: an 8-bit code predictor gives +0.010 similarity for 56 MB). QWENVOICE_CODE_PREDICTOR_BITS=8 (8bec3007): about 20% slower on a GPU-bound frame (the code predictor runs 15 times per frame); rule code-predictor-8bit NOT REPEATED; Korean long-form NOT SHOWN (15 of 16 projects refused either way). 2026-11-12, maintainer: a custom model may ship, up to 20% slower, and one hybrid model replaces the Speed/Quality selector if it is right. Ceiling probe (exploratory): the 8-bit model generated 31 of 32 Chinese and Japanese long-form projects the 4-bit refused 21 of. QWENVOICE_MIXED_PRECISION (533da6e3, cbffd309) takes named talker tensors from the 8-bit sibling. Probes of 24 East Asian projects: Speed 11, attn 17 (RTF x1.06, +124 MB peak), attn-down 19 (x1.15), Quality 22 (x1.63). Campaign at 4ef80685: hybrid-attn and hybrid-attn-down against Speed and Quality (clone seed set 3; long-form seed sets 13-15, 72 projects); hybrid-single-model chooses. Built-artifact route (958e8d55): scripts/build_hybrid_model.py and a development contract."
+      "notes": "Opened 2026-11-11 (the review's pre-screen). An 8-bit code predictor costs about 20% on a GPU-bound frame with no repeatable gain (code-predictor-8bit NOT REPEATED; Korean long-form NOT SHOWN). 2026-11-12, maintainer: a custom model may ship, up to 20% slower, and one hybrid model replaces the Speed/Quality selector if it is right. QWENVOICE_MIXED_PRECISION (533da6e3, cbffd309) screens a recipe; scripts/build_hybrid_model.py (958e8d55) builds it. Decided 2026-11-12 (results in config/quality-screens.json; docs/reference/hybrid-model.md): attn, the talker's attention at 8 bits (+176 MB), is the single-model candidate. ADOPT on clones and single takes against both models and on long-form (65 of 72 projects; Speed 56, Quality 68), at RTF x1.05 to x1.06 and MLX peak +168 MB; the built artifact reproduces its arm (192 of 192 clone takes, 21 of 21 projects). It beats Speed everywhere and does not match Quality: clone similarity -0.026, long-form error rate about twice Quality's. Left: the formal speed lane; the iPhone's memory and speed; the maintainer's publication and selector decisions."
     },
     {
       "id": "RF-57",

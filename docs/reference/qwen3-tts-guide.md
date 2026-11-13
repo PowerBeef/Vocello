@@ -666,7 +666,7 @@ The long-form planner fills each segment up to a 300-unit budget (`LongFormPlann
 text exhaustion. The RF-18 screens kept that budget: a 200-unit budget (C2) failed 15 of 56 projects
 under Consistent against 9 for the control, so C-02 was not adopted. Consistent is retired (RF-58);
 the long-form refusals left under Expressive, mostly in Chinese, Japanese and Korean, are RF-55's
-subject (§11.2). Shipping behavior is in
+subject (§11.2; the hybrid candidate is in [`hybrid-model.md`](hybrid-model.md)). Shipping behavior is in
 [`long-form-generation.md`](long-form-generation.md).
 
 ---
@@ -747,7 +747,9 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
   past 2 s and slow delivery; sampling the talker as Balanced does (0.8 / 0.95) refused 8, with the
   error rate flat, and shipped for long-form segments on 2026-11-12 (rule
   `long-form-consistent-talker`, RF-53) until RF-58 retired the variation the same day. Under
-  Expressive, East Asian long-form projects are still refused most (RF-55).
+  Expressive, Speed still refuses long-form projects most in Chinese, Japanese and Korean: of the 72
+  projects of seed sets 13 to 15 (six strata), Speed generated 56, the `attn` hybrid 65 and Quality 68
+  (RF-55, [hybrid-model.md](hybrid-model.md)).
 - **Single takes see their whole text (D1, adopted 2026-10-20, RF-21).** With the streaming text
   layout, a short take that opened with a sigh or a long pause could feed its whole script before
   speech started; the talker then saw only `tts_pad` and whispered or mumbled (a French take ran to

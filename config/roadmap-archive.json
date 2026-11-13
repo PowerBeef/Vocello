@@ -6055,6 +6055,24 @@
         "file:scripts/cli_package.py",
         "file:scripts/tests/test_cli_package.py"
       ]
+    },
+    {
+      "id": "BKL-75",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The local routed check never compiles the vocello executable's own sources",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "scripts/dev.sh check plans ./scripts/build.sh cli --version whenever a source the CLI links (Sources/VocelloCLI, the cores, Packages) or project.yml changes, and a test pins it.",
+      "sourceOfTruth": [
+        "scripts/development_workflow.py",
+        "scripts/tests/test_development_workflow.py"
+      ],
+      "updated": "2026-11-13",
+      "notes": "Found 2026-11-13 while verifying RF-59: b3b09d3c passed the routed check with a main-actor error in ModelsCommand.swift, a file only the vocello executable compiles (fixed in d50e860b). The macOS test host compiles VocelloCLICore and the cores but not the executable; push CI builds it, so a push would have failed there. Needs no iPhone, so it is fixed in the change that records it. Fixed 2026-11-13: check_plan adds the CLI build (CI's own command) when builds_cli() sees such a path; the incremental build shares the macOS tests' arena.",
+      "evidence": [
+        "file:scripts/development_workflow.py",
+        "file:scripts/tests/test_development_workflow.py"
+      ]
     }
   ]
 }

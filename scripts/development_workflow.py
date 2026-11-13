@@ -418,6 +418,26 @@ def ui_bundle_mode(paths: list[str]) -> str | None:
     return "ios"
 
 
+# 2026-11-13 (RF-59): a main-actor error in a file only the `vocello` executable
+# compiles reached a commit through a passing local check, since the macOS test
+# host compiles VocelloCLICore and the cores, never the executable's own
+# sources. Push CI builds it (CI_COMMANDS); the local check builds it too when a
+# source it links changes, in the same incremental arena as the macOS tests.
+CLI_LINKED_SOURCES = (
+    "Sources/VocelloCLI/",
+    "Sources/VocelloDesktopCore/",
+    "Sources/QwenVoiceCore/",
+    "Sources/QwenVoiceBackendCore/",
+    "Packages/",
+)
+CLI_BUILD = ["./scripts/build.sh", "cli", "--version"]
+
+
+def builds_cli(paths: list[str]) -> bool:
+    """Whether the dirty tree can break the `vocello` executable."""
+    return any(p.startswith(CLI_LINKED_SOURCES) or p == "project.yml" for p in paths)
+
+
 LINEAGE_IDENTITY = "scripts/lib/lineage_identity.py"
 
 
@@ -451,6 +471,8 @@ def check_plan(paths: list[str], *, scoped: bool = False) -> dict:
     if lanes["swift"]:
         # A swift lane that schedules nothing verifies nothing: fall back to the whole lane.
         commands.extend(swift_test_commands(paths) or [[*MACOS_TESTS]])
+    if builds_cli(paths):
+        commands.append(list(CLI_BUILD))
     if lanes["ios"]:
         commands.append(["./scripts/build_foundation_targets.sh", "ios", "--incremental"])
     if lanes["website"]:
@@ -476,7 +498,7 @@ CI_COMMANDS: list[list[str]] = [
     ["python3", "scripts/lint_baseline.py", "pyright"],
     ["scripts/macos_test.sh", "test"],
     ["scripts/macos_test.sh", "tsan"],
-    ["./scripts/build.sh", "cli", "--version"],
+    CLI_BUILD,
     ["./scripts/build_foundation_targets.sh", "ios", "--incremental"],
     # After both deterministic builds, in their arenas: only the UI-test targets compile.
     ["./scripts/build_ui_test_bundles.sh", "all", "--gate"],

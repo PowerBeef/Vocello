@@ -73,6 +73,19 @@ class CheckPlanTests(unittest.TestCase):
                 joined = commands(MODULE.check_plan([changed]))
                 self.assertIn(f"./scripts/build_ui_test_bundles.sh {expected}", joined)
 
+    def test_sources_the_cli_links_build_the_cli(self) -> None:
+        """RF-59: the macOS test host never compiles the `vocello` executable's own sources."""
+        cli = "./scripts/build.sh cli --version"
+        with mock.patch.object(MODULE, "project_generation_status", return_value=None):
+            for changed in ("Sources/VocelloCLI/ModelsCommand.swift", "Sources/QwenVoiceCore/ModelAssets.swift",
+                            "Sources/VocelloDesktopCore/EngineHostLease.swift", "project.yml"):
+                with self.subTest(changed=changed):
+                    self.assertIn(cli, commands(MODULE.check_plan([changed])))
+            for changed in ("Sources/ContentView.swift", "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+                            "docs/ROADMAP.md"):
+                with self.subTest(changed=changed):
+                    self.assertNotIn(cli, commands(MODULE.check_plan([changed])))
+
     def test_xcuitest_only_changes_skip_the_deterministic_suites(self) -> None:
         """PA-06: no macOS test bundle compiles the XCUITest sources, so only their bundle compiles."""
         mac = commands(MODULE.check_plan(["Tests/VocelloMacUITests/VocelloMacUITestCase.swift"]))

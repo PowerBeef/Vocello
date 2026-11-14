@@ -6073,6 +6073,24 @@
         "file:scripts/development_workflow.py",
         "file:scripts/tests/test_development_workflow.py"
       ]
+    },
+    {
+      "id": "RF-50",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 0: the pre-registered machine screens",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Before a screen decides anything it is run against itself (the same build and seeds, twice), so each metric's noise floor is known (RF-57). Nobody listens.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "scripts/clone_fidelity_lane.py",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-11-14",
+      "notes": "Opened 2026-11-11 at the maintainer's request (the review's verified findings; ER-01's encoder parity fixtures). The golden-codes pin: scripts/encoder_golden_codes.py with config/encoder-golden-codes.json (d7d18eda). The paired screen: scripts/quality_screen.py with config/quality-screens.json (6e934d2c, e57ddd57); the clone screen is 192 takes over 48 saved voices in six languages; its noise floor (two seed sets) is 0.035 similarity, 0.027 error rate and 3 gross failures. The long-form screen is version 2 (Expressive only, RF-58). Closed 2026-11-14: the long-form screen's self-run at 6db4906d on the installed attn hybrid reproduces itself (seed set 16 twice: 21 of 21 projects PCM-identical, the same 3 refused); its noise floor (seed sets 16 and 17) is -0.004 [-0.042, +0.036] in error rate and +0.013 [-0.040, +0.067] in window spread, gross failures 3 and 3.",
+      "evidence": [
+        "doc:docs/reference/qc.md"
+      ]
     }
   ]
 }

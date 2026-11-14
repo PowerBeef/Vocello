@@ -554,6 +554,15 @@ PY="$(python3 scripts/select_python.py)"
   It scores both ASR families over the joined output, the spread of the speaker windows (no
   reference), each segment's end reason (one that ran to the frame cap is a gross failure) and the
   segments' Fast QC warnings; strata are reported by stratum and by variation.
+- **The long-form screen's self-run** (2026-11-14 at `6db4906d`, the installed `attn` hybrid). The
+  same build on seed set 16 twice: 21 of 24 projects generated in both runs, all 21 PCM-identical,
+  and the same 3 refused (two Korean, one Chinese), so the screen reproduces itself. Its noise floor,
+  seed set 16 against 17 (20 paired projects): the better family's error rate differs by −0.004
+  [−0.042, +0.036], the speaker-window spread by +0.013 [−0.040, +0.067], duration by +1.2 s
+  [−4.2, +7.2], and gross failures are 3 against 3. The error rate's floor reaches the 0.04 margin
+  and the window spread's passes the 0.05 margin, so at four projects per stratum the screen
+  separates a gross regression from no change and nothing finer; a finer long-form decision needs
+  more projects or seed sets.
 - **Its noise floor** (measured 2026-11-11 at `6e934d2c`: the same takes under two seed sets) is
   0.035 in mean speaker similarity, 0.027 in the better family's error rate, 25 ms of trailing
   silence and 3 gross failures. A conditioning change moves every take's sampling as a new seed

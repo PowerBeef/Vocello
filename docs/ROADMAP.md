@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 47/84 (56%) |
+| `release-first-3-0-2026-09` | active | release-qa | 48/84 (57%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -72,7 +72,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-46` | planned | Core overhaul, stage 2a: the frame pipeline, identity-preserving | `RF-44` |
 | `RF-47` | planned | Core overhaul, stage 3: memory | `RF-44` |
 | `RF-48` | planned | Core overhaul, stage 4: finalization, preview and the heat pause | `RF-44` |
-| `RF-50` | planned | Quality remediation, stage 0: the pre-registered machine screens | — |
 | `RF-51` | planned | Quality remediation, stage 1: clone input correctness | — |
 | `RF-52` | planned | Quality remediation, stage 2: clone conditioning parity | `RF-50` |
 | `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
@@ -171,9 +170,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-48`** (planned) — Core overhaul, stage 4: finalization, preview and the heat pause.
   gate: The watermark's weights are held across takes; marking, Fast QC and the hash run as chunks arrive, with every saved or exported take still marked and checked; the live preview's prebuffer follows measured speed; long-form pauses between segments, never inside a take, while the thermal state is serious or critical, and says why (report cards H1, H2, H3; section 8.3).
 
-- **`RF-50`** (planned) — Quality remediation, stage 0: the pre-registered machine screens.
-  gate: A clone screen and a long-form screen run from repository lanes on fixed seeds, each with its decision rule recorded before any take is generated. Clones: speaker similarity to the reference (ReDimNet2+), the two ASR families' edit rate, Fast QC, the onset-burst warning and ending silence, over saved voices in more than one language. Long-form: Fast QC, runaway endings, dropouts and the two ASR families, with English, French, Japanese and Voice Design strata and both the default and the Consistent variation. A golden-codes fixture pins the speech-tokenizer encoder against the reference encoder. Before a screen decides anything it is run against itself (the same build and seeds, twice), so each metric's noise floor is known (RF-57). Nobody listens.
-
 - **`RF-51`** (planned) — Quality remediation, stage 1: clone input correctness.
   gate: With no sample change for a good reference or for text that is already composed and single-spaced: audio-only is an explicit request state that a saved voice's stored transcript cannot override (G-02); enrollment sends a recognized transcript without edge coverage to review instead of Ready (G-01); the reference checks run on the original audio and reach the user, naming low source rates, near-silence and clipping, with the Mac's one-off reference under the duration policy and the iPhone's Stop under the same minimum as the Mac (G-08 to G-11); stored and sidecar transcripts take the Studio's whitespace shaping (G-12); scripts, briefs, instructions and transcripts are composed to NFC as the reference tokenizer composes them (A-18); audio preparation carries a version (G-13); the padding comment is corrected (A-12). Each lands with deterministic tests, and the iPhone surfaces are confirmed in a phone window.
 
@@ -199,7 +195,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.
 
 - **`RF-61`** (planned) — Ship Vocello and the vocello CLI 3.1 on the Mac.
-  gate: Vocello and the vocello CLI 3.1.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.1.0 with a build number above the last release tag's; the hybrid's Mac lanes recorded (the formal speed lane against the 3.0 Speed and Quality packages, the Mac memory bands and the prewarm and idle-unload timings re-derived from its measured peak, benchmark baselines reseeded as a new lineage and the Mac gate bench reseeded); RF-50's long-form screen run against itself; docs/releases/v3.1.0.md passes check_release_notes.py; the README charts, the website's performance numbers and copy, and config/public-product-facts.json describe 3.1; scripts/dev.sh ci, release-readiness, the full macOS smoke lane and the engine bench pass on the release commit, with static audits of the release diff. Then the maintainer's signed v3.1.0 tag builds a verified draft through release.yml; the macOS promotion lanes and the CLI's signed-candidate qualification pass on the tag checkout; the maintainer promotes the release. The website deploys with it.
+  gate: Vocello and the vocello CLI 3.1.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.1.0 with a build number above the last release tag's; the hybrid's Mac lanes recorded (the formal speed lane against the 3.0 Speed and Quality packages, the Mac memory bands and the prewarm and idle-unload timings re-derived from its measured peak, benchmark baselines reseeded as a new lineage and the Mac gate bench reseeded); RF-50's long-form screen run against itself; docs/releases/v3.1.0.md passes check_release_notes.py; the README charts, the website's performance numbers and copy, and config/public-product-facts.json describe 3.1; scripts/dev.sh ci, release-readiness, the full macOS smoke lane and the engine bench pass on the release commit, with static audits of the release diff. UI acceptance (maintainer request 2026-11-14: responsiveness, smooth animations, reliable playback and streaming preview): ui_test.sh macos perf passes with no hitch-ceiling warning; ui_test.sh macos benchmark passes its stall gate and its playback-capture gate on every captured take, with no playback underrun or continuity failure in any take; the smoke lane's playback journeys pass; anything short of that is fixed before the tag. Then the maintainer's signed v3.1.0 tag builds a verified draft through release.yml; the macOS promotion lanes and the CLI's signed-candidate qualification pass on the tag checkout; the maintainer promotes the release. The website deploys with it.
 
 ## Specialist-audit remediation
 

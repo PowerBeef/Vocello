@@ -599,7 +599,7 @@
         "config/public-product-facts.json"
       ],
       "updated": "2026-11-14",
-      "notes": "Opened 2026-11-14 at the maintainer's request: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The readiness check of 2026-11-14 on 8f85011b: push CI and the release rehearsal pass, the build number check passes (30 over 24), the promotion contract is valid; missing: the release notes, the version, the hybrid's Mac lanes, the release-gate lanes, the public surfaces and the seven macOS promotion lanes (delivery, engine, language and UI benchmarks, model download lifecycle, retained memory, UI performance)."
+      "notes": "Opened 2026-11-14 at the maintainer's request: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. Done 2026-11-14 (local, not pushed): speed lane (attn RTF 0.303, Speed 0.279, Quality 0.412); memory on the M6 and the emulated 8 GB floor, bands and idle timings unchanged; gate bench reseeded (6db4906d); RF-50 closed; 3.1.0 build 31 with notes (5cee46dd); website checked in the built-in browser (Playwright absent here); ui_test.sh macos perf PASS inside every ceiling (bedafc14). Stopped by the maintainer the same day. Open: ui_test.sh macos benchmark FAILED at 5cee46dd/bedafc14 (macos-xcui-benchmark-20261114-195242-cfbe3925): take 13, design/short/warm#1 (cell-hash-v1 seed), refused by Fast QC v10 as terminal_silence:3425ms; the speech ended and silence ran on, so the app refused it by design (ICA-15). Its seed is fixed, so a rerun likely fails the same way; the refusal rate on random seeds was not measured. Not run: full smoke, release-readiness, dev.sh ci, engine bench, static audits, promotion lanes; the README charts and website numbers are not regenerated."
     },
     {
       "id": "RF-16",

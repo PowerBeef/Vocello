@@ -20,22 +20,48 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 ### November 14: the target is 3.1; the Mac and CLI ship first (resume here)
 
 Maintainer decision of November 14: there is no iOS 3.0 release; every platform's next release is
-3.1, and the Mac app and the CLI 3.1 ship first (RF-61), then the iPhone. `main` was pushed at
-`8f85011b` (CI and the release rehearsal pass). The readiness check that day found the build number
-and the promotion contract ready, and the rest missing. RF-61's order:
+3.1, and the Mac app and the CLI 3.1 ship first (RF-61), then the iPhone. `origin/main` is at
+`8f85011b`; the work below is committed on local `main` and not pushed. The maintainer stopped the
+work the same day; nothing is running.
 
-1. On a quiet host, lead only, the hybrid's Mac lanes: the formal speed lane
-   (`scripts/pcm_identity.py`, the installed hybrid against `capture --stock`), the hybrid's Mac
-   memory peak with the memory bands and prewarm and idle-unload timings re-derived from it, the
-   benchmark baselines as a new lineage and the Mac gate bench reseeded (Fast QC v10); RF-50's
-   long-form screen run against itself.
-2. The release commit: `MARKETING_VERSION` 3.1.0, `docs/releases/v3.1.0.md`, the README charts and
-   copy, the website's numbers and copy, `config/public-product-facts.json`; then `scripts/dev.sh
-   ci`, `release-readiness`, the full macOS smoke lane, the engine bench against the new baseline
-   and static audits of the release diff.
-3. ★ The maintainer pushes, signs the `v3.1.0` tag and approves `release.yml`'s draft.
-4. The macOS promotion lanes and the CLI's signed-candidate qualification on the tag checkout;
-   ★ the maintainer promotes, and the website deploys with it.
+**Done (November 14)**
+
+- Decision recorded (`9236f175`): the focus lock, the plan's title, RF-12/15/16 titled 3.1.0, RF-61
+  opened with its gate (including the maintainer's UI acceptance: responsiveness, smooth
+  animations, reliable playback and streaming preview).
+- The hybrid's formal speed lane (`27af0c0e`): median RTF Speed 0.279, `attn` 0.303, Quality 0.412.
+- Memory (`132a4dee`, `7a050686`): M6 retained-memory PASS (MLX peak 3,765 MB on a clone take, the
+  calibration rebased); the emulated 8 GB floor PASS (footprint 3,264 MB against a 4,505 MB guarded
+  band); a cold load 767 to 886 ms. The Mac bands and idle-unload timings stay as they are.
+- The Mac gate bench baseline reseeded on the hybrid from three passing gate runs (`6db4906d`).
+- RF-50 closed (`f681e1e2`): the long-form screen reproduces itself and its noise floor is in
+  [qc.md](reference/qc.md).
+- 3.1.0 build 31 (`5cee46dd`): the version, the attribution manifest, the CLI contract examples,
+  `docs/releases/v3.1.0.md` (passes `check_release_notes.py`), and 3.1.0 declared the unpublished
+  candidate in `config/public-product-facts.json`. The routed check passed; its website step ran
+  in the desktop app's built-in browser because Playwright's browsers are not installed on this
+  host (a download not authorized).
+- `ui_test.sh macos perf` PASS (`bedafc14`): every hitch rate and frame gap inside its calibrated
+  ceiling; the one warning (delivery-menu footprint) is a model warm at the window's end.
+
+**Open, in order**
+
+1. **The UI benchmark failed** (`macos-xcui-benchmark-20261114-195242-cfbe3925`, at `bedafc14`):
+   take 13, `design/short/warm#1` ("The train left the station at dawn.", Neutral delivery, the
+   `cell-hash-v1` seed 13240896822931298179), was refused by Fast QC v10 as
+   `terminal_silence:3425ms`: the hybrid finished the sentence and the silence ran on, so the app
+   stopped and refused the take by design (ICA-15: never trim, regenerate or substitute). Takes
+   1 to 12 had completed. The seed is fixed per cell, so a rerun likely fails the same way. Not yet
+   known: how often the hybrid ends a short Voice Design take this way on random seeds (a 40-take
+   comparison with Speed was stopped before it reported; RF-55's single-take screen saw no refusal
+   in 144 `attn` takes). ★ A decision is needed before the gate can pass: how a deterministic,
+   correct refusal in the benchmark matrix is treated.
+2. Then, on the release commit: the full macOS smoke lane, `release-readiness`, `scripts/dev.sh ci`,
+   the engine bench against the new baseline, static audits of the release diff, the README
+   charts and the website's performance numbers.
+3. ★ The maintainer pushes, signs `v3.1.0` and approves `release.yml`'s draft; then the macOS
+   promotion lanes and the CLI's signed-candidate qualification on the tag checkout; ★ promotion,
+   with the README, website copy and public facts flipped to 3.1.
 
 The iPhone-only checks (RF-51, RF-52, RF-55, RF-58, RF-59, RF-60) and RF-54's decision wait for the
 iPhone 3.1.

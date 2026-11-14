@@ -38,13 +38,14 @@ session can continue from it alone.
    intact, a passing take per mode) and by `ui_test.sh macos smoke --scenario model-update`. The
    iPhone flow (`smoke --scenario update-models` on a phone holding a 3.0 TestFlight install) waits
    for a phone window. The six 3.0 Speed and Quality folders moved (maintainer's word, November 13)
-   to `~/Library/Application Support/QwenVoice-Research/models`, out of the app's models folder,
-   which now holds no model: the quality screens' stock arms (`run --stock`), the speed lane's
-   baseline (`capture --stock`) and `build_hybrid_model.py` read them there through the last
-   two-package contract, so a normal launch of this build (or `macos_test.sh models ensure`) can
-   install the hybrids without touching them.
+   to `~/Library/Application Support/QwenVoice-Research/models`, out of the app's models folder:
+   the quality screens' stock arms (`run --stock`), the speed lane's baseline (`capture --stock`)
+   and `build_hybrid_model.py` read them there through the last two-package contract. On November
+   14 (maintainer's word) `macos_test.sh models ensure` installed the three hybrids in the app's
+   folder (92 s, all 14 files of each verified, the tokenizer shared with the research folders), so
+   the Mac model lanes run again; the research folders were untouched.
 2. On a quiet host, lead only: the formal speed lane for `attn` (`scripts/pcm_identity.py`: the
-   hybrid installed with `macos_test.sh models ensure`, its baseline `capture --stock`) and the Mac
+   hybrid, installed, against its baseline `capture --stock`) and the Mac
    gate bench's baseline seeded again (Fast QC v10).
 3. ★ The iPhone's memory and speed for `attn` (a BrowserStack App Automate farm run the maintainer
    runs, or an announced phone window), with the queued phone checks of RF-51, RF-52 (a punctuated

@@ -120,9 +120,14 @@ verdict below was read by hand against its rule's decision text.
 | `attn` | 0.499 (×1.05) | 0.297 (×1.06) | 176 MB | 3,765 MB (+168) |
 | Quality | 0.610 (×1.28) | 0.390 (×1.39) | 768 MB | 4,330 MB (+733) |
 
-The formal speed lane (`scripts/pcm_identity.py`, quiet host, lead only) is still owed: the hybrid
-installed in the debug root for one capture, `capture --stock` (the 3.0 Speed packages from the
-research folder) for its baseline.
+**The formal speed lane** (`scripts/pcm_identity.py`, 2026-11-14 at `9236f175`, lead only, load 1.8
+to 3.1, thermal nominal): four captures in alternation, the 3.0 Speed and Quality packages
+(`capture --stock --variants speed,quality`) then the installed hybrid, twice; three modes, short,
+medium and long, two warm takes per cell (36 warm takes per model). Median engine real-time factor
+(wall over audio): Speed 0.279, `attn` 0.303, Quality 0.412. Per cell, `attn` takes ×1.04 and ×1.06
+of Speed's time (the two rounds' medians; Built-in Voice ×1.04, Voice Design ×1.05, Voice Cloning
+×1.03 pooled) and ×0.72 of Quality's, as the campaign measured. Short clone takes, where a frame's
+fixed cost dominates, run at Speed's pace.
 
 **Known limits: `attn` beats Speed and does not match Quality.**
 - **Clone likeness stays at Speed's level.** `attn` does not recover Quality's speaker-similarity
@@ -218,8 +223,8 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
 - **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
   top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
 
-**Left:** the iPhone's memory and speed, the formal speed lane, the memory bands and benchmark
-baselines from those measurements, and `config/public-product-facts.json`, the README and the website
+**Left:** the iPhone's memory and speed, the memory bands and benchmark baselines from the
+measurements, and `config/public-product-facts.json`, the README and the website
 with the release that ships the change. RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution

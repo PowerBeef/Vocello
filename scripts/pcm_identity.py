@@ -285,7 +285,7 @@ def main() -> int:
     capture_parser.add_argument("--label", required=True)
     capture_parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     capture_parser.add_argument("--modes", default="custom,design,clone")
-    capture_parser.add_argument("--variants", default="speed", help="speed, quality or both (quality needs --stock)")
+    capture_parser.add_argument("--variants", default="speed", help="speed, quality or speed,quality (quality needs --stock)")
     capture_parser.add_argument("--stock", action="store_true",
                                 help="the 3.0 Speed and Quality packages from the research folder (RF-59)")
     capture_parser.add_argument("--lengths", default="short,medium")

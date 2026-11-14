@@ -129,6 +129,16 @@ of Speed's time (the two rounds' medians; Built-in Voice ×1.04, Voice Design ×
 ×1.03 pooled) and ×0.72 of Quality's, as the campaign measured. Short clone takes, where a frame's
 fixed cost dominates, run at Speed's pace.
 
+**Memory on the Mac** (2026-11-14, `scripts/macos_test.sh memory`, PASS on both runs): on the M6 at
+`27af0c0e` (`mac-memory-qualification-20261114-174519-39bd0268`) the MLX peak is 2,227 MB for Built-in
+Voice, 2,621 MB for Voice Design and 3,765 MB for Voice Cloning's first take (3,095 MB after), with no
+growth within a mode; the calibration's bounds are unchanged and now cite this run. On the emulated
+8 GB floor (`QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8`, `…-174644-2e88d57a`, exploratory) the highest
+footprint is 3,264 MB, against the floor's guarded band of 4,505 MB (55% of 8 GiB) and critical band
+of 5,898 MB, and the MLX peak is 69% of its 5,461 MB Metal working set (critical at 85%): the Mac's
+bands hold unchanged. A cold load takes 767 to 886 ms (Speed's record of 2026-10-20: 710 to 812 ms)
+and the prewarm about 160 ms, so the idle-unload timings stand as they are.
+
 **Known limits: `attn` beats Speed and does not match Quality.**
 - **Clone likeness stays at Speed's level.** `attn` does not recover Quality's speaker-similarity
   advantage on clones (−0.026 against Quality, inside the 0.05 margin).
@@ -223,9 +233,9 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
 - **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
   top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
 
-**Left:** the iPhone's memory and speed, the memory bands and benchmark baselines from the
-measurements, and `config/public-product-facts.json`, the README and the website
-with the release that ships the change. RF-58 (one take variation, Expressive) landed first.
+**Left:** the iPhone's memory, speed and footprint bands, the benchmark baselines, and
+`config/public-product-facts.json`, the README and the website with the release that ships the
+change. RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution
 

@@ -1932,3 +1932,9 @@ their harness files differ from the baseline's.
 | 2026-09-27 | [`macos-xcui-perf-20260927-112952-a17db9fe`](runs/ui-perf/macos-xcui-perf-20260927-112952-a17db9fe.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `5c2c73726f3c` | `069502f6473f` | baseline | macos-xcui-perf-20260927-112952-a17db9fe |
 | 2026-09-27 | [`macos-xcui-perf-20260927-123958-bfbe8242`](runs/ui-perf/macos-xcui-perf-20260927-123958-bfbe8242.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `87f2aa391019` | `069502f6473f` | vs macos-xcui-perf-20260927-112952-a17db9fe: compatible | macos-xcui-perf-20260927-123958-bfbe8242 |
 | 2026-09-27 | [`macos-xcui-perf-20260927-133001-8484a1d1`](runs/ui-perf/macos-xcui-perf-20260927-133001-8484a1d1.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `65a815e2733b` | `069502f6473f` | vs macos-xcui-perf-20260927-123958-bfbe8242: compatible | macos-xcui-perf-20260927-133001-8484a1d1 |
+
+## ui-perf / macos / mac-mini-m6-16gb / config `684283851ab3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-14 | [`macos-xcui-perf-20261114-193957-54115c9c`](runs/ui-perf/macos-xcui-perf-20261114-193957-54115c9c.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `5cee46dd01bf` | `684283851ab3` | baseline | macos-xcui-perf-20261114-193957-54115c9c |

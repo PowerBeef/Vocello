@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-13
+reviewed: 2026-11-14
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,11 +17,33 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 11–13: the quality remediation's decisions, and one hybrid model (resume here)
+### November 14: the target is 3.1; the Mac and CLI ship first (resume here)
 
-The remediation the maintainer asked for on November 11 (RF-50 to RF-60). Nothing is pushed: `main`
-is ahead of `origin/main` (`f4edb60a`) by every commit since then, and a push needs the maintainer's
-word. The phone is not available, so everything ran on the Mac. This entry is written so another
+Maintainer decision of November 14: there is no iOS 3.0 release; every platform's next release is
+3.1, and the Mac app and the CLI 3.1 ship first (RF-61), then the iPhone. `main` was pushed at
+`8f85011b` (CI and the release rehearsal pass). The readiness check that day found the build number
+and the promotion contract ready, and the rest missing. RF-61's order:
+
+1. On a quiet host, lead only, the hybrid's Mac lanes: the formal speed lane
+   (`scripts/pcm_identity.py`, the installed hybrid against `capture --stock`), the hybrid's Mac
+   memory peak with the memory bands and prewarm and idle-unload timings re-derived from it, the
+   benchmark baselines as a new lineage and the Mac gate bench reseeded (Fast QC v10); RF-50's
+   long-form screen run against itself.
+2. The release commit: `MARKETING_VERSION` 3.1.0, `docs/releases/v3.1.0.md`, the README charts and
+   copy, the website's numbers and copy, `config/public-product-facts.json`; then `scripts/dev.sh
+   ci`, `release-readiness`, the full macOS smoke lane, the engine bench against the new baseline
+   and static audits of the release diff.
+3. ★ The maintainer pushes, signs the `v3.1.0` tag and approves `release.yml`'s draft.
+4. The macOS promotion lanes and the CLI's signed-candidate qualification on the tag checkout;
+   ★ the maintainer promotes, and the website deploys with it.
+
+The iPhone-only checks (RF-51, RF-52, RF-55, RF-58, RF-59, RF-60) and RF-54's decision wait for the
+iPhone 3.1.
+
+### November 11–13: the quality remediation's decisions, and one hybrid model
+
+The remediation the maintainer asked for on November 11 (RF-50 to RF-60), pushed through
+`8f85011b` on November 14. The phone is not available, so everything ran on the Mac. This entry is written so another
 session can continue from it alone.
 
 **Next, in order**

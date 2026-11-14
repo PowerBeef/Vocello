@@ -109,7 +109,7 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 ## Hard boundaries
 
-- **Release focus (until the 3.0 iOS submission):** the `focusLock` in `config/roadmap.json` makes
+- **Release focus (until the 3.1 iOS submission; the Mac and CLI 3.1 ship first, RF-61):** the `focusLock` in `config/roadmap.json` makes
   `release-first-3-0-2026-09` the only plan with live work, at most `focusLock.maxInFlight` items in
   flight (`roadmap.py validate` enforces it). `focusLock.decision` is the authority; in summary:
   - **Classify every new finding.** A release blocker joins that plan with a gate. A release

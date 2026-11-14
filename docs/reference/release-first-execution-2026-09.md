@@ -1,15 +1,25 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-11
-summary: The iOS 3.0 App Store submission path rebaselined on October 12, the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
+reviewed: 2026-11-14
+summary: The 3.1 release path (the Mac and CLI first, then the iOS App Store submission; there is no iOS 3.0 release since 2026-11-14), the October 12 rebaseline and the maintainer's decisions behind it, and the focus-lock rules that keep other work parked until submission.
 sourceOfTruth:
   - config/roadmap.json
   - config/quality-promotion-contract.json
   - config/release-evidence-contract.json
   - project.yml
 ---
-# Vocello 3.0 — iOS App Store submission
+# Vocello 3.1 — the Mac and CLI release, then the iOS App Store submission
+
+**Decision of 2026-11-14.** There is no iOS 3.0 release: every platform's next release is 3.1. The
+Mac app and the CLI 3.1 ship first, once their Mac gates pass (RF-61: the hybrid's Mac lanes, the
+release-gate lanes, the release notes and public surfaces, the signed tag's draft and the macOS
+promotion lanes); the iPhone 3.1 submission follows on its own gates. Where this document and the
+item titles say 3.0.0 for the iPhone, read 3.1.0; iPhone candidates are `v3.1.0-ios.N` tags. The
+iPhone-only checks of RF-51, RF-52, RF-55, RF-58, RF-59 and RF-60 wait for a phone window and do not
+block the Mac and CLI release. The October 12 rebaseline below stays the record of how the plan was
+set.
+
 
 The maintainer adopted the release-first programme on 2026-09-04 and rebaselined it on 2026-10-12
 onto one goal: submit Vocello 3.0 for iPhone to the App Store. `config/roadmap.json` is the only status

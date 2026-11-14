@@ -68,6 +68,58 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path), "released, nothing holds it")
     }
 
+    /// RF-59 (review of 2026-11-14, item 8): the Mac's "remove the earlier models first" pins the
+    /// shared blobs the earlier folders hold, so an automatic reclamation keeps them for the new
+    /// models until the pins are released; a removal that cannot record the plan removes nothing
+    /// and leaves no pins.
+    func testTheMacsRemovalBeforeTheUpdateKeepsSharedBlobsUntilReleased() throws {
+        let root = try temporaryDirectory("make-room")
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: root.appendingPathComponent("models").path
+            )
+            try? FileManager.default.removeItem(at: root)
+        }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let contract = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let registry = try ContractBackedModelRegistry(manifestURL: contract)
+            .expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: false)
+        let earlier = "Qwen3-TTS-12Hz-1.7B-Base-8bit"
+        let sharedBytes = Data("speech-tokenizer".utf8)
+        let shared = try identity(path: "speech_tokenizer/model.safetensors", bytes: sharedBytes)
+        let store = SharedModelComponentStore(modelsRoot: models)
+        let model = models.appendingPathComponent(earlier, isDirectory: true)
+        try write(sharedBytes, to: model.appendingPathComponent(shared.relativePath))
+        try write(Data("weights".utf8), to: model.appendingPathComponent("model.safetensors"))
+        let content = try SharedComponentContentIdentity(files: [shared])
+        let manifest = try SharedComponentInstalledModelManifest(
+            modelIdentity: earlier, contentIdentity: content,
+            compatibilityIdentity: try compatibility(content: content, capability: .encoderAndDecoder)
+        )
+        _ = try store.migrate(try SharedComponentMigrationPlan(modelFolder: earlier, manifest: manifest)) { _ in }
+        let blob = try store.blobURL(for: shared.sha256)
+
+        // No plan can be recorded (the models folder is read-only): nothing goes, no pin is left.
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: models.path)
+        let refused = registry.removeRetiredFoldersBeforeUpdate(in: models) { _ in false }
+        XCTAssertEqual(refused.removed, [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: model.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.updatePinsRoot.path), "the pins were released")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: models.path)
+
+        let result = registry.removeRetiredFoldersBeforeUpdate(in: models) { _ in false }
+        XCTAssertEqual(result.removed, [earlier])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: model.path))
+        _ = try store.reclaimUnreferencedComponents(gracePeriod: 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path), "pinned through the removal and a reclamation")
+        XCTAssertTrue(try store.containsVerified(content), "the new model still reuses it")
+
+        registry.releaseModelUpdatePins(in: models)
+        _ = try store.reclaimUnreferencedComponents(gracePeriod: 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path), "released, nothing holds it")
+    }
+
     /// RF-59: a retired package's folder goes through the store: the blob only it listed goes with
     /// it, the shared file the current model still lists stays linked, and a folder that cannot be
     /// removed is reported without stopping the others.

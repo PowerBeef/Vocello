@@ -93,9 +93,11 @@ final class LocalModelStatusProvider: ModelStatusProviding {
         // RF-59: drops a mode whose new model is now installed, then reads the rest, off the main
         // actor (a lock and a few small files; a pass that changes nothing writes nothing).
         let store = modelAssetStore
-        let plan = await Task.detached(priority: .utility) { @concurrent in
-            (try? store.reconcileModelUpdatePlan()) ?? store.modelUpdatePlan()
-        }.value
+        let plan = await IOSBackgroundTime.hold("vocello.model-update.refresh") {
+            await Task.detached(priority: .utility) { @concurrent in
+                (try? store.reconcileModelUpdatePlan()) ?? store.modelUpdatePlan()
+            }.value
+        }
         return Dictionary(uniqueKeysWithValues: models.map { model in
             let status: ModelInventoryStatus
             guard let descriptor = modelAssetStore.descriptor(id: model.id) else {

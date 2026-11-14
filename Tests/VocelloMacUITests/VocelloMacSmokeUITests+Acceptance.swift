@@ -99,34 +99,45 @@ extension VocelloMacSmokeUITests {
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-long-form-recovery-discarded")
     }
 
-    /// RF-59: a user of an earlier Vocello opens this build, on an isolated profile holding that
+    /// RF-59: a user of an earlier Vocello opens this build, on isolated profiles holding that
     /// build's Built-in Voice (Speed) and Voice Cloning (Quality) folders as an earlier install
     /// leaves them (an integrity manifest naming the folder, tiny weights). With automatic start off
     /// (the registered QWENVOICE_MODEL_UPDATE_AUTOSTART, which every lane launch sets), nothing
-    /// downloads: those modes read Update
-    /// required with Update, Voice Design (never installed) still offers Download, Studio's button
-    /// says Update in Settings, and the banner offers the update. With automatic start on, the update
-    /// starts by itself; Cancel stops it (recorded in the profile's ledger, staging discarded), the
-    /// rows offer Update again, and a relaunch leaves it stopped with no banner asking again.
+    /// downloads: those modes read Update required, Voice Design (never installed) still offers
+    /// Download, Studio's button says Update in Settings, and the banner and the Settings summary
+    /// offer the update. The banner's Not Now stops it (recorded in the ledger) and a relaunch with
+    /// automatic start on leaves it stopped, unasked. On a second profile automatic start runs the
+    /// update by itself; Cancel stops it, discarding its staging.
     func test15_ModelUpdateFromAnEarlierVocello() throws {
         beginSession()
         defer { endSession() }
         let artifacts = try XCTUnwrap(ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"])
-        let profile = URL(fileURLWithPath: artifacts).appendingPathComponent("model-update-profile")
-        let models = profile.appendingPathComponent("models", isDirectory: true)
-        for folder in ["Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", "Qwen3-TTS-12Hz-1.7B-Base-8bit"] {
-            let directory = models.appendingPathComponent(folder, isDirectory: true)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try Data("earlier".utf8).write(to: directory.appendingPathComponent("model.safetensors"))
-            let manifest = """
-            {"schema_version": 2, "repo": "mlx-community/\(folder)", "revision": "earlier", \
-            "target_folder": "\(folder)", "created_at_utc": "2026-09-14T00:00:00Z", \
-            "files": [{"path": "model.safetensors", "size": 7, "sha256": "\(String(repeating: "ab", count: 32))"}]}
-            """
-            try Data(manifest.utf8).write(to: directory.appendingPathComponent(".qwenvoice-model-integrity.json"))
+        func earlierProfile(_ name: String) throws -> (profile: URL, models: URL) {
+            let profile = URL(fileURLWithPath: artifacts).appendingPathComponent(name)
+            let models = profile.appendingPathComponent("models", isDirectory: true)
+            for folder in ["Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", "Qwen3-TTS-12Hz-1.7B-Base-8bit"] {
+                let directory = models.appendingPathComponent(folder, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try Data("earlier".utf8).write(to: directory.appendingPathComponent("model.safetensors"))
+                let manifest = """
+                {"schema_version": 2, "repo": "mlx-community/\(folder)", "revision": "earlier", \
+                "target_folder": "\(folder)", "created_at_utc": "2026-09-14T00:00:00Z", \
+                "files": [{"path": "model.safetensors", "size": 7, "sha256": "\(String(repeating: "ab", count: 32))"}]}
+                """
+                try Data(manifest.utf8).write(to: directory.appendingPathComponent(".qwenvoice-model-integrity.json"))
+            }
+            return (profile, models)
+        }
+        func ledgerEntries(_ models: URL) throws -> [[String: Any]] {
+            let ledger = try JSONSerialization.jsonObject(
+                with: Data(contentsOf: models.appendingPathComponent(".qwenvoice-model-update.json"))
+            ) as? [String: Any]
+            return (ledger?["entries"] as? [[String: Any]]) ?? []
         }
 
-        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": profile.path])
+        // 1. Automatic start off: every surface offers the update; Not Now stops it.
+        let first = try earlierProfile("model-update-profile")
+        relaunchApp(additionalEnvironment: ["QWENVOICE_APP_SUPPORT_DIR": first.profile.path])
         XCTAssertTrue(VocelloUIWait.exists(element("macModelUpdateBanner"), timeout: 30))
         XCTAssertTrue(button("macModelUpdateBanner_update").exists, "the banner offers the update")
         navigate(to: .customVoice)
@@ -138,37 +149,28 @@ extension VocelloMacSmokeUITests {
         XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 30))
         XCTAssertTrue(button("settings_update_pro_clone_speed").exists)
         XCTAssertTrue(button("settings_download_pro_design_speed").exists, "a mode never installed stays a first install")
+        XCTAssertTrue(button("settings_updateModels").exists, "the Settings summary speaks of the update")
+        XCTAssertFalse(button("settings_downloadRecommendedModels").exists)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-required")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("macModelUpdateBanner_notNow"), timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.condition("the banner to leave after Not Now", timeout: 20) {
+                !self.element("macModelUpdateBanner").exists
+            }
+        )
+        XCTAssertTrue(VocelloUIWait.condition("Not Now to be recorded", timeout: 20) {
+            ((try? ledgerEntries(first.models)) ?? []).allSatisfy { $0["paused"] as? Bool == true }
+        })
+        XCTAssertTrue(button("settings_update_pro_custom_speed").exists, "the rows still offer the update")
 
         // Automatic start on, as shipped (the lane's launch turns it off everywhere else).
-        let automatic = ["QWENVOICE_APP_SUPPORT_DIR": profile.path, "QWENVOICE_MODEL_UPDATE_AUTOSTART": "on"]
-        relaunchApp(additionalEnvironment: automatic)
-        openSettingsCategory("modelsFiles")
-        XCTAssertTrue(
-            VocelloUIWait.exists(button("settings_cancelRecommendedSetup"), timeout: 60),
-            "the update starts by itself on an unmetered network"
-        )
-        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-running")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_cancelRecommendedSetup"), timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 60))
-        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_clone_speed"), timeout: 60))
-        let ledger = try JSONSerialization.jsonObject(
-            with: Data(contentsOf: models.appendingPathComponent(".qwenvoice-model-update.json"))
-        ) as? [String: Any]
-        let entries = (ledger?["entries"] as? [[String: Any]]) ?? []
-        XCTAssertEqual(Set(entries.compactMap { $0["mode"] as? String }), ["custom", "clone"])
-        XCTAssertTrue(entries.allSatisfy { $0["paused"] as? Bool == true }, "Cancel is recorded as stopped")
-        let staged = (try? FileManager.default.contentsOfDirectory(
-            atPath: models.appendingPathComponent(".qwenvoice-downloads").path
-        )) ?? []
-        XCTAssertEqual(staged.filter { !$0.hasPrefix(".") }, [], "no partial download stays behind")
-
-        relaunchApp(additionalEnvironment: automatic)
+        relaunchApp(additionalEnvironment: [
+            "QWENVOICE_APP_SUPPORT_DIR": first.profile.path, "QWENVOICE_MODEL_UPDATE_AUTOSTART": "on",
+        ])
         navigate(to: .customVoice)
         XCTAssertTrue(VocelloUIWait.exists(button("textInput_installModelButton"), timeout: 30))
         XCTAssertFalse(element("macModelUpdateBanner").exists, "a stopped update is not asked about again")
         openSettingsCategory("modelsFiles")
-        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 30))
         XCTAssertFalse(
             VocelloUIWait.settles("a stopped update to restart", timeout: 10) {
                 self.button("settings_cancelRecommendedSetup").exists
@@ -176,6 +178,37 @@ extension VocelloMacSmokeUITests {
             "a stopped update never restarts on its own"
         )
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-stopped")
+
+        // 2. A second profile, automatic start on: the update runs by itself; Cancel stops it.
+        let second = try earlierProfile("model-update-automatic-profile")
+        relaunchApp(additionalEnvironment: [
+            "QWENVOICE_APP_SUPPORT_DIR": second.profile.path, "QWENVOICE_MODEL_UPDATE_AUTOSTART": "on",
+        ])
+        openSettingsCategory("modelsFiles")
+        XCTAssertTrue(
+            VocelloUIWait.exists(button("settings_cancelRecommendedSetup"), timeout: 60),
+            "the update starts by itself on an unmetered network with room for its first two downloads "
+                + "(about 9 GB free; short of that the banner offers to remove the earlier models first)"
+        )
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-model-update-running")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_cancelRecommendedSetup"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_custom_speed"), timeout: 60))
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_update_pro_clone_speed"), timeout: 60))
+        // Cancel stops each mode in turn (its pause, then its staging), so the files are read once
+        // both are done, not when the rows first read Update.
+        let staging = second.models.appendingPathComponent(".qwenvoice-downloads")
+        func staged() -> [String] {
+            ((try? FileManager.default.contentsOfDirectory(atPath: staging.path)) ?? []).filter { !$0.hasPrefix(".") }
+        }
+        XCTAssertTrue(VocelloUIWait.condition("Cancel to be recorded and its staging discarded", timeout: 30) {
+            let entries = (try? ledgerEntries(second.models)) ?? []
+            return entries.count == 2 && entries.allSatisfy { $0["paused"] as? Bool == true } && staged().isEmpty
+        })
+        let entries = try ledgerEntries(second.models)
+        XCTAssertEqual(Set(entries.compactMap { $0["mode"] as? String }), ["custom", "clone"])
+        XCTAssertTrue(entries.allSatisfy { $0["paused"] as? Bool == true }, "Cancel is recorded as stopped")
+        XCTAssertTrue(entries.allSatisfy { $0["lastFailure"] == nil }, "a cancel is not a failure")
+        XCTAssertEqual(staged(), [], "no partial download stays behind")
         relaunchApp(additionalEnvironment: additionalLaunchEnvironment)
     }
 

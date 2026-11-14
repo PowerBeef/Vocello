@@ -51,9 +51,11 @@ this doc.** All claims below are cited to a file or commit; re-verify before rel
 
 ## TL;DR — clean canonical evidence as of 2026-07-16 (iPhone 17 Pro)
 
-- **In-process, Speed (4-bit) only.** The engine runs inside the app process (`MLXTTSEngine` via
+- **In-process, one model per mode.** The engine runs inside the app process (`MLXTTSEngine` via
   `NativeRuntimeFactory`); the ExtensionKit extension was removed (it could never load the model —
-  see §1). iPhone runs the 4-bit Speed variant only; 8-bit Quality is macOS-only by contract.
+  see §1). Since RF-59 the iPhone runs the same hybrid model per mode as the Mac (4-bit with the
+  talker's attention at 8 bits); its memory and speed on a phone are not yet measured. The figures
+  below were measured on the earlier 4-bit Speed models.
 - **Faster than realtime with bounded memory.** The clean 29-take schema-v2 record
   [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json)
   measured a per-cell median decode speedup (recorded as "RTF") of **1.70–1.89** and peak physical
@@ -408,8 +410,9 @@ blocks prewarm and clone priming without silently changing models or cancelling 
 policy remains future work and requires separate on-device evidence; the 0.6B fallback remains ruled
 out because Voice Design needs 1.7B.
 
-**Research question — Quality (8-bit) on a 12 GB iPhone.** Currently iPhone is Speed-4bit-only by
-contract (`platforms: ["iOS","macOS"]` for Speed, `["macOS"]` for Quality). The 17 Pro's ~6 GB
+**Research question — Quality (8-bit) on a 12 GB iPhone** (closed by RF-59: one hybrid model per mode
+now ships on both platforms). Before it, iPhone was Speed-4bit-only by contract
+(`platforms: ["iOS","macOS"]` for Speed, `["macOS"]` for Quality). The 17 Pro's ~6 GB
 entitled limit of the time (8,192 MB under iOS 27) *might* fit 8-bit under the streaming path (the non-streaming ~5.7 GB+ figure is the
 wrong yardstick, §3), but this is unproven and device-fragmenting (8 GB devices can't). Treat as a
 research spike behind the 8 GB proof + a streaming-path 8-bit footprint measurement, not a commitment.

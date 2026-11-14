@@ -126,7 +126,8 @@ final class IOSModelInstallerViewModel {
     /// At launch: asks once, then resumes on its own (`IOSModelUpdateAutoStartPolicy`).
     func startModelUpdateIfNeeded() async {
         guard let modelAssetStore else { return }
-        let facts = await Task.detached(priority: .utility) { @concurrent in
+        let facts = await IOSBackgroundTime.hold("vocello.model-update.launch") {
+            await Task.detached(priority: .utility) { @concurrent in
             UpdateDiskFacts(
                 plan: modelAssetStore.modelUpdatePlan(),
                 availableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
@@ -136,16 +137,20 @@ final class IOSModelInstallerViewModel {
                     of: modelAssetStore.descriptors.map(\.model), in: modelAssetStore.rootDirectory
                 ).isEmpty
             )
-        }.value
+            }.value
+        }
         updatePlan = facts.plan
         let models = modelUpdateCandidates()
         let candidates = models.map { model in
             IOSModelUpdateAutoStartPolicy.Candidate(
                 modelID: model.id,
                 estimatedBytes: model.estimatedDownloadBytes ?? 0,
-                paused: updatePlan.isPaused(model.mode) || sessionPausedModes.contains(model.mode),
-                active: isTransferring(states[model.id]),
-                failed: { if case .failed = states[model.id] { return true }; return false }()
+                mode: model.mode,
+                plan: updatePlan,
+                pausedThisSession: sessionPausedModes.contains(model.mode),
+                transferring: isTransferring(states[model.id]),
+                // NET-1: a failed update waits for the user's Retry; a launch never restarts it.
+                failedThisSession: { if case .failed = states[model.id] { return true }; return false }()
             )
         }
         guard !candidates.isEmpty else { return }
@@ -200,14 +205,16 @@ final class IOSModelInstallerViewModel {
     private func runModelUpdate(modelIDs: [String], makingRoomFirst: Bool) async {
         guard let modelAssetStore else { return }
         if makingRoomFirst {
-            let result = await Task.detached(priority: .userInitiated) { @concurrent in
-                modelAssetStore.removeRetiredFoldersBeforeUpdate()
-            }.value
+            let result = await IOSBackgroundTime.hold("vocello.model-update.make-room") {
+                await Task.detached(priority: .userInitiated) { @concurrent in
+                    modelAssetStore.removeRetiredFoldersBeforeUpdate()
+                }.value
+            }
             modelUpdateFreedBytes += result.freedBytes
         }
         for model in TTSModel.all where modelIDs.contains(model.id) {
-            if updatePlan.isPaused(model.mode) {
-                await changeModelUpdatePlan(.resume(model.mode))
+            if let change = updatePlan.changeBeforeUpdating(model.mode) {
+                await changeModelUpdatePlan(change)
             }
             install(model)
         }
@@ -217,9 +224,11 @@ final class IOSModelInstallerViewModel {
     /// this session, and the failure is recorded.
     private func changeModelUpdatePlan(_ change: ModelUpdateLedger.Change) async {
         guard let modelAssetStore else { return }
-        let outcome: Result<ModelUpdatePlan, any Error> = await Task.detached(priority: .userInitiated) { @concurrent in
-            Result { try modelAssetStore.reconcileModelUpdatePlan(change: change) }
-        }.value
+        let outcome: Result<ModelUpdatePlan, any Error> = await IOSBackgroundTime.hold("vocello.model-update.plan") {
+            await Task.detached(priority: .userInitiated) { @concurrent in
+                Result { try modelAssetStore.reconcileModelUpdatePlan(change: change) }
+            }.value
+        }
         switch outcome {
         case .success(let plan):
             updatePlan = plan
@@ -230,13 +239,17 @@ final class IOSModelInstallerViewModel {
         case .pause(let mode): sessionPausedModes.insert(mode)
         case .resume(let mode): sessionPausedModes.remove(mode)
         case .resumeAll: sessionPausedModes.removeAll()
-        case .none: break
+        case .none, .recordFailure: break
         }
     }
 
     /// After a verified install: every retired folder goes once one new model is in place; the
     /// update pins go once no update download is left; the done note follows the last mode.
     private func reclaimAfterInstall() async {
+        await IOSBackgroundTime.hold("vocello.model-update.reclaim") { await reclaimAfterInstallHoldingTime() }
+    }
+
+    private func reclaimAfterInstallHoldingTime() async {
         guard let modelAssetStore else { return }
         let updateStillDownloading = TTSModel.all.contains {
             updatePlan.needsUpdate($0.mode) && isTransferring(states[$0.id])
@@ -262,13 +275,17 @@ final class IOSModelInstallerViewModel {
     /// RF-59: the banner's progress while the update runs: the modes updated since launch, of
     /// those plus the ones still updating (a mode the user stopped is not counted).
     var modelUpdateProgress: (completed: Int, total: Int)? {
-        let remaining = modelUpdateCandidates()
-        guard remaining.contains(where: { isTransferring(states[$0.id]) }) else { return nil }
-        let completed = max(0, sessionUpdateModeCount - remaining.count)
-        let updating = remaining.filter {
-            isTransferring(states[$0.id]) || !(updatePlan.isPaused($0.mode) || sessionPausedModes.contains($0.mode))
-        }
-        return (completed, completed + updating.count)
+        let state = ModelUpdateBannerState.derive(
+            remaining: modelUpdateCandidates().map { model in
+                ModelUpdateBannerState.Remaining(
+                    paused: updatePlan.isPaused(model.mode) || sessionPausedModes.contains(model.mode),
+                    active: isTransferring(states[model.id]), fraction: nil
+                )
+            },
+            sessionModeCount: sessionUpdateModeCount, completionFreedBytes: nil, needsRoom: false
+        )
+        guard case .updating(let completed, let total, _) = state else { return nil }
+        return (completed, total)
     }
 
     private func isTransferring(_ state: OperationState?) -> Bool {
@@ -343,8 +360,8 @@ final class IOSModelInstallerViewModel {
 
         Task {
             do {
-                if updatePlan.isPaused(model.mode) {
-                    await changeModelUpdatePlan(.resume(model.mode))
+                if let change = updatePlan.changeBeforeUpdating(model.mode) {
+                    await changeModelUpdatePlan(change)
                 }
                 try await coordinator.install(model: model)
             } catch {
@@ -545,7 +562,13 @@ final class IOSModelInstallerViewModel {
             states[snapshot.modelID] = .deleting
         case .failed:
             states[snapshot.modelID] = .failed(snapshot.message ?? IOSInterfaceText.deliveryFailed)
+            let failedModel = TTSModel.all.first { $0.id == snapshot.modelID }
+            let failure = ModelUpdateFailure.classify(description: snapshot.message ?? "")
             Task {
+                // RF-59: a failed update waits for the user's Retry; no launch restarts it.
+                if let failedModel, let change = updatePlan.changeAfterFailure(failedModel.mode, failure) {
+                    await changeModelUpdatePlan(change)
+                }
                 await refreshModelInventory(modelID: snapshot.modelID, event: "failed-refresh")
             }
         case .deleted:
@@ -580,7 +603,8 @@ final class IOSModelInstallerViewModel {
     }
 
     private func refreshModelInventory(modelID: String?, event: String) async {
-        await modelManager.refresh()
+        // The refresh reconciles the update plan under its file lock, possibly while in the background.
+        await IOSBackgroundTime.hold("vocello.model-inventory.refresh") { await modelManager.refresh() }
         let targetAvailable = modelID.flatMap { id in
             TTSModel.all.first(where: { $0.id == id }).map(modelManager.isAvailable)
         }

@@ -26,10 +26,17 @@ session can continue from it alone.
 
 **Next, in order**
 
-0. Read [the RF-59 implementation review](audits/2026-11-13-rf59-implementation-review.md)
-   (November 13): two defects (a failed update download restarts at every launch on the iPhone;
-   the Mac has no failure memory or free-space check), the verification owed, and ordered
-   follow-ups. ★ Push `main` so CI compiles the unpushed commits.
+0. [The RF-59 implementation review](audits/2026-11-13-rf59-implementation-review.md)
+   (November 13): its phone-free follow-ups are done (November 14), with a second review's fixes:
+   a failed update is recorded in the ledger as a class and never restarted at launch on either
+   app; a download that failed for want of space, or a disk short of room for the downloads that
+   run at once, offers to remove the earlier models first (the Mac's banner and Settings say so on
+   the button, Not Now stops it, and their pins outlive the removal; the iPhone asks again at the
+   next launch); the iPhone's ledger, reclaim and removal work holds background time
+   (`IOSBackgroundTime`); the banner and launch decisions are tested value types; the Settings
+   summary speaks of the update; stale two-package prose and retired clone prompt caches are gone.
+   `main` was last pushed at `d3ecf50b` (CI passed); later commits are local. Left: the iPhone flow
+   on a device (finding 2).
 1. RF-59's verification. The swap is on `main` (`b3b09d3c`, `d50e860b`, `dbe59080`; one `speed`
    variant per mode, the hybrid, on both platforms; [hybrid-model.md](reference/hybrid-model.md) §6).
    The model update for 3.0 users is on `main` too: the modes an earlier build installed read Update

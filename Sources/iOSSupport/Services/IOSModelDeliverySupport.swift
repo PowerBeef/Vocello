@@ -308,7 +308,7 @@ enum IOSModelDeliverySupport {
     /// The free space a transfer of `requiredBytes` needs: twice the bytes (staged, then installed),
     /// and never less than the bytes plus a 256 MB margin.
     static func minimumFreeBytes(forFetching requiredBytes: Int64) -> Int64 {
-        max(requiredBytes * 2, requiredBytes + Int64(256 * 1_024 * 1_024))
+        ModelDeliverySpace.minimumFreeBytes(forFetching: requiredBytes)
     }
 
     static func ensureSufficientDiskSpace(

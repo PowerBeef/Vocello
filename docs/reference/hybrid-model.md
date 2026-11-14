@@ -206,7 +206,10 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
   The Mac starts their update on its own on an unmetered network, with a banner over every
   destination and "Update in Settings" on Studio's button; the iPhone asks once (total size,
   networks; on a nearly full phone the earlier models go first, their shared blobs pinned) and
-  resumes at later launches. Cancel, the Mac's Not Now and the iPhone's Later stop it until the
+  resumes at later launches. A failed attempt is recorded in the ledger (its class: space,
+  verification, network) and waits for the user's Update or Retry; the Mac checks free space first
+  and, short of it, offers to remove the earlier models before updating. Cancel, the Mac's Not Now
+  and the iPhone's Later stop it until the
   user taps Update, and nothing asks again; a done note says how much space the earlier models
   freed.
 - **The selector.** A mode with one model shows no Speed/Quality switch, no "Prefer lower-memory

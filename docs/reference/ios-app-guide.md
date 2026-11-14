@@ -442,9 +442,9 @@ A recording that stops itself at its time cap releases its claim like an explici
 ## 3. Model download management & state (generation precondition)
 
 **A generation is impossible without the mode's model installed.** Three mode models map
-to the contract: `pro_custom` (Custom), `pro_design` (Design), `pro_clone` (Clone). iOS
-ships the **Speed (4-bit)** variant only (Quality is macOS-only); the iOS-eligible set
-comes from `qwenvoice_ios_model_catalog.json`.
+to the contract: `pro_custom` (Custom), `pro_design` (Design), `pro_clone` (Clone). Both apps ship
+one mixed-precision model per mode (the `attn` hybrid: 4-bit with the talker's attention at 8 bits, RF-59); the iOS-eligible set comes from
+`qwenvoice_ios_model_catalog.json`.
 
 ### Per-model states (Settings → Voice Models, `iosModelRow_<modelID>`)
 
@@ -464,10 +464,13 @@ first launch asks once for all of them (`iosModelUpdatePromptConfirm` / `iosMode
 the reason, the total size and the allowed networks (RF-41). Update records the consent for exactly
 those artifacts and queues every model; later launches resume without asking, never under Low Data
 Mode, and never a model the user cancelled or postponed with Later (it stays "Update required" until
-Update, and no launch asks again) or one whose download failed (Retry). The consent is cleared once
-nothing is left to update, so a later set of models asks again. On a
-phone without the space to keep the earlier models meanwhile, the alert says they are removed first
-(their shared blobs pinned, so the tokenizer is still reused). A banner above every tab counts the
+Update, and no launch asks again) or one whose download failed (the failure's class is kept in the
+update ledger; it waits for Retry). The consent is cleared once nothing is left to update, so a later
+set of models asks again. On a phone without the space to keep the earlier models meanwhile, the
+alert says they are removed first (their shared blobs pinned, so the tokenizer is still reused); a
+download that already failed for want of space while earlier models remain is asked about again on
+the next launch, this time with their removal first, even after consent (Later stops it). The
+ledger, reclaim and removal work holds a background-time grant (`IOSBackgroundTime`). A banner above every tab counts the
 models ready (`iosModelUpdateBanner`), then notes the space the earlier models freed
 (`iosModelUpdateBanner_done`, dismissed with a tap). Studio's install button reads "Update [mode]".
 
@@ -615,7 +618,8 @@ final model language, think/no-think token mode, and conditioning mode separatel
 
 ### Cross-cutting
 
-- **Speed vs Quality** — iOS is Speed-only (smaller, faster, lower memory). Quality (8-bit) is macOS-only.
+- **One model per mode** — since RF-59 both apps ship the same hybrid model per mode; the earlier
+  Speed (4-bit) and the Mac's Quality (8-bit) packages are retired, and a 3.0 install updates to it.
 - **Reproducible takes** — every take samples as the model's reference does (the Take variation
   setting is retired, RF-58). Each generation records its effective seed in History (schema v6);
   "Pin seed" on a History row reproduces that take on demand and the Studio Seed chip shows/unpins

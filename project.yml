@@ -725,6 +725,8 @@ targets:
       - path: Sources/iOSSupport/Services/DatabaseService.swift
       - path: Sources/iOS/Commerce/IOSExportGate.swift
       - path: Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift
+      # RF-59: the model update's background-time grant (a pass-through off iOS).
+      - path: Sources/iOSSupport/Services/IOSBackgroundTime.swift
       - path: Sources/iOSSupport/Models/TTSModel.swift
       - path: Sources/iOSSupport/Models/TTSContract.swift
       - path: Sources/iOSSupport/Services/AppPerformanceSignposts.swift

@@ -1160,6 +1160,18 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.modelUpdate.updateNow", defaultValue: "Update Now",
                comment: "macOS interface: model update banner button that starts the update (RF-59). Presentation only.")
     }
+    static var modelUpdateNeedsRoomTitle: String {
+        localization.string(localized: "vocello.mac.modelUpdate.needsRoomTitle", defaultValue: "Not enough space to update your voice models",
+               comment: "macOS interface: model update banner title when the disk lacks space for the update (RF-59). Presentation only.")
+    }
+    static var modelUpdateNeedsRoomMessage: String {
+        localization.string(localized: "vocello.mac.modelUpdate.needsRoomMessage", defaultValue: "Vocello can remove your earlier models first to make room for the improved ones.",
+               comment: "macOS interface: model update banner body when the disk lacks space; the earlier models can be removed first (RF-59). Presentation only.")
+    }
+    static var modelUpdateMakeRoom: String {
+        localization.string(localized: "vocello.mac.modelUpdate.makeRoom", defaultValue: "Remove Earlier Models and Update",
+               comment: "macOS interface: model update banner button that removes the earlier models, then starts the update (RF-59). Presentation only.")
+    }
     static var modelUpdateNotNow: String {
         localization.string(localized: "vocello.mac.modelUpdate.notNow", defaultValue: "Not Now",
                comment: "macOS interface: model update banner button that leaves the update for later; the models stay offered in Settings and Studio (RF-59). Presentation only.")

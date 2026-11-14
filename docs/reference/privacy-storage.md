@@ -41,8 +41,8 @@ QWENVOICE_APP_SUPPORT_DIR=/path/to/custom/app-support
 
 Maintained macOS subtrees and preferences:
 
-- `models/` stores installed Hugging Face model files. Speed and Quality folders for the same
-  generation mode can coexist on macOS. Catalog-v2 installs may also use the hidden
+- `models/` stores installed Hugging Face model files: one model folder per mode since RF-59; a 3.0
+  install's Speed and Quality folders go once the first new model verifies. Catalog-v2 installs may also use the hidden
   `.qwenvoice-components-v1/` content-addressed store; ordinary model paths remain regular hard
   links, and component liveness is derived from strict installed manifests. Deleting a model, and
   each engine start, reclaims blobs no installed manifest lists plus `trash/` and `staging/`

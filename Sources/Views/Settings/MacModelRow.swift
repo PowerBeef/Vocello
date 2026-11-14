@@ -15,15 +15,25 @@ struct MacModelSetupSummaryRow: View {
         let summary = viewModel.modelSetupSummary()
         let setupProgress = viewModel.recommendedSetupProgress
         let isComplete = summary.installedRecommendedCount == summary.totalRecommendedCount
+        // RF-59: while an earlier Vocello's models wait for their update, the summary speaks of it,
+        // as the banner does, instead of counting first installs.
+        let isUpdate = viewModel.hasPendingModelUpdate
+        // Short of room, the button says it removes the earlier models first: it deletes them.
+        let makesRoom = isUpdate && viewModel.modelUpdateNeedsRoom
+        let title = isUpdate
+            ? (setupProgress?.kind == .update ? MacInterfaceText.modelUpdateTitle
+                : (makesRoom ? MacInterfaceText.modelUpdateNeedsRoomTitle : MacInterfaceText.modelUpdateNeededTitle))
+            : summary.text
 
         VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
             HStack(alignment: .center, spacing: MacTheme.Spacing.md) {
                 HStack(alignment: .top, spacing: MacTheme.Spacing.snug) {
                     MacSettingsIcon(
-                        symbol: isComplete ? "checkmark.circle.fill" : "arrow.down.circle",
-                        tint: isComplete ? MacTheme.Status.healthy : MacTheme.settingsTint
+                        symbol: isUpdate ? "arrow.triangle.2.circlepath.circle"
+                            : (isComplete ? "checkmark.circle.fill" : "arrow.down.circle"),
+                        tint: isComplete && !isUpdate ? MacTheme.Status.healthy : MacTheme.settingsTint
                     )
-                    Text(summary.text)
+                    Text(title)
                         .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -37,6 +47,20 @@ struct MacModelSetupSummaryRow: View {
                     }
                     .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.settingsTint))
                     .accessibilityIdentifier("settings_cancelRecommendedSetup")
+                } else if makesRoom {
+                    Button(MacInterfaceText.modelUpdateMakeRoom) {
+                        Task { await viewModel.makeRoomAndStartModelUpdate() }
+                    }
+                    .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.accent, prominence: .primary))
+                    .disabled(viewModel.modelUpdateMakingRoom)
+                    .accessibilityIdentifier("settings_makeRoomAndUpdateModels")
+                } else if isUpdate {
+                    Button(MacInterfaceText.modelUpdateUpdateNow) {
+                        Task { await viewModel.startModelUpdate() }
+                    }
+                    .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.accent, prominence: .primary))
+                    .disabled(viewModel.modelUpdateMakingRoom)
+                    .accessibilityIdentifier("settings_updateModels")
                 } else if !viewModel.recommendedSetupCandidates().isEmpty {
                     Button(MacInterfaceText.settingsDownloadRecommended) {
                         viewModel.setUpRecommendedModels()

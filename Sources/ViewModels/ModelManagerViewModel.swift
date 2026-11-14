@@ -159,9 +159,21 @@ final class ModelManagerViewModel {
     /// The modes the plan held at launch: the banner counts the finished ones against them.
     @ObservationIgnored private var sessionUpdateModeCount = 0
     @ObservationIgnored private var modelUpdateCompletionShown = false
+    /// A download's failure class, recorded in the update ledger when the download completes.
+    @ObservationIgnored private var pendingUpdateFailures: [String: ModelUpdateFailure] = [:]
+    /// Too little room for the update while earlier models hold some (at launch, on the user's
+    /// Update, or after a download failed for want of space).
+    private(set) var modelUpdateNeedsRoom = false
+    /// The earlier models are being removed so the update fits: their shared blobs stay pinned, and
+    /// the banner's and Settings' buttons wait.
+    private(set) var modelUpdateMakingRoom = false
     /// The bundled contract's registry for this Mac (no base aliases), for the update plan and the
     /// retired-folder reclamation.
     @ObservationIgnored private let updateRegistry: ContractBackedModelRegistry?
+    /// Every model id the contract names on this Mac, base aliases included (the CLI uses them): a
+    /// clone prompt cache for any other id is a retired model's.
+    @ObservationIgnored private let currentModelIDs: Set<String>
+    @ObservationIgnored private var clonePromptCachesChecked = false
 
     private let fileManager: FileManager
     private let modelsDirectory: URL
@@ -209,6 +221,10 @@ final class ModelManagerViewModel {
         self.deviceClass = deviceClass
         self.prefersLowerMemoryModels = MacModelVariantPreferences.preferSpeedEverywhere()
         self.updateRegistry = Self.makeUpdateRegistry(manifestURL: TTSContract.manifestURL)
+        self.currentModelIDs = TTSContract.manifestURL
+            .flatMap { try? ContractBackedModelRegistry(manifestURL: $0) }
+            .map { Set($0.expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: true).models.map(\.id)) }
+            ?? []
 
         for model in TTSModel.all {
             modelInfoByID[model.id] = localModelInfo(for: model)
@@ -676,11 +692,7 @@ final class ModelManagerViewModel {
 
     /// What the model update banner shows: nothing, a running update, an update that has not started
     /// or was stopped, or the note once every mode is updated.
-    enum ModelUpdateBanner: Equatable {
-        case updating(completed: Int, total: Int, fraction: Double)
-        case needed
-        case done(freedBytes: Int64)
-    }
+    typealias ModelUpdateBanner = ModelUpdateBannerState
 
     /// What Studio's install button shows for a mode whose model needs its update.
     enum StudioModelUpdate: Equatable {
@@ -700,47 +712,139 @@ final class ModelManagerViewModel {
         updatePlan.modes.compactMap(recommendedVariant(for:)).filter { !isAvailable($0) }
     }
 
+    /// Some mode's model from an earlier Vocello still needs its update.
+    var hasPendingModelUpdate: Bool {
+        !modelUpdateCandidates.isEmpty
+    }
+
     func needsModelUpdate(_ model: TTSModel) -> Bool {
         updatePlan.needsUpdate(model.mode) && !isAvailable(model)
     }
 
-    /// Starts the update on its own after launch, for the modes the user has not stopped, when the
-    /// network is unmetered (`NetworkPathCost`). Otherwise the banner offers it.
+    /// Starts the update on its own after launch (`MacModelUpdateAutoStart`): for the modes the user
+    /// has not stopped and whose last attempt did not fail, on an unmetered network
+    /// (`NetworkPathCost`), with room for the downloads that run at once. Short of room while the
+    /// earlier models hold some, the banner offers to remove them first; otherwise it offers the update.
     func startModelUpdateIfNeeded() async {
         guard !Self.automaticModelUpdateDisabled, recommendedSetupTask == nil else { return }
-        let candidates = modelUpdateCandidates.filter { !updatePlan.isPaused($0.mode) && !isDownloadActive($0.id) }
-        guard !candidates.isEmpty, await NetworkPathCost.current().allowsAutomaticDownloads else { return }
+        let models = modelUpdateCandidates
+        guard !models.isEmpty, let facts = await modelUpdateDiskFacts() else { return }
+        let network = await NetworkPathCost.current()
+        switch modelUpdateDecision(for: models, facts: facts, userInitiated: false,
+                                   networkAllowsAutomaticDownloads: network.allowsAutomaticDownloads) {
+        case .none:
+            return
+        case .needsRoom:
+            modelUpdateNeedsRoom = true
+        case .start(let modelIDs):
+            runSetup(candidates: models.filter { modelIDs.contains($0.id) }, kind: .update)
+        }
+    }
+
+    /// The banner's and Settings' Update: resumes every stopped or failed mode and updates them all,
+    /// unless the disk lacks the room while earlier models hold some (or a download already failed
+    /// for want of space): then the banner offers to remove them first.
+    func startModelUpdate() async {
+        guard !modelUpdateMakingRoom else { return }
+        let models = modelUpdateCandidates
+        if !models.isEmpty, let facts = await modelUpdateDiskFacts(),
+           case .needsRoom = modelUpdateDecision(for: models, facts: facts, userInitiated: true,
+                                                 networkAllowsAutomaticDownloads: true) {
+            modelUpdateNeedsRoom = true
+            return
+        }
+        await beginModelUpdate()
+    }
+
+    private func beginModelUpdate() async {
+        if updatePlan.modes.contains(where: { updatePlan.changeBeforeUpdating($0) != nil }) {
+            await changeUpdatePlan(.resumeAll)
+        }
+        modelUpdateNeedsRoom = false
+        let candidates = modelUpdateCandidates.filter { !isDownloadActive($0.id) }
+        guard recommendedSetupTask == nil else {
+            // Another setup runs: queue the update's downloads beside it.
+            for model in candidates { await download(model) }
+            return
+        }
         runSetup(candidates: candidates, kind: .update)
     }
 
-    /// The banner's Update Now: resumes every stopped mode and updates them all.
-    func startModelUpdate() async {
-        if updatePlan.modes.contains(where: updatePlan.isPaused) {
-            await changeUpdatePlan(.resumeAll)
+    /// The banner's offer on a disk too full for the update: removes the earlier models first (their
+    /// shared blobs pinned, so the new models still reuse them), then updates. While it runs no
+    /// refresh drops those pins, and a second click does nothing.
+    func makeRoomAndStartModelUpdate() async {
+        guard !modelUpdateMakingRoom, let registry = updateRegistry else { return }
+        modelUpdateMakingRoom = true
+        defer { modelUpdateMakingRoom = false }
+        let modelsDirectory = modelsDirectory
+        let installed = Set(TTSModel.all.filter { info(for: $0).complete }.map(\.id))
+        let result = await Task.detached(priority: .userInitiated) { @concurrent in
+            registry.removeRetiredFoldersBeforeUpdate(in: modelsDirectory) { installed.contains($0.id) }
+        }.value
+        modelUpdateFreedBytes += result.freedBytes
+        for (folder, reason) in result.failed.sorted(by: { $0.key < $1.key }) {
+            ModelManagerLog.logger.error(
+                "[ModelManagerViewModel] earlier model folder \(folder, privacy: .public) kept: \(reason, privacy: .private)"
+            )
         }
-        runSetup(candidates: modelUpdateCandidates.filter { !isDownloadActive($0.id) }, kind: .update)
+        // Nothing went (the plan could not be recorded): the disk is still short, so the offer stays.
+        guard !result.removed.isEmpty else { return }
+        await beginModelUpdate()
+    }
+
+    /// Disk facts the update decision reads, gathered off the main actor.
+    private struct ModelUpdateDiskFacts: Sendable {
+        let availableBytes: Int64?
+        let holdsEarlierModels: Bool
+    }
+
+    private func modelUpdateDiskFacts() async -> ModelUpdateDiskFacts? {
+        guard let registry = updateRegistry else { return nil }
+        let modelsDirectory = modelsDirectory
+        return await Task.detached(priority: .utility) { @concurrent in
+            ModelUpdateDiskFacts(
+                availableBytes: ModelDeliverySpace.availableBytes(at: modelsDirectory),
+                holdsEarlierModels: !RetiredModelReclamation.presentFolders(of: registry.models, in: modelsDirectory).isEmpty
+            )
+        }.value
+    }
+
+    private func modelUpdateDecision(
+        for models: [TTSModel], facts: ModelUpdateDiskFacts, userInitiated: Bool, networkAllowsAutomaticDownloads: Bool
+    ) -> MacModelUpdateAutoStart.Decision {
+        MacModelUpdateAutoStart.decide(
+            candidates: models.map { model in
+                MacModelUpdateAutoStart.Candidate(
+                    modelID: model.id, estimatedBytes: model.estimatedDownloadBytes ?? 0,
+                    paused: updatePlan.isPaused(model.mode), active: isDownloadActive(model.id),
+                    failure: updatePlan.failure(model.mode)
+                )
+            },
+            userInitiated: userInitiated,
+            networkAllowsAutomaticDownloads: networkAllowsAutomaticDownloads,
+            availableBytes: facts.availableBytes,
+            holdsEarlierModels: facts.holdsEarlierModels,
+            concurrentDownloads: Self.maxConcurrentModelDownloads
+        )
     }
 
     /// Nothing while every remaining mode was stopped by the user: the rows and Studio still offer
     /// the update, but the banner no longer asks.
     var modelUpdateBanner: ModelUpdateBanner? {
-        if let freed = modelUpdateCompletion { return .done(freedBytes: freed) }
-        let remaining = modelUpdateCandidates
-        let running = remaining.filter { isDownloadActive($0.id) }
-        guard !running.isEmpty else {
-            return remaining.contains(where: { !updatePlan.isPaused($0.mode) }) ? .needed : nil
-        }
-        // The modes updated since launch, plus the ones still updating (a stopped mode is not counted).
-        let completed = max(0, sessionUpdateModeCount - remaining.count)
-        let total = completed + remaining.filter { !updatePlan.isPaused($0.mode) || isDownloadActive($0.id) }.count
-        let inFlight = running.reduce(0.0) { sum, model in
-            guard case .downloading(let progress) = statuses[model.id],
-                  let total = progress.totalBytes, total > 0 else { return sum }
-            return sum + min(1, Double(progress.downloadedBytes) / Double(total))
-        }
-        return .updating(
-            completed: completed, total: total,
-            fraction: (Double(completed) + inFlight) / Double(total)
+        ModelUpdateBannerState.derive(
+            remaining: modelUpdateCandidates.map { model in
+                var fraction: Double?
+                if case .downloading(let progress) = statuses[model.id], let total = progress.totalBytes, total > 0 {
+                    fraction = Double(progress.downloadedBytes) / Double(total)
+                }
+                return ModelUpdateBannerState.Remaining(
+                    paused: updatePlan.isPaused(model.mode), active: isDownloadActive(model.id), fraction: fraction
+                )
+            },
+            sessionModeCount: sessionUpdateModeCount,
+            completionFreedBytes: modelUpdateCompletion,
+            needsRoom: modelUpdateNeedsRoom
         )
     }
 
@@ -775,6 +879,8 @@ final class ModelManagerViewModel {
         for mode in updatePlan.modes where !updatePlan.isPaused(mode) {
             await changeUpdatePlan(.pause(mode))
         }
+        // After the pauses: the banner goes at once instead of offering the update meanwhile.
+        modelUpdateNeedsRoom = false
     }
 
     private func changeUpdatePlan(_ change: ModelUpdateLedger.Change) async {
@@ -867,8 +973,8 @@ final class ModelManagerViewModel {
     func download(_ model: TTSModel) async {
         let modelID = model.id
         guard !isDownloadActive(modelID) else { return }
-        if updatePlan.isPaused(model.mode) {
-            await changeUpdatePlan(.resume(model.mode))
+        if let change = updatePlan.changeBeforeUpdating(model.mode) {
+            await changeUpdatePlan(change)
             // A second click, or a setup, may have queued it while the ledger was written.
             guard !isDownloadActive(modelID) else { return }
         }
@@ -905,6 +1011,9 @@ final class ModelManagerViewModel {
             downloadPlan = try TTSContract.productionDownloadPlan(for: model)
         } catch {
             lastFailureMessages[modelID] = error.localizedDescription
+            // No download ran, so no completion records it: recorded here.
+            let failure = ModelUpdateFailure.classify(error)
+            Task { await recordUpdateFailure(of: model, failure) }
             // Reuse the last full snapshot: a fresh main-actor snapshot is size-only
             // and would hide a digest failure the background pass already found.
             statuses[modelID] = status(
@@ -968,6 +1077,7 @@ final class ModelManagerViewModel {
             } catch {
                 guard self.isCurrentEpoch(epoch, for: modelID) else { return }
                 self.lastFailureMessages[modelID] = error.localizedDescription
+                self.pendingUpdateFailures[modelID] = ModelUpdateFailure.classify(error)
                 await self.handleMutationCompletion(for: modelID)
                 return
             }
@@ -1013,6 +1123,7 @@ final class ModelManagerViewModel {
             let postDownloadSnapshot = localModelInfo(for: model)
             if !postDownloadSnapshot.complete {
                 lastFailureMessages[model.id] = "Download finished, but required model files are still missing."
+                pendingUpdateFailures[model.id] = .verification
             } else {
                 persistInstallMetadata(for: model, snapshot: postDownloadSnapshot)
                 diagnostics.recordSuccess(
@@ -1034,6 +1145,7 @@ final class ModelManagerViewModel {
                         .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
                 ).recordFailure(classification: "download", error: dlError)
                 lastFailureMessages[model.id] = dlError.localizedDescription
+                pendingUpdateFailures[model.id] = ModelUpdateFailure.classify(dlError)
             }
         } catch {
             guard isCurrentEpoch(epoch, for: model.id) else { return }
@@ -1043,6 +1155,7 @@ final class ModelManagerViewModel {
                     .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
             ).recordFailure(classification: "download", error: error)
             lastFailureMessages[model.id] = error.localizedDescription
+            pendingUpdateFailures[model.id] = ModelUpdateFailure.classify(error)
         }
         await handleMutationCompletion(for: model.id)
     }
@@ -1198,7 +1311,12 @@ final class ModelManagerViewModel {
         let modelsDirectory = modelsDirectory
         let startedGenerations = mutationGenerations
         let registry = updateRegistry
-        let (snapshots, plan, reclaimed) = await Task.detached(priority: .utility) { @concurrent in
+        // Retired models' clone prompt caches: checked once per launch, and when earlier folders go.
+        let checkClonePromptCaches = !clonePromptCachesChecked
+        clonePromptCachesChecked = true
+        let currentModelIDs = currentModelIDs
+        let voicesDirectory = AppPaths.voicesDir
+        let (snapshots, plan, reclaimed, holdsEarlierModels) = await Task.detached(priority: .utility) { @concurrent in
             let snapshots = Self.fetchSnapshots(in: modelsDirectory)
             // RF-59: the plan first (the retired folders are its only evidence), then the reclaim.
             let plan = Self.reconcileUpdatePlan(
@@ -1206,10 +1324,23 @@ final class ModelManagerViewModel {
                 installed: Set(snapshots.filter(\.complete).map(\.id)), change: .none
             )
             let reclaimed = Self.reclaimRetiredFolders(in: modelsDirectory, registry: registry, snapshots: snapshots)
-            return (snapshots, plan, reclaimed)
+            if !currentModelIDs.isEmpty, checkClonePromptCaches || !reclaimed.removed.isEmpty {
+                for cache in RetiredClonePromptCaches.remove(in: voicesDirectory, currentModelIDs: currentModelIDs) {
+                    ModelManagerLog.logger.info(
+                        "[ModelManagerViewModel] removed a retired model's clone prompt cache \(cache, privacy: .private)"
+                    )
+                }
+            }
+            let holdsEarlierModels = registry.map {
+                !RetiredModelReclamation.presentFolders(of: $0.models, in: modelsDirectory).isEmpty
+            } ?? false
+            return (snapshots, plan, reclaimed, holdsEarlierModels)
         }.value
         updatePlan = plan
         modelUpdateFreedBytes += reclaimed.freedBytes
+        // Nothing left to remove: the banner no longer offers to make room.
+        if !holdsEarlierModels, !modelUpdateMakingRoom { modelUpdateNeedsRoom = false }
+        releaseModelUpdatePinsIfUnused()
         applySnapshots(snapshots, startedGenerations: startedGenerations)
         noteModelUpdateCompletionIfDone()
     }
@@ -1311,7 +1442,32 @@ final class ModelManagerViewModel {
         return .notDownloaded(message: failureMessage)
     }
 
+    /// Pins made to remove the earlier models first serve that removal and the update downloads
+    /// after it (a setup waiting to start them included). Checked and dropped on the main actor, so
+    /// no removal or setup can begin between the check and the release; the release unlinks a
+    /// handful of hard links.
+    private func releaseModelUpdatePinsIfUnused() {
+        guard ModelUpdatePins.mayRelease(
+            makingRoom: modelUpdateMakingRoom, setupPending: recommendedSetupTask != nil,
+            updateDownloadActive: modelUpdateCandidates.contains { isDownloadActive($0.id) }
+        ) else { return }
+        updateRegistry?.releaseModelUpdatePins(in: modelsDirectory)
+    }
+
+    private func recordUpdateFailure(of model: TTSModel, _ failure: ModelUpdateFailure) async {
+        guard let change = updatePlan.changeAfterFailure(model.mode, failure) else { return }
+        await changeUpdatePlan(change)
+        // Out of room while earlier models hold some: the banner offers to remove them now.
+        if failure == .space, let facts = await modelUpdateDiskFacts(), facts.holdsEarlierModels {
+            modelUpdateNeedsRoom = true
+        }
+    }
+
     private func handleMutationCompletion(for modelID: String) async {
+        // RF-59: a failed update waits for the user's Update; no launch restarts it.
+        if let failure = pendingUpdateFailures.removeValue(forKey: modelID), let model = TTSModel.model(id: modelID) {
+            await recordUpdateFailure(of: model, failure)
+        }
         mutationGenerations[modelID, default: 0] += 1
         downloaders.removeValue(forKey: modelID)
         downloadTasks.removeValue(forKey: modelID)

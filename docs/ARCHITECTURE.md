@@ -234,8 +234,8 @@ Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 | EventSource | `1.4.1` | Server-sent events (transitive). |
 | swift-syntax | `603.0.2` | Macro support (transitive). |
 
-Shipped models (`Sources/Resources/qwenvoice_contract.json`): Qwen3-TTS 1.7B in
-**Speed (4-bit)** and **Quality (8-bit)** variants across three modes —
+Shipped models (`Sources/Resources/qwenvoice_contract.json`): Qwen3-TTS 1.7B as one mixed-precision
+model per mode (the `attn` hybrid, RF-59; a 3.0 install's Speed and Quality folders update to it) —
 `pro_custom`, `pro_design`, `pro_clone` (see [§11 Model management](#11-model-management--contract)).
 
 ---

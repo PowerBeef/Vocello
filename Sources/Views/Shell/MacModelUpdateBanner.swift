@@ -73,6 +73,18 @@ struct MacModelUpdateBanner: View {
                     Task { await modelManager.postponeModelUpdate() }
                 }
                 .accessibilityIdentifier("macModelUpdateBanner_notNow")
+            case .needsRoom:
+                Button(MacInterfaceText.modelUpdateMakeRoom) {
+                    Task { await modelManager.makeRoomAndStartModelUpdate() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(modelManager.modelUpdateMakingRoom)
+                .accessibilityIdentifier("macModelUpdateBanner_makeRoom")
+                Button(MacInterfaceText.modelUpdateNotNow) {
+                    Task { await modelManager.postponeModelUpdate() }
+                }
+                .disabled(modelManager.modelUpdateMakingRoom)
+                .accessibilityIdentifier("macModelUpdateBanner_notNow")
             case .updating:
                 showInSettingsButton
             case .done:
@@ -98,6 +110,7 @@ struct MacModelUpdateBanner: View {
     private func symbol(for state: ModelManagerViewModel.ModelUpdateBanner) -> String {
         switch state {
         case .updating, .needed: "arrow.triangle.2.circlepath.circle.fill"
+        case .needsRoom: "externaldrive.badge.exclamationmark"
         case .done: "checkmark.circle.fill"
         }
     }
@@ -105,6 +118,7 @@ struct MacModelUpdateBanner: View {
     private func tint(for state: ModelManagerViewModel.ModelUpdateBanner) -> Color {
         switch state {
         case .updating, .needed: MacTheme.accent
+        case .needsRoom: MacTheme.Status.guarded
         case .done: MacTheme.Status.healthy
         }
     }
@@ -113,6 +127,7 @@ struct MacModelUpdateBanner: View {
         switch state {
         case .updating: MacInterfaceText.modelUpdateTitle
         case .needed: MacInterfaceText.modelUpdateNeededTitle
+        case .needsRoom: MacInterfaceText.modelUpdateNeedsRoomTitle
         case .done: MacInterfaceText.modelUpdateDoneTitle
         }
     }
@@ -121,6 +136,8 @@ struct MacModelUpdateBanner: View {
         switch state {
         case .updating, .needed:
             return MacInterfaceText.modelUpdateMessage
+        case .needsRoom:
+            return MacInterfaceText.modelUpdateNeedsRoomMessage
         case .done(let freedBytes):
             guard freedBytes > 0 else { return nil }
             return MacInterfaceText.modelUpdateDoneMessage(MacInterfaceLanguage.current.fileSize(freedBytes))

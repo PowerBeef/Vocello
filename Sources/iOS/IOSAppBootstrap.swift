@@ -189,8 +189,14 @@ extension QVoiceiOSApp {
         // weights) before the first statuses, so those modes read "Update Required"; then, off the
         // launch path, every retired Speed folder goes once any new model verifies.
         _ = try? modelAssetStore.reconcileModelUpdatePlan()
-        Task.detached(priority: .utility) { @concurrent in
-            _ = modelAssetStore.reclaimRetiredFolders()
+        // Holds background time: the reclaim takes file locks, also on a background relaunch for
+        // a download session's events.
+        Task {
+            await IOSBackgroundTime.hold("vocello.model-update.launch-reclaim") {
+                _ = await Task.detached(priority: .utility) { @concurrent in
+                    modelAssetStore.reclaimRetiredFolders()
+                }.value
+            }
         }
 
         let modelManager = ModelManagerViewModel(

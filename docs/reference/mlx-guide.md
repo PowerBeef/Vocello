@@ -47,8 +47,8 @@ through [`mlx-swift`](https://github.com/ml-explore/mlx-swift) and
 
 - **Unified memory:** CPU and GPU share one physical pool, so weights and caches need no copies.
 - **Lazy evaluation:** operations build a graph that runs only when a result is needed.
-- **Native quantization:** 4-bit and 8-bit weight-only quantization is a first-class path, which is
-  how Vocello ships Speed (4-bit) and Quality (8-bit).
+- **Native quantization:** 4-bit and 8-bit weight-only quantization is a first-class path, per tensor:
+  Vocello's one model per mode is 4-bit with the talker's attention at 8 bits (RF-59).
 - **A Swift API:** no Python runtime ships in the app or the CLI.
 
 ---

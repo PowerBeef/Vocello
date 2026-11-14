@@ -77202,6 +77202,204 @@
           }
         }
       }
+    },
+    "vocello.mac.modelUpdate.needsRoomTitle": {
+      "comment": "macOS interface: model update banner title when the disk lacks space for the update (RF-59). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough space to update your voice models"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espace insuffisant pour mettre à jour vos modèles de voix"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay espacio suficiente para actualizar tus modelos de voz"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht genug Speicherplatz für das Update deiner Stimmmodelle"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spazio insufficiente per aggiornare i modelli vocali"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não há espaço suficiente para atualizar seus modelos de voz"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをアップデートする空き容量が足りません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성 모델을 업데이트할 공간이 부족합니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Недостаточно места для обновления голосовых моделей"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空间不足，无法更新语音模型"
+          }
+        }
+      }
+    },
+    "vocello.mac.modelUpdate.needsRoomMessage": {
+      "comment": "macOS interface: model update banner body when the disk lacks space; the earlier models can be removed first (RF-59). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello can remove your earlier models first to make room for the improved ones."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello peut d’abord supprimer vos anciens modèles pour faire de la place aux nouveaux."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello puede eliminar primero tus modelos anteriores para dejar espacio a los mejorados."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello kann zuerst deine bisherigen Modelle entfernen, um Platz für die verbesserten zu schaffen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello può rimuovere prima i modelli precedenti per fare spazio a quelli migliorati."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello pode remover primeiro seus modelos anteriores para abrir espaço para os aprimorados."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocelloは以前のモデルを先に削除して、改良されたモデルのための空き容量を確保できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 이전 모델을 먼저 삭제해 개선된 모델을 위한 공간을 확보할 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello может сначала удалить прежние модели, чтобы освободить место для улучшенных."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 可以先移除旧模型，为改进后的模型腾出空间。"
+          }
+        }
+      }
+    },
+    "vocello.mac.modelUpdate.makeRoom": {
+      "comment": "macOS interface: model update banner button that removes the earlier models, then starts the update (RF-59). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Earlier Models and Update"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer les anciens modèles et mettre à jour"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar modelos anteriores y actualizar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bisherige Modelle entfernen und aktualisieren"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi i modelli precedenti e aggiorna"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover modelos anteriores e atualizar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前のモデルを削除してアップデート"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 모델 삭제 후 업데이트"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить прежние модели и обновить"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除旧模型并更新"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -15,12 +15,20 @@ public struct ModelUpdatePlan: Equatable, Sendable {
         public let detectedAtUTC: String
         /// The user stopped this mode's update; nothing restarts it on its own.
         public var paused: Bool
+        /// The class of the last update attempt's failure (`ModelUpdateFailure`), never a path or a
+        /// message. Nothing restarts a failed update on its own: the user's Update or Retry clears it.
+        /// Absent in a ledger written before it existed.
+        public var lastFailure: String?
 
-        public init(mode: GenerationMode, retiredFolders: [String], detectedAtUTC: String, paused: Bool) {
+        public init(
+            mode: GenerationMode, retiredFolders: [String], detectedAtUTC: String, paused: Bool,
+            lastFailure: String? = nil
+        ) {
             self.mode = mode
             self.retiredFolders = retiredFolders
             self.detectedAtUTC = detectedAtUTC
             self.paused = paused
+            self.lastFailure = lastFailure
         }
     }
 
@@ -52,6 +60,29 @@ public struct ModelUpdatePlan: Equatable, Sendable {
         entries[mode]?.paused == true
     }
 
+    /// The last update attempt failed and waits for the user's Update or Retry.
+    public func hasFailed(_ mode: GenerationMode) -> Bool {
+        entries[mode]?.lastFailure != nil
+    }
+
+    /// The class of the mode's last update failure, when one is recorded (a class this build does
+    /// not know reads as `.other`).
+    public func failure(_ mode: GenerationMode) -> ModelUpdateFailure? {
+        entries[mode]?.lastFailure.map { ModelUpdateFailure(rawValue: $0) ?? .other }
+    }
+
+    /// The change the user's Update or Retry makes before the mode's download starts: a stopped or
+    /// failed mode resumes; any other needs none.
+    public func changeBeforeUpdating(_ mode: GenerationMode) -> ModelUpdateLedger.Change? {
+        isPaused(mode) || hasFailed(mode) ? .resume(mode) : nil
+    }
+
+    /// The change a failed download of the mode's model records: its class, for a mode the plan
+    /// holds; nothing otherwise.
+    public func changeAfterFailure(_ mode: GenerationMode, _ failure: ModelUpdateFailure) -> ModelUpdateLedger.Change? {
+        needsUpdate(mode) ? .recordFailure(mode, failure) : nil
+    }
+
     mutating func record(_ entry: Entry) {
         entries[entry.mode] = entry
     }
@@ -62,6 +93,59 @@ public struct ModelUpdatePlan: Equatable, Sendable {
 
     mutating func setPaused(_ paused: Bool, for mode: GenerationMode) {
         entries[mode]?.paused = paused
+    }
+
+    mutating func setFailure(_ failure: String?, for mode: GenerationMode) {
+        entries[mode]?.lastFailure = failure
+    }
+}
+
+/// RF-59: why an update attempt failed, as recorded in the ledger: a class, never a path or message.
+public enum ModelUpdateFailure: String, Codable, Equatable, Sendable {
+    /// Not enough free space for the download.
+    case space
+    /// A downloaded file did not match the catalog.
+    case verification
+    /// The transfer failed after its retries.
+    case network
+    case other
+
+    /// The class of `error` (a download or install failure), read from its type, its underlying
+    /// errors and, last, its description.
+    public static func classify(_ error: any Error) -> ModelUpdateFailure {
+        if let download = error as? HuggingFaceDownloader.DownloadError {
+            switch download {
+            case .fileDownloadFailed(_, let underlying): return classify(underlying)
+            case .integrityCheckFailed: return .verification
+            case .httpError, .rangeUnsupported, .shortRange: return .network
+            case .cancelled, .chunkAssemblyFailed, .invalidRemotePath, .invalidLocalDestination, .apiError:
+                return classify(description: download.errorDescription ?? "")
+            }
+        }
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteOutOfSpaceError { return .space }
+        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(ENOSPC) { return .space }
+        // The cause first: a transfer that could not write its file wraps the disk's error.
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            let inner = classify(underlying)
+            if inner != .other { return inner }
+        }
+        if nsError.domain == NSURLErrorDomain { return .network }
+        return classify(description: nsError.localizedDescription)
+    }
+
+    /// The class of a failure known only by its English description (a delivery snapshot's
+    /// message). Whole phrases, so a word such as "shared" never reads as a digest failure.
+    public static func classify(description: String) -> ModelUpdateFailure {
+        let text = description.lowercased()
+        let space = ["not enough free", "not enough space", "not enough storage", "insufficient space",
+                     "insufficient storage", "insufficient disk", "out of space", "no space left", "free storage",
+                     "storage is full", "disk is full", "disk full"]
+        if space.contains(where: { text.contains($0) }) { return .space }
+        let verification = ["sha-256", "sha256", "digest", "hash mismatch", "hash does not match", "checksum",
+                            "integrity", "verification", "failed to verify", "mismatch"]
+        if verification.contains(where: { text.contains($0) }) { return .verification }
+        return .other
     }
 }
 
@@ -83,6 +167,8 @@ public enum ModelUpdateLedger {
         case pause(GenerationMode)
         case resume(GenerationMode)
         case resumeAll
+        /// An update attempt failed; `failure` is a `ModelUpdateFailure` class.
+        case recordFailure(GenerationMode, ModelUpdateFailure)
     }
 
     public enum LedgerError: Error, Equatable, Sendable {
@@ -173,9 +259,16 @@ public enum ModelUpdateLedger {
             case .pause(let mode):
                 plan.setPaused(true, for: mode)
             case .resume(let mode):
+                // The user's Update or Retry: neither stopped nor failed any more.
                 plan.setPaused(false, for: mode)
+                plan.setFailure(nil, for: mode)
             case .resumeAll:
-                for mode in plan.modes { plan.setPaused(false, for: mode) }
+                for mode in plan.modes {
+                    plan.setPaused(false, for: mode)
+                    plan.setFailure(nil, for: mode)
+                }
+            case .recordFailure(let mode, let failure):
+                plan.setFailure(failure.rawValue, for: mode)
             }
 
             // A pass that changes nothing writes nothing: the launch and refresh passes stay reads.

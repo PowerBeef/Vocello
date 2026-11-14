@@ -129,6 +129,98 @@ final class ModelUpdateLedgerTests: XCTestCase {
         XCTAssertTrue(ModelUpdateLedger.holdsEarlierInstall("clone-4bit", in: models))
     }
 
+    /// Review finding 3 and 4: a failed update is remembered, so no launch restarts it; the user's
+    /// Update or Retry clears it. A ledger written before the field existed still reads.
+    func testAFailedUpdateIsRememberedUntilTheUserTriesAgain() throws {
+        try installEarlier("custom-4bit")
+        try installEarlier("clone-4bit")
+        let failed = try reconcile(change: .recordFailure(.custom, .space))
+        XCTAssertTrue(failed.hasFailed(.custom))
+        XCTAssertEqual(failed.entries[.custom]?.lastFailure, "space")
+        XCTAssertEqual(failed.failure(.custom), .space)
+        XCTAssertNil(failed.failure(.clone))
+        XCTAssertTrue(try reconcile().hasFailed(.custom), "it survives the next pass")
+        // The user's Update or Retry resumes it before the download; nothing else needs a change.
+        XCTAssertEqual(failed.changeBeforeUpdating(.custom), .resume(.custom))
+        XCTAssertNil(failed.changeBeforeUpdating(.clone))
+        let retried = try reconcile(change: try XCTUnwrap(failed.changeBeforeUpdating(.custom)))
+        XCTAssertFalse(retried.hasFailed(.custom))
+        XCTAssertNil(retried.changeBeforeUpdating(.custom))
+        XCTAssertEqual(try reconcile(change: .pause(.clone)).changeBeforeUpdating(.clone), .resume(.clone))
+        _ = try reconcile(change: .recordFailure(.clone, .network))
+        let resumed = try reconcile(change: .resumeAll)
+        XCTAssertFalse(resumed.hasFailed(.clone) || resumed.isPaused(.clone))
+        // A failure is recorded only for a mode the plan holds.
+        XCTAssertEqual(resumed.changeAfterFailure(.clone, .verification), .recordFailure(.clone, .verification))
+        XCTAssertNil(resumed.changeAfterFailure(.design, .verification), "a first install is not an update")
+        var unknown = resumed
+        unknown.setFailure("a-later-class", for: .clone)
+        XCTAssertEqual(unknown.failure(.clone), .other, "a class this build does not know")
+
+        let ledger = models.appendingPathComponent(ModelUpdateLedger.filename)
+        let earlier = #"{"schemaVersion": 1, "entries": [{"mode": "design", "retiredFolders": ["design-4bit"], "#
+            + #""detectedAtUTC": "2026-11-13T00:00:00Z", "paused": false}]}"#
+        try Data(earlier.utf8).write(to: ledger)
+        let read = ModelUpdateLedger.read(in: models)
+        XCTAssertEqual(read.modes, [.design])
+        XCTAssertFalse(read.hasFailed(.design))
+    }
+
+    func testAFailureIsAClassNeverAPathOrMessage() {
+        XCTAssertEqual(ModelUpdateFailure.classify(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)), .network)
+        XCTAssertEqual(ModelUpdateFailure.classify(NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(description: "Not enough free disk space"), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(description: "SHA-256 mismatch for model.safetensors"), .verification)
+        XCTAssertEqual(ModelUpdateFailure.classify(description: "something else"), .other)
+        // The iPhone's delivery messages.
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(description: "Not enough free storage. Need 4 GB, but only 1 GB is available."),
+            .space
+        )
+        XCTAssertEqual(ModelUpdateFailure.classify(description: "Integrity check failed for model.safetensors."), .verification)
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(description: "Could not link the shared component"), .other,
+            "\"shared\" is not a digest"
+        )
+        // The Mac downloader's errors, which wrap the system's.
+        typealias DownloadError = HuggingFaceDownloader.DownloadError
+        let outOfSpace = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+        XCTAssertEqual(ModelUpdateFailure.classify(DownloadError.fileDownloadFailed(path: "a/b", underlying: outOfSpace)), .space)
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(DownloadError.fileDownloadFailed(path: "a/b", underlying: URLError(.timedOut))), .network
+        )
+        XCTAssertEqual(ModelUpdateFailure.classify(DownloadError.integrityCheckFailed(path: "a/b", reason: "size")), .verification)
+        XCTAssertEqual(ModelUpdateFailure.classify(DownloadError.httpError(statusCode: 503, path: "a/b")), .network)
+        XCTAssertEqual(ModelUpdateFailure.classify(DownloadError.invalidLocalDestination("a/b")), .other)
+        let wrapped = NSError(
+            domain: "Install", code: 1, userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))]
+        )
+        XCTAssertEqual(ModelUpdateFailure.classify(wrapped), .space)
+        let cannotWrite = NSError(
+            domain: NSURLErrorDomain, code: NSURLErrorCannotWriteToFile,
+            userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))]
+        )
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(DownloadError.fileDownloadFailed(path: "a/b", underlying: cannotWrite)), .space,
+            "a transfer that could not write its file for want of space"
+        )
+    }
+
+    /// The Mac's "remove earlier models first": the plan is recorded, then every retired folder goes,
+    /// though no new model is installed yet.
+    func testTheMacCanRemoveTheEarlierModelsBeforeTheUpdate() throws {
+        let contract = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let registry = try ContractBackedModelRegistry(manifestURL: contract)
+            .expandedForPlatform(.macOS, deviceClass: nil, includeBaseAliases: false)
+        let earlier = "Qwen3-TTS-12Hz-1.7B-Base-8bit"
+        try installEarlier(earlier)
+        XCTAssertEqual(registry.reclaimRetiredFolders(in: models) { _ in false }, .nothing, "nothing verified")
+        let removed = registry.removeRetiredFoldersBeforeUpdate(in: models) { _ in false }
+        XCTAssertEqual(removed.removed, [earlier])
+        XCTAssertEqual(ModelUpdateLedger.read(in: models).modes, [.clone])
+    }
+
     func testConcurrentWritersLoseNothing() throws {
         for folder in ["custom-4bit", "design-4bit", "clone-4bit"] { try installEarlier(folder) }
         let directory = models!

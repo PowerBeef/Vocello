@@ -55,8 +55,8 @@ actual reachable sizes rather than treating those constants as proof of fit.
 | History search field | `history_searchField` | Cmd+F (opens History) |
 | Stop: cancels a running take, otherwise stops playback | Playback menu | Cmd+. |
 
-Three generation modes (Custom / Design / Clone) — same engine contract as iOS, but macOS
-has **both Speed (4-bit) and Quality (8-bit)** variants.
+Three generation modes (Custom / Design / Clone) — same engine contract and, since RF-59, the same
+one mixed-precision model per mode (the `attn` hybrid: 4-bit with the talker's attention at 8 bits, RF-59) as iOS.
 
 ---
 
@@ -214,7 +214,7 @@ headings use `settings_detail_<category>`, and `settings_backButton` returns to 
 | Element | Identifier |
 |---|---|
 | Model summary | `settings_modelDownloadsSummary`; recommended setup `settings_downloadRecommendedModels` / `settings_cancelRecommendedSetup` / `settings_recommendedSetupProgress` (during the RF-59 model update it reads "Updating [mode] · n of m complete", and Cancel stops the update) |
-| Model update (RF-59) | After an update from an earlier Vocello, the modes it installed read Update required (`settings_update_<id>`) and update on their own on an unmetered network (`QWENVOICE_MODEL_UPDATE_AUTOSTART=off` keeps them waiting in a debug session); `macModelUpdateBanner` above every destination shows the progress (`macModelUpdateBanner_progress`) and links Settings (`macModelUpdateBanner_showInSettings`), offers Update Now (`macModelUpdateBanner_update`) or Not Now (`macModelUpdateBanner_notNow`, which stops it like Cancel) when it has not started, asks nothing once the user stopped every remaining mode, and ends with the space the earlier models freed (`macModelUpdateBanner_dismiss`); Studio's `textInput_installModelButton` reads "Update in Settings" or "Updating · n%" |
+| Model update (RF-59) | After an update from an earlier Vocello, the modes it installed read Update required (`settings_update_<id>`) and update on their own on an unmetered network with room for the downloads that run at once (`QWENVOICE_MODEL_UPDATE_AUTOSTART=off` keeps them waiting in a debug session); a failed attempt is recorded in the update ledger and waits for the user's Update, never restarting at launch; on a disk too full while the earlier models hold space (at launch, on the user's Update, or after a download failed for want of space) the banner and the Settings summary offer Remove Earlier Models and Update (`macModelUpdateBanner_makeRoom`, `settings_makeRoomAndUpdateModels`; their shared blobs stay pinned, so the tokenizer is reused, until no update download is left), and Not Now stops it; otherwise the Settings summary reads as the update (`settings_updateModels`) while one is pending; `macModelUpdateBanner` above every destination shows the progress (`macModelUpdateBanner_progress`) and links Settings (`macModelUpdateBanner_showInSettings`), offers Update Now (`macModelUpdateBanner_update`) or Not Now (`macModelUpdateBanner_notNow`, which stops it like Cancel) when it has not started, asks nothing once the user stopped every remaining mode, and ends with the space the earlier models freed (`macModelUpdateBanner_dismiss`); Studio's `textInput_installModelButton` reads "Update in Settings" or "Updating · n%" |
 | Mode row | `settings_mode_<mode>` (scrolled to and flashed from a Studio installation link) |
 | Package row | `settings_package_<modelID>` / `settings_packageBadge_<modelID>` (Recommended or Heavy) / `settings_packageStatus_<modelID>` / `settings_downloadProgress_<modelID>` |
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
@@ -297,8 +297,9 @@ generation-resume feature. A joined-row commit reloads the complete History proj
 
 ## 3. Model download management
 
-macOS has **both Speed (4-bit) and Quality (8-bit)** variants (unlike iOS Speed-only).
-Settings → Models & Files → Model downloads shows per-mode packages. Download via `settings_download_<id>`;
+macOS ships one mixed-precision model per mode (the `attn` hybrid: 4-bit with the talker's attention at 8 bits, RF-59), as iOS does; the Speed and Quality packages of 3.0 are
+retired, and a 3.0 install updates to it (the model update below). Settings → Models & Files → Model
+downloads shows one package row per mode. Download via `settings_download_<id>`;
 cancel via `settings_cancel_<id>`; repair via `settings_repair_<id>`; a complete install whose files no longer match the pinned catalog identity shows **Update available** with `settings_update_<id>` (the same authenticated download path repairs it in place).
 
 The shared foreground downloader distinguishes queued, waiting for connectivity, downloading,
@@ -317,8 +318,7 @@ is installed — otherwise the app prompts to download from Settings.
 
 Same engine as iOS. See [`ios-app-guide.md`](ios-app-guide.md) §4 for the full reference
 (modes, 9 speakers + native languages, 8 delivery presets, custom
-tone, 10 languages, reproducible takes). macOS adds the **Quality (8-bit)** variant for
-higher-fidelity output.
+tone, 10 languages, reproducible takes). Both apps run the same model per mode (RF-59).
 
 ---
 

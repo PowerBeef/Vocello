@@ -122,9 +122,16 @@ decision 2026-11-13), and the legacy cleanup leaves them alone until then. Befor
 host records the model update plan (`ModelUpdateLedger`, `.qwenvoice-model-update.json`): the modes
 whose earlier model was installed, so they read "Update required" and update even after their
 folders are gone; a plan it cannot record removes nothing, and a newer build's ledger is left
-alone. The apps start that update themselves: the Mac on an unmetered network after its first
-refresh (a banner otherwise offers it), the iPhone after one consent alert naming the total size
-(RF-41), resumed silently at later launches; a mode the user stopped stays stopped. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
+alone. The apps start that update themselves: the Mac on an unmetered network with room for the
+downloads that run at once after its first refresh (a banner otherwise offers it, or offers to remove
+the earlier models first when the disk is short or a download already failed for want of space, as
+the user's Update does), the iPhone after one consent alert naming the total size (RF-41), resumed
+silently at later launches; a mode the user stopped stays stopped, and one whose last attempt failed
+(recorded in the ledger as a class) waits for the user's Update or Retry. The iPhone asks for
+background time around the ledger's lock, the reclaim and the removal of the earlier models, so iOS
+does not suspend it holding a file lock in the App Group container while that time lasts; when iOS
+reclaims the time first, the grant ends and the work goes on. Clone prompt caches of retired model
+ids are removed on the Mac. Schema v2 also proves that the four files beneath `speech_tokenizer/` have the same content across
 all artifacts (the hybrids keep the shipped tokenizer, so installed copies are reused). It gives that component separate content identity (ordered path, size, and
 SHA-256) and compatibility identity (content plus component schema, loader ABI, runtime profile,
 and encoder capability), along with ordered source artifacts. Schema-v1 catalog documents remain

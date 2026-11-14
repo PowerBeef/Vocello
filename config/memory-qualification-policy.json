@@ -21,7 +21,7 @@
     "targetIntervalMultiple": 2.0,
     "floorMS": 500.0,
     "status": "calibrated",
-    "calibrationRunID": "mac-memory-qualification-20260926-011258-82f5f55c",
+    "calibrationRunID": "mac-memory-qualification-20261114-174519-39bd0268",
     "floorTiers": {
       "description": "The floor tiers (the 8 GB Mac and the iPhone, by the device class each engine row stamps, forced or not) moved from a 500 ms to a 250 ms cadence on 2026-09-25, which would cut their bound from 1,000 ms to 500 ms while the only calibration data comes from the M6. They keep a 1,000 ms floor until a consented, unforced iPhone or 8 GB Mac memory-qualification record calibrates it (scripts/derive_memory_calibration.py --write on that record); an M6 calibration never moves it.",
       "deviceClasses": [
@@ -45,7 +45,7 @@
       "requirement": "One consented memory-qualification run per platform on its canonical host sets each mode's bound from that run's within-mode MLX growth noise; a maintainer records it here with the run ID.",
       "macos": {
         "status": "calibrated",
-        "calibrationRunID": "mac-memory-qualification-20260926-011258-82f5f55c",
+        "calibrationRunID": "mac-memory-qualification-20261114-174519-39bd0268",
         "growthLimitMBByMode": {
           "custom": 16.0,
           "design": 16.0,

@@ -184,4 +184,49 @@ final class CLIContractTests: XCTestCase {
         CLIPresenter.succeed(Rows(modes: ["custom"]))
         XCTAssertTrue(captured.withLock { $0.isEmpty }, "text mode prints its own output")
     }
+
+    /// Audit C6: a run exits with the status of what it reported. A signal with nothing yet
+    /// reported becomes `cancelled`; it never turns a reported success into exit 130.
+    func testASignalledRunExitsWithTheStatusItReported() throws {
+        let captured = Mutex<[Data]>([])
+        let sink: @Sendable (Data) -> Bool = { data in
+            captured.withLock { $0.append(data) }
+            return true
+        }
+        struct Rows: Encodable, Sendable { let modes: [String] }
+
+        // Nothing was reported when the signal arrived: the run is a cancellation and says so.
+        CLIPresenter.begin(format: .json, command: "generate", requestID: "fixture", stdoutSink: sink)
+        XCTAssertNil(CLIPresenter.reportedExitCode)
+        XCTAssertEqual(CLIPresenter.finishCompletedCommand(signal: SIGTERM), 143)
+        XCTAssertEqual(CLIPresenter.reportedExitCode, 143)
+        var lines = captured.withLock { $0 }
+        XCTAssertEqual(lines.count, 1)
+        let cancelled = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(lines.first)) as? [String: Any])
+        XCTAssertEqual(cancelled["ok"] as? Bool, false)
+        let error = try XCTUnwrap(cancelled["error"] as? [String: Any])
+        XCTAssertEqual(error["code"] as? String, "cancelled")
+        XCTAssertEqual((error["exitCode"] as? NSNumber)?.int32Value, 143)
+
+        // The result went out before the signal took effect: it stands, and so does its status,
+        // whatever fails afterwards (an interrupted player).
+        captured.withLock { $0.removeAll() }
+        CLIPresenter.begin(format: .json, command: "generate", requestID: "fixture", stdoutSink: sink)
+        CLIPresenter.succeed(Rows(modes: ["custom"]))
+        XCTAssertEqual(CLIPresenter.finishCompletedCommand(signal: SIGINT), 0)
+        XCTAssertEqual(CLIPresenter.finishFailedCommand(CLIFailure.cancellation(signal: SIGINT)), 0)
+        lines = captured.withLock { $0 }
+        XCTAssertEqual(lines.count, 1, "one envelope")
+        let succeeded = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(lines.first)) as? [String: Any])
+        XCTAssertEqual(succeeded["ok"] as? Bool, true)
+
+        // Without a signal a machine format gets the empty success, and a failure its own status.
+        captured.withLock { $0.removeAll() }
+        CLIPresenter.begin(format: .json, command: "modes.list", requestID: "fixture", stdoutSink: sink)
+        XCTAssertEqual(CLIPresenter.finishCompletedCommand(signal: nil), 0)
+        XCTAssertEqual(captured.withLock { $0.count }, 1)
+        CLIPresenter.begin(format: .json, command: "generate", requestID: "fixture", stdoutSink: sink)
+        XCTAssertEqual(CLIPresenter.finishFailedCommand(CLIErrorObject(code: .qcRejected, message: "rejected")), 1)
+        XCTAssertEqual(CLIPresenter.reportedExitCode, 1)
+    }
 }

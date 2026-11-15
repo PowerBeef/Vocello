@@ -233,7 +233,10 @@ command and awaits its cleanup. A second signal or 30-second deadline forces exi
 stderr warning after killing any `--play` child and waiting up to 2 seconds for its reap; exit
 status alone is not proof of clean cancellation. A signalled run exits `130`/`143` even when the
 command also failed for another reason; its envelope then reports `cancelled` with that failure in
-`detail.failure`. A closed stdout (EPIPE) stops the command the same way and exits `141`, with
+`detail.failure`. The exit status always follows what the run reported: a signal that arrives with
+nothing yet reported makes the run `cancelled` (also when the command itself had finished), and one
+that arrives once the result has gone out changes nothing, so a run whose envelope says `ok: true`
+exits `0`. A closed stdout (EPIPE) stops the command the same way and exits `141`, with
 nothing more reported; after a real signal it changes nothing.
 
 ## Commands

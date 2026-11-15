@@ -337,6 +337,30 @@ final class CLIExecutionTests: XCTestCase {
         XCTAssertEqual(signalled.finish(code: 1), 130, "the signal's status stands")
     }
 
+    /// Audit C6: what the command reported decides the exit status, so the process never exits
+    /// against its own report; a signal decides it only when nothing was reported.
+    func testAReportedStatusStandsAgainstASignal() {
+        let forced = Mutex<[Int32]>([])
+        let succeeded = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        succeeded.receive(SIGINT)
+        XCTAssertEqual(succeeded.finish(code: 0, reported: 0), 0, "ok: true went out, so the run exits 0")
+
+        let cancelled = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        cancelled.receive(SIGTERM)
+        XCTAssertEqual(cancelled.finish(code: 143, reported: 143), 143)
+
+        let silent = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        silent.receive(SIGINT)
+        XCTAssertEqual(silent.finish(code: 0, reported: nil), 130, "nothing reported: the signal decides")
+        XCTAssertTrue(forced.withLock { $0.isEmpty })
+
+        let escalated = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })
+        escalated.receive(SIGINT)
+        escalated.receive(SIGINT)
+        XCTAssertNil(escalated.finish(code: 0, reported: 0), "the forced path alone owns the exit")
+        XCTAssertEqual(forced.withLock { $0 }, [130])
+    }
+
     func testSignalBeforeAttachmentCancelsTheLateCommand() async {
         let forced = Mutex<[Int32]>([])
         let supervisor = CLIProcessSupervisor(forceExit: { code in forced.withLock { $0.append(code) } })

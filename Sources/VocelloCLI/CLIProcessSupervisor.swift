@@ -90,11 +90,16 @@ public final class CLIProcessSupervisor: Sendable {
 
     /// The exit status of the finished command, or nil when a forced exit
     /// already owns the process exit and the caller must not exit as well.
-    func finish(code: Int32) -> Int32? {
+    /// `reported` is the status of what the command reported, when it reported:
+    /// it stands, so the process never exits against its own report (a signal
+    /// that arrives as a result goes out does not turn `ok: true` into 130).
+    /// With nothing reported, a signal decides the status.
+    func finish(code: Int32, reported: Int32? = nil) -> Int32? {
         state.withLock {
             $0.finished = true
             $0.command = nil
             guard !$0.forcing else { return nil }
+            if let reported { return reported }
             return $0.firstSignal.map { 128 + $0 } ?? code
         }
     }
@@ -110,6 +115,17 @@ public final class CLIProcessSupervisor: Sendable {
     public static func run(
         signals: [Int32] = [SIGINT, SIGTERM],
         _ operation: @escaping @MainActor @Sendable () async -> Int32
+    ) async -> Int32 {
+        await run(signals: signals, reportedStatus: { nil }, operation: operation)
+    }
+
+    /// `reportedStatus` answers, once the command has ended, the exit status of
+    /// what it reported (nil when it reported nothing): see `finish`.
+    @MainActor
+    public static func run(
+        signals: [Int32] = [SIGINT, SIGTERM],
+        reportedStatus: @escaping @Sendable () -> Int32?,
+        operation: @escaping @MainActor @Sendable () async -> Int32
     ) async -> Int32 {
         let supervisor = CLIProcessSupervisor(children: .shared)
         let queue = DispatchQueue(label: "vocello.cli.signals")
@@ -147,7 +163,8 @@ public final class CLIProcessSupervisor: Sendable {
         // A forced exit's reap also unblocks the command while the forced
         // path goes on to call `exit` on the signal queue; returning here
         // would race it with a second `exit` from main.
-        guard let code = supervisor.finish(code: await command.value) else {
+        let status = await command.value
+        guard let code = supervisor.finish(code: status, reported: reportedStatus()) else {
             await parkForever()
         }
         for source in sources { source.cancel() }

@@ -13,7 +13,9 @@ enum VocelloMain {
         // A closed stdout must fail its writes (EPIPE), never end the process
         // before the command's owned cleanup runs.
         signal(SIGPIPE, SIG_IGN)
-        let code = await CLIProcessSupervisor.run { await execute() }
+        let code = await CLIProcessSupervisor.run(
+            reportedStatus: CLIPresenter.reportedStatus, operation: { await execute() }
+        )
         if code != 0 { exit(code) }
     }
 
@@ -53,8 +55,9 @@ enum VocelloMain {
         }
         do {
             try await dispatch(invocation)
-            CLIPresenter.finishSuccessIfUnreported()
-            return CLIPresenter.resultWasUnencodable ? VocelloErrorCode.internalError.exitCode : 0
+            // A signal with nothing yet reported makes the run a cancellation;
+            // a result already reported stands, with its status.
+            return CLIPresenter.finishCompletedCommand(signal: CLIProcessSupervisor.receivedSignal)
         } catch {
             // A forced exit's reap of a `--play` child also unwinds the
             // command; the forced path reports that exit, not this one.
@@ -62,8 +65,7 @@ enum VocelloMain {
             // A signalled run exits 128 + the signal whatever else failed, and says so.
             let failure = CLIFailure.classify(error, signal: CLIProcessSupervisor.receivedSignal)
                 .signalled(by: CLIProcessSupervisor.receivedSignal)
-            CLIPresenter.fail(failure)
-            return failure.exitCode
+            return CLIPresenter.finishFailedCommand(failure)
         }
     }
 

@@ -14,6 +14,8 @@ public enum CLIPresenter {
         var started = ContinuousClock.now
         var warnings: [CLIWarning] = []
         var reported = false
+        /// The exit status of what was reported: 0, or the error's.
+        var reportedExitCode: Int32?
         var unencodable = false
         var replayed = false
         var partialResult: (any Encodable & Sendable)?
@@ -139,6 +141,36 @@ public enum CLIPresenter {
     /// went out instead and the process must exit as failed.
     public static var resultWasUnencodable: Bool { state.withLock { $0.unencodable } }
 
+    /// The exit status of what this run reported: 0 for a success, the error's
+    /// for a failure. Nil while nothing has been reported, and once stdout's
+    /// reader went away (nothing reached it).
+    public static var reportedExitCode: Int32? {
+        state.withLock { ($0.events?.outputBroken ?? false) ? nil : $0.reportedExitCode }
+    }
+
+    /// `reportedExitCode`, as a function the process supervisor holds.
+    @Sendable public static func reportedStatus() -> Int32? { reportedExitCode }
+
+    /// Ends a command that returned without throwing and gives its exit status.
+    /// What it already reported stands. With nothing reported, a SIGINT or
+    /// SIGTERM that reached the run makes it a cancellation and is reported as
+    /// one, so an interrupted run never says `ok: true` and exits 130.
+    public static func finishCompletedCommand(signal: Int32?) -> Int32 {
+        if let reported = reportedExitCode { return reported }
+        if let signal, signal == SIGINT || signal == SIGTERM {
+            return finishFailedCommand(CLIFailure.cancellation(signal: signal))
+        }
+        finishSuccessIfUnreported()
+        return reportedExitCode ?? 0
+    }
+
+    /// Reports `failure` for a command that threw and gives the exit status:
+    /// the failure's, unless the run had already reported, whose status stands.
+    public static func finishFailedCommand(_ failure: CLIErrorObject) -> Int32 {
+        fail(failure)
+        return reportedExitCode ?? failure.exitCode
+    }
+
     private static func report(ok: Bool, result: (any Encodable & Sendable)?, error: CLIErrorObject?) {
         if let capture {
             capture.report(ok: ok, result: result, error: error)
@@ -147,6 +179,7 @@ public enum CLIPresenter {
         let snapshot = state.withLock { state -> State? in
             guard !state.reported else { return nil }
             state.reported = true
+            state.reportedExitCode = ok ? 0 : error?.exitCode ?? VocelloErrorCode.internalError.exitCode
             return state
         }
         guard let snapshot else { return }
@@ -170,7 +203,13 @@ public enum CLIPresenter {
                 )
             )
             let encodes = (try? CLIJSONEncoding.encoder().encode(envelope)) != nil
-            if !encodes { state.withLock { $0.unencodable = true } }
+            if !encodes {
+                // The fallback envelope is an `internal_error`.
+                state.withLock {
+                    $0.unencodable = true
+                    $0.reportedExitCode = VocelloErrorCode.internalError.exitCode
+                }
+            }
             if let events = snapshot.events {
                 events.finish(result: envelope)
             } else {

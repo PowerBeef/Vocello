@@ -460,7 +460,7 @@ final class LongFormPublishTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.manifestPath)), "the manifest stays")
     }
 
-    func testASignalOrAFailedMovePublishesNothing() throws {
+    func testASignalPublishesNothingAndAFailedMoveKeepsTheProject() throws {
         let (outcome, root) = try project()
         let output = root.appendingPathComponent("story.wav")
         try Data([9]).write(to: output)
@@ -477,7 +477,10 @@ final class LongFormPublishTests: XCTestCase {
         XCTAssertThrowsError(try CLILongFormProject.publishJoined(second, to: unwritable, signalled: false)) {
             XCTAssertEqual(($0 as? CLIError)?.code, .outputUnavailable)
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(second.manifestPath)))
+        // RF-61 (audit finding C12): the project passed, so a destination that cannot be written
+        // costs neither its joined output nor the manifest that names it.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(second.audioPath)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(second.manifestPath)))
     }
 }
 

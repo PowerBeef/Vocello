@@ -167,6 +167,9 @@ final class ModelManagerViewModel {
     /// The earlier models are being removed so the update fits: their shared blobs stay pinned, and
     /// the banner's and Settings' buttons wait.
     private(set) var modelUpdateMakingRoom = false
+    /// The last "Remove Earlier Models and Update" removed nothing, so the offer stays and the
+    /// banner says why (A9). Cleared when the removal is tried again and whenever the offer goes.
+    private(set) var modelUpdateRoomNotMade = false
     /// The bundled contract's registry for this Mac (no base aliases), for the update plan and the
     /// retired-folder reclamation.
     @ObservationIgnored private let updateRegistry: ContractBackedModelRegistry?
@@ -761,6 +764,7 @@ final class ModelManagerViewModel {
             await changeUpdatePlan(.resumeAll)
         }
         modelUpdateNeedsRoom = false
+        modelUpdateRoomNotMade = false
         let candidates = modelUpdateCandidates.filter { !isDownloadActive($0.id) }
         guard recommendedSetupTask == nil else {
             // Another setup runs: queue the update's downloads beside it.
@@ -776,6 +780,7 @@ final class ModelManagerViewModel {
     func makeRoomAndStartModelUpdate() async {
         guard !modelUpdateMakingRoom, let registry = updateRegistry else { return }
         modelUpdateMakingRoom = true
+        modelUpdateRoomNotMade = false
         defer { modelUpdateMakingRoom = false }
         let modelsDirectory = modelsDirectory
         let installed = Set(TTSModel.all.filter { info(for: $0).complete }.map(\.id))
@@ -788,8 +793,12 @@ final class ModelManagerViewModel {
                 "[ModelManagerViewModel] earlier model folder \(folder, privacy: .public) kept: \(reason, privacy: .private)"
             )
         }
-        // Nothing went (the plan could not be recorded): the disk is still short, so the offer stays.
-        guard !result.removed.isEmpty else { return }
+        // Nothing went (the plan could not be recorded, or no folder could be deleted): the disk is
+        // still short, so the offer stays, and the banner says the removal did not happen.
+        guard !result.removed.isEmpty else {
+            modelUpdateRoomNotMade = true
+            return
+        }
         await beginModelUpdate()
     }
 
@@ -881,6 +890,7 @@ final class ModelManagerViewModel {
         }
         // After the pauses: the banner goes at once instead of offering the update meanwhile.
         modelUpdateNeedsRoom = false
+        modelUpdateRoomNotMade = false
     }
 
     private func changeUpdatePlan(_ change: ModelUpdateLedger.Change) async {
@@ -1339,7 +1349,10 @@ final class ModelManagerViewModel {
         updatePlan = plan
         modelUpdateFreedBytes += reclaimed.freedBytes
         // Nothing left to remove: the banner no longer offers to make room.
-        if !holdsEarlierModels, !modelUpdateMakingRoom { modelUpdateNeedsRoom = false }
+        if !holdsEarlierModels, !modelUpdateMakingRoom {
+            modelUpdateNeedsRoom = false
+            modelUpdateRoomNotMade = false
+        }
         releaseModelUpdatePinsIfUnused()
         applySnapshots(snapshots, startedGenerations: startedGenerations)
         noteModelUpdateCompletionIfDone()

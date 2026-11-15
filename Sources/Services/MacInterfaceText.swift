@@ -1193,6 +1193,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.modelUpdate.needsRoomMessage", defaultValue: "Vocello can remove your earlier models first to make room for the improved ones.",
                comment: "macOS interface: model update banner body when the disk lacks space; the earlier models can be removed first (RF-59). Presentation only.")
     }
+    static var modelUpdateRoomNotMade: String {
+        localization.string(localized: "vocello.mac.modelUpdate.roomNotMade", defaultValue: "Vocello couldn't remove your earlier models, so there is still not enough space for the update. Free up space on this Mac, then try again.",
+               comment: "macOS interface: model update banner body after Remove Earlier Models and Update removed nothing, so the disk still lacks space (RF-59). Presentation only.")
+    }
     static var modelUpdateMakeRoom: String {
         localization.string(localized: "vocello.mac.modelUpdate.makeRoom", defaultValue: "Remove Earlier Models and Update",
                comment: "macOS interface: model update banner button that removes the earlier models, then starts the update (RF-59). Presentation only.")

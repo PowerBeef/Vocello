@@ -137,7 +137,10 @@ struct MacModelUpdateBanner: View {
         case .updating, .needed:
             return MacInterfaceText.modelUpdateMessage
         case .needsRoom:
-            return MacInterfaceText.modelUpdateNeedsRoomMessage
+            // The removal was tried and nothing went: say so instead of repeating the offer (A9).
+            return modelManager.modelUpdateRoomNotMade
+                ? MacInterfaceText.modelUpdateRoomNotMade
+                : MacInterfaceText.modelUpdateNeedsRoomMessage
         case .done(let freedBytes):
             guard freedBytes > 0 else { return nil }
             return MacInterfaceText.modelUpdateDoneMessage(MacInterfaceLanguage.current.fileSize(freedBytes))

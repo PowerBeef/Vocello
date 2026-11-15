@@ -78264,6 +78264,72 @@
           }
         }
       }
+    },
+    "vocello.mac.modelUpdate.roomNotMade": {
+      "comment": "macOS interface: model update banner body after Remove Earlier Models and Update removed nothing, so the disk still lacks space (RF-59). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't remove your earlier models, so there is still not enough space for the update. Free up space on this Mac, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu supprimer vos anciens modèles : l’espace reste insuffisant pour la mise à jour. Libérez de l’espace sur ce Mac, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo eliminar tus modelos anteriores, así que sigue sin haber espacio suficiente para la actualización. Libera espacio en este Mac y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte deine bisherigen Modelle nicht entfernen, daher reicht der Speicherplatz für das Update weiterhin nicht aus. Gib Speicherplatz auf diesem Mac frei und versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a rimuovere i modelli precedenti, quindi lo spazio per l’aggiornamento è ancora insufficiente. Libera spazio su questo Mac e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu remover seus modelos anteriores, então ainda não há espaço suficiente para a atualização. Libere espaço neste Mac e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法移除旧模型，因此仍没有足够的空间进行更新。请释放这台 Mac 上的空间，然后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocelloは以前のモデルを削除できなかったため、アップデートに必要な空き容量がまだ足りません。このMacの空き容量を増やしてから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 이전 모델을 삭제하지 못해 업데이트할 공간이 여전히 부족합니다. 이 Mac의 공간을 확보한 다음 다시 시도해 주세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось удалить прежние модели, поэтому места для обновления по-прежнему недостаточно. Освободите место на этом Mac и повторите попытку."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

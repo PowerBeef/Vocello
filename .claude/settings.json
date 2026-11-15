@@ -216,6 +216,8 @@
       "Bash(scripts/install_pinned_tools.sh*)",
       "Bash(./scripts/install_pinned_tools.sh*)",
       "Bash(python3 scripts/publish_benchmark_history.py*)",
+      "Bash(python3 scripts/benchmark_history.py record*)",
+      "Bash(*scripts/benchmark_history.py record*)",
       "Bash(gh workflow run*)",
       "Bash(gh pr create*)",
       "Bash(gh pr merge*)",

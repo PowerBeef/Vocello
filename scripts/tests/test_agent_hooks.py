@@ -591,6 +591,7 @@ class PermissionTests(unittest.TestCase):
         for rule in ("Bash(scripts/macos_test.sh models install*)", "Bash(scripts/macos_test.sh models ensure*)",
                      "Bash(scripts/ui_test.sh * model-download*)", "Bash(scripts/clean_build_caches.sh*)",
                      "Bash(scripts/install_pinned_tools.sh*)", "Bash(python3 scripts/publish_benchmark_history.py*)",
+                     "Bash(python3 scripts/benchmark_history.py record*)", "Bash(*scripts/benchmark_history.py record*)",
                      "Bash(gh workflow run*)", "Bash(git branch -D*)", "Bash(git worktree remove --force*)",
                      "Bash(git reset --hard*)", "Bash(hf download*)"):
             self.assertIn(rule, self.ask)

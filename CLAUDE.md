@@ -68,12 +68,14 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
   swift-huggingface pins are exact and move only with authorization and benchmark review (couplings:
   `docs/reference/mlx-guide.md` §9).
 - **Model delivery:** `Sources/Resources/qwenvoice_contract.json` (models, speakers) and the generated
-  production catalog (from `config/model-artifact-receipts.json`) carry exact sizes and SHA-256 digests.
+  production catalog carry exact sizes and SHA-256 digests. Its receipts come from the bundled iPhone
+  catalog (`Sources/Resources/qwenvoice_ios_model_catalog.json`), plus
+  `config/model-artifact-receipts.json` for a Mac-only artifact.
   Hosts download, verify, then atomically activate complete artifacts; never infer checksums.
 - **Audio quality:** three separate systems. In-app Fast QC ships with every take; QC v2
   (`scripts/qc.py`, `scripts/qc/`, `config/qc/`) is an offline, report-only harness whose `gate`
   exits 0 pass, 1 fail, 2 error, 3 warn, 4 NOT_ASSESSED; older prosody/delivery/clone gates remain.
-  No automated score is a quality verdict. For 3.0 nobody listens (maintainer decision 2026-10-13):
+  No automated score is a quality verdict. For 3.x nobody listens (maintainer decision 2026-10-13):
   machine screens catch gross failures only, and subtle defects ship as a documented known limitation
   (detail: `docs/reference/tooling-and-evidence.md`, Audio QA).
 - **Website** (`website/`): React 19 + Vite SSR/prerender, Playwright acceptance, deployed by Vercel
@@ -107,29 +109,35 @@ same commit. Local Xcode may be newer than the CI pin (`config/toolchain.json`);
 prove the pinned compiler accepts the change. Observe CI (`gh run watch` in the background) only after an
 authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc.py ...`.
 
+Lanes, learned on the 3.1 run (2026-11-14):
+
+- **UI lanes take over the Mac** (`scripts/ui_test.sh macos smoke|perf|benchmark`): run them only in a
+  window the maintainer gives, in the background (`run_in_background`, never `&`).
+- **In a release sitting, the most failure-prone lane runs first** (the UI benchmark).
+- **A benchmark take the audio check refuses is a product outcome.** It stands, and the seeds never
+  move for it (decision of 2026-11-15).
+- **The website check needs Playwright's browsers** (`npx playwright install chromium webkit`, a
+  download: ask). The browser pane is a stand-in, not the verdict.
+- **Read a lane's `--help` before passing options.**
+
 ## Hard boundaries
 
-- **Release focus (until the 3.1 iOS submission; the Mac and CLI 3.1 ship first, RF-61):** the `focusLock` in `config/roadmap.json` makes
-  `release-first-3-0-2026-09` the only plan with live work, at most `focusLock.maxInFlight` items in
-  flight (`roadmap.py validate` enforces it). `focusLock.decision` is the authority; in summary:
-  - **Classify every new finding.** A release blocker joins that plan with a gate. A release
-    blocker is an App Review rejection risk, a crash or hang, data loss, a broken purchase or restore,
-    or a privacy or metadata mismatch on iOS.
-  - **No target dates; the core overhaul comes first** (decisions of 2026-11-10): no item carries a
-    due date and gates set the order. The runtime's core overhaul (RF-44 to RF-48,
-    `docs/audits/2026-11-10-apple-silicon-performance-research.md`) is performed before the iOS
-    submission, and the result must be fully App Store compliant.
-  - **Output quality is remediated before the submission** (decision of 2026-11-11): RF-50 to
-    RF-57, from `docs/audits/2026-11-11-qwen3-tts-quality-report-review.md`; the submission waits
-    until the engine and its output are as good as they can be. A change that alters samples lands
-    only behind a machine screen whose decision rule is recorded before its takes are generated,
-    and a screen is first run against itself, so its noise floor is known (RF-57).
-  - **Anything else** becomes one parked line in `post-3-0-backlog-2026-10`, with no investigation.
-  - **Backlog items that need no iPhone stay authorized** (decision of 2026-10-16): each is closed in
-    the change that fixes it, and a Mac-only request joins the plan as an item. Ask the maintainer
-    before any other work outside the plan, and open no new plans or audits.
-  - **The freeze is recorded** (`focusLock.freeze`): every commit after it names a release item in its
-    subject.
+- **Release focus (until the 3.1 iOS submission; the Mac and CLI 3.1 ship first, RF-61):** the
+  `focusLock` in `config/roadmap.json` makes `release-first-3-0-2026-09` the only plan with live work,
+  at most `focusLock.maxInFlight` items in flight (`roadmap.py validate` enforces it).
+  `focusLock.decision` is the authority for the order and the gates: no target dates, and the core
+  overhaul and the output-quality remediation come before the iOS submission.
+  - **Classify every new finding.** A release blocker joins that plan with a gate: an App Review
+    rejection risk, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata
+    mismatch on iOS. Anything else becomes one parked line in `post-3-0-backlog-2026-10`, with no
+    investigation.
+  - **A change that alters samples** lands only behind a machine screen whose decision rule is recorded
+    before its takes are generated, and a screen is first run against itself, so its noise floor is
+    known (RF-57).
+  - **Backlog items that need no iPhone stay authorized**, each closed in the change that fixes it,
+    and a Mac-only request joins the plan as an item. Ask the maintainer before any other work outside
+    the plan, and open no new plans or audits.
+  - **Every commit after the recorded freeze** (`focusLock.freeze`) names a release item in its subject.
 
   Path, decisions and rules: `docs/reference/release-first-execution-2026-09.md`.
 - **Main is the only published branch:** commit on local `main`; push only `main`, fast-forward, on
@@ -137,8 +145,9 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
   maintainer-run, except an iPhone TestFlight candidate: on the maintainer's request, after `main` is
   pushed and its CI passed, `python3 scripts/ios_candidate_tag.py` signs and pushes the next
   `v<version>-ios.N` tag, whose push archives the app and uploads it to TestFlight.
-- **Agents and side sessions:** at most four active including the lead, inheriting its model; Claude
-  desktop app side sessions count. The lead works in the main checkout, never in a worktree. An
+- **Agents and side sessions:** at most four active including the lead; Claude desktop app side
+  sessions count. Agents and editing side sessions inherit the lead's model; a read-only side session
+  may use a cheaper one. The lead works in the main checkout, never in a worktree. An
   editing agent (Agent tool, `isolation: "worktree"`) or editing side session (`use_worktree: true`)
   works in its own worktree from a committed checkpoint, on a disjoint file set. Agents and side
   sessions commit only on their branch, never push, never run native builds, devices, models or
@@ -187,38 +196,28 @@ authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc
 
 ## Claude Code harness
 
-- **`.claude/settings.json`** wires the guards in `scripts/hooks/` and the permissions. Permissions
-  allow the routine loop, local lanes and the candidate tag script, and ask before pushes, destructive
-  git, model installs, cache cleanup, installers, benchmark publication, global settings and external
-  writes. Deny rules and the `policy_guard.sh` hook together refuse force and non-main pushes,
-  hand-made branches and worktrees, broad staging, stashing, whole-cache deletion, releases,
-  `.xcodeproj` edits and unsupported-destination MCP tools; a non-main push and `git branch` are
-  refused by the hook alone. The GitHub connector's ask rules name one server and may not match the
-  connector in use (BKL-62), so treat every connector write as needing an explicit request. Hooks and
-  permissions are guardrails, not authorization; personal overrides go in the untracked
-  `.claude/settings.local.json`. `scripts/tests/test_agent_hooks.py` pins the wiring; the hook list,
-  the event table and the full rules are in `docs/reference/development-workflow.md`, "Claude Code
-  setup and tool routing".
+`.claude/settings.json` wires the guards in `scripts/hooks/` and the permissions. Both are guardrails,
+not authorization: every write through an optional tool (plugins, MCP servers, connectors, the
+browsers, `gh`, `hf`, `asc`, the Vercel CLI) needs an explicit request, an artifact is published only
+on request, and the Workflow tool runs only on explicit opt-in. The hook list, the permission rules,
+the tool-routing table and the desktop app's rules are in `docs/reference/development-workflow.md`,
+"Claude Code setup and tool routing"; personal overrides go in the untracked
+`.claude/settings.local.json`.
+
 - **Worker tracking:** the SessionStart hook exports `QVOICE_WORKER_SESSION` to Bash; measured lanes
   refuse unknown or active agent leases and other live sessions in this repository. If tracking is
   unavailable, join every agent and side session, then run the lane with `QVOICE_LEAD_ONLY=1`.
-- **Claude desktop app:** artifacts, file cards and notifications carry no raw diagnostics, private
-  paths, prompts, transcripts, reference audio or credentials, and an artifact is published only on
-  request. Waits, notifications, the browser pane and side sessions:
-  `docs/reference/development-workflow.md`, "The Claude desktop app".
 - **Skills** (`.claude/skills`, invoked as `/vocello-*`): `vocello-ios-validation`, `vocello-macos-ui`,
-  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, `vocello-ui-autonomy` (computer
-  use for what XCUITest cannot cover), read-only `vocello-release-readiness`. They wrap the scripts and
-  add no gate or permission.
+  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, `vocello-ui-autonomy`, read-only
+  `vocello-release-readiness`. They wrap the scripts and add no gate or permission.
 - **Agents** (`.claude/agents`, read-only): `vocello-swift-review` for Swift diffs and
-  `vocello-xcresult-triage` for a finished run directory. Explore/Plan and the Axiom auditor agents
-  research and audit; editing agents are general-purpose agents with worktree isolation.
-- **Tool routing** (table: `docs/reference/development-workflow.md`, "Claude Code setup and tool
-  routing"): repository scripts own builds, tests and evidence. MobileBuildMCP runs only its
-  discovery and coverage workflows; never use Axiom `xcui` or the simulator agents. Every optional
-  tool (plugins, MCP servers, connectors, the browsers, `gh`, `hf`, `asc`, the Vercel CLI) stays
-  read-only unless the user requests a write. Use the Workflow tool only on explicit opt-in. Missing
-  optional tools never block the script workflow, and CI never depends on personal plugins.
+  `vocello-xcresult-triage` for a finished run directory. Editing agents are general-purpose agents
+  with worktree isolation.
+- **Tool routing:** repository scripts own builds, tests and evidence. MobileBuildMCP runs only its
+  discovery and coverage workflows; never use Axiom `xcui` or the simulator agents. Missing optional
+  tools never block the script workflow.
+- **Desktop app:** artifacts, file cards and notifications carry no raw diagnostics, private paths,
+  prompts, transcripts, reference audio or credentials.
 - **Interactive or maintainer-run commands** (logins, model installs, publication): prepare them; the
-  user runs them with the `!` prefix in the CLI, or in the desktop app from a `bash` block's Run button
-  or a Terminal panel tab, where any secret is typed, never in chat.
+  user runs them from a `bash` block's Run button, a Terminal panel tab or the CLI's `!` prefix, where
+  any secret is typed, never in chat.

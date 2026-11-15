@@ -340,6 +340,14 @@ change, make `native-engineering.md` describe what the product actually does.
   `longestSilenceMS` against the 1.2 s line. If none is refused, close as not observed.
 - 39b (only if 39a shows refusals): count a paragraph break and an en dash as pause runs, as a new
   Fast QC algorithm version, behind a screen whose rule is recorded before its takes.
+- **39a result (2026-11-15, retained quality-screen takes on the M6, no generation):** of 9,408
+  single takes, 82 carry an en dash. None was refused and none passed the 1.2 s line: their longest
+  silence has a median of 28 ms and a maximum of 1,036 ms, against 45 ms and 1,578 ms for the takes
+  without one. Four long-form runs of one script with an en dash were refused, all under the retired
+  Consistent variation, and the same script completes under Expressive. No retained take carries a
+  blank line, because every screen script is one paragraph, so the paragraph-break half of E4 is
+  **not observed and not measured**. The en-dash half closes as not observed; 39b does not start.
+  A paragraph break stays an open question that only new takes can answer.
 
 ### Tests and lanes
 

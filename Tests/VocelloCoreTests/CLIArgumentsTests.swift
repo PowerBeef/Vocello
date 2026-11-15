@@ -326,6 +326,31 @@ final class CLIArgumentsTests: XCTestCase {
         XCTAssertThrowsError(try CLIRuntime.offeredVariantKinds(modes: ["unknown"], registry: shipped))
     }
 
+    /// Audit C12: `--stream --no-stream` is a contradiction, never a silent `--no-stream`, and a
+    /// model id names its model in any letter case.
+    func testContradictoryStreamFlagsAreRefusedAndModelIDsIgnoreLetterCase() throws {
+        XCTAssertTrue(try GenerateCommand.parseStreaming(generate(["--text", "Hi."])), "a take streams by default")
+        XCTAssertTrue(try GenerateCommand.parseStreaming(generate(["--text", "Hi.", "--stream"])))
+        XCTAssertFalse(try GenerateCommand.parseStreaming(generate(["--text", "Hi.", "--no-stream"])))
+        for argv in [["--stream", "--no-stream"], ["--no-stream", "--stream"]] {
+            XCTAssertThrowsError(try GenerateCommand.parseStreaming(generate(["--text", "Hi."] + argv))) {
+                XCTAssertEqual(($0 as? CLIError)?.code, .invalidInput)
+            }
+        }
+
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        for path in ["Sources/Resources/qwenvoice_contract.json", "Tests/Fixtures/two-package-model-contract.json"] {
+            let registry = try ContractBackedModelRegistry(manifestURL: root.appendingPathComponent(path))
+                .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+            XCTAssertFalse(registry.models.isEmpty, path)
+            for model in registry.models {
+                XCTAssertEqual(CLIModelID.canonical(model.id.uppercased()), model.id, "the contract writes ids in lowercase")
+                XCTAssertEqual(registry.model(id: CLIModelID.canonical(model.id.capitalized))?.id, model.id)
+            }
+        }
+    }
+
     /// P15-07 / P02-09: an unknown `--language` is refused before boot instead of
     /// silently running as Auto; names, codes and region-tagged codes resolve to
     /// the canonical language the apps send.

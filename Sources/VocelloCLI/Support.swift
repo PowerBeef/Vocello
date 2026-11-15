@@ -141,6 +141,14 @@ func isInteractiveStdin() -> Bool {
     isatty(FileHandle.standardInput.fileDescriptor) != 0
 }
 
+// MARK: - Model ids
+
+/// A model id as every command takes it. The contract writes ids in lowercase,
+/// so an id typed in any letter case names the same model.
+public enum CLIModelID {
+    public static func canonical(_ raw: String) -> String { raw.lowercased() }
+}
+
 // MARK: - Filesystem helpers (models command)
 
 /// Best-effort total byte size of all regular files under a directory (0 if absent).

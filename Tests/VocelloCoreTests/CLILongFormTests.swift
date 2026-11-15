@@ -231,6 +231,47 @@ final class CLILongFormTests: XCTestCase {
         }
     }
 
+    /// Audit C12: a project that passed keeps its joined output when the final rename fails, and
+    /// says where; a signal still wins and publishes nothing.
+    func testAFailedFinalRenameKeepsTheJoinedOutput() throws {
+        let root = try makeRoot()
+        let folder = root.appendingPathComponent("story_segments", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let joined = folder.appendingPathComponent("joined.wav")
+        let manifest = folder.appendingPathComponent("manifest.json")
+        try Data([1, 2, 3]).write(to: joined)
+        try Data("{}".utf8).write(to: manifest)
+        var outcome = CLILongFormProject.Outcome(baseSeed: 7, planDigest: "digest")
+        outcome.audioPath = joined.path
+        outcome.manifestPath = manifest.path
+
+        // The destination's folder does not exist, so the rename fails.
+        let unreachable = root.appendingPathComponent("missing/story.wav")
+        XCTAssertThrowsError(try CLILongFormProject.publishJoined(outcome, to: unreachable, signalled: false)) { error in
+            let refusal = error as? CLIError
+            XCTAssertEqual(refusal?.code, .outputUnavailable)
+            XCTAssertEqual(refusal?.detail?["joinedPath"], .string(joined.path))
+        }
+        XCTAssertEqual(try Data(contentsOf: joined), Data([1, 2, 3]), "the joined output is kept")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path), "and the manifest that names it")
+
+        // A reachable destination takes it by a rename.
+        let output = root.appendingPathComponent("story.wav")
+        try CLILongFormProject.publishJoined(outcome, to: output, signalled: false)
+        XCTAssertEqual(try Data(contentsOf: output), Data([1, 2, 3]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: joined.path))
+
+        // A signal that arrives after the runner finished publishes nothing and removes both.
+        try Data([4]).write(to: joined)
+        let late = root.appendingPathComponent("late.wav")
+        XCTAssertThrowsError(try CLILongFormProject.publishJoined(outcome, to: late, signalled: true)) {
+            XCTAssertTrue($0 is CancellationError)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: late.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: joined.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+    }
+
     /// Review B2 (01f9206f): a clone project never replaces its reference audio,
     /// whether --out names it directly, through a symlink or as a hard link.
     func testAProjectNeverReplacesItsCloneReference() throws {

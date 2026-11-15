@@ -157,7 +157,8 @@ enum ModelsCommand {
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
 
-        let onlyID = args.positionals.first  // optional `status <id>` / `list <id>` filter
+        // The optional `status <id>` / `list <id>` filter.
+        let onlyID = args.positionals.first.map(CLIModelID.canonical)
         let catalog = try? ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
 
         let updatePlan = ModelUpdateLedger.read(in: ctx.modelsDirectory)
@@ -257,7 +258,7 @@ enum ModelsCommand {
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
         let catalog = try ProductionModelCatalog(contentsOf: CLIRuntime.locateProductionCatalogURL())
-        let onlyID = args.positionals.first
+        let onlyID = args.positionals.first.map(CLIModelID.canonical)
         let models = ctx.registry.models.filter { onlyID == nil || $0.id == onlyID }
         if let onlyID, models.isEmpty {
             throw CLIError(.modelUnknown, "no model '\(onlyID)' in the contract", hint: "see `vocello models list` for the ids")
@@ -340,7 +341,7 @@ enum ModelsCommand {
     /// CLI-installed model is immediately usable by the app, and vice-versa.
     @MainActor
     static func runInstall(_ args: Args) async throws {
-        guard let modelID = args.positionals.first?.lowercased() else {
+        guard let modelID = args.positionals.first.map(CLIModelID.canonical) else {
             throw CLIError(.usageError, "install requires a model id (e.g. pro_custom_speed). Run `vocello models list` for ids.")
         }
 
@@ -598,7 +599,7 @@ enum ModelsCommand {
     /// runs, since either may have the model loaded.
     @MainActor
     static func runRemove(_ args: Args) throws {
-        let modelID = args.positionals.first?.lowercased() ?? ""
+        let modelID = args.positionals.first.map(CLIModelID.canonical) ?? ""
         let ctx = try CLIRuntime.bootstrapRegistryOnly(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
             manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })

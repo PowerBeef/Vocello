@@ -247,7 +247,7 @@ public enum GenerateCommand {
     @MainActor
     public static func prepare(_ args: Args, interactive: Bool) async throws -> PreparedTake {
         let explicitQuality = try parseVariantFlag(args)
-        let streaming = !args.flag("no-stream")
+        let streaming = try parseStreaming(args)
 
         // Resolve text first so a missing-text run fails fast (before any prompt).
         // A request an agent sent never takes unnamed stdin.
@@ -1031,6 +1031,18 @@ public enum GenerateCommand {
         } onCancel: {
             gate.cancel()
         }
+    }
+
+    /// Whether the take streams: `--stream` (the default) or `--no-stream`.
+    /// Together they contradict each other and are refused.
+    static func parseStreaming(_ args: Args) throws -> Bool {
+        if args.flag("stream"), args.flag("no-stream") {
+            throw CLIError(
+                .invalidInput, "--stream and --no-stream contradict each other",
+                hint: "pass one of them, or neither: a take streams by default"
+            )
+        }
+        return !args.flag("no-stream")
     }
 
     /// `--variant`: true for quality, false for speed, nil when the app's choice applies.

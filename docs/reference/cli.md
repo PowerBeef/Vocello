@@ -266,7 +266,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--long-form` | `auto` (default): a script longer than one take (900 characters, East Asian characters counting three) runs as a long-form project, as the apps route it · `always`: any script does · `never`: such a script is refused (`text_too_long`) |
 | `--line-by-line` | one take per line, as the Mac app's line batch runs them (see below); `--out-dir <folder>` names their folder (default `<data>/outputs/cli`) |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
-| `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
+| `--no-stream` | accumulate the full result before decoding (old non-streaming behavior); with `--stream` it is refused as `invalid_input` |
 | `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
 | `--client-request-id` | idempotency: a repeated id with the same request replays its stored result (see `run`) |
 | `--plan` | resolve the take (mode, model and its source, whether it is installed, language, seed, variation, output path) and report it without loading a model |
@@ -313,7 +313,9 @@ joined output must pass the apps' QC too, and the manifest v4 is written. A Desi
 delivery gets the Neutral one, as the apps send it. Segment takes and the manifest stay in
 `<output stem>_segments/` beside the output (`<output stem>_segments-<attempt>/` when that folder
 already exists: an attempt never reuses one); the joined file replaces `--out` only once the project
-passed, and never after a signal. The result adds `longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`,
+passed, and never after a signal. If that last move fails (the destination cannot be written), the
+project's joined output and manifest stay in the segments folder and the failure, `output_unavailable`,
+names the file in `detail.joinedPath`; a `batch --long-form` row keeps it there too. The result adds `longForm: true`, `longFormBaseSeed` (also its `seed`), `longFormPlanDigest`,
 `longFormLanguage`, `longFormManifestPath`, `longFormSegments` (each kept segment's index, boundary,
 pause, seed, generation id, path, duration, finish reason and QC warnings) and `longFormAssembly`;
 `finishReason` is `max_tokens` when any segment was truncated. A rejected segment or join fails with
@@ -681,7 +683,9 @@ each mode resolves to.
 exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any difference exits 1 with
 `integrity_failed` and keeps every row.
 
-Shows each model's install state, on-disk size, and (for `status`) any missing required files.
+Shows each model's install state, on-disk size, and (for `status`) any missing required files. Every
+subcommand that takes a model id (`list`, `status`, `verify`, `install`, `remove`) accepts it in any
+letter case.
 `install` uses the same `HuggingFaceDownloader` as the macOS app: a CLI-installed model is
 immediately usable in the app, and vice versa. Before it fetches anything, `install` checks the free
 space on the model store's volume: it needs the bytes still to download (the plan's, less what an

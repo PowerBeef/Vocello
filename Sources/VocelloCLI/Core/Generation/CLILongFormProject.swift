@@ -156,25 +156,28 @@ public enum CLILongFormProject {
     /// Moves a completed project's joined output onto `destination` by a rename
     /// (the project folder sits beside it, on its volume, so an existing file is
     /// replaced whole or not at all), unless `signalled`: a signal that arrived
-    /// after the runner finished still wins, and nothing is published. On a
-    /// signal or a failed rename the joined output and the manifest, which names
-    /// it by its digest, are removed; the segments stay with the caller.
+    /// after the runner finished still wins, nothing is published, and the
+    /// joined output and the manifest, which names it by its digest, are
+    /// removed. A failed rename keeps both in the project's folder and says
+    /// where: the project passed, so its audio is not thrown away for want of a
+    /// destination. The segments stay with the caller either way.
     public static func publishJoined(_ outcome: Outcome, to destination: URL, signalled: Bool) throws {
         guard let joined = outcome.audioPath else {
             throw CLIError(.internalError, "a completed long-form project has no joined output")
         }
-        func discard() {
+        if signalled {
             try? FileManager.default.removeItem(atPath: joined)
             if let manifest = outcome.manifestPath { try? FileManager.default.removeItem(atPath: manifest) }
-        }
-        if signalled {
-            discard()
             throw CancellationError()
         }
         guard unsafe rename(joined, destination.path) == 0 else {
             let failure = Errno(rawValue: errno)
-            discard()
-            throw CLIError(.outputUnavailable, "could not write \(destination.path): \(failure)")
+            throw CLIError(
+                .outputUnavailable,
+                "could not write \(destination.path): \(failure); the project's joined output is kept at \(joined)",
+                hint: "move it into place, or run again with another output path",
+                detail: ["joinedPath": .string(joined)]
+            )
         }
     }
 

@@ -48,7 +48,10 @@ work the same day; nothing is running.
 [audits/2026-11-15-project-audit.md](audits/2026-11-15-project-audit.md): no blocker in the product
 code; the History stall's cause is found (a History over 500 entries rebuilds its list twice per
 change); the measured lanes cannot fail on a silent or slower app; local evidence is built with a
-different Xcode than the release. Its "Recommended order" lists what to do before the tag.
+different Xcode than the release. Its "Recommended order" lists what to do before the tag, and
+[audits/2026-11-15-remediation-plan.md](audits/2026-11-15-remediation-plan.md) turns every finding into
+53 ordered steps: eight maintainer decisions, then the work before the tag (steps 1 to 17), the
+release sitting (18 to 20), the publication flip (21 to 26) and what follows 3.1 (27 to 53).
 
 **Open, in order** ([investigation of November 15](audits/2026-11-15-release-3-1-interruption-investigation.md):
 the refused take is a rare model ending at that seed, 0 refusals in 60 other seeds on the hybrid and on

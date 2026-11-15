@@ -981,12 +981,18 @@ class VocelloMacUITestCase: XCTestCase {
 
     /// Player visibility is first-chunk proof; the re-enabled Generate control
     /// is the visible completion condition.
+    /// Returns whether the take completed. It always does, or the test has failed, unless
+    /// `refusalIsAnOutcome`: then a take that ends on its retryable error returns false and the
+    /// caller records it (the benchmark, RF-61 and decision D-5: a take the mandatory audio check
+    /// refuses is a product outcome, and the rest of the matrix is still measured).
+    @discardableResult
     func generateAndWaitForCompletion(
         mode: VocelloUIBenchMatrix.Mode,
         timeout: TimeInterval,
+        refusalIsAnOutcome: Bool = false,
         onBeforeGenerate: (() -> Void)? = nil,
         onAfterGenerateClick: (() -> Void)? = nil
-    ) {
+    ) -> Bool {
         assertReadyToGenerate(mode: mode)
         let generate = generationAction
         let cancel = button("textInput_cancelButton")
@@ -1070,10 +1076,14 @@ class VocelloMacUITestCase: XCTestCase {
         }
         XCTAssertFalse(backendError.exists, "Generation must not expose a backend error")
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
+        if refusalIsAnOutcome, generationError.exists {
+            return false
+        }
         XCTAssertFalse(
             generationError.exists,
             "Generation must not end on its retryable error (the mandatory audio check refused the take, or it failed)"
         )
+        return true
     }
 
     /// Waits until the visible Studio or sidebar player stops playing. The control

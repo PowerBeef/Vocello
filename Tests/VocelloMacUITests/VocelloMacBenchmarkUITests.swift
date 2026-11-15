@@ -120,9 +120,10 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                 if capturesPlayback {
                     capture?.beginTake(index: takeIndex, cell: take.cellID, warmState: take.warmState.rawValue)
                 }
-                generateAndWaitForCompletion(
+                let completed = generateAndWaitForCompletion(
                     mode: take.mode,
                     timeout: timeout(for: take),
+                    refusalIsAnOutcome: true,
                     onBeforeGenerate: {
                         phases.mark("submitMS")
                         capture?.markSubmit()
@@ -130,6 +131,22 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                     onAfterGenerateClick: { capture?.markSubmitReturned() }
                 )
                 phases.mark("completedMS")
+                guard completed else {
+                    // The take ended on its retryable error: nothing plays and nothing is
+                    // timed. The checker decides from the take's own rows whether the audio
+                    // check refused it (a recorded outcome) or it failed (a failed lane); the
+                    // seeds never move for it, and the next take starts from the same control.
+                    phases.refused = true
+                    if capturesPlayback {
+                        capture?.endTake(playbackEnded: false)
+                    }
+                    Self.emitRefusedTake(takeIndex: takeIndex, cell: take.cellID)
+                    VocelloUIScreenshot.attach(
+                        app,
+                        named: "mac-benchmark-\(takeIndex)-\(sanitized(take.cellID))-refused"
+                    )
+                    return
+                }
                 if capturesPlayback {
                     // A captured take plays out before the next begins, whether or
                     // not the tap is live (audit #74): the idle gap before the next
@@ -170,6 +187,17 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             phases.mark("endMS")
             phases.emit()
         }
+    }
+
+    /// One line per take that ended on its retryable error, for `scripts/check_macos_ui_bench.py`
+    /// (RF-61, audit finding T5).
+    private static func emitRefusedTake(takeIndex: Int, cell: String) {
+        let payload: [String: Any] = ["schemaVersion": 1, "takeIndex": takeIndex, "cell": cell]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else {
+            return
+        }
+        print("VOCELLO_BENCH_TAKE_REFUSED=\(data.base64EncodedString())")
+        unsafe fflush(stdout)
     }
 
     /// Whether a take starts a new app session: the first take, a cold take,
@@ -368,6 +396,9 @@ private final class VocelloBenchTakePhases {
     var relaunched = false
     /// Whether the take played out for the played-audio capture (audit #31).
     var captured = false
+    /// Whether the take ended on its retryable error. Written only when true, so every other
+    /// take's line keeps its bytes.
+    var refused = false
 
     init(takeIndex: Int, cell: String) {
         start = clock.now
@@ -390,6 +421,9 @@ private final class VocelloBenchTakePhases {
         ]
         for (phase, offset) in offsetsMS {
             payload[phase] = offset
+        }
+        if refused {
+            payload["refused"] = true
         }
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let line = String(data: data, encoding: .utf8) else { return }

@@ -1,13 +1,12 @@
 import Foundation
 import QwenVoiceCore
-import VocelloCLICore
 import VocelloDesktopCore
 
 /// `vocello batch` — synthesize many clips that share one voice/mode/variant,
 /// reusing one process and loaded model with per-item terminal receipts. The headline
 /// throughput win over repeated `generate` calls (which reboot + reload the model
 /// every time).
-enum BatchCommand {
+public enum BatchCommand {
     struct ItemJSON: Encodable, Sendable {
         let index: Int
         let text: String
@@ -96,7 +95,7 @@ enum BatchCommand {
     }
 
     @MainActor
-    static func run(_ args: Args) async throws {
+    public static func run(_ args: Args) async throws {
         // The parser refuses --language, --stream and --out (batch uses per-text
         // Auto language and non-streaming output) and a value on a bare flag.
         let appDelivery = try GenerateCommand.parseAppDelivery(args)

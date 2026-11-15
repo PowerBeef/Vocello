@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "history.list",
+  "requestID": "3f9a6b20-1c4d-4e7f-9a8b-0c1d2e3f4a5b",
+  "result": {
+    "hasMore": false,
+    "items": [],
+    "longFormRecoveryPending": false,
+    "totalCount": 0
+  },
+  "error": null,
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.1.0",
+    "build": "31",
+    "contractRevision": 1,
+    "durationMs": 12,
+    "replayed": false
+  }
+}

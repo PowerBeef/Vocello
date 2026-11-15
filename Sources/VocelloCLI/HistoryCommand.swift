@@ -1,12 +1,11 @@
 import Foundation
 import QwenVoiceCore
-import VocelloCLICore
 import VocelloDesktopCore
 
 /// `vocello history`: the Mac app's History, read-only (RF-26). Every read is
 /// one short read-only transaction on the app's store; nothing here migrates,
 /// reconciles or writes it.
-enum HistoryCommand {
+public enum HistoryCommand {
     struct Shown: Encodable, Sendable {
         let item: DesktopHistoryItem
         let completionReceipt: GenerationCompletionReceipt?
@@ -20,7 +19,7 @@ enum HistoryCommand {
     }
 
     @MainActor
-    static func run(action: String, _ args: Args) async throws {
+    public static func run(action: String, _ args: Args) async throws {
         let reader = DesktopHistoryReader(root: CLIPaths.dataDirectory(override: args.string("data-dir")))
         do {
             switch action {
@@ -173,7 +172,7 @@ enum HistoryCommand {
 
 /// `vocello settings`: the Mac app's settings (RF-26), changed as its
 /// Settings change them (RF-28).
-enum SettingsCommand {
+public enum SettingsCommand {
     struct Rows: Encodable, Sendable {
         let domain: String
         let settings: [DesktopAppSettings.Entry]
@@ -230,7 +229,7 @@ enum SettingsCommand {
     }
 
     @MainActor
-    static func run(action: String, _ args: Args) async throws {
+    public static func run(action: String, _ args: Args) async throws {
         let settings = DesktopAppSettings()
         switch action {
         case "set":
@@ -264,7 +263,7 @@ enum SettingsCommand {
 }
 
 /// `vocello briefs`: Voice Design's starting briefs, by position (RF-26).
-enum BriefsCommand {
+public enum BriefsCommand {
     struct Rows: Encodable, Sendable {
         let language: String
         let descriptionLimit: Int
@@ -272,7 +271,7 @@ enum BriefsCommand {
     }
 
     @MainActor
-    static func run(_ args: Args) async throws {
+    public static func run(_ args: Args) async throws {
         let language = try GenerateCommand.parseLanguage(args) ?? .english
         let briefs = DesktopBriefCatalog.briefs(in: language)
         if CLIPresenter.isMachine {

@@ -1,10 +1,9 @@
 import Foundation
 import QwenVoiceCore
-import VocelloCLICore
 import VocelloDesktopCore
 
 /// `vocello voices` — manage saved (enrolled) clone voices.
-enum VoicesCommand {
+public enum VoicesCommand {
     struct VoiceJSON: Encodable, Sendable {
         let id: String
         let name: String
@@ -60,7 +59,7 @@ enum VoicesCommand {
 
     /// `action` is the canonical subcommand the parser resolved: list, enroll or delete.
     @MainActor
-    static func run(action: String, _ args: Args) async throws {
+    public static func run(action: String, _ args: Args) async throws {
         // PA-17: enrollment needs this invocation's recorded consent; refuse before boot.
         let consent = try CLIVoiceCloningConsent.policy(from: args)
         if ["enroll", "replace", "save-take"].contains(action) {

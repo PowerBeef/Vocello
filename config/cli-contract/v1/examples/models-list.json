@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "models.list",
+  "requestID": "7c1e4a52-9b0d-4f36-8a2e-5d6f7a8b9c01",
+  "result": {
+    "models": [
+      {
+        "estimatedDownloadBytes": 2225870484,
+        "id": "pro_custom_speed",
+        "installed": false,
+        "installedBytes": 0,
+        "missingPaths": [
+          "README.md",
+          "config.json",
+          "generation_config.json"
+        ],
+        "mode": "custom",
+        "name": "Built-in Voice",
+        "stalePaths": [],
+        "updateAvailable": false,
+        "updateRequired": false
+      },
+      {
+        "estimatedDownloadBytes": 2249887307,
+        "id": "pro_clone_speed",
+        "installed": false,
+        "installedBytes": 0,
+        "missingPaths": [
+          "README.md",
+          "config.json",
+          "generation_config.json"
+        ],
+        "mode": "clone",
+        "name": "Voice Cloning",
+        "stalePaths": [],
+        "updateAvailable": false,
+        "updateRequired": false
+      }
+    ]
+  },
+  "error": null,
+  "warnings": [],
+  "meta": {
+    "vocelloVersion": "3.1.0",
+    "build": "31",
+    "contractRevision": 1,
+    "durationMs": 12,
+    "replayed": false
+  }
+}

@@ -1,13 +1,12 @@
 import Foundation
 import QwenVoiceCore
-import VocelloCLICore
 import VocelloDesktopCore
 
 /// `vocello models` — the contract's models: inventory (install state, on-disk
 /// size, missing or stale files), verification, installs (one, or the packages
 /// the app would use: `install-recommended`), removal and the app's package
 /// choices. Uses the lightweight registry bootstrap (no engine boot).
-enum ModelsCommand {
+public enum ModelsCommand {
     struct ModelJSON: Encodable, Sendable {
         let id: String
         let mode: String
@@ -114,7 +113,7 @@ enum ModelsCommand {
 
     /// `action` is the canonical subcommand the parser resolved.
     @MainActor
-    static func run(action: String, _ args: Args) async throws {
+    public static func run(action: String, _ args: Args) async throws {
         if action == "install-recommended" {
             try await runInstallRecommended(args)
             return

@@ -1,12 +1,11 @@
 import Foundation
 import QwenVoiceCore
-import VocelloCLICore
 
 /// `vocello doctor`: a read-only check of what the CLI needs, with no engine
 /// boot: the data folder, the bundled contract and catalog, installed models,
 /// the memory tier and free disk. A missing trust anchor is a configuration
 /// error (exit 78); anything else is a warning the result names.
-enum DoctorCommand {
+public enum DoctorCommand {
     struct Check: Encodable, Sendable {
         let name: String
         /// ok, warn or fail.
@@ -28,7 +27,7 @@ enum DoctorCommand {
     }
 
     @MainActor
-    static func run(_ args: Args) async throws {
+    public static func run(_ args: Args) async throws {
         let dataDirectory = CLIPaths.dataDirectory(override: args.string("data-dir"))
         var checks: [Check] = []
         var installed: [String] = []

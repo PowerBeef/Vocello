@@ -338,7 +338,7 @@ owns each lane's journeys, flags and evidence:
 | Lane | Purpose |
 |------|---------|
 | `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
-| `scripts/ui_test.sh macos smoke` | Fifteen journeys, `test00`–`test14` in `VocelloMacSmokeUITests` and its `+Acceptance` extension, with named screenshots and on-failure desktop and element-tree evidence; `--scenario` runs one |
+| `scripts/ui_test.sh macos smoke` | Sixteen journeys, `test00`–`test15` in `VocelloMacSmokeUITests` and its `+Acceptance` extension, with named screenshots and on-failure desktop and element-tree evidence; `--scenario` runs one |
 | `scripts/ui_test.sh macos localization` | `test01` with the ten-language walk |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
 | `scripts/ui_test.sh macos perf` | Eleven frame-health scenarios (`VocelloMacPerfUITests`) against warn-only ceilings |

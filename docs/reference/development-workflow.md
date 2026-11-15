@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -504,7 +504,8 @@ worktrees stay denied.
 **Side sessions.** The Claude desktop app adds sessions the lead starts (`start_session`) or the
 maintainer opens, each with its own transcript. They follow the agent rules, and the lead stays in
 the main checkout. A read-only side session (CI or release watching, triage, research) shares the main
-checkout (`use_worktree: false`), often on a cheaper model, and its brief says it edits nothing. An
+checkout (`use_worktree: false`) and may use a cheaper model, and its brief says it edits nothing.
+Agents and editing side sessions inherit the lead's model. An
 editing side session gets the app's own worktree (`use_worktree: true`): `.claude/worktrees/<name>`
 on `claude/<name>`, cut from local HEAD, so commit the checkpoint first. Keep the Code tab's default
 branch prefix `claude` and its in-project worktree location. Without `use_worktree`, a side session of
@@ -662,7 +663,7 @@ tool is offered.
 | Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
 | Model research | Receipts, exact pins and maintenance contracts | The huggingface-skills plugin's MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`) and its read-side skills (`hf-cli` reads, `hf-mem` weight-memory estimates, `huggingface-papers`, `huggingface-datasets`, `huggingface-best`) and the `hf` CLI for hub search, cards, file sizes, licenses and papers. Downloads, Space runs, Jobs, Inference Endpoints, SageMaker, training, uploads and publishing need a specific request, and the paid ones also go against the no-paid-services preference; no implied repin |
-| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.0 (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
+| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
 | Code navigation | Source, tests and the reference rules | swift-lsp (clangd-lsp for C) through the LSP tool when a symbol server is configured (New Mac setup, above) |
 | Claude Code configuration | Tracked `.claude/`, `CLAUDE.md` and `scripts/tests/test_agent_hooks.py` | skill-creator for project skills; claude-md-management for `CLAUDE.md` upkeep; `/update-config` for settings |
 

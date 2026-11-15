@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 summary: Tooling, CI, packaging, benchmark and evidence rule; Claude Code loads it through .claude/rules/tooling.md when matching files are touched.
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 paths:
   - "scripts/**"
   - ".github/**"
@@ -127,7 +127,7 @@ rules they enforce:
   contract-v1 records keep their ≥95% coverage rule. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
 - **Audio QA: Fast QC gates, QC v2 reports, no automated score is a quality verdict
-  (`docs/reference/qc.md`).** For 3.0 nobody listens (maintainer decision 2026-10-13): RF-14 and RF-15
+  (`docs/reference/qc.md`).** For 3.x nobody listens (maintainer decision 2026-10-13): RF-14 and RF-15
   use a machine screen for gross failures only (Fast QC, end of take, the better ASR family's edit rate
   and the language check), and subtle defects ship as the documented known limitation.
   Fixed seeds and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 is

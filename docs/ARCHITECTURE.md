@@ -442,15 +442,18 @@ arms and the text layouts per take kind are owned by
 
 Explicit reserved/generating/aborting ownership prevents an
 abort-owned reservation from reopening generation and makes duplicate aborts join one finalization.
-Typed cache-trim/full-unload relief transfers the generation lease directly into critical relief;
-admission reopens only after the selected release completes and the relief lease revalidates.
-Rejected atomic relief claims clear their matching ownership before querying the session barrier;
-an ordinary acknowledgment accepted on either side of that rollback therefore cannot strand the
-generation lease.
+The actor also has a typed cache-trim/full-unload relief that transfers the generation lease directly
+into critical relief, reopens admission only after the selected release completes, and clears a
+rejected atomic relief claim before querying the session barrier. That relief, its pressure ingress
+and the actor's own unload are internal to the package and run in its tests only. The product does
+not call them: `MLXTTSEngine` closes its own admission gate and waits for the running operation,
+`NativeEngineRuntime` trims or unloads, and a full unload drops the host's reference to the actor
+(`docs/reference/native-engineering.md`, "Relief and unload are the host's").
 Clone prompts remain actor-owned behind epoch-bound handles. The default retained-handle capacity is
 one; larger explicit capacities evict least-recently-used handles. Explicit release makes future
-lookups fail closed without invalidating a prompt already captured by a reservation. Noncritical
-cache trim preserves handles, while model reload, critical trim, and full unload invalidate them.
+lookups fail closed without invalidating a prompt already captured by a reservation. A reload or a
+full unload ends the actor and its handles. A hard trim drops the host's cached handles; the actor
+keeps its one record until the next handle replaces it or the model unloads.
 
 `VocelloQwen3Engine` models one actor-owned operation lease; `ClassifiedGenerationSession` provides a single-consumer,
 frame-bounded suspending audio channel and independent prepared/progress/model-terminal/diagnostic

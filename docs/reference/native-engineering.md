@@ -53,9 +53,21 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   `MLXRandom.RandomState`; never reintroduce `MLXRandom.seed` or a process-global override.
 - **Actor-owned surfaces.** Prepared-model loading, metadata, priming and clone-artifact persistence are
   actor-owned public surfaces; the legacy compatibility SPI is retired. Reserved / generating / aborting
-  ownership is explicit: open fails once abort owns the reservation, duplicate aborts join one
-  finalization, cache-trim and full-unload relief carry the generation lease. Clone prompt tensors stay
-  actor-owned behind epoch-bound handles and are invalidated on reload, critical trim or full unload.
+  ownership is explicit: open fails once abort owns the reservation and duplicate aborts join one
+  finalization. Clone prompt tensors stay actor-owned behind epoch-bound handles.
+- **Relief and unload are the host's, not the actor's.** `MLXTTSEngine` closes its own admission gate,
+  waits for the running model operation, then calls `NativeEngineRuntime.trimMemory` or `unloadModel`.
+  A hard trim clears the host's clone conditioning (its cached handles included), the prewarm marks, the
+  MLX buffer cache and the Qwen3 runtime caches, and keeps the weights. A full unload drops
+  `MLXModelLoadCoordinator`'s reference to the loaded model, and the `VocelloQwen3Engine` actor and its
+  clone handles go with it; every load makes a new actor. A Mac clears the runtime caches for memory
+  relief only (a hard trim, or the full unload a trim asked for) and keeps them across an idle or
+  explicit unload; the iPhone clears them at every unload, failed load and hard trim. After a hard trim
+  the actor still holds its one clone record until the next handle replaces it or the model unloads.
+  The actor's own `observeMemoryPressure`, `relieveMemory`, `unload` and
+  `acknowledgeProductFinalizationAndRelieveMemory` are internal to the package and run in its tests
+  only: do not describe them as the product's mechanism, and route the product through them only as a
+  planned change with its own evidence.
 - **Decoder drift.** `Qwen3TTSSpeechTokenizer` uses input-side overlap-and-discard; do not change the
   output side.
 - **Convergence authority.** `config/runtime-refactor-contract.json` `phaseStatus` is the only per-phase
@@ -93,7 +105,8 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   (W1-D/W2-A).
 - **Memory relief is in-process.** The engine's own kernel-pressure responder trims caches and never
   unloads the weights; the store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working
-  set and fully unloads at its critical band; idle unload follows
+  set and fully unloads at its critical band, which also clears the Qwen3 runtime caches; idle unload
+  keeps those caches and follows
   `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. Every tier, the
   high-memory Mac included, idle-unloads and answers pressure; warms follow Studio intent, never
   browsing, and a cancelled warm or prime re-arms idle unload (AUD-10). No hard

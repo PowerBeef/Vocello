@@ -308,6 +308,16 @@ public struct VocelloQwen3GenerationReservation: Sendable {
 /// model while load/prewarm/trim ownership finishes converging; it never runs
 /// a shadow generation or loads a second weight set. The inner Qwen generation
 /// gate remains active as defense-in-depth during that migration.
+///
+/// Not on the shipping path: memory pressure, memory relief and unload. The
+/// product never calls `observeMemoryPressure`, `relieveMemory`, `unload` or
+/// `acknowledgeProductFinalizationAndRelieveMemory`. Its host closes its own
+/// admission gate, waits for the running operation, releases its clone
+/// conditioning, calls `VocelloQwen3Runtime.clearRuntimeCaches()` and unloads
+/// by dropping its reference to this actor; a take always ends through
+/// `acknowledgeProductFinalization`. Those four entry points are internal and
+/// exercised by the package tests only, so in the product `pressure` never
+/// leaves its initial value and admission here never closes.
 public actor VocelloQwen3Engine {
     private enum GenerationLifecycle: Sendable, Equatable {
         case reserved
@@ -472,9 +482,6 @@ public actor VocelloQwen3Engine {
         )
     }
 
-    /// Records pressure ingress without exposing an admission-reopen switch.
-    /// Critical pressure is monotonic until this actor completes the matching
-    /// relief operation; warning/normal observations cannot reopen it.
     /// Post-load metadata for the actor-owned model, or `nil` when unloaded.
     public func loadedModelFacts() -> VocelloQwen3LoadedModelFacts? {
         guard let model = loadedModel else { return nil }
@@ -499,7 +506,12 @@ public actor VocelloQwen3Engine {
         loadedModel?.resetPreparationDiagnostics()
     }
 
-    public func observeMemoryPressure(_ level: VocelloQwen3MemoryPressureLevel) {
+    /// Records pressure ingress without exposing an admission-reopen switch.
+    /// Critical pressure is monotonic until this actor completes the matching
+    /// relief operation; warning/normal observations cannot reopen it.
+    ///
+    /// Not on the shipping path (see the type's note): package tests only.
+    func observeMemoryPressure(_ level: VocelloQwen3MemoryPressureLevel) {
         if pressure.admissionClosed, level != .critical {
             return
         }
@@ -1282,7 +1294,9 @@ public actor VocelloQwen3Engine {
     /// Atomically converts the completed generation lease into the critical
     /// relief lease. Admission remains closed throughout; no newer operation
     /// can appear between product cleanup and cache release.
-    public func acknowledgeProductFinalizationAndRelieveMemory(
+    ///
+    /// Not on the shipping path (see the type's note): package tests only.
+    func acknowledgeProductFinalizationAndRelieveMemory(
         generationID: UUID,
         leaseID: UUID,
         token: VocelloQwen3ProductFinalizationToken,
@@ -1300,7 +1314,9 @@ public actor VocelloQwen3Engine {
     /// Acknowledges product finalization and transfers the existing generation
     /// lease directly into the selected relief action. No admission window is
     /// opened between product cleanup and cache trim or full model unload.
-    public func acknowledgeProductFinalizationAndRelieveMemory(
+    ///
+    /// Not on the shipping path (see the type's note): package tests only.
+    func acknowledgeProductFinalizationAndRelieveMemory(
         generationID: UUID,
         leaseID: UUID,
         token: VocelloQwen3ProductFinalizationToken,
@@ -1430,15 +1446,19 @@ public actor VocelloQwen3Engine {
 
     /// Clears prepared and decoder caches only when no product operation owns
     /// the runtime. Critical-pressure continuity is coordinated by the product
-    /// gate until its cutover to this actor.
-    public func relieveMemory() async throws {
+    /// gate, which has not cut over to this actor.
+    ///
+    /// Not on the shipping path (see the type's note): package tests only.
+    func relieveMemory() async throws {
         try await relieveMemory(.cacheTrim)
     }
 
     /// Performs a typed standalone relief action. Both actions are admitted
     /// while critical pressure is closed and reopen admission only after the
     /// selected release has completed.
-    public func relieveMemory(_ action: VocelloQwen3MemoryReliefAction) async throws {
+    ///
+    /// Not on the shipping path (see the type's note): package tests only.
+    func relieveMemory(_ action: VocelloQwen3MemoryReliefAction) async throws {
         let lease = try beginOperation(
             kind: .memoryRelief,
             generationID: nil,
@@ -1453,7 +1473,11 @@ public actor VocelloQwen3Engine {
         }
     }
 
-    public func unload() async throws {
+    /// A full unload under the actor's own lease.
+    ///
+    /// Not on the shipping path (see the type's note): the product unloads by
+    /// dropping its reference to this actor. Package tests only.
+    func unload() async throws {
         let lease = try beginOperation(
             kind: .unload,
             generationID: nil,

@@ -411,7 +411,6 @@
 		6797EA54CC530CD354F517DA /* NativeCloneSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22EFD3BC7EF7334F82BB018A /* NativeCloneSupport.swift */; };
 		67EA9233F53190A58848853B /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63BC3858C14A2B4F42D6C2F6 /* AppNotifications.swift */; };
 		6807BC244CA81EC19BCD072D /* PrewarmSlotGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95780FD2E72EB2524A4022C1 /* PrewarmSlotGateTests.swift */; };
-		689D08BCA01E5473A77C54BF /* AtomicWAVGenerationOutputSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6FA78E40FCBFCB0D07F466 /* AtomicWAVGenerationOutputSink.swift */; };
 		68E6E9BD321ED289F008E451 /* GenerationStartupDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1016DA6A3DF1D89718D1ACE2 /* GenerationStartupDiagnosticsTests.swift */; };
 		6932FF6FC9F1EC505A1D354E /* VocelloPresentationText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 927598F48A6C57FCB82ED71C /* VocelloPresentationText.swift */; };
 		693DD23E4C00ECF001F0CA96 /* GenerationTelemetryJSONLSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06B56F5A8C00E4A44902C849 /* GenerationTelemetryJSONLSink.swift */; };
@@ -772,6 +771,7 @@
 		CFD607F3C615C3EA15DB6001 /* MacStudioPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0877C3750C967A99DE37C8B /* MacStudioPlayerCard.swift */; };
 		CFE22C23851A532E2786B1D2 /* SharedStoreChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C54147DE2B33AA4B76975EF /* SharedStoreChange.swift */; };
 		CFF5C36393CCB036F7908A3E /* AudioPlaybackResumePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB99DD50D5BC43C30438BD6 /* AudioPlaybackResumePolicy.swift */; };
+		D02254AF9A1634AA38F3A5D5 /* AtomicWAVGenerationOutputSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED55B97B10568016CD260C74 /* AtomicWAVGenerationOutputSink.swift */; };
 		D0564D9C21BA41E16743B13C /* GenerationStreamingTelemetryV9Publication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2347BA664B33C9BBEFB73ED3 /* GenerationStreamingTelemetryV9Publication.swift */; };
 		D08BE1E7E4EA556218FDD05C /* IOSAppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B848AF4B3F3149565356237 /* IOSAppLanguage.swift */; };
 		D0A4C4DBADE1D461F01D65EE /* HistoryPersistenceError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F8727F31A416A0EB376386 /* HistoryPersistenceError.swift */; };
@@ -1616,7 +1616,6 @@
 		CDF848BB10F7776CA116676F /* GenerationTerminalDiagnosticEvidenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationTerminalDiagnosticEvidenceTests.swift; sourceTree = "<group>"; };
 		CE192CBD7C2045EB31DADF0C /* ModelsCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsCommand.swift; sourceTree = "<group>"; };
 		CE25D73D5B7D62D9FCCDC19C /* PrewarmSlotGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrewarmSlotGate.swift; sourceTree = "<group>"; };
-		CE6FA78E40FCBFCB0D07F466 /* AtomicWAVGenerationOutputSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtomicWAVGenerationOutputSink.swift; sourceTree = "<group>"; };
 		CF238E487C0AF15E3F460C2B /* SavedVoicesBusyRetryPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedVoicesBusyRetryPolicyTests.swift; sourceTree = "<group>"; };
 		CFF825491199FD696880AEDB /* BenchMatrixSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchMatrixSpec.swift; sourceTree = "<group>"; };
 		D0E6A0106BC9B8E31525C42E /* GenerationPlanShadowMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationPlanShadowMapperTests.swift; sourceTree = "<group>"; };
@@ -1692,6 +1691,7 @@
 		EC640275A11FF9829D6C221F /* VocelloiOSPerfUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloiOSPerfUITests.swift; sourceTree = "<group>"; };
 		EC6D82A98FA839569A5E4078 /* VocelloiOSRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VocelloiOSRelease.entitlements; sourceTree = "<group>"; };
 		EC8C0BC3C73220CD00FF4598 /* DatabaseServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseServiceTests.swift; sourceTree = "<group>"; };
+		ED55B97B10568016CD260C74 /* AtomicWAVGenerationOutputSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtomicWAVGenerationOutputSink.swift; sourceTree = "<group>"; };
 		ED81EBF07E9A9E406DCBE49F /* ModelUpdateLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelUpdateLedgerTests.swift; sourceTree = "<group>"; };
 		EDAF51C92D6D16B455C573AC /* dylan.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = dylan.wav; sourceTree = "<group>"; };
 		EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingPlaybackEngine.swift; sourceTree = "<group>"; };
@@ -1838,6 +1838,7 @@
 			children = (
 				6091136F1FF4F003448B116F /* ActiveGenerationCoordinatorTests.swift */,
 				0AE5AF4773BAC85DD0F3F1EF /* AllocationRetryAnnotationTests.swift */,
+				ED55B97B10568016CD260C74 /* AtomicWAVGenerationOutputSink.swift */,
 				84FBDE8D47186B68966CEAFE /* AtomicWAVGenerationOutputSinkTests.swift */,
 				871845457144444EC50F7D04 /* AtomicWAVPublicationTests.swift */,
 				41F161283A7DA34835387463 /* AudioPlaybackResumePolicyTests.swift */,
@@ -2540,7 +2541,6 @@
 			children = (
 				54D7E9FF77042614ADD58259 /* ActiveGenerationCoordinator.swift */,
 				D8402AFF57B7E57136A97A46 /* AnyTTSEngineBackend.swift */,
-				CE6FA78E40FCBFCB0D07F466 /* AtomicWAVGenerationOutputSink.swift */,
 				3498E2CBEBF0240D236BF8D8 /* AudioPreparation.swift */,
 				FB77FC791E6636F020D74CC3 /* AudioPublicationMarking.swift */,
 				235672B6A5614E1FE2161DD7 /* AudioQCSignalObserver.swift */,
@@ -3355,7 +3355,6 @@
 			files = (
 				F00C3CDB3495F39FFD3BA257 /* ActiveGenerationCoordinator.swift in Sources */,
 				CCC2A8C1E114FCB6A4654CBF /* AnyTTSEngineBackend.swift in Sources */,
-				689D08BCA01E5473A77C54BF /* AtomicWAVGenerationOutputSink.swift in Sources */,
 				5B3D58EAABD8ADC17DB31929 /* AudioPreparation.swift in Sources */,
 				9ACAC0E9E71BAB3E773F4324 /* AudioPublicationMarking.swift in Sources */,
 				F4B991B1E3CFDB85C9227748 /* AudioQCSignalObserver.swift in Sources */,
@@ -3627,6 +3626,7 @@
 				FDF875343C8CFB84AA14F348 /* AppNotifications.swift in Sources */,
 				2A583A59DD08093E791347BE /* AppPaths.swift in Sources */,
 				57963DB8DDE2A1288CD36992 /* AppPerformanceSignposts.swift in Sources */,
+				D02254AF9A1634AA38F3A5D5 /* AtomicWAVGenerationOutputSink.swift in Sources */,
 				32E24B9604A4EB59A305BF15 /* AtomicWAVGenerationOutputSinkTests.swift in Sources */,
 				199D5A2D3B07BF6FBE43ECF1 /* AtomicWAVPublicationTests.swift in Sources */,
 				CFF5C36393CCB036F7908A3E /* AudioPlaybackResumePolicy.swift in Sources */,

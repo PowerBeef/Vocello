@@ -20,7 +20,7 @@ the iOS compile and the UI bundles). No UI lane has run on any of it.
 | Steps | State |
 |---|---|
 | 1 to 13 | Done. Step 7's ceilings stay unenforced (`enforce` is empty) until three perf runs derive them; step 12's limit is recalibrated from the same sitting. |
-| 14 | The promotion check is done. **The pin has not moved:** GitHub offers Xcode 27 only on a preview runner image, which the decision did not know. The maintainer chooses again. |
+| 14 | The promotion check is done. **The pin stays at Xcode 26.6** (maintainer, 2026-11-15, reversing D-1 once it was known that GitHub offers Xcode 27 only on a preview runner image). One thing is still open: promotion evidence is built on this Mac, which runs macOS 27.2.1, and Apple lists Xcode 26.6 as supported on macOS 26.2 to 26.x only. Either 26.6 is tried here unsupported, or promotion records the difference as an accepted exception instead of refusing it, or the pin moves after all. The maintainer chooses. |
 | 15 to 17 | Done. |
 | 18 to 20 | Wait for a window with the Mac free, then the maintainer's push and tag. |
 | 21 to 26 | Go with the release, in one commit. The reference documents of step 25 and the privacy reference of step 23 are done; the website page of step 23 is not. |

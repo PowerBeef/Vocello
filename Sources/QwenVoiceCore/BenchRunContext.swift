@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Bench metadata stamped into telemetry `notes` when the macOS bench env vars are set.
 public enum BenchRunContext {
@@ -6,6 +7,12 @@ public enum BenchRunContext {
     private static let takeIndexKey = "QVOICE_MAC_BENCH_TAKE_INDEX"
     private static let cellKey = "QVOICE_MAC_BENCH_CELL"
     private static let warmStateKey = "QVOICE_MAC_BENCH_WARM_STATE"
+
+    /// The take a bench driver in this process last announced through
+    /// `writeCurrentTakeFile`, until `clearCurrentTakeFile`. A process that
+    /// drives its own takes (`vocello bench`, the iPhone diagnostics runner)
+    /// stamps them from here in any build, without reading the file back.
+    private static let announcedTake = Mutex<[String: String]?>(nil)
 
     public static var isActive: Bool {
         guard TelemetryGate.resolvedEnabled else { return false }
@@ -21,16 +28,34 @@ public enum BenchRunContext {
     public static func telemetryNotes(intendedWarmState: String? = nil) -> [String: String] {
         guard TelemetryGate.resolvedEnabled else { return [:] }
         var notes = notesFromEnvironment(intendedWarmState: intendedWarmState)
-        if let fileNotes = currentTakeFileNotes() {
+        if let takeNotes = currentTakeNotes() {
             // The process keeps the environment from its launch, while the
             // benchmark advances multiple warm takes in that same process. The
-            // current-take file is therefore authoritative for the fields it
+            // current take is therefore authoritative for the fields it
             // carries.
-            for (key, value) in fileNotes {
+            for (key, value) in takeNotes {
                 notes[key] = value
             }
         }
         return notes
+    }
+
+    /// The current take's identity: what a driver in this process announced,
+    /// or the file a driver in another process wrote.
+    ///
+    /// The file is read only in an internal-diagnostics build. On macOS it is
+    /// a fixed path under `/tmp` that any process can write, so a shipped
+    /// build with telemetry on must not take bench identity from it. The
+    /// macOS UI benchmark, whose runner writes the file from outside the app,
+    /// runs a build with that capability.
+    static func currentTakeNotes(
+        internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
+    ) -> [String: String]? {
+        if let announced = announcedTake.withLock({ $0 }) {
+            return announced
+        }
+        guard internalDiagnosticsAvailable else { return nil }
+        return currentTakeFileNotes()
     }
 
     /// Bench driver writes a current-take manifest in temporary storage so
@@ -38,7 +63,9 @@ public enum BenchRunContext {
     ///
     /// macOS uses a fixed global path because processes outside the app write
     /// it: `scripts/ui_test.sh` and the XCUITest runner
-    /// (`VocelloMacBenchmarkUITests`). The app and the CLI read it in-process.
+    /// (`VocelloMacBenchmarkUITests`). The app reads it only in an
+    /// internal-diagnostics build (`currentTakeNotes`); a process that calls
+    /// this itself, such as the CLI, stamps its takes from what it announced.
     /// iOS uses its sandbox-owned temporary directory.
     public static func writeCurrentTakeFile(
         takeIndex: Int,
@@ -61,9 +88,12 @@ public enum BenchRunContext {
         guard currentTakeFileNotes() == payload else {
             throw BenchRunContextError.currentTakeReadbackMismatch
         }
+        let announced = payload
+        announcedTake.withLock { $0 = announced }
     }
 
     public static func clearCurrentTakeFile() {
+        announcedTake.withLock { $0 = nil }
         try? FileManager.default.removeItem(at: currentTakeFileURL)
     }
 

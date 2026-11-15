@@ -955,7 +955,10 @@ the device-open cost out of the first take's measured playback-scheduling latenc
 shipped audio lifecycle, so the app is left as it is. The runner pastes each take's script with one
 genuine paste (Cmd-A, Cmd-V, restoring the pasteboard's text) instead of typing it a key at a time,
 and an unsandboxed runner (the lane re-signed it) writes the current-take file itself instead of
-relaying it through the log and polling; a sandboxed one keeps the relay. The app row keeps the
+relaying it through the log and polling; a sandboxed one keeps the relay. The app reads that file
+only in an internal-diagnostics build, which every lane builds: it is a fixed path under `/tmp`, so
+a shipped build with telemetry on takes no bench identity from it. A process that announces its own
+takes (`vocello bench`, the iPhone diagnostics runner) stamps them in any build. The app row keeps the
 take identity it was submitted under, and the checker refuses a run whose app and engine rows name
 different takes. The runner prints each take's harness phases (monotonic offsets from the take's
 start: manifest published, session ready, script entered, submit, completion seen, playback ended,

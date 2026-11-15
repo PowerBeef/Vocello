@@ -32,6 +32,32 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         XCTAssertNil(BenchRunContext.currentTakeFileNotes())
     }
 
+    /// The current-take file sits at a fixed path any process can write, so
+    /// only an internal-diagnostics build takes bench identity from it. A
+    /// driver that announces its takes in this process stamps them in any
+    /// build.
+    func testOnlyAnInternalDiagnosticsBuildReadsTheCurrentTakeFile() throws {
+        BenchRunContext.clearCurrentTakeFile()
+        defer { BenchRunContext.clearCurrentTakeFile() }
+
+        // Another process wrote the file.
+        let planted = ["benchTakeIndex": "3", "benchCell": "custom/speed/short", "benchWarmState": "cold"]
+        try JSONSerialization.data(withJSONObject: planted, options: [.sortedKeys])
+            .write(to: BenchRunContext.currentTakeFileURL, options: .atomic)
+        XCTAssertNil(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: false))
+        XCTAssertEqual(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: true), planted)
+
+        // A driver in this process announced its take.
+        try BenchRunContext.writeCurrentTakeFile(takeIndex: 4, cell: "design/speed/short", intendedWarmState: "warm")
+        let announced = ["benchTakeIndex": "4", "benchCell": "design/speed/short", "benchWarmState": "warm"]
+        XCTAssertEqual(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: false), announced)
+        XCTAssertEqual(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: true), announced)
+
+        BenchRunContext.clearCurrentTakeFile()
+        XCTAssertNil(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: false))
+        XCTAssertNil(BenchRunContext.currentTakeNotes(internalDiagnosticsAvailable: true))
+    }
+
     func testSchemaV7RowDecodesWithoutV8MemoryPayload() throws {
         let json = """
         {

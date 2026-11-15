@@ -17,6 +17,8 @@
     "settings-scroll",
     "composer-typing"
   ],
+  "enforce": [],
+  "enforceDescription": "warnOnly is the default posture: a hitch or max-gap ceiling breach is a warning code. A scenario named in enforce fails the run instead (exit 1, report status failed, no evidence manifest) when it breaches either ceiling on the calibration profile and refresh interval; it must have both ceilings in this contract. Ceilings may cover scenarios outside confirmatoryScenarios (check_macos_ui_perf.py --derive-thresholds RECORD... --scenarios a,b,c); those stay warn-only unless enforced. A run that is uncalibrated (another profile or refresh interval, or calibrationStale) enforces nothing. Empty until the ceilings are re-derived from new runs (RF-61, audit T1).",
   "hitchCeilingMSPerS": {
     "idle-baseline": 8.0,
     "sidebar-navigation": 77.5,

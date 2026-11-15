@@ -12,14 +12,19 @@ Phase-2 posture (UI-7, 2026-08-05):
 * **The gate stays structural**: every expected scenario present exactly
   once, probe coverage of each marked window >= the floor, monotonic block
   timestamps, a sane refresh interval.
-* **Thresholds are warn-only** (``config/ui-perf-thresholds.json``): a ceiling
-  breach marks the scenario and run ``passedWithWarnings`` and never fails the
-  gate or blocks publication. Promotion to hard ceilings waits for repeated
-  baseline sessions. The contract names the profile and refresh interval it was
-  derived on; on any other, the run carries one ``uiperf.uncalibrated:<profile>``
-  code instead of ceiling verdicts (audit #77). ``--derive-thresholds RECORD...``
-  derives a contract from at least three counted runs (``scripts/lib/
-  ui_perf_thresholds.py``: the run-to-run spread with a 1.3x floor, audit #34).
+* **Thresholds warn unless enforced** (``config/ui-perf-thresholds.json``): a
+  ceiling breach marks the scenario and run ``passedWithWarnings`` and neither
+  fails the gate nor blocks publication, except in a scenario the contract names
+  in ``enforce`` (RF-61, audit T1): there a hitch or max-gap breach fails the
+  run (exit 1, report status ``failed``, no evidence manifest). Ceilings cover
+  the confirmatory scenarios and may cover others. The contract names the
+  profile and refresh interval it was derived on; on any other, the run carries
+  one ``uiperf.uncalibrated:<profile>`` code instead of ceiling verdicts, and
+  nothing is enforced (audit #77). ``--derive-thresholds RECORD...`` derives a
+  contract from at least three counted runs (``scripts/lib/
+  ui_perf_thresholds.py``: the run-to-run spread with a 1.3x floor, audit #34);
+  ``--scenarios a,b,c`` names the scenarios that get ceilings (default: the
+  confirmatory ones).
 * A confirmatory scenario whose window grows the footprint past
   ``footprintGrowthCeilingMB`` gets a warn-only ``uiperf.footprint`` code (#33).
 * **Registry publication** (``--emit-evidence``): on the canonical hardware
@@ -372,16 +377,54 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     return summary, coverage
 
 
+CEILING_KEYS = ("hitchCeilingMSPerS", "maxGapCeilingMS")
+
+
+def enforced_scenarios(thresholds: dict) -> list[str]:
+    """The scenarios whose ceiling breach fails the run (RF-61, audit T1)."""
+    return list(thresholds.get("enforce") or [])
+
+
 def load_thresholds(path: Path) -> dict:
+    """The ceiling contract. ``warnOnly`` stays true, the default posture: a breach
+    warns unless its scenario is named in the optional ``enforce`` list."""
     thresholds = json.loads(path.read_text(encoding="utf-8"))
     if thresholds.get("schemaVersion") != 1 or thresholds.get("warnOnly") is not True:
         raise GateError(f"unsupported thresholds contract: {path}")
     confirmatory = thresholds.get("confirmatoryScenarios")
     if not isinstance(confirmatory, list) or not set(confirmatory) <= set(EXPECTED_SCENARIOS):
         raise GateError(f"thresholds contract names unknown confirmatory scenarios: {path}")
-    for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
-        if set(thresholds.get(key, {})) != set(confirmatory):
-            raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
+    hitch, gap = (thresholds.get(key) for key in CEILING_KEYS)
+    if not isinstance(hitch, dict) or not isinstance(gap, dict) or set(hitch) != set(gap):
+        raise GateError(
+            f"thresholds contract {' and '.join(CEILING_KEYS)} must name the same scenarios: {path}"
+        )
+    if not set(confirmatory) <= set(hitch) <= set(EXPECTED_SCENARIOS):
+        raise GateError(
+            "thresholds contract ceilings must cover every confirmatory scenario and name only "
+            f"known scenarios: {path}"
+        )
+    enforce = thresholds.get("enforce", [])
+    if (
+        not isinstance(enforce, list) or any(not isinstance(name, str) for name in enforce)
+        or len(set(enforce)) != len(enforce)
+    ):
+        raise GateError(f"thresholds contract enforce must be a list of distinct scenario names: {path}")
+    if unknown := [name for name in enforce if name not in EXPECTED_SCENARIOS]:
+        raise GateError(f"thresholds contract enforces unknown scenarios ({', '.join(unknown)}): {path}")
+    # An enforced scenario with no usable ceiling would pass every run.
+    unjudged = [
+        name for name in enforce
+        if any(
+            isinstance(ceilings.get(name), bool) or not isinstance(ceilings.get(name), (int, float))
+            or ceilings[name] <= 0
+            for ceilings in (hitch, gap)
+        )
+    ]
+    if unjudged:
+        raise GateError(
+            f"thresholds contract enforces scenarios without ceilings ({', '.join(unjudged)}): {path}"
+        )
     if problems := calibration_rules.validate_calibration_fields(thresholds):
         raise GateError(f"thresholds contract {'; '.join(problems)}: {path}")
     return thresholds
@@ -423,8 +466,10 @@ def run_hardware_context(
 
 
 def evaluate_thresholds(summary: dict, thresholds: dict) -> list[str]:
-    """Warn-only ceilings (UI-7): a breach never fails the gate; it marks the
-    scenario and run passedWithWarnings so the registry shows the drift."""
+    """The scenario's ceiling breach codes. The caller decides what a breach
+    costs: a warning that marks the scenario and run passedWithWarnings so the
+    registry shows the drift (UI-7), or a failed run when the contract names the
+    scenario in ``enforce`` (RF-61, audit T1)."""
     scenario = summary["scenario"]
     warnings = []
     hitch_ceiling = thresholds["hitchCeilingMSPerS"].get(scenario)
@@ -566,12 +611,85 @@ def canonical_profile_id(platform: str = "macos") -> str:
     return str(publisher.canonical_hardware_profile(platform)["id"])
 
 
+def derivation_scenarios(argument: str | None, base: dict) -> list[str]:
+    """The scenarios a derivation gives ceilings: ``--scenarios a,b,c``, or the
+    confirmatory ones. The list must keep the base contract loadable, so it
+    covers every confirmatory and every enforced scenario."""
+    confirmatory = list(base["confirmatoryScenarios"])
+    if argument is None:
+        scenarios = confirmatory
+    else:
+        scenarios = [name.strip() for name in argument.split(",")]
+        if not all(scenarios) or len(set(scenarios)) != len(scenarios):
+            raise GateError("--scenarios must be a comma-separated list of distinct scenario names")
+        if unknown := [name for name in scenarios if name not in EXPECTED_SCENARIOS]:
+            raise GateError(f"--scenarios names unknown scenarios: {', '.join(unknown)}")
+        if missing := [name for name in confirmatory if name not in scenarios]:
+            raise GateError(f"--scenarios must keep the confirmatory scenarios: {', '.join(missing)}")
+    if missing := [name for name in enforced_scenarios(base) if name not in scenarios]:
+        raise GateError(f"the contract enforces scenarios the derivation gives no ceiling: {', '.join(missing)}")
+    return scenarios
+
+
+def derive_contract(records: list[dict], base: dict, scenarios: list[str], *, rule: str) -> dict:
+    """A contract with ceilings for `scenarios`, derived by the shared rules. The
+    confirmatory designation, the ``enforce`` list and its description carry over
+    from `base`: a derivation moves ceilings, never what fails a run."""
+    confirmatory = list(base["confirmatoryScenarios"])
+    derived = calibration_rules.derive(records, {**base, "confirmatoryScenarios": scenarios}, rule=rule)
+    contract: dict = {}
+    for key, value in derived.items():
+        if key == "basis" and scenarios != confirmatory:
+            value = value.replace("Per confirmatory scenario", "Per scenario with a ceiling")
+        if key == "confirmatoryScenarios":
+            value = confirmatory
+        contract[key] = value
+        if key == "confirmatoryScenarios":
+            for carried in ("enforce", "enforceDescription"):
+                if carried in base:
+                    contract[carried] = base[carried]
+    return contract
+
+
+def derive_thresholds_main(argv: list[str]) -> int:
+    """`--derive-thresholds RECORD... [--scenarios a,b,c]` (audit #34, #78; RF-61, audit T1)."""
+    parser = argparse.ArgumentParser(
+        description="Derive macos ui-perf ceilings from at least three counted runs of one profile.",
+    )
+    parser.add_argument("--derive-thresholds", nargs="+", required=True, metavar="RECORD",
+                        help="ui-perf record paths or run IDs (benchmarks/runs/ui-perf/<id>.json)")
+    parser.add_argument("--rule", choices=calibration_rules.RULES, default=calibration_rules.SPREAD_RULE)
+    parser.add_argument("--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
+                        help="the contract whose confirmatory scenarios, enforce list and footprint "
+                        "ceiling carry over")
+    parser.add_argument("--scenarios", metavar="A,B,C",
+                        help="the scenarios that get ceilings (default: the contract's confirmatory "
+                        "scenarios, which the list must include)")
+    parser.add_argument("--write", type=Path, metavar="PATH",
+                        help="write the derived contract here instead of printing it")
+    args = parser.parse_args(argv)
+    try:
+        base = load_thresholds(args.thresholds)
+        scenarios = derivation_scenarios(args.scenarios, base)
+        records = [calibration_rules.load_record(reference, UI_PERF_RUNS) for reference in args.derive_thresholds]
+        if {record.get("run", {}).get("platform") for record in records} != {"macos"}:
+            raise calibration_rules.DerivationError("derivation inputs must be macos ui-perf records")
+        contract = derive_contract(records, base, scenarios, rule=args.rule)
+    except (ValueError, OSError, KeyError) as error:
+        print(f"ui-perf derivation FAILED: {error}", file=sys.stderr)
+        return 1
+    text = json.dumps(contract, indent=2) + "\n"
+    if args.write:
+        args.write.write_text(text, encoding="utf-8")
+        print(f"ui-perf ceilings ({args.rule}, {contract['calibrationProfile']}) -> {args.write}")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def main() -> int:
     if "--derive-thresholds" in sys.argv[1:]:
-        return calibration_rules.derive_main(
-            sys.argv[1:], platform="macos", default_thresholds=DEFAULT_THRESHOLDS_PATH,
-            load_thresholds=load_thresholds, runs_root=UI_PERF_RUNS,
-        )
+        return derive_thresholds_main(sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True)
@@ -584,7 +702,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
-        help="warn-only ceiling contract (config/ui-perf-thresholds.json)",
+        help="ceiling contract, warn-only outside its enforce list (config/ui-perf-thresholds.json)",
     )
     parser.add_argument("--label", default="")
     parser.add_argument(
@@ -653,24 +771,34 @@ def main() -> int:
     calibration = calibration_rules.calibration(
         thresholds, canonical_profile_id(), [row["refreshIntervalMS"] for row in scenarios],
     )
+    # A breach in a scenario the contract enforces fails the run; anywhere else
+    # it stays a warning code (RF-61, audit T1).
+    enforced = enforced_scenarios(thresholds)
     scenario_warnings: dict[str, list[str]] = {}
+    run_failures: list[str] = []
     for summary in scenarios:
-        warnings = evaluate_thresholds(summary, thresholds) if calibration["calibrated"] else []
+        breaches = evaluate_thresholds(summary, thresholds) if calibration["calibrated"] else []
+        failures = breaches if summary["scenario"] in enforced else []
+        warnings = [] if failures else breaches
         warnings += calibration_rules.footprint_growth_warning(summary, thresholds)
         summary["thresholdWarnings"] = warnings
+        summary["thresholdFailures"] = failures
         scenario_warnings[summary["scenario"]] = warnings
+        run_failures += failures
     extra_run_warnings = [calibration["code"]] if calibration["code"] else []
     run_warnings = sorted(
         {code for codes in scenario_warnings.values() for code in codes} | set(extra_run_warnings)
     )
     report = {
         "schemaVersion": 1,
-        "evidence": "registry" if args.emit_evidence else "local-only",
+        "evidence": "registry" if args.emit_evidence and not run_failures else "local-only",
         "hardwareContext": {k: v for k, v in hardware_context.items() if k != "profileID"},
         "runID": args.run_id,
-        "status": "passedWithWarnings" if run_warnings else "passed",
+        "status": "failed" if run_failures else "passedWithWarnings" if run_warnings else "passed",
         "thresholds": {
-            "path": str(args.thresholds), "warnOnly": True, "warnings": run_warnings,
+            "path": str(args.thresholds), "warnOnly": not enforced, "warnings": run_warnings,
+            "enforce": enforced, "failures": run_failures,
+            "enforcementApplied": bool(enforced) and calibration["calibrated"],
             "calibrated": calibration["calibrated"],
             "calibrationProfile": calibration["calibrationProfile"],
             "calibrationRefreshIntervalMS": calibration["calibrationRefreshIntervalMS"],
@@ -689,13 +817,21 @@ def main() -> int:
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not calibration["calibrated"]:
         print(f"  ceilings not applied ({calibration['code']}): {'; '.join(calibration['reasons'])}")
+        if enforced:
+            print(f"  enforced ceilings NOT applied either: {', '.join(enforced)} cannot fail this run")
     for row in scenarios:
-        flag = " !" + ",".join(row["thresholdWarnings"]) if row["thresholdWarnings"] else ""
+        codes = row["thresholdFailures"] + row["thresholdWarnings"]
+        flag = " !" + ",".join(codes) if codes else ""
         print(
             f"  {row['scenario']:20} hitch {row['hitchTimeMSPerS']:>8} ms/s  "
             f"maxGap {row['maxGapMS']:>8} ms  frames {row['framesDelivered']:>6}  "
             f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]{flag}"
         )
+
+    if run_failures:
+        # No evidence manifest: a failed run never reaches the registry.
+        print(f"ui-perf gate FAILED: enforced ceiling breached: {', '.join(run_failures)}", file=sys.stderr)
+        return 1
 
     if args.emit_evidence:
         import publish_benchmark_history as publisher

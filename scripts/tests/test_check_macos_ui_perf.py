@@ -184,6 +184,98 @@ class UIPerfFixture(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(report["thresholds"]["warnings"], ["uiperf.hitch:idle-baseline(50/5)"])
+        self.assertTrue(report["thresholds"]["warnOnly"])
+        self.assertEqual(report["thresholds"]["failures"], [])
+
+    def enforce(self, *names: str, **extra) -> None:
+        """A contract with ceilings on idle-baseline and history-filter that enforces `names`."""
+        self.thresholds.write_text(json.dumps({
+            **self.contract,
+            "hitchCeilingMSPerS": {"idle-baseline": 5.0, "history-filter": 5.0},
+            "maxGapCeilingMS": {"idle-baseline": 40.0, "history-filter": 40.0},
+            "enforce": list(names), **extra,
+        }))
+
+    def run_emitting(self, log: Path) -> tuple[int, dict | None]:
+        live_publisher = sys.modules.get("publish_benchmark_history")
+        if live_publisher is None:
+            import publish_benchmark_history as live_publisher
+        with mock.patch.object(
+            live_publisher, "verify_canonical_hardware", return_value={"profileID": "mac-mini-m6-16gb"}
+        ):
+            return self.run_checker(log, emit=True)
+
+    def test_a_breach_in_an_enforced_scenario_fails_the_run(self):
+        """RF-61, audit T1: the lane can fail on a hitch regression."""
+        self.enforce("history-filter")
+        status, report = self.run_emitting(self.write_run(hitch_by_scenario={"history-filter": 50.0}))
+        self.assertEqual(status, 1)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["evidence"], "local-only")
+        self.assertEqual(report["thresholds"]["failures"], ["uiperf.hitch:history-filter(50/5)"])
+        self.assertEqual(report["thresholds"]["enforce"], ["history-filter"])
+        self.assertFalse(report["thresholds"]["warnOnly"])
+        self.assertTrue(report["thresholds"]["enforcementApplied"])
+        row = next(row for row in report["scenarios"] if row["scenario"] == "history-filter")
+        self.assertEqual(row["thresholdFailures"], ["uiperf.hitch:history-filter(50/5)"])
+        self.assertEqual(row["thresholdWarnings"], [])
+        # A failed run leaves nothing the registry could publish.
+        self.assertFalse((self.root / "benchmark-evidence.json").exists())
+        # The same enforced scenario inside its ceilings passes and emits evidence.
+        status, report = self.run_emitting(self.write_run())
+        self.assertEqual((status, report["status"]), (0, "passed"))
+        self.assertTrue((self.root / "benchmark-evidence.json").is_file())
+
+    def test_a_breach_outside_the_enforce_list_still_only_warns(self):
+        self.enforce("history-filter")
+        status, report = self.run_emitting(self.write_run(hitch_by_scenario={"idle-baseline": 50.0}))
+        self.assertEqual(status, 0)
+        self.assertEqual(report["status"], "passedWithWarnings")
+        self.assertEqual(report["thresholds"]["warnings"], ["uiperf.hitch:idle-baseline(50/5)"])
+        self.assertEqual(report["thresholds"]["failures"], [])
+        self.assertTrue((self.root / "benchmark-evidence.json").is_file())
+        # A ceiling on a scenario that is neither confirmatory nor enforced warns too.
+        self.enforce()
+        status, report = self.run_checker(self.write_run(hitch_by_scenario={"history-filter": 50.0}))
+        self.assertEqual(status, 0)
+        self.assertEqual(report["thresholds"]["warnings"], ["uiperf.hitch:history-filter(50/5)"])
+        row = next(row for row in report["scenarios"] if row["scenario"] == "history-filter")
+        self.assertEqual(row["designation"], "exploratory")
+
+    def test_an_uncalibrated_run_enforces_nothing_and_says_so(self):
+        self.enforce("history-filter", calibrationStale="new driver")
+        status, report = self.run_checker(self.write_run(hitch_by_scenario={"history-filter": 50.0}))
+        self.assertEqual(status, 0)
+        self.assertEqual(report["thresholds"]["failures"], [])
+        self.assertFalse(report["thresholds"]["enforcementApplied"])
+        self.assertEqual(report["thresholds"]["warnings"], ["uiperf.uncalibrated:mac-mini-m6-16gb"])
+
+    def test_enforce_names_only_scenarios_with_ceilings(self):
+        """A scenario enforced without a ceiling would pass every run, so loading refuses it."""
+        self.enforce("history-filter", "idle-baseline")
+        self.assertEqual(
+            checker.enforced_scenarios(checker.load_thresholds(self.thresholds)),
+            ["history-filter", "idle-baseline"],
+        )
+        for enforce, pattern in (
+            (["window-resize"], "without ceilings"),
+            (["no-such-scenario"], "unknown scenarios"),
+            (["idle-baseline", "idle-baseline"], "distinct"),
+            ("idle-baseline", "distinct"),
+        ):
+            self.thresholds.write_text(json.dumps({**self.contract, "enforce": enforce}))
+            with self.subTest(enforce=enforce), self.assertRaisesRegex(checker.GateError, pattern):
+                checker.load_thresholds(self.thresholds)
+        for ceiling in (None, 0, True, "5"):
+            self.thresholds.write_text(json.dumps({
+                **self.contract, "enforce": ["idle-baseline"], "maxGapCeilingMS": {"idle-baseline": ceiling},
+            }))
+            with self.subTest(ceiling=ceiling), self.assertRaisesRegex(checker.GateError, "without ceilings"):
+                checker.load_thresholds(self.thresholds)
+        # The run fails closed on such a contract instead of passing unjudged.
+        self.thresholds.write_text(json.dumps({**self.contract, "enforce": ["window-resize"]}))
+        status, report = self.run_checker(self.write_run())
+        self.assertEqual((status, report), (1, None))
 
     def test_m2_ceilings_on_the_canonical_m6_are_uncalibrated(self):
         """audit #77: M6 runs carry one uncalibrated code, never M2 verdicts."""
@@ -605,6 +697,73 @@ class DerivationTests(unittest.TestCase):
         # A derivation replaces a stale contract with a fresh one.
         self.assertNotIn("calibrationStale", derived)
         self.assertEqual(derived["confirmatoryScenarios"], self.base["confirmatoryScenarios"])
+        self.assertEqual(set(derived["hitchCeilingMSPerS"]), set(self.base["confirmatoryScenarios"]))
+
+    def derive_cli(self, root: Path, *arguments: str, base: dict | None = None) -> tuple[int, Path]:
+        """`--derive-thresholds` over three records that also carry history-filter."""
+        paths = []
+        for index, record in enumerate(v3_records()):
+            record["hardware"]["profileID"] = "mac-mini-m6-16gb"
+            record["takes"].append({"cell": "ui-perf/history-filter", "metrics": {
+                "uiHitchTimeMSPerS": (124.0, 125.0, 126.0)[index], "uiMaxGapMS": (460.0, 465.0, 470.0)[index],
+                "uiRefreshIntervalMS": 16.667,
+            }})
+            path = root / f"{record['run']['id']}.json"
+            path.write_text(json.dumps(record))
+            paths.append(str(path))
+        output = root / "derived.json"
+        thresholds = root / "base.json"
+        thresholds.write_text(json.dumps(base if base is not None else self.base))
+        argv = ["check_macos_ui_perf.py", "--derive-thresholds", *paths, "--thresholds", str(thresholds),
+                "--write", str(output), *arguments]
+        with mock.patch.object(sys, "argv", argv), mock.patch("sys.stderr"):
+            return checker.main(), output
+
+    def test_scenarios_names_the_scenarios_that_get_ceilings(self):
+        """RF-61, audit T1: a ceiling for a scenario outside the confirmatory set."""
+        confirmatory = self.base["confirmatoryScenarios"]
+        with tempfile.TemporaryDirectory() as temporary:
+            status, output = self.derive_cli(
+                Path(temporary), "--scenarios", ",".join([*confirmatory, "history-filter"]))
+            self.assertEqual(status, 0)
+            derived = checker.load_thresholds(output)
+        # median 125, spread 1.6% -> the 1.3x floor -> 162.5; gap 465 x 1.3 -> 604.5 -> 610
+        self.assertEqual(derived["hitchCeilingMSPerS"]["history-filter"], 162.5)
+        self.assertEqual(derived["maxGapCeilingMS"]["history-filter"], 610.0)
+        self.assertEqual(set(derived["hitchCeilingMSPerS"]), {*confirmatory, "history-filter"})
+        self.assertIn("history-filter", derived["derivationInputs"])
+        # The designation and what fails a run carry over unchanged; history-filter stays exploratory.
+        self.assertEqual(derived["confirmatoryScenarios"], confirmatory)
+        self.assertEqual(derived["enforce"], [])
+        self.assertEqual(derived["enforceDescription"], self.base["enforceDescription"])
+        self.assertIn("history-filter", checker.exploratory_scenarios(derived))
+        self.assertIn("Per scenario with a ceiling", derived["basis"])
+
+    def test_scenarios_must_keep_the_contract_loadable(self):
+        confirmatory = self.base["confirmatoryScenarios"]
+        enforcing = {
+            **self.base, "enforce": ["history-filter"],
+            "hitchCeilingMSPerS": {**self.base["hitchCeilingMSPerS"], "history-filter": 162.5},
+            "maxGapCeilingMS": {**self.base["maxGapCeilingMS"], "history-filter": 610.0},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for arguments, base in (
+                (("--scenarios", "history-filter"), None),                         # drops the confirmatory ones
+                (("--scenarios", ",".join([*confirmatory, "no-such"])), None),      # unknown
+                (("--scenarios", ",".join([*confirmatory, confirmatory[0]])), None),  # repeated
+                (("--scenarios", ",".join([*confirmatory, "window-resize"])), None),  # no such take in the records
+                ((), enforcing),                                                    # would drop an enforced ceiling
+            ):
+                with self.subTest(arguments=arguments):
+                    status, output = self.derive_cli(root, *arguments, base=base)
+                    self.assertEqual(status, 1)
+                    self.assertFalse(output.exists())
+            # With the enforced scenario derived, enforcement carries over.
+            status, output = self.derive_cli(
+                root, "--scenarios", ",".join([*confirmatory, "history-filter"]), base=enforcing)
+            self.assertEqual(status, 0)
+            self.assertEqual(checker.load_thresholds(output)["enforce"], ["history-filter"])
 
 
 class ThresholdsContractTests(unittest.TestCase):
@@ -617,18 +776,43 @@ class ThresholdsContractTests(unittest.TestCase):
             "harness-control", "sidebar-navigation-warms",
         })
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]))
+        # RF-61: the field exists and is documented in the contract; nothing is enforced
+        # until the ceilings are re-derived.
+        self.assertEqual(contract["enforce"], [])
+        self.assertIn("enforce", contract["enforceDescription"])
+        self.assertIs(contract["warnOnly"], True)
 
-    def test_contract_with_a_ceiling_for_an_undesignated_scenario_is_refused(self):
+    def test_ceilings_cover_the_confirmatory_scenarios_in_both_maps(self):
+        base = {
+            "schemaVersion": 1, "warnOnly": True,
+            "calibrationProfile": "mac-mini-m6-16gb", "calibrationRefreshIntervalMS": 16.67,
+            "confirmatoryScenarios": ["idle-baseline"],
+        }
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "thresholds.json"
+            for hitch, gap, pattern in (
+                # One map names a scenario the other does not.
+                ({"idle-baseline": 5.0, "window-resize": 5.0}, {"idle-baseline": 40.0}, "same scenarios"),
+                # A confirmatory scenario without ceilings.
+                ({"window-resize": 5.0}, {"window-resize": 40.0}, "every confirmatory"),
+                # A scenario the lane does not run.
+                ({"idle-baseline": 5.0, "no-such": 5.0}, {"idle-baseline": 40.0, "no-such": 40.0}, "known"),
+            ):
+                path.write_text(json.dumps({**base, "hitchCeilingMSPerS": hitch, "maxGapCeilingMS": gap}))
+                with self.subTest(hitch=hitch), self.assertRaisesRegex(checker.GateError, pattern):
+                    checker.load_thresholds(path)
+            # A ceiling on a non-confirmatory scenario is accepted (warn-only unless enforced).
             path.write_text(json.dumps({
-                "schemaVersion": 1, "warnOnly": True,
-                "calibrationProfile": "mac-mini-m6-16gb", "calibrationRefreshIntervalMS": 16.67,
-                "confirmatoryScenarios": ["idle-baseline"],
-                "hitchCeilingMSPerS": {"idle-baseline": 5.0, "window-resize": 5.0},
+                **base, "hitchCeilingMSPerS": {"idle-baseline": 5.0, "window-resize": 5.0},
+                "maxGapCeilingMS": {"idle-baseline": 40.0, "window-resize": 40.0},
+            }))
+            self.assertEqual(checker.enforced_scenarios(checker.load_thresholds(path)), [])
+            # warnOnly stays the declared default posture.
+            path.write_text(json.dumps({
+                **base, "warnOnly": False, "hitchCeilingMSPerS": {"idle-baseline": 5.0},
                 "maxGapCeilingMS": {"idle-baseline": 40.0},
             }))
-            with self.assertRaisesRegex(checker.GateError, "exactly the confirmatory"):
+            with self.assertRaisesRegex(checker.GateError, "unsupported"):
                 checker.load_thresholds(path)
 
 

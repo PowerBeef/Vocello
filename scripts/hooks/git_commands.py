@@ -374,6 +374,97 @@ def _branch_violation(args: list[str]) -> str:
     return ""
 
 
+# Quoted spellings of the directory a command runs in or of the checkout's root.
+TREE_ROOT_WORDS = ("$PWD", "${PWD}", "$(pwd)", "$CLAUDE_PROJECT_DIR", "${CLAUDE_PROJECT_DIR}",
+                   "$VOCELLO_PROJECT_ROOT", "${VOCELLO_PROJECT_ROOT}", "$(git rev-parse --show-toplevel)")
+ADD_VALUE_OPTIONS = ("--chmod", "--pathspec-from-file")
+STASH_READS = {"list", "show"}
+
+
+def _whole_tree_pathspec(path: str, directory: Path | None) -> bool:
+    """Whether a pathspec names the directory the command runs in, one above it or the whole
+    tree (`.`, `./`, `..`, `:/`, `:(top)`, `*`, `"$PWD"`, an exclusion such as `:!docs`) rather
+    than a file or a directory below. A computed path (`"$file"`) cannot be judged and is not one."""
+    spec = path
+    if spec.startswith(":("):
+        magic, _, spec = spec[2:].partition(")")
+        if any(word.strip() == "exclude" for word in magic.split(",")):
+            return True                               # everything but the named paths
+    elif spec.startswith(":"):
+        spec = spec[1:]
+        while spec[:1] in ("/", "!", "^"):
+            if spec[0] != "/":
+                return True                           # `:!path`, `:^path`: everything but it
+            spec = spec[1:]
+        spec = spec[1:] if spec.startswith(":") else spec     # the optional end of the short magic
+    for word in TREE_ROOT_WORDS:
+        if spec == word or spec.startswith(word + "/"):
+            spec = "." + spec[len(word):]
+            break
+    if "$" in spec or "`" in spec:
+        return False
+    parts = [part for part in spec.split("/") if part not in ("", ".")]
+    if not spec.startswith(("/", "~")) and all(part in ("*", "**", "..") for part in parts):
+        return True                                   # the directory itself, a parent, or every entry
+    if directory is None:
+        return False
+    here = directory.resolve()
+    resolved = _resolve(here, spec)
+    return resolved is not None and (resolved == here or resolved in here.parents)
+
+
+def _add_violation(invocation: GitInvocation) -> str:
+    """Why a `git add` stages more than named paths, wherever the flag or the pathspec stands."""
+    args = invocation.args
+    index, only_paths = 0, False
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if only_paths or not argument.startswith("-") or argument == "-":
+            if _whole_tree_pathspec(argument, invocation.directory):
+                return f"`git add {argument}` stages a whole tree, not named files"
+        elif argument == "--":
+            only_paths = True
+        elif argument.startswith("--"):
+            broad = _long(argument, "--all", "--no-ignore-removal", "--update")
+            if broad:
+                return f"`git add {broad}` stages every {'tracked ' if broad == '--update' else ''}change"
+            if _long(argument, *ADD_VALUE_OPTIONS) and "=" not in argument:
+                index += 1                            # the option's value, not a pathspec
+        elif re.fullmatch(r"-[A-Za-z]+", argument):   # no short option of `git add` takes a value
+            if "A" in argument:
+                return "`git add -A` stages every change"
+            if "u" in argument:
+                return "`git add -u` stages every tracked change"
+    return ""
+
+
+def _commit_takes_all(args: list[str]) -> bool:
+    """`git commit -a`/`--all`, alone or in a cluster (`-am`, `-qa`); an option's value is not a flag."""
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if argument == "--":
+            break
+        if argument.startswith("--"):
+            if argument == "--all":
+                return True
+            if _long(argument, *COMMIT_VALUE_OPTIONS) and "=" not in argument:
+                index += 1
+        elif argument.startswith("-") and len(argument) > 1:
+            for position, letter in enumerate(argument[1:], 1):
+                if letter == "a":
+                    return True
+                if letter in "Su":
+                    break                             # `-S<keyid>`, `-u<mode>`: the rest is a value
+                if letter in COMMIT_VALUE_SHORT:
+                    if position == len(argument) - 1:
+                        index += 1                    # the value is the next word
+                    break
+    return False
+
+
 def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
     """(category, reason) for a git invocation the repository forbids, else ("", "")."""
     sub, args = invocation.subcommand, invocation.args
@@ -384,6 +475,19 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
         return "config", f"`{invocation.config_env}` injects git configuration"
     if "$" in sub or "`" in sub:
         return "push", "the git subcommand is computed at run time"
+    # Staging and stashing (CLAUDE.md: stage explicit paths, never stash or broadly stage). The
+    # permission rules deny the literal prefixes; these catch every other spelling (`git add -- .`,
+    # `git add -v -A`, `git commit -m x -a`, `git -C . stash`).
+    if sub in ADD_COMMANDS:
+        reason = _add_violation(invocation)
+        if reason:
+            return "staging", reason
+    elif sub == "stash":
+        if not args or args[0] not in STASH_READS:
+            return "staging", (f"`git stash{' ' + args[0] if args else ''}` changes the stash, which every "
+                               "worktree and session shares; only `git stash list` and `git stash show` read it")
+    elif sub == "commit" and _commit_takes_all(args):
+        return "staging", "`git commit -a` records every tracked change, not the files staged by name"
     if sub in ("push", "send-pack") or (sub == "subtree" and "push" in args):
         reason = _push_violation(args if sub == "push" else ["origin", *args])
         if sub == "push" and any("$" in a or "`" in a for a in args if not a.startswith("-")):

@@ -962,6 +962,100 @@ class PolicyGuardTests(unittest.TestCase):
                                 capture_output=True, check=False, timeout=20)
         self.assertEqual(result.returncode, 0)
 
+    STAGING_RULE = "never stash or broadly stage"
+
+    def test_broad_staging_is_refused_wherever_the_flag_or_the_pathspec_stands(self):
+        # B7: the permission rules deny literal prefixes (`git add -A*`, `git add .`), which
+        # `git add -- .`, `git add :/` and `git add -v -A` do not match.
+        refused = (
+            "git add -A", "git add --all", "git add .", "git add -u", "git add --update",
+            "git add -- .", "git add ./", "git add :/", "git add -v -A", "git add -vA", "git add -f -u scripts",
+            "git add scripts/x.py -A", "git add scripts/x.py .", "git add --al", "git add --upd",
+            "git add --no-ignore-removal", "git add ':(top)'", "git add ':!docs'", "git add ':(exclude)docs' .",
+            "git add '*'", "git add ./*", "git add ..", 'git add "$PWD"', 'git add "$(pwd)"',
+            'git add "$CLAUDE_PROJECT_DIR"', f'git add "{ROOT}"', "git stage -A", "git -C . add -A",
+            "git -c color.ui=never add .", "bash -c 'git add -A'", "git status && git add .",
+            "cd scripts && git add ..", "cd scripts && git add .", "sh <<'EOF'\ngit add -A\nEOF\n",
+        )
+        for command, result in run_all(self.guard, refused):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(self.STAGING_RULE, result.stderr)
+                self.assertIn("git add <path>", result.stderr)
+
+    def test_stash_is_refused_in_every_spelling_but_its_reads(self):
+        refused = ("git stash", "git -C . stash", "git stash -u", "git stash --include-untracked",
+                   "git stash push -u -m tag", "git stash save wip", "git stash pop", "git stash apply abc1234",
+                   "git stash drop stash@{0}", "git stash clear", "git stash create", "git stash store abc1234",
+                   "git stash branch topic", "git -c color.ui=never stash", "bash -lc 'git stash'",
+                   "git status; git stash pop", "git stash -- scripts/x.py")
+        for command, result in run_all(self.guard, refused):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(self.STAGING_RULE, result.stderr)
+        allowed = ("git stash list", "git stash list --format=%H", "git stash show", "git stash show -p stash@{0}",
+                   "git -C . stash list", "git log --grep=stash", 'rg -n "git stash pop" docs')
+        for command, result in run_all(self.guard, allowed):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_commit_all_is_refused_alone_or_in_a_cluster(self):
+        commit = "com" "mit"
+        refused = (f"git {commit} -a", f"git {commit} -a -m x", f"git {commit} -m x -a", f"git {commit} -am x",
+                   f"git {commit} -qam x", f"git {commit} -vam x", f"git {commit} --all -m x",
+                   f"git {commit} -m x --all", f"git -C . {commit} -a -m x", f"git -c x=y {commit} -a -m x",
+                   f'git {commit} -m "subject\n\nbody" -a', f"git add scripts/x.py && git {commit} -am x")
+        for command, result in run_all(self.guard, refused):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(self.STAGING_RULE, result.stderr)
+
+    def test_named_paths_and_plain_commits_are_still_allowed(self):
+        commit = "com" "mit"
+        allowed = (
+            "git add path/to/file", "git add -- a b", f'git {commit} -m "x"',
+            "git add scripts/hooks/git_commands.py scripts/tests/test_agent_hooks.py", "git add scripts",
+            "git add ./scripts/x.py", "git add :/scripts/x.py", "git add -N new.py", "git add -f out/evidence.json",
+            "git add -p scripts/x.py", "git add -n scripts/x.py", "git add --chmod=+x scripts/x.sh",
+            "git add --chmod +x scripts/x.sh", "git add -- -A", "git add scripts/*.py", 'git add "$file"',
+            "git add scripts/x.py && git status", f"git add a.py b.py && git {commit} -q -F - <<'EOF'\nmsg\nEOF",
+            # An option's value is not a flag, and a message is text.
+            f'git {commit} -m "fix: handle -a flag"', f"git {commit} -qm -a", f"git {commit} -Spatrice -m x",
+            f"git {commit} -uno -m x", f"git {commit} --amend --no-edit", f"git {commit} --allow-empty -m x",
+            f"git {commit} --author 'A <a@example.invalid>' -m x", f"git {commit} -m x -- notes.md",
+            f"git {commit} -F - <<'EOF'\nnever git add -A, git {commit} -a or git stash pop\nEOF\n",
+            "cat > notes.md <<'EOF'\ngit add -A\ngit stash\nEOF\n", "git diff --stat", "git add --help",
+        )
+        for command, result in run_all(self.guard, allowed):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_command_a_parser_cannot_read_is_refused_not_allowed(self):
+        # B7: the three policy checks used to ignore a parser exception and let the command through.
+        defect = "\n\ndef {name}(*_args, **_kwargs):\n    raise RuntimeError('parser defect')\n"
+        for name, check in (("join_quoted_newlines", "Simulator"),
+                            ("_without_redirections", "build-output and project-file"),
+                            ("git_invocations", "git")):
+            with self.subTest(parser=name), tempfile.TemporaryDirectory(prefix="vocello parser hooks ") as tmp:
+                root = Path(tmp).resolve()
+                hooks = fixture_hooks(root)
+                payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": str(root),
+                                      "tool_input": {"command": "ls -la scripts"}})
+
+                def guard():
+                    return subprocess.run(["bash", str(hooks / "policy_guard.sh")], input=payload, text=True,
+                                          capture_output=True, cwd=root, timeout=20,
+                                          env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(root)))
+
+                self.assertEqual(guard().returncode, 0)          # the copied hooks read the command
+                with (hooks / "git_commands.py").open("a", encoding="utf-8") as module:
+                    module.write(defect.format(name=name))
+                result = guard()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"BLOCKED — the {check} check could not parse this command", result.stderr)
+                self.assertIn("parser defect", result.stderr)
+                self.assertNotIn("ignored", result.stderr)
+
 
 
 class CommitLintTests(unittest.TestCase):
@@ -1237,6 +1331,106 @@ class ReviewTrailerLintTests(unittest.TestCase):
                                     capture_output=True, cwd=root, timeout=20)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotIn("advisory", result.stdout + result.stderr)
+
+
+class FreezeSubjectLintTests(unittest.TestCase):
+    """While the roadmap records a freeze, a subject that names no item of the focus plan is warned
+    about before the commit exists (B11); `roadmap.py validate` rejects it afterwards."""
+
+    repo = CommitLintTests.repo
+    lint = CommitLintTests.lint
+    advice = ReviewTrailerLintTests.advice
+    COMMIT = "git com" "mit"
+
+    def committed(self, root: Path, *, freeze: bool = True) -> None:
+        self.repo(root)
+        (root / "config").mkdir()
+        lock = {"plan": "release-first", "freeze": {"commit": "a" * 40}} if freeze else {"plan": "release-first"}
+        (root / "config/roadmap.json").write_text(json.dumps({"focusLock": lock, "items": [
+            {"id": "RF-61", "plan": "release-first"}, {"id": "BKL-12", "plan": "backlog"}]}))
+        (root / "config/roadmap-archive.json").write_text(json.dumps({"items": [
+            {"id": "ASR-04", "plan": "release-first", "legacyIds": ["F-05"]}, {"id": "DW-01", "plan": "tooling"}]}))
+        (root / "named.txt").write_text("fix: the gate finds its Python (RF-61)\n\nbody\n")
+        (root / "plain.txt").write_text("fix: the gate finds its Python\n\nThe body mentions RF-61.\n")
+        subprocess.run(["git", "-C", str(root), "add", "config", "named.txt", "plain.txt"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"], check=True)
+        (root / "notes.md").write_text("ok\n")
+        subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+
+    def test_a_subject_that_names_an_item_of_the_focus_plan_gets_no_warning(self):
+        commit = self.COMMIT
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            for command in (f"{commit} -m 'fix: x (RF-61)'", f"{commit} -m 'fix: RF-61 x'",
+                            f"{commit} -m 'docs: x (ASR-04)'", f"{commit} -m 'docs: x (F-05)'",
+                            f"{commit} -m 'fix: x (BKL-12, RF-61)'", f"{commit} -qm 'fix: x (RF-61)' -m body",
+                            f"{commit} -q -F - <<'EOF'\nfix: x (RF-61)\n\nbody\nEOF",
+                            f'{commit} -m "$(cat <<\'EOF\'\nfix: x (RF-61)\n\nbody\nEOF\n)"',
+                            f"{commit} -F named.txt", f"{commit} --amend -m 'fix: x (RF-61)'"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.advice(root, command), "")
+
+    def test_a_subject_without_one_is_warned_about_not_blocked(self):
+        commit = self.COMMIT
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            for command in (f"{commit} -m 'fix: x'", f"{commit} -m 'fix: x' -m 'The body mentions RF-61.'",
+                            f'{commit} -m "fix: x\n\nThe body mentions RF-61."', f"{commit} -m 'fix: RF-611 x'",
+                            f"{commit} -q -F - <<'EOF'\nfix: x\n\nThe body mentions RF-61.\nEOF",
+                            f'{commit} -m "$(cat <<\'EOF\'\nfix: x\n\nThe body mentions RF-61.\nEOF\n)"',
+                            f"{commit} -F plain.txt", f"{commit} --amend -m 'fix: x'"):
+                with self.subTest(command=command):
+                    advice = self.advice(root, command)
+                    self.assertIn("names no item of the focus plan (release-first)", advice)
+                    self.assertIn("roadmap.py validate", advice)
+                    self.assertIn("Nothing is blocked", advice)
+            # An item of another plan does not satisfy the rule, and the warning says which one it read.
+            for subject, named in (("fix: x (BKL-12)", "BKL-12"), ("fix: x (DW-01)", "DW-01")):
+                with self.subTest(subject=subject):
+                    advice = self.advice(root, f"{commit} -m '{subject}'")
+                    self.assertIn(f"`{subject}`", advice)
+                    self.assertIn(f"It names {named}, which is not of that plan.", advice)
+
+    def test_an_unreadable_subject_or_a_checkout_without_a_freeze_says_nothing(self):
+        commit = self.COMMIT
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            for command in (commit, f'{commit} -m "$MESSAGE"', f'{commit} -m "$(git log -1 --format=%s)"',
+                            f"{commit} --amend --no-edit", f"{commit} -C HEAD", f"{commit} --fixup HEAD",
+                            f"{commit} -F missing.txt", f"printf x | {commit} -F -", "git status"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.advice(root, command), "")
+            result = subprocess.run(["bash", str(fixture_hooks(root) / "commit_lint.sh"), "--staged"], text=True,
+                                    capture_output=True, cwd=root, timeout=20)
+            self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root, freeze=False)
+            self.assertEqual(self.advice(root, f"{commit} -m 'fix: x'"), "")
+            (root / "config/roadmap.json").write_text("not JSON")
+            self.assertEqual(self.advice(root, f"{commit} -m 'fix: x'"), "")
+
+    def test_both_advisories_arrive_as_one_hook_answer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.committed(root)
+            engine = root / ReviewTrailerLintTests.ENGINE
+            engine.parent.mkdir(parents=True)
+            engine.write_text("struct A {}\n")
+            subprocess.run(["git", "-C", str(root), "add", ReviewTrailerLintTests.ENGINE], check=True)
+            advice = self.advice(root, f"{self.COMMIT} -m 'fix: x'")
+            self.assertIn(f"`{ReviewTrailerLintTests.TRAILER}`", advice)
+            self.assertIn("names no item of the focus plan", advice)
+            self.assertEqual(len(advice.splitlines()), 2)
+
+    def test_the_recorded_freeze_has_the_shape_the_advisory_reads(self):
+        roadmap = json.loads((ROOT / "config/roadmap.json").read_text(encoding="utf-8"))
+        lock = roadmap["focusLock"]
+        self.assertRegex(lock["freeze"]["commit"], r"^[0-9a-f]{40}$")
+        self.assertTrue(any(item.get("plan") == lock["plan"] for item in roadmap["items"]))
 
 
 class WorktreeCommitLintTests(unittest.TestCase):

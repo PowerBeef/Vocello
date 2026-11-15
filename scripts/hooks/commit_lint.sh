@@ -21,12 +21,16 @@
 # checked on the working tree's changed and untracked files. It finishes in
 # seconds and never builds or tests anything: CI on push is the gate.
 #
-# One check only advises. A commit that records behaviour-bearing Swift sources
-# (Sources/QwenVoiceCore, Sources/iOS, Sources/Services, Sources/ViewModels,
-# Packages/*/Sources) while its message lacks the `Reviewed-by:
-# vocello-swift-review` trailer gets a warning as the hook's additionalContext,
-# never a block. A message the hook cannot read (an editor, a substitution, a
-# parser error) skips the warning.
+# Two checks only advise: each returns a warning as the hook's additionalContext,
+# never a block, and a message the hook cannot read (an editor, a substitution, a
+# parser error) skips it.
+#   * A commit that records behaviour-bearing Swift sources (Sources/QwenVoiceCore,
+#     Sources/iOS, Sources/Services, Sources/ViewModels, Packages/*/Sources) while
+#     its message lacks the `Reviewed-by: vocello-swift-review` trailer.
+#   * While config/roadmap.json records a freeze (`focusLock.freeze`), a commit
+#     whose subject names no item of the focus plan, as in `... (RF-61)`. It is the
+#     rule `roadmap.py validate` applies to every commit after the freeze commit,
+#     said before the commit exists instead of after (audit B11).
 
 set -euo pipefail
 
@@ -65,12 +69,19 @@ review_sources() {
   } 2>/dev/null | grep -E "$REVIEW_SOURCES" | sort -u || true
 }
 
-# Whether the commit messages carry the review trailer: `present`, `absent` (every
-# message is readable and lacks it) or `unknown`; any error is `unknown`. A message
-# is read from the command text (-m, a heredoc, --trailer), an -F file, the commit
-# that -C/-c reuses or, for --amend without a new message, HEAD.
-review_trailer_state() {
-  REVIEW_PAYLOAD="$payload" python3 - "$HOOK_DIR" <<'PY' 2>/dev/null || echo unknown
+# Reads the commit messages in the command, for the two advisory checks.
+#
+# `trailer` prints whether the messages carry the review trailer: `present`,
+# `absent` (every message is readable and lacks it) or `unknown`; any error is
+# `unknown`. A message is read from the command text (-m, a heredoc, --trailer), an
+# -F file, the commit that -C/-c reuses or, for --amend without a new message, HEAD.
+#
+# `freeze` prints one advisory line per commit whose subject names no item of the
+# focus plan while the checkout's config/roadmap.json records a freeze, and nothing
+# for a subject it cannot read (an editor, a computed or reused message, a fixup),
+# a checkout without a recorded freeze, or any error.
+commit_message_query() {
+  REVIEW_PAYLOAD="$payload" python3 - "$HOOK_DIR" "$1" <<'PY' 2>/dev/null
 import json
 import os
 from pathlib import Path
@@ -178,23 +189,109 @@ def state():
     return "absent"
 
 
+ITEM_ID = re.compile(r"\b[A-Z][A-Z0-9]*-[0-9]+\b")
+
+
+def subject(invocation, bodies):
+    """(subject line, whether it is fully readable) of a commit, or None when the command does
+    not carry the message: an editor, a reused or amended message, a fixup."""
+    text = None
+    for option, value in options(invocation.args):
+        if option in ("--fixup", "--squash", "--reuse-message", "--reedit-message"):
+            return None
+        if option == "--message":
+            # `-m "$(cat <<'EOF' ...)"` keeps its body in the one heredoc of the command.
+            # The tokenizer turned the newlines of a quoted message into spaces, so the blank line
+            # that ends the subject reads as two or more of them.
+            text = ((bodies[0] if len(bodies) == 1 else None) if "<<HEREDOC" in value
+                    else re.split(r"\s{2,}", value.strip())[0])
+            break
+        if option == "--file":
+            text = ((bodies[0] if len(bodies) == 1 else None) if value == "-"
+                    else file_message(invocation.directory, value))
+            break
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    return lines[0], not ("$" in lines[0] or "`" in lines[0] or "SUBST" in lines[0])
+
+
+def focus_plan(top):
+    """(plan, its item ids) when the checkout's roadmap records a freeze, else None. The ids are
+    the ones `roadmap.py validate` accepts: the plan's open and archived items and their legacy ids."""
+    try:
+        data = json.loads((top / "config/roadmap.json").read_text(encoding="utf-8"))
+        lock = data["focusLock"]
+        if not isinstance(lock["freeze"], dict) or not lock["freeze"].get("commit"):
+            return None
+        items = list(data.get("items") or [])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    try:
+        archive = json.loads((top / "config/roadmap-archive.json").read_text(encoding="utf-8"))
+        items += list(archive.get("items") or [])
+    except (OSError, ValueError, AttributeError, TypeError):
+        pass
+    ids = set()
+    for item in items:
+        if isinstance(item, dict) and item.get("plan") == lock.get("plan") and item.get("id"):
+            ids.add(str(item["id"]))
+            ids.update(str(legacy) for legacy in item.get("legacyIds") or [])
+    return str(lock.get("plan")), ids
+
+
+def freeze_advice():
+    payload = json.loads(os.environ["REVIEW_PAYLOAD"])
+    command = payload["tool_input"]["command"]
+    bodies = [body for _, body in git_commands.strip_heredocs(command)[1]]
+    cwd = Path(payload.get("cwd") or os.getcwd())
+    for invocation in git_commands.git_invocations(command, cwd):
+        if invocation.subcommand != "commit" or invocation.directory is None:
+            continue
+        read = subject(invocation, bodies)
+        if read is None:
+            continue
+        line, readable = read
+        result = subprocess.run(["git", "-C", str(invocation.directory), "rev-parse", "--show-toplevel"],
+                                capture_output=True, text=True, timeout=5, check=False)
+        plan = focus_plan(Path(result.stdout.strip())) if result.returncode == 0 else None
+        if plan is None or not plan[1]:
+            continue
+        named = set(ITEM_ID.findall(line))
+        if named & plan[1] or not readable:
+            continue
+        other = (f" It names {', '.join(sorted(named))}, which {'is' if len(named) == 1 else 'are'} not of "
+                 "that plan." if named else "")
+        shown = line if len(line) <= 80 else line[:77] + "..."
+        yield (f"commit lint: advisory — the subject `{shown}` names no item of the focus plan "
+               f"({plan[0]}).{other} Since the freeze every commit names one, as in `... (RF-61)`, and "
+               "`python3 scripts/roadmap.py validate` fails on a commit that does not. Add the release item "
+               "the change belongs to. Nothing is blocked.")
+
+
 try:
-    print(state())
+    if sys.argv[2] == "trailer":
+        print(state())
+    else:
+        for advice in freeze_advice():
+            print(advice)
 except Exception:  # noqa: BLE001 - the advice is optional; a parser defect never blocks a commit
-    print("unknown")
+    if sys.argv[2] == "trailer":
+        print("unknown")
 PY
 }
 
-# The advisory, as PreToolUse additionalContext on stdout and as text on stderr.
+review_trailer_state() {
+  commit_message_query trailer || echo unknown
+}
+
+# The Swift review advisory's text.
 review_advice() {
   local more=""
   if (( $2 > 1 )); then
     more=" and $(( $2 - 1 )) more"
   fi
-  local text="commit lint: advisory — this commit changes behaviour-bearing Swift ($1$more) but its message has no \`$REVIEW_TRAILER\` trailer. Run the vocello-swift-review agent on the diff, test-adequacy checks included, and record the review with \`git commit --trailer '$REVIEW_TRAILER'\`. Nothing is blocked."
-  echo "$text" >&2
-  REVIEW_TEXT="$text" python3 -c 'import json, os; print(json.dumps({"hookSpecificOutput": {
-    "hookEventName": "PreToolUse", "additionalContext": os.environ["REVIEW_TEXT"]}}))' 2>/dev/null || true
+  echo "commit lint: advisory — this commit changes behaviour-bearing Swift ($1$more) but its message has no \`$REVIEW_TRAILER\` trailer. Run the vocello-swift-review agent on the diff, test-adequacy checks included, and record the review with \`git commit --trailer '$REVIEW_TRAILER'\`. Nothing is blocked."
 }
 
 actions="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" git-actions)" \
@@ -312,8 +409,21 @@ while IFS= read -r line; do
 done <<< "$actions"
 
 # Advisory only: every block above has passed, and nothing here changes the exit status.
+# The advice goes out as text on stderr and as one PreToolUse additionalContext on stdout.
+advice=()
 if (( ${#reviewed_sources[@]} > 0 )) && [[ "$(review_trailer_state)" == absent ]]; then
-  review_advice "${reviewed_sources[0]}" "${#reviewed_sources[@]}"
+  advice+=("$(review_advice "${reviewed_sources[0]}" "${#reviewed_sources[@]}")")
+fi
+while IFS= read -r line; do
+  if [[ -n "$line" ]]; then
+    advice+=("$line")
+  fi
+done <<<"$(commit_message_query freeze || true)"
+if (( ${#advice[@]} > 0 )); then
+  text="$(printf '%s\n' "${advice[@]}")"
+  echo "$text" >&2
+  ADVICE_TEXT="$text" python3 -c 'import json, os; print(json.dumps({"hookSpecificOutput": {
+    "hookEventName": "PreToolUse", "additionalContext": os.environ["ADVICE_TEXT"]}}))' 2>/dev/null || true
 fi
 
 exit 0

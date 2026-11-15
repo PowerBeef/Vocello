@@ -423,21 +423,33 @@ def simulator_policy(command: str, depth: int = 0) -> str:
 
 
 def git_policy(payload: dict, root: Path) -> str:
-    """`category<TAB>reason` for the first forbidden git invocation, else empty."""
+    """`category<TAB>reason` for the first forbidden git invocation, else empty. A parser
+    defect raises: the caller refuses the command (`parser_failure`)."""
     cwd = Path(payload.get("cwd") or root)
     tool_input = payload.get("tool_input", {})
     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
     if not isinstance(command, str):
         return ""
-    try:
-        invocations = git_commands.git_invocations(command, cwd if cwd.is_absolute() else root)
-        for invocation in invocations:
-            category, reason = git_commands.policy_violation(invocation)
-            if category:
-                return f"{category}\t{reason}"
-    except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
-        print(f"policy guard: git parser error ignored: {error!r}", file=sys.stderr)
+    for invocation in git_commands.git_invocations(command, cwd if cwd.is_absolute() else root):
+        category, reason = git_commands.policy_violation(invocation)
+        if category:
+            return f"{category}\t{reason}"
     return ""
+
+
+def parser_failure(parser: str, error: Exception) -> int:
+    """A policy check that cannot read a command refuses it (exit 2, the reason on stderr).
+
+    Until 2026-11-15 the three policy checks ignored a parser exception and allowed the
+    command, so a spelling that broke the parser also passed the guard (audit B7).
+    policy_guard.sh runs under `set -e`: the failed substitution ends the hook with this
+    status and Claude Code shows the text. Only the command the parser cannot read is refused."""
+    print(f"policy guard: BLOCKED — the {parser} check could not parse this command ({error!r}), so it "
+          "cannot be judged against the repository rules.", file=sys.stderr)
+    print("Run it in a simpler form: one command per call, without nested quoting or substitutions. If a "
+          "plain command is refused, the parser has a defect; report it instead of working around the guard.",
+          file=sys.stderr)
+    return 2
 
 
 def main() -> int:
@@ -471,7 +483,10 @@ def main() -> int:
             for line in git_actions(payload, root):
                 print(line)
         elif mode == "git-policy":
-            violation = git_policy(payload, root)
+            try:
+                violation = git_policy(payload, root)
+            except Exception as error:  # noqa: BLE001 - an unreadable command is refused, not allowed
+                return parser_failure("git", error)
             if violation:
                 print(violation)
         else:
@@ -483,18 +498,16 @@ def main() -> int:
                 cwd = Path(payload.get("cwd") or root)
                 try:
                     violation = file_policy(command, cwd if cwd.is_absolute() else root, root)
-                except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
-                    print(f"policy guard: file parser error ignored: {error!r}", file=sys.stderr)
-                    violation = ""
+                except Exception as error:  # noqa: BLE001 - an unreadable command is refused, not allowed
+                    return parser_failure("build-output and project-file", error)
                 if violation:
                     print(violation)
                 return 0
             if mode == "simulator-policy":
                 try:
                     violation = simulator_policy(command)
-                except Exception as error:  # noqa: BLE001 - a parser defect must not block every Bash call
-                    print(f"policy guard: simulator parser error ignored: {error!r}", file=sys.stderr)
-                    violation = ""
+                except Exception as error:  # noqa: BLE001 - an unreadable command is refused, not allowed
+                    return parser_failure("Simulator", error)
                 if violation:
                     print(violation)
                 return 0

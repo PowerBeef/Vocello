@@ -11,13 +11,18 @@
 #     worktrees, and ref rewrites (Main is the only published branch; agent
 #     worktrees come only from Claude Code Agent isolation, EnterWorktree or a
 #     desktop app session)
+#   * broad staging (`git add -A`, `-u`, `.`, `:/`), `git commit -a` and every
+#     `git stash` but `list` and `show`, in any spelling (stage explicit paths,
+#     never stash or broadly stage)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
 #
 # Everything else exits 0 immediately. The Simulator and cache checks judge each
 # simple command's words in agent_hook_input.py, git commands are tokenized by
 # git_commands.py, and the pbxproj check is bash pattern matching (patterns live
 # in variables so macOS bash 3.2 parses them). It finishes in milliseconds and
-# never runs git, xcodebuild or python beyond parsing stdin.
+# never runs git, xcodebuild or python beyond parsing stdin. A command one of
+# the three parsers cannot read is refused (agent_hook_input.py exits 2 with the
+# reason, and `set -e` ends this hook with that status), never allowed unjudged.
 #
 # agent_hook_input.py assembles the unsupported-destination words from fragments,
 # so no hook contains the literal strings that scripts/repo_invariants.sh rejects
@@ -75,6 +80,9 @@ if [[ -n "$git_violation" ]]; then
     push|config)
       block "$reason; only main is ever pushed (CLAUDE.md: Main is the only published branch)." \
         "Integrate agent branches into main locally, then push main; release tags are maintainer-run, and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
+    staging)
+      block "$reason (CLAUDE.md: stage explicit paths, never stash or broadly stage)." \
+        "Stage the assigned files by name (git add <path> ...) and commit the index; set work aside with a commit on the branch, never the stash." ;;
     *)
       block "$reason (CLAUDE.md: Main is the only published branch)." \
         "Work on main, or use a Claude Code agent worktree (Agent isolation, EnterWorktree or a desktop app session); the lead integrates it." ;;

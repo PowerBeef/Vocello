@@ -2697,29 +2697,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         }
     }
 
-    func generateCustomVoiceStream(
-        text _: String,
-        language _: String,
-        speaker _: String,
-        instruct _: String?,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        customVoiceProfile _: String?,
-        streamStepEvalPolicy _: String?,
-        generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error> {
-        capture(
-            generationParameters,
-            samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
-        )
-        return fixtureStream()
-    }
-
     func generateCustomVoice(
         text _: String,
         language _: String,
@@ -2819,27 +2796,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         _ = isolation
     }
 
-    func generateVoiceDesignStream(
-        text _: String,
-        language _: String,
-        voiceDescription _: String,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        streamStepEvalPolicy _: String?,
-        generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error> {
-        capture(
-            generationParameters,
-            samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
-        )
-        return fixtureStream()
-    }
-
     func generateVoiceDesign(
         text _: String,
         language _: String,
@@ -2928,27 +2884,6 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         isolation: isolated (any Actor)?
     ) async throws {
         _ = isolation
-    }
-
-    func generateVoiceCloneStream(
-        text _: String,
-        language _: String,
-        voiceClonePrompt _: Qwen3TTSVoiceClonePrompt,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        streamStepEvalPolicy _: String?,
-        generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error> {
-        capture(
-            generationParameters,
-            samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
-        )
-        return fixtureStream()
     }
 
     func generateVoiceClone(

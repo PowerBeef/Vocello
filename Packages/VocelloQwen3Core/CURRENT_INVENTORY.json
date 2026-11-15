@@ -328,7 +328,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift",
-      "sha256": "5e1b5cd6f70fce49649f8d51800d3cb5538b800293d696866014fb36dee3340d",
+      "sha256": "65a5f6898d04712d805cc8c3728efa222f08b96ac3454f9b605d2ec2fc1a6600",
       "upstreamStatus": "added"
     }
   ],

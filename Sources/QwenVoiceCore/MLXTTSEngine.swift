@@ -572,6 +572,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private let idleUnloadDelayOverride: Double?
     private let allocatorControl: NativeMLXAllocatorControl
     private var isInitialized = false
+    /// Counts `stop()` calls. `stop()` resets the published state without
+    /// waiting for a load or warm in flight, so one that was suspended across
+    /// it resumes on an engine it no longer owns. It compares the value it
+    /// started with (`wasStopped(since:)`) after each suspension and publishes
+    /// nothing when a stop came in between. A count, not `isInitialized`,
+    /// because the engine may have been initialized again meanwhile.
+    private var stopGeneration: UInt64 = 0
     private var appSupportDirectoryURL: URL?
     private var voicesDirectory: URL?
     private var preparedVoiceRepository: PreparedVoiceRepository?
@@ -862,6 +869,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             await runtime.stop()
         }
         isInitialized = false
+        stopGeneration &+= 1
         appSupportDirectoryURL = nil
         diagnosticAppSupportBox.url = nil
         voicesDirectory = nil
@@ -1062,8 +1070,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     public func loadModel(id: String) async throws {
         try ensureInitialized()
+        let startedIn = stopGeneration
         let operationID = try await beginUserModelOperation(.explicitLoad)
         defer { finishModelOperation(id: operationID) }
+        // The wait for the operation slot may have spanned a `stop()`.
+        guard !wasStopped(since: startedIn) else { throw CancellationError() }
         cancelIdleUnload()
         do {
             loadState = .starting
@@ -1072,19 +1083,24 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 id: id,
                 capabilityProfile: loadCapabilityProfile(forModelID: id)
             )
+            guard !wasStopped(since: startedIn) else { throw CancellationError() }
             loadState = .loaded(modelID: id)
             // A load of the model already resident keeps its primed reference.
             if clonePreparationState.phase == .primed {
                 await reconcilePrimedClonePreparationWithRuntime()
+                guard !wasStopped(since: startedIn) else { throw CancellationError() }
             } else {
                 clonePreparationState = .idle
             }
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
-            await settleCancelledModelOperation()
+            await settleCancelledModelOperation(startedIn: startedIn)
             throw CancellationError()
         } catch {
+            // A load that failed after `stop()` reset the engine publishes no
+            // failure on it.
+            guard !wasStopped(since: startedIn) else { throw error }
             // No silent Quality→Speed downgrade: a model load that fails
             // (including an 8-bit allocation failure on a memory-constrained
             // Mac) surfaces the real error. "Quality" always means the 8-bit
@@ -1116,18 +1132,24 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         guard let operationID = beginProactiveModelOperation(.proactiveLoad) else { return }
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
+        let startedIn = stopGeneration
         do {
             applyMemoryPolicyIfKnown(modelID: id, isBatch: false)
             _ = try await runtime.loadModel(
                 id: id,
                 capabilityProfile: loadCapabilityProfile(forModelID: id)
             )
+            // `stop()` reset the engine while the load was suspended: the
+            // stopped engine must not show the model as loaded.
+            guard !wasStopped(since: startedIn) else { return }
             loadState = .loaded(modelID: id)
             await reconcilePrimedClonePreparationWithRuntime()
+            guard !wasStopped(since: startedIn) else { return }
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
-            await settleCancelledModelOperation()
+            await settleCancelledModelOperation(startedIn: startedIn)
         } catch {
+            guard !wasStopped(since: startedIn) else { return }
             handle(error)
             await reconcilePrimedClonePreparationWithRuntime()
             await scheduleIdleUnloadAfterFailure()
@@ -1140,6 +1162,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         guard let operationID = beginProactiveModelOperation(.proactivePrewarm) else { return }
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
+        let startedIn = stopGeneration
         do {
             try ensureInitialized()
             let previousLoadState = loadState
@@ -1148,13 +1171,18 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 loadState = .starting
             }
             _ = try await runtime.prepareInteractiveReadiness(for: request)
+            // `stop()` reset the engine while the warm was suspended: the
+            // stopped engine must not show the model as loaded.
+            guard !wasStopped(since: startedIn) else { return }
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
             await reconcilePrimedClonePreparationWithRuntime()
+            guard !wasStopped(since: startedIn) else { return }
             scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
         } catch let error where Self.isModelOperationCancellation(error) {
-            await settleCancelledModelOperation()
+            await settleCancelledModelOperation(startedIn: startedIn)
         } catch {
+            guard !wasStopped(since: startedIn) else { return }
             handle(error)
             await scheduleIdleUnloadAfterFailure()
         }
@@ -1177,6 +1205,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         guard let operationID = beginProactiveModelOperation(.proactivePrewarm) else { return nil }
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
+        let startedIn = stopGeneration
         do {
             try ensureInitialized()
             let previousLoadState = loadState
@@ -1188,9 +1217,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 for: request,
                 customPrewarmDepth: customPrewarmDepth
             )
+            // `stop()` reset the engine while the warm was suspended: the
+            // stopped engine must not show the model as loaded.
+            guard !wasStopped(since: startedIn) else { return nil }
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
             await reconcilePrimedClonePreparationWithRuntime()
+            guard !wasStopped(since: startedIn) else { return diagnostics }
             scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
             return diagnostics
         } catch {
@@ -1204,9 +1237,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // (AUD-10). A failure published meanwhile keeps its resident
             // weights' idle unload (PA-32); any other state this warm did not
             // publish (`stop()` reset it meanwhile) is left alone.
+            guard !wasStopped(since: startedIn) else { return nil }
             switch loadState {
             case .starting, .loaded:
-                await settleCancelledModelOperation()
+                await settleCancelledModelOperation(startedIn: startedIn)
             case .failed:
                 await scheduleIdleUnloadAfterFailure()
             case .idle, .running:
@@ -1830,8 +1864,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// superseded it owns the outcome. The published state is re-derived from
     /// what the runtime still holds, and a model still resident gets back the
     /// idle unload the operation cancelled.
-    private func settleCancelledModelOperation() async {
-        if let modelID = await runtime.loadedModelID() {
+    ///
+    /// `startedIn` is the `stopGeneration` the operation began in. Nothing is
+    /// published when `stop()` reset the engine since then, or while this asks
+    /// the runtime what it holds: the runtime may still report the model until
+    /// the stop's own cleanup has unloaded it.
+    private func settleCancelledModelOperation(startedIn: UInt64? = nil) async {
+        let startedIn = startedIn ?? stopGeneration
+        let residentModelID = await runtime.loadedModelID()
+        guard !wasStopped(since: startedIn) else { return }
+        if let modelID = residentModelID {
             loadState = .loaded(modelID: modelID)
             await reconcilePrimedClonePreparationWithRuntime()
             scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
@@ -2501,6 +2543,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         guard isInitialized else {
             throw MLXTTSEngineError.notInitialized
         }
+    }
+
+    /// Whether `stop()` ran since `generation` was read from `stopGeneration`.
+    private func wasStopped(since generation: UInt64) -> Bool {
+        stopGeneration != generation
     }
 
     private func handle(_ error: Error) {

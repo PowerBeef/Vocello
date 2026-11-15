@@ -1053,6 +1053,34 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         }
     }
 
+    /// `stop()` resets the published state without waiting for a warm in
+    /// flight. The warm's load then returns and the warm ends cancelled; it
+    /// used to settle from the runtime, which still reports the model the
+    /// load brought in whenever the stop's own cleanup has not unloaded it
+    /// yet, and so published `.loaded` on the stopped engine. It now publishes
+    /// nothing.
+    @MainActor
+    func testAWarmSuspendedAcrossStopPublishesNothing() async throws {
+        try await withResidentEngine(resident: "pro_custom", warmRequests: .holdBodyLoad) { engine, coordinator, published in
+            let warm = Task { @MainActor in
+                await engine.prewarmModelIfNeeded(for: Self.customWarmRequest())
+            }
+            await waitUntilBodyLoadIsHeld(by: coordinator)
+
+            engine.stop()
+            XCTAssertEqual(engine.loadState, .idle, "stop resets the published state")
+            let publishedAtStop = published.states
+
+            warm.cancel()
+            await coordinator.releaseHeldLoad()
+            await warm.value
+
+            XCTAssertEqual(engine.loadState, .idle, "a stopped engine shows no model")
+            XCTAssertNil(engine.visibleErrorMessage, "a stopped engine shows no failure")
+            XCTAssertEqual(published.states, publishedAtStop, "nothing is published after stop")
+        }
+    }
+
     /// Returns once `coordinator` holds the operation's load; fails, rather
     /// than hangs, when the operation never reaches it.
     @MainActor

@@ -63,6 +63,28 @@ final class AtomicWAVPublicationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: stagingURL.path))
     }
 
+    /// The staged WAV is closed and synchronized before anything validates
+    /// it. When it cannot be reopened for that, finalization throws instead
+    /// of handing back a path whose bytes were never committed, and nothing
+    /// is published.
+    func testFinishStagingThrowsWhenTheStagedFileCannotBeSynchronized() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-unsynced-wav-\(UUID().uuidString)", isDirectory: true)
+        let output = directory.appendingPathComponent("take.wav")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writer = try IncrementalPCM16WAVFileWriter(sampleRate: 24_000, outputURL: output)
+        try writer.append(pcmSamples: Array(repeating: Int16(500), count: 480))
+
+        let staged = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        XCTAssertEqual(staged.count, 1, "only the hidden staging file exists before publication")
+        try FileManager.default.removeItem(at: XCTUnwrap(staged.first))
+
+        XCTAssertThrowsError(try writer.finishStaging())
+        XCTAssertThrowsError(try writer.publish(), "a staging file that was never finalized is not published")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+    }
+
     func testPersistedWAVQCReadsWrittenFramesAndRetainsPreWriteInstability() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-persisted-qc-\(UUID().uuidString)", isDirectory: true)

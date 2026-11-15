@@ -683,7 +683,15 @@ private enum AtomicFilePublisher {
             .appendingPathComponent(temporaryName)
     }
 
-    static func publishAtomically(temporaryURL: URL, finalURL: URL) throws {
+    /// `synchronizingDirectory` also commits the directory entry the rename
+    /// wrote, so a published take survives a power loss. The final WAV asks
+    /// for it; a streaming preview chunk, written many times a take and
+    /// replayable from the final WAV, does not.
+    static func publishAtomically(
+        temporaryURL: URL,
+        finalURL: URL,
+        synchronizingDirectory: Bool = false
+    ) throws {
         // Same-directory staging guarantees one filesystem. rename is the
         // single commit point: replace-or-create without an existence TOCTOU
         // window. A failed publication leaves the previous destination intact.
@@ -695,6 +703,23 @@ private enum AtomicFilePublisher {
             }
         }
         guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        if synchronizingDirectory {
+            synchronizeDirectory(containing: finalURL)
+        }
+    }
+
+    /// Best effort. The rename is the commit point and has already happened,
+    /// so a directory that cannot be opened or synchronized never turns a
+    /// published file into a failed publication.
+    private static func synchronizeDirectory(containing url: URL) {
+        let directory = url.deletingLastPathComponent()
+        let descriptor = unsafe directory.withUnsafeFileSystemRepresentation { path in
+            guard let path = unsafe path else { return Int32(-1) }
+            return unsafe Darwin.open(path, O_RDONLY | O_CLOEXEC)
+        }
+        guard descriptor >= 0 else { return }
+        fsync(descriptor)
+        close(descriptor)
     }
 }
 
@@ -804,7 +829,8 @@ enum AtomicPCM16WAVWriter {
             }
             try AtomicFilePublisher.publishAtomically(
                 temporaryURL: temporaryURL,
-                finalURL: outputURL
+                finalURL: outputURL,
+                synchronizingDirectory: true
             )
         }()
     }
@@ -1368,10 +1394,10 @@ private final class PCM16ChunkFileWriter {
             try? FileManager.default.removeItem(at: temporaryURL)
         }
 
-        // Hold AVAudioFile in a narrow scope so ARC guarantees its deinit
-        // fires at the closing brace. AVAudioFile writes the final WAV/RIFF
-        // `data`-chunk size field on deinit, not on write(from:), so this
-        // deterministic teardown is the first half of correct finalization.
+        // AVAudioFile writes the final WAV/RIFF `data`-chunk size field when
+        // the file is closed, not on write(from:). Close it explicitly, so
+        // finalization does not depend on when the object is released; the
+        // narrow scope still releases it at the closing brace.
         do {
             let file = try AVAudioFile(
                 forWriting: temporaryURL,
@@ -1379,6 +1405,7 @@ private final class PCM16ChunkFileWriter {
                 commonFormat: format.commonFormat,
                 interleaved: format.isInterleaved
             )
+            defer { file.close() }
             try file.write(from: buffer)
         }
         // Force the kernel to commit the completed WAV so independent
@@ -1483,6 +1510,11 @@ final class IncrementalPCM16WAVFileWriter {
 
     /// Closes and synchronizes the staged WAV without making it visible at the
     /// destination. The converged adapter validates this exact file first.
+    ///
+    /// The file is closed explicitly, which is when AVAudioFile writes the
+    /// RIFF sizes, and a staged file that cannot be reopened or synchronized
+    /// throws: the take then fails with the I/O error instead of a Fast QC
+    /// refusal of whatever reached the disk.
     @discardableResult
     func finishStaging() throws -> URL {
         if stagingFinalized { return temporaryURL }
@@ -1490,18 +1522,25 @@ final class IncrementalPCM16WAVFileWriter {
             "Native Final WAV AVAudioFile Finalize",
             "\(self.signpostCorrelation.message, privacy: .public)"
         )
+        defer {
+            NativeStreamingSignposts.signposter.endInterval(
+                "Native Final WAV AVAudioFile Finalize",
+                finalizeSignpost,
+                "\(self.signpostCorrelation.message, privacy: .public)"
+            )
+        }
         reusableBuffer = nil
+        file?.close()
         file = nil
-        if let handle = try? FileHandle(forWritingTo: temporaryURL) {
-            try? handle.synchronize()
+        let handle = try FileHandle(forWritingTo: temporaryURL)
+        do {
+            try handle.synchronize()
+            try handle.close()
+        } catch {
             try? handle.close()
+            throw error
         }
         stagingFinalized = true
-        NativeStreamingSignposts.signposter.endInterval(
-            "Native Final WAV AVAudioFile Finalize",
-            finalizeSignpost,
-            "\(self.signpostCorrelation.message, privacy: .public)"
-        )
         return temporaryURL
     }
 
@@ -1515,13 +1554,15 @@ final class IncrementalPCM16WAVFileWriter {
         try Task.checkCancellation()
         try AtomicFilePublisher.publishAtomically(
             temporaryURL: temporaryURL,
-            finalURL: finalURL
+            finalURL: finalURL,
+            synchronizingDirectory: true
         )
         published = true
     }
 
     func discard() {
         reusableBuffer = nil
+        file?.close()
         file = nil
         stagingFinalized = true
         try? FileManager.default.removeItem(at: temporaryURL)

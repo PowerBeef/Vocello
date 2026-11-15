@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import Synchronization
+import System
 import XCTest
 @testable import VocelloCLICore
 
@@ -135,6 +136,68 @@ final class CLIContractTests: XCTestCase {
         XCTAssertFalse(classify(Unknown.fixture).message.isEmpty)
         XCTAssertEqual(CLIFailure.rowCode(for: Unknown.fixture), .generationFailed, "a row names the take failing")
         XCTAssertEqual(CLIFailure.rowCode(for: TTSEngineError.modelUnavailable("x")), .modelNotInstalled)
+    }
+
+    /// Audit C8: a full volume is `storage_full` (exit 74), whichever error carries it, and
+    /// `models install` refuses a download the volume cannot hold before fetching a byte.
+    func testAFullVolumeIsStorageFullBeforeAndDuringADownload() throws {
+        let noSpace = NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))
+        XCTAssertEqual(CLIFailure.classify(noSpace).code, .storageFull)
+        XCTAssertEqual(CLIFailure.classify(noSpace).exitCode, 74)
+        XCTAssertEqual(CLIFailure.classify(NSError(domain: NSPOSIXErrorDomain, code: Int(EDQUOT))).code, .storageFull)
+        XCTAssertEqual(CLIFailure.classify(Errno.noSpace).code, .storageFull)
+        XCTAssertEqual(CLIFailure.classify(Errno.noSuchFileOrDirectory).code, .internalError)
+        // A transfer that could not write its file wraps the volume's error.
+        let transfer = NSError(
+            domain: NSURLErrorDomain, code: NSURLErrorCannotWriteToFile, userInfo: [NSUnderlyingErrorKey: noSpace]
+        )
+        XCTAssertEqual(CLIFailure.classify(transfer).code, .storageFull)
+        for underlying in [noSpace, transfer, CocoaError(.fileWriteOutOfSpace) as NSError] {
+            let failed = CLIFailure.classify(
+                HuggingFaceDownloader.DownloadError.fileDownloadFailed(path: "a/b", underlying: underlying)
+            )
+            XCTAssertEqual(failed.code, .storageFull, underlying.domain)
+            XCTAssertNotNil(failed.hint)
+        }
+        XCTAssertEqual(
+            CLIFailure.classify(HuggingFaceDownloader.DownloadError.fileDownloadFailed(
+                path: "a/b", underlying: NSError(domain: NSPOSIXErrorDomain, code: Int(EIO))
+            )).code,
+            .downloadFailed, "any other write failure stays a failed download"
+        )
+
+        let gigabyte: Int64 = 1 << 30
+        XCTAssertNoThrow(try CLIStoragePreflight.ensureRoom(forFetching: 2 * gigabyte, availableBytes: 3 * gigabyte))
+        XCTAssertNoThrow(
+            try CLIStoragePreflight.ensureRoom(forFetching: 2 * gigabyte, availableBytes: nil),
+            "an unknown capacity refuses nothing"
+        )
+        XCTAssertNoThrow(try CLIStoragePreflight.ensureRoom(forFetching: 0, availableBytes: 0), "nothing left to fetch")
+        XCTAssertThrowsError(
+            try CLIStoragePreflight.ensureRoom(forFetching: 2 * gigabyte, availableBytes: 2 * gigabyte)
+        ) { error in
+            let refusal = error as? CLIError
+            XCTAssertEqual(refusal?.code, .storageFull)
+            XCTAssertEqual(
+                refusal?.detail?["requiredBytes"], .string(String(2 * gigabyte + CLIStoragePreflight.marginBytes))
+            )
+            XCTAssertEqual(refusal?.detail?["availableBytes"], .string(String(2 * gigabyte)))
+        }
+
+        // A resumed download needs room only for what its kept staging does not hold yet.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CLIStoragePreflight-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let target = root.appendingPathComponent("models/fixture-model", isDirectory: true)
+        let staging = root.appendingPathComponent("models/.qwenvoice-downloads/fixture-model/partials", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 4_000, targetDirectory: target), 4_000)
+        try Data(count: 1_000).write(to: staging.appendingPathComponent("weights.partial"))
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 4_000, targetDirectory: target), 3_000)
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 500, targetDirectory: target), 0)
+        XCTAssertNotNil(
+            CLIStoragePreflight.availableBytes(near: target), "read at the nearest folder that exists"
+        )
     }
 
     func testPresenterWritesExactlyOneEnvelopeInJSONAndNothingInText() throws {

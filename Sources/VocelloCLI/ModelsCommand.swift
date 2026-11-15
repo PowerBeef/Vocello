@@ -394,6 +394,13 @@ enum ModelsCommand {
         let delivery = try await Task.detached(priority: .utility) { @concurrent in
             try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
         }.value
+        // Refused before any byte is fetched when the volume cannot hold the download.
+        try CLIStoragePreflight.ensureRoom(
+            forFetching: CLIStoragePreflight.bytesStillToFetch(
+                planBytes: delivery.filesToDownload.reduce(0) { $0 + $1.size }, targetDirectory: targetDir
+            ),
+            availableBytes: CLIStoragePreflight.availableBytes(near: modelsDirectory)
+        )
         note("Installing \(modelID) from \(artifact.repo) (revision \(artifact.revision.prefix(7))\u{2026})")
         if delivery.reusedVerifiedComponent {
             noteVerbose("  reusing verified shared speech tokenizer (\(humanBytes(delivery.reusedComponentBytes)))")

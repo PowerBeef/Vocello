@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import System
 
 /// The contract's error object: `{code, category, exitCode, message, retryable,
 /// retryAfterMs, hint, detail}`. Every key is always present; absent values are null.
@@ -101,6 +102,11 @@ public enum CLIFailure {
         if let download = error as? HuggingFaceDownloader.DownloadError {
             return classify(download, signal: signal)
         }
+        // Before the network and file classes: a transfer or a write that ran out
+        // of room carries the volume's error under another one.
+        if isStorageFull(error) {
+            return CLIErrorObject(code: .storageFull, message: message(of: error), hint: storageFullHint)
+        }
         if error is DeliveryInstructionCellError || error is SpokenTextPlanningError || error is LongFormPlanningError {
             return CLIErrorObject(code: .invalidInput, message: message(of: error))
         }
@@ -140,8 +146,6 @@ public enum CLIFailure {
             switch CocoaError.Code(rawValue: cocoa.code) {
             case .fileReadNoSuchFile, .fileNoSuchFile:
                 return CLIErrorObject(code: .inputFileNotFound, message: message(of: error))
-            case .fileWriteOutOfSpace:
-                return CLIErrorObject(code: .storageFull, message: message(of: error))
             default:
                 if CocoaError.Code(rawValue: cocoa.code).isFileError {
                     return CLIErrorObject(code: .ioError, message: message(of: error))
@@ -158,6 +162,21 @@ public enum CLIFailure {
         return code == .internalError ? .generationFailed : code
     }
 
+    static let storageFullHint = "free some space on the volume, then retry"
+
+    /// Whether `error`, or an error under it, says the volume is full: Cocoa's
+    /// out-of-space code, or ENOSPC or EDQUOT as a POSIX error or a System `Errno`.
+    static func isStorageFull(_ error: any Error, depth: Int = 0) -> Bool {
+        if let posix = error as? Errno {
+            return posix.rawValue == ENOSPC || posix.rawValue == EDQUOT
+        }
+        let cocoa = error as NSError
+        if cocoa.domain == NSCocoaErrorDomain, cocoa.code == NSFileWriteOutOfSpaceError { return true }
+        if cocoa.domain == NSPOSIXErrorDomain, cocoa.code == Int(ENOSPC) || cocoa.code == Int(EDQUOT) { return true }
+        guard depth < 4, let underlying = cocoa.userInfo[NSUnderlyingErrorKey] as? NSError else { return false }
+        return isStorageFull(underlying, depth: depth + 1)
+    }
+
     static func cancellation(signal: Int32?) -> CLIErrorObject {
         let signal = signal ?? SIGINT
         let name = signal == SIGTERM ? "SIGTERM" : signal == SIGINT ? "SIGINT" : "signal \(signal)"
@@ -171,6 +190,11 @@ public enum CLIFailure {
 
     private static func classify(_ error: HuggingFaceDownloader.DownloadError, signal: Int32?) -> CLIErrorObject {
         let text = message(of: error)
+        // A full volume, read as the apps read it (the cause under a failed file, or
+        // the failure's own words), is not a failed download: retrying cannot help.
+        if ModelUpdateFailure.classify(error) == .space {
+            return CLIErrorObject(code: .storageFull, message: text, hint: storageFullHint)
+        }
         switch error {
         case .cancelled:
             return cancellation(signal: signal)

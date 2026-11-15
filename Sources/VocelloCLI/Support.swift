@@ -155,6 +155,50 @@ public func directorySize(_ url: URL) -> Int64 {
     return total
 }
 
+/// A download's free-space check, made before any byte is fetched, so a volume
+/// that cannot hold it is refused as `storage_full` instead of failing partway.
+public enum CLIStoragePreflight {
+    /// Room kept free beyond the bytes themselves.
+    public static let marginBytes: Int64 = 256 * 1_024 * 1_024
+
+    /// Refuses a download of `bytesToFetch` the volume cannot hold. A download
+    /// lands in staging beside the model store and moves into place by a
+    /// rename, so it needs its own bytes plus the margin. An unknown capacity
+    /// (`availableBytes` nil) refuses nothing.
+    public static func ensureRoom(forFetching bytesToFetch: Int64, availableBytes: Int64?) throws {
+        guard bytesToFetch > 0, let availableBytes else { return }
+        let needed = bytesToFetch + marginBytes
+        guard availableBytes < needed else { return }
+        throw CLIError(
+            .storageFull,
+            "not enough free space: the download needs \(humanBytes(needed)) free and the volume has \(humanBytes(availableBytes))",
+            hint: CLIFailure.storageFullHint,
+            detail: ["requiredBytes": .string(String(needed)), "availableBytes": .string(String(availableBytes))]
+        )
+    }
+
+    /// The bytes a download into `targetDirectory` still has to fetch: the
+    /// plan's, less what an earlier attempt's kept staging already holds
+    /// (`.qwenvoice-downloads/<folder>` beside the model folders,
+    /// `docs/reference/model-delivery.md`), which a resumed download reuses.
+    public static func bytesStillToFetch(planBytes: Int64, targetDirectory: URL) -> Int64 {
+        let staging = targetDirectory.deletingLastPathComponent()
+            .appendingPathComponent(".qwenvoice-downloads", isDirectory: true)
+            .appendingPathComponent(targetDirectory.lastPathComponent, isDirectory: true)
+        return max(0, planBytes - directorySize(staging))
+    }
+
+    /// The space available on the volume that holds `url`, read at the nearest
+    /// folder that exists (a first install's model folder does not yet).
+    public static func availableBytes(near url: URL) -> Int64? {
+        var probe = url.standardizedFileURL
+        while !FileManager.default.fileExists(atPath: probe.path), probe.path != "/" {
+            probe = probe.deletingLastPathComponent()
+        }
+        return ModelDeliverySpace.availableBytes(at: probe)
+    }
+}
+
 /// Human-readable byte size (e.g. "1.7 GB").
 public func humanBytes(_ bytes: Int64) -> String {
     let fmt = ByteCountFormatter()

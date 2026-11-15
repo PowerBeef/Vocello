@@ -678,10 +678,14 @@ exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any diff
 
 Shows each model's install state, on-disk size, and (for `status`) any missing required files.
 `install` uses the same `HuggingFaceDownloader` as the macOS app: a CLI-installed model is
-immediately usable in the app, and vice versa. The variant-scoped ids are `pro_custom_speed`,
-`pro_design_speed` and `pro_clone_speed`: each mode's one model, the hybrid, keeps the `speed` id,
-and no `…_quality` id exists since RF-59. `generate --variant quality` warns `variant_retired` and
-uses that model. Foreground sessions are invalidated on every terminal path;
+immediately usable in the app, and vice versa. Before it fetches anything, `install` checks the free
+space on the model store's volume: it needs the bytes still to download (the plan's, less what an
+earlier attempt's kept staging already holds) plus 256 MB, and with less it fails with `storage_full`
+(74), naming `detail.requiredBytes` and `detail.availableBytes` as decimal strings. A volume that
+fills during a download is `storage_full` too, not `download_failed`. The variant-scoped ids are
+`pro_custom_speed`, `pro_design_speed` and `pro_clone_speed`: each mode's one model, the hybrid,
+keeps the `speed` id, and no `…_quality` id exists since RF-59. `generate --variant quality` warns
+`variant_retired` and uses that model. Foreground sessions are invalidated on every terminal path;
 durable staging precedes terminal continuation, bounded progress retains the exact final count,
 transient retries preserve valid staging, explicit cancellation discards it, and compact local
 metrics are bounded under `diagnostics/model-downloads/`. See

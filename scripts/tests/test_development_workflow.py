@@ -447,6 +447,41 @@ class CommandRunnerTests(unittest.TestCase):
                 MODULE.run_commands([MODULE.PYTEST])
             run.assert_not_called()
 
+    def test_website_check_needs_playwright_browsers_before_it_runs(self) -> None:
+        # B5: without the browser builds the step used to fail last, after lint, tests and build.
+        calls: list[list[str]] = []
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0)
+
+        with tempfile.TemporaryDirectory(prefix="vocello playwright ") as directory:
+            cache = Path(directory) / "ms-playwright"
+            for name in ("chromium-1217", "ffmpeg-1011"):
+                (cache / name).mkdir(parents=True)
+            with mock.patch.dict(MODULE.os.environ, {"PLAYWRIGHT_BROWSERS_PATH": str(cache)}), \
+                    mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run), redirect_stdout(io.StringIO()):
+                with self.assertRaises(MODULE.WorkflowError) as raised:
+                    MODULE.run_commands([["true"], list(MODULE.WEBSITE_CHECK), ["true"]])
+                self.assertEqual(calls, [["true"]])
+                message = str(raised.exception)
+                self.assertIn(f"missing from {cache}: chromium headless shell, webkit.", message)
+                self.assertIn("`npm --prefix website exec playwright install chromium webkit`", message)
+                self.assertIn("needs the maintainer's word", message)
+                self.assertIn("nothing was installed", message)
+
+                for name in ("chromium_headless_shell-1217", "webkit-2227"):
+                    (cache / name).mkdir()
+                calls.clear()
+                MODULE.run_commands([list(MODULE.WEBSITE_CHECK), ["true"]])
+                self.assertEqual(calls, [["npm", "--prefix", "website", "run", "check"], ["true"]])
+
+    def test_the_planned_and_the_ci_website_step_are_the_guarded_command(self) -> None:
+        with mock.patch.object(MODULE, "project_generation_status", return_value=None):
+            plan = MODULE.check_plan(["website/src/App.tsx"])
+        self.assertIn(MODULE.WEBSITE_CHECK, plan["commands"])
+        self.assertIn(MODULE.WEBSITE_CHECK, MODULE.CI_COMMANDS)
+
     def test_ci_commands_mirror_the_push_workflow(self) -> None:
         joined = [" ".join(command) for command in MODULE.CI_COMMANDS]
         for expected in (

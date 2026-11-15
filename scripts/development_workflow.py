@@ -444,6 +444,12 @@ def builds_cli(paths: list[str]) -> bool:
     return any(p.startswith(CLI_LINKED_SOURCES) or p == "project.yml" for p in paths)
 
 
+# The website's lint, tests, build and browser tests. The last part drives Playwright's
+# Chromium and WebKit builds, which `npm ci` does not download: run_commands looks for
+# them first, so a host without them is told what to install instead of failing after
+# the lint, the unit tests and the build have already run (audit B5).
+WEBSITE_CHECK = ["npm", "--prefix", "website", "run", "check"]
+
 LINEAGE_IDENTITY = "scripts/lib/lineage_identity.py"
 
 
@@ -482,7 +488,7 @@ def check_plan(paths: list[str], *, scoped: bool = False) -> dict:
     if lanes["ios"]:
         commands.append(["./scripts/build_foundation_targets.sh", "ios", "--incremental"])
     if lanes["website"]:
-        commands.append(["npm", "--prefix", "website", "run", "check"])
+        commands.append(list(WEBSITE_CHECK))
     bundles = ui_bundle_mode(paths)
     if bundles:
         commands.append(["./scripts/build_ui_test_bundles.sh", bundles])
@@ -509,7 +515,7 @@ CI_COMMANDS: list[list[str]] = [
     # After both deterministic builds, in their arenas: only the UI-test targets compile.
     ["./scripts/build_ui_test_bundles.sh", "all", "--gate"],
     ["python3", "scripts/supply_chain_contract.py", "--installed", "website"],
-    ["npm", "--prefix", "website", "run", "check"],
+    WEBSITE_CHECK,
 ]
 
 REGEN_COMMANDS: list[list[str]] = [
@@ -538,6 +544,14 @@ def run_commands(commands: list[list[str]]) -> None:
             if problems:
                 raise WorkflowError("selected Python test dependencies: " + "; ".join(problems)
                                     + ". Select an installed environment with VOCELLO_PYTHON; no packages were installed")
+        if command == WEBSITE_CHECK:
+            browsers = _load("scripts/workflow_diagnostics.py").playwright_browsers(ROOT)
+            if browsers["missing"]:
+                raise WorkflowError(
+                    f"the website check's browser tests need Playwright's {', '.join(browsers['present'])} "
+                    f"builds; missing from {browsers['cache']}: {', '.join(browsers['missing'])}. Install them "
+                    f"with `{browsers['installCommand']}` ({browsers['installNote']}); the step was not run "
+                    "and nothing was installed")
         completed = subprocess.run(command, cwd=ROOT, check=False)
         elapsed = time.monotonic() - command_started
         print(f"==> [dev] completed in {elapsed:.1f}s (exit {completed.returncode})", flush=True)

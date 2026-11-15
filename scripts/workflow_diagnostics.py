@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,50 @@ def python_dependency_problems(root: Path = ROOT) -> list[str]:
         elif entry["matchesPin"] is not True:
             problems.append(f"{name} {entry['version'] or 'unknown'} (required {entry['pinnedVersion']})")
     return problems
+
+
+# The website's browser tests (website/playwright.config.mjs) drive headless Chromium and
+# WebKit. `playwright install chromium webkit` leaves one directory per build in the
+# browser cache; the values below are the prefixes of those directories.
+PLAYWRIGHT_BROWSERS = {"chromium": "chromium-", "chromium headless shell": "chromium_headless_shell-",
+                       "webkit": "webkit-"}
+PLAYWRIGHT_INSTALL = "npm --prefix website exec playwright install chromium webkit"
+
+
+def playwright_browser_cache(root: Path = ROOT, environ: Mapping[str, str] | None = None,
+                             home: Path | None = None) -> Path:
+    """Where Playwright keeps its browser builds: PLAYWRIGHT_BROWSERS_PATH, else the platform cache."""
+    environ = os.environ if environ is None else environ
+    override = environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if override == "0":  # Playwright's hermetic install, inside the package
+        return root / "website/node_modules/playwright-core/.local-browsers"
+    if override:
+        return Path(override).expanduser()
+    home = Path.home() if home is None else home
+    if sys.platform == "darwin":
+        return home / "Library/Caches/ms-playwright"
+    if sys.platform == "win32":
+        return Path(environ.get("LOCALAPPDATA") or home / "AppData/Local") / "ms-playwright"
+    return Path(environ.get("XDG_CACHE_HOME") or home / ".cache") / "ms-playwright"
+
+
+def playwright_browsers(root: Path = ROOT, environ: Mapping[str, str] | None = None,
+                        home: Path | None = None) -> dict:
+    """Whether the browser builds `npm --prefix website run check` needs are installed.
+
+    Lists one directory and starts nothing. Presence only: a build left behind by another
+    Playwright version still counts, and Playwright names the revision it wants in that case."""
+    cache = playwright_browser_cache(root, environ, home)
+    try:
+        entries = sorted(entry.name for entry in cache.iterdir() if entry.is_dir())
+    except OSError:
+        entries = []
+    present = {name: any(entry.startswith(prefix) for entry in entries)
+               for name, prefix in PLAYWRIGHT_BROWSERS.items()}
+    missing = [name for name, found in present.items() if not found]
+    return {"cache": os.fspath(cache), "present": present, "missing": missing, "available": not missing,
+            "installCommand": PLAYWRIGHT_INSTALL,
+            "installNote": "a download: it needs the maintainer's word"}
 
 
 def doctor(root: Path = ROOT) -> dict:
@@ -129,6 +174,7 @@ def doctor(root: Path = ROOT) -> dict:
                            "hookActivationNote": "A fresh Claude Code session must confirm hook activation (/hooks and the SessionStart output); file presence is insufficient.",
                            "mcpAvailability": "session-only; inspect exposed tools in the active Claude Code session"},
             "axiomHelpers": helpers,
+            "websiteBrowsers": playwright_browsers(root),
             "notes": ["No installations, downloads, package resolution, native builds or device probes were performed.",
                       "Optional plugins and helpers never replace repository checks or their native lock."]}
 
@@ -382,6 +428,13 @@ def print_report(report: dict) -> None:
             detail = entry["version"] or ("present; version unknown" if entry["available"] else "missing")
             pin = f" (pin: {entry['pinnedVersion']})" if entry["pinnedVersion"] else ""
             print(f"Python {name}: {detail}{pin}")
+        browsers = report["websiteBrowsers"]
+        if browsers["available"]:
+            print(f"Playwright browsers: {', '.join(browsers['present'])} present (npm --prefix website run check)")
+        else:
+            print(f"Playwright browsers: missing {', '.join(browsers['missing'])} in {browsers['cache']}; "
+                  f"npm --prefix website run check cannot run its browser tests. Install: "
+                  f"{browsers['installCommand']} ({browsers['installNote']})")
         print(f"Claude Code hooks: {'configured' if report['claudeCode']['hooksConfigured'] else 'missing'}; activation unconfirmed")
         print(report["claudeCode"]["hookActivationNote"])
         print(f"MCP availability: {report['claudeCode']['mcpAvailability']}")

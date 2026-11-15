@@ -347,6 +347,69 @@ class DoctorTests(unittest.TestCase):
             self.assertEqual(helper["helpProbeStatus"], "usage-nonzero")
             self.assertEqual(helper["helpProbeExitCode"], 1)
 
+    def test_playwright_browser_cache_follows_the_override_then_the_platform(self):
+        root, home = Path("/repository"), Path("/home/someone")
+        for platform, environ, expected in (
+                ("darwin", {}, home / "Library/Caches/ms-playwright"),
+                ("linux", {}, home / ".cache/ms-playwright"),
+                ("linux", {"XDG_CACHE_HOME": "/cache"}, Path("/cache/ms-playwright")),
+                ("darwin", {"PLAYWRIGHT_BROWSERS_PATH": "/elsewhere/browsers"}, Path("/elsewhere/browsers")),
+                ("darwin", {"PLAYWRIGHT_BROWSERS_PATH": "0"},
+                 root / "website/node_modules/playwright-core/.local-browsers")):
+            with self.subTest(platform=platform, environ=environ), mock.patch.object(MODULE.sys, "platform", platform):
+                self.assertEqual(MODULE.playwright_browser_cache(root, environ, home), expected)
+
+    def test_playwright_browsers_are_found_by_their_cache_directories(self):
+        with tempfile.TemporaryDirectory(prefix="vocello playwright ") as directory:
+            cache = Path(directory) / "ms-playwright"
+            environ = {"PLAYWRIGHT_BROWSERS_PATH": str(cache)}
+            report = MODULE.playwright_browsers(Path(directory), environ)
+            self.assertEqual(report["missing"], ["chromium", "chromium headless shell", "webkit"])  # no cache at all
+            self.assertFalse(report["available"])
+            self.assertEqual(report["cache"], str(cache))
+            self.assertEqual(report["installCommand"], "npm --prefix website exec playwright install chromium webkit")
+            self.assertIn("maintainer's word", report["installNote"])
+            # The headless shell is its own build, a file is not a build, other tools do not count.
+            (cache / "chromium_headless_shell-1217").mkdir(parents=True)
+            (cache / "ffmpeg-1011").mkdir()
+            (cache / "webkit-2227").write_text("")
+            report = MODULE.playwright_browsers(Path(directory), environ)
+            self.assertEqual(report["present"], {"chromium": False, "chromium headless shell": True, "webkit": False})
+            (cache / "webkit-2227").unlink()
+            for name in ("chromium-1217", "webkit-2227"):
+                (cache / name).mkdir()
+            report = MODULE.playwright_browsers(Path(directory), environ)
+            self.assertEqual(report["missing"], [])
+            self.assertTrue(report["available"])
+
+    def test_doctor_reports_the_website_browsers_as_a_capability_line(self):
+        with tempfile.TemporaryDirectory(prefix="vocello doctor ") as directory:
+            root = Path(directory)
+            cache = root / "ms-playwright"
+            (cache / "chromium-1217").mkdir(parents=True)
+
+            def lines():
+                with mock.patch.object(MODULE.shutil, "which", return_value=None), \
+                        mock.patch.object(MODULE.Path, "home", return_value=root), \
+                        mock.patch.dict(MODULE.os.environ, {"PLAYWRIGHT_BROWSERS_PATH": str(cache)}), \
+                        redirect_stdout(io.StringIO()) as stream:
+                    report = MODULE.doctor(root)
+                    MODULE.print_report(report)
+                return report, [line for line in stream.getvalue().splitlines() if line.startswith("Playwright")]
+
+            report, printed = lines()
+            self.assertEqual(report["websiteBrowsers"]["missing"], ["chromium headless shell", "webkit"])
+            self.assertEqual(len(printed), 1)
+            self.assertIn("missing chromium headless shell, webkit", printed[0])
+            self.assertIn("npm --prefix website exec playwright install chromium webkit", printed[0])
+            self.assertIn("maintainer's word", printed[0])
+            for name in ("chromium_headless_shell-1217", "webkit-2227"):
+                (cache / name).mkdir()
+            report, printed = lines()
+            self.assertTrue(report["websiteBrowsers"]["available"])
+            self.assertEqual(printed, ["Playwright browsers: chromium, chromium headless shell, webkit present "
+                                       "(npm --prefix website run check)"])
+
     def test_doctor_and_triage_route_without_workflow_execution(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(WORKFLOW, "run_commands") as run:
             for command in (["doctor", "--json"], ["triage", directory, "--json"]):

@@ -84,13 +84,14 @@ Maintained macOS subtrees and preferences:
     completion time, and the command's result as it was printed. For a single take or a long-form
     project that result names the output paths, the generation id, the model, the seed, timings, the
     audio check's report and digests and character counts of the script, the delivery instruction
-    and the reference; it does not hold the script. **A line-by-line request's result currently
-    includes each script line as text** (`items[].text`), with each line's output path.
+    and the reference; it does not hold the script. A line-by-line request's entry keeps, per
+    line, the output path, `textDigest` (the SHA-256 of the line's UTF-8 bytes) and
+    `textCharacters`, never the line's text.
   - **How long:** an entry is replayed for seven days after it completed and never after. It is
-    deleted by the next pruning pass, which runs only when a later request with an id completes, at
-    most once an hour. With no later request the expired entry, script lines included, stays on disk
-    until the folder is deleted. The folder also holds `ledger.lock` and `ledger.pruned`, which are
-    empty.
+    deleted by the next pruning pass, which runs when a later request with an id is claimed or
+    completes, at most once an hour; the lock files of ids that kept nothing age out the same way.
+    With no later request the expired entry stays on disk until the folder is deleted. The folder
+    also holds `ledger.lock` and `ledger.pruned`, which are empty.
   - Deleting `cli/requests/` while no `vocello` process runs is safe: the only effect is that an
     earlier request id runs again instead of replaying.
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). WAV, MP3, AIFF, and M4A are kept as they are; any other readable format (FLAC, Ogg, AIF, CAF) is converted to canonical WAV before the candidate is staged, through a transient `cache/normalized_clone_refs/saved-voice-import-<UUID>.wav` removed once the candidate holds its copy (MAC-09). Voices saved by earlier builds are not rewritten. Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.

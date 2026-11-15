@@ -584,6 +584,199 @@ final class EngineHostLeaseTests: XCTestCase {
     }
 }
 
+/// RF-61 (audit finding C3): a warm engine's lease follows its model, so an
+/// idle server neither blocks another engine nor hides a model it has loaded.
+final class WarmEngineLeaseTests: XCTestCase {
+    private static let contract = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+
+    private func makeRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WarmEngineLease-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return root
+    }
+
+    /// Waits for `condition`: the store publishes an engine state on a later
+    /// main-actor turn, and a failure's window is a real sleep.
+    @MainActor
+    private func settles(_ condition: @MainActor () -> Bool) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(10))
+        while !condition(), clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        return condition()
+    }
+
+    @MainActor
+    private struct Fixture {
+        let warm: CLIWarmEngine
+        /// The engine behind the warm host's store: its published state is the test's to set.
+        let engine: StoreFixtureEngine
+        let runtime: CLIRuntime
+        let root: URL
+
+        /// A request that loads a model, as `generate` bootstraps under the server.
+        func admit() async throws {
+            _ = try await warm.runtime(
+                dataDirectory: root, manifestOverride: nil, consent: CLIVoiceCloningConsent.notConfirmed,
+                hosted: true, takesEngineLease: true
+            )
+        }
+    }
+
+    /// A warm engine on an 8 GB Mac whose host runs the store's fixture engine,
+    /// with its leases in `folder`.
+    @MainActor
+    private func fixture(leasesIn folder: URL) throws -> Fixture {
+        let root = try makeRoot()
+        let registry = try ContractBackedModelRegistry(manifestURL: Self.contract)
+            .expandedForPlatform(.macOS, deviceClass: .mid16GBMac, includeBaseAliases: true)
+        let components = try NativeRuntimeFactory.make(
+            registry: registry, paths: .rooted(at: root), storeVersionSeed: "rf61-warm-lease-fixture"
+        )
+        let engine = StoreFixtureEngine(modelRegistry: registry)
+        let consent = VoiceCloningConsentPolicy(isConsentRecorded: false)
+        let runtime = CLIRuntime(
+            engine: components.engine, registry: registry, dataDirectory: root, voiceCloningConsent: consent,
+            host: DesktopEngineHost(engine: engine, consent: consent, deviceClass: .mid16GBMac)
+        )
+        let warm = CLIWarmEngine(
+            dataDirectory: root, manifestOverride: nil, concurrency: CLIEngineConcurrency(),
+            seams: CLIWarmEngine.Seams(
+                deviceClass: { .floor8GBMac }, appRunning: { false }, leaseFolder: folder,
+                failureWindow: .milliseconds(30), boot: { runtime }
+            )
+        )
+        return Fixture(warm: warm, engine: engine, runtime: runtime, root: root)
+    }
+
+    @MainActor
+    func testTheLeaseIsGivenBackOnIdleUnloadAndTakenAgainForTheNextLoad() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let fixture = try fixture(leasesIn: folder)
+        defer { fixture.runtime.engine.stop() }
+        let warm = fixture.warm
+        XCTAssertFalse(warm.holdsLease, "no lease before the first load")
+
+        warm.engineRequestBegan()
+        try await fixture.admit()
+        XCTAssertTrue(warm.holdsLease, "admitted before its load")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder).map(\.kind), ["cli"])
+        fixture.engine.loadState = .loaded(modelID: "pro_custom_speed")
+        let loaded = await settles { warm.modelPresence == .present }
+        XCTAssertTrue(loaded, "the host's store publishes the load")
+        warm.engineRequestEnded()
+        XCTAssertTrue(warm.holdsLease, "a loaded model keeps the lease between requests")
+
+        // The engine's idle unload publishes `.idle`.
+        fixture.engine.loadState = .idle
+        let released = await settles { !warm.holdsLease }
+        XCTAssertTrue(released, "the idle unload gives the lease back")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [], "an idle server blocks no other engine")
+
+        warm.engineRequestBegan()
+        try await fixture.admit()
+        XCTAssertTrue(warm.holdsLease, "the next load is admitted again")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder).count, 1)
+        warm.engineRequestEnded()
+        XCTAssertFalse(warm.holdsLease, "a request that loaded nothing gives its lease back when it ends")
+    }
+
+    @MainActor
+    func testARefusedReadmissionFailsThatRequestAndTheEngineStaysUp() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let fixture = try fixture(leasesIn: folder)
+        defer { fixture.runtime.engine.stop() }
+        let warm = fixture.warm
+        warm.engineRequestBegan()
+        try await fixture.admit()
+        warm.engineRequestEnded()
+        XCTAssertFalse(warm.holdsLease)
+
+        // Another engine took this 8 GB Mac while the server sat idle.
+        let other = try EngineHostLease.acquire(in: folder, kind: "cli")
+        warm.engineRequestBegan()
+        do {
+            try await fixture.admit()
+            XCTFail("an 8 GB Mac holds one engine at a time")
+        } catch {
+            XCTAssertEqual((error as? CLIError)?.code, .engineBusy, "the error a fresh vocello generate gets")
+        }
+        warm.engineRequestEnded()
+        XCTAssertFalse(warm.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder, excluding: other), [], "a refused request keeps no lease")
+        XCTAssertTrue(warm.isBooted, "the engine stays up for the next request")
+
+        other.release()
+        warm.engineRequestBegan()
+        try await fixture.admit()
+        XCTAssertTrue(warm.holdsLease, "admitted once the other engine has gone")
+        warm.engineRequestEnded()
+    }
+
+    @MainActor
+    func testAKeeperHoldsItsLeaseWhileAModelMayBeLoaded() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let keeper = EngineHostLeaseKeeper(kind: "app", folder: folder, failureWindow: .milliseconds(30))
+        XCTAssertFalse(keeper.holdsLease)
+
+        // A model that shows up with no lease held gets one, and keeps the same
+        // one across its load, a take and a clone prime.
+        keeper.engineChanged(loadState: .starting, clonePreparation: .idle)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder).map(\.kind), ["app"])
+        let first = keeper.lease?.host
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle)
+        keeper.engineChanged(loadState: .running(modelID: "m", label: nil, fraction: nil), clonePreparation: .idle)
+        keeper.engineChanged(loadState: .idle, clonePreparation: .preparing)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [first].compactMap { $0 })
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle)
+        XCTAssertFalse(keeper.holdsLease, "the unload gives the lease back")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // Weights a failure left resident keep the lease for the idle window,
+        // also once the failure is dismissed.
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle)
+        keeper.engineChanged(loadState: .failed(message: "failed"), clonePreparation: .idle)
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle)
+        XCTAssertTrue(keeper.holdsLease, "the weights may still be resident")
+        let released = await settles { !keeper.holdsLease }
+        XCTAssertTrue(released, "the idle window has unloaded them")
+
+        // Quitting gives the lease up whatever is loaded.
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle)
+        XCTAssertTrue(keeper.holdsLease)
+        keeper.releaseNow()
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
+    @MainActor
+    func testAnAdmittedLeaseStaysUntilItsRequestEnds() throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let keeper = EngineHostLeaseKeeper(kind: "cli", folder: folder, failureWindow: .milliseconds(30))
+        let admitted = try EngineHostLease.acquire(in: folder, kind: "cli")
+        keeper.requestBegan()
+        keeper.adopt(admitted)
+        // Nothing the engine publishes on the way to the load takes it back.
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle)
+        XCTAssertTrue(keeper.holdsLease)
+        // A second admission while one is held is given back, not kept beside it.
+        keeper.adopt(try EngineHostLease.acquire(in: folder, kind: "cli"))
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [admitted.host])
+        keeper.requestEnded()
+        XCTAssertFalse(keeper.holdsLease, "a request that loaded nothing gives its lease back")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        XCTAssertEqual(EngineHostModelPresence.of(loadState: .failed(message: "x"), clonePreparation: .idle),
+                       .absentAfterIdleWindow)
+        XCTAssertEqual(EngineHostLeaseKeeper.failureWindow(for: .floor8GBMac), .seconds(125.0),
+                       "the 8 GB tier's two-minute idle window, with room for the unload")
+    }
+}
+
 @MainActor
 private final class EventLog {
     var lines: [String] = []

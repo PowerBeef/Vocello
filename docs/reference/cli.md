@@ -287,6 +287,14 @@ engine is refused (`engine_busy`, exit 75); pass `--wait-for-engine` to wait for
 with the warning `concurrent_engine`. Lanes that drive the CLI on an 8 GB Mac therefore need the app
 closed.
 
+A one-shot command holds its lease from before it boots until it exits. The `vocello mcp` server's
+lease follows its model instead: a request that loads a model is admitted exactly as a fresh
+`vocello generate` is and takes the lease, the lease stays while the model is loading or loaded, and
+the engine's idle unload gives it back, so an idle server blocks no other engine and its next load
+is admitted again. A request that loads nothing gives its lease back when it ends. After a failed
+request the lease stays for the tier's idle window, the time the engine takes to unload weights a
+failure left loaded.
+
 Streaming is the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates: there is no live preview player; `--play` plays the completed file.
@@ -473,8 +481,12 @@ warning as a text line); a failure is a tool error whose `structuredContent.erro
 object. Reads run at once, beside anything else. Engine tools share one warm engine, booted by the first
 one and unloaded by the engine's idle policy, and run one at a time: up to `--max-queue` (default 4) wait
 in arrival order, and the next is refused with `engine_busy` (75). The engine takes its lease (and its
-8 GB admission) when it first loads a model. With a `progressToken` in `_meta`, a call's events become
-`notifications/progress` (chunks at most twice a second). `notifications/cancelled` stops the call
+8 GB admission) each time it is about to load a model and gives it back when the model unloads on idle
+(see "One engine at a time on an 8 GB Mac"). A request refused at that admission fails with
+`engine_busy` (75) as a fresh `vocello generate` does, or waits or runs anyway under the server's
+`--wait-for-engine` or `--allow-concurrent-engine`; the server stays up and the next request is
+admitted afresh. `get_status` reports `engine.holdsLease`. With a `progressToken` in `_meta`, a call's
+events become `notifications/progress` (chunks at most twice a second). `notifications/cancelled` stops the call
 through its command's cancellation (a take through the engine's typed barrier), discards a waiting call
 and answers neither.
 

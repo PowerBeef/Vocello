@@ -29,7 +29,8 @@ public struct CLIRuntime {
     /// RF-27: product commands (generate, batch, run) host the engine as the Mac
     /// app does, through the shared store; bench drives the raw engine (nil).
     public internal(set) var host: DesktopEngineHost? = nil
-    /// The hosted engine's lease on the data root, held for the process's life.
+    /// The hosted engine's lease: a one-shot command holds it for the process's
+    /// life, and a warm engine's follows its model (`CLIWarmEngine`).
     var lease: EngineHostLease? = nil
 
     public static func bootstrap(
@@ -379,28 +380,71 @@ public enum CLIEngineScope {
 /// The MCP server's one engine (RF-29). Under its scope every bootstrap returns
 /// this engine instead of starting another, which a long-lived process would
 /// otherwise accumulate: the first boots it (callers arriving meanwhile wait for
-/// that boot), and the first that loads a model takes the engine lease, which
-/// the server then holds. A hosted command takes it under its own consent, which
-/// becomes the shared host's (the server runs those one at a time); a read takes
-/// it under its own without touching the host's. The engine's own idle policy
+/// that boot). A hosted command takes it under its own consent, which becomes
+/// the shared host's (the server runs those one at a time); a read takes it
+/// under its own without touching the host's. The engine's own idle policy
 /// unloads the model between requests.
+///
+/// Its lease follows the model (RF-61, `EngineHostLeaseKeeper`): a request that
+/// loads a model is admitted as a fresh `vocello generate` is and takes the
+/// lease, the engine's idle unload gives it back, and the next such request is
+/// admitted again. A refused admission fails that request (`engine_busy`) and
+/// the engine stays up for the next one. The server brackets each engine
+/// request with `engineRequestBegan` and `engineRequestEnded`.
 @MainActor
 public final class CLIWarmEngine {
+    /// What an admission reads, and how the engine boots; tests replace them.
+    struct Seams {
+        var deviceClass: @MainActor () -> NativeDeviceMemoryClass = { NativeMemoryPolicyResolver.deviceClass() }
+        var appRunning: () -> Bool = DesktopAppPresence.isAppRunning
+        var leaseFolder: URL = EngineHostLease.sharedFolder
+        /// How long a published failure keeps the lease; nil is the tier's idle window.
+        var failureWindow: Duration?
+        var boot: (@MainActor () async throws -> CLIRuntime)?
+    }
+
     public let dataDirectory: URL
     public let manifestOverride: URL?
     let concurrency: CLIEngineConcurrency
+    private let seams: Seams
+    private let leaseKeeper: EngineHostLeaseKeeper
     private var runtime: CLIRuntime?
     private var booting: Task<Result<CLIRuntime, any Error>, Never>?
     private var registry: CLIRegistryContext?
 
-    public init(dataDirectory: URL, manifestOverride: URL?, concurrency: CLIEngineConcurrency) {
+    public convenience init(dataDirectory: URL, manifestOverride: URL?, concurrency: CLIEngineConcurrency) {
+        self.init(
+            dataDirectory: dataDirectory, manifestOverride: manifestOverride, concurrency: concurrency, seams: Seams()
+        )
+    }
+
+    init(dataDirectory: URL, manifestOverride: URL?, concurrency: CLIEngineConcurrency, seams: Seams) {
         self.dataDirectory = dataDirectory
         self.manifestOverride = manifestOverride
         self.concurrency = concurrency
+        self.seams = seams
+        leaseKeeper = EngineHostLeaseKeeper(
+            kind: "cli", folder: seams.leaseFolder,
+            failureWindow: seams.failureWindow ?? EngineHostLeaseKeeper.failureWindow(for: seams.deviceClass())
+        )
     }
 
     public var isBooted: Bool { runtime != nil }
-    public var holdsLease: Bool { runtime?.lease != nil }
+    public var holdsLease: Bool { leaseKeeper.holdsLease }
+    /// What the engine last published about its model, as the lease reads it.
+    var modelPresence: EngineHostModelPresence { leaseKeeper.presence }
+
+    /// An engine request starts: until it ends, the lease stays whatever the
+    /// engine publishes on the way to its load.
+    public func engineRequestBegan() {
+        leaseKeeper.requestBegan()
+    }
+
+    /// An engine request ended: one that loaded no model gives its lease back
+    /// now, and a loaded model keeps it until the engine unloads.
+    public func engineRequestEnded() {
+        leaseKeeper.requestEnded()
+    }
 
     func runtime(
         dataDirectory: URL, manifestOverride: URL?, consent: VoiceCloningConsentPolicy, hosted: Bool,
@@ -408,12 +452,14 @@ public final class CLIWarmEngine {
     ) async throws -> CLIRuntime {
         try checkRoot(dataDirectory, manifestOverride)
         var current = try await booted()
-        if takesEngineLease, current.lease == nil {
-            current.lease = try await CLIRuntime.admitEngineHost(
-                deviceClass: NativeMemoryPolicyResolver.deviceClass(), concurrency: concurrency
-            )
-            runtime = current
+        if takesEngineLease, !leaseKeeper.holdsLease {
+            // The same admission as a fresh start, so a refusal is the same error.
+            leaseKeeper.adopt(try await CLIRuntime.admitEngineHost(
+                deviceClass: seams.deviceClass(), concurrency: concurrency, appRunning: seams.appRunning,
+                folder: seams.leaseFolder
+            ))
         }
+        current.lease = leaseKeeper.lease
         return hosted ? current.withConsent(consent) : current.reading(under: consent)
     }
 
@@ -441,10 +487,7 @@ public final class CLIWarmEngine {
             await CLIPresenter.$capture.withValue(nil) {
                 await CLIEngineScope.$warm.withValue(nil) {
                     do {
-                        return .success(try await CLIRuntime.bootstrap(
-                            dataDirectory: self.dataDirectory, manifestOverride: self.manifestOverride,
-                            hostedLikeTheApp: true, concurrency: self.concurrency, takesEngineLease: false
-                        ))
+                        return .success(try await self.bootRuntime())
                     } catch {
                         return .failure(error)
                     }
@@ -455,9 +498,24 @@ public final class CLIWarmEngine {
         let outcome = await boot.value
         // Only this boot's waiters clear it: a newer one may have started since.
         if booting == boot { booting = nil }
-        if runtime == nil { runtime = try outcome.get() }
+        if runtime == nil {
+            let started = try outcome.get()
+            // From here the lease follows what the engine publishes about its model.
+            started.host?.observeEngineState { [leaseKeeper] loadState, clonePreparation in
+                leaseKeeper.engineChanged(loadState: loadState, clonePreparation: clonePreparation)
+            }
+            runtime = started
+        }
         guard let runtime else { throw CLIError(.internalError, "the engine did not start") }
         return runtime
+    }
+
+    private func bootRuntime() async throws -> CLIRuntime {
+        if let boot = seams.boot { return try await boot() }
+        return try await CLIRuntime.bootstrap(
+            dataDirectory: dataDirectory, manifestOverride: manifestOverride,
+            hostedLikeTheApp: true, concurrency: concurrency, takesEngineLease: false
+        )
     }
 }
 

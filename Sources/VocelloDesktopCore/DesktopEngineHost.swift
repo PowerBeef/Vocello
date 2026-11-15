@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import QwenVoiceCore
 
@@ -12,6 +13,7 @@ public final class DesktopEngineHost {
     let store: TTSEngineStore
     /// The consent the store admits the next request under.
     public private(set) var consent: VoiceCloningConsentPolicy
+    private var engineStateObserver: AnyCancellable?
 
     /// Any engine: the CLI hosts `MLXTTSEngine`; tests host the fixture engines.
     public init<Engine: TTSEngine & AnyObject>(
@@ -43,6 +45,18 @@ public final class DesktopEngineHost {
     /// The consent the next request is admitted under (one host serves many requests).
     public func setConsent(_ policy: VoiceCloningConsentPolicy) {
         consent = policy
+    }
+
+    /// Calls `handler` with every load and clone-preparation state the engine
+    /// publishes from now on, so a warm host's lease can follow its model
+    /// (`EngineHostLeaseKeeper`). One observer at a time: a second call replaces
+    /// the first.
+    public func observeEngineState(
+        _ handler: @escaping @MainActor (EngineLoadState, ClonePreparationPhase) -> Void
+    ) {
+        engineStateObserver = store.snapshotUpdates.sink { state in
+            handler(state.loadState, state.clonePreparationState.phase)
+        }
     }
 
     public func loadModel(id: String) async throws {

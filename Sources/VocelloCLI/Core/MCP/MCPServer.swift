@@ -244,6 +244,10 @@ public final class MCPServer {
             if tool.kind == .engine {
                 try await gate.enter()
                 defer { gate.leave() }
+                // RF-61: the engine's lease follows its model; a request that
+                // loads nothing gives it back when it ends.
+                warm.engineRequestBegan()
+                defer { warm.engineRequestEnded() }
                 try await run(invocation, capture: capture)
             } else {
                 try await run(invocation, capture: capture)

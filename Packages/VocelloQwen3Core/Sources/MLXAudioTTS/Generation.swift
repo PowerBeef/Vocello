@@ -486,21 +486,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         isolation: isolated (any Actor)?
     ) async throws
 
-    func generateCustomVoiceStream(
-        text: String,
-        language: String,
-        speaker: String,
-        instruct: String?,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        customVoiceProfile: String?,
-        streamStepEvalPolicy: String?,
-        generationSpeedProfile: String?,
-        enableChunkTimings: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error>
-
     func generateCustomVoice(
         text: String,
         language: String,
@@ -519,19 +504,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws
-
-    func generateVoiceDesignStream(
-        text: String,
-        language: String,
-        voiceDescription: String,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        streamStepEvalPolicy: String?,
-        generationSpeedProfile: String?,
-        enableChunkTimings: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error>
 
     func generateVoiceDesign(
         text: String,
@@ -556,19 +528,6 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws
-
-    func generateVoiceCloneStream(
-        text: String,
-        language: String,
-        voiceClonePrompt: Qwen3TTSVoiceClonePrompt,
-        generationParameters: GenerateParameters,
-        samplingPolicy: Qwen3RequestSamplingPolicy,
-        memoryPolicy: Qwen3RequestMemoryPolicy,
-        streamingInterval: Double,
-        streamStepEvalPolicy: String?,
-        generationSpeedProfile: String?,
-        enableChunkTimings: Bool
-    ) -> AsyncThrowingStream<AudioGeneration, Error>
 
     func generateVoiceClone(
         text: String,

@@ -1,5 +1,12 @@
 import Foundation
+@testable import QwenVoiceCore
 import VocelloQwen3Core
+
+// Test support, not product code. No host uses this sink: the shipping output
+// path is `GenerationOutputAdapter`. It lives in the test target so that
+// `AtomicWAVGenerationOutputSinkTests` can drive the product's writer, limiter
+// and Fast QC through the package's `VocelloQwen3ProductOutputSink` protocol
+// without a second output pipeline shipping in the framework.
 
 enum AtomicWAVGenerationOutputSinkError: Error, Equatable, Sendable {
     case invalidAudioFormat
@@ -17,7 +24,8 @@ struct AtomicWAVGenerationOutputResult: Sendable {
     let audioQC: AudioQCReport
 }
 
-/// Product-owned sink for the actor runtime's mandatory audio drain.
+/// A sink for the actor runtime's mandatory audio drain, built from the
+/// product's own writer, limiter and Fast QC.
 ///
 /// Every chunk is limited, converted, and appended to the staged WAV before a
 /// limited PCM copy can reach preview. The staged file is reopened for Fast QC

@@ -10,8 +10,11 @@ whether anything dropped out, how much of the take was played, and whether the
 played signal carries the same step bursts the file QC measures.
 
 Everything here is numpy-only and reference-based: the published WAV is the
-reference, the capture is the measurement. Thresholds produce warn-only codes;
-the lane never fails on them until a corpus justifies a gate (roadmap PC-02).
+reference, the capture is the measurement. The WARN_* thresholds produce
+warn-only codes; `gate_failures` is what fails a lane (roadmap PC-02): a
+captured take outside the GATE_* thresholds, a silent take, and, when the
+runner armed capture (`capture_armed`), any planned take that did not end
+captured (RF-61, audit T3).
 """
 
 from __future__ import annotations
@@ -45,12 +48,19 @@ WARN_HIGH_RESIDUAL_DBFS = -20.0
 # 2026-09-14 (87 takes): coverage was 1.00 on every take, the residual never
 # rose above -31.9 dBFS, no take had a dropout, and 86 of 87 audible onsets
 # fell within 250 ms of the app's scheduling stamp (the outlier: 359 ms). A
-# captured take that breaks one of these fails the lane; unavailable, silent
-# and unresolved captures stay warnings so an ungranted host still passes.
+# captured take that breaks one of these fails the lane, and so does a silent
+# one: the tap ran and the app played nothing audible (RF-61, audit T3).
+# Unavailable, unresolved and aborted captures fail only when the runner armed
+# capture; a lane that ran unarmed (no grant) still passes without them.
 GATE_COVERAGE_MIN = 0.98
 GATE_RESIDUAL_MAX_DBFS = -25.0
 GATE_DROPOUT_MAX = 0
 GATE_MISALIGNED_MAX_MS = 500.0
+# The runner writes this manifest into the capture directory once it has armed
+# its tap; scripts/ui_test.sh records its `playback-capture` step from the same file.
+ARMED_MANIFEST = "capture-run.json"
+# Statuses that say a planned take has no usable capture.
+NOT_CAPTURED_STATUSES = ("unavailable", "referenceUnresolved", "aborted")
 # The app names published takes `YYYYMMDD_HH-mm-ss-SSS_<prefix>.wav` in local time.
 OUTPUT_SUBDIRECTORY = {"custom": "CustomVoice", "design": "VoiceDesign", "clone": "Clones"}
 OUTPUT_NAME_RE = re.compile(r"^(\d{8})_(\d{2})-(\d{2})-(\d{2})-(\d{3})_")
@@ -302,9 +312,28 @@ def first_audible_ms(capture: np.ndarray, rate: int, sidecar: dict[str, Any],
     return float(start) + float(audible[0]) * FRAME_MS - float(click)
 
 
-def gate_failures(status: str, metrics: dict[str, Any], playback_scheduled_ms: float | None = None) -> list[str]:
-    """Why a captured take fails the played-audio gate; empty when it passes or was not captured."""
+def capture_armed(capture_dir: Path | None) -> bool:
+    """Whether the runner armed played-audio capture for this run: it wrote its
+    run manifest into the capture directory. An armed run owes a capture for
+    every planned take."""
+    return capture_dir is not None and Path(capture_dir, ARMED_MANIFEST).is_file()
+
+
+def gate_failures(status: str, metrics: dict[str, Any], playback_scheduled_ms: float | None = None,
+                  *, armed: bool = False) -> list[str]:
+    """Why a planned take fails the played-audio gate; empty when it passes.
+
+    A silent take always fails. A take without a usable capture (unavailable,
+    referenceUnresolved, aborted) fails when the runner armed capture and is
+    left to the caller as a warning when the lane ran unarmed."""
+    if status == "silent":
+        return [
+            "playback capture is silent: the app played nothing audible (a tap without the System Audio "
+            "Recording grant also hears silence; QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=off runs unarmed)"
+        ]
     if status != "captured":
+        if armed and status in NOT_CAPTURED_STATUSES:
+            return [f"playback capture {status}: capture was armed, so every planned take must be captured"]
         return []
     failures: list[str] = []
     coverage = metrics.get("playbackCaptureCoverage")
@@ -410,6 +439,12 @@ def analyze_take(sidecar: dict[str, Any], capture_wav: Path | None,
     status = sidecar.get("status")
     if status == "aborted":
         result["status"] = "aborted"
+        return result
+    if status == "silent" and capture_wav is None:
+        # The runner's own verdict: its tap delivered no buffers, so it wrote no
+        # WAV. The app's output device never started for this take.
+        result["status"] = "silent"
+        result["warnings"].append("playback.capture.silent")
         return result
     if capture_wav is None or status not in (None, "captured", "silent"):
         return result

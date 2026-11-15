@@ -960,7 +960,15 @@ if __name__ == "__main__":
 class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
     """PC-01: the runner's per-take capture joins the take and yields warn-only evidence."""
 
-    def _capture_fixture(self, root: Path, *, take_index: int, cell: str, duration: float, hole_ms: float = 0.0) -> tuple[Path, Path]:
+    def _capture_fixture(
+        self, root: Path, *, take_index: int, cell: str, duration: float, hole_ms: float = 0.0,
+        armed: bool = True, played_silence: bool = False, no_buffers: bool = False,
+    ) -> tuple[Path, Path]:
+        """One take's published WAV, capture WAV and sidecar; call it once per captured take.
+
+        `armed` writes the runner's capture-run.json. `played_silence` captures zeros
+        (the tap ran, the app played nothing audible); `no_buffers` is the runner's own
+        silent verdict, a sidecar with no WAV."""
         import datetime as dt
         import numpy as np
         sys.path.insert(0, str(ROOT / "scripts"))
@@ -970,29 +978,102 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
         burst = ((t > 0.2) & (t < duration - 0.3)).astype(float)
         world = 0.4 * np.sin(2 * np.pi * 440 * t) * burst * (1 + 0.3 * np.sin(2 * np.pi * 3 * t))
         outputs = root / "outputs"
-        (outputs / "CustomVoice").mkdir(parents=True)
-        stamp = dt.datetime(2026, 9, 13, 15, 0, 0)
-        reference = outputs / "CustomVoice" / (stamp.strftime("%Y%m%d_%H-%M-%S-") + "000_fixture.wav")
+        published = outputs / pc.OUTPUT_SUBDIRECTORY[cell.split("/")[0]]
+        published.mkdir(parents=True, exist_ok=True)
+        # A minute apart, so each take's window holds exactly its own published WAV.
+        stamp = dt.datetime(2026, 9, 13, 15, take_index, 0)
+        reference = published / (stamp.strftime("%Y%m%d_%H-%M-%S-") + "000_fixture.wav")
         pc.write_wav_int16(reference, 24_000, pc.resample(world, world_rate, 24_000))
         captures = root / "playback-capture"
-        captures.mkdir()
+        captures.mkdir(exist_ok=True)
         safe_cell = cell.replace("/", "_")
         played = np.concatenate([np.zeros(int(world_rate * 0.137)), world * 0.7, np.zeros(world_rate)])
         if hole_ms:
             # A dropout inside the spoken part: the app stopped rendering for hole_ms.
             start = int(world_rate * (0.137 + 1.0)); played[start:start + int(world_rate * hole_ms / 1000)] = 0.0
-        pc.write_wav_float32(captures / f"take-{take_index:02d}-{safe_cell}.wav", world_rate, played)
+        if played_silence:
+            played = np.zeros_like(played)
+        if not no_buffers:
+            pc.write_wav_float32(captures / f"take-{take_index:02d}-{safe_cell}.wav", world_rate, played)
         start = stamp.timestamp() * 1000 - 1_000
         (captures / f"take-{take_index:02d}-{safe_cell}.json").write_text(json.dumps({
-            "takeIndex": take_index, "cell": cell, "status": "captured",
+            "takeIndex": take_index, "cell": cell, "status": "silent" if no_buffers else "captured",
             # The fixture app schedules playback 30 ms after submit; the burst starts
             # 0.2 s into the file and the capture adds 137 ms, so a click 307 ms after
             # the capture start makes the audible first frame agree with the app.
             "submitClickEpochMS": start + 307, "captureStartEpochMS": start,
             "stopEpochMS": start + duration * 1000 + 3_000,
         }))
-        (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
+        if armed:
+            (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
         return captures, outputs
+
+    # The fixture matrix's capture plan (audit #31): the takes an armed run owes.
+    PLANNED_CAPTURES = {2: "custom/short/warm#0", 3: "custom/medium/warm#0", 5: "clone/medium/warm#0"}
+
+    @staticmethod
+    def _planned_durations(rows: list[dict]) -> None:
+        for take_index in PlaybackCaptureEvidenceTests.PLANNED_CAPTURES:
+            rows[take_index - 1]["outputMetrics"]["durationSeconds"] = 3.0
+
+    def _run_with_captures(self, captures: Path, outputs: Path) -> subprocess.CompletedProcess[str]:
+        return self.run_checker(
+            self.expected_order, mutate_engine_rows=self._planned_durations, evidence=True,
+            extra_args=["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)],
+        )
+
+    def test_an_armed_run_with_every_planned_capture_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            for take_index, cell in self.PLANNED_CAPTURES.items():
+                captures, outputs = self._capture_fixture(Path(temp), take_index=take_index, cell=cell, duration=3.0)
+            result = self._run_with_captures(captures, outputs)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(
+                [take.get("playbackCaptureStatus") for take in self.last_manifest["historyRecord"]["takes"]],
+                [None, "captured", "captured", None, "captured"],
+            )
+            summary = json.loads((captures / "summary.json").read_text())
+            self.assertEqual((summary["armed"], summary["captured"], summary["expected"]), (True, 3, 3))
+            self.assertEqual(summary["gate"]["failedTakes"], [])
+
+    def test_an_armed_run_fails_on_a_planned_take_without_a_capture(self) -> None:
+        """RF-61, audit T3: once the runner armed capture, a missing capture is a failure."""
+        with tempfile.TemporaryDirectory() as temp:
+            # Only take 2 was captured; takes 3 and 5 have no sidecar at all.
+            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
+            result = self._run_with_captures(captures, outputs)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            for take_index in (3, 5):
+                self.assertIn(
+                    f"take {take_index} ({self.PLANNED_CAPTURES[take_index]}): playback capture unavailable",
+                    result.stdout,
+                )
+            self.assertNotIn("take 2 (", result.stdout)
+            self.assertIsNone(self.last_manifest)
+            # A capture whose published WAV cannot be resolved is not captured either.
+            for path in (outputs / "CustomVoice").glob("*.wav"):
+                path.unlink()
+            result = self._run_with_captures(captures, outputs)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("take 2 (custom/short/warm#0): playback capture referenceUnresolved", result.stdout)
+
+    def test_a_silent_take_fails_the_lane_armed_or_not(self) -> None:
+        """RF-61, audit T3: the app played nothing and the gate used to pass."""
+        for armed in (True, False):
+            for fixture in ({"played_silence": True}, {"no_buffers": True}):
+                with self.subTest(armed=armed, **fixture), tempfile.TemporaryDirectory() as temp:
+                    for take_index, cell in self.PLANNED_CAPTURES.items():
+                        captures, outputs = self._capture_fixture(
+                            Path(temp), take_index=take_index, cell=cell, duration=3.0, armed=armed,
+                            **(fixture if take_index == 3 else {}),
+                        )
+                    result = self._run_with_captures(captures, outputs)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn(
+                        "take 3 (custom/medium/warm#0): playback capture is silent: the app played nothing audible",
+                        result.stdout,
+                    )
+                    self.assertIsNone(self.last_manifest)
 
     def test_a_captured_take_with_a_dropout_fails_the_lane_but_keeps_its_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1022,7 +1103,9 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
 
     def test_a_late_tap_and_the_app_submit_stamp_are_honoured(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
-            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
+            # Unarmed, so the two planned takes without a capture do not fail the run.
+            captures, outputs = self._capture_fixture(
+                Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0, armed=False)
             sidecar_path = next(captures.glob("take-02-*.json"))
             sidecar = json.loads(sidecar_path.read_text())
             # The tap attached 10 s after the click (a relaunched app): the reference
@@ -1060,7 +1143,10 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
             return float(pc.FRAME_MS)
 
         with tempfile.TemporaryDirectory() as temp:
-            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
+            # The runner never armed capture (no capture-run.json), so the planned
+            # takes without a capture are unavailable instead of failures.
+            captures, outputs = self._capture_fixture(
+                Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0, armed=False)
 
             def set_duration(rows: list[dict]) -> None:
                 rows[1]["outputMetrics"]["durationSeconds"] = 3.0
@@ -1070,6 +1156,7 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
                 extra_args=["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)],
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("the runner did not arm played-audio capture", result.stdout)
             takes = self.last_manifest["historyRecord"]["takes"]
             captured = takes[1]
             self.assertEqual(captured["playbackCaptureStatus"], "captured")
@@ -1092,7 +1179,7 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
                 [None, "captured", "unavailable", None, "unavailable"],
             )
             summary = json.loads((captures / "summary.json").read_text())
-            self.assertEqual((summary["captured"], summary["expected"]), (1, 3))
+            self.assertEqual((summary["armed"], summary["captured"], summary["expected"]), (False, 1, 3))
             self.assertEqual(summary["plannedTakes"], [2, 3, 5])
             self.assertEqual(summary["gate"]["failedTakes"], [])
             self.assertEqual(summary["gate"]["coverageMin"], 0.98)

@@ -741,21 +741,26 @@ def app_bundle_from_receipt(executable_relative_path) -> str | None:
 def evaluate_playback_capture(
     take_index: int, cell: str, mode: str, duration_seconds, captures: dict,
     capture_dir: Path | None, outputs_dir: Path | None, playback_scheduled_ms=None,
-    submit_epoch_ms=None,
+    submit_epoch_ms=None, *, armed: bool = False,
 ) -> dict:
     """Played-audio capture evidence for one take (PC-01): fields, metrics, warn codes, summary.
 
-    A lane that never armed a capture directory adds nothing; a lane that did but has
-    no sidecar for the take marks it unavailable. Comparison metrics exist only when
-    the capture aligned with the published WAV; warnings never fail the lane.
+    A lane without a capture directory adds nothing; a lane with one but no sidecar
+    for the take marks it unavailable. Comparison metrics exist only when the capture
+    aligned with the published WAV. Warnings never fail the lane; `gateFailures` do
+    (PC-02): a captured take outside the gate, a silent take, and, when the runner
+    `armed` capture, a planned take that did not end captured (RF-61, audit T3).
     """
     empty = {"fields": {}, "metrics": {}, "warnings": [], "summary": None}
     if capture_dir is None:
         return empty
     entry = captures.get((take_index, cell))
     if entry is None:
+        gate = playback_capture.gate_failures("unavailable", {}, armed=armed)
         return {"fields": {"playbackCaptureStatus": "unavailable"}, "metrics": {}, "warnings": [],
-                "summary": {"takeIndex": take_index, "cell": cell, "status": "unavailable"}}
+                "summary": {"takeIndex": take_index, "cell": cell, "status": "unavailable",
+                            **({"gateFailures": gate} if gate else {})},
+                "gateFailures": gate}
     sidecar = entry["sidecar"]
     reference = None
     # The window opens at the earlier of the click and the tap's arming: on a
@@ -798,7 +803,9 @@ def evaluate_playback_capture(
         summary["submitReference"] = "runnerClick"
     if result.get("error"):
         summary["error"] = result["error"]
-    gate = playback_capture.gate_failures(result["status"], result["metrics"], playback_scheduled_ms)
+    gate = playback_capture.gate_failures(
+        result["status"], result["metrics"], playback_scheduled_ms, armed=armed,
+    )
     if gate:
         summary["gateFailures"] = gate
     return {"fields": fields, "metrics": dict(result["metrics"]), "warnings": list(result["warnings"]),
@@ -832,9 +839,12 @@ def evaluate_all_captures(
     playback_capture_dir: Path | None, outputs_dir: Path | None,
 ) -> dict[int, dict]:
     """The capture evidence of every planned take, keyed by take index, before the
-    verdict is decided; takes outside the capture plan carry none."""
+    verdict is decided; takes outside the capture plan carry none. When the runner
+    armed capture (its run manifest is in the directory), every planned take must
+    end captured (RF-61, audit T3)."""
     if playback_capture_dir is None:
         return {}
+    armed = playback_capture.capture_armed(playback_capture_dir)
     captures = playback_capture.collect_captures(playback_capture_dir)
     app_by_id = {row.get("generationID"): row for row in app_rows}
     planned = capture_plan(cells)
@@ -850,7 +860,7 @@ def evaluate_all_captures(
         results[index] = evaluate_playback_capture(
             index, cell, mode, output.get("durationSeconds"), captures,
             playback_capture_dir, outputs_dir, frontend.get("submitToPlaybackScheduledMS"),
-            app_timings.get("submittedAtEpochMS"),
+            app_timings.get("submittedAtEpochMS"), armed=armed,
         )
     return results
 
@@ -1048,6 +1058,8 @@ def build_manifest(
             "runID": run_id,
             "takes": capture_summary,
             "captured": sum(1 for item in capture_summary if item.get("status") == "captured"),
+            # Whether the runner armed capture, so every planned take owed one (audit T3).
+            "armed": playback_capture.capture_armed(playback_capture_dir),
             # One captured repetition per cell (audit #31): the plan, not every take.
             "expected": len(capture_plan(cells)),
             "plannedTakes": sorted(capture_plan(cells)),
@@ -1195,7 +1207,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--playback-capture-dir", type=Path, metavar="DIR",
-        help="the runner's per-take capture WAVs and sidecars (PC-01); takes without one are marked unavailable",
+        help="the runner's per-take capture WAVs and sidecars (PC-01). A silent take fails; when the "
+             "directory holds the runner's capture-run.json (capture was armed), every planned take must "
+             "be captured, otherwise takes without a capture are marked unavailable",
     )
     parser.add_argument(
         "--outputs-dir", type=Path, metavar="DIR",
@@ -1446,12 +1460,18 @@ def main() -> int:
         except MemoryEvidenceError as error:
             failures.append(str(error))
 
-    # Played-audio gate (PC-02): captured takes must match what the app played.
+    # Played-audio gate (PC-02): captured takes must match what the app played, a
+    # silent take fails, and an armed run owes every planned capture (audit T3).
     capture_results: dict[int, dict] | None = None
     if not failures and args.playback_capture_dir is not None:
         capture_results = evaluate_all_captures(
             expected_cell_order, engine_rows, app_rows, args.playback_capture_dir, args.outputs_dir,
         )
+        if not playback_capture.capture_armed(args.playback_capture_dir):
+            print(
+                f"note: no {playback_capture.ARMED_MANIFEST} in {args.playback_capture_dir}: the runner did not "
+                "arm played-audio capture, so planned takes without a capture are unavailable, not failures"
+            )
         for index, capture in sorted(capture_results.items()):
             for reason in capture.get("gateFailures", []):
                 failures.append(f"take {index} ({expected_cell_order[index - 1]}): {reason}")

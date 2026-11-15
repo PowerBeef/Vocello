@@ -161,9 +161,8 @@ class GateTests(unittest.TestCase):
         clean = {"playbackCaptureCoverage": 1.0, "playbackCaptureResidualDBFS": -40.0,
                  "playbackCaptureDropoutCount": 0.0, "playbackCaptureFirstAudibleMS": 120.0}
         self.assertEqual(pc.gate_failures("captured", clean, 100.0), [])
-        self.assertEqual(pc.gate_failures("silent", clean, 100.0), [], "only captured takes are gated")
-        self.assertEqual(pc.gate_failures("unavailable", {}, None), [])
-        bad = {"playbackCaptureCoverage": 0.9, "playbackCaptureResidualDBFS": -20.0,
+        self.assertEqual(pc.gate_failures("captured", clean, 100.0, armed=True), [])
+        bad ={"playbackCaptureCoverage": 0.9, "playbackCaptureResidualDBFS": -20.0,
                "playbackCaptureDropoutCount": 1.0, "playbackCaptureFirstAudibleMS": 900.0}
         reasons = pc.gate_failures("captured", bad, 100.0)
         self.assertEqual(len(reasons), 4)
@@ -173,6 +172,35 @@ class GateTests(unittest.TestCase):
         self.assertTrue(any("audible onset" in r for r in reasons))
         # 359 ms was the corpus outlier: a warning, not a failure.
         self.assertEqual(pc.gate_failures("captured", {**clean, "playbackCaptureFirstAudibleMS": 459.0}, 100.0), [])
+
+    def test_a_silent_take_fails_whether_or_not_capture_was_armed(self) -> None:
+        """RF-61, audit T3: the gate used to pass when the app played nothing."""
+        for armed in (False, True):
+            with self.subTest(armed=armed):
+                [reason] = pc.gate_failures("silent", {}, 100.0, armed=armed)
+                self.assertIn("the app played nothing audible", reason)
+
+    def test_an_armed_run_owes_every_planned_capture(self) -> None:
+        for status in ("unavailable", "referenceUnresolved", "aborted"):
+            with self.subTest(status=status):
+                # Unarmed (no grant): the take carries its status and the lane still passes.
+                self.assertEqual(pc.gate_failures(status, {}, None), [])
+                self.assertEqual(pc.gate_failures(status, {}, None, armed=False), [])
+                [reason] = pc.gate_failures(status, {}, None, armed=True)
+                self.assertIn(f"playback capture {status}", reason)
+                self.assertIn("armed", reason)
+        self.assertEqual(set(pc.NOT_CAPTURED_STATUSES) | {"captured", "silent"}, set(pc.CAPTURE_STATUSES))
+
+    def test_the_runner_manifest_is_the_armed_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.assertFalse(pc.capture_armed(None))
+            self.assertFalse(pc.capture_armed(directory / "missing"))
+            # Sidecars alone do not arm a run; the runner's manifest does.
+            Path(directory, "take-01-custom_short_warm#0.json").write_text("{}")
+            self.assertFalse(pc.capture_armed(directory))
+            Path(directory, pc.ARMED_MANIFEST).write_text(json.dumps({"runID": "fixture"}))
+            self.assertTrue(pc.capture_armed(directory))
 
 
 class AnalyzeTakeTests(unittest.TestCase):
@@ -202,7 +230,14 @@ class AnalyzeTakeTests(unittest.TestCase):
     def test_statuses_and_warnings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             sidecar, capture, reference = self._fixture(tmp, silent=True)
-            self.assertEqual(pc.analyze_take(sidecar, capture, reference)["status"], "silent")
+            silent = pc.analyze_take(sidecar, capture, reference)
+            self.assertEqual((silent["status"], silent["warnings"]), ("silent", ["playback.capture.silent"]))
+            self.assertTrue(pc.gate_failures(silent["status"], silent["metrics"]))
+            # The runner's own silent verdict: its tap delivered no buffers, so it
+            # wrote no WAV. That is a silent take, not a merely unavailable one.
+            no_buffers = pc.analyze_take({**sidecar, "status": "silent"}, None, reference)
+            self.assertEqual((no_buffers["status"], no_buffers["digest"]), ("silent", None))
+            self.assertTrue(pc.gate_failures(no_buffers["status"], no_buffers["metrics"]))
             # A long lead-in inside the capture is not a fault: the tap runs from the
             # app's device start. Misalignment is measured against the app's own
             # playback-scheduled time, in either direction.

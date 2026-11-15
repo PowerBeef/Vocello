@@ -114,6 +114,48 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(log.snapshot, ["record(/a.wav)", "deleteRecord(7)", "removeFile(/a.wav)"])
     }
 
+    // MARK: - The player's file among the deleted audio
+
+    /// A deleted row's audio leaves the player, whether or not its file could
+    /// be removed; a delete that deleted nothing leaves the player alone.
+    func testAOneRowDeleteRemovesThePlayersFileOnlyWhenTheRowWent() {
+        let gone: [HistoryDeletionEngine.SingleOutcome] = [.deleted, .audioCleanupFailure("locked")]
+        for outcome in gone {
+            let result = HistoryDeletionResult(single: outcome, recordID: 7, audioPath: "/a.wav")
+            XCTAssertEqual(result.deletedAudioPaths, ["/a.wav"], "\(outcome)")
+            XCTAssertTrue(result.removesAudio(heldByPlayerAt: "/a.wav"), "\(outcome)")
+            XCTAssertFalse(result.removesAudio(heldByPlayerAt: "/b.wav"), "\(outcome)")
+            XCTAssertFalse(result.removesAudio(heldByPlayerAt: nil), "\(outcome)")
+        }
+        let kept: [HistoryDeletionEngine.SingleOutcome] = [.databaseFailure("db down"), .removalUnrecorded]
+        for outcome in kept {
+            let result = HistoryDeletionResult(single: outcome, recordID: 7, audioPath: "/a.wav")
+            XCTAssertEqual(result.deletedAudioPaths, [], "\(outcome)")
+            XCTAssertFalse(result.removesAudio(heldByPlayerAt: "/a.wav"), "\(outcome)")
+        }
+    }
+
+    /// A project's delete covers the joined output and every segment, so the
+    /// player is dismissed whichever of them it holds. The path is compared
+    /// exactly, as the app compares the player's file everywhere else.
+    func testAProjectDeleteRemovesThePlayersFileWhicheverRowItHolds() {
+        let log = EffectLog()
+        let engine = makeEngine(
+            log: log, existingPaths: ["/joined.wav", "/s1.wav", "/s2.wav"], failingRemovals: ["/s1.wav"]
+        )
+        let result = engine.deleteUnit(rows: projectRows, deleteRecords: { _ in })
+        for path in ["/joined.wav", "/s1.wav", "/s2.wav"] {
+            XCTAssertTrue(result.removesAudio(heldByPlayerAt: path), path)
+        }
+        XCTAssertFalse(result.removesAudio(heldByPlayerAt: "/other.wav"))
+        XCTAssertFalse(result.removesAudio(heldByPlayerAt: "/S1.wav"), "The exact path, never a folded one")
+        XCTAssertFalse(result.removesAudio(heldByPlayerAt: "/./s1.wav"), "The exact path, never a resolved one")
+        XCTAssertFalse(result.removesAudio(heldByPlayerAt: nil), "A player holding no file")
+
+        let refused = engine.deleteUnit(rows: projectRows, deleteRecords: { _ in throw StubError(message: "db down") })
+        XCTAssertFalse(refused.removesAudio(heldByPlayerAt: "/joined.wav"), "Nothing was deleted")
+    }
+
     // MARK: - Long-form project as a unit (A4)
 
     /// A project's joined row and its two segments.
@@ -131,7 +173,12 @@ final class HistoryDeletionEngineTests: XCTestCase {
         let result = engine.deleteUnit(rows: projectRows, deleteRecords: { log.append("deleteRecords(\($0))") })
         XCTAssertEqual(
             result,
-            HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [9, 7, 8], unremovedAudioPaths: [])
+            HistoryDeletionResult(
+                outcome: .deleted,
+                deletedRowIDs: [9, 7, 8],
+                deletedAudioPaths: ["/joined.wav", "/s1.wav", "/s2.wav"],
+                unremovedAudioPaths: []
+            )
         )
         XCTAssertEqual(log.snapshot, [
             "record(/joined.wav)", "record(/s1.wav)", "record(/s2.wav)",
@@ -151,7 +198,9 @@ final class HistoryDeletionEngineTests: XCTestCase {
         let result = engine.deleteUnit(rows: projectRows, deleteRecords: { _ in throw StubError(message: "db down") })
         XCTAssertEqual(
             result,
-            HistoryDeletionResult(outcome: .databaseFailure("db down"), deletedRowIDs: [], unremovedAudioPaths: [])
+            HistoryDeletionResult(
+                outcome: .databaseFailure("db down"), deletedRowIDs: [], deletedAudioPaths: [], unremovedAudioPaths: []
+            )
         )
         XCTAssertEqual(log.snapshot, [
             "record(/joined.wav)", "record(/s1.wav)", "record(/s2.wav)",
@@ -176,7 +225,9 @@ final class HistoryDeletionEngineTests: XCTestCase {
         let result = engine.deleteUnit(rows: projectRows, deleteRecords: { log.append("deleteRecords(\($0))") })
         XCTAssertEqual(
             result,
-            HistoryDeletionResult(outcome: .removalUnrecorded, deletedRowIDs: [], unremovedAudioPaths: [])
+            HistoryDeletionResult(
+                outcome: .removalUnrecorded, deletedRowIDs: [], deletedAudioPaths: [], unremovedAudioPaths: []
+            )
         )
         XCTAssertEqual(log.snapshot, ["record(/joined.wav)", "record(/s1.wav)", "withdraw(/joined.wav)"])
     }
@@ -194,6 +245,7 @@ final class HistoryDeletionEngineTests: XCTestCase {
             HistoryDeletionResult(
                 outcome: .audioCleanupFailure("locked: /s1.wav"),
                 deletedRowIDs: [9, 7, 8],
+                deletedAudioPaths: ["/joined.wav", "/s1.wav", "/s2.wav"],
                 unremovedAudioPaths: ["/s1.wav"]
             )
         )
@@ -215,7 +267,13 @@ final class HistoryDeletionEngineTests: XCTestCase {
         let result = engine.deleteUnit(rows: rows, deleteRecords: { log.append("deleteRecords(\($0))") })
         XCTAssertEqual(
             result,
-            HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [9, 7, 8, 10], unremovedAudioPaths: [])
+            HistoryDeletionResult(
+                outcome: .deleted,
+                deletedRowIDs: [9, 7, 8, 10],
+                // The audio of every row that went, the missing file's too.
+                deletedAudioPaths: ["/joined.wav", "/s1.wav", "/s2.wav"],
+                unremovedAudioPaths: []
+            )
         )
         XCTAssertEqual(log.snapshot, [
             "record(/joined.wav)", "record(/s1.wav)",

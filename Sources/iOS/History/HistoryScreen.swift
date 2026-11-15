@@ -159,6 +159,9 @@ private enum IOSHistoryBucket: Int, CaseIterable, Identifiable {
 
 private struct IOSHistoryLibrarySection: View {
     @Environment(AppModel.self) private var appModel
+    /// The shared player, the Studio's. Read only when a delete finishes,
+    /// never in `body`, so playback does not redraw the list.
+    @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @State private var items: [Generation] = []
     @State private var availableAudioPaths: Set<String> = []
     @State private var errorMessage: String?
@@ -822,6 +825,11 @@ private struct IOSHistoryLibrarySection: View {
             let deletion = await GenerationHistoryRecovery.deleteHistoryRow(
                 recordID: recordID, audioPath: audioPath, localization: IOSAppLanguage.shared.localization
             )
+            // A deleted take leaves the shared player too, the Studio's: the
+            // row itself, or any row of the project that went with it.
+            if deletion.removesAudio(heldByPlayerAt: audioPlayer.currentFilePath) {
+                audioPlayer.dismiss()
+            }
             switch deletion.outcome {
             case .deleted:
                 reload()

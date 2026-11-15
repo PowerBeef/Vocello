@@ -988,6 +988,7 @@ actor GenerationHistoryRecoveryCoordinator {
                         HistoryPersistenceError.interfaceMessage(for: error, localization: localization)
                     ),
                     deletedRowIDs: [],
+                    deletedAudioPaths: [],
                     unremovedAudioPaths: []
                 )
             }
@@ -1311,6 +1312,9 @@ struct HistoryDeletionResult: Equatable, Sendable {
     let outcome: HistoryDeletionEngine.SingleOutcome
     /// The rows that left History; empty when nothing was deleted.
     let deletedRowIDs: [Int64]
+    /// The audio those rows pointed at, each path once, whether or not its
+    /// file could be removed; empty when nothing was deleted.
+    let deletedAudioPaths: [String]
     /// Audio whose row is gone and whose file could not be removed.
     let unremovedAudioPaths: [String]
     /// The long-form project changed between the read of its rows and their
@@ -1323,11 +1327,13 @@ struct HistoryDeletionResult: Equatable, Sendable {
     init(
         outcome: HistoryDeletionEngine.SingleOutcome,
         deletedRowIDs: [Int64],
+        deletedAudioPaths: [String],
         unremovedAudioPaths: [String],
         unitChanged: Bool = false
     ) {
         self.outcome = outcome
         self.deletedRowIDs = deletedRowIDs
+        self.deletedAudioPaths = deletedAudioPaths
         self.unremovedAudioPaths = unremovedAudioPaths
         self.unitChanged = unitChanged
     }
@@ -1337,12 +1343,27 @@ struct HistoryDeletionResult: Equatable, Sendable {
         let rowID = recordID.map { [$0] } ?? []
         switch outcome {
         case .deleted:
-            self.init(outcome: outcome, deletedRowIDs: rowID, unremovedAudioPaths: [])
+            self.init(outcome: outcome, deletedRowIDs: rowID, deletedAudioPaths: [audioPath], unremovedAudioPaths: [])
         case .audioCleanupFailure:
-            self.init(outcome: outcome, deletedRowIDs: rowID, unremovedAudioPaths: [audioPath])
+            self.init(
+                outcome: outcome, deletedRowIDs: rowID, deletedAudioPaths: [audioPath],
+                unremovedAudioPaths: [audioPath]
+            )
         case .databaseFailure, .removalUnrecorded:
-            self.init(outcome: outcome, deletedRowIDs: [], unremovedAudioPaths: [])
+            self.init(outcome: outcome, deletedRowIDs: [], deletedAudioPaths: [], unremovedAudioPaths: [])
         }
+    }
+
+    /// Whether the shared player holds audio this delete took out of History.
+    /// The screen then dismisses the player: a deleted take can no longer be
+    /// played, revealed or saved from it. One rule for a row and for a
+    /// long-form project, whose segments go with it. `playerFilePath` is the
+    /// player's `currentFilePath`, and the comparison is the exact path, as
+    /// everywhere the app asks whether the player holds a file: a History
+    /// row hands the player the path it stores.
+    func removesAudio(heldByPlayerAt playerFilePath: String?) -> Bool {
+        guard let playerFilePath else { return false }
+        return deletedAudioPaths.contains(playerFilePath)
     }
 }
 
@@ -1380,6 +1401,10 @@ extension HistoryDeletionEngine {
         describe: (any Error) -> String = { $0.localizedDescription }
     ) -> HistoryDeletionResult {
         let rowIDs = rows.map(\.id)
+        var rowAudioPaths: [String] = []
+        for row in rows where !rowAudioPaths.contains(row.audioPath) {
+            rowAudioPaths.append(row.audioPath)
+        }
         var audioPaths: [String] = []
         for row in rows where !audioPaths.contains(row.audioPath) && fileExists(row.audioPath) {
             audioPaths.append(row.audioPath)
@@ -1391,7 +1416,9 @@ extension HistoryDeletionEngine {
                 recorded.append(path)
             } catch {
                 for earlier in recorded { withdrawAudioRemoval(earlier) }
-                return HistoryDeletionResult(outcome: .removalUnrecorded, deletedRowIDs: [], unremovedAudioPaths: [])
+                return HistoryDeletionResult(
+                    outcome: .removalUnrecorded, deletedRowIDs: [], deletedAudioPaths: [], unremovedAudioPaths: []
+                )
             }
         }
         do {
@@ -1401,6 +1428,7 @@ extension HistoryDeletionEngine {
             return HistoryDeletionResult(
                 outcome: .databaseFailure(describe(error)),
                 deletedRowIDs: [],
+                deletedAudioPaths: [],
                 unremovedAudioPaths: [],
                 unitChanged: error is HistoryDeletionUnitChanged
             )
@@ -1418,10 +1446,15 @@ extension HistoryDeletionEngine {
         }
         if let firstFailure {
             return HistoryDeletionResult(
-                outcome: .audioCleanupFailure(firstFailure), deletedRowIDs: rowIDs, unremovedAudioPaths: unremoved
+                outcome: .audioCleanupFailure(firstFailure),
+                deletedRowIDs: rowIDs,
+                deletedAudioPaths: rowAudioPaths,
+                unremovedAudioPaths: unremoved
             )
         }
-        return HistoryDeletionResult(outcome: .deleted, deletedRowIDs: rowIDs, unremovedAudioPaths: [])
+        return HistoryDeletionResult(
+            outcome: .deleted, deletedRowIDs: rowIDs, deletedAudioPaths: rowAudioPaths, unremovedAudioPaths: []
+        )
     }
 }
 

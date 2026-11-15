@@ -1048,6 +1048,12 @@ private extension MacHistoryScreen {
             _ = await GenerationHistoryRecovery.retainAudioRemovals(deletion.unremovedAudioPaths)
             refreshRecoveryState()
         }
+        // A deleted take leaves the player too, so it can no longer be played
+        // or revealed (⇧⌘R) from there: the row itself, or any row of the
+        // project that went with it.
+        if deletion.removesAudio(heldByPlayerAt: audioPlayer.currentFilePath) {
+            audioPlayer.dismiss()
+        }
 
         let deletedRowIDs = Set(deletion.deletedRowIDs)
         items.removeAll { listed in

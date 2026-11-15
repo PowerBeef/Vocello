@@ -727,6 +727,11 @@ final class DatabaseServiceTests: XCTestCase {
         let project = [f.joined] + f.segments
         XCTAssertEqual(result.outcome, .deleted)
         XCTAssertEqual(Set(result.deletedRowIDs), Set(project.compactMap(\.id)))
+        XCTAssertEqual(result.deletedAudioPaths, project.map(\.audioPath))
+        for row in project {
+            XCTAssertTrue(result.removesAudio(heldByPlayerAt: row.audioPath), row.text)
+        }
+        XCTAssertFalse(result.removesAudio(heldByPlayerAt: f.standalone.audioPath))
         XCTAssertEqual(result.unremovedAudioPaths, [])
         XCTAssertEqual(try f.remainingPaths(), before.subtracting(project.map(\.audioPath)))
         for row in project {
@@ -747,7 +752,10 @@ final class DatabaseServiceTests: XCTestCase {
             let result = await f.delete(row)
             XCTAssertEqual(
                 result,
-                HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [row.id ?? -1], unremovedAudioPaths: []),
+                HistoryDeletionResult(
+                    outcome: .deleted, deletedRowIDs: [row.id ?? -1], deletedAudioPaths: [row.audioPath],
+                    unremovedAudioPaths: []
+                ),
                 row.text
             )
             expected.remove(row.audioPath)
@@ -817,6 +825,7 @@ final class DatabaseServiceTests: XCTestCase {
                         .interfaceMessage(VocelloLocalization())
                 ),
                 deletedRowIDs: [],
+                deletedAudioPaths: [],
                 unremovedAudioPaths: [],
                 unitChanged: true
             )

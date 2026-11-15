@@ -245,7 +245,11 @@ its end, live tail and final file, before the next item's starts; the next items
 memory. Past about five minutes of waiting audio a newly waiting item stops buffering its preview
 and keeps only its result, so a line still plays from its file at its turn.
 Internal segment cleanup preserves the joined-output handoff. Studio result errors belong only to
-the file that failed; a stale card cannot display or control another clip's failure.
+the file that failed; a stale card cannot display or control another clip's failure. Deleting a
+History row whose audio the player holds dismisses the player, and so does deleting a long-form
+project when the player holds its joined output or one of its segments
+(`HistoryDeletionResult.removesAudio(heldByPlayerAt:)`, both apps; on iPhone the shared player is
+the Studio's).
 
 | Element | Identifier |
 |---|---|

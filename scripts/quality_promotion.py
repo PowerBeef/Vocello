@@ -366,6 +366,24 @@ RELEASE_TOOLCHAIN_FIELDS = {
     "xcodeBuild": ("xcode_build", "Xcode build"),
     "swiftVersion": ("swift_version", "Swift"),
 }
+# A difference the maintainer accepts is never silent (decision of 2026-11-15: the release keeps
+# its pinned Xcode, and the Mac that measures runs a macOS that Xcode does not support). `create
+# --accept-toolchain-difference "REASON"` writes it into the manifest: what built the release, what
+# each record was built with, and why. `validate` accepts exactly the differences written there.
+TOOLCHAIN_DIFFERENCE_FIELDS = {"release", "evidence", "reason"}
+MAX_TOOLCHAIN_DIFFERENCE_REASON = 400
+
+
+def toolchain_difference_reason(value: Any) -> str:
+    if (
+        not isinstance(value, str) or not value.strip() or value != value.strip()
+        or "\n" in value or len(value) > MAX_TOOLCHAIN_DIFFERENCE_REASON
+    ):
+        raise PromotionError(
+            "the accepted toolchain difference needs a reason: one line of at most "
+            f"{MAX_TOOLCHAIN_DIFFERENCE_REASON} characters"
+        )
+    return value
 
 
 def release_toolchain(
@@ -575,7 +593,10 @@ def validate_record(
     identity: str, record: dict[str, Any], definition: dict[str, Any], release: dict[str, Any],
     commit: str, accepted_warnings: set[str], contract: dict[str, Any], now: datetime,
     built_with: dict[str, str] | None = None,
+    accepted_differences: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    """`accepted_differences`, when given, collects per evidence id the toolchain fields that differ
+    from the release's instead of refusing them; the caller decides whether they were accepted."""
     try:
         benchmark_history.validate_record(record)
     except benchmark_history.HistoryError as error:
@@ -606,10 +627,15 @@ def validate_record(
     for field, expected in (built_with or {}).items():
         observed = toolchain.get(field)
         if observed != expected:
+            if accepted_differences is not None:
+                accepted_differences.setdefault(identity, {})[field] = observed
+                continue
             label = RELEASE_TOOLCHAIN_FIELDS[field][1]
             raise PromotionError(
                 f"{identity} benchmark record was built with {label} {observed!r}, the release with "
-                f"{label} {expected!r}: acceptance evidence must come from the toolchain that built the release"
+                f"{label} {expected!r}: acceptance evidence must come from the toolchain that built the "
+                "release (or the maintainer accepts the difference by name: create "
+                "--accept-toolchain-difference \"REASON\")"
             )
     warnings = set(run.get("warnings") or [])
     if warnings - set(contract["allowedWarnings"]):
@@ -706,6 +732,10 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
         raise PromotionError("accepted warnings exceed the promotion allowlist")
     now = datetime.now(timezone.utc).replace(microsecond=0)
     contract_digest = digest_value(contract)
+    difference_reason = getattr(args, "accept_toolchain_difference", None)
+    if difference_reason is not None:
+        difference_reason = toolchain_difference_reason(difference_reason)
+    differences: dict[str, dict[str, Any]] | None = {} if difference_reason is not None else None
     lanes: dict[str, Any] = {}
     for identity in required:
         definition = contract["evidence"][identity]
@@ -715,7 +745,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
                 raise PromotionError(f"{identity} requires --record")
             lanes[identity] = validate_record(
                 identity, read_json(path), definition, release_evidence["release"], commit,
-                accepted, contract, now, built_with,
+                accepted, contract, now, built_with, differences,
             )
         else:
             path = receipt_paths.get(identity)
@@ -747,6 +777,15 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
         "lanes": lanes,
         "privacy": {"containsPrivateDeviceIdentity": False, "containsAbsolutePaths": False},
     }
+    if difference_reason is not None:
+        if not differences:
+            raise PromotionError(
+                "--accept-toolchain-difference was given, but every record was built with the release's "
+                "toolchain: drop the option"
+            )
+        manifest["toolchainDifference"] = {
+            "release": built_with, "evidence": differences, "reason": difference_reason,
+        }
     manifest["digest"] = digest_value(manifest)
     privacy_scan(manifest, contract)
     return manifest
@@ -762,7 +801,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
         "release", "contractDigest", "impact", "requiredEvidence", "acceptedWarnings",
         "capabilityCoverage", "unsupportedDimensions", "lanes", "privacy", "digest",
     }
-    if set(manifest) != expected_top_level:
+    if set(manifest) - {"toolchainDifference"} != expected_top_level:
         raise PromotionError("quality promotion manifest top-level fields are malformed")
     privacy_scan(manifest, contract)
     claimed_digest = manifest.get("digest")
@@ -811,6 +850,18 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(lanes, dict) or sorted(lanes) != required:
         raise PromotionError("quality promotion lane set is incomplete")
     now = datetime.now(timezone.utc).replace(microsecond=0)
+    declared_difference = manifest.get("toolchainDifference")
+    if "toolchainDifference" in manifest:
+        if (
+            not isinstance(declared_difference, dict)
+            or set(declared_difference) != TOOLCHAIN_DIFFERENCE_FIELDS
+            or declared_difference["release"] != built_with
+            or not isinstance(declared_difference["evidence"], dict)
+            or not declared_difference["evidence"]
+        ):
+            raise PromotionError("quality promotion toolchain difference is malformed or names another release")
+        toolchain_difference_reason(declared_difference["reason"])
+    differences: dict[str, dict[str, Any]] | None = {} if declared_difference is not None else None
     for identity in required:
         lane = lanes[identity]
         definition = contract["evidence"][identity]
@@ -819,7 +870,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
         if definition["type"] == "benchmark-record":
             expected = validate_record(
                 identity, lane.get("record"), definition, release_evidence["release"], commit,
-                set(accepted), contract, now, built_with,
+                set(accepted), contract, now, built_with, differences,
             )
         else:
             expected = validate_receipt(
@@ -828,6 +879,11 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
             )
         if lane != expected:
             raise PromotionError(f"{identity} lane wrapper differs from its evidence")
+    if declared_difference is not None and differences != declared_difference["evidence"]:
+        raise PromotionError(
+            "quality promotion toolchain difference does not name exactly the records that differ from "
+            "the release's toolchain"
+        )
     return manifest
 
 
@@ -901,6 +957,11 @@ def parser() -> argparse.ArgumentParser:
     create_parser.add_argument("--record", action="append", default=[])
     create_parser.add_argument("--receipt", action="append", default=[])
     create_parser.add_argument("--accept-warning", action="append", default=[])
+    create_parser.add_argument(
+        "--accept-toolchain-difference", metavar="REASON",
+        help="accept benchmark records built with another Xcode or Swift than the release's, and write "
+             "what differs and this one-line reason into the manifest; without it such a record is refused",
+    )
     create_parser.add_argument("--output", type=Path, required=True)
     validate_parser = commands.add_parser("validate")
     validate_parser.add_argument("--platform", choices=("macos", "ios"), required=True)

@@ -500,6 +500,60 @@ class QualityPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(PROMOTION.PromotionError, r"Xcode build '[^']+', the release with Xcode build '0X000'"):
             PROMOTION.create(self.create_args())
 
+    def test_an_accepted_toolchain_difference_is_written_down_and_validated_by_name(self) -> None:
+        # Decision of 2026-11-15: the release keeps its pinned Xcode; the Mac that measures cannot run it.
+        recorded = self.record["toolchain"]["xcodeVersion"]
+        self.bind_metadata("xcode_version=1.0-release-pin", "sdk_version=26.0")
+        reason = "The measuring Mac's macOS does not run the release's Xcode."
+        manifest = PROMOTION.create(self.create_args(accept_toolchain_difference=reason))
+        self.assertEqual(manifest["toolchainDifference"], {
+            "release": {"xcodeVersion": "1.0-release-pin"},
+            "evidence": {"macos-ui-benchmark": {"xcodeVersion": recorded}},
+            "reason": reason,
+        })
+        path = self.root / "quality-promotion.json"
+        self.write_json(path, manifest)
+        self.assertEqual(PROMOTION.validate_manifest(self.validation_args(path))["digest"], manifest["digest"])
+
+        def resigned(change) -> Path:
+            altered = json.loads(json.dumps(manifest))
+            change(altered)
+            altered.pop("digest")
+            altered["digest"] = PROMOTION.digest_value(altered)
+            self.write_json(path, altered)
+            return path
+
+        # Without the written acceptance the same manifest is refused: validation never accepts silently.
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "was built with Xcode"):
+            PROMOTION.validate_manifest(self.validation_args(resigned(lambda m: m.pop("toolchainDifference"))))
+        # The acceptance names exactly what differs, for exactly this release.
+        for label, change in (
+            ("another value", lambda m: m["toolchainDifference"]["evidence"]["macos-ui-benchmark"].update(
+                xcodeVersion="9.9")),
+            ("another record", lambda m: m["toolchainDifference"]["evidence"].update(
+                {"macos-ui-perf": {"xcodeVersion": recorded}})),
+            ("another release", lambda m: m["toolchainDifference"]["release"].update(xcodeVersion="2.0")),
+            ("no reason", lambda m: m["toolchainDifference"].update(reason=" ")),
+            ("an extra field", lambda m: m["toolchainDifference"].update(note="x")),
+        ):
+            with self.subTest(label), self.assertRaisesRegex(PROMOTION.PromotionError, "toolchain difference"):
+                PROMOTION.validate_manifest(self.validation_args(resigned(change)))
+
+    def test_accepting_a_difference_needs_a_reason_and_a_difference(self) -> None:
+        self.bind_metadata("xcode_version=1.0-release-pin", "sdk_version=26.0")
+        for reason in ("", "   ", "two\nlines", "x" * 401):
+            with self.subTest(reason=reason[:8]), self.assertRaisesRegex(PROMOTION.PromotionError, "needs a reason"):
+                PROMOTION.create(self.create_args(accept_toolchain_difference=reason))
+        # A stale option is refused, so the acceptance cannot linger once the toolchains agree.
+        recorded = self.record["toolchain"]
+        self.bind_metadata(f"xcode_version={recorded['xcodeVersion']}", "sdk_version=26.0")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "drop the option"):
+            PROMOTION.create(self.create_args(accept_toolchain_difference="No longer true."))
+        # And without the option the refusal says how a difference is accepted.
+        self.bind_metadata("xcode_version=1.0-release-pin", "sdk_version=26.0")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "--accept-toolchain-difference"):
+            PROMOTION.create(self.create_args())
+
     def test_release_metadata_the_evidence_names_must_be_present_intact_and_name_xcode(self) -> None:
         metadata = self.bind_metadata(f"xcode_version={self.record['toolchain']['xcodeVersion']}")
         metadata.write_text(metadata.read_text(encoding="utf-8") + "edited=after-the-evidence\n", encoding="utf-8")

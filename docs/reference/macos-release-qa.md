@@ -177,6 +177,10 @@ release-readiness and artifact checks.
    [`quality-promotion.md`](quality-promotion.md) on the clean tag checkout. Produce the canonical
    Mac generation matrix and every path-classified engine, retained-memory, UI-performance, or
    model-delivery lane; assemble and validate `quality-promotion.json`; then upload it to the draft.
+   For 3.1 the records are built on the benchmark Mac with Xcode 27.2 while the release is built
+   with the pinned Xcode 26.6, which that Mac's macOS does not run (maintainer decision of
+   2026-11-15): pass `create --accept-toolchain-difference "REASON"`, so the manifest names the
+   difference and why. Without it `create` refuses those records.
    Dispatch `promote-release.yml` from the tag itself (`gh workflow run promote-release.yml --ref
    <tag> -f tag=<tag>`; any other ref is refused). It runs under the reviewer-gated `release`
    environment, verifies every DMG and installer package the release evidence names (both DMGs and

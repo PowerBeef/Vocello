@@ -105,7 +105,11 @@ rules they enforce:
   `xcode_version`; an `xcode_build` or `swift_version` row is compared when present) and refuse a
   benchmark record whose toolchain differs, naming both values. Release evidence that binds no
   metadata file (the iPhone's) states no toolchain; `--release-toolchain <json>` (`xcodeVersion`,
-  optionally `xcodeBuild` and `swiftVersion`) supplies it, and what it states is enforced.
+  optionally `xcodeBuild` and `swiftVersion`) supplies it, and what it states is enforced. A
+  difference is accepted only by name: `create --accept-toolchain-difference "REASON"` writes what
+  differs and why into the manifest, and `validate` accepts exactly what is written there
+  (`docs/reference/quality-promotion.md`; the 3.1 Mac release, built with Xcode 26.6 and measured on
+  a Mac whose macOS runs only Xcode 27, is the case).
 - **Evidence retention.** Only qualified privacy-safe PASS records enter `benchmarks/runs/` (≤ 256 KB
   each, strict allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
   xcresult and traces stay untracked; publication never stages, commits or pushes. The `benchmark` and

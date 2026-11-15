@@ -54,7 +54,21 @@ record's `xcodeBuild` or `swiftVersion` as well. Release evidence that binds no 
 iPhone's) states no toolchain, so `--release-toolchain <json>` supplies it: an object with
 `xcodeVersion` and optionally `xcodeBuild` and `swiftVersion`. Every record must then match it, and
 where the metadata states the same field the two must agree. Capture the promotion records with the
-Xcode the release was built with (`config/toolchain.json`), not a newer local one. Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
+Xcode the release was built with (`config/toolchain.json`), not a newer local one.
+
+**When that Xcode cannot run where the records are measured,** the maintainer may accept the
+difference by name, never silently: `create --accept-toolchain-difference "REASON"` takes one line of
+at most 400 characters and writes `toolchainDifference` into the manifest, with what built the
+release, what each differing record was built with, and the reason. `validate` takes no such option:
+it accepts exactly the differences the manifest names, for exactly that release, and refuses a
+manifest whose list is missing, longer, shorter or about another release. `create` refuses the
+option when no record differs, so an acceptance cannot linger once the toolchains agree. The
+3.1 Mac release is the case it was added for (maintainer decision of 2026-11-15): the release is
+built with the pinned Xcode 26.6, which Apple supports on macOS 26.x, and the benchmark Mac runs
+macOS 27 with Xcode 27.2. An accepted difference does not make the evidence equivalent: the records
+prove the same source under another compiler and SDK, and the promotion record says so.
+
+Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
 `run.rtfDefinition: "wall/audio"` (`rtf` is synthesis wall time divided by audio duration, lower is
 faster; `scripts/benchmark_history.py validate` rejects a newer record without the field), and the
 v1/v2 records already in `benchmarks/runs/` are read-only history that never share a comparison key
@@ -171,7 +185,9 @@ python3 scripts/quality_promotion.py validate \
 ```
 
 Warning acceptance is explicit and restricted by the checked-in allowlist. Omit
-`--accept-warning` when every required record passed without warnings. For iOS, whose release
+`--accept-warning` when every required record passed without warnings. Add
+`--accept-toolchain-difference "REASON"` to `create` only when the records were built with another
+Xcode than the release's and the maintainer accepts that (above). For iOS, whose release
 evidence binds no metadata file, add `--release-toolchain <json>` to both commands.
 
 For macOS, upload the validated manifest to the existing draft, then manually dispatch **Promote

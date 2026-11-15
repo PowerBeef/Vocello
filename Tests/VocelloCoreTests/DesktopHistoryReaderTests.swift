@@ -106,6 +106,41 @@ final class DesktopHistoryReaderTests: XCTestCase {
         }
     }
 
+    /// Audit C11: a receipt this build cannot decode marks its own row. The page, and the row,
+    /// are still read; the take is not reported as a store from a newer Vocello.
+    func testAnUnreadableReceiptMarksItsRowAndKeepsThePage() throws {
+        let root = try makeRoot()
+        try seed(root, [
+            row("Readable take", at: 1, audioPath: root.appendingPathComponent("a.wav").path),
+            row("Take with a damaged receipt", at: 2, audioPath: root.appendingPathComponent("b.wav").path),
+        ])
+        let reader = DesktopHistoryReader(root: root, appIsUsingRoot: { _ in false })
+        let queue = try DatabaseQueue(path: reader.databaseURL.path)
+        try queue.write { db in
+            try db.execute(sql: "UPDATE generations SET completionReceipt = 'malformed' WHERE text LIKE '%damaged%'")
+        }
+
+        let page = try reader.page()
+        XCTAssertEqual(page.items.map(\.text), ["Take with a damaged receipt", "Readable take"])
+        XCTAssertEqual(page.items.map(\.completionReceiptUnreadable), [true, nil])
+        XCTAssertEqual(page.totalCount, 2)
+        XCTAssertEqual(
+            try reader.page(query: "damaged").items.map(\.completionReceiptUnreadable), [true], "a search keeps it too"
+        )
+
+        let detail = try XCTUnwrap(try reader.detail(id: try XCTUnwrap(Int64(page.items[0].id))))
+        XCTAssertEqual(detail.item, page.items[0])
+        XCTAssertNil(detail.completionReceipt)
+        let readable = try XCTUnwrap(try reader.detail(id: try XCTUnwrap(Int64(page.items[1].id))))
+        XCTAssertNil(readable.item.completionReceiptUnreadable)
+
+        // The mark is absent from the JSON of a row whose receipt reads.
+        let marked = String(decoding: try JSONEncoder().encode(page.items[0]), as: UTF8.self)
+        let unmarked = String(decoding: try JSONEncoder().encode(page.items[1]), as: UTF8.self)
+        XCTAssertTrue(marked.contains("\"completionReceiptUnreadable\":true"))
+        XCTAssertFalse(unmarked.contains("completionReceiptUnreadable"))
+    }
+
     func testAPendingLongFormRecoveryWithholdsProjectRows() throws {
         let root = try makeRoot()
         try seed(root, [

@@ -67,6 +67,12 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
     }
 
     init(row: Row) throws {
+        self.init(rowWithoutReceipt: row)
+        completionReceipt = try Self.storedReceipt(in: row)
+    }
+
+    /// Every column but the completion receipt.
+    private init(rowWithoutReceipt row: Row) {
         id = row[Columns.id]
         text = row[Columns.text]
         mode = row[Columns.mode]
@@ -80,12 +86,31 @@ extension Generation: TableRecord, FetchableRecord, MutablePersistableRecord {
         longFormProjectID = row[Columns.longFormProjectID]
         longFormRole = row[Columns.longFormRole]
         seed = row[Columns.seed]
-        // GRDB's Codable record encoder stores nested Codable values as JSON.
-        // A malformed stored receipt fails the read instead of disappearing.
+    }
+
+    /// The row's stored receipt. GRDB's Codable record encoder stores nested
+    /// Codable values as JSON. A malformed stored receipt fails the read
+    /// instead of disappearing.
+    private static func storedReceipt(in row: Row) throws -> GenerationCompletionReceipt? {
         let receiptJSON: String? = row[Columns.completionReceipt]
-        completionReceipt = try receiptJSON.map {
-            try Self.databaseJSONDecoder(for: Columns.completionReceipt.rawValue)
+        return try receiptJSON.map {
+            try databaseJSONDecoder(for: Columns.completionReceipt.rawValue)
                 .decode(GenerationCompletionReceipt.self, from: Data($0.utf8))
+        }
+    }
+
+    /// `row` for a read-only listing (the CLI's History), which shows the takes
+    /// it can and owns no recovery: a stored receipt this build cannot decode
+    /// (malformed, or a shape it does not know) leaves the row without one and
+    /// says so, instead of failing the read. The apps' own reads stay strict
+    /// (`init(row:)`).
+    static func keepingUnreadableReceipt(_ row: Row) -> (generation: Generation, receiptUnreadable: Bool) {
+        var generation = Generation(rowWithoutReceipt: row)
+        do {
+            generation.completionReceipt = try storedReceipt(in: row)
+            return (generation, false)
+        } catch {
+            return (generation, true)
         }
     }
 

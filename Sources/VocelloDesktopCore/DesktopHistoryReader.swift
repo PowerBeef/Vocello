@@ -35,6 +35,10 @@ public struct DesktopHistoryItem: Encodable, Sendable, Equatable {
     public let longFormRole: String?
     /// The take's effective sampling seed; nil for rows recorded before seeds were kept.
     public let seed: String?
+    /// True when the row holds a completion receipt this build cannot decode
+    /// (malformed, or written in a shape it does not know): the row is listed
+    /// without it. Absent otherwise.
+    public let completionReceiptUnreadable: Bool?
 }
 
 /// A page of History: the Mac app's listing (a long-form project's segments
@@ -155,20 +159,42 @@ public struct DesktopHistoryReader: Sendable {
             mode: mode, query: query, searchStyle: .lowercasedTranscriptAndVoice,
             order: order.pageOrder, limit: max(1, limit)
         )
-        let page = try read { db in
-            try GenerationHistoryPageQuery.fetch(request, includesLongFormProjects: !pending, in: db)
+        // Each row decodes its own receipt, so one that cannot be read marks its
+        // row instead of failing the page.
+        let (page, unreadable) = try read { db -> (GenerationHistoryPage, Set<Int64>) in
+            var unreadable: Set<Int64> = []
+            let page = try GenerationHistoryPageQuery.fetch(
+                request, includesLongFormProjects: !pending, in: db,
+                decodingRowsWith: { row in
+                    let kept = Generation.keepingUnreadableReceipt(row)
+                    if kept.receiptUnreadable, let id = kept.generation.id { unreadable.insert(id) }
+                    return kept.generation
+                }
+            )
+            return (page, unreadable)
         }
         return DesktopHistoryPage(
-            items: page.rows.map(Self.item), hasMore: page.hasMore, totalCount: page.archiveCount,
-            longFormRecoveryPending: pending
+            items: page.rows.map { row in
+                Self.item(row, receiptUnreadable: row.id.map { unreadable.contains($0) } ?? false)
+            },
+            hasMore: page.hasMore, totalCount: page.archiveCount, longFormRecoveryPending: pending
         )
     }
 
-    /// The row with this id, or nil.
+    /// The row with this id, or nil. A receipt that cannot be decoded marks the
+    /// row (`completionReceiptUnreadable`) and is left out.
     public func detail(id: Int64) throws -> DesktopHistoryDetail? {
         guard exists else { return nil }
-        let row = try read { db in try Generation.fetchOne(db, key: id) }
-        return row.map { DesktopHistoryDetail(item: Self.item($0), completionReceipt: $0.completionReceipt) }
+        let kept = try read { db in
+            try Row.fetchOne(db, sql: "SELECT * FROM generations WHERE id = ?", arguments: [id])
+                .map(Generation.keepingUnreadableReceipt)
+        }
+        return kept.map {
+            DesktopHistoryDetail(
+                item: Self.item($0.generation, receiptUnreadable: $0.receiptUnreadable),
+                completionReceipt: $0.generation.completionReceipt
+            )
+        }
     }
 
     private func read<T>(_ body: (Database) throws -> T) throws -> T {
@@ -205,7 +231,7 @@ public struct DesktopHistoryReader: Sendable {
         }
     }
 
-    static func item(_ row: Generation) -> DesktopHistoryItem {
+    static func item(_ row: Generation, receiptUnreadable: Bool = false) -> DesktopHistoryItem {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return DesktopHistoryItem(
@@ -220,7 +246,8 @@ public struct DesktopHistoryReader: Sendable {
             createdAt: formatter.string(from: row.createdAt),
             longFormProjectID: row.longFormProjectID,
             longFormRole: row.longFormRole,
-            seed: row.samplingSeed.map { String($0) }
+            seed: row.samplingSeed.map { String($0) },
+            completionReceiptUnreadable: receiptUnreadable ? true : nil
         )
     }
 }

@@ -498,7 +498,11 @@ Reads the History the Mac app owns (`<data>/history.sqlite`) through `VocelloDes
 read-only transaction per command: it never migrates, reconciles or writes the store, and it lists takes
 exactly as the app does (newest first; a long-form project's segments follow its joined row unless a
 search lists matches flat; the Mac search is case-insensitive over text and voice). A store written by a
-newer Vocello is refused with `history_schema_newer` (78); a busy store is `store_busy` (75). While the
+newer Vocello is refused with `history_schema_newer` (78); a busy store is `store_busy` (75). Each row
+decodes its own completion receipt: one this build cannot read (malformed, or in a shape it does not
+know) is left out and its row carries `completionReceiptUnreadable: true` (a `(receipt unreadable)`
+note in text mode), while the rest of the page, and that row in `show` and `export`, read as usual.
+While the
 app has a long-form recovery pending, project rows are withheld with a warning. The app writes History
 without waiting for other readers, so until the cross-process History lock lands (RF-30) every
 `history` command refuses with `store_busy` while the Vocello app is running on the same data folder;

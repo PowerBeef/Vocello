@@ -106,7 +106,8 @@ enum HistoryCommand {
             let indent = item.longFormRole == "segment" ? "  " : ""
             let preview = item.text.count > 60 ? String(item.text.prefix(60)) + "…" : item.text
             let missing = item.audioExists ? "" : "  (audio missing)"
-            print("\(indent)\(item.id)\t\(when)\t\(item.mode)\t\(duration)\t\(preview)\(missing)")
+            let receipt = item.completionReceiptUnreadable == true ? "  (receipt unreadable)" : ""
+            print("\(indent)\(item.id)\t\(when)\t\(item.mode)\t\(duration)\t\(preview)\(missing)\(receipt)")
         }
         if page.hasMore {
             note("more rows: raise --limit (at most 500) or narrow with --mode or a search")
@@ -128,6 +129,7 @@ enum HistoryCommand {
         if let seed = item.seed { print("seed: \(seed)") }
         if let role = item.longFormRole { print("long-form: \(role) of \(item.longFormProjectID ?? "?")") }
         print("audio: \(item.audioPath)\(item.audioExists ? "" : " (missing)")")
+        if item.completionReceiptUnreadable == true { print("receipt: unreadable by this build") }
         print("text: \(item.text)")
     }
 

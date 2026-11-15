@@ -177,11 +177,19 @@ struct GenerationHistoryReloadCoalescer: Equatable, Sendable {
 enum GenerationHistoryPageQuery {
     /// `includesLongFormProjects` is false while a long-form journal needs
     /// recovery: project rows stay withheld, as `readableHistory` does.
+    /// `decode` reads each row in place of `Generation.init(row:)`: a read-only
+    /// listing passes one that keeps a row whose receipt it cannot decode
+    /// (`Generation.keepingUnreadableReceipt`); the apps pass none.
     static func fetch(
         _ request: GenerationHistoryPageRequest,
         includesLongFormProjects: Bool,
-        in db: Database
+        in db: Database,
+        decodingRowsWith decode: ((Row) throws -> Generation)? = nil
     ) throws -> GenerationHistoryPage {
+        func generations(sql: String, arguments: StatementArguments) throws -> [Generation] {
+            guard let decode else { return try Generation.fetchAll(db, sql: sql, arguments: arguments) }
+            return try Row.fetchAll(db, sql: sql, arguments: arguments).map(decode)
+        }
         let query = request.normalizedQuery
         let mode = request.mode?.lowercased()
         let limit = max(1, request.limit)
@@ -218,8 +226,7 @@ enum GenerationHistoryPageQuery {
         }
         arguments.append(limit + 1)
         let whereClause = conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND ")
-        var entries = try Generation.fetchAll(
-            db,
+        var entries = try generations(
             sql: "SELECT * FROM generations \(whereClause) ORDER BY \(orderClause(request.order)) LIMIT ?",
             arguments: StatementArguments(arguments)
         )
@@ -240,8 +247,7 @@ enum GenerationHistoryPageQuery {
                     modeCondition = " AND LOWER(mode) = ?"
                     segmentArguments.append(mode)
                 }
-                let segments = try Generation.fetchAll(
-                    db,
+                let segments = try generations(
                     sql: """
                         SELECT * FROM generations
                         WHERE longFormRole IS 'segment'

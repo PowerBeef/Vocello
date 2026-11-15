@@ -430,6 +430,58 @@ streaming/memory/determinism discipline, and the benchmark rigor as one curated 
   consequence before the technical grounding: the same dual-audience rule as release
   notes.
 
+## Publication checklist (the flip to a new release)
+
+Until a release is published, every public surface keeps describing the last published one: the
+README, the website and `config/public-product-facts.json` still name it, and the new version is
+only the declared, unpublished candidate. The flip to the new release is **one commit, made when
+the release is published**, never spread over the work that precedes it. A surface flipped early
+advertises a download that does not exist; one flipped late keeps describing a product nobody can
+install. Work the list in order, then run the checks at the end. Pushing the commit deploys the
+website, so the push is the maintainer's word.
+
+1. **The public facts file.** In `config/public-product-facts.json`, set `stableMacRelease` to the
+   new version and tag, and remove `candidateRelease`. `scripts/public_facts_contract.py` holds the
+   project version, the README install link and the website call to action to this file.
+2. **The two scripts that pin README wording.** They fail until the README says what they require,
+   so they change in this commit, with their tests in `scripts/tests`:
+   - `scripts/public_facts_contract.py` requires the README's Mac and iPhone model-availability rows
+     to carry exact wording. Change the required wording when the model line-up changed.
+   - `scripts/generate_readme_charts.py` labels the chart's pool from the take's variant
+     (`VARIANT_LABELS`), and the `scripts/readme_art/performance.html` and
+     `performance-narrow.html` templates name the models in their source lines. Change the labels
+     when the models' public names changed.
+3. **The README lines.** The release badge and the download and installer links (they name the
+   tag), the model table and its captions, the requirements and download sizes, the performance
+   captions and alt text, and the command-line section. Search the file for the old version, the
+   old tag and every retired product term; do not rely on a list of line numbers.
+4. **The README images.** Re-render the hero, modes and performance art
+   (`scripts/readme_art/render.sh`, which needs Chrome) when a screenshot, a number or a model name
+   in them changed; edit `docs/readme/download-mac.svg` and `install-cli.svg`, which carry the
+   version; regenerate the charts (`python3 scripts/generate_readme_charts.py`) from the release's
+   canonical record ("Performance surfaces ship current numbers", above). Replace any screenshot
+   that shows a retired control.
+5. **The website data.** `website/src/data/release.js` (the stable release's version and tag),
+   `website/src/data/whatsnew.js` and `website/src/data/cli.js`.
+6. **The website sections.** `FinalCTA`, `Limitations`, `IphoneBeta`, `CommandLine`, `Engineering`
+   and `WhatsNew` under `website/src/sections`, the meta descriptions of the three page entries
+   (`website/index.html`, `website/cli/index.html`, `website/engineering/index.html`), and the
+   screenshots under `website/public/assets/screens/` when the product they show changed.
+   The Engineering medians and provenance follow "Performance surfaces ship current numbers".
+7. **The privacy and support pages.** `website/public/privacy/index.html` states when Vocello
+   contacts the network and which version's files carry the audio mark;
+   `website/public/support/index.html` states how each version updates. Re-read both against the
+   release's behaviour, not only for the version number: a release that changes when a download
+   starts (as 3.1's automatic model update does) changes what the privacy page must say.
+8. **The notes.** `docs/releases/<tag>.md` is already written and gated
+   ("Release notes are a release artifact", above); record each acceptance lane's run ID in it
+   before the tag, not in this commit.
+
+Checks before the commit: `python3 scripts/public_facts_contract.py`,
+`python3 scripts/generate_readme_charts.py --check`, `npm --prefix website run check` (it needs
+Playwright's browsers), and a read of the five public pages in a browser. Earlier releases' notes
+stay as published.
+
 ## Outward-facing performance terminology
 
 Since 2026-09-12 every surface — release notes in `docs/releases/`, the GitHub Release body, the

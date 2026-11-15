@@ -298,7 +298,11 @@ and generation identities. Old manifest-v4 files remain readable; this adds no c
 generation-resume feature. A joined-row commit reloads the complete History project. Deleting a
 project's joined row in History deletes its segment rows and their audio with it, in one database
 transaction, and the confirmation names the segment count; a segment, a superseded output or an
-ordinary take is deleted alone (both apps, `GenerationHistoryRecovery.deleteHistoryRow`).
+ordinary take is deleted alone (both apps, `GenerationHistoryRecovery.deleteHistoryRow`). The
+deleting transaction checks that the row is still the project's joined row and that the project
+still holds exactly the segments that were read; a project a long-form save changed in between
+deletes nothing (`HistoryDeletionUnitChanged`), and the screen says History was busy and reads the
+list again.
 
 ---
 

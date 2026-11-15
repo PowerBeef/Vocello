@@ -621,6 +621,7 @@ final class DatabaseServiceTests: XCTestCase {
     private struct ProjectFixture {
         let service: DatabaseService
         let outbox: GenerationHistoryOutboxStore
+        let audioDirectory: URL
         let coordinator: GenerationHistoryRecoveryCoordinator
         let engine: HistoryDeletionEngine
         let unit: HistoryDeletionUnitStore
@@ -689,10 +690,11 @@ final class DatabaseServiceTests: XCTestCase {
         )
         let unit = HistoryDeletionUnitStore(
             segmentRows: { try service.longFormSegmentRows(forJoinedRowID: $0) },
-            deleteRows: { try service.deleteGenerations(ids: $0) }
+            deleteProject: { try service.deleteLongFormProject(joinedRowID: $0, segmentRowIDs: $1) }
         )
         return ProjectFixture(
-            service: service, outbox: outbox, coordinator: coordinator, engine: engine, unit: unit,
+            service: service, outbox: outbox, audioDirectory: audio,
+            coordinator: coordinator, engine: engine, unit: unit,
             joined: joined, segments: segments, replaced: replaced, standalone: standalone
         )
     }
@@ -763,7 +765,7 @@ final class DatabaseServiceTests: XCTestCase {
         let before = try f.remainingPaths()
         struct Refused: Error {}
         var unit = f.unit
-        unit.deleteRows = { _ in throw Refused() }
+        unit.deleteProject = { _, _ in throw Refused() }
 
         let result = await f.coordinator.deleteUnit(
             recordID: f.joined.id, audioPath: f.joined.audioPath, using: f.engine, unit: unit,
@@ -774,11 +776,94 @@ final class DatabaseServiceTests: XCTestCase {
             return XCTFail("Expected the database failure, got \(result.outcome)")
         }
         XCTAssertEqual(result.deletedRowIDs, [])
+        XCTAssertFalse(result.unitChanged, "A storage failure is not a project that changed")
         XCTAssertEqual(try f.remainingPaths(), before)
         for row in [f.joined] + f.segments {
             XCTAssertTrue(FileManager.default.fileExists(atPath: row.audioPath), row.text)
         }
         XCTAssertEqual(try f.outbox.loadPendingAudioRemovals(), [], "The rows stayed, so no audio is listed")
+    }
+
+    /// The segment rows are read in one write and deleted in another, and a
+    /// long-form save can land between them. A segment that joined the
+    /// project after the read stops the delete: every row and every file
+    /// stays, nothing is left listed for removal, and the result says the
+    /// project changed, with the "busy, retry" guidance to show.
+    @concurrent func testASegmentAddedBetweenTheReadAndTheDeleteDeletesNothing() async throws {
+        let f = try makeProjectFixture()
+        let service = f.service
+        let addedURL = f.audioDirectory.appendingPathComponent("segment-3.wav")
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: addedURL)
+        let added = row(addedURL.path, text: "segment-3.wav", at: 6, projectID: "project-a", role: "segment")
+        var unit = f.unit
+        unit.segmentRows = { joinedRowID in
+            let rows = try service.longFormSegmentRows(forJoinedRowID: joinedRowID)
+            // The other writer lands here, after the read and before the delete.
+            var landed = added
+            try service.saveGeneration(&landed)
+            return rows
+        }
+
+        let result = await f.coordinator.deleteUnit(
+            recordID: f.joined.id, audioPath: f.joined.audioPath, using: f.engine, unit: unit,
+            localization: VocelloLocalization()
+        )
+
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(
+                outcome: .databaseFailure(
+                    HistoryPersistenceError(operation: .delete, failure: .locked)
+                        .interfaceMessage(VocelloLocalization())
+                ),
+                deletedRowIDs: [],
+                unremovedAudioPaths: [],
+                unitChanged: true
+            )
+        )
+        let project = [f.joined] + f.segments
+        let paths = try f.remainingPaths()
+        XCTAssertTrue(paths.isSuperset(of: project.map(\.audioPath)), "Every row of the project stays")
+        XCTAssertTrue(paths.contains(addedURL.path), "The segment that landed stays")
+        for path in project.map(\.audioPath) + [addedURL.path] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: path), path)
+        }
+        XCTAssertEqual(try f.outbox.loadPendingAudioRemovals(), [], "The rows stayed, so no audio is listed")
+    }
+
+    /// The delete's own transaction refuses a row that is no longer the
+    /// project's current joined row, and a segment list that is no longer the
+    /// project's, whichever way it differs. Nothing is deleted.
+    func testAProjectDeleteRefusesASupersededJoinedRowAndAStaleSegmentList() throws {
+        let f = try makeProjectFixture()
+        let before = try f.remainingPaths()
+        let joinedID = try XCTUnwrap(f.joined.id)
+        let replacedID = try XCTUnwrap(f.replaced.id)
+        let segmentIDs = f.segments.compactMap(\.id)
+        XCTAssertEqual(segmentIDs.count, 2)
+
+        let stale: [(joined: Int64, segments: [Int64], why: String)] = [
+            (replacedID, segmentIDs, "a newer joined output replaced the row"),
+            (joinedID, [segmentIDs[0]], "the project holds a segment that was not read"),
+            (joinedID, segmentIDs + [replacedID], "a row that was read is no longer one of its segments"),
+            (joinedID, [], "the project has segments and none was read"),
+        ]
+        for attempt in stale {
+            XCTAssertThrowsError(
+                try f.service.deleteLongFormProject(joinedRowID: attempt.joined, segmentRowIDs: attempt.segments),
+                attempt.why
+            ) { error in
+                XCTAssertTrue(error is HistoryDeletionUnitChanged, "\(attempt.why): \(error)")
+            }
+            XCTAssertEqual(try f.remainingPaths(), before, attempt.why)
+        }
+
+        // The list that is still the project's deletes it.
+        try f.service.deleteLongFormProject(joinedRowID: joinedID, segmentRowIDs: segmentIDs.reversed())
+        XCTAssertEqual(
+            try f.remainingPaths(),
+            before.subtracting(([f.joined] + f.segments).map(\.audioPath))
+        )
     }
 
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {

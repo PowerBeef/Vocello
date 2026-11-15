@@ -52,7 +52,7 @@ enum GenerationHistoryRecovery {
     /// transaction (A4).
     private static let deletionUnitStore = HistoryDeletionUnitStore(
         segmentRows: { try DatabaseService.shared.longFormSegmentRows(forJoinedRowID: $0) },
-        deleteRows: { try DatabaseService.shared.deleteGenerations(ids: $0) }
+        deleteProject: { try DatabaseService.shared.deleteLongFormProject(joinedRowID: $0, segmentRowIDs: $1) }
     )
 
     /// The delete both History screens run, on the recovery coordinator

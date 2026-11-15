@@ -419,14 +419,35 @@ final class DatabaseService: @unchecked Sendable {
         WHERE joined.id = ? AND joined.longFormRole IS 'joined' AND segment.longFormRole IS 'segment'
         """
 
-    /// Deletes exactly these rows in one transaction, so a long-form project's
-    /// joined row and its segments leave History together or not at all (A4).
-    func deleteGenerations(ids: [Int64]) throws {
-        guard !ids.isEmpty else { return }
+    /// Deletes a long-form project in one transaction, so its joined row and
+    /// its segments leave History together or not at all (A4). The segment
+    /// rows were read in an earlier write (`longFormSegmentRows`), and a
+    /// long-form acceptance on another thread can land between the two: it
+    /// replaces the joined row and changes which segments the project holds.
+    /// So this transaction checks again that `joinedRowID` is still the
+    /// project's current joined row and that the project's segment rows are
+    /// exactly `segmentRowIDs`. When they are not, nothing is deleted and
+    /// `HistoryDeletionUnitChanged` is thrown: the rows a newer output kept
+    /// stay, with their audio.
+    func deleteLongFormProject(joinedRowID: Int64, segmentRowIDs: [Int64]) throws {
         let dbQueue = try requireQueue(for: .delete)
         do {
             try dbQueue.write { db in
                 try longFormAcceptance.reconcile(in: db)
+                let isCurrentJoinedRow = try Int.fetchOne(
+                    db,
+                    sql: "SELECT COUNT(*) FROM generations WHERE id = ? AND longFormRole IS 'joined'",
+                    arguments: [joinedRowID]
+                ) == 1
+                let currentSegmentRowIDs = try Int64.fetchSet(
+                    db,
+                    sql: "SELECT segment.id " + Self.longFormSegmentsOfJoinedRow,
+                    arguments: [joinedRowID]
+                )
+                guard isCurrentJoinedRow, currentSegmentRowIDs == Set(segmentRowIDs) else {
+                    throw HistoryDeletionUnitChanged()
+                }
+                let ids = [joinedRowID] + segmentRowIDs
                 var start = ids.startIndex
                 while start < ids.endIndex {
                     let end = ids.index(start, offsetBy: 500, limitedBy: ids.endIndex) ?? ids.endIndex
@@ -438,6 +459,9 @@ final class DatabaseService: @unchecked Sendable {
                     start = end
                 }
             }
+        } catch let changed as HistoryDeletionUnitChanged {
+            // Not a storage failure: History is fine and nothing was deleted.
+            throw changed
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .delete)
         }

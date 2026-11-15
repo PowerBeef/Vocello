@@ -965,6 +965,11 @@ actor GenerationHistoryRecoveryCoordinator {
     /// database transaction, and their audio under the rules of
     /// `deleteSingle`. Any other row is deleted alone, by `deleteSingle`
     /// itself. Like it, this runs in one turn of this actor, with no await.
+    /// The segment rows are read in one database write and deleted in
+    /// another, and a long-form acceptance does not run on this actor, so one
+    /// can land in between. The delete's own transaction therefore checks the
+    /// project again (`HistoryDeletionUnitStore.deleteProject`): a project
+    /// that changed deletes nothing, and the result says so (`unitChanged`).
     func deleteUnit(
         recordID: Int64?,
         audioPath: String,
@@ -993,12 +998,20 @@ actor GenerationHistoryRecoveryCoordinator {
             }
             return HistoryDeletionResult(single: outcome, recordID: recordID, audioPath: audioPath)
         }
+        let segmentRowIDs = segments.map(\.id)
         return journaled.deleteUnit(
             rows: [HistoryDeletionRow(id: joinedID, audioPath: audioPath)] + segments,
-            deleteRecords: unit.deleteRows
-        ) {
-            HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
-        }
+            deleteRecords: { _ in try unit.deleteProject(joinedID, segmentRowIDs) },
+            describe: { error in
+                // A project that changed under the delete is not a storage
+                // failure. History's "busy, nothing changed, retry" guidance
+                // is what happened: another Vocello operation saved the project.
+                guard error is HistoryDeletionUnitChanged else {
+                    return HistoryPersistenceError.interfaceMessage(for: error, localization: localization)
+                }
+                return HistoryPersistenceError(operation: .delete, failure: .locked).interfaceMessage(localization)
+            }
+        )
     }
 
     /// `engine` with its audio removals on the pending list (A2-04).
@@ -1300,11 +1313,23 @@ struct HistoryDeletionResult: Equatable, Sendable {
     let deletedRowIDs: [Int64]
     /// Audio whose row is gone and whose file could not be removed.
     let unremovedAudioPaths: [String]
+    /// The long-form project changed between the read of its rows and their
+    /// delete, so nothing was deleted (`HistoryDeletionUnitChanged`). The
+    /// outcome is then a `databaseFailure` carrying the message to show, but
+    /// History itself is fine: the screen reads the list again instead of
+    /// treating the database as unavailable.
+    let unitChanged: Bool
 
-    init(outcome: HistoryDeletionEngine.SingleOutcome, deletedRowIDs: [Int64], unremovedAudioPaths: [String]) {
+    init(
+        outcome: HistoryDeletionEngine.SingleOutcome,
+        deletedRowIDs: [Int64],
+        unremovedAudioPaths: [String],
+        unitChanged: Bool = false
+    ) {
         self.outcome = outcome
         self.deletedRowIDs = deletedRowIDs
         self.unremovedAudioPaths = unremovedAudioPaths
+        self.unitChanged = unitChanged
     }
 
     /// The result of a one-row delete, from the engine's outcome.
@@ -1326,9 +1351,18 @@ struct HistoryDeletionUnitStore: Sendable {
     /// The segment rows of the project whose joined row has this id; empty
     /// for any other row.
     var segmentRows: @Sendable (Int64) throws -> [HistoryDeletionRow]
-    /// Deletes exactly the rows with these ids, in one transaction.
-    var deleteRows: @Sendable ([Int64]) throws -> Void
+    /// Deletes the project whose joined row has the first id and whose
+    /// segment rows have exactly the others, in one transaction. It throws
+    /// `HistoryDeletionUnitChanged`, deleting nothing, when the row is no
+    /// longer the project's current joined row or the project's segment rows
+    /// are no longer those.
+    var deleteProject: @Sendable (_ joinedRowID: Int64, _ segmentRowIDs: [Int64]) throws -> Void
 }
+
+/// A long-form project changed between the read of its rows and their delete
+/// (A4): a newer joined output replaced the row, or the project's segments
+/// are no longer the ones that were read. Nothing was deleted.
+struct HistoryDeletionUnitChanged: Error, Equatable, Sendable {}
 
 extension HistoryDeletionEngine {
     /// Deletes several rows as one unit (A4): a long-form project's joined
@@ -1365,7 +1399,10 @@ extension HistoryDeletionEngine {
         } catch {
             for path in recorded { withdrawAudioRemoval(path) }
             return HistoryDeletionResult(
-                outcome: .databaseFailure(describe(error)), deletedRowIDs: [], unremovedAudioPaths: []
+                outcome: .databaseFailure(describe(error)),
+                deletedRowIDs: [],
+                unremovedAudioPaths: [],
+                unitChanged: error is HistoryDeletionUnitChanged
             )
         }
         var unremoved: [String] = []

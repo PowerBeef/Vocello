@@ -187,9 +187,11 @@ private struct IOSHistoryLibrarySection: View {
     /// deleted (PA-21, AUD-05). Never silent; `audioNotDeletedMessage` says which.
     @State private var isAudioNotDeletedPresented = false
     @State private var audioNotDeletedMessage = ""
-    /// A single delete that could not record its audio removal deleted
-    /// nothing; the user is told and can retry (the database is fine).
+    /// A delete that could not record its audio removal, or whose long-form
+    /// project changed under it (A4), deleted nothing; the user is told and
+    /// can retry (the database is fine). `deleteRefusedMessage` says which.
     @State private var isDeleteRefusedPresented = false
+    @State private var deleteRefusedMessage = ""
     /// A clear that was refused or failed is never silent (PA-30); the message
     /// is the typed error, which says what was preserved.
     @State private var isClearFailurePresented = false
@@ -243,7 +245,7 @@ private struct IOSHistoryLibrarySection: View {
                 Button(IOSInterfaceText.ok, role: .cancel) {}
                     .accessibilityIdentifier("historyDeleteRefusedDismiss")
             } message: {
-                Text(IOSAppLanguage.shared.presentation.historyRemovalUnrecorded)
+                Text(deleteRefusedMessage)
             }
 
             IOSHistoryFilterChips(selection: $modeFilter)
@@ -832,10 +834,20 @@ private struct IOSHistoryLibrarySection: View {
                 isAudioNotDeletedPresented = true
                 reload()
             case .databaseFailure(let message):
-                databaseUnavailable = true
-                errorMessage = message
+                if deletion.unitChanged {
+                    // A long-form save changed the project under the delete
+                    // (A4): nothing was deleted and History is fine. The alert
+                    // says so and the list, now stale, is read again.
+                    deleteRefusedMessage = message
+                    isDeleteRefusedPresented = true
+                    reload()
+                } else {
+                    databaseUnavailable = true
+                    errorMessage = message
+                }
             case .removalUnrecorded:
                 // The failed append may have set an unreadable list aside.
+                deleteRefusedMessage = IOSAppLanguage.shared.presentation.historyRemovalUnrecorded
                 isDeleteRefusedPresented = true
                 refreshRecoveryState()
             }

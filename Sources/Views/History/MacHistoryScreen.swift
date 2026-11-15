@@ -1026,7 +1026,14 @@ private extension MacHistoryScreen {
         let outcome = deletion.outcome
 
         if case .databaseFailure = outcome {
-            databaseUnavailable = true
+            if deletion.unitChanged {
+                // A long-form save changed the project under the delete (A4):
+                // nothing was deleted and History is fine. The list on screen
+                // is the stale one, so it is read again.
+                reloadHistory()
+            } else {
+                databaseUnavailable = true
+            }
             return outcome
         }
         databaseUnavailable = false

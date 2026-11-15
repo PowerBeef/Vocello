@@ -71,6 +71,16 @@ struct GenerationHistoryPageRequest: Equatable, Sendable {
         return .filterLoadedRows
     }
 
+    /// Whether a page that just landed is shown at once. A page read for inputs the user has
+    /// since changed, with the read for the new inputs queued behind it, is not: filtered by
+    /// the new inputs it would show a partial or empty list until that read lands, so the rows
+    /// on screen stay until it does. With no read queued, the landed page is all there is.
+    static func showsLandedPage(
+        landed: GenerationHistoryPageRequest, current: GenerationHistoryPageRequest, followUpPending: Bool
+    ) -> Bool {
+        landed == current || !followUpPending
+    }
+
     /// The query as the screen matches it.
     var normalizedQuery: String {
         switch searchStyle {

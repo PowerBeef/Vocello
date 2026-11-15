@@ -268,6 +268,20 @@ final class GenerationHistoryPageTests: XCTestCase {
         XCTAssertEqual(Request.answerToChange(loaded: nil, hasMoreItems: false), .readFirstPage, "nothing loaded yet")
     }
 
+    func testAPageOvertakenByANewerChangeWaitsForTheReadQueuedBehindIt() {
+        typealias Request = GenerationHistoryPageRequest
+        let typed = Request(query: "harbor")
+        XCTAssertTrue(Request.showsLandedPage(landed: typed, current: typed, followUpPending: true))
+        XCTAssertFalse(
+            Request.showsLandedPage(landed: Request(), current: typed, followUpPending: true),
+            "filtered by the newer search, the older page would flash a partial or empty list"
+        )
+        XCTAssertTrue(
+            Request.showsLandedPage(landed: Request(), current: typed, followUpPending: false),
+            "with no read queued, the landed page is all there is to show"
+        )
+    }
+
     private func row(
         _ text: String,
         mode: String = "custom",

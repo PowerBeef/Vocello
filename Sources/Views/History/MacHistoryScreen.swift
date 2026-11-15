@@ -804,8 +804,14 @@ private extension MacHistoryScreen {
                     hasMoreItems = hasMore
                     archiveCount = count
                     // In this same update, not through `itemsRevision`: the page and its
-                    // sections reach the list in one pass (RF-61).
-                    recomputeFilteredItems()
+                    // sections reach the list in one pass (RF-61). A page overtaken by a newer
+                    // search, filter or sort waits for the read queued behind it.
+                    if GenerationHistoryPageRequest.showsLandedPage(
+                        landed: request, current: currentPageRequest(),
+                        followUpPending: reloadCoalescer.followUpPending
+                    ) {
+                        recomputeFilteredItems()
+                    }
                     MacHistorySessionCache.items = loadedItems
                     MacHistorySessionCache.pageLimit = request.limit
                     MacHistorySessionCache.loadedRequest = request

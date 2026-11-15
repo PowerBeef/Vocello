@@ -44,6 +44,12 @@ work the same day; nothing is running.
 - `ui_test.sh macos perf` PASS (`bedafc14`): every hitch rate and frame gap inside its calibrated
   ceiling; the one warning (delivery-menu footprint) is a model warm at the window's end.
 
+**The whole-project audit of November 15** is in
+[audits/2026-11-15-project-audit.md](audits/2026-11-15-project-audit.md): no blocker in the product
+code; the History stall's cause is found (a History over 500 entries rebuilds its list twice per
+change); the measured lanes cannot fail on a silent or slower app; local evidence is built with a
+different Xcode than the release. Its "Recommended order" lists what to do before the tag.
+
 **Open, in order** ([investigation of November 15](audits/2026-11-15-release-3-1-interruption-investigation.md):
 the refused take is a rare model ending at that seed, 0 refusals in 60 other seeds on the hybrid and on
 Speed; filtering History now stalls up to 873 ms against about 470 ms in September, cause untraced)

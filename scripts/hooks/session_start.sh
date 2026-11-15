@@ -18,19 +18,29 @@ with_deadline() {
 }
 
 public_links() {
-  # The `path` of each `publicLinks` entry in config/build-output-policy.json.
+  # One `path<TAB>required|optional` line per `publicLinks` entry in config/build-output-policy.json.
+  # An entry marked `"optional": true` points into an arena only a trial command builds (the
+  # Enhanced Security CLI): its link dangling says that trial is unbuilt, not that a cache was lost.
   [[ -f config/build-output-policy.json ]] || return 0
   awk '
     /"publicLinks"[ \t]*:/ { on = 1 }
     !on { next }
     {
-      line = $0
-      while (match(line, /"path"[ \t]*:[ \t]*"[^"]*"/)) {
-        value = substr(line, RSTART, RLENGTH)
-        sub(/^"path"[ \t]*:[ \t]*"/, "", value)
-        sub(/"$/, "", value)
-        print value
-        line = substr(line, RSTART + RLENGTH)
+      count = split($0, parts, "}")
+      for (i = 1; i <= count; i++) {
+        part = parts[i]
+        if (match(part, /"path"[ \t]*:[ \t]*"[^"]*"/)) {
+          path = substr(part, RSTART, RLENGTH)
+          sub(/^"path"[ \t]*:[ \t]*"/, "", path)
+          sub(/"$/, "", path)
+        }
+        if (part ~ /"optional"[ \t]*:[ \t]*true/) optional = 1
+        if (i < count && path != "") {
+          # This part ended at a closing brace: the entry is complete.
+          print path "\t" (optional ? "optional" : "required")
+          path = ""
+          optional = 0
+        }
       }
       opened += gsub(/\[/, "[")
       closed += gsub(/\]/, "]")
@@ -40,12 +50,16 @@ public_links() {
 }
 
 cache_health() {
-  local links link dangling="" count=0 available_kb notes=""
+  local links link kind dangling="" unbuilt="" count=0 available_kb notes=""
   links="$(public_links)"
   [[ -n "$links" ]] || links="$(printf '%s\n' build/vocello build/Vocello.app)"
-  while IFS= read -r link; do
+  while IFS=$'\t' read -r link kind; do
     [[ -n "$link" ]] || continue
     if [[ -L "$link" && ! -e "$link" ]]; then
+      if [[ "$kind" == optional ]]; then
+        unbuilt="${unbuilt:+$unbuilt and }$link"
+        continue
+      fi
       dangling="${dangling:+$dangling and }$link"
       count=$((count + 1))
     fi
@@ -70,6 +84,9 @@ EOF
   esac
   if [[ -n "$notes" ]]; then
     echo "cache health: WARN $notes"
+  elif [[ -n "$unbuilt" ]]; then
+    echo "cache health: ok ($((available_kb / 1024 / 1024)) GiB free; no required public build link dangles;" \
+      "the optional trial link $unbuilt is unbuilt)"
   else
     echo "cache health: ok ($((available_kb / 1024 / 1024)) GiB free; no public build link dangles)"
   fi

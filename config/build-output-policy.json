@@ -472,7 +472,8 @@
     {
       "path": "build/vocello-enhanced-security",
       "targetEntry": "xcode-macos-enhanced-security-derived-data",
-      "targetSuffix": "Build/Products/Release/vocello"
+      "targetSuffix": "Build/Products/Release/vocello",
+      "optional": true
     }
   ],
   "externalXcodeDerivedData": {

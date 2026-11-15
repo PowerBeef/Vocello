@@ -1664,6 +1664,43 @@ class SessionStartTests(unittest.TestCase):
             output = self.session(root, "## Resume now\n### Current\nCheckpoint\n")
             self.assertIn("cache health: ok (400 GiB free; no public build link dangles)", output)
 
+    def test_a_dangling_optional_link_is_an_unbuilt_trial_not_a_lost_arena(self):
+        # B12: build/vocello-enhanced-security dangled as a leftover of the Enhanced Security trial
+        # while the main arenas were intact, and every session was told its next build would be cold.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            for compact in (False, True):
+                (root / "config/build-output-policy.json").write_text(json.dumps({
+                    "entries": [{"path": "build/not-a-link"}],
+                    "publicLinks": [{"path": "build/fixture-cli", "alternateTargetEntries": ["y"]},
+                                    {"path": "build/fixture-trial", "targetSuffix": "x", "optional": True},
+                                    {"path": "build/Fixture.app", "optional": False}],
+                    "migrations": [{"path": "build/never-read", "optional": True}]},
+                    indent=None if compact else 2).replace('"publicLinks"', '\n"publicLinks"'))
+                (root / "build").mkdir(exist_ok=True)
+                for name in ("fixture-cli", "fixture-trial", "Fixture.app"):
+                    link = root / "build" / name
+                    if link.is_symlink():
+                        link.unlink()
+                (root / "build/fixture-trial").symlink_to("cache/xcode/trial-gone/vocello")
+                with self.subTest(compact=compact, dangling="optional only"):
+                    health = [line for line in self.session(root, "## Resume now\n### Current\nCheckpoint\n").splitlines()
+                              if line.startswith("cache health: ")]
+                    self.assertEqual(health, ["cache health: ok (400 GiB free; no required public build link dangles; "
+                                              "the optional trial link build/fixture-trial is unbuilt)"])
+                (root / "build/Fixture.app").symlink_to("cache/xcode/gone/Fixture.app")
+                with self.subTest(compact=compact, dangling="optional and required"):
+                    health = [line for line in self.session(root, "## Resume now\n### Current\nCheckpoint\n").splitlines()
+                              if line.startswith("cache health: ")]
+                    self.assertEqual(health, ["cache health: WARN build/Fixture.app dangles (a lost Xcode build "
+                                              "arena: the next native build is cold, never a measurement)"])
+
+    def test_the_policy_marks_only_the_trial_link_optional(self):
+        policy = json.loads((ROOT / "config/build-output-policy.json").read_text(encoding="utf-8"))
+        self.assertEqual([link["path"] for link in policy["publicLinks"] if link.get("optional")],
+                         ["build/vocello-enhanced-security"])
+
 
 class ProjectSkillTests(unittest.TestCase):
     SKILLS = {"vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",

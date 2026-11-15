@@ -11,6 +11,7 @@ import pathlib
 import re
 import sys
 import tempfile
+from typing import Any
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib"))
@@ -213,7 +214,7 @@ def lane_log(cases: list[tuple[str, str]]) -> str:
 class ExpectedLaneTests(unittest.TestCase):
     """RF-61, audit T10: a lane's full run must contain the lane's tests, none skipped."""
 
-    def run_summary(self, cases, *arguments: str) -> tuple[int, dict | None, str]:
+    def run_summary(self, cases, *arguments: str) -> tuple[int, Any, str]:
         with tempfile.TemporaryDirectory() as temp:
             log, out = pathlib.Path(temp) / "xcodebuild.log", pathlib.Path(temp) / "test-results.json"
             log.write_text(lane_log(cases), encoding="utf-8")

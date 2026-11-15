@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import TypeGuard
 import sys
 import tempfile
 
@@ -377,7 +378,7 @@ def filter_run_id(rows: list[dict], run_id: str) -> list[dict]:
     return [row for row in rows if (row.get("notes") or {}).get("benchRunID") == run_id]
 
 
-def _number(value) -> bool:
+def _number(value) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 

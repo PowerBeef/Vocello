@@ -175,7 +175,7 @@ def write_summary(log_path: pathlib.Path, out_path: pathlib.Path, *, quiet: bool
     expected = expected_tests(expect_config, expect_lane) if expect_lane else None
     text = log_path.read_text(encoding="utf-8", errors="replace")
     payload = summarize(text, source=str(log_path), require_complete=require_complete)
-    if expected is not None:
+    if expected is not None and expect_lane:
         payload["expected"] = check_expected(payload["tests"], expected, expect_lane)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

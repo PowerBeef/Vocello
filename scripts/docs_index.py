@@ -61,8 +61,9 @@ def front_matter(text: str) -> tuple[dict[str, str], str]:
     for line in lines[1:end]:
         match = KEY.match(line)
         if match:
-            current = match.group(1)
-            fields[current] = (match.group(2) or "").strip()
+            key: str = match.group(1)
+            current = key
+            fields[key] = (match.group(2) or "").strip()
         elif current is not None and line.startswith((" ", "\t")) and not line.lstrip().startswith("- "):
             fields[current] = f"{fields[current]} {line.strip()}".strip()
         else:
@@ -154,7 +155,9 @@ def render(root: pathlib.Path) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog=__doc__[__doc__.index("Usage:"):],
+    documentation = __doc__ or ""
+    parser = argparse.ArgumentParser(description=documentation.splitlines()[0],
+                                     epilog=documentation[documentation.index("Usage:"):],
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", nargs="?", default="render", choices=["render"], help=f"write {RENDER_PATH}")
     parser.add_argument("--check", action="store_true", help="verify, do not write")

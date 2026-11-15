@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -131,7 +132,7 @@ class UIPerfFixture(unittest.TestCase):
         log.write_text("\n".join(log_lines) + "\n")
         return log
 
-    def run_checker(self, log: Path, *, emit: bool = False) -> tuple[int, dict | None]:
+    def run_checker(self, log: Path, *, emit: bool = False) -> tuple[int, Any]:
         output = self.root / "ui-perf-report.json"
         argv = [
             "check_macos_ui_perf.py",
@@ -234,7 +235,7 @@ class UIPerfFixture(unittest.TestCase):
             "enforce": list(names), **extra,
         }))
 
-    def run_emitting(self, log: Path) -> tuple[int, dict | None]:
+    def run_emitting(self, log: Path) -> tuple[int, Any]:
         live_publisher = sys.modules.get("publish_benchmark_history")
         if live_publisher is None:
             import publish_benchmark_history as live_publisher

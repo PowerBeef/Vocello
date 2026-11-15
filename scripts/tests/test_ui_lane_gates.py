@@ -9,6 +9,7 @@ nothing builds, launches the app or publishes.
 from __future__ import annotations
 
 import json
+from typing import Any
 import unittest
 
 from shell_stubs import ROOT, UIFunctionShell, quote, ui_lane_sandbox
@@ -62,12 +63,13 @@ class ExpectedLaneTestsWiring(unittest.TestCase):
 
     def test_a_scenario_run_and_the_other_lanes_check_nothing(self) -> None:
         one_journey = [(SMOKE[0], "passed")]
-        for arguments in (
+        focused_runs: tuple[dict[str, Any], ...] = (
             {"scenario": "layout"},                      # a focused macOS smoke run
             {"lane": "localization"},                    # test01 alone, by design
             {"lane": "auto-language"},
             {"platform": "ios"},                         # the iPhone lanes list nothing yet
-        ):
+        )
+        for arguments in focused_runs:
             with self.subTest(**arguments):
                 status, results = self.summarize(one_journey, **arguments)
                 self.assertEqual(status, 0)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 import shlex
 import subprocess
 import sys
@@ -166,7 +167,7 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         lengths: str = "short,medium",
         extra_args: list[str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        self.last_manifest = None
+        self.last_manifest: Any = None
         with tempfile.TemporaryDirectory() as temp:
             diagnostics = Path(temp)
             engine = diagnostics / "engine"

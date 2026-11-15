@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+from typing import Any
 import subprocess
 import sys
 import tempfile
@@ -195,7 +196,7 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run the checker on a fixture; `in_process` is the imported checker
         module to call directly (so a test can observe it) instead of a subprocess."""
-        self.last_manifest = None
+        self.last_manifest: Any = None
         with tempfile.TemporaryDirectory() as temp:
             diagnostics = Path(temp)
             engine_rows = [
@@ -1108,6 +1109,7 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
 
     def test_an_armed_run_with_every_planned_capture_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
+            captures = outputs = Path(temp)
             for take_index, cell in self.PLANNED_CAPTURES.items():
                 captures, outputs = self._capture_fixture(Path(temp), take_index=take_index, cell=cell, duration=3.0)
             result = self._run_with_captures(captures, outputs)

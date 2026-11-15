@@ -36,6 +36,7 @@
 		06269EEB3FAEF11E7CEECABF /* VocelloUIInteractionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2925211C7580F8DD7B566A42 /* VocelloUIInteractionPolicy.swift */; };
 		062F3A10DB8A68E6FB6C41D5 /* ScriptTextState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D258F35C47E33A7A503ABC4 /* ScriptTextState.swift */; };
 		068FCDC9DFC3ADE7B6E1F551 /* MacModelVariantResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE9D2BDA257CCFD9C61608 /* MacModelVariantResolution.swift */; };
+		06C73FC3E0710706B5BE8B61 /* LiveStreamingPlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE376ADE93795C18BBBB0ED9 /* LiveStreamingPlaybackEngine.swift */; };
 		06E706C7F05B460E0699C677 /* MacSettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB384091F8AA65F0DB3AF78 /* MacSettingsScreen.swift */; };
 		072F0AE0D0C824948E3B4D8C /* MacSharedStoreChangeObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3372F8B85B9CBDE39894EC37 /* MacSharedStoreChangeObserver.swift */; };
 		07FF4D1C995D144E0A0E8D0A /* VocelloPresentationTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF9DA350918EAD0A4735D4E /* VocelloPresentationTextTests.swift */; };
@@ -453,6 +454,7 @@
 		74AC0D754398D27DABE2E73D /* MacInterfaceLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1EE5632D8F815C9D90BFF9 /* MacInterfaceLanguage.swift */; };
 		754F5D419C1C2A94AF4A19FB /* MacStudioGenerationRequestFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B992E1A6D01B95314004B09 /* MacStudioGenerationRequestFactory.swift */; };
 		758D5ECBC6890C55E9738942 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE6246EDCA8B09170C7F0FF /* DatabaseService.swift */; };
+		759EA3EB5F0A53CF991F4D69 /* LiveStreamingPlaybackEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E0F3DA85E7711E05309390 /* LiveStreamingPlaybackEngineTests.swift */; };
 		75FBB39C30D85969ABA8EB72 /* CLIGenerateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D59F8E52BE1B0846EB130C5 /* CLIGenerateRequest.swift */; };
 		7628081BA5C0D244B2DBAB30 /* MacBatchGenerationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D19986918FF5B7862E79E4B /* MacBatchGenerationSheet.swift */; };
 		7683651C002A3B800CE8532C /* DesktopVoiceEnrollmentCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D77D858EBB3CCEFA40E4E0 /* DesktopVoiceEnrollmentCoverageTests.swift */; };
@@ -1386,6 +1388,7 @@
 		6FF06A4116BBDB359ADECFF4 /* MacListPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacListPrimitives.swift; sourceTree = "<group>"; };
 		70D894E4C00402DCD93B693A /* GenerationStartupDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationStartupDiagnostics.swift; sourceTree = "<group>"; };
 		71BF891DDCD76290F1E6DCA2 /* MacVoiceCloningReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVoiceCloningReadiness.swift; sourceTree = "<group>"; };
+		71E0F3DA85E7711E05309390 /* LiveStreamingPlaybackEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingPlaybackEngineTests.swift; sourceTree = "<group>"; };
 		7286A8F823E95E9E6B702750 /* VocelloMacUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocelloMacUITestCase.swift; sourceTree = "<group>"; };
 		72B703DF8A07FC4F83D3202F /* ModelInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInfo.swift; sourceTree = "<group>"; };
 		731806AD2E661F625043EC13 /* ModelDeletionSequence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDeletionSequence.swift; sourceTree = "<group>"; };
@@ -1894,6 +1897,7 @@
 				BB4517A30649AC205A080416 /* IOSStartupReliabilityPlanTests.swift */,
 				8CD6D7A2094F235EC327012B /* LanguageSelectionPresentationTests.swift */,
 				C3DF6C0FD82032380A9E1689 /* LanguageTestSupport.swift */,
+				71E0F3DA85E7711E05309390 /* LiveStreamingPlaybackEngineTests.swift */,
 				F280AA7C0FC90027496C24B4 /* LocalBenchmarkDataPolicyTests.swift */,
 				BE7BE1B65EF321510802A416 /* LocalModelAssetStoreIntegrityTests.swift */,
 				6483C88935F8DA2E2EC149B3 /* LongFormAssemblyTests.swift */,
@@ -3746,6 +3750,8 @@
 				A43F191A9BED89F1BDDC8BFF /* LanguageSelectionPresentationTests.swift in Sources */,
 				4F46B5EB5B7339B64A46F2CA /* LanguageTestSupport.swift in Sources */,
 				56E00D041F4B0446AFFB1961 /* LivePreviewEstimate.swift in Sources */,
+				06C73FC3E0710706B5BE8B61 /* LiveStreamingPlaybackEngine.swift in Sources */,
+				759EA3EB5F0A53CF991F4D69 /* LiveStreamingPlaybackEngineTests.swift in Sources */,
 				4254917FA0415432A0A2FE1A /* LocalBenchmarkDataPolicyTests.swift in Sources */,
 				41627DB9D5F1FAAFF154A0E9 /* LocalModelAssetStoreIntegrityTests.swift in Sources */,
 				A4487DCCC6BA1A5F84F8CAFB /* LongFormAssemblyTests.swift in Sources */,

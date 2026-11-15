@@ -757,4 +757,47 @@ final class LivePreviewEstimateTests: XCTestCase {
     func testMixedScriptAddsBothParts() throws {
         XCTAssertEqual(try estimate("第3章"), 2 * 0.26 + 1 / 2.45, accuracy: 1e-9)
     }
+
+    // MARK: - The live preview's playhead (RF-61, audit finding A3)
+
+    func testThePlayheadIsTheNodeClockUntilAnUnderrun() {
+        var playhead = LivePreviewPlayhead()
+        playhead.bufferPlayed(seconds: 1)
+        // A user pause and resume change nothing: the node's clock continues by itself.
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 3), 3)
+        XCTAssertEqual(playhead.offset, 0)
+    }
+
+    func testAnUnderrunAnchorsThePlayheadToWhatWasPlayed() {
+        var playhead = LivePreviewPlayhead()
+        playhead.bufferPlayed(seconds: 1.2)
+        playhead.bufferPlayed(seconds: 0.8)
+        let silence = 1024.0 / 24_000.0
+        // The node was held 80 ms after its last buffer ended.
+        playhead.underrun(nodeSeconds: 2.08, leadingSilenceSeconds: silence)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 2.08), 2.0, accuracy: 1e-9)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 2.08 + silence), 2.0, accuracy: 1e-9)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 2.08 + silence + 0.5), 2.5, accuracy: 1e-9)
+
+        // A second underrun anchors again, from the audio played by then.
+        playhead.bufferPlayed(seconds: 1)
+        playhead.underrun(nodeSeconds: 2.08 + silence + 1.03, leadingSilenceSeconds: silence)
+        XCTAssertEqual(
+            playhead.heardSeconds(nodeSeconds: 2.08 + silence + 1.03 + silence + 0.25), 3.25, accuracy: 1e-9
+        )
+    }
+
+    func testAnUnderrunWithoutAClockOrWithUnusableValuesNeverMovesThePlayheadBack() {
+        var playhead = LivePreviewPlayhead()
+        playhead.bufferPlayed(seconds: 2)
+        playhead.bufferPlayed(seconds: .nan)
+        playhead.bufferPlayed(seconds: -1)
+        XCTAssertEqual(playhead.playedSeconds, 2)
+        playhead.underrun(nodeSeconds: nil, leadingSilenceSeconds: 0.04)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 2.0), 2.0, accuracy: 1e-9)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 2.54), 2.5, accuracy: 1e-9)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: .nan), 2.0)
+        playhead.underrun(nodeSeconds: .infinity, leadingSilenceSeconds: .nan)
+        XCTAssertEqual(playhead.heardSeconds(nodeSeconds: 0), 2.0)
+    }
 }

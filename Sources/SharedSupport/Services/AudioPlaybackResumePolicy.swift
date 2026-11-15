@@ -17,6 +17,45 @@ enum AudioPlaybackResumePolicy {
     }
 }
 
+/// The live preview's playhead: the position the listener has heard, from the player node's clock.
+///
+/// `AVAudioPlayerNode` keeps its player time across `pause()` and continues from it on the next
+/// `play()`; only `stop()` returns it to zero (measured on macOS 27.2, in offline rendering and on
+/// the output device, 2026-11-15). A user pause therefore needs no correction. An underrun does:
+/// the node's clock ran on between the end of its last buffer and the moment it was held, and it
+/// runs through the short silence queued ahead of the audio that follows.
+struct LivePreviewPlayhead: Equatable, Sendable {
+    /// Added to the node's player time to give the heard position.
+    private(set) var offset: TimeInterval = 0
+    /// Audio the node has played to its end since its timeline began.
+    private(set) var playedSeconds: TimeInterval = 0
+    /// The heard position never reads below what the last underrun had already played.
+    private var floorSeconds: TimeInterval = 0
+
+    mutating func bufferPlayed(seconds: TimeInterval) {
+        guard seconds.isFinite, seconds > 0 else { return }
+        playedSeconds += seconds
+    }
+
+    /// The queue ran dry and the node was held with its clock at `nodeSeconds` (nil when it was
+    /// not playing and has none to read); `leadingSilenceSeconds` of silence now lead its queue.
+    /// When playback resumes, the first new sample is heard at exactly `playedSeconds`.
+    mutating func underrun(nodeSeconds: TimeInterval?, leadingSilenceSeconds: TimeInterval) {
+        let silence = leadingSilenceSeconds.isFinite ? max(0, leadingSilenceSeconds) : 0
+        floorSeconds = playedSeconds
+        guard let nodeSeconds, nodeSeconds.isFinite else {
+            offset -= silence
+            return
+        }
+        offset = playedSeconds - nodeSeconds - silence
+    }
+
+    func heardSeconds(nodeSeconds: TimeInterval) -> TimeInterval {
+        guard nodeSeconds.isFinite else { return floorSeconds }
+        return max(floorSeconds, nodeSeconds + offset)
+    }
+}
+
 /// A user-started operation may contain several engine generations (a batch or
 /// long-form project). Choosing other audio or dismissing revokes the whole
 /// operation, including chunks that have not arrived yet and its final output.

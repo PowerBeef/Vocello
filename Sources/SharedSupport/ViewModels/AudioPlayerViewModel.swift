@@ -216,7 +216,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     @ObservationIgnored private var pendingAutoplaySignpost = false
     @ObservationIgnored private var livePlaybackStarted = false
     @ObservationIgnored private var livePreviewDuration: TimeInterval = 0
-    @ObservationIgnored private var livePlaybackTimeOffset: TimeInterval = 0
     @ObservationIgnored private var liveUnderrunCount = 0
     /// How fast the current take's audio is arriving (RF-48); reset with the
     /// underrun count, wherever a take's live state starts over.
@@ -730,7 +729,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePlayback.clearFormat()
         livePlaybackStarted = false
         livePreviewDuration = 0
-        livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
         livePreviewPace = LivePreviewPace()
         livePreviewEstimate = sessionEstimate
@@ -1126,7 +1124,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePlayback.clearFormat()
         livePlaybackStarted = false
         livePreviewDuration = 0
-        livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
         livePreviewPace = LivePreviewPace()
         // Smooth-first prebuffer estimate handoff: pending values
@@ -1523,7 +1520,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePlayback.resetBookkeeping()
         livePlaybackStarted = false
         livePreviewDuration = 0
-        livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
         livePreviewPace = LivePreviewPace()
         liveExpectedFrameOffset = nil
@@ -1627,10 +1623,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         do {
             try livePlayback.startEngineIfNeeded()
             if !livePlayback.isNodePlaying {
-                if livePlaybackStarted {
-                    livePlaybackTimeOffset = currentTime
-                    livePlayback.scheduleLeadingSilence()
-                }
+                // Nothing is scheduled and nothing is added to the playhead here: the node kept
+                // its queue and its clock across the pause, and an underrun queued its own
+                // leading silence when the queue ran dry (RF-61, audit findings A2 and A3).
                 livePlayback.playNode()
                 AppGenerationTimeline.shared.recordPlaybackScheduled(
                     id: liveSessionID,
@@ -1687,7 +1682,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             liveUnderrunCount += 1
             AppPerformanceSignposts.emit("Live Preview Underrun")
             AppGenerationTimeline.shared.recordPlaybackUnderrun(id: liveSessionID)
-            livePlayback.pauseNode()
+            livePlayback.holdForUnderrun()
             isPlaying = false
             stopTimer()
             setLivePreviewPhase(.buffering)
@@ -1761,7 +1756,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePlayback.resetBookkeeping()
         livePlaybackStarted = false
         livePreviewDuration = 0
-        livePlaybackTimeOffset = 0
         liveUnderrunCount = 0
         livePreviewPace = LivePreviewPace()
         livePlayback.clearFormat()
@@ -1900,7 +1894,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             livePlayback.resetBookkeeping()
             livePlaybackStarted = false
             livePreviewDuration = 0
-            livePlaybackTimeOffset = 0
             liveUnderrunCount = 0
             livePreviewPace = LivePreviewPace()
             livePlayback.clearFormat()
@@ -2085,7 +2078,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         stopTimer()
         let interval = desiredTimerInterval
         activeTimerInterval = interval
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if self.activeTimerInterval != self.desiredTimerInterval {
@@ -2096,6 +2089,11 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
                 self.updatePlaybackProgress()
             }
         }
+        // The common modes, so the playhead keeps moving while a menu is open, a control is
+        // tracked or the window resizes (RF-61, audit finding A6): the default mode alone
+        // stops there, and with it the live preview's hand-off to the final file.
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
     private func stopTimer() {
@@ -2114,9 +2112,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             }
         case .live:
             guard livePlayback.isConfigured else { return }
-            if let renderedTime = livePlayback.renderedNodeSeconds {
-                let adjustedTime = renderedTime + livePlaybackTimeOffset
-                currentTime = duration > 0 ? min(adjustedTime, duration) : adjustedTime
+            if let heardTime = livePlayback.heardSeconds {
+                currentTime = duration > 0 ? min(heardTime, duration) : heardTime
             }
 
             if !livePlayback.isNodePlaying, liveFinalFilePath != nil {

@@ -241,7 +241,7 @@
       ],
       "owner": "one-way live playback graph retirement task",
       "invariant": "The MainActor owner stops the player node, removes every app reference to the AVAudioEngine graph, and transfers the graph exactly once into an immutable box. A utility-priority detached task performs only terminal stop/reset and never publishes, reuses, or concurrently reads the graph.",
-      "reviewedAt": "2026-08-29",
+      "reviewedAt": "2026-11-15",
       "removalCondition": "Remove when AVFAudio graph types gain checked Sendable terminal ownership or an asynchronous engine-stop API makes the one-way transfer unnecessary.",
       "tests": [
         "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift"

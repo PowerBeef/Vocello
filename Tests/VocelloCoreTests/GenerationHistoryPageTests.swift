@@ -251,6 +251,23 @@ final class GenerationHistoryPageTests: XCTestCase {
         }
     }
 
+    /// RF-61 (audit finding A1): an archive larger than the loaded page, or a page a filter or
+    /// search already narrowed, is answered by the database, and the rows on screen wait for it.
+    /// Filtering them first rebuilt the list twice and showed "No matches" for matches the page
+    /// did not hold.
+    func testAChangeIsAnsweredInMemoryOnlyWhenTheWholeArchiveIsLoaded() {
+        typealias Request = GenerationHistoryPageRequest
+        XCTAssertEqual(Request.answerToChange(loaded: Request(), hasMoreItems: false), .filterLoadedRows)
+        XCTAssertEqual(Request.answerToChange(loaded: Request(), hasMoreItems: true), .readFirstPage, "more than a page")
+        XCTAssertEqual(
+            Request.answerToChange(loaded: Request(query: "harbor"), hasMoreItems: false), .readFirstPage,
+            "the loaded rows are a search's, not the archive"
+        )
+        XCTAssertEqual(Request.answerToChange(loaded: Request(mode: "clone"), hasMoreItems: false), .readFirstPage)
+        XCTAssertEqual(Request.answerToChange(loaded: Request(query: "  "), hasMoreItems: false), .filterLoadedRows)
+        XCTAssertEqual(Request.answerToChange(loaded: nil, hasMoreItems: false), .readFirstPage, "nothing loaded yet")
+    }
+
     private func row(
         _ text: String,
         mode: String = "custom",

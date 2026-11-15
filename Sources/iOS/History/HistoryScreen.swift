@@ -565,16 +565,15 @@ private struct IOSHistoryLibrarySection: View {
     /// filtered in memory, as before paging; otherwise the database answers from
     /// the first page, so no match hides beyond the rows already loaded.
     private func showFirstPage() {
-        recomputePresentation()
-        guard !holdsWholeArchive else { return }
-        pageLimit = GenerationHistoryPageRequest.pageSize
-        loadPage(reconciling: false)
-    }
-
-    /// The loaded rows are the complete, unfiltered archive.
-    private var holdsWholeArchive: Bool {
-        guard let loadedRequest, !hasMoreItems else { return false }
-        return loadedRequest.isUnfiltered
+        switch GenerationHistoryPageRequest.answerToChange(loaded: loadedRequest, hasMoreItems: hasMoreItems) {
+        case .filterLoadedRows:
+            recomputePresentation()
+        case .readFirstPage:
+            // The rows on screen stay until the page lands (RF-61): filtering them first showed
+            // an empty or partial list, then rebuilt it when the page arrived.
+            pageLimit = GenerationHistoryPageRequest.pageSize
+            loadPage(reconciling: false)
+        }
     }
 
     /// Reads the current page off the main thread. A full reload reconciles

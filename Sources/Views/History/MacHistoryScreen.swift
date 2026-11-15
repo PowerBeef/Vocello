@@ -277,12 +277,6 @@ struct MacHistoryScreen: View {
         items.isEmpty && archiveCount == 0
     }
 
-    /// The loaded rows are the complete, unfiltered archive.
-    private var holdsWholeArchive: Bool {
-        guard let loadedRequest, !hasMoreItems else { return false }
-        return loadedRequest.isUnfiltered
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
@@ -683,10 +677,15 @@ private extension MacHistoryScreen {
     /// sorted and filtered in memory, as before paging; otherwise the database
     /// answers from the first page, so no match hides beyond the loaded rows.
     func pageInputsChanged() {
-        recomputeFilteredItems()
-        guard !holdsWholeArchive else { return }
-        pageLimit = GenerationHistoryPageRequest.pageSize
-        reloadHistory(reconciling: false)
+        switch GenerationHistoryPageRequest.answerToChange(loaded: loadedRequest, hasMoreItems: hasMoreItems) {
+        case .filterLoadedRows:
+            recomputeFilteredItems()
+        case .readFirstPage:
+            // The rows on screen stay until the page lands (RF-61): filtering them first showed
+            // "No matches" or a partial list, then rebuilt the list a second time.
+            pageLimit = GenerationHistoryPageRequest.pageSize
+            reloadHistory(reconciling: false)
+        }
     }
 
     /// The page the current sort, filter and search ask for; the search uses
@@ -804,7 +803,9 @@ private extension MacHistoryScreen {
                     loadedRequest = request
                     hasMoreItems = hasMore
                     archiveCount = count
-                    itemsRevision &+= 1
+                    // In this same update, not through `itemsRevision`: the page and its
+                    // sections reach the list in one pass (RF-61).
+                    recomputeFilteredItems()
                     MacHistorySessionCache.items = loadedItems
                     MacHistorySessionCache.pageLimit = request.limit
                     MacHistorySessionCache.loadedRequest = request
@@ -885,8 +886,9 @@ private extension MacHistoryScreen {
             let snapshot = await GenerationHistoryRecovery.snapshot()
             let urls = await GenerationHistoryRecovery.recoveryExportURLs()
             guard !Task.isCancelled else { return }
-            recoverySnapshot = snapshot
-            recoveryAudioURLs = urls
+            // Unchanged values are not assigned: each assignment is another pass over the list.
+            if recoverySnapshot != snapshot { recoverySnapshot = snapshot }
+            if recoveryAudioURLs != urls { recoveryAudioURLs = urls }
         }
     }
 

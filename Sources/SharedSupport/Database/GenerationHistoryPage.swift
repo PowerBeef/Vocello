@@ -55,6 +55,22 @@ struct GenerationHistoryPageRequest: Equatable, Sendable {
         mode == nil && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// How a screen answers a filter, sort or search change (RF-61, audit finding A1).
+    enum ChangeAnswer: Equatable, Sendable {
+        /// The loaded rows are the complete, unfiltered archive: filter and sort them in memory.
+        case filterLoadedRows
+        /// The archive is larger than the loaded page, or the page is already narrowed: the
+        /// database answers from its first page. The rows on screen stay until that page lands.
+        /// Filtering them meanwhile would show an empty or partial list that the page then
+        /// replaces, two rebuilds of the list for one change.
+        case readFirstPage
+    }
+
+    static func answerToChange(loaded: GenerationHistoryPageRequest?, hasMoreItems: Bool) -> ChangeAnswer {
+        guard let loaded, !hasMoreItems, loaded.isUnfiltered else { return .readFirstPage }
+        return .filterLoadedRows
+    }
+
     /// The query as the screen matches it.
     var normalizedQuery: String {
         switch searchStyle {

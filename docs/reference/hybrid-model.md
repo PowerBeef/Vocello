@@ -2,7 +2,7 @@
 status: active
 owner: backend-mlx
 reviewed: 2026-11-15
-summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two shipped artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
+summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two 3.0 artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
   - config/quality-screens.json

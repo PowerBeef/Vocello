@@ -1,6 +1,7 @@
 ---
 status: historical
 owner: backend-and-platform
+reviewed: 2026-10-20
 summary: Three uncalibrated QC v2 candidate producers (local phonation, isolated fragments and French word-boundary evidence) implemented at 5b141b4c, their place in the QC lane, and the qualification boundary.
 sourceOfTruth:
   - scripts/qc/candidates.py

@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-10-20
 summary: Standing policy: why the macOS engine stays outside the App Sandbox, the constrained entitlement exceptions, and the trust boundary those exceptions must never widen.
 sourceOfTruth:
   - Sources/QwenVoice.entitlements

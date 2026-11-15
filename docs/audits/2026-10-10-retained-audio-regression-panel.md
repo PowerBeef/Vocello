@@ -1,6 +1,7 @@
 ---
 status: historical
 owner: backend-and-platform
+reviewed: 2026-10-20
 summary: Cache-only analysis of a retained, annotated French recording as a development regression case — what the installed detectors recover and miss, and why it cannot become an independent test.
 sourceOfTruth:
   - scripts/qc/lanes.py

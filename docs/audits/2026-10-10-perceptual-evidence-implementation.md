@@ -1,6 +1,7 @@
 ---
 status: historical
 owner: backend-and-platform
+reviewed: 2026-10-20
 summary: Installed-model QC v2 evidence for French pronunciation, expected phone paths and intervals and Clone register, its retained-clip verification and the held-out normalization fix; diagnostic only, with no qualified pass/fail decision.
 sourceOfTruth:
   - scripts/qc/evidence.py

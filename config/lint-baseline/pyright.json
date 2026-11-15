@@ -125,7 +125,6 @@
     {"file": "scripts/check_language_output.py", "code": "reportCallIssue", "fingerprint": "c80a9758eeceb31e", "count": 1},
     {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "012655c29ce88a89", "count": 1},
     {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "022f00932c33f961", "count": 1},
-    {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "1aa322d7795bc866", "count": 1},
     {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "4a64d0f70b8fcc0b", "count": 1},
     {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "4f9e2ec88b695567", "count": 1},
     {"file": "scripts/check_macos_ui_bench.py", "code": "reportArgumentType", "fingerprint": "58ce806483df2d5c", "count": 1},

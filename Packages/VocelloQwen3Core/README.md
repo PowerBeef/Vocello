@@ -76,19 +76,26 @@ streamed takes (D1, 2026-10-20, RF-21); a long-form segment turns D1 off to keep
 host gives the subtalker the reference sampling on every take (RF-18). The host's Balanced and
 Consistent variations are retired (RF-58), so every take now samples as Expressive did.
 
-The actor closes its inert-reservation and critical-relief lifecycle explicitly.
-Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join
-one finalization. Typed cache-trim or full-unload relief carries the generation lease through the
-release operation and reopens critical admission only after relief completes. A rejected atomic
-relief claim clears ownership before session reconciliation so a concurrent ordinary finalizer
-cannot strand the lease.
+The actor closes its inert-reservation lifecycle explicitly. Reserved, generating, and aborting
+states prevent open-after-abort and make duplicate aborts join one finalization.
+
+Memory relief and unload are the host's. Vocello closes its own admission gate, waits for the running
+model operation, then trims or drops its reference to the loaded model, and the actor goes with it
+(`docs/reference/native-engineering.md`, "Relief and unload are the host's"). The actor's own
+`observeMemoryPressure`, `relieveMemory`, `unload` and
+`acknowledgeProductFinalizationAndRelieveMemory` are internal to the package and exercised by its
+tests only: there, typed cache-trim or full-unload relief carries the generation lease through the
+release operation and reopens critical admission only after relief completes, and a rejected atomic
+relief claim clears ownership before session reconciliation so a concurrent ordinary finalizer cannot
+strand the lease.
 
 Clone prompts remain actor-owned behind epoch-bound `VocelloQwen3CloneHandle` values. The default
 retained-handle capacity is one, and Vocello never raises it; an explicit larger capacity uses
 least-recently-used eviction. The host's own clone LRU is larger on bigger Macs, so its older slots
 hold invalidated handles (engine audit B-16; `docs/ARCHITECTURE.md` §4.8).
 Release is explicit and repeat-safe, a reservation keeps an already captured prompt, noncritical
-cache trim preserves valid handles, and model reload, critical trim, or full unload invalidates them.
+cache trim preserves valid handles, and model reload, critical trim, or full unload invalidates them
+(in the product every load makes a new actor, so a handle never outlives its model).
 
 The `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` products remain checked in for implementation
 compatibility. They may be used inside this package, but are not the application-layer dependency

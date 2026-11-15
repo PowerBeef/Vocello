@@ -35,8 +35,10 @@ These files are the canonical data: the Swift side is golden-tested against them
   `cancelled` exits 130 for SIGINT and 143 for SIGTERM and names the signal in `detail.signal`. A
   consumer meeting a code it does not know falls back on `category` and `exitCode`.
 - **Values**: seeds and other 64-bit integers are decimal strings. `message` and `hint` are English
-  prose for people; programs read `code`. No envelope or record carries text to speak, transcripts, PCM
-  or private paths beyond the output paths a command returns.
+  prose for people; programs read `code`. No envelope or record carries transcripts, PCM or private
+  paths beyond the output paths a command returns, and none carries text to speak except a live
+  line-by-line result, whose `items[].text` repeats each line the caller sent beside its output path
+  (the request ledger's replayed copy keeps `textDigest` and `textCharacters` instead).
 
 ## The Vocello schema profile
 

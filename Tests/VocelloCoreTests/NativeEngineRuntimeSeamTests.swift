@@ -354,6 +354,50 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         await assertPrewarmSlotIsFree(runtime)
     }
 
+    // MARK: - Runtime caches
+
+    /// On a Mac the Qwen3 runtime caches survive an idle or explicit unload
+    /// and a soft trim, so the next load of the same weights stays fast. They
+    /// go only for memory relief: a hard trim, which keeps the weights, and
+    /// the full unload a pressure band asked for.
+    @concurrent func testOnAMacOnlyMemoryReliefClearsTheRuntimeCaches() async throws {
+        let fixture = RuntimeSeamFixture()
+        let runtime = fixture.runtime
+
+        _ = try await runtime.loadModel(id: RuntimeSeam.modelA)
+        // The idle unload and the explicit unload both end here.
+        await runtime.unloadModel()
+        await runtime.trimMemory(level: .softTrim, reason: "seam_soft_trim")
+        XCTAssertEqual(
+            fixture.runtimeCacheClears.entries,
+            [],
+            "an idle unload and a soft trim keep the runtime caches on a Mac"
+        )
+
+        _ = try await runtime.loadModel(id: RuntimeSeam.modelA)
+        await runtime.trimMemory(level: .hardTrim, reason: "seam_hard_trim")
+        XCTAssertEqual(fixture.runtimeCacheClears.entries.count, 1, "a hard trim clears them")
+        let afterHardTrim = await runtime.loadedModelID()
+        XCTAssertEqual(afterHardTrim, RuntimeSeam.modelA, "a hard trim keeps the weights")
+
+        await runtime.trimMemory(level: .fullUnload, reason: "seam_full_unload")
+        XCTAssertEqual(fixture.runtimeCacheClears.entries.count, 2, "a pressure-driven full unload clears them")
+        let afterFullUnload = await runtime.loadedModelID()
+        XCTAssertNil(afterFullUnload)
+
+        XCTAssertTrue(NativeEngineRuntime.clearsRuntimeCaches(deviceClass: .iPhonePro, forMemoryRelief: false))
+        for mac in [NativeDeviceMemoryClass.floor8GBMac, .mid16GBMac, .highMemoryMac] {
+            XCTAssertFalse(
+                NativeEngineRuntime.clearsRuntimeCaches(deviceClass: mac, forMemoryRelief: false),
+                mac.rawValue
+            )
+            XCTAssertTrue(
+                NativeEngineRuntime.clearsRuntimeCaches(deviceClass: mac, forMemoryRelief: true),
+                mac.rawValue
+            )
+        }
+    }
+
     // MARK: - Runtime-failure query
 
     /// The runtime returns the coordinator's verdict unchanged, and asking
@@ -492,13 +536,18 @@ private typealias RuntimeSeamWarmTask = Task<Result<InteractivePrefetchDiagnosti
 /// from the same control, so the cache's clears are logged too.
 private struct RuntimeSeamFixture {
     let log: RuntimeSeamLog
+    /// One entry per clear of the Qwen3 runtime caches, kept apart from `log`
+    /// so the ordered assertions on the allocator and the coordinator stand.
+    let runtimeCacheClears: RuntimeSeamLog
     let coordinator: RuntimeSeamCoordinator
     let runtime: NativeEngineRuntime
 
     init() {
         let log = RuntimeSeamLog()
+        let runtimeCacheClears = RuntimeSeamLog()
         let coordinator = RuntimeSeamCoordinator(log: log)
         self.log = log
+        self.runtimeCacheClears = runtimeCacheClears
         self.coordinator = coordinator
         runtime = NativeEngineRuntime(
             loadCoordinator: coordinator,
@@ -506,7 +555,8 @@ private struct RuntimeSeamFixture {
             lightweightWarmupText: "Hi.",
             allocatorControl: NativeMLXAllocatorControl(
                 applyPolicy: { log.append("allocator.applyPolicy:\($0.name)") },
-                clearCache: { log.append(RuntimeSeam.clearCache) }
+                clearCache: { log.append(RuntimeSeam.clearCache) },
+                runtimeCacheClear: .recording({ runtimeCacheClears.append("runtime-caches") })
             )
         )
     }

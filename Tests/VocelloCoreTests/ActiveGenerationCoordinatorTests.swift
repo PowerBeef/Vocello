@@ -669,7 +669,10 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             loadCoordinator: coordinator,
             streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
                 fatalError("This test never starts a generation.")
-            }
+            },
+            // The full unload below is memory relief, which on a Mac also clears the
+            // runtime caches: keep this lifecycle test off MLX.
+            allocatorControl: .inert
         )
 
         let load = Task { @MainActor in

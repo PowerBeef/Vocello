@@ -382,12 +382,25 @@ public enum NativeMemoryPolicyResolver {
 /// a trim. Production always uses `.live`; lifecycle tests pass `.inert` so the
 /// core test bundle, which the ThreadSanitizer lane runs, never touches MLX.
 struct NativeMLXAllocatorControl: Sendable {
+    /// What the runtime does when it drops the Qwen3 runtime caches (the resident speech
+    /// tokenizer, the text tokenizers, conditioning prefixes, decoder buckets and primed
+    /// decoder state).
+    enum RuntimeCacheClear: Sendable {
+        /// `VocelloQwen3Runtime.clearRuntimeCaches()`, on the runtime actor.
+        case live
+        /// Calls the closure instead, so a lifecycle test sees the clear without touching MLX.
+        case recording(@Sendable () -> Void)
+    }
+
     let applyPolicy: @Sendable (NativeMemoryPolicy) -> Void
     let clearCache: @Sendable () -> Void
+    /// A control built from the two closures above never reaches the live caches.
+    var runtimeCacheClear: RuntimeCacheClear = .recording({})
 
     static let live = NativeMLXAllocatorControl(
         applyPolicy: { NativeMemoryPolicyResolver.apply($0) },
-        clearCache: { Memory.clearCache() }
+        clearCache: { Memory.clearCache() },
+        runtimeCacheClear: .live
     )
 
     static let inert = NativeMLXAllocatorControl(applyPolicy: { _ in }, clearCache: {})

@@ -78,7 +78,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift",
-      "sha256": "ac4c69094d6900d70ff2086339d3171805df8474049a555066c2b6f43b906563",
+      "sha256": "49e61febb17d9fa895c0bd36b82c0bd9e266b0b0b0cf95154ea2cad9b5fcbbe8",
       "upstreamStatus": "added"
     },
     {

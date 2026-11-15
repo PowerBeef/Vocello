@@ -29,9 +29,12 @@ final class CachedTokenizerBox: @unchecked Sendable {
 /// caching fail-safe. Ownership follows the registered lock-protected cache
 /// invariant: exactly one logical user at a time — the loaded model — with
 /// the cache holding the handoff reference between sequential loads.
-/// `Qwen3TTSMemoryCaches.clearAll` (memory relief and explicit unload) clears
-/// the slot, so pressure never retains it; only an in-process model switch
-/// preserves it.
+/// `Qwen3TTSMemoryCaches.clearAll` clears the slot, and the host decides when
+/// to call it. The iPhone calls it at every unload, failed load and hard trim,
+/// so only an in-process model switch keeps the slot there. A Mac calls it for
+/// memory relief only (a hard trim, or the full unload a pressure band asked
+/// for), so the slot also survives an idle or explicit unload and the next
+/// load adopts it; pressure never retains it on either platform.
 final class CachedSpeechTokenizerBox: @unchecked Sendable {
     let identityKey: String
     let includesEncoder: Bool

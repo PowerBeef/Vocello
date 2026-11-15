@@ -845,7 +845,8 @@ concrete type. Key iOS behaviors:
   UIApplication lifecycle) runs during headless device diagnostics only; events land in
   `device-diagnostics-done.json` as `interruptions` so doomed runs self-report calls/backgrounding.
 - **Memory posture**: `.iPhonePro` policy; `Qwen3TTSMemoryCaches.clearAll()` on
-  hard-trim/unload/failure (macOS preserves cache warmth).
+  hard-trim/unload/failure. A Mac clears the same caches for memory relief only (a hard trim, or
+  the full unload a pressure band asked for) and keeps them across an idle or explicit unload.
 - **Clone load profile**: `.fullCapabilities` vs `.iOSProductionDefault`
 (`.withoutCloneEncoders`) depending on the entitled memory limit.
 - **Hardware gate**: `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro+).

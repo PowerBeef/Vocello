@@ -166,8 +166,10 @@ from **two independent criteria**, and the engine band is the worse of them:
 uses the typed `.memoryPressure` reason to cancel the active generation and await its terminal
 barrier before the hard trim can begin. On iPhone hard-trim / unload / failure,
 `NativeEngineRuntime.clearQwen3MemoryCachesIfNeeded()`
-calls `Qwen3TTSMemoryCaches.clearAll()` — **iPhone-only**; macOS deliberately preserves Qwen3
-prepared/conditioning/decoder cache warmth across trims so warm-after-idle stays fast.
+calls `Qwen3TTSMemoryCaches.clearAll()`. When this was written the call was **iPhone-only**. Since
+2026-11-15 a Mac also clears for memory relief (a hard trim, or the full unload a pressure band asked
+for); it still keeps the prepared/conditioning/decoder caches across an idle or explicit unload so
+warm-after-idle stays fast.
 
 **Admission semantics (corrected 2026-07-02 to match code).**
 `TTSEngineStore.guardModelAdmission(...)` refreshes the memory context, records a
@@ -431,8 +433,10 @@ memctx cosmetic cleanup (`72c95fc`).
   sends must backpressure rather than evict an older event.
 - **No hard `Memory.memoryLimit` on any tier** (reverted in `b77c08e`) — it over-promised headroom
   and caused spurious downgrades. Gate on `os_proc_available_memory()` / the band instead.
-- **`Qwen3TTSMemoryCaches.clearAll()` runs on iPhone hard-trim/unload/failure only** — macOS preserves
-  cache warmth. Don't make macOS clear, don't stop iPhone clearing.
+- **`Qwen3TTSMemoryCaches.clearAll()` runs on iPhone hard-trim/unload/failure.** A Mac keeps cache
+  warmth across an idle or explicit unload and clears only for memory relief (a hard trim, or a
+  pressure-driven full unload; since 2026-11-15). Don't make a Mac idle unload clear, don't stop
+  iPhone clearing.
 - **No Quality→Speed OOM fallback** — iPhone is Speed-only by contract; picking a variant loads it and
   surfaces the real error (no silent downgrade).
 - **Admission blocks on critical headroom/GPU only** (`guardModelAdmission` throws

@@ -518,7 +518,10 @@ actor NativeEngineRuntime {
         activeModelID
     }
 
-    func unloadModel() async {
+    /// `forMemoryRelief` is true only for the full unload a memory trim asked
+    /// for. On a Mac that unload also drops the runtime caches, which an idle
+    /// or explicit unload keeps (`clearQwen3MemoryCachesIfNeeded`).
+    func unloadModel(forMemoryRelief: Bool = false) async {
         // DW-03: a trace-visible full unload for the requests routed through
         // here (memory relief, idle unload, delete). stop(), a model switch
         // inside a load and a failed load or prewarm release the weights
@@ -532,7 +535,7 @@ actor NativeEngineRuntime {
         await loadCoordinator.unloadModel()
         activeModelID = nil
         await clearCloneState()
-        await clearQwen3MemoryCachesIfNeeded()
+        await clearQwen3MemoryCachesIfNeeded(forMemoryRelief: forMemoryRelief)
         await telemetryRecorder?.mark(stage: .unload)
         await activeTelemetrySampler?.captureBoundary("memory_unload")
         await telemetryRecorder?.mark(
@@ -708,9 +711,9 @@ actor NativeEngineRuntime {
             primedCloneUIIdentityKeys.removeAll()
             clonePrimeTimingOverridesMS.removeAll()
             allocatorControl.clearCache()
-            await clearQwen3MemoryCachesIfNeeded()
+            await clearQwen3MemoryCachesIfNeeded(forMemoryRelief: true)
         case .fullUnload:
-            await unloadModel()
+            await unloadModel(forMemoryRelief: true)
         }
         await activeTelemetrySampler?.captureBoundary("after_memory_trim")
     }
@@ -2376,14 +2379,33 @@ actor NativeEngineRuntime {
         }
     }
 
-    private func clearQwen3MemoryCachesIfNeeded() async {
-        // macOS intentionally preserves Qwen3 prepared/conditioning/decoder
-        // cache warmth across unload, idle-unload, and trim so warm-after-idle
-        // generations stay fast. Only iPhone clears these caches to stay under
-        // the Jetsam ceiling. (The iOS-only model-switch path below the
-        // `#if os(iOS)` guard clears explicitly and is unaffected by this.)
-        guard NativeMemoryPolicyResolver.deviceClass() == .iPhonePro else { return }
-        await VocelloQwen3Runtime.clearRuntimeCaches()
+    /// Drops the Qwen3 runtime caches (the resident speech tokenizer, text
+    /// tokenizers, conditioning prefixes, decoder buckets and primed decoder
+    /// state) where the device and the cause call for it.
+    ///
+    /// The iPhone clears them at every unload, failed load and trim, to stay
+    /// under its memory limit. A Mac keeps them across an idle unload, an
+    /// explicit unload and a failed load, so the next load of the same weights
+    /// stays fast, and clears them only for memory relief: a hard trim, or the
+    /// full unload a pressure band asked for (`trimMemory`).
+    private func clearQwen3MemoryCachesIfNeeded(forMemoryRelief: Bool = false) async {
+        guard Self.clearsRuntimeCaches(
+            deviceClass: NativeMemoryPolicyResolver.deviceClass(),
+            forMemoryRelief: forMemoryRelief
+        ) else { return }
+        switch allocatorControl.runtimeCacheClear {
+        case .live:
+            await VocelloQwen3Runtime.clearRuntimeCaches()
+        case .recording(let record):
+            record()
+        }
+    }
+
+    nonisolated static func clearsRuntimeCaches(
+        deviceClass: NativeDeviceMemoryClass,
+        forMemoryRelief: Bool
+    ) -> Bool {
+        deviceClass == .iPhonePro || forMemoryRelief
     }
 
     private func ensureActiveClonePrimeToken(_ token: UUID) throws {

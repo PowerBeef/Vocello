@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import pathlib
+import re
 import sys
 import tempfile
 import unittest
@@ -162,6 +165,164 @@ class SwiftTestingTests(unittest.TestCase):
         self.assertNotIn("swiftTesting", payload)
         self.assertTrue(payload["complete"])
         self.assertTrue(payload["consistent"])
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+LANE_CONFIG = ROOT / "config" / "ui-lane-tests.json"
+MAC_UI_TESTS = ROOT / "Tests" / "VocelloMacUITests"
+# The XCTest class each lane of config/ui-lane-tests.json runs in full (scripts/ui_test.sh).
+LANE_CLASSES = {
+    "macos-smoke": "VocelloMacSmokeUITests",
+    "macos-perf": "VocelloMacPerfUITests",
+    "macos-benchmark": "VocelloMacBenchmarkUITests",
+}
+SWIFT_TYPE = re.compile(r"^(?:[a-z@()]+\s+)*(?:class|extension|struct|enum|actor|protocol)\s+(\w+)")
+SWIFT_TEST_METHOD = re.compile(r"^\s+func (test\w*)\s*\(\s*\)")
+
+
+def swift_test_methods(directory: pathlib.Path) -> dict[str, list[str]]:
+    """The `test…()` methods of each top-level type, its extensions included."""
+    methods: dict[str, list[str]] = {}
+    for path in sorted(directory.glob("*.swift")):
+        current = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if match := SWIFT_TYPE.match(line):
+                current = match.group(1)
+            elif current and (match := SWIFT_TEST_METHOD.match(line)):
+                methods.setdefault(current, []).append(match.group(1))
+    return methods
+
+
+def lane_log(cases: list[tuple[str, str]]) -> str:
+    """A complete `Selected tests` log of (Suite/method, verdict) cases."""
+    lines = ["Test Suite 'Selected tests' started at 2026-11-15 10:00:00.000."]
+    for identifier, verdict in cases:
+        suite, test = identifier.split("/")
+        lines.append(f"Test Case '-[VocelloMacUITests.{suite} {test}]' started.")
+        lines.append(f"Test Case '-[VocelloMacUITests.{suite} {test}]' {verdict} (1.000 seconds).")
+    skipped = sum(1 for _, verdict in cases if verdict == "skipped")
+    failed = sum(1 for _, verdict in cases if verdict == "failed")
+    skipped_clause = f"{skipped} test{'s' if skipped != 1 else ''} skipped and " if skipped else ""
+    lines.append(f"Test Suite 'Selected tests' {'failed' if failed else 'passed'} at 2026-11-15 10:30:00.000.")
+    lines.append(
+        f"\t Executed {len(cases)} tests, with {skipped_clause}{failed} failures (0 unexpected) in 1.0 (1.1) seconds"
+    )
+    return "\n".join(lines) + "\n"
+
+
+class ExpectedLaneTests(unittest.TestCase):
+    """RF-61, audit T10: a lane's full run must contain the lane's tests, none skipped."""
+
+    def run_summary(self, cases, *arguments: str) -> tuple[int, dict | None, str]:
+        with tempfile.TemporaryDirectory() as temp:
+            log, out = pathlib.Path(temp) / "xcodebuild.log", pathlib.Path(temp) / "test-results.json"
+            log.write_text(lane_log(cases), encoding="utf-8")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                status = summary.main([str(log), str(out), "--quiet", "--require-complete", *arguments])
+            payload = json.loads(out.read_text(encoding="utf-8")) if out.is_file() else None
+            return status, payload, stderr.getvalue()
+
+    def test_the_config_lists_exactly_the_test_methods_in_the_swift_sources(self):
+        """A renamed, added or deleted journey must change config/ui-lane-tests.json with it."""
+        config = json.loads(LANE_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(config["schemaVersion"], 1)
+        self.assertEqual(set(config["lanes"]), set(LANE_CLASSES))
+        methods = swift_test_methods(MAC_UI_TESTS)
+        for lane, suite in LANE_CLASSES.items():
+            with self.subTest(lane=lane):
+                self.assertTrue(methods.get(suite), f"no test methods found for {suite}")
+                self.assertEqual(config["lanes"][lane], [f"{suite}/{name}" for name in sorted(methods[suite])])
+                self.assertEqual(summary.expected_tests(LANE_CONFIG, lane), config["lanes"][lane])
+        # The parser reads one class's methods, not its neighbours in the same file.
+        self.assertEqual(methods["VocelloMacAutoLanguageUITests"], ["testAutoLanguageReachesTheEngine"])
+        self.assertEqual(len(config["lanes"]["macos-smoke"]), 16)
+        self.assertEqual(config["lanes"]["macos-benchmark"], ["VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"])
+
+    def test_a_full_run_of_every_expected_test_passes(self):
+        for lane in LANE_CLASSES:
+            with self.subTest(lane=lane):
+                expected = summary.expected_tests(LANE_CONFIG, lane)
+                status, payload, stderr = self.run_summary(
+                    [(name, "passed") for name in expected], "--expect-lane", lane)
+                self.assertEqual((status, stderr), (0, ""))
+                self.assertEqual(payload["expected"], {
+                    "lane": lane, "count": len(expected), "missing": [], "skipped": [], "met": True})
+
+    def test_a_missing_journey_fails_the_lane(self):
+        expected = summary.expected_tests(LANE_CONFIG, "macos-smoke")
+        deleted = "VocelloMacSmokeUITests/test15_ModelUpdateFromAnEarlierVocello"
+        cases = [(name, "passed") for name in expected if name != deleted]
+        status, payload, stderr = self.run_summary(cases, "--expect-lane", "macos-smoke")
+        # The log is complete and consistent; only the expectation fails it.
+        self.assertTrue(payload["consistent"])
+        self.assertEqual(status, summary.EXIT_EXPECTED_TESTS)
+        self.assertEqual((payload["expected"]["missing"], payload["expected"]["skipped"]), ([deleted], []))
+        self.assertFalse(payload["expected"]["met"])
+        self.assertIn(f"expected macos-smoke test missing: {deleted}", stderr)
+        # A renamed journey is a missing one too.
+        renamed = [*cases, ("VocelloMacSmokeUITests/test15_ModelUpdate", "passed")]
+        self.assertEqual(self.run_summary(renamed, "--expect-lane", "macos-smoke")[0], summary.EXIT_EXPECTED_TESTS)
+
+    def test_a_skipped_journey_fails_the_lane(self):
+        expected = summary.expected_tests(LANE_CONFIG, "macos-perf")
+        skipped = expected[3]
+        cases = [(name, "skipped" if name == skipped else "passed") for name in expected]
+        status, payload, stderr = self.run_summary(cases, "--expect-lane", "macos-perf")
+        self.assertTrue(payload["consistent"])
+        self.assertEqual(status, summary.EXIT_EXPECTED_TESTS)
+        self.assertEqual((payload["expected"]["missing"], payload["expected"]["skipped"]), ([], [skipped]))
+        self.assertIn(f"expected macos-perf test skipped: {skipped}", stderr)
+
+    def test_a_failed_test_ran_and_a_focused_run_checks_nothing(self):
+        expected = summary.expected_tests(LANE_CONFIG, "macos-smoke")
+        # A failing journey is the run's own failure, not a missing test.
+        cases = [(name, "failed" if index == 2 else "passed") for index, name in enumerate(expected)]
+        status, payload, _ = self.run_summary(cases, "--expect-lane", "macos-smoke")
+        self.assertEqual((status, payload["expected"]["met"]), (0, True))
+        # `--scenario layout` runs one journey; without --expect-lane it stays a pass.
+        status, payload, _ = self.run_summary([(expected[0], "passed")])
+        self.assertEqual(status, 0)
+        self.assertNotIn("expected", payload)
+        # The same subset is refused as a full run.
+        self.assertEqual(
+            self.run_summary([(expected[0], "passed")], "--expect-lane", "macos-smoke")[0],
+            summary.EXIT_EXPECTED_TESTS,
+        )
+
+    def test_an_inconsistent_log_keeps_its_own_exit_code(self):
+        expected = summary.expected_tests(LANE_CONFIG, "macos-benchmark")
+        with tempfile.TemporaryDirectory() as temp:
+            log, out = pathlib.Path(temp) / "xcodebuild.log", pathlib.Path(temp) / "out.json"
+            # Truncated before the trailer, and the expected test never reported.
+            log.write_text("Test Suite 'Selected tests' started at 2026-11-15 10:00:00.000.\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()):
+                status = summary.main([str(log), str(out), "--quiet", "--require-complete",
+                                       "--expect-lane", "macos-benchmark"])
+            self.assertEqual(status, summary.EXIT_INCONSISTENT)
+            self.assertEqual(json.loads(out.read_text())["expected"]["missing"], expected)
+
+    def test_an_unknown_lane_or_a_malformed_config_is_refused(self):
+        cases = [("VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix", "passed")]
+        status, payload, stderr = self.run_summary(cases, "--expect-lane", "macos-marketing")
+        self.assertEqual((status, payload), (2, None))
+        self.assertIn("lists no lane 'macos-marketing'", stderr)
+        with tempfile.TemporaryDirectory() as temp:
+            config = pathlib.Path(temp) / "lanes.json"
+            for text in (
+                "{not json",
+                json.dumps({"schemaVersion": 2, "lanes": {"lane": ["A/b"]}}),
+                json.dumps({"schemaVersion": 1, "lanes": {"lane": []}}),
+                json.dumps({"schemaVersion": 1, "lanes": {"lane": ["A/b", "A/b"]}}),
+                json.dumps({"schemaVersion": 1, "lanes": {"lane": ["no-suite"]}}),
+            ):
+                config.write_text(text, encoding="utf-8")
+                with self.subTest(text=text):
+                    status, payload, _ = self.run_summary(
+                        cases, "--expect-lane", "lane", "--expect-config", str(config))
+                    self.assertEqual((status, payload), (2, None))
+            self.assertEqual(self.run_summary(
+                cases, "--expect-lane", "lane", "--expect-config", str(config.with_name("absent.json")))[0], 2)
 
 
 if __name__ == "__main__":

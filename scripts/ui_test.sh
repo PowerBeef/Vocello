@@ -707,8 +707,24 @@ mac_ui_preflight() {
 write_test_summary() {
   # One writer for every lane (scripts/lib/xctest_summary.py); the macOS unit lane
   # uses the same module, so triage reads a single test-results.json shape.
+  # `--expect-lane-tests` (the passing run's last summary) also requires the lane's
+  # expected tests; the collectors of a failed or interrupted run never pass it.
   [[ -f "$out/xcodebuild.log" ]] || { warn "missing XCUITest log"; return 2; }
-  python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json" --require-complete
+  local expected_lane=""
+  [[ "${1:-}" != "--expect-lane-tests" ]] || expected_lane="$(expected_test_lane)"
+  python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json" --require-complete \
+    ${expected_lane:+--expect-lane "$expected_lane" --expect-config "$ROOT_DIR/config/ui-lane-tests.json"}
+}
+
+# The lane of config/ui-lane-tests.json a full run must satisfy (audit T10): a
+# deleted or skipped journey still ends with a consistent log, so the full macOS
+# smoke, perf and benchmark runs check which tests ran. A --scenario run is one
+# journey by design and names no lane; neither does any other lane.
+expected_test_lane() {
+  [[ "$platform" == "macos" && -z "$scenario_argument" ]] || return 0
+  case "$lane" in
+    smoke|perf|benchmark) printf 'macos-%s\n' "$lane" ;;
+  esac
 }
 
 # The crash marker is stamped by arm_mac_crash_marker right before the app
@@ -2126,8 +2142,13 @@ ui_finalize_collections \
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 note "per-test results:"
 # A summary that disagrees with the log's own totals (exit 3) means the log is
-# truncated or the run was interrupted; a PASS cannot be recorded on it.
-write_test_summary \
+# truncated or the run was interrupted; a PASS cannot be recorded on it. Exit 4
+# means a consistent run without one of the lane's expected tests (audit T10).
+test_summary_status=0
+write_test_summary --expect-lane-tests || test_summary_status=$?
+(( test_summary_status != 4 )) \
+  || die "an expected $platform $lane test did not run or was skipped (config/ui-lane-tests.json; see $out/test-results.json); the run cannot be recorded as passed"
+(( test_summary_status == 0 )) \
   || die "test-results.json is inconsistent with the xcodebuild log; the run cannot be recorded as passed"
 final_run_status="passed"
 if [[ "$lane" == "control-audit" && -f "$out/control-audit-summary.json" ]]; then

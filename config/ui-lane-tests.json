@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "description": "The tests a full macOS UI lane must have run, as scripts/lib/xctest_summary.py names them (Suite/method). scripts/ui_test.sh passes the lane to xctest_summary.py --expect-lane after a full smoke, perf or benchmark run; a listed test that is missing from the results or was skipped fails the lane. A --scenario run is a subset and checks nothing. scripts/tests/test_xctest_summary.py compares each list with the test methods in Tests/VocelloMacUITests, so a renamed, added or deleted journey must change this file in the same commit (RF-61, audit T10).",
+  "lanes": {
+    "macos-smoke": [
+      "VocelloMacSmokeUITests/test00_WindowSizesAndSettingsScene",
+      "VocelloMacSmokeUITests/test01_NavigationAndReadiness",
+      "VocelloMacSmokeUITests/test02_CustomGenerationAndHistory",
+      "VocelloMacSmokeUITests/test03_GenerationCancellation",
+      "VocelloMacSmokeUITests/test04_RecordingFlow",
+      "VocelloMacSmokeUITests/test05_LibrarySurfaces",
+      "VocelloMacSmokeUITests/test06_LongFormProjectJourney",
+      "VocelloMacSmokeUITests/test07_LineBatchJourney",
+      "VocelloMacSmokeUITests/test08_DesignBriefAndCompletedPlayer",
+      "VocelloMacSmokeUITests/test09_CloneReferenceAndCompletedPlayer",
+      "VocelloMacSmokeUITests/test10_MissingModelsAndStudioLinks",
+      "VocelloMacSmokeUITests/test11_GenerationErrorAndRecovery",
+      "VocelloMacSmokeUITests/test12_CrossLanguageStudioContent",
+      "VocelloMacSmokeUITests/test13_LongFormRecoveryDiscard",
+      "VocelloMacSmokeUITests/test14_SavedVoicesEmptyAndErrorStates",
+      "VocelloMacSmokeUITests/test15_ModelUpdateFromAnEarlierVocello"
+    ],
+    "macos-perf": [
+      "VocelloMacPerfUITests/test01IdleBaseline",
+      "VocelloMacPerfUITests/test02SidebarNavigation",
+      "VocelloMacPerfUITests/test02aHarnessControl",
+      "VocelloMacPerfUITests/test03HistoryScroll",
+      "VocelloMacPerfUITests/test04HistoryFilter",
+      "VocelloMacPerfUITests/test04bHistoryFilterPaged",
+      "VocelloMacPerfUITests/test05DeliveryMenu",
+      "VocelloMacPerfUITests/test06SettingsScroll",
+      "VocelloMacPerfUITests/test07ComposerTyping",
+      "VocelloMacPerfUITests/test08WindowResize",
+      "VocelloMacPerfUITests/test08bSidebarNavigationWarms",
+      "VocelloMacPerfUITests/test09GenerationActive"
+    ],
+    "macos-benchmark": [
+      "VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
+    ]
+  }
+}

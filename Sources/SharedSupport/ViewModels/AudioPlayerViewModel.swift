@@ -23,6 +23,13 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         case ready
     }
 
+    /// The duration readout. A stream still arriving has no length yet; the
+    /// screen words `.live` in the interface language (A5).
+    enum DurationDisplay: Equatable, Sendable {
+        case live
+        case time(String)
+    }
+
     // MARK: - High-frequency playback progress (isolated to avoid fan-out)
 
     /// Lightweight observable that holds timer-driven properties (currentTime, duration).
@@ -50,7 +57,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     var currentFilePath: String?
     var currentTitle: String = ""
     var waveformSamples: [Float] = []
-    var playbackError: String?
+    var playbackError: VocelloPresentationText.PlaybackFailure?
     private(set) var playbackTargetFilePath: String?
     private(set) var currentGenerationMode: GenerationMode?
     @ObservationIgnored private var generationPlaybackOwnership = GenerationPlaybackOwnership()
@@ -74,7 +81,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         generationPlaybackOwnership.claimStream(generationID, operationID: operationID)
     }
 
-    func playbackError(forFile path: String) -> String? {
+    func playbackError(forFile path: String) -> VocelloPresentationText.PlaybackFailure? {
         playbackTargetFilePath == path ? playbackError : nil
     }
 
@@ -85,7 +92,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     // the 3 Studio mode views, which use this VM only for imperative cancel/abort). Observation
     // updates a view only for what its body reads, and these stay ignored so a chunk touches no
     // registrar; the high-frequency progress is isolated in the PlaybackProgress slice. Internal
-    // state stays ignored likewise, except what `hasAudio`, `canSeek` and `durationDisplayText`
+    // state stays ignored likewise, except what `hasAudio`, `canSeek` and `durationDisplay`
     // read (`liveSessionID`, `playbackMode`, `liveFinalFilePath`).
     @ObservationIgnored private(set) var livePreviewQueueDepth = 0
     @ObservationIgnored private(set) var livePreviewPhase: LivePreviewPhase = .idle
@@ -254,7 +261,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
 
     var hasAudio: Bool { currentFilePath != nil || isLiveStream || liveSessionID != nil }
     var canSeek: Bool { playbackMode == .file || liveFinalFilePath != nil }
-    var durationDisplayText: String { isLiveStream && liveFinalFilePath == nil ? "Live" : playbackProgress.formattedDuration }
+    var durationDisplay: DurationDisplay { isLiveStream && liveFinalFilePath == nil ? .live : .time(playbackProgress.formattedDuration) }
     var activeGeneratePreviewVisibilityState: GeneratePreviewVisibilityState {
         playbackPresentationContext == .generatePreview ? generatePreviewVisibilityState : .hidden
     }
@@ -264,15 +271,6 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     var isShowingNowPlayingRail: Bool {
         if generatePreviewVisibilityState != .hidden { return true }
         return currentFilePath != nil || isLiveStream
-    }
-
-    /// Label for the rail's context chip, or nil when no chip should render.
-    var nowPlayingContextChipLabel: String? {
-        switch playbackPresentationContext {
-        case .generatePreview: return "Preview"
-        case .library: return "Library"
-        case .none: return nil
-        }
     }
 
     /// Pass-through to `playbackProgress` for imperative callers. A view body that reads it
@@ -544,7 +542,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             clearLoadedAudio()
             resetPresentationState()
             currentTitle = title.isEmpty ? URL(fileURLWithPath: filePath).lastPathComponent : title
-            playbackError = error.localizedDescription
+            playbackError = VocelloPresentationText.PlaybackFailure(error)
         }
     }
 
@@ -1436,7 +1434,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
                 viewModel: self,
                 url: url
             )
-            playbackError = "Live audio preview could not decode the latest chunk."
+            playbackError = .livePreviewUndecodable
             return
         }
 
@@ -1538,7 +1536,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         guard validatePreviewAudioChunk(previewAudio) else { return }
         guard let (buffer, format) = makePCMBuffer(from: previewAudio) else {
             stopLivePreviewForChunkContinuityFailure()
-            playbackError = "Live audio preview could not decode the latest chunk."
+            playbackError = .livePreviewUndecodable
             return
         }
 
@@ -1645,7 +1643,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             startTimer()
             consumeAutoplaySignpostIfNeeded()
         } catch {
-            playbackError = "Playback could not start."
+            playbackError = .couldNotStart
         }
     }
 
@@ -1741,7 +1739,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
                 playbackTelemetrySessionID: telemetrySessionID
             )
         } catch {
-            playbackError = error.localizedDescription
+            playbackError = VocelloPresentationText.PlaybackFailure(error)
         }
     }
 
@@ -1883,9 +1881,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     ) throws {
         let url = URL(fileURLWithPath: filePath)
         guard FileManager.default.fileExists(atPath: filePath) else {
-            throw NSError(domain: "AudioPlayerViewModel", code: 404, userInfo: [
-                NSLocalizedDescriptionKey: "Audio file not found."
-            ])
+            throw VocelloPresentationText.PlaybackFailure.audioFileMissing
         }
 
         let audioPlayer = try AVAudioPlayer(contentsOf: url)
@@ -1971,13 +1967,13 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         }
 
         guard let path = currentFilePath else {
-            playbackError = "Playback could not start."
+            playbackError = .couldNotStart
             return
         }
 
         let url = URL(fileURLWithPath: path)
         guard let rebuilt = try? AVAudioPlayer(contentsOf: url) else {
-            playbackError = "Playback could not start."
+            playbackError = .couldNotStart
             return
         }
         rebuilt.delegate = self
@@ -1996,7 +1992,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             startTimer()
             consumeAutoplaySignpostIfNeeded()
         } else {
-            playbackError = "Playback could not start."
+            playbackError = .couldNotStart
         }
     }
 
@@ -2171,7 +2167,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             self.currentTime = flag ? self.duration : snapshotTime
             self.stopTimer()
             if !flag {
-                self.playbackError = "Playback stopped unexpectedly."
+                self.playbackError = .stoppedUnexpectedly
             }
             // U07: the operation's next take was waiting for this file.
             self.promoteQueuedLiveSession()

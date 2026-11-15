@@ -916,7 +916,7 @@ final class ModelManagerViewModel {
         }
         if let bytesPerSecond = progress.bytesPerSecond, bytesPerSecond > 0,
            progress.phase == .downloading {
-            details.append("\(Self.formattedFileSize(bytesPerSecond))/s")
+            details.append(MacInterfaceText.modelsTransferRate(Self.formattedFileSize(bytesPerSecond)))
         }
         if let eta = progress.estimatedSecondsRemaining, eta.isFinite,
            progress.phase == .downloading {
@@ -1122,7 +1122,7 @@ final class ModelManagerViewModel {
             guard isCurrentEpoch(epoch, for: model.id) else { return }
             let postDownloadSnapshot = localModelInfo(for: model)
             if !postDownloadSnapshot.complete {
-                lastFailureMessages[model.id] = "Download finished, but required model files are still missing."
+                lastFailureMessages[model.id] = MacInterfaceText.modelsDownloadIncomplete
                 pendingUpdateFailures[model.id] = .verification
             } else {
                 persistInstallMetadata(for: model, snapshot: postDownloadSnapshot)

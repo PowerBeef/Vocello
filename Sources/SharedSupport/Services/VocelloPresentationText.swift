@@ -448,6 +448,46 @@ struct VocelloPresentationText: Sendable {
         case audioOnlyConfirmed
     }
 
+    /// Why the shared player could not play (A5). The player records the
+    /// case; a screen reads its copy through `playbackFailureMessage(_:)`, so
+    /// the message follows the interface language.
+    enum PlaybackFailure: Error, Equatable, Sendable {
+        case couldNotStart
+        case livePreviewUndecodable
+        case stoppedUnexpectedly
+        case audioFileMissing
+        /// An audio error the system reported, in the system's own words.
+        case system(String)
+
+        /// A thrown playback error: its typed case, or the system's description.
+        init(_ error: any Error) {
+            self = (error as? PlaybackFailure) ?? .system(error.localizedDescription)
+        }
+    }
+
+    func playbackFailureMessage(_ failure: PlaybackFailure) -> String {
+        switch failure {
+        case .couldNotStart:
+            return localization.string(localized: "vocello.presentation.playbackCouldNotStart",
+                defaultValue: "Playback could not start.",
+                comment: "Player error when audio playback cannot begin. Presentation only.")
+        case .livePreviewUndecodable:
+            return localization.string(localized: "vocello.presentation.playbackLivePreviewUndecodable",
+                defaultValue: "Live audio preview could not decode the latest chunk.",
+                comment: "Player error when a chunk of the streaming preview of a take being generated cannot be decoded. Presentation only.")
+        case .stoppedUnexpectedly:
+            return localization.string(localized: "vocello.presentation.playbackStoppedUnexpectedly",
+                defaultValue: "Playback stopped unexpectedly.",
+                comment: "Player error when audio playback ends because of a decoding failure. Presentation only.")
+        case .audioFileMissing:
+            return localization.string(localized: "vocello.presentation.playbackAudioFileMissing",
+                defaultValue: "Audio file not found.",
+                comment: "Player error when the audio file of a take is no longer on disk. Presentation only.")
+        case .system(let description):
+            return description
+        }
+    }
+
     func status(_ status: Status) -> String {
         switch status {
         case .ready:

@@ -989,6 +989,15 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.models.checkingDetail", defaultValue: "Looking for local model files.",
                comment: "macOS interface: model package detail while local files are inspected. Presentation only.")
     }
+    static var modelsDownloadIncomplete: String {
+        localization.string(localized: "vocello.mac.models.downloadIncomplete", defaultValue: "Download finished, but required model files are still missing.",
+               comment: "macOS interface: model package failure when a download completed but the installed model is still incomplete. Presentation only.")
+    }
+    static func modelsTransferRate(_ size: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.models.transferRate",
+            defaultValue: "%@/s",
+            comment: "macOS interface: download detail; %@ is the size transferred per second, already formatted with its unit. Presentation only."), size)
+    }
     static func modelsEtaSeconds(_ seconds: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.models.etaSeconds",
             defaultValue: "about %@s remaining",

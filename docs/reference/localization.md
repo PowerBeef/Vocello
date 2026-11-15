@@ -148,6 +148,13 @@ Never refresh the baseline merely to silence an unexplained failure. The baselin
 paths, presentation API names, counts, and SHA-256 identities; it does not duplicate user-facing
 copy.
 
+The shared view models (`Sources/SharedSupport/ViewModels`) have a stricter rule with no baseline,
+because they hand text to a screen as a plain value that the call scan cannot see: the validator
+refuses a capitalised string literal assigned, returned or passed as a value there. Comment lines
+and constants such as environment keys are exempt. A view model holds a typed case, such as
+`VocelloPresentationText.PlaybackFailure` or `AudioPlayerViewModel.DurationDisplay`, and the screen
+maps it through `VocelloPresentationText`, `MacInterfaceText` or `IOSInterfaceText`.
+
 ## Acceptance scope and routes
 
 Both apps carry all ten UI catalogs (the eight added on September 21, plus RF-36's last strings in

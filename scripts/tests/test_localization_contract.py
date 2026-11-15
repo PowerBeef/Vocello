@@ -86,6 +86,7 @@ class LocalizationContractTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "Sources/Resources").mkdir(parents=True)
         (self.root / "Sources/SharedSupport/Services").mkdir(parents=True)
+        (self.root / localization_contract.VIEW_MODEL_ROOT).mkdir(parents=True)
         (self.root / "Sources/iOS/Studio").mkdir(parents=True)
         (self.root / "Sources/iOSSupport/Services").mkdir(parents=True)
         (self.root / "Sources/Views").mkdir(parents=True)
@@ -429,6 +430,36 @@ class LocalizationContractTests(unittest.TestCase):
 
         self.literal_source.write_text("", encoding="utf-8")
         self.assertEqual(localization_contract.validate(self.root), 0)
+
+    def test_shared_view_model_cannot_hold_a_user_facing_literal(self) -> None:
+        source = self.root / localization_contract.VIEW_MODEL_ROOT / "PlayerViewModel.swift"
+        # Typed cases, diagnostics, constants and comments are not presentation text.
+        source.write_text(
+            "playbackError = .couldNotStart\n"
+            'AppPerformanceSignposts.emit("Live Engine Play")\n'
+            'let key = RuntimeDebugGate.value(for: "QWENVOICE_FAKE_MIC_WAV")\n'
+            '// playbackError = "Playback could not start."\n',
+            encoding="utf-8",
+        )
+        self.assertEqual(localization_contract.validate(self.root), 1)
+
+        for literal in (
+            'playbackError = "Playback could not start."\n',
+            'var text: String { isLive ? "Live" : duration }\n',
+            'case .library: return "Library"\n',
+            'NSLocalizedDescriptionKey: "Audio file not found."\n',
+        ):
+            with self.subTest(literal=literal):
+                source.write_text(literal, encoding="utf-8")
+                with self.assertRaisesRegex(
+                    localization_contract.ContractError, r"PlayerViewModel\.swift:1"
+                ):
+                    localization_contract.validate(self.root)
+
+        source.unlink()
+        (self.root / localization_contract.VIEW_MODEL_ROOT).rmdir()
+        with self.assertRaisesRegex(localization_contract.ContractError, "scan root is missing"):
+            localization_contract.validate(self.root)
 
     def test_typed_localized_string_is_not_classified_as_a_direct_literal(self) -> None:
         self.literal_source.write_text(

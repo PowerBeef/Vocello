@@ -1,5 +1,15 @@
 import SwiftUI
 
+extension AudioPlayerViewModel.DurationDisplay {
+    /// The duration readout in the interface language (A5).
+    var macText: String {
+        switch self {
+        case .live: MacInterfaceText.playerLive
+        case .time(let text): text
+        }
+    }
+}
+
 /// Compact now-playing card: title and transport above a slim waveform.
 /// The tint follows the audio's origin, independently of the selected screen.
 /// One card serves the live stream and the completed take, so the transition is an in-place morph. Keeps every
@@ -25,7 +35,7 @@ struct MacInlinePlayerCard: View {
             }
 
             if let playbackError = audioPlayer.playbackError {
-                Text(playbackError)
+                Text(MacInterfaceText.presentation.playbackFailureMessage(playbackError))
                     .macType(.caption)
                     .foregroundStyle(MacTheme.Status.guarded)
                     .lineLimit(2)
@@ -150,7 +160,7 @@ private struct MacInlineWaveformRow: View {
                 .frame(width: Self.timeColumnWidth, alignment: .leading)
                 .accessibilityIdentifier("sidebarPlayer_time")
                 .accessibilityValue(
-                    "\(playbackProgress.formattedCurrentTime) / \(audioPlayer.durationDisplayText)"
+                    "\(playbackProgress.formattedCurrentTime) / \(audioPlayer.durationDisplay.macText)"
                 )
 
             GeometryReader { geo in
@@ -182,7 +192,7 @@ private struct MacInlineWaveformRow: View {
                 audioPlayer.seek(to: target)
             }
 
-            Text(audioPlayer.durationDisplayText)
+            Text(audioPlayer.durationDisplay.macText)
                 .macType(.counter)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .frame(width: Self.timeColumnWidth, alignment: .trailing)

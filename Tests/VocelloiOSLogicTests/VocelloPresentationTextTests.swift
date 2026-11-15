@@ -118,6 +118,40 @@ final class VocelloPresentationTextTests: XCTestCase {
         XCTAssertTrue(english.dateTime(middayUTC).contains("Sep"), english.dateTime(middayUTC))
     }
 
+    /// A5: the shared player's failures keep their English source values and
+    /// read in the interface language everywhere else.
+    func testPlaybackFailuresKeepTheirEnglishSourceValuesAndAreTranslated() {
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))
+        let sources: [(failure: VocelloPresentationText.PlaybackFailure, text: String)] = [
+            (.couldNotStart, "Playback could not start."),
+            (.livePreviewUndecodable, "Live audio preview could not decode the latest chunk."),
+            (.stoppedUnexpectedly, "Playback stopped unexpectedly."),
+            (.audioFileMissing, "Audio file not found."),
+        ]
+        for source in sources {
+            XCTAssertEqual(english.playbackFailureMessage(source.failure), source.text)
+        }
+        for language in ["fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"] {
+            let text = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: language))
+            for source in sources {
+                XCTAssertNotEqual(text.playbackFailureMessage(source.failure), source.text, "\(language) \(source.failure)")
+            }
+        }
+
+        // A system audio error keeps the system's wording; a thrown typed case keeps its case.
+        XCTAssertEqual(english.playbackFailureMessage(.system("The file is damaged.")), "The file is damaged.")
+        XCTAssertEqual(
+            VocelloPresentationText.PlaybackFailure(VocelloPresentationText.PlaybackFailure.audioFileMissing),
+            .audioFileMissing
+        )
+        let systemError = CocoaError(.fileReadCorruptFile)
+        XCTAssertEqual(
+            VocelloPresentationText.PlaybackFailure(systemError),
+            .system(systemError.localizedDescription)
+        )
+    }
+
     func testEveryGenerationFailureReasonHasTranslatedCatalogCopy() {
         let bundle = Bundle(for: Self.self)
         let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))

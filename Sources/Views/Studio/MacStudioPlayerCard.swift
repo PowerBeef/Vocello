@@ -133,11 +133,15 @@ struct MacStudioPlayerCard: View {
         return audioPlayer.isLiveStream
     }
 
+    /// The player's failure for this card's audio, in the interface language.
     private var displayedPlaybackError: String? {
+        let failure: VocelloPresentationText.PlaybackFailure?
         if let item = phase.completedItem {
-            return audioPlayer.playbackError(forFile: item.audioURL.path)
+            failure = audioPlayer.playbackError(forFile: item.audioURL.path)
+        } else {
+            failure = ownsAudio ? audioPlayer.playbackError : nil
         }
-        return ownsAudio ? audioPlayer.playbackError : nil
+        return failure.map { MacInterfaceText.presentation.playbackFailureMessage($0) }
     }
 
     private var playPauseButton: some View {
@@ -329,7 +333,7 @@ private struct MacStudioWaveformRow: View {
                 audioPlayer.seek(to: target)
             }
 
-            Text(audioPlayer.durationDisplayText)
+            Text(audioPlayer.durationDisplay.macText)
                 .macType(.counter)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .frame(width: 34, alignment: .trailing)

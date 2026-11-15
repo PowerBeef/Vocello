@@ -41,6 +41,14 @@ CALL_PATTERN = re.compile(
     r'"(?P<literal>(?:\\.|[^"\\])*)"',
     re.MULTILINE,
 )
+# Shared view models hand their text to a screen as plain values, where the call
+# scanner above cannot see it (audit 2026-11-15, A5): `playbackError = "Playback could
+# not start."` reached the Mac untranslated in ten languages. A capitalised literal in
+# value position (after `=`, `return`, `?` or `:`) is refused there.
+VIEW_MODEL_ROOT = Path("Sources/SharedSupport/ViewModels")
+VIEW_MODEL_LITERAL = re.compile(r'(?:=|\breturn\b|\?|:)\s*"(?P<literal>[A-Z](?:\\.|[^"\\])*)"')
+# Environment keys and other constants (`QWENVOICE_FAKE_MIC_WAV`) are not prose.
+CONSTANT_LITERAL = re.compile(r"[A-Z][A-Z0-9_]*")
 REQUIRED_SETTINGS = (
     "LOCALIZATION_PREFERS_STRING_CATALOGS",
     "STRING_CATALOG_GENERATE_SYMBOLS",
@@ -463,6 +471,33 @@ def _validate_literal_baseline(root: Path) -> int:
     return sum(record["count"] for record in current)
 
 
+def scan_view_model_literals(root: Path) -> list[str]:
+    """Capitalised literals the shared view models assign, return or pass as a value."""
+    base = root / VIEW_MODEL_ROOT
+    if not base.is_dir():
+        raise ContractError(f"localization scan root is missing: {VIEW_MODEL_ROOT}")
+    findings: list[str] = []
+    for path in sorted(base.rglob("*.swift")):
+        relative = path.relative_to(root).as_posix()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("//"):
+                continue
+            for match in VIEW_MODEL_LITERAL.finditer(line):
+                if CONSTANT_LITERAL.fullmatch(match["literal"]) is None:
+                    findings.append(f"{relative}:{number}")
+    return findings
+
+
+def _validate_view_model_literals(root: Path) -> None:
+    findings = scan_view_model_literals(root)
+    if findings:
+        raise ContractError(
+            "shared view models must hold typed cases a screen maps through "
+            "VocelloPresentationText, MacInterfaceText or IOSInterfaceText, not user-facing "
+            f"literals: {', '.join(findings[:12])}"
+        )
+
+
 def _validate_locale_bound_formatting(root: Path) -> None:
     """Formatted copy must take its plural rules from the interface language.
 
@@ -505,6 +540,7 @@ def validate(root: Path) -> int:
     _validate_catalog(root)
     _validate_permission_catalog(root)
     _validate_typed_presentation(root)
+    _validate_view_model_literals(root)
     _validate_locale_bound_formatting(root)
     _validate_pseudo_localization(root)
     return _validate_literal_baseline(root)

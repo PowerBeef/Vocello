@@ -4,7 +4,9 @@ import QwenVoiceCore
 /// A text file dropped on the batch sheet (A8). The extension is compared
 /// without regard to case, the text is decoded in the encoding the file
 /// shows, and a file that is not taken is refused with a reason the sheet
-/// shows instead of being ignored.
+/// shows instead of being ignored. Text that decodes with a NUL character in
+/// it, as UTF-16 without a byte order mark does when read as UTF-8, is
+/// refused as an encoding that cannot be told.
 enum MacBatchDroppedTextFile {
     enum Refusal: Error, Equatable, Sendable {
         /// Not a `.txt` file.
@@ -26,6 +28,12 @@ enum MacBatchDroppedTextFile {
             return .failure(.unreadable)
         }
         guard let text = unicodeText(data) ?? systemDetectedText(at: url) else {
+            return .failure(.unknownEncoding)
+        }
+        // UTF-16 or UTF-32 without a byte order mark is, for Latin text, also
+        // valid UTF-8: every other byte decodes as U+0000. A script holds no
+        // NUL, so the encoding was not what the bytes were decoded in.
+        guard !text.unicodeScalars.contains("\u{0}") else {
             return .failure(.unknownEncoding)
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

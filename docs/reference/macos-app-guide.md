@@ -271,7 +271,9 @@ Switching it off restores automatic routing. The batch sheet receives the curren
 selected segmentation, with its existing review, Generate all, cancel and recovery actions. A
 `.txt` file dropped on the sheet replaces the script (`MacBatchDroppedTextFile`): the extension is
 compared without regard to case, UTF-8, marked UTF-16 or UTF-32 and an encoding macOS recorded on
-the file are decoded, and any other file is refused with its reason in `batch_errorLine`.
+the file are decoded, and any other file is refused with its reason in `batch_errorLine`. Text
+that decodes with a NUL character in it, as UTF-16 without its mark does when read as UTF-8, is
+refused as an encoding that cannot be told.
 
 | Element | Identifier |
 |---|---|

@@ -50,6 +50,37 @@ final class MacBatchDroppedTextFileTests: XCTestCase {
         let latin1 = try file(named: "latin1.txt", bytes: [0x63, 0x61, 0x66, 0xE9])
         XCTAssertEqual(MacBatchDroppedTextFile.read(latin1), .failure(.unknownEncoding))
     }
+
+    /// UTF-16 and UTF-32 without a byte order mark are, for Latin text, valid
+    /// UTF-8 with a NUL between the letters. That is refused, never handed to
+    /// the sheet as a script with NUL characters in it.
+    func testUnicodeTextWithoutAByteOrderMarkIsRefusedNotReadAsNULInterleavedText() throws {
+        let script = "Line one\nLine two"
+        let littleEndian = script.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }
+        let bigEndian = script.utf16.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] }
+        let utf32LittleEndian = script.unicodeScalars.flatMap { scalar -> [UInt8] in
+            [UInt8(scalar.value & 0xFF), UInt8((scalar.value >> 8) & 0xFF), 0, 0]
+        }
+        // The premise: without the mark these bytes do decode as UTF-8.
+        XCTAssertNotNil(String(data: Data(littleEndian), encoding: .utf8))
+        XCTAssertNotNil(String(data: Data(bigEndian), encoding: .utf8))
+
+        let unmarked: [(name: String, bytes: [UInt8])] = [
+            ("utf16le.txt", littleEndian), ("utf16be.txt", bigEndian), ("utf32le.txt", utf32LittleEndian),
+        ]
+        for (name, bytes) in unmarked {
+            let url = try file(named: name, bytes: bytes)
+            XCTAssertEqual(MacBatchDroppedTextFile.read(url), .failure(.unknownEncoding), name)
+        }
+
+        // A NUL inside otherwise ordinary UTF-8 is refused for the same reason.
+        let embedded = try file(named: "embedded.txt", bytes: Array("Line".utf8) + [0x00] + Array("one".utf8))
+        XCTAssertEqual(MacBatchDroppedTextFile.read(embedded), .failure(.unknownEncoding))
+
+        // The same text with its mark is still read.
+        let marked = try file(named: "marked.txt", bytes: [0xFF, 0xFE] + littleEndian)
+        XCTAssertEqual(MacBatchDroppedTextFile.read(marked), .success(script))
+    }
 }
 
 /// The pure half of the macOS line batch (`MacLineBatchRequest`, items and

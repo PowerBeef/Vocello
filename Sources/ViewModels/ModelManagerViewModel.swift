@@ -795,7 +795,7 @@ final class ModelManagerViewModel {
         }
         // Nothing went (the plan could not be recorded, or no folder could be deleted): the disk is
         // still short, so the offer stays, and the banner says the removal did not happen.
-        guard !result.removed.isEmpty else {
+        guard MacModelUpdateAutoStart.afterMakingRoom(result) == .startUpdate else {
             modelUpdateRoomNotMade = true
             return
         }

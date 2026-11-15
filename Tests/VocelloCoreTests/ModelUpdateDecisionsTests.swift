@@ -118,6 +118,35 @@ final class ModelUpdateDecisionsTests: XCTestCase {
         XCTAssertFalse(ModelUpdatePins.mayRelease(makingRoom: false, setupPending: false, updateDownloadActive: true))
     }
 
+    /// A9: "Remove Earlier Models and Update" that removed nothing leaves the disk as short as it
+    /// was, so the banner says the earlier models could not be removed; one folder gone starts the
+    /// update, whatever else stayed.
+    func testMakingRoomThatRemovedNothingIsRoomNotMade() {
+        typealias Removal = RetiredModelReclamation
+        XCTAssertEqual(MacModelUpdateAutoStart.afterMakingRoom(.nothing), .roomNotMade, "the plan could not be recorded")
+        XCTAssertEqual(
+            MacModelUpdateAutoStart.afterMakingRoom(Removal(removed: [], failed: ["pro_custom_quality": "busy"])),
+            .roomNotMade,
+            "no folder could be deleted"
+        )
+        XCTAssertEqual(
+            MacModelUpdateAutoStart.afterMakingRoom(Removal(removed: ["pro_custom_quality"], failed: [:], freedBytes: gigabyte)),
+            .startUpdate
+        )
+        XCTAssertEqual(
+            MacModelUpdateAutoStart.afterMakingRoom(
+                Removal(removed: ["pro_custom_quality"], failed: ["pro_clone_quality": "busy"])
+            ),
+            .startUpdate,
+            "one folder gone is room made; the one that stayed is tried again later"
+        )
+        XCTAssertEqual(
+            MacModelUpdateAutoStart.afterMakingRoom(Removal(removed: ["pro_custom_quality"], failed: [:], freedBytes: 0)),
+            .startUpdate,
+            "a folder that held only shared blobs still went"
+        )
+    }
+
     func testTheBannerFollowsTheUpdate() {
         typealias Remaining = ModelUpdateBannerState.Remaining
         func derive(_ remaining: [Remaining], session: Int = 3, freed: Int64? = nil, room: Bool = false) -> ModelUpdateBannerState? {

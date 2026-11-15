@@ -70,6 +70,8 @@ EXPECTED_SCENARIOS = [
     "harness-control",
     "history-scroll",
     "history-filter",
+    # The same journey over 700 seeded rows, past the 500-row page (RF-61).
+    "history-filter-paged",
     "delivery-menu",
     "settings-scroll",
     "composer-typing",
@@ -88,6 +90,10 @@ PHASE_NAMES = frozenset({"query", "action", "verify"})
 # drain lands deterministically inside history-scroll's window
 # (baseline-v2: 456 +/- 3 ms/s), so the number tracks harness+app, never
 # the app alone.
+# history-filter and history-filter-paged mark their three type/clear cycles
+# like the other cycle scenarios (`cycles` in the marker, read by
+# `cycle_hitch_rates`); both stay exploratory, without ceilings, until three
+# counted runs calibrate them (RF-61, audit T1).
 # The confirmatory/exploratory designation lives in the thresholds contract
 # (`confirmatoryScenarios`); `exploratory_scenarios()` derives the rest so the
 # checker and the config cannot disagree.

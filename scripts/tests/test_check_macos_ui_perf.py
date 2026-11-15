@@ -22,13 +22,20 @@ from lib import ui_perf_thresholds as rules  # noqa: E402
 from lib import ui_perf_lane as lane  # noqa: E402
 
 
-def make_marker(scenario: str, start: int, end: int, actions: int = 4) -> str:
+def make_marker(scenario: str, start: int, end: int, actions: int = 4, cycles: int = 0) -> str:
+    """A scenario marker; `cycles` splits the window into that many equal cycle marks,
+    as `measuredCycles` in VocelloMacPerfUITests does."""
+    span = (end - start) // cycles if cycles else 0
     payload = base64.b64encode(json.dumps({
         "schemaVersion": 1,
         "scenario": scenario,
         "windowStartEpochMS": start,
         "windowEndEpochMS": end,
         "actionCount": actions,
+        **({"cycles": [
+            {"startEpochMS": start + index * span, "endEpochMS": start + (index + 1) * span}
+            for index in range(cycles)
+        ]} if cycles else {}),
     }).encode()).decode()
     return f"VOCELLO_UIPERF_SCENARIO={payload}"
 
@@ -82,15 +89,16 @@ class UIPerfFixture(unittest.TestCase):
     def write_run(self, hitch_by_scenario: dict[str, float] | None = None, *,
                   refresh_ms: float = 16.667, footprint_growth: dict[str, float] | None = None,
                   probe_summary: dict | None = None, sampler_interval_ms: int | None = None,
-                  samples: bool = False):
+                  samples: bool = False, cycles: dict[str, int] | None = None):
         hitch_by_scenario = hitch_by_scenario or {}
         footprint_growth = footprint_growth or {}
+        cycles = cycles or {}
         log_lines = []
         launch = self.run_started + 1_000
         for offset, scenario in enumerate(checker.EXPECTED_SCENARIOS):
             window_start = launch + offset * 20_000 + 3_000
             window_end = window_start + 5_000
-            log_lines.append(make_marker(scenario, window_start, window_end))
+            log_lines.append(make_marker(scenario, window_start, window_end, cycles=cycles.get(scenario, 0)))
             per_block = hitch_by_scenario.get(scenario, 0.0) * 0.5  # ms/s -> ms per 500 ms block
             rows = [{"kind": "meta", "scenario": scenario}, {
                 "kind": "environment",
@@ -175,6 +183,36 @@ class UIPerfFixture(unittest.TestCase):
         log = self.write_run()
         lines = log.read_text().splitlines()
         log.write_text("\n".join(lines[1:]) + "\n")
+        status, _ = self.run_checker(log)
+        self.assertEqual(status, 1)
+
+    def test_both_history_filter_scenarios_run_and_report_their_cycles(self):
+        """RF-61: history-filter-paged (700 rows) is a required scenario, and both
+        History filter scenarios mark three type/clear cycles."""
+        self.assertEqual(
+            checker.EXPECTED_SCENARIOS.index("history-filter-paged"),
+            checker.EXPECTED_SCENARIOS.index("history-filter") + 1,
+        )
+        filters = ("history-filter", "history-filter-paged")
+        log = self.write_run(
+            hitch_by_scenario={"history-filter-paged": 120.0}, cycles={name: 3 for name in filters},
+        )
+        status, report = self.run_checker(log)
+        self.assertEqual((status, report["status"]), (0, "passed"))
+        by_scenario = {row["scenario"]: row for row in report["scenarios"]}
+        for name in filters:
+            row = by_scenario[name]
+            # Exploratory, with no ceiling: a high hitch rate is reported, never judged.
+            self.assertEqual((row["designation"], row["thresholdWarnings"]), ("exploratory", []))
+            self.assertEqual(len(row["cycleHitchTimeMSPerS"]), 3)
+        self.assertEqual(by_scenario["history-filter-paged"]["cycleHitchTimeMSPerS"], [120.0] * 3)
+        self.assertNotIn("cycleHitchTimeMSPerS", by_scenario["history-scroll"])
+        # A run without the paged scenario's marker is incomplete.
+        kept = [
+            line for line in log.read_text().splitlines()
+            if json.loads(base64.b64decode(line.split("=", 1)[1]))["scenario"] != "history-filter-paged"
+        ]
+        log.write_text("\n".join(kept) + "\n")
         status, _ = self.run_checker(log)
         self.assertEqual(status, 1)
 
@@ -774,6 +812,8 @@ class ThresholdsContractTests(unittest.TestCase):
             "window-resize", "generation-active", "history-filter", "history-scroll",
             # audit #32 and #33: the harness control and the warm-on navigation.
             "harness-control", "sidebar-navigation-warms",
+            # RF-61: the History filter over 700 rows, uncalibrated like history-filter.
+            "history-filter-paged",
         })
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]))
         # RF-61: the field exists and is documented in the contract; nothing is enforced

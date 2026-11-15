@@ -390,6 +390,26 @@ final class CLIRequestTests: XCTestCase {
         ledger.abandon(again)
     }
 
+    func testARequestWithoutAnIDPrunesAnExistingLedgerAndCreatesNone() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CLIRequestLedgerPrune-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("cli/requests", isDirectory: true)
+        let ledger = CLIRequestLedger(dataDirectory: root)
+        ledger.pruneIfPresent()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "no ledger is made for a request without an id")
+
+        let request: CLIJSONValue = .object(["text": "Hello."])
+        guard case .fresh(let held) = try ledger.claim(id: "old-1", request: request) else { return XCTFail() }
+        let longAgo = Date(timeIntervalSinceNow: -(CLIRequestLedger.retention + 60))
+        XCTAssertTrue(ledger.complete(held, result: .object(["audioPath": "/x.wav"]), now: longAgo))
+        let entries = { try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".json") } }
+        XCTAssertEqual(try entries().count, 1)
+        // Completing pruned a moment ago, so the next pass waits its hour; a later one removes it.
+        ledger.pruneIfPresent(now: Date(timeIntervalSinceNow: 2 * 3600))
+        XCTAssertEqual(try entries(), [], "an expired entry goes without any further request that carries an id")
+    }
+
     private func code(_ body: () throws -> CLIRequestLedger.Start) -> VocelloErrorCode? {
         do {
             _ = try body()

@@ -185,15 +185,35 @@ public enum CLIStoragePreflight {
         )
     }
 
-    /// The bytes a download into `targetDirectory` still has to fetch: the
-    /// plan's, less what an earlier attempt's kept staging already holds
+    /// The bytes a download into `targetDirectory` still has to fetch: each planned file's size,
+    /// less what an earlier attempt's kept staging already holds of that file
     /// (`.qwenvoice-downloads/<folder>` beside the model folders,
-    /// `docs/reference/model-delivery.md`), which a resumed download reuses.
-    public static func bytesStillToFetch(planBytes: Int64, targetDirectory: URL) -> Int64 {
+    /// `docs/reference/model-delivery.md`), which a resumed download reuses. Only planned files
+    /// count, by the space they really occupy: staging also holds hard links to shared components
+    /// the plan does not download, and a chunked partial is sparse, so its length overstates it.
+    public static func bytesStillToFetch(
+        plan: [HuggingFaceDownloader.RepoFile], targetDirectory: URL
+    ) -> Int64 {
         let staging = targetDirectory.deletingLastPathComponent()
             .appendingPathComponent(".qwenvoice-downloads", isDirectory: true)
             .appendingPathComponent(targetDirectory.lastPathComponent, isDirectory: true)
-        return max(0, planBytes - directorySize(staging))
+        let complete = staging.appendingPathComponent("files", isDirectory: true)
+        let partial = staging.appendingPathComponent("partials", isDirectory: true)
+        return plan.reduce(0) { remaining, file in
+            let held = max(
+                occupiedBytes(of: complete.appendingPathComponent(file.path)),
+                occupiedBytes(of: partial.appendingPathComponent(file.path).appendingPathExtension("partial"))
+            )
+            return remaining + max(0, file.size - min(held, file.size))
+        }
+    }
+
+    /// The bytes a regular file occupies on disk, never more than its length; 0 when there is none.
+    private static func occupiedBytes(of url: URL) -> Int64 {
+        guard let values = try? url.resourceValues(
+            forKeys: [.isRegularFileKey, .fileSizeKey, .totalFileAllocatedSizeKey]
+        ), values.isRegularFile == true, let length = values.fileSize else { return 0 }
+        return Int64(min(values.totalFileAllocatedSize ?? length, length))
     }
 
     /// The space available on the volume that holds `url`, read at the nearest

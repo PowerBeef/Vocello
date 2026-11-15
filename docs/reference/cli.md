@@ -688,8 +688,8 @@ subcommand that takes a model id (`list`, `status`, `verify`, `install`, `remove
 letter case.
 `install` uses the same `HuggingFaceDownloader` as the macOS app: a CLI-installed model is
 immediately usable in the app, and vice versa. Before it fetches anything, `install` checks the free
-space on the model store's volume: it needs the bytes still to download (the plan's, less what an
-earlier attempt's kept staging already holds) plus 256 MB, and with less it fails with `storage_full`
+space on the model store's volume: it needs the bytes still to download (each planned file's size,
+less what an earlier attempt's kept staging really holds of that file) plus 256 MB, and with less it fails with `storage_full`
 (74), naming `detail.requiredBytes` and `detail.availableBytes` as decimal strings. A volume that
 fills during a download is `storage_full` too, not `download_failed`. The variant-scoped ids are
 `pro_custom_speed`, `pro_design_speed` and `pro_clone_speed`: each mode's one model, the hybrid,

@@ -72,6 +72,8 @@ public enum RunCommand {
             if let value = args.string(name) { shared.append("--\(name)=\(value)") }
         }
         let ledger = CLIRequestLedger(dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")))
+        // Expired entries go even when none of these requests carries an id.
+        ledger.pruneIfPresent()
         var runtime: CLIRuntime?
         let outcome = await runRequests(documents, shared: shared, ledger: ledger) { take in
             // Checked before boot, so a request whose path cannot hold its take

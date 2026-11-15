@@ -463,6 +463,8 @@ public enum GenerateCommand {
             case .run(let held):
                 reservation = held
             }
+        } else {
+            ledger.pruneIfPresent()
         }
 
         let report: CLIJSONValue

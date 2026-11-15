@@ -8,10 +8,23 @@ public enum ModelDeliverySpace {
         max(requiredBytes * 2, requiredBytes + Int64(256 * 1_024 * 1_024))
     }
 
-    /// The space available for important use on the volume holding `url`, when the system says.
+    /// The space available on the volume holding `url`, when the system says: the capacity for
+    /// important use, or the plain available capacity where that reads zero or nothing. A volume
+    /// that does not support the first (some external and network formats) reports zero for it
+    /// with room to spare, and a zero taken at its word would refuse every download there.
     public static func availableBytes(at url: URL) -> Int64? {
-        (try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            .volumeAvailableCapacityForImportantUsage).map { Int64($0) }
+        let values = try? url.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey]
+        )
+        return availableBytes(
+            forImportantUsage: values?.volumeAvailableCapacityForImportantUsage,
+            plain: values?.volumeAvailableCapacity.map(Int64.init)
+        )
+    }
+
+    public static func availableBytes(forImportantUsage important: Int64?, plain: Int64?) -> Int64? {
+        if let important, important > 0 { return important }
+        return plain ?? important
     }
 }
 

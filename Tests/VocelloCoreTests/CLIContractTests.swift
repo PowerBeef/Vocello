@@ -184,17 +184,46 @@ final class CLIContractTests: XCTestCase {
             XCTAssertEqual(refusal?.detail?["availableBytes"], .string(String(2 * gigabyte)))
         }
 
-        // A resumed download needs room only for what its kept staging does not hold yet.
+        // A resumed download needs room only for what its kept staging holds of the planned files.
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("CLIStoragePreflight-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let target = root.appendingPathComponent("models/fixture-model", isDirectory: true)
-        let staging = root.appendingPathComponent("models/.qwenvoice-downloads/fixture-model/partials", isDirectory: true)
-        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 4_000, targetDirectory: target), 4_000)
-        try Data(count: 1_000).write(to: staging.appendingPathComponent("weights.partial"))
-        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 4_000, targetDirectory: target), 3_000)
-        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(planBytes: 500, targetDirectory: target), 0)
+        let staging = root.appendingPathComponent("models/.qwenvoice-downloads/fixture-model", isDirectory: true)
+        let partials = staging.appendingPathComponent("partials/nested", isDirectory: true)
+        let files = staging.appendingPathComponent("files", isDirectory: true)
+        try FileManager.default.createDirectory(at: partials, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: files, withIntermediateDirectories: true)
+        let plan = [
+            HuggingFaceDownloader.RepoFile(path: "nested/weights.bin", size: 4_000, sha256: nil),
+            HuggingFaceDownloader.RepoFile(path: "config.json", size: 500, sha256: nil),
+        ]
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(plan: plan, targetDirectory: target), 4_500)
+        try Data(repeating: 1, count: 1_000).write(to: partials.appendingPathComponent("weights.bin.partial"))
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(plan: plan, targetDirectory: target), 3_500)
+        try Data(repeating: 1, count: 500).write(to: files.appendingPathComponent("config.json"))
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(plan: plan, targetDirectory: target), 3_000)
+        // A shared component hard-linked into staging is not part of the plan: it frees nothing.
+        try Data(repeating: 1, count: 9_000).write(to: files.appendingPathComponent("speech_tokenizer.safetensors"))
+        XCTAssertEqual(CLIStoragePreflight.bytesStillToFetch(plan: plan, targetDirectory: target), 3_000)
+        // A sparse partial holds less than its length says.
+        let sparse = partials.appendingPathComponent("weights.bin.partial")
+        try FileManager.default.removeItem(at: sparse)
+        XCTAssertTrue(FileManager.default.createFile(atPath: sparse.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: sparse)
+        try handle.truncate(atOffset: 4_000_000)
+        try handle.close()
+        XCTAssertGreaterThan(
+            CLIStoragePreflight.bytesStillToFetch(
+                plan: [HuggingFaceDownloader.RepoFile(path: "nested/weights.bin", size: 4_000_000, sha256: nil)],
+                targetDirectory: target
+            ),
+            3_000_000, "a hole is not downloaded bytes"
+        )
+        XCTAssertEqual(ModelDeliverySpace.availableBytes(forImportantUsage: 0, plain: 5_000), 5_000)
+        XCTAssertEqual(ModelDeliverySpace.availableBytes(forImportantUsage: 7_000, plain: 5_000), 7_000)
+        XCTAssertEqual(ModelDeliverySpace.availableBytes(forImportantUsage: 0, plain: nil), 0)
+        XCTAssertNil(ModelDeliverySpace.availableBytes(forImportantUsage: nil, plain: nil))
         XCTAssertNotNil(
             CLIStoragePreflight.availableBytes(near: target), "read at the nearest folder that exists"
         )

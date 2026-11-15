@@ -397,7 +397,7 @@ public enum ModelsCommand {
         // Refused before any byte is fetched when the volume cannot hold the download.
         try CLIStoragePreflight.ensureRoom(
             forFetching: CLIStoragePreflight.bytesStillToFetch(
-                planBytes: delivery.filesToDownload.reduce(0) { $0 + $1.size }, targetDirectory: targetDir
+                plan: delivery.filesToDownload, targetDirectory: targetDir
             ),
             availableBytes: CLIStoragePreflight.availableBytes(near: modelsDirectory)
         )

@@ -219,6 +219,15 @@ public struct CLIRequestLedger: Sendable {
         _ = try? withLedgerLock { pruneHoldingLedgerLock(now: now, force: force) }
     }
 
+    /// `prune` for a request that carries no id, so expired entries do not outlive the last
+    /// request that did: only where a ledger already exists, and as rarely as `prune`.
+    public func pruneIfPresent(now: Date = Date()) {
+        var isDirectory: ObjCBool = false
+        guard unsafe FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else { return }
+        prune(now: now)
+    }
+
     /// `prune`, for a caller that holds the ledger lock (a second lock on the
     /// same file from this process would wait on the first forever).
     private func pruneHoldingLedgerLock(now: Date, force: Bool) {

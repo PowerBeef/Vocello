@@ -432,6 +432,8 @@ def ui_bundle_mode(paths: list[str]) -> str | None:
 CLI_LINKED_SOURCES = (
     "Sources/VocelloCLI/",
     "Sources/VocelloDesktopCore/",
+    # Compiled into VocelloDesktopCore by path, and into the app by its glob.
+    "Sources/DesktopShared/",
     "Sources/QwenVoiceCore/",
     "Sources/QwenVoiceBackendCore/",
     "Packages/",

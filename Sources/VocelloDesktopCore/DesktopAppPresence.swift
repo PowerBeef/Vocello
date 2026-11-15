@@ -53,7 +53,7 @@ public enum DesktopAppPresence {
     /// paths are compared in memory and never logged or stored.
     public static func runningExecutablePaths() -> [String] {
         // The kernel's count, with room for processes that start meanwhile.
-        let expected = unsafe proc_listallpids(nil, 0)
+        let expected = proc_listallpids(nil, 0)
         guard expected > 0 else { return [] }
         var processIDs = [pid_t](repeating: 0, count: Int(expected) + 64)
         let listed = processIDs.withMutableBufferPointer { buffer -> Int in

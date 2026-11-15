@@ -90,7 +90,8 @@ class CheckPlanTests(unittest.TestCase):
         cli = "./scripts/build.sh cli --version"
         with mock.patch.object(MODULE, "project_generation_status", return_value=None):
             for changed in ("Sources/VocelloCLI/ModelsCommand.swift", "Sources/QwenVoiceCore/ModelAssets.swift",
-                            "Sources/VocelloDesktopCore/EngineHostLease.swift", "project.yml"):
+                            "Sources/VocelloDesktopCore/DesktopAppPresence.swift",
+                            "Sources/DesktopShared/EngineHostLease.swift", "project.yml"):
                 with self.subTest(changed=changed):
                     self.assertIn(cli, commands(MODULE.check_plan([changed])))
             for changed in ("Sources/ContentView.swift", "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",

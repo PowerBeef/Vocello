@@ -228,6 +228,17 @@ final class ClassifiedGenerationSessionTests: XCTestCase {
         XCTAssertEqual(latestProgress?.generatedTokenCount, 16)
     }
 
+    /// The engine publishes progress once per chunk-level signal. A per-token
+    /// signal only raises the counts the next publication carries, so the
+    /// per-frame loop pays no extra actor hop for a slot the product never
+    /// reads.
+    func testOnlyChunkLevelSignalsPublishProgress() {
+        XCTAssertFalse(VocelloQwen3GenerationSignal.token(7).publishesProgress)
+        XCTAssertFalse(VocelloQwen3GenerationSignal.codecFrame([1, 2, 3]).publishesProgress)
+        XCTAssertTrue(VocelloQwen3GenerationSignal.prepared.publishesProgress)
+        XCTAssertTrue(VocelloQwen3GenerationSignal.audio([0, 0.1]).publishesProgress)
+    }
+
     func testModelTerminalDoesNotRequireProgressOrDiagnosticSubscribers() async throws {
         let session = makeSession()
         let prepared = VocelloQwen3PreparedEvent(

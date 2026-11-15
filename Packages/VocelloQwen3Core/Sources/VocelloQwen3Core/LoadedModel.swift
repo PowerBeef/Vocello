@@ -244,6 +244,19 @@ enum VocelloQwen3GenerationSignal: Sendable {
     case info(VocelloQwen3GenerationInfo)
     case audio([Float])
     case chunkTimings(VocelloQwen3ChunkTimings)
+
+    /// Whether the engine publishes a progress event after this signal. The
+    /// per-token signals do not: a take emits one `token` per codec frame (and
+    /// one `codecFrame` when its trace is captured), and the counts they raise
+    /// travel with the next chunk-level signal.
+    var publishesProgress: Bool {
+        switch self {
+        case .token, .codecFrame:
+            return false
+        case .prepared, .info, .audio, .chunkTimings:
+            return true
+        }
+    }
 }
 
 struct VocelloQwen3GenerationCompletion: Sendable {

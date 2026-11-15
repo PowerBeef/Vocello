@@ -169,7 +169,9 @@ frames, so a slow output adapter applies bounded backpressure to the token and d
 of dropping final audio or turning consumer speed into a runtime failure. The channel records its
 frame high-water mark, producer suspension duration and cancellation wakeups. Prepared state is
 replay-latest, progress is monotonic and coalesced, model terminal is an independent promise, and
-diagnostics are bounded, PCM-free and explicitly lossy.
+diagnostics are bounded, PCM-free and explicitly lossy. Progress is published once per chunk-level
+signal, not per token: nothing in the product reads it, and a per-token publication was one more
+actor hop in the per-frame loop.
 
 Reservation alone creates no model task. Generation opens only after the output adapter claims the
 audio drain, and model EOS moves the same operation lease to product finalization rather than

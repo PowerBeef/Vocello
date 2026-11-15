@@ -1778,13 +1778,19 @@ public actor VocelloQwen3Engine {
             throw VocelloQwen3EngineError.staleOperation
         }
         try revalidate(current.lease)
-        await current.session.publishProgress(VocelloQwen3ProgressEvent(
-            generationID: current.request.generationID,
-            generatedTokenCount: current.generatedTokenCount,
-            emittedAudioFrameCount: current.emittedAudioFrameCount,
-            elapsedMilliseconds: startedAt.elapsedMilliseconds
-        ))
-        try revalidate(current.lease)
+        // Progress is a replay-latest slot on another actor, and nothing in
+        // the product reads it. A token only raises the count, which the next
+        // chunk-level signal publishes, so the per-frame loop does not pay one
+        // more actor hop per token for it.
+        if signal.publishesProgress {
+            await current.session.publishProgress(VocelloQwen3ProgressEvent(
+                generationID: current.request.generationID,
+                generatedTokenCount: current.generatedTokenCount,
+                emittedAudioFrameCount: current.emittedAudioFrameCount,
+                elapsedMilliseconds: startedAt.elapsedMilliseconds
+            ))
+            try revalidate(current.lease)
+        }
         try current.session.cancellation.checkCancellation()
     }
 

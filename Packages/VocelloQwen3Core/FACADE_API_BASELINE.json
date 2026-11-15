@@ -456,7 +456,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "be87f61264f80f13a55437f15b04f3ffc6bc338ba0e561e804df75006c5ec9d5"
+      "sha256": "8c8380b2b343c1346d1867959d07521b66a7f00dec93a57f740e795c03c7315e"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
@@ -464,7 +464,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "321f049861a2b4667c421581bd00c0da2cd92ff3fced4c17d733164e0d804974"
+      "sha256": "d2b12995ab04dc193f06b1ed704c9c0857c7c022715459c4e7a7753e1b85c4ae"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

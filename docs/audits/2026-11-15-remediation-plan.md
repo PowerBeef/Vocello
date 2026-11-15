@@ -31,8 +31,9 @@ A plan only: nothing here is done yet. Finding IDs (A1, T3, …) are those of
 **Decided on 2026-11-15:** D-1 to D-5, each as recommended. The CI pin moves to the Xcode 27 line;
 `models install` keeps removing every mode's earlier models and reports them; MCP `delete_voice`
 goes behind `--allow-voice-delete`; deleting a long-form project deletes its segments, and the
-confirmation says so; the benchmark records a refused take and publishes the rest. **Open:** D-7
-(pause budget, measured first) and D-8 (tag signer).
+confirmation says so; the benchmark records a refused take and publishes the rest. D-7 and D-8 were decided the same day, as recommended: the pause budget is measured on retained
+takes before anything changes, and the release tag's signer is allow-listed. The maintainer then
+asked for the whole plan to be implemented.
 
 **D-6 is settled by the record (2026-11-15).** Each hybrid was built by
 `scripts/build_hybrid_model.py` from two of Vocello's own 3.0 artifacts, with no requantization, as

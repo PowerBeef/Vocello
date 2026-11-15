@@ -64,6 +64,10 @@ def make_engine_row(index: int, cell: str) -> dict:
             "benchRunID": RUN_ID,
             "benchTakeIndex": str(index),
             "benchCell": cell,
+            # The canonical M6's native tier: the shipped stall contract is
+            # calibrated, so every take must be one it can judge (audit T6).
+            "deviceClass": "mid_16gb_mac",
+            "deviceClassForced": "false",
             "quality_registry_outcome": "pass",
             "quality_registry_required_gates": "terminal,token_cap,codec_behavior,persisted_wav,streaming_continuity",
         },
@@ -413,10 +417,18 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
 
     def test_a_forced_or_emulated_tier_publishes_only_exploratory_evidence(self) -> None:
         """audit #11 option b: the 8 GB floor emulated on the M6 never reads as canonical."""
-        result = self.run_checker(self.expected_order, evidence=True)
+        def unstamped(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].pop("deviceClass")
+                row["notes"].pop("deviceClassForced")
+
+        # Rows that predate the tier stamp carry no provenance block. Only a
+        # provisional stall contract accepts them: a calibrated one must judge every take.
+        with tempfile.TemporaryDirectory() as temporary:
+            provisional = ["--stall-contract", str(self.write_stall_contract(Path(temporary)))]
+            result = self.run_checker(self.expected_order, unstamped, evidence=True, extra_args=provisional)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
-        # Rows that predate the tier stamp carry no provenance block.
         self.assertNotIn("runtimePolicy", self.last_manifest["historyRecord"]["run"])
 
         def emulate_floor(rows: list[dict]) -> None:
@@ -576,6 +588,8 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
             for row in rows:
                 if device_class is not None:
                     row["notes"]["deviceClass"] = device_class
+                else:
+                    row["notes"].pop("deviceClass", None)
                 row["notes"]["deviceClassForced"] = "true" if forced else "false"
 
         def add_stalls(layers: dict[str, list[dict]]) -> None:
@@ -680,9 +694,45 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         # The floor tier stays gated even when forced, as before.
         result = self.run_with_stalls("floor8GBMac", forced=True, extra_args=enforced)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        # Rows without a Mac tier are not gated.
-        result = self.run_with_stalls(None, extra_args=enforced)
+
+    def test_a_calibrated_stall_gate_cannot_pass_with_unjudged_takes(self) -> None:
+        """RF-61, audit T6: a row without a Mac device class skipped the gate, so a
+        calibrated limit passed a run it had judged no take of."""
+        enforced = self.enforced_stall_contract_args()
+        for device_class in (None, "iphone_pro", ""):
+            with self.subTest(device_class=device_class):
+                # Stalls far above the limit and nothing to judge them: the run fails for that.
+                result = self.run_with_stalls(device_class, maximum_ms=5_000, extra_args=enforced)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("judged 0 of 5 takes", result.stdout)
+                self.assertIn("a calibrated gate must cover the matrix", result.stdout)
+                self.assertIn("take 1 (custom/medium/cold#0) deviceClass=", result.stdout)
+        # One unjudged take among judged ones is enough.
+        def unstamp_one(rows: list[dict]) -> None:
+            rows[3]["notes"].pop("deviceClass")
+        result = self.run_checker(self.expected_order, unstamp_one, extra_args=enforced)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("judged 4 of 5 takes", result.stdout)
+        self.assertIn("unjudged take 4 (clone/short/warm#0) deviceClass=None", result.stdout)
+        # A provisional contract only reports, as before; the count is still printed.
+        result = self.run_with_stalls(None, maximum_ms=5_000, evidence=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("0 gated take(s) of 5", result.stdout)
+        stall = self.last_manifest["stallGate"]
+        self.assertEqual(
+            (stall["gatedTakeCount"], stall["expectedTakeCount"], stall["exemptTakeCount"], stall["coversMatrix"]),
+            (0, 5, 0, False),
+        )
+        # A forced non-floor tier is a declared diagnostic: exempt, never unjudged.
+        result = self.run_with_stalls("mid_16gb_mac", forced=True, maximum_ms=5_000, extra_args=enforced, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        stall = self.last_manifest["stallGate"]
+        self.assertEqual((stall["gatedTakeCount"], stall["exemptTakeCount"], stall["coversMatrix"]), (0, 5, True))
+        # A fully judged native-tier run covers the matrix.
+        result = self.run_with_stalls("mid_16gb_mac", stalls=0, maximum_ms=0, extra_args=enforced, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        stall = self.last_manifest["stallGate"]
+        self.assertEqual((stall["gatedTakeCount"], stall["expectedTakeCount"], stall["coversMatrix"]), (5, 5, True))
 
     def test_the_contract_owns_the_statistic_and_limit(self) -> None:
         # Two heartbeats over 50 ms, none over 250 ms: the shipped contract passes them,

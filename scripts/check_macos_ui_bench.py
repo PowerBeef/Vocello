@@ -91,6 +91,14 @@ def stall_gate_applies(notes: dict) -> bool:
     return str(notes.get("deviceClassForced", "false")).lower() != "true"
 
 
+def stall_gate_exempt(notes: dict) -> bool:
+    """Whether a take the gate does not cover is left out by design: a forced
+    non-floor tier, a diagnostic simulation whose record is exploratory. A row
+    with no Mac device class is not exempt, only unjudged, and a calibrated
+    contract fails a run that holds one (RF-61, audit T6)."""
+    return not stall_gate_applies(notes) and str(notes.get("deviceClass") or "") in MAC_DEVICE_CLASSES
+
+
 def takes_above_load_limit(history_takes: list[dict]) -> list[tuple[int, float]]:
     """(takeIndex, load) of every take whose own one-minute load exceeded the
     stricter per-take limit (maintainer decision 2026-09-25, audit #28): the
@@ -208,11 +216,16 @@ def stall_statistic_value(app_row: dict, statistic: str):
     return None
 
 
-def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored: int) -> dict:
+def stall_gate_summary(
+    contract: dict, observed: list[tuple[str, int]], censored: int,
+    *, expected: int | None = None, exempt: int = 0,
+) -> dict:
     """What the gate saw, for calibration: the per-take distribution of the statistic.
 
     `observed` is each gated take's (cell, value) in take order; `takes` keeps
     them all, because calibrating the contract needs the whole distribution.
+    `expected` is the selected matrix's take count and `exempt` the forced-tier
+    diagnostic takes among them; `coversMatrix` says every other take was gated.
     """
     values = sorted(value for _, value in observed)
 
@@ -233,6 +246,11 @@ def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored
         "enforced": stall_contract_enforced(contract),
         "wouldFail": above > 0,
         "gatedTakeCount": len(values),
+        # The gate cannot pass empty (audit T6): what the matrix owed it.
+        **({
+            "expectedTakeCount": expected, "exemptTakeCount": exempt,
+            "coversMatrix": len(values) + exempt >= expected,
+        } if expected is not None else {}),
         "takesAboveLimit": above,
         "median": quantile(0.5),
         "p90": quantile(0.9),
@@ -1437,11 +1455,18 @@ def main() -> int:
     stall_limit = stall_contract["maximumAllowed"]
     stall_enforced = stall_contract_enforced(stall_contract)
     stall_observed: list[tuple[str, int]] = []
+    stall_exempt = 0
+    stall_unjudged: list[str] = []
     censored_heartbeats = 0
     for index, engine_row in enumerate(engine_rows, start=1):
         gid = engine_row.get("generationID")
         notes = engine_row.get("notes") or {}
         if not stall_gate_applies(notes):
+            if stall_gate_exempt(notes):
+                stall_exempt += 1
+            else:
+                cell = notes.get("benchCell") if isinstance(notes.get("benchCell"), str) else "?"
+                stall_unjudged.append(f"take {index} ({cell}) deviceClass={notes.get('deviceClass')!r}")
             continue
         app_row = app_by_id.get(gid)
         if app_row is None:
@@ -1463,7 +1488,20 @@ def main() -> int:
                 f"{statistic} {value} > {stall_limit} (generation {gid}; "
                 f"stall contract {stall_contract['policyID']}, {stall_contract['calibrationStatus']})"
             )
-    stall_gate = stall_gate_summary(stall_contract, stall_observed, censored_heartbeats)
+    stall_gate = stall_gate_summary(
+        stall_contract, stall_observed, censored_heartbeats, expected=expected, exempt=stall_exempt,
+    )
+    # The gate cannot pass empty (RF-61, audit T6): a row without a Mac device
+    # class used to skip it silently, so a calibrated limit could judge nothing.
+    # Every take of the selected matrix must be gated, bar the forced-tier
+    # diagnostic takes the gate leaves out by design. A take already failed
+    # above (a missing row or statistic) is not reported a second time.
+    if stall_enforced and not stall_gate["coversMatrix"] and (stall_unjudged or not failures):
+        failures.append(
+            f"stall gate {stall_contract['policyID']} judged {len(stall_observed)} of {expected} takes "
+            f"({stall_exempt} forced-tier diagnostic take(s) exempt); a calibrated gate must cover the matrix"
+            + (f": unjudged {'; '.join(stall_unjudged)}" if stall_unjudged else "")
+        )
 
     # The seed policy (audit #29): under a cell-hash policy every take sampled with its
     # cell's seed; the lane's selection must match what the rows ran.
@@ -1522,7 +1560,8 @@ def main() -> int:
     print(
         f"stall gate {stall_gate['policyID']} ({stall_gate['calibrationStatus']} on "
         f"{stall_gate['calibrationProfile']}, {enforcement}): {statistic} <= {stall_limit} over "
-        f"{stall_gate['gatedTakeCount']} gated take(s); median={stall_gate['median']} "
+        f"{stall_gate['gatedTakeCount']} gated take(s) of {expected} "
+        f"({stall_exempt} exempt); median={stall_gate['median']} "
         f"p90={stall_gate['p90']} max={stall_gate['maximum']} "
         f"above={stall_gate['takesAboveLimit']} wouldFail={would_fail} "
         f"censoredHeartbeats={censored_heartbeats}"

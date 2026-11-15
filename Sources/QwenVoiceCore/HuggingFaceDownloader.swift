@@ -3255,22 +3255,36 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let installParent = targetDir.deletingLastPathComponent()
         try fileManager.createDirectory(at: installParent, withIntermediateDirectories: true)
 
-        let installingURL = installParent
-            .appendingPathComponent(".\(targetDir.lastPathComponent).installing.\(UUID().uuidString)", isDirectory: true)
+        // Named so the component store's startup reclamation sweeps it if the process dies
+        // between the two renames below.
+        let installingURL = installParent.appendingPathComponent(
+            SharedModelComponentStore.workingDirectoryName(
+                .plainInstall,
+                forModelFolder: targetDir.lastPathComponent
+            ),
+            isDirectory: true
+        )
         if fileManager.fileExists(atPath: installingURL.path) {
             try fileManager.removeItem(at: installingURL)
         }
         try fileManager.moveItem(at: filesRoot, to: installingURL)
 
-        if fileManager.fileExists(atPath: targetDir.path) {
-            _ = try fileManager.replaceItemAt(
-                targetDir,
-                withItemAt: installingURL,
-                backupItemName: nil,
-                options: []
-            )
-        } else {
-            try fileManager.moveItem(at: installingURL, to: targetDir)
+        do {
+            if fileManager.fileExists(atPath: targetDir.path) {
+                _ = try fileManager.replaceItemAt(
+                    targetDir,
+                    withItemAt: installingURL,
+                    backupItemName: nil,
+                    options: []
+                )
+            } else {
+                try fileManager.moveItem(at: installingURL, to: targetDir)
+            }
+        } catch {
+            // The staged tree was moved out of the download's staging root, so nothing else
+            // removes it. A failed exchange must not leave a hidden copy of the model behind.
+            try? fileManager.removeItem(at: installingURL)
+            throw error
         }
     }
 

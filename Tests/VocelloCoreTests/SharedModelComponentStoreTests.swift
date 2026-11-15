@@ -933,6 +933,58 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
     }
 
+    /// A process killed mid-install leaves its working directory beside the model folders, with
+    /// a hard link to every shared blob. Reclamation keeps a fresh one (an install may be in
+    /// flight) and removes an aged one together with the blob only it was holding.
+    func testReclaimSweepsAgedInstallWorkingDirectoriesAndKeepsFreshOnes() throws {
+        let root = try temporaryDirectory("abandoned-working-directories")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let source = root.appendingPathComponent("source", isDirectory: true)
+        try write(Data("linked-by-a-killed-install".utf8), to: source.appendingPathComponent("component.bin"))
+        let file = try SharedComponentFileIdentity.verify(
+            relativePath: "component.bin",
+            fileURL: source.appendingPathComponent("component.bin")
+        )
+        let store = SharedModelComponentStore(modelsRoot: models)
+        _ = try store.publish(content: SharedComponentContentIdentity(files: [file]), from: source)
+        let blob = try store.blobURL(for: file.sha256)
+
+        var abandoned: [URL] = []
+        for kind in SharedModelComponentStore.WorkingDirectoryKind.allCases {
+            let name = SharedModelComponentStore.workingDirectoryName(kind, forModelFolder: "model-a")
+            XCTAssertTrue(SharedModelComponentStore.isWorkingDirectoryName(name), name)
+            let directory = models.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.linkItem(at: blob, to: directory.appendingPathComponent("component.bin"))
+            abandoned.append(directory)
+        }
+        // Not a name an install produces, so not the store's to remove at any age.
+        let foreign = models.appendingPathComponent(".model-a.component-install.fixture", isDirectory: true)
+        XCTAssertFalse(SharedModelComponentStore.isWorkingDirectoryName(foreign.lastPathComponent))
+        XCTAssertFalse(SharedModelComponentStore.isWorkingDirectoryName(".component-install.\(UUID().uuidString)"))
+        XCTAssertFalse(SharedModelComponentStore.isWorkingDirectoryName("model-a.installing.\(UUID().uuidString)"))
+        try write(Data("kept".utf8), to: foreign.appendingPathComponent("note.txt"))
+
+        // Fresh: nothing is swept and the links protect the blob.
+        XCTAssertEqual(try store.reclaimUnreferencedComponents().preservedDigests, [file.sha256])
+        for directory in abandoned {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
+
+        // Aged: the working directories go, and the blob they held goes in the same pass.
+        Thread.sleep(forTimeInterval: 0.8)
+        XCTAssertEqual(try store.reclaimUnreferencedComponents(gracePeriod: 0.5).removedDigests, [file.sha256])
+        for directory in abandoned {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: foreign.path))
+        let trash = store.storeRoot.appendingPathComponent("trash", isDirectory: true)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: trash.path), [])
+    }
+
     /// PA-22 / CORE-08: a model loaded by an earlier build carries the engine's overlay of
     /// absolute symlinks inside its folder. Migration and repair used to fail on it and fall back
     /// to a full re-download; they now drop the rebuildable overlay and succeed.

@@ -613,7 +613,7 @@ public struct SharedModelComponentStore: Sendable {
 
         let target = modelsRoot.appendingPathComponent(plan.modelFolder, isDirectory: true)
         let replica = modelsRoot.appendingPathComponent(
-            ".\(plan.modelFolder).component-install.\(UUID().uuidString)",
+            Self.workingDirectoryName(.componentInstall, forModelFolder: plan.modelFolder),
             isDirectory: true
         )
         let stagedSnapshot: SharedComponentFileSystem.DirectorySnapshot
@@ -849,10 +849,13 @@ public struct SharedModelComponentStore: Sendable {
 
     /// Automatic reclamation, run after every model delete and once per engine start. Unlike the
     /// exact `pruneUnreferencedComponents()`, it also sweeps `trash/` and `staging/` leftovers
-    /// from interrupted operations and protects what may belong to an operation in flight: a blob
-    /// with another hard link (an install or migration replica holds it, or a download pinned it
-    /// for reuse) or one published within the grace period, and trash or staging entries whose
-    /// newest change is younger than it. A store that does not exist yet is left uncreated.
+    /// from interrupted operations and the working directories a process killed mid-install left
+    /// beside the model folders (`WorkingDirectoryKind`), and protects what may belong to an
+    /// operation in flight: a blob with another hard link (an install or migration replica holds
+    /// it, or a download pinned it for reuse) or one published within the grace period, and
+    /// trash, staging or working-directory entries whose newest change is younger than it. A
+    /// working directory swept in this pass no longer protects the blobs it linked, so they are
+    /// reclaimed in the same pass. A store that does not exist yet is left uncreated.
     @discardableResult
     public func reclaimUnreferencedComponents(
         gracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
@@ -884,11 +887,103 @@ public struct SharedModelComponentStore: Sendable {
                 try? Self.removeTombstone(entry)
             }
         }
-        return try pruneUnreferencedComponents { digest, blob in
-            guard let status = SharedComponentFileSystem.linkStatus(blob) else { return true }
-            if status.linkCount > 1 { return true }
-            if releasedDigests.contains(digest) { return false }
-            return status.changedAt >= cutoff
+        var sweptTombstones: [URL] = []
+        var sweptLinks: [SharedComponentFileSystem.FileIdentifier: UInt64] = [:]
+        // Removed after the lock is released, and also when the prune below fails closed. A
+        // tombstone that cannot be removed now is left to a later trash sweep.
+        defer {
+            for tombstone in sweptTombstones {
+                try? Self.removeTombstone(tombstone)
+            }
+        }
+        return try pruneUnreferencedComponents(
+            beforePruneUnderLock: {
+                for directory in abandonedWorkingDirectories(olderThan: cutoff) {
+                    let tombstone = trashRoot.appendingPathComponent(
+                        "working-\(UUID().uuidString)",
+                        isDirectory: true
+                    )
+                    do {
+                        try SharedComponentFileSystem.move(
+                            directory,
+                            to: tombstone,
+                            operation: "tombstone-working-directory"
+                        )
+                    } catch {
+                        continue
+                    }
+                    sweptTombstones.append(tombstone)
+                    for (identifier, count) in SharedComponentFileSystem.linkCounts(under: tombstone) {
+                        sweptLinks[identifier, default: 0] += count
+                    }
+                }
+            },
+            isProtected: { digest, blob in
+                guard let status = SharedComponentFileSystem.linkStatus(blob) else { return true }
+                // The links a swept working directory holds go with its tombstone.
+                if status.linkCount > 1 + (sweptLinks[status.identifier] ?? 0) { return true }
+                if releasedDigests.contains(digest) { return false }
+                return status.changedAt >= cutoff
+            }
+        )
+    }
+
+    /// The hidden directories an install builds beside the model folders, each named
+    /// `.<model folder>.<kind>.<uuid>`. A normal run renames or removes its directory before it
+    /// returns. A process killed in between leaves it, with a hard link to every shared blob the
+    /// model uses, so automatic reclamation sweeps the aged ones.
+    enum WorkingDirectoryKind: String, CaseIterable, Sendable {
+        /// `installStagedModel`'s replica of a staged download.
+        case componentInstall = "component-install"
+        /// `replaceModelWithSharedLinks`' replica, which holds the original model after the swap
+        /// until validation passes.
+        case componentMigration = "component-migration"
+        /// `HuggingFaceDownloader.installStagedRepository`'s staged tree for a model without a
+        /// shared-component plan.
+        case plainInstall = "installing"
+    }
+
+    static func workingDirectoryName(_ kind: WorkingDirectoryKind, forModelFolder folder: String) -> String {
+        ".\(folder).\(kind.rawValue).\(UUID().uuidString)"
+    }
+
+    /// True only for a name `workingDirectoryName` can have produced: a safe model folder name, a
+    /// known kind and a UUID. Anything else beside the model folders is not this store's to remove.
+    static func isWorkingDirectoryName(_ name: String) -> Bool {
+        guard name.hasPrefix(".") else { return false }
+        for kind in WorkingDirectoryKind.allCases {
+            guard let marker = name.range(of: ".\(kind.rawValue).", options: .backwards),
+                  marker.lowerBound > name.startIndex else { continue }
+            let folder = String(name[name.index(after: name.startIndex)..<marker.lowerBound])
+            let suffix = String(name[marker.upperBound...])
+            if SharedComponentIdentityValidation.isSafeFolder(folder), UUID(uuidString: suffix) != nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Working directories whose newest change is older than `cutoff`. Called under the
+    /// publication lock, so an install's final exchange cannot interleave with the sweep.
+    ///
+    /// The age is the newest ctime of the directory and its immediate children. That also covers a
+    /// migration replica after its swap, when it holds the original model for a possible rollback:
+    /// building the replica hard-linked every file of that model, which refreshed each file's
+    /// ctime, so the original stays fresh for the whole grace period.
+    private func abandonedWorkingDirectories(olderThan cutoff: Date) -> [URL] {
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: modelsRoot,
+            includingPropertiesForKeys: nil,
+            options: []
+        )) ?? []
+        return entries.filter { entry in
+            guard Self.isWorkingDirectoryName(entry.lastPathComponent),
+                  let status = SharedComponentFileSystem.linkStatus(entry),
+                  status.isDirectory,
+                  let changedAt = SharedComponentFileSystem.newestChangeTime(of: entry) else {
+                return false
+            }
+            return changedAt < cutoff
         }
     }
 
@@ -933,10 +1028,11 @@ public struct SharedModelComponentStore: Sendable {
     /// Moves unreferenced blobs to private trash while holding the publication lock, then removes
     /// them after releasing it. A malformed manifest or missing live blob makes pruning fail closed.
     public func pruneUnreferencedComponents() throws -> SharedComponentPruneResult {
-        try pruneUnreferencedComponents { _, _ in false }
+        try pruneUnreferencedComponents(beforePruneUnderLock: {}, isProtected: { _, _ in false })
     }
 
     private func pruneUnreferencedComponents(
+        beforePruneUnderLock: () -> Void,
         isProtected: (_ digest: String, _ blob: URL) -> Bool
     ) throws -> SharedComponentPruneResult {
         try prepareStoreDirectories()
@@ -944,6 +1040,7 @@ public struct SharedModelComponentStore: Sendable {
         var preserved: [String] = []
         var tombstones: [URL] = []
         try withPublicationLock {
+            beforePruneUnderLock()
             let live = Set(try livenessUnlocked().liveBlobDigests)
             for (digest, url) in try allStoredBlobs() {
                 if live.contains(digest) || isProtected(digest, url) {
@@ -1044,7 +1141,7 @@ public struct SharedModelComponentStore: Sendable {
         // The overlay is cache the engine now rebuilds outside the model folder.
         PreparedModelOverlay.removeLegacyOverlay(in: modelURL)
         let replica = modelsRoot.appendingPathComponent(
-            ".\(modelURL.lastPathComponent).component-migration.\(UUID().uuidString)",
+            Self.workingDirectoryName(.componentMigration, forModelFolder: modelURL.lastPathComponent),
             isDirectory: true
         )
         var originalSnapshot: SharedComponentFileSystem.DirectorySnapshot?
@@ -1464,10 +1561,24 @@ private enum SharedComponentFileSystem {
         )
     }
 
-    /// Hard-link count and status-change time (ctime: set by publication's rename and chmod, and
-    /// by every link or unlink), read without following a symlink. `nil` when the entry cannot be
-    /// read; reclamation treats that as protected.
-    static func linkStatus(_ url: URL) -> (linkCount: UInt64, changedAt: Date)? {
+    /// One file's identity on its volume. Two paths with the same identifier are hard links.
+    struct FileIdentifier: Hashable {
+        let device: dev_t
+        let inode: ino_t
+    }
+
+    struct LinkStatus {
+        let identifier: FileIdentifier
+        let linkCount: UInt64
+        let changedAt: Date
+        let isRegularFile: Bool
+        let isDirectory: Bool
+    }
+
+    /// Identity, hard-link count and status-change time (ctime: set by publication's rename and
+    /// chmod, and by every link or unlink), read without following a symlink. `nil` when the entry
+    /// cannot be read; reclamation treats that as protected.
+    static func linkStatus(_ url: URL) -> LinkStatus? {
         var info = stat()
         let result = unsafe url.withUnsafeFileSystemRepresentation { path -> Int32 in
             guard let path = unsafe path else { return -1 }
@@ -1478,7 +1589,30 @@ private enum SharedComponentFileSystem {
             timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec)
                 + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
         )
-        return (UInt64(info.st_nlink), changedAt)
+        return LinkStatus(
+            identifier: FileIdentifier(device: info.st_dev, inode: info.st_ino),
+            linkCount: UInt64(info.st_nlink),
+            changedAt: changedAt,
+            isRegularFile: (info.st_mode & S_IFMT) == S_IFREG,
+            isDirectory: (info.st_mode & S_IFMT) == S_IFDIR
+        )
+    }
+
+    /// How many paths under `root` link each regular file. An entry that cannot be read is not
+    /// counted, which leaves the blob it may link protected.
+    static func linkCounts(under root: URL) -> [FileIdentifier: UInt64] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [],
+            errorHandler: { _, _ in true }
+        ) else { return [:] }
+        var counts: [FileIdentifier: UInt64] = [:]
+        for case let url as URL in enumerator {
+            guard let status = linkStatus(url), status.isRegularFile else { continue }
+            counts[status.identifier, default: 0] += 1
+        }
+        return counts
     }
 
     /// The newest ctime of `entry` and, for a directory, of its immediate children, so a

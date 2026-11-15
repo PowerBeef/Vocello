@@ -44,7 +44,9 @@ work the same day; nothing is running.
 - `ui_test.sh macos perf` PASS (`bedafc14`): every hitch rate and frame gap inside its calibrated
   ceiling; the one warning (delivery-menu footprint) is a model warm at the window's end.
 
-**Open, in order**
+**Open, in order** ([investigation of November 15](audits/2026-11-15-release-3-1-interruption-investigation.md):
+the refused take is a rare model ending at that seed, 0 refusals in 60 other seeds on the hybrid and on
+Speed; filtering History now stalls up to 873 ms against about 470 ms in September, cause untraced)
 
 1. **The UI benchmark failed** (`macos-xcui-benchmark-20261114-195242-cfbe3925`, at `bedafc14`):
    take 13, `design/short/warm#1` ("The train left the station at dawn.", Neutral delivery, the

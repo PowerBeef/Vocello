@@ -28,6 +28,12 @@ A plan only: nothing here is done yet. Finding IDs (A1, T3, …) are those of
 
 ## Phase 0: decisions (the maintainer's, before the work they gate)
 
+**Decided on 2026-11-15:** D-1 to D-5, each as recommended. The CI pin moves to the Xcode 27 line;
+`models install` keeps removing every mode's earlier models and reports them; MCP `delete_voice`
+goes behind `--allow-voice-delete`; deleting a long-form project deletes its segments, and the
+confirmation says so; the benchmark records a refused take and publishes the rest. **Open:** D-6
+(attribution), D-7 (pause budget, measured first) and D-8 (tag signer).
+
 | # | Decision | Gates | Recommendation |
 |---|---|---|---|
 | D-1 | **Xcode for 3.1** (B1): move the CI pin to the 27 line, or keep 26.6 and run acceptance on it | Steps 14, 18 | Move the pin. This Mac already builds and measures on 27.2, and the nightly preview workflow already compiles on it. Keeping 26.6 means installing it here and re-measuring everything. |

@@ -52,6 +52,11 @@ different Xcode than the release. Its "Recommended order" lists what to do befor
 [audits/2026-11-15-remediation-plan.md](audits/2026-11-15-remediation-plan.md) turns every finding into
 53 ordered steps: eight maintainer decisions, then the work before the tag (steps 1 to 17), the
 release sitting (18 to 20), the publication flip (21 to 26) and what follows 3.1 (27 to 53).
+The maintainer decided D-1 to D-5 as recommended on November 15 (the Xcode pin moves to the 27 line;
+`models install` reports what it removes; MCP voice deletion behind a flag; a long-form project deletes
+with its segments; the benchmark records a refusal); D-6 to D-8 are open. Playwright's browsers are
+installed on this Mac since that day, and `npm --prefix website run check` passes (45 browser tests).
+No step of the plan is implemented yet.
 
 **Open, in order** ([investigation of November 15](audits/2026-11-15-release-3-1-interruption-investigation.md):
 the refused take is a rare model ending at that seed, 0 refusals in 60 other seeds on the hybrid and on

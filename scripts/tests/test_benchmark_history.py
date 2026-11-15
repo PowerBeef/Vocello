@@ -1983,6 +1983,17 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertIsNone(comparison["baselineRunID"])
         self.assertEqual(comparison["deltas"], {})
 
+    def test_a_ui_perf_record_carries_the_scenario_set_of_one_era_never_a_mix(self) -> None:
+        # Tracked records were published with nine scenarios (to 2026-09-25), eleven (to
+        # 2026-11-15) and twelve since history-filter-paged joined (RF-61).
+        mac = history.ui_perf_scenario_sets("macos")
+        self.assertEqual([len(scenarios) for scenarios in mac], [12, 11, 9])
+        self.assertEqual(mac[0] - mac[1], {"history-filter-paged"})
+        self.assertEqual(mac[1] - mac[2], {"harness-control", "sidebar-navigation-warms"})
+        self.assertNotIn(mac[0] - {"harness-control"}, mac)
+        self.assertEqual(history.ui_perf_scenario_sets("ios"),
+                         [history.UI_PERF_SCENARIOS_BY_PLATFORM["ios"]])
+
     def test_records_without_an_rtf_need_no_rtf_definition_after_the_cutover(self) -> None:
         # ui-perf measures frame health; the first perf run after the cutover
         # (macos-xcui-perf-20260913-173142) was refused for a declaration it has

@@ -685,6 +685,9 @@ UI_PERF_SCENARIOS_BY_PLATFORM = {
         # Since 2026-09-25: the harness-only control (audit #32) and navigation
         # with the product's warms on (audit #33), both exploratory.
         "harness-control", "sidebar-navigation-warms",
+        # Since 2026-11-15 (RF-61): the History filter over 700 rows, past the
+        # 500-row page, exploratory.
+        "history-filter-paged",
     },
     "ios": {
         "ios-idle-baseline", "ios-tab-navigation", "ios-history-scroll",
@@ -692,12 +695,23 @@ UI_PERF_SCENARIOS_BY_PLATFORM = {
         "ios-sheet-present-dismiss", "ios-player-scrub", "ios-generation-active",
     },
 }
-# Scenarios a platform's earlier records measured without: a record carries
-# either the full current set or the full set without these, never a mix.
+# Scenarios a platform's earlier records measured without, oldest addition
+# first: a record carries the full current set or the set as it stood before
+# one of these additions, never a mix.
 UI_PERF_SCENARIOS_ADDED = {
-    "macos": {"harness-control", "sidebar-navigation-warms"},
-    "ios": set(),
+    "macos": [{"harness-control", "sidebar-navigation-warms"}, {"history-filter-paged"}],
+    "ios": [],
 }
+
+
+def ui_perf_scenario_sets(platform: str) -> list[set[str]]:
+    """Every scenario set a ui-perf record of `platform` may carry, newest first."""
+    current = set(UI_PERF_SCENARIOS_BY_PLATFORM[platform])
+    allowed = [set(current)]
+    for added in reversed(UI_PERF_SCENARIOS_ADDED[platform]):
+        current = current - added
+        allowed.append(set(current))
+    return allowed
 MEMORY_REQUIRED_METRICS = {
     "residentStartMB", "residentEndMB", "residentDeltaMB", "peakResidentMB",
     "physicalFootprintStartMB", "physicalFootprintEndMB", "physicalFootprintDeltaMB",
@@ -2730,7 +2744,7 @@ def validate_ui_perf_semantics(record: dict[str, Any]) -> None:
         raise HistoryError("ui-perf must not claim generation telemetry or audio-QC")
     takes = record["takes"]
     scenarios = [str(take.get("cell", "")).removeprefix("ui-perf/") for take in takes]
-    allowed_sets = [expected_scenarios, expected_scenarios - UI_PERF_SCENARIOS_ADDED[run["platform"]]]
+    allowed_sets = ui_perf_scenario_sets(run["platform"])
     if len(set(scenarios)) != len(takes) or set(scenarios) not in allowed_sets:
         raise HistoryError("ui-perf requires exactly one take per probe scenario")
     for take, scenario in zip(takes, scenarios):

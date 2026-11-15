@@ -874,8 +874,11 @@ private extension MacHistoryScreen {
         reloadCoalescer.cancelRead(readToken)
     }
 
+    /// The copy runs off the main actor (A7); its failure comes back here for the alert.
     func exportGeneration(_ item: MacHistoryListItem) {
-        if let failure = MacHistoryFileActions.saveCopy(of: item.generation.audioPath) {
+        let audioPath = item.generation.audioPath
+        Task {
+            guard let failure = await MacHistoryFileActions.saveCopy(of: audioPath) else { return }
             presentActionAlert(
                 title: MacInterfaceText.historyExportError,
                 message: MacInterfaceText.historyExportErrorMessage(failure)
@@ -884,11 +887,14 @@ private extension MacHistoryScreen {
     }
 
     func exportPendingAudio() {
-        guard let failures = MacHistoryFileActions.exportPendingAudio(recoveryAudioURLs), failures > 0 else { return }
-        presentActionAlert(
-            title: MacInterfaceText.historyExportWarning,
-            message: VocelloPresentationText.recoveryExportFailure(failures)
-        )
+        let urls = recoveryAudioURLs
+        Task {
+            guard let failures = await MacHistoryFileActions.exportPendingAudio(urls), failures > 0 else { return }
+            presentActionAlert(
+                title: MacInterfaceText.historyExportWarning,
+                message: VocelloPresentationText.recoveryExportFailure(failures)
+            )
+        }
     }
 
     func refreshRecoveryState() {

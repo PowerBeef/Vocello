@@ -235,7 +235,10 @@ struct MacStudioPlayerCard: View {
                     label: MacInterfaceText.historySaveAs,
                     accessibilityIdentifier: "studio_inlinePlayer_saveAs",
                     size: MacControl.icon.height,
-                    action: { saveAsFailure = MacHistoryFileActions.saveCopy(of: item.audioURL.path) }
+                    action: {
+                        let audioPath = item.audioURL.path
+                        Task { saveAsFailure = await MacHistoryFileActions.saveCopy(of: audioPath) }
+                    }
                 )
                 MacIconButton(
                     symbol: "folder",

@@ -9,8 +9,43 @@ sourceOfTruth:
 ---
 # Remediation plan for the 2026-11-15 audit (RF-61)
 
-A plan only: nothing here is done yet. Finding IDs (A1, T3, …) are those of
-[the audit](2026-11-15-project-audit.md). Every finding has a step, the low-priority ones included.
+Finding IDs (A1, T3, …) are those of [the audit](2026-11-15-project-audit.md). Every finding has a
+step, the low-priority ones included.
+
+## Status (2026-11-15, local `main`, nothing pushed)
+
+Implemented and passing the routed check (lint, contracts, every deterministic macOS test, the CLI,
+the iOS compile and the UI bundles). No UI lane has run on any of it.
+
+| Steps | State |
+|---|---|
+| 1 to 13 | Done. Step 7's ceilings stay unenforced (`enforce` is empty) until three perf runs derive them; step 12's limit is recalibrated from the same sitting. |
+| 14 | The promotion check is done. **The pin has not moved:** GitHub offers Xcode 27 only on a preview runner image, which the decision did not know. The maintainer chooses again. |
+| 15 to 17 | Done. |
+| 18 to 20 | Wait for a window with the Mac free, then the maintainer's push and tag. |
+| 21 to 26 | Go with the release, in one commit. The reference documents of step 25 and the privacy reference of step 23 are done; the website page of step 23 is not. |
+| 27 to 36 | Done, with three limits. A11 was declined: moving the Studio screens off the engine store is not mechanical and changes when state lands. Of E9, the generic unbounded `generateStream` pair stays (a protocol requirement a package test uses). Step 33 marked the actor's relief API off the shipping path and corrected the rule; the product still unloads by dropping its reference. |
+| 37 | In progress. |
+| 38 | Done. |
+| 39 | 39a done (result under step 39); 39b does not start. |
+| 40 | Waits for three canonical benchmark runs under `cell-hash-v2`. |
+| 41, 42 | Not started. |
+| 43 | Started: the player's live preview runs under unit test through an underrun and a pause. The take queue, the final-file hand-off and ownership are not covered. |
+| 44 | The test half is done; the checker half is in progress. |
+| 45 | The watermark and crash-delta parts are in progress. The two sleeps of T12 stay: one is a window in which nothing must happen, the other ages a file's change time, which cannot be set. |
+| 46 | Not started: it rewrites the release workflow and can only be proved by the release rehearsal, so it follows 3.1. |
+| 47 to 49 | Done. |
+| 50 | The pyright baseline went from 877 to 792; the rest is ongoing. |
+| 51 to 53 | Done. `telemetry-and-benchmarking.md` is not split. |
+
+Found while implementing, not in the audit:
+
+- **An output-device change under a paused live preview loses the queued audio.** In offline
+  rendering a stopped engine drops its node's queue and fires no completion, so the preview's
+  bookkeeping waits for buffers that will never play. It needs an attended check (pause a preview,
+  unplug the headphones, press Play) before a fix.
+- **A second History change during a page read** flashed a partial list; fixed in the review of
+  step 1.
 
 ## How to read it
 

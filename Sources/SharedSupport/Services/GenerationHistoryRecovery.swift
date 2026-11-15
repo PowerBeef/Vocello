@@ -38,30 +38,53 @@ enum GenerationHistoryRecovery {
         }
     )
 
-    /// The single-row delete's database and file side. The sequencing rules
-    /// live tested in `QwenVoiceCore.HistoryDeletionEngine`; it runs only
-    /// through `deleteSingle`, which records the audio removal first.
+    /// A History delete's database and file side. The sequencing rules live
+    /// tested in `QwenVoiceCore.HistoryDeletionEngine` and in its `deleteUnit`
+    /// (`GenerationHistoryOutbox.swift`); it runs only through
+    /// `deleteHistoryRow`, which records the audio removal first.
     private static let deletionEngine = HistoryDeletionEngine(
         deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
         removeFile: { try removeUnreferencedAudio(atPath: $0) },
         fileExists: { FileManager.default.fileExists(atPath: $0) }
     )
 
-    /// Single-row delete for both History screens, on the recovery coordinator
+    /// The rows a long-form project's delete covers, and their removal in one
+    /// transaction (A4).
+    private static let deletionUnitStore = HistoryDeletionUnitStore(
+        segmentRows: { try DatabaseService.shared.longFormSegmentRows(forJoinedRowID: $0) },
+        deleteRows: { try DatabaseService.shared.deleteGenerations(ids: $0) }
+    )
+
+    /// The delete both History screens run, on the recovery coordinator
     /// (A2-04): the audio removal is listed before the row goes, so a process
-    /// that dies in between leaves it for a later reconcile. An audio file that
-    /// cannot be removed is a warning outcome, which the screens report and
-    /// hand to `retainAudioRemoval(_:)`. Off the main actor: a synchronous
-    /// SQLite write and a file removal.
+    /// that dies in between leaves it for a later reconcile. A long-form
+    /// project's joined row takes its segment rows and their audio with it
+    /// (A4); any other row is deleted alone. Audio that cannot be removed is a
+    /// warning outcome, which the screens report and hand to
+    /// `retainAudioRemovals(_:)`. Off the main actor: synchronous SQLite
+    /// writes and file removals.
     /// A failure reads in `localization`, the caller's interface language.
-    @concurrent static func deleteSingle(
+    @concurrent static func deleteHistoryRow(
         recordID: Int64?,
         audioPath: String,
         localization: VocelloLocalization
-    ) async -> HistoryDeletionEngine.SingleOutcome {
-        await coordinator.deleteSingle(
-            recordID: recordID, audioPath: audioPath, using: deletionEngine, localization: localization
+    ) async -> HistoryDeletionResult {
+        await coordinator.deleteUnit(
+            recordID: recordID,
+            audioPath: audioPath,
+            using: deletionEngine,
+            unit: deletionUnitStore,
+            localization: localization
         )
+    }
+
+    /// How many segments a delete of this row also removes, for the
+    /// confirmation to name (A4): a long-form project's joined row takes its
+    /// segments with it. Zero for any other row, and when History cannot be
+    /// read, in which case the delete itself reports the failure.
+    @concurrent static func segmentCountDeletedWith(recordID: Int64?, longFormRole: String?) async -> Int {
+        guard longFormRole == "joined", let recordID else { return 0 }
+        return (try? DatabaseService.shared.longFormSegmentCount(forJoinedRowID: recordID)) ?? 0
     }
 
     /// A deleted row's audio, removed only when nothing else uses it
@@ -74,11 +97,13 @@ enum GenerationHistoryRecovery {
         )
     }
 
-    /// Keeps the audio of a deleted row for a later reconcile to remove (AUD-05).
+    /// Keeps the audio of deleted rows for a later reconcile to remove (AUD-05).
     /// `false` when even the pending list could not be written.
-    @concurrent static func retainAudioRemoval(_ audioPath: String) async -> Bool {
+    @concurrent static func retainAudioRemovals(_ audioPaths: [String]) async -> Bool {
         do {
-            try await coordinator.retainAudioRemoval(audioPath)
+            for audioPath in audioPaths {
+                try await coordinator.retainAudioRemoval(audioPath)
+            }
             return true
         } catch {
             return false

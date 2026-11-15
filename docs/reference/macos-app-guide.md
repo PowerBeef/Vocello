@@ -292,7 +292,10 @@ and one journaled SQLite transaction. Failed replacement preserves the previous 
 recovery runs before History reads/writes. Superseded joined outputs, and segment takes a
 regeneration replaced, retain individually deletable History rows rather than becoming unowned WAVs. Unchanged segments retain their QC, effective seeds,
 and generation identities. Old manifest-v4 files remain readable; this adds no cross-launch
-generation-resume feature. A joined-row commit reloads the complete History project.
+generation-resume feature. A joined-row commit reloads the complete History project. Deleting a
+project's joined row in History deletes its segment rows and their audio with it, in one database
+transaction, and the confirmation names the segment count; a segment, a superseded output or an
+ordinary take is deleted alone (both apps, `GenerationHistoryRecovery.deleteHistoryRow`).
 
 ---
 

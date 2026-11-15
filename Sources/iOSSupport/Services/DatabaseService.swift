@@ -367,6 +367,82 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
+    /// The segment rows of the long-form project whose joined row is `id`, for
+    /// the delete that removes a project as a unit (A4). Empty for any other
+    /// row: an ordinary take, a segment, or an older joined output a newer one
+    /// replaced. Read on the writer after long-form reconciliation, as the
+    /// delete that follows runs.
+    func longFormSegmentRows(forJoinedRowID id: Int64) throws -> [HistoryDeletionRow] {
+        let dbQueue = try requireQueue(for: .delete)
+        do {
+            return try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
+                return try Row.fetchAll(
+                    db,
+                    sql: "SELECT segment.id, segment.audioPath " + Self.longFormSegmentsOfJoinedRow
+                        + " ORDER BY segment.createdAt ASC, segment.id ASC",
+                    arguments: [id]
+                ).map { row -> HistoryDeletionRow in
+                    let rowID: Int64 = row["id"]
+                    let audioPath: String = row["audioPath"]
+                    return HistoryDeletionRow(id: rowID, audioPath: audioPath)
+                }
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .delete)
+        }
+    }
+
+    /// How many segment rows a delete of row `id` also removes; the delete
+    /// confirmation names it (A4). Zero for anything but a project's joined row.
+    func longFormSegmentCount(forJoinedRowID id: Int64) throws -> Int {
+        let dbQueue = try requireQueue(for: .read)
+        do {
+            return try dbQueue.read { db in
+                try Int.fetchOne(
+                    db,
+                    sql: "SELECT COUNT(*) " + Self.longFormSegmentsOfJoinedRow,
+                    arguments: [id]
+                ) ?? 0
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .read)
+        }
+    }
+
+    /// The segment rows of the project whose current joined row has the bound
+    /// id. A replaced joined output has the role `superseded`, so it matches
+    /// nothing and is deleted alone.
+    private static let longFormSegmentsOfJoinedRow = """
+        FROM generations AS segment
+        JOIN generations AS joined ON joined.longFormProjectID = segment.longFormProjectID
+        WHERE joined.id = ? AND joined.longFormRole IS 'joined' AND segment.longFormRole IS 'segment'
+        """
+
+    /// Deletes exactly these rows in one transaction, so a long-form project's
+    /// joined row and its segments leave History together or not at all (A4).
+    func deleteGenerations(ids: [Int64]) throws {
+        guard !ids.isEmpty else { return }
+        let dbQueue = try requireQueue(for: .delete)
+        do {
+            try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
+                var start = ids.startIndex
+                while start < ids.endIndex {
+                    let end = ids.index(start, offsetBy: 500, limitedBy: ids.endIndex) ?? ids.endIndex
+                    let chunk = Array(ids[start..<end])
+                    try db.execute(
+                        sql: "DELETE FROM generations WHERE id IN (\(databaseQuestionMarks(count: chunk.count)))",
+                        arguments: StatementArguments(chunk)
+                    )
+                    start = end
+                }
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .delete)
+        }
+    }
+
     /// Deletes the rows whose id is at most `maxRowID` and returns their audio
     /// paths, in one write (`GenerationHistoryBoundedDelete`, AUD-05).
     func deleteGenerations(throughID maxRowID: Int64) throws -> [String] {

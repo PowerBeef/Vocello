@@ -248,6 +248,9 @@ struct MacHistoryScreen: View {
     @State private var loadError: String?
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: MacHistoryListItem?
+    /// The segments that go with `itemToDelete` when it is a long-form
+    /// project's joined row; the confirmation names the count (A4).
+    @State private var itemToDeleteSegmentCount = 0
     @State private var actionAlert: MacHistoryActionAlert?
     /// One long-form Discard at a time, so a second cannot race the first's
     /// failure alert (F-16).
@@ -357,7 +360,11 @@ struct MacHistoryScreen: View {
                 itemToDelete = nil
             }
         } message: {
-            Text(MacInterfaceText.historyDeleteDetail)
+            Text(
+                itemToDeleteSegmentCount > 0
+                    ? MacInterfaceText.presentation.historyDeleteProjectDetail(itemToDeleteSegmentCount)
+                    : MacInterfaceText.historyDeleteDetail
+            )
         }
         .alert(item: $actionAlert) { alert in
             if let confirmTitle = alert.confirmTitle, let onConfirm = alert.onConfirm {
@@ -492,10 +499,7 @@ struct MacHistoryScreen: View {
                     savedVoiceSheetConfiguration = item.makeSaveVoiceConfiguration()
                 },
                 onSaveAs: { exportGeneration(item) },
-                onDelete: {
-                    itemToDelete = item
-                    showDeleteConfirmation = true
-                }
+                onDelete: { requestDelete(item) }
             )
             .contextMenu {
                 Button {
@@ -961,6 +965,22 @@ private extension MacHistoryScreen {
         }
     }
 
+    /// Opens the delete confirmation. A long-form project's joined row takes
+    /// its segments with it (A4), so their count is read first, off the main
+    /// actor, for the confirmation to name.
+    func requestDelete(_ item: MacHistoryListItem) {
+        let recordID = item.generation.id
+        let longFormRole = item.generation.longFormRole
+        Task {
+            let segmentCount = await GenerationHistoryRecovery.segmentCountDeletedWith(
+                recordID: recordID, longFormRole: longFormRole
+            )
+            itemToDelete = item
+            itemToDeleteSegmentCount = segmentCount
+            showDeleteConfirmation = true
+        }
+    }
+
     func confirmDelete(_ item: MacHistoryListItem) async {
         switch await deleteItem(item) {
         case .deleted:
@@ -989,13 +1009,15 @@ private extension MacHistoryScreen {
     /// tested in `QwenVoiceCore` and are worth keeping that way -- and runs on
     /// the History recovery coordinator, which lists the audio removal before
     /// the row goes (A2-04). Audio that could not be removed is kept for a
-    /// later reconcile (AUD-05).
+    /// later reconcile (AUD-05). A long-form project's joined row takes its
+    /// segment rows with it (A4), so several rows can leave the list.
     func deleteItem(_ item: MacHistoryListItem) async -> HistoryDeletionEngine.SingleOutcome {
         let recordID = item.generation.id
         let audioPath = item.generation.audioPath
-        let outcome = await GenerationHistoryRecovery.deleteSingle(
+        let deletion = await GenerationHistoryRecovery.deleteHistoryRow(
             recordID: recordID, audioPath: audioPath, localization: MacInterfaceLanguage.current
         )
+        let outcome = deletion.outcome
 
         if case .databaseFailure = outcome {
             databaseUnavailable = true
@@ -1010,15 +1032,18 @@ private extension MacHistoryScreen {
             return outcome
         }
         if case .audioCleanupFailure = outcome {
-            _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
+            _ = await GenerationHistoryRecovery.retainAudioRemovals(deletion.unremovedAudioPaths)
             refreshRecoveryState()
         }
 
-        items.removeAll { $0.id == item.id }
+        let deletedRowIDs = Set(deletion.deletedRowIDs)
+        items.removeAll { listed in
+            listed.id == item.id || listed.generation.id.map(deletedRowIDs.contains) == true
+        }
         // A read already in flight may predate the delete; its page must not
         // bring the row back (P10-07).
         reloadCoalescer.noteRowChangedInPlace()
-        archiveCount = max(0, archiveCount - 1)
+        archiveCount = max(0, archiveCount - max(1, deletedRowIDs.count))
         itemsRevision &+= 1
         MacHistorySessionCache.items = items
         MacHistorySessionCache.archiveCount = archiveCount

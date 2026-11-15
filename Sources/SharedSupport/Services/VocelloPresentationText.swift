@@ -285,6 +285,14 @@ struct VocelloPresentationText: Sendable {
                comment: "History: alert title when a single take could not be deleted. Presentation only.")
     }
 
+    /// The delete confirmation for a long-form project (A4): its segments and
+    /// their audio go with it.
+    func historyDeleteProjectDetail(_ segmentCount: Int) -> String {
+        localization.format(localization.string(localized: "vocello.presentation.historyDeleteProjectDetail",
+            defaultValue: "This permanently deletes the long-form project, its %1$lld segments and their audio files.",
+            comment: "History: delete confirmation body for a long-form project; %1$lld is the number of segments deleted with it (plural). Presentation only."), segmentCount)
+    }
+
     var historyRemovalUnrecorded: String {
         localization.string(localized: "vocello.history.removal_unrecorded",
                defaultValue: "Nothing was deleted: Vocello couldn't mark this take's audio for removal. Try again.",

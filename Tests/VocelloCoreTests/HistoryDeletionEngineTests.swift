@@ -113,4 +113,115 @@ final class HistoryDeletionEngineTests: XCTestCase {
         XCTAssertEqual(outcome, .audioCleanupFailure("locked: /a.wav"))
         XCTAssertEqual(log.snapshot, ["record(/a.wav)", "deleteRecord(7)", "removeFile(/a.wav)"])
     }
+
+    // MARK: - Long-form project as a unit (A4)
+
+    /// A project's joined row and its two segments.
+    private let projectRows = [
+        HistoryDeletionRow(id: 9, audioPath: "/joined.wav"),
+        HistoryDeletionRow(id: 7, audioPath: "/s1.wav"),
+        HistoryDeletionRow(id: 8, audioPath: "/s2.wav"),
+    ]
+
+    /// Every removal is recorded before any row goes, the rows go in one
+    /// call, and each record is withdrawn once its file is gone.
+    func testUnitDeleteRecordsEveryRemovalThenDeletesTheRowsOnceThenRemovesTheFiles() {
+        let log = EffectLog()
+        let engine = makeEngine(log: log, existingPaths: ["/joined.wav", "/s1.wav", "/s2.wav"])
+        let result = engine.deleteUnit(rows: projectRows, deleteRecords: { log.append("deleteRecords(\($0))") })
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [9, 7, 8], unremovedAudioPaths: [])
+        )
+        XCTAssertEqual(log.snapshot, [
+            "record(/joined.wav)", "record(/s1.wav)", "record(/s2.wav)",
+            "deleteRecords([9, 7, 8])",
+            "removeFile(/joined.wav)", "withdraw(/joined.wav)",
+            "removeFile(/s1.wav)", "withdraw(/s1.wav)",
+            "removeFile(/s2.wav)", "withdraw(/s2.wav)",
+        ])
+        XCTAssertFalse(log.snapshot.contains { $0.hasPrefix("deleteRecord(") }, "No row is deleted on its own")
+    }
+
+    /// The rows stay, so every removal recorded for them is withdrawn and no
+    /// file is touched.
+    func testUnitDeleteDatabaseFailureWithdrawsEveryRecordAndRemovesNoFile() {
+        let log = EffectLog()
+        let engine = makeEngine(log: log, existingPaths: ["/joined.wav", "/s1.wav", "/s2.wav"])
+        let result = engine.deleteUnit(rows: projectRows, deleteRecords: { _ in throw StubError(message: "db down") })
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(outcome: .databaseFailure("db down"), deletedRowIDs: [], unremovedAudioPaths: [])
+        )
+        XCTAssertEqual(log.snapshot, [
+            "record(/joined.wav)", "record(/s1.wav)", "record(/s2.wav)",
+            "withdraw(/joined.wav)", "withdraw(/s1.wav)", "withdraw(/s2.wav)",
+        ])
+    }
+
+    /// One removal that cannot be recorded deletes nothing, and the removals
+    /// recorded before it are withdrawn.
+    func testUnitDeleteThatCannotRecordARemovalDeletesNothing() {
+        let log = EffectLog()
+        let engine = HistoryDeletionEngine(
+            deleteRecord: { log.append("deleteRecord(\($0))") },
+            removeFile: { log.append("removeFile(\($0))") },
+            fileExists: { _ in true },
+            recordAudioRemoval: { path in
+                log.append("record(\(path))")
+                if path == "/s1.wav" { throw StubError(message: "list unwritable") }
+            },
+            withdrawAudioRemoval: { log.append("withdraw(\($0))") }
+        )
+        let result = engine.deleteUnit(rows: projectRows, deleteRecords: { log.append("deleteRecords(\($0))") })
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(outcome: .removalUnrecorded, deletedRowIDs: [], unremovedAudioPaths: [])
+        )
+        XCTAssertEqual(log.snapshot, ["record(/joined.wav)", "record(/s1.wav)", "withdraw(/joined.wav)"])
+    }
+
+    /// The rows are gone; the file that stayed keeps its removal recorded and
+    /// is named in the result, and the other files are still removed.
+    func testUnitDeleteFileFailureIsAWarningAndNamesTheFileThatStayed() {
+        let log = EffectLog()
+        let engine = makeEngine(
+            log: log, existingPaths: ["/joined.wav", "/s1.wav", "/s2.wav"], failingRemovals: ["/s1.wav"]
+        )
+        let result = engine.deleteUnit(rows: projectRows, deleteRecords: { log.append("deleteRecords(\($0))") })
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(
+                outcome: .audioCleanupFailure("locked: /s1.wav"),
+                deletedRowIDs: [9, 7, 8],
+                unremovedAudioPaths: ["/s1.wav"]
+            )
+        )
+        XCTAssertEqual(log.snapshot, [
+            "record(/joined.wav)", "record(/s1.wav)", "record(/s2.wav)",
+            "deleteRecords([9, 7, 8])",
+            "removeFile(/joined.wav)", "withdraw(/joined.wav)",
+            "removeFile(/s1.wav)",
+            "removeFile(/s2.wav)", "withdraw(/s2.wav)",
+        ])
+    }
+
+    /// Audio that is already gone is skipped, and a path two rows share is
+    /// handled once; every row still goes.
+    func testUnitDeleteSkipsMissingAudioAndHandlesASharedPathOnce() {
+        let log = EffectLog()
+        let engine = makeEngine(log: log, existingPaths: ["/joined.wav", "/s1.wav"])
+        let rows = projectRows + [HistoryDeletionRow(id: 10, audioPath: "/s1.wav")]
+        let result = engine.deleteUnit(rows: rows, deleteRecords: { log.append("deleteRecords(\($0))") })
+        XCTAssertEqual(
+            result,
+            HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [9, 7, 8, 10], unremovedAudioPaths: [])
+        )
+        XCTAssertEqual(log.snapshot, [
+            "record(/joined.wav)", "record(/s1.wav)",
+            "deleteRecords([9, 7, 8, 10])",
+            "removeFile(/joined.wav)", "withdraw(/joined.wav)",
+            "removeFile(/s1.wav)", "withdraw(/s1.wav)",
+        ])
+    }
 }

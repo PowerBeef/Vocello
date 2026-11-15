@@ -77400,6 +77400,210 @@
           }
         }
       }
+    },
+    "vocello.presentation.historyDeleteProjectDetail": {
+      "comment": "History: delete confirmation body for a long-form project; %1$lld is the number of segments deleted with it (plural). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This permanently deletes the long-form project, its %1$lld segment and their audio files."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This permanently deletes the long-form project, its %1$lld segments and their audio files."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprimera définitivement le projet de texte long, son %1$lld segment et leurs fichiers audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprimera définitivement le projet de texte long, ses %1$lld segments et leurs fichiers audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprimera définitivement le projet de texte long, ses %1$lld segments et leurs fichiers audio."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto eliminará permanentemente el proyecto de formato largo, su %1$lld segmento y sus archivos de audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto eliminará permanentemente el proyecto de formato largo, sus %1$lld segmentos y sus archivos de audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto eliminará permanentemente el proyecto de formato largo, sus %1$lld segmentos y sus archivos de audio."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies löscht das Langtext-Projekt, seinen %1$lld Abschnitt und die zugehörigen Audiodateien dauerhaft."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies löscht das Langtext-Projekt, seine %1$lld Abschnitte und die zugehörigen Audiodateien dauerhaft."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminerà definitivamente il progetto di testo lungo, il suo %1$lld segmento e i relativi file audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminerà definitivamente il progetto di testo lungo, i suoi %1$lld segmenti e i relativi file audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Eliminerà definitivamente il progetto di testo lungo, i suoi %1$lld segmenti e i relativi file audio."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Isso excluirá permanentemente o projeto de texto longo, seu %1$lld segmento e os arquivos de áudio correspondentes."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Isso excluirá permanentemente o projeto de texto longo, seus %1$lld segmentos e os arquivos de áudio correspondentes."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Isso excluirá permanentemente o projeto de texto longo, seus %1$lld segmentos e os arquivos de áudio correspondentes."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "这将永久删除长文本项目、其 %1$lld 个片段及对应的音频文件。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "長文プロジェクトとその %1$lld 区間、および音声ファイルを完全に削除します。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "긴 원고 프로젝트와 구간 %1$lld개, 해당 오디오 파일을 영구적으로 삭제합니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегмент и их аудиофайлы."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегмента и их аудиофайлы."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегментов и их аудиофайлы."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегмента и их аудиофайлы."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version": "1.0"

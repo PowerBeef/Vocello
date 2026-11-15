@@ -811,20 +811,21 @@ private struct IOSHistoryLibrarySection: View {
     /// removal, after the removal is listed (`HistoryDeletionEngine`, A2-04).
     /// Audio that then cannot be removed is reported and kept for a later
     /// reconcile to remove, because nothing can reach it in the App Group once
-    /// its row is gone (AUD-05).
+    /// its row is gone (AUD-05). A long-form project's joined row takes its
+    /// segment rows and their audio with it (A4); the confirmation said so.
     private func delete(_ item: Generation) {
         let recordID = item.id
         let audioPath = item.audioPath
         Task {
-            let outcome = await GenerationHistoryRecovery.deleteSingle(
+            let deletion = await GenerationHistoryRecovery.deleteHistoryRow(
                 recordID: recordID, audioPath: audioPath, localization: IOSAppLanguage.shared.localization
             )
-            switch outcome {
+            switch deletion.outcome {
             case .deleted:
                 reload()
             case .audioCleanupFailure:
-                // Promise a later retry only when the path is on the removal list.
-                let retained = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
+                // Promise a later retry only when the paths are on the removal list.
+                let retained = await GenerationHistoryRecovery.retainAudioRemovals(deletion.unremovedAudioPaths)
                 audioNotDeletedMessage = retained
                     ? IOSInterfaceText.historyDeleteAudioKept
                     : IOSInterfaceText.historyDeleteAudioStranded
@@ -854,8 +855,24 @@ private struct IOSHistoryItemCard: View {
     var onPinSeed: (() -> Void)? = nil
 
     @State private var isConfirmingDelete = false
+    /// The segments that go with this row when it is a long-form project's
+    /// joined row; the confirmation names the count (A4).
+    @State private var deleteSegmentCount = 0
     @State private var exportGate = IOSExportGate()
     @Environment(\.presentIOSPlayerSheet) private var presentPlayerSheet
+
+    /// Opens the delete confirmation once the segment count is read, off the
+    /// main actor.
+    private func requestDelete() {
+        let recordID = item.id
+        let longFormRole = item.longFormRole
+        Task {
+            deleteSegmentCount = await GenerationHistoryRecovery.segmentCountDeletedWith(
+                recordID: recordID, longFormRole: longFormRole
+            )
+            isConfirmingDelete = true
+        }
+    }
 
     private var modeText: String {
         switch item.mode.lowercased() {
@@ -987,7 +1004,7 @@ private struct IOSHistoryItemCard: View {
                 }
                 Divider()
                 Button(IOSInterfaceText.deleteAction, role: .destructive) {
-                    isConfirmingDelete = true
+                    requestDelete()
                 }
                 .disabled(!allowsDeletion)
             } label: {
@@ -1033,7 +1050,11 @@ private struct IOSHistoryItemCard: View {
             .accessibilityIdentifier("historyRowDeleteConfirm_\(item.historyAccessibilityID)")
             Button(IOSInterfaceText.cancel, role: .cancel) {}
         } message: {
-            Text(IOSInterfaceText.deleteAudioDetail)
+            Text(
+                deleteSegmentCount > 0
+                    ? IOSAppLanguage.shared.presentation.historyDeleteProjectDetail(deleteSegmentCount)
+                    : IOSInterfaceText.deleteAudioDetail
+            )
         }
         .iosExportPresentation(exportGate)
     }

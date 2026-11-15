@@ -955,6 +955,54 @@ actor GenerationHistoryRecoveryCoordinator {
         using engine: HistoryDeletionEngine,
         localization: VocelloLocalization
     ) -> HistoryDeletionEngine.SingleOutcome {
+        journalingRemovals(engine).deleteSingle(recordID: recordID, audioPath: audioPath) {
+            HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
+        }
+    }
+
+    /// The delete both History screens run (A4). A long-form project goes as
+    /// a unit: deleting its joined row also deletes its segment rows, in one
+    /// database transaction, and their audio under the rules of
+    /// `deleteSingle`. Any other row is deleted alone, by `deleteSingle`
+    /// itself. Like it, this runs in one turn of this actor, with no await.
+    func deleteUnit(
+        recordID: Int64?,
+        audioPath: String,
+        using engine: HistoryDeletionEngine,
+        unit: HistoryDeletionUnitStore,
+        localization: VocelloLocalization
+    ) -> HistoryDeletionResult {
+        let journaled = journalingRemovals(engine)
+        var segments: [HistoryDeletionRow] = []
+        if let recordID {
+            do {
+                segments = try unit.segmentRows(recordID)
+            } catch {
+                return HistoryDeletionResult(
+                    outcome: .databaseFailure(
+                        HistoryPersistenceError.interfaceMessage(for: error, localization: localization)
+                    ),
+                    deletedRowIDs: [],
+                    unremovedAudioPaths: []
+                )
+            }
+        }
+        guard let joinedID = recordID, !segments.isEmpty else {
+            let outcome = journaled.deleteSingle(recordID: recordID, audioPath: audioPath) {
+                HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
+            }
+            return HistoryDeletionResult(single: outcome, recordID: recordID, audioPath: audioPath)
+        }
+        return journaled.deleteUnit(
+            rows: [HistoryDeletionRow(id: joinedID, audioPath: audioPath)] + segments,
+            deleteRecords: unit.deleteRows
+        ) {
+            HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
+        }
+    }
+
+    /// `engine` with its audio removals on the pending list (A2-04).
+    private func journalingRemovals(_ engine: HistoryDeletionEngine) -> HistoryDeletionEngine {
         var journaled = engine
         let outbox = self.store
         journaled.recordAudioRemoval = { path in
@@ -965,9 +1013,7 @@ actor GenerationHistoryRecoveryCoordinator {
             }
         }
         journaled.withdrawAudioRemoval = { path in _ = try? outbox.withdrawPendingAudioRemoval(path) }
-        return journaled.deleteSingle(recordID: recordID, audioPath: audioPath) {
-            HistoryPersistenceError.interfaceMessage(for: $0, localization: localization)
-        }
+        return journaled
     }
 
     /// Runs `decide` with every audio path History still uses: every row,
@@ -1237,6 +1283,108 @@ actor GenerationHistoryRecoveryCoordinator {
         let remaining = try store.loadPendingAudioRemovals().filter { !resolved.contains($0) }
         try store.writePendingAudioRemovals(remaining)
         return failed
+    }
+}
+
+/// One History row a delete removes: its id and the audio it points at.
+struct HistoryDeletionRow: Equatable, Sendable {
+    let id: Int64
+    let audioPath: String
+}
+
+/// What a History delete did. A long-form project goes as a unit (A4), so
+/// several rows can leave History in one delete.
+struct HistoryDeletionResult: Equatable, Sendable {
+    let outcome: HistoryDeletionEngine.SingleOutcome
+    /// The rows that left History; empty when nothing was deleted.
+    let deletedRowIDs: [Int64]
+    /// Audio whose row is gone and whose file could not be removed.
+    let unremovedAudioPaths: [String]
+
+    init(outcome: HistoryDeletionEngine.SingleOutcome, deletedRowIDs: [Int64], unremovedAudioPaths: [String]) {
+        self.outcome = outcome
+        self.deletedRowIDs = deletedRowIDs
+        self.unremovedAudioPaths = unremovedAudioPaths
+    }
+
+    /// The result of a one-row delete, from the engine's outcome.
+    init(single outcome: HistoryDeletionEngine.SingleOutcome, recordID: Int64?, audioPath: String) {
+        let rowID = recordID.map { [$0] } ?? []
+        switch outcome {
+        case .deleted:
+            self.init(outcome: outcome, deletedRowIDs: rowID, unremovedAudioPaths: [])
+        case .audioCleanupFailure:
+            self.init(outcome: outcome, deletedRowIDs: rowID, unremovedAudioPaths: [audioPath])
+        case .databaseFailure, .removalUnrecorded:
+            self.init(outcome: outcome, deletedRowIDs: [], unremovedAudioPaths: [])
+        }
+    }
+}
+
+/// The database side of a History delete that may cover a long-form project.
+struct HistoryDeletionUnitStore: Sendable {
+    /// The segment rows of the project whose joined row has this id; empty
+    /// for any other row.
+    var segmentRows: @Sendable (Int64) throws -> [HistoryDeletionRow]
+    /// Deletes exactly the rows with these ids, in one transaction.
+    var deleteRows: @Sendable ([Int64]) throws -> Void
+}
+
+extension HistoryDeletionEngine {
+    /// Deletes several rows as one unit (A4): a long-form project's joined
+    /// row and its segment rows. The rules are `deleteSingle`'s, over every
+    /// row. Each audio file on disk has its removal recorded first; one that
+    /// cannot be recorded aborts with nothing deleted and the earlier records
+    /// withdrawn. Then `deleteRecords` removes every row in one transaction;
+    /// a failure there also withdraws the records and deletes nothing. Then
+    /// each file is removed and its record withdrawn. A file that cannot be
+    /// removed is a warning outcome, never a rollback: the rows are gone, the
+    /// file stays, and its removal stays recorded for a retry.
+    func deleteUnit(
+        rows: [HistoryDeletionRow],
+        deleteRecords: ([Int64]) throws -> Void,
+        describe: (any Error) -> String = { $0.localizedDescription }
+    ) -> HistoryDeletionResult {
+        let rowIDs = rows.map(\.id)
+        var audioPaths: [String] = []
+        for row in rows where !audioPaths.contains(row.audioPath) && fileExists(row.audioPath) {
+            audioPaths.append(row.audioPath)
+        }
+        var recorded: [String] = []
+        for path in audioPaths {
+            do {
+                try recordAudioRemoval(path)
+                recorded.append(path)
+            } catch {
+                for earlier in recorded { withdrawAudioRemoval(earlier) }
+                return HistoryDeletionResult(outcome: .removalUnrecorded, deletedRowIDs: [], unremovedAudioPaths: [])
+            }
+        }
+        do {
+            try deleteRecords(rowIDs)
+        } catch {
+            for path in recorded { withdrawAudioRemoval(path) }
+            return HistoryDeletionResult(
+                outcome: .databaseFailure(describe(error)), deletedRowIDs: [], unremovedAudioPaths: []
+            )
+        }
+        var unremoved: [String] = []
+        var firstFailure: String?
+        for path in audioPaths {
+            do {
+                try removeFile(path)
+                withdrawAudioRemoval(path)
+            } catch {
+                unremoved.append(path)
+                if firstFailure == nil { firstFailure = describe(error) }
+            }
+        }
+        if let firstFailure {
+            return HistoryDeletionResult(
+                outcome: .audioCleanupFailure(firstFailure), deletedRowIDs: rowIDs, unremovedAudioPaths: unremoved
+            )
+        }
+        return HistoryDeletionResult(outcome: .deleted, deletedRowIDs: rowIDs, unremovedAudioPaths: [])
     }
 }
 

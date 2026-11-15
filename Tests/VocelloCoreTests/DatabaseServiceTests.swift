@@ -613,6 +613,174 @@ final class DatabaseServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Long-form project delete (A4)
+
+    /// A long-form project in a real History: its joined row and two segment
+    /// rows, an older joined output a newer one replaced, and an unrelated
+    /// take, each with an audio file, plus the delete path both screens run.
+    private struct ProjectFixture {
+        let service: DatabaseService
+        let outbox: GenerationHistoryOutboxStore
+        let coordinator: GenerationHistoryRecoveryCoordinator
+        let engine: HistoryDeletionEngine
+        let unit: HistoryDeletionUnitStore
+        let joined: Generation
+        let segments: [Generation]
+        let replaced: Generation
+        let standalone: Generation
+
+        func delete(_ row: Generation) async -> HistoryDeletionResult {
+            await coordinator.deleteUnit(
+                recordID: row.id, audioPath: row.audioPath, using: engine, unit: unit,
+                localization: VocelloLocalization()
+            )
+        }
+
+        func remainingPaths() throws -> Set<String> {
+            Set(try service.fetchAllGenerations().map(\.audioPath))
+        }
+    }
+
+    private func makeProjectFixture() throws -> ProjectFixture {
+        let root = try makeRoot()
+        let service = DatabaseService(rootDirectory: root)
+        let audio = root.appendingPathComponent("outputs", isDirectory: true)
+        let outboxRoot = root.appendingPathComponent("outbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: audio, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outboxRoot, withIntermediateDirectories: true)
+        let outbox = GenerationHistoryOutboxStore(rootURL: outboxRoot)
+
+        func saved(
+            _ name: String, at seconds: TimeInterval, projectID: String? = nil, role: String? = nil
+        ) throws -> Generation {
+            let url = audio.appendingPathComponent(name)
+            try Data([0x52, 0x49, 0x46, 0x46]).write(to: url)
+            var generation = row(url.path, text: name, at: seconds, projectID: projectID, role: role)
+            try service.saveGeneration(&generation)
+            return generation
+        }
+        let standalone = try saved("standalone.wav", at: 0)
+        let replaced = try saved("joined-old.wav", at: 1, projectID: "project-a", role: "superseded")
+        let segments = try [
+            saved("segment-1.wav", at: 2, projectID: "project-a", role: "segment"),
+            saved("segment-2.wav", at: 3, projectID: "project-a", role: "segment"),
+        ]
+        let joined = try saved("joined.wav", at: 4, projectID: "project-a", role: "joined")
+        // Another project's segment never goes with this one.
+        _ = try saved("other-segment.wav", at: 5, projectID: "project-b", role: "segment")
+
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: outbox,
+            commitGeneration: { @concurrent _, generation in try await service.saveGenerationIfMissingAsync(generation) },
+            fetchAllGenerations: { @concurrent in try service.fetchAllGenerationsForClear() },
+            deleteGenerationsThrough: { @concurrent in try service.deleteGenerations(throughID: $0) },
+            referencedAudioPaths: { @concurrent in try service.referencedAudioPaths(among: $0) }
+        )
+        let engine = HistoryDeletionEngine(
+            deleteRecord: { try service.deleteGeneration(id: $0) },
+            removeFile: { path in
+                try GenerationHistoryAudioFile.removeUnreferenced(
+                    atPath: path,
+                    outbox: outbox,
+                    referencedAudioPaths: { try service.referencedAudioPaths(among: $0) }
+                )
+            },
+            fileExists: { FileManager.default.fileExists(atPath: $0) }
+        )
+        let unit = HistoryDeletionUnitStore(
+            segmentRows: { try service.longFormSegmentRows(forJoinedRowID: $0) },
+            deleteRows: { try service.deleteGenerations(ids: $0) }
+        )
+        return ProjectFixture(
+            service: service, outbox: outbox, coordinator: coordinator, engine: engine, unit: unit,
+            joined: joined, segments: segments, replaced: replaced, standalone: standalone
+        )
+    }
+
+    func testOnlyAProjectsCurrentJoinedRowNamesSegmentsToDeleteWithIt() throws {
+        let f = try makeProjectFixture()
+        let joinedID = try XCTUnwrap(f.joined.id)
+
+        XCTAssertEqual(
+            try f.service.longFormSegmentRows(forJoinedRowID: joinedID),
+            f.segments.map { HistoryDeletionRow(id: $0.id ?? -1, audioPath: $0.audioPath) },
+            "The project's own segments, oldest first"
+        )
+        XCTAssertEqual(try f.service.longFormSegmentCount(forJoinedRowID: joinedID), 2)
+        for other in [f.standalone, f.replaced, f.segments[0]] {
+            let id = try XCTUnwrap(other.id)
+            XCTAssertEqual(try f.service.longFormSegmentRows(forJoinedRowID: id), [], other.text)
+            XCTAssertEqual(try f.service.longFormSegmentCount(forJoinedRowID: id), 0, other.text)
+        }
+    }
+
+    /// D-4: deleting a long-form project removes its joined row, its segment
+    /// rows and their audio, and nothing else.
+    @concurrent func testDeletingALongFormProjectRemovesItsSegmentsAndTheirAudio() async throws {
+        let f = try makeProjectFixture()
+        let before = try f.remainingPaths()
+
+        let result = await f.delete(f.joined)
+
+        let project = [f.joined] + f.segments
+        XCTAssertEqual(result.outcome, .deleted)
+        XCTAssertEqual(Set(result.deletedRowIDs), Set(project.compactMap(\.id)))
+        XCTAssertEqual(result.unremovedAudioPaths, [])
+        XCTAssertEqual(try f.remainingPaths(), before.subtracting(project.map(\.audioPath)))
+        for row in project {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: row.audioPath), row.text)
+        }
+        for kept in [f.standalone, f.replaced] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: kept.audioPath), kept.text)
+        }
+        XCTAssertEqual(try f.outbox.loadPendingAudioRemovals(), [], "Every removed file left the pending list")
+    }
+
+    /// Any row that is not a project's current joined row is deleted alone.
+    @concurrent func testDeletingAnOrdinaryTakeASegmentOrAReplacedOutputDeletesThatRowAlone() async throws {
+        let f = try makeProjectFixture()
+        var expected = try f.remainingPaths()
+
+        for row in [f.standalone, f.segments[0], f.replaced] {
+            let result = await f.delete(row)
+            XCTAssertEqual(
+                result,
+                HistoryDeletionResult(outcome: .deleted, deletedRowIDs: [row.id ?? -1], unremovedAudioPaths: []),
+                row.text
+            )
+            expected.remove(row.audioPath)
+            XCTAssertEqual(try f.remainingPaths(), expected, row.text)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: row.audioPath), row.text)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.joined.audioPath), "The project's output stays")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.segments[1].audioPath), "Its other segment stays")
+    }
+
+    /// The rows go in one transaction: when it fails, the joined row, the
+    /// segments and every audio file stay, and nothing is left listed.
+    @concurrent func testAProjectDeleteThatFailsInTheDatabaseDeletesNothing() async throws {
+        let f = try makeProjectFixture()
+        let before = try f.remainingPaths()
+        struct Refused: Error {}
+        var unit = f.unit
+        unit.deleteRows = { _ in throw Refused() }
+
+        let result = await f.coordinator.deleteUnit(
+            recordID: f.joined.id, audioPath: f.joined.audioPath, using: f.engine, unit: unit,
+            localization: VocelloLocalization()
+        )
+
+        guard case .databaseFailure = result.outcome else {
+            return XCTFail("Expected the database failure, got \(result.outcome)")
+        }
+        XCTAssertEqual(result.deletedRowIDs, [])
+        XCTAssertEqual(try f.remainingPaths(), before)
+        for row in [f.joined] + f.segments {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: row.audioPath), row.text)
+        }
+        XCTAssertEqual(try f.outbox.loadPendingAudioRemovals(), [], "The rows stayed, so no audio is listed")
+    }
+
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {
         // The directory does not exist yet, so SQLite cannot create the database.
         let root = try makeRoot(creatingDirectory: false)

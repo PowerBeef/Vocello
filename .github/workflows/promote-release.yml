@@ -58,6 +58,15 @@ jobs:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
 
+      # The attestation check below gates publication, so it runs on the gh
+      # pinned in config/toolchain.json, never on whichever gh the runner image
+      # carries. The installer puts the pin first on PATH for every later step.
+      - name: Install the pinned release tool gh
+        run: |
+          set -euo pipefail
+          ./scripts/install_pinned_tools.sh gh
+          PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH" python3 scripts/supply_chain_contract.py --installed release
+
       - name: Verify tag and draft state
         env:
           GH_TOKEN: ${{ github.token }}

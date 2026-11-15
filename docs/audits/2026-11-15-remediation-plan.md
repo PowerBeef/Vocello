@@ -29,10 +29,11 @@ the iOS compile and the UI bundles). No UI lane has run on any of it.
 | 38 | Done. |
 | 39 | 39a done (result under step 39); 39b does not start. |
 | 40 | Waits for three canonical benchmark runs under `cell-hash-v2`. |
-| 41, 42 | Not started. |
+| 41 | Not started: it extracts the Mac update's state machine from the 1,800-line view model that step 37 is changing, so it follows that step. |
+| 42 | Done for `models`, `history`, `settings`, `batch`, `doctor` and `voices`: the handlers are in `VocelloCLICore`, with in-process tests of `models`, `history` and `doctor` over an empty data folder and two new contract examples. `voices`, `settings` and `batch` have no handler test. |
 | 43 | Started: the player's live preview runs under unit test through an underrun and a pause. The take queue, the final-file hand-off and ownership are not covered. |
-| 44 | The test half is done; the checker half is in progress. |
-| 45 | The watermark and crash-delta parts are in progress. The two sleeps of T12 stay: one is a window in which nothing must happen, the other ages a file's change time, which cannot be set. |
+| 44 | Done: a take the audio check refuses is recorded (proved from its engine row), the run publishes its other takes as an exploratory record with `refusedCells`, and more than one refusal fails the lane. The benchmark lane has not run with it. The random-seed screen of the refusal rate is not built. |
+| 45 | The test lane says whether the watermark parity tests ran, and the crash delta settles and counts `.hang` and `.spin` reports. The two sleeps of T12 stay: one is a window in which nothing must happen, the other ages a file's change time, which cannot be set. |
 | 46 | Not started: it rewrites the release workflow and can only be proved by the release rehearsal, so it follows 3.1. |
 | 47 to 49 | Done. |
 | 50 | The pyright baseline went from 877 to 792; the rest is ongoing. |

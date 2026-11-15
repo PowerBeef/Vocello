@@ -926,6 +926,40 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("inconsistent frontend lifecycle ordering", result.stdout + result.stderr)
 
+    def test_a_playback_continuity_failure_fails_its_take(self) -> None:
+        """RF-61, audit T4: the counter only had to be non-negative."""
+        def broken_stream(layers):
+            layers["app"][2]["frontendMetrics"]["playbackContinuityFailures"] = 1
+        result = self.run_checker(self.expected_order, mutate_layers=broken_stream, evidence=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "take 3 (custom/medium/warm#0): playbackContinuityFailures 1 > 0 (generation fixture-3)", result.stdout,
+        )
+        self.assertIsNone(self.last_manifest)
+        # No allowance covers a continuity failure.
+        result = self.run_checker(
+            self.expected_order, mutate_layers=broken_stream, extra_args=["--max-playback-underruns", "5"],
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_playback_underruns_fail_a_take_above_the_allowance(self) -> None:
+        """RF-61, audit T4: zero underruns allowed unless the lane declares more."""
+        def underruns(count):
+            def mutate(layers):
+                layers["app"][1]["frontendMetrics"]["playbackUnderruns"] = count
+            return mutate
+        result = self.run_checker(self.expected_order, mutate_layers=underruns(1))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("take 2 (custom/short/warm#0): playbackUnderruns 1 > 0", result.stdout)
+        allowance = ["--max-playback-underruns", "2"]
+        result = self.run_checker(self.expected_order, mutate_layers=underruns(2), extra_args=allowance)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.run_checker(self.expected_order, mutate_layers=underruns(3), extra_args=allowance)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("playbackUnderruns 3 > 2", result.stdout)
+        result = self.run_checker(self.expected_order, extra_args=["--max-playback-underruns", "-1"])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
 
 class StartupWindowMetricsTests(unittest.TestCase):
     """audit #58: the startup time the standard RTF excludes is published."""

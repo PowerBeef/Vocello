@@ -568,6 +568,25 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("final-file playback must expose one active file buffer", result.stdout + result.stderr)
 
+    def test_playback_underruns_and_continuity_failures_are_reported_not_gated(self) -> None:
+        """RF-61, audit T4: what the Mac gate fails is named here and stays
+        report-only until a phone run calibrates it."""
+        def app(rows):
+            rows[1]["frontendMetrics"]["playbackUnderruns"] = 2
+            rows[3]["frontendMetrics"]["playbackContinuityFailures"] = 1
+        result = self.run_checker(self.expected_order, mutate_app_rows=app, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("WARN (playback health, report only", result.stdout)
+        self.assertIn("take 2 (custom/short/warm#0): playbackUnderruns 2 > 0", result.stdout)
+        self.assertIn("take 4 (clone/short/warm#0): playbackContinuityFailures 1 > 0", result.stdout)
+        # The record is the one a clean run publishes: no status or warning code changes.
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["run"]["status"], "passed")
+        self.assertTrue(all(take["warnings"] == [] for take in record["takes"]))
+        clean = self.run_checker(self.expected_order)
+        self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
+        self.assertNotIn("WARN (playback health", clean.stdout)
+
     def test_unrelated_historical_rows_are_not_selected(self) -> None:
         def append_unrelated(rows: list[dict]) -> None:
             unrelated = make_row(99, "custom", "short", "warm")

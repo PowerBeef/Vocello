@@ -446,6 +446,25 @@ def validate_v7_frontend(row: dict) -> list[str]:
     return []
 
 
+def playback_health_failures(frontend: dict, max_underruns: int = 0) -> list[str]:
+    """Why a take's playback was not continuous (RF-61, audit T4).
+
+    The app counts a continuity failure when a streamed chunk does not follow
+    the previous one and an underrun when the player ran out of queued audio.
+    Both only had to be non-negative, so the lane that guarantees playback could
+    not fail on them. A continuity failure always fails the take; underruns fail
+    it above `max_underruns` (`--max-playback-underruns`, default 0). Missing or
+    malformed counters are `validate_v7_frontend`'s failure, not repeated here."""
+    failures: list[str] = []
+    continuity = frontend.get("playbackContinuityFailures")
+    if _number(continuity) and continuity > 0:
+        failures.append(f"playbackContinuityFailures {continuity:g} > 0")
+    underruns = frontend.get("playbackUnderruns")
+    if _number(underruns) and underruns > max_underruns:
+        failures.append(f"playbackUnderruns {underruns:g} > {max_underruns}")
+    return failures
+
+
 def validate_layer(
     layer: str,
     rows: list[dict],
@@ -1215,7 +1234,14 @@ def main() -> int:
         "--outputs-dir", type=Path, metavar="DIR",
         help="the app's published outputs root, used to resolve each take's WAV for the capture comparison",
     )
+    parser.add_argument(
+        "--max-playback-underruns", type=int, default=0, metavar="N",
+        help="playback underruns a take may report before it fails (default 0; audit T4). "
+             "A playback continuity failure always fails the take",
+    )
     args = parser.parse_args()
+    if args.max_playback_underruns < 0:
+        parser.error("--max-playback-underruns must be 0 or more")
 
     if args.evidence_manifest and args.evidence_manifest.exists():
         args.evidence_manifest.unlink()
@@ -1394,6 +1420,17 @@ def main() -> int:
                 f"app generation {row.get('generationID', '?')} requires telemetry schema "
                 f"v{REQUIRED_TELEMETRY_SCHEMA} or newer for memory qualification"
             )
+    # Playback health (RF-61, audit T4): a take whose stream broke or whose
+    # player ran dry fails, named by its place in the matrix.
+    for index, engine_row in enumerate(engine_rows, start=1):
+        gid = engine_row.get("generationID")
+        frontend = (app_by_id.get(gid) or {}).get("frontendMetrics")
+        if not isinstance(frontend, dict):
+            continue  # already a failure above
+        cell = (engine_row.get("notes") or {}).get("benchCell")
+        take = f"take {index} ({cell})" if isinstance(cell, str) else f"take {index}"
+        for reason in playback_health_failures(frontend, args.max_playback_underruns):
+            failures.append(f"{take}: {reason} (generation {gid or '?'})")
     # The stall gate (audit #6): the contract names the statistic and limit, and
     # its status whether the limit fails the run or only reports (provisional).
     statistic = stall_contract["statistic"]

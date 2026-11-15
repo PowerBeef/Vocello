@@ -230,6 +230,21 @@ def validate_v7_frontend(row: dict) -> list[str]:
     return []
 
 
+def playback_health_warnings(frontend: dict, max_underruns: int = 0) -> list[str]:
+    """What the Mac checker fails a take on (RF-61, audit T4): a playback
+    continuity failure, or more underruns than allowed. On the iPhone these are
+    report-only until a device run calibrates them, so they are printed with
+    the take's name and never change the verdict or the record."""
+    warnings: list[str] = []
+    continuity = frontend.get("playbackContinuityFailures")
+    if _number(continuity) and continuity > 0:
+        warnings.append(f"playbackContinuityFailures {continuity:g} > 0")
+    underruns = frontend.get("playbackUnderruns")
+    if _number(underruns) and underruns > max_underruns:
+        warnings.append(f"playbackUnderruns {underruns:g} > {max_underruns}")
+    return warnings
+
+
 def validate_layer(
     layer: str,
     rows: list[dict],
@@ -838,6 +853,20 @@ def main() -> int:
             continue
         failures.extend(validate_v7_frontend(row))
 
+    # Playback health, report-only on the iPhone (RF-61, audit T4): the takes the
+    # Mac gate would fail are named, and the verdict and the record are unchanged.
+    app_frontend = {
+        str(row.get("generationID")).lower(): row.get("frontendMetrics")
+        for row in app_rows if row.get("generationID")
+    }
+    playback_warnings: list[str] = []
+    for index, row in enumerate(engine_rows, start=1):
+        frontend = app_frontend.get(str(row.get("generationID")).lower())
+        if not isinstance(frontend, dict):
+            continue
+        take = f"take {index} ({cell_name(expected_cells[index - 1])})" if index <= expected_count else f"take {index}"
+        playback_warnings.extend(f"{take}: {reason}" for reason in playback_health_warnings(frontend))
+
     memory_qualification = None
     if not failures:
         try:
@@ -855,6 +884,10 @@ def main() -> int:
     )
     for cell, count in sorted(Counter(actual_cells).items()):
         print(f"  {'/'.join(map(str, cell)):<32} n={count}")
+    if playback_warnings:
+        print("WARN (playback health, report only until a phone run calibrates it):")
+        for warning in playback_warnings:
+            print(f"  - {warning}")
     if failures:
         print("FAIL:")
         for failure in failures:

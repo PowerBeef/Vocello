@@ -45,7 +45,7 @@ final class MCPServerTests: XCTestCase {
     /// A server over `dispatch`; by default every command echoes what it was asked.
     private func makeServer(
         _ session: Session, allowed: [URL] = [], maxQueue: Int = 4, allowModelInstall: Bool = false,
-        dispatch: MCPServer.Dispatch? = nil
+        allowVoiceDelete: Bool = false, dispatch: MCPServer.Dispatch? = nil
     ) throws -> MCPServer {
         let data = try makeFolder("data")
         let echo: MCPServer.Dispatch = { invocation in
@@ -57,7 +57,8 @@ final class MCPServerTests: XCTestCase {
         let run = dispatch ?? echo
         return try MCPServer(
             configuration: MCPServer.Configuration(
-                dataDirectory: data, allowedFolders: allowed, maxQueue: maxQueue, allowModelInstall: allowModelInstall
+                dataDirectory: data, allowedFolders: allowed, maxQueue: maxQueue, allowModelInstall: allowModelInstall,
+                allowVoiceDelete: allowVoiceDelete
             ),
             dispatch: { invocation in
                 session.invocations.withLock { $0.append(invocation) }
@@ -493,6 +494,52 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(install.hints.openWorld)
     }
 
+    /// Audit C5, decision D-3: a tool that deletes for good, or downloads several GB, is offered
+    /// only when the server was started with its flag. Without it the tool is absent from
+    /// tools/list and from the instructions, and a call to it runs nothing.
+    func testDestructiveToolsAreAbsentByDefault() async throws {
+        let session = Session()
+        let server = try makeServer(session)
+        request(server, 1, "tools/list")
+        guard case .array(let listed)? = session.reply(1)?.field("result")?.field("tools") else {
+            return XCTFail("no tools")
+        }
+        let names = listed.compactMap { tool -> String? in
+            if case .string(let name)? = tool.field("name") { return name }
+            return nil
+        }
+        XCTAssertEqual(names, server.tools.map(\.name))
+        for optIn in MCPTools.optInFlags.keys {
+            XCTAssertFalse(names.contains(optIn), "\(optIn) needs its flag")
+            XCTAssertFalse(server.instructions.contains(optIn), "\(optIn) is not named to the agent")
+        }
+        call(server, 2, "delete_voice", ["id": "voice-1"])
+        call(server, 3, "get_status")
+        await server.drain()
+        XCTAssertEqual(session.reply(2)?.field("error")?.field("code"), .integer(-32602), "delete_voice is not offered")
+        XCTAssertTrue(session.invocations.withLock { $0.isEmpty }, "the refused call ran no command")
+        XCTAssertEqual(session.reply(3)?.field("result")?.field("structuredContent")?.field("voiceDelete"), .bool(false))
+
+        // The flags name exactly the tools the default catalog leaves out.
+        let everyTool = MCPTools.catalog(allowModelInstall: true, allowVoiceDelete: true).map(\.name)
+        XCTAssertEqual(Set(everyTool).subtracting(names), Set(MCPTools.optInFlags.keys))
+        for flag in MCPTools.optInFlags.values {
+            XCTAssertNotNil(VocelloCommandTree.mcp.options.first { $0.name == flag }, "--\(flag) is an mcp option")
+        }
+
+        let deleting = Session()
+        let allowed = try makeServer(deleting, allowVoiceDelete: true)
+        let delete = try XCTUnwrap(allowed.tools.first { $0.name == "delete_voice" })
+        XCTAssertEqual(delete.kind, .engine)
+        XCTAssertTrue(delete.hints.destructive)
+        XCTAssertFalse(allowed.tools.contains { $0.name == "install_model" }, "each flag offers its own tool only")
+        XCTAssertTrue(allowed.instructions.contains("delete_voice"))
+        call(allowed, 1, "delete_voice", ["id": "voice-1"])
+        await allowed.drain()
+        XCTAssertEqual(deleting.reply(1)?.field("result")?.field("isError"), .bool(false))
+        XCTAssertEqual(deleting.invocations.withLock { $0.map(\.commandName) }, ["voices.delete"])
+    }
+
     // MARK: Schemas and the capture
 
     func testTheGenerationSchemaIsTheContractsRequestWithoutTextFile() throws {
@@ -507,7 +554,7 @@ final class MCPServerTests: XCTestCase {
     }
 
     func testEveryToolSchemaIsAClosedObjectNamingItsRequiredArguments() throws {
-        for tool in MCPTools.catalog(allowModelInstall: true) {
+        for tool in MCPTools.catalog(allowModelInstall: true, allowVoiceDelete: true) {
             let schema = tool.inputSchema
             XCTAssertEqual(schema.field("type"), "object", tool.name)
             XCTAssertEqual(schema.field("additionalProperties"), .bool(false), tool.name)
@@ -610,11 +657,15 @@ final class MCPServerTests: XCTestCase {
     }
 
     func testTheSetupNamesThisExecutableAndTheServersOptions() throws {
-        let args = try CLIParser.args(["--allow-dir=/tmp/a:/tmp/b", "--allow-model-install", "--max-queue=2"], for: "mcp")
+        let args = try CLIParser.args(
+            ["--allow-dir=/tmp/a:/tmp/b", "--allow-voice-delete", "--allow-model-install", "--max-queue=2"], for: "mcp"
+        )
         XCTAssertEqual(
             MCPCommand.serverArguments(args),
-            ["mcp", "--allow-dir=/tmp/a:/tmp/b", "--max-queue=2", "--allow-model-install"]
+            ["mcp", "--allow-dir=/tmp/a:/tmp/b", "--max-queue=2", "--allow-model-install", "--allow-voice-delete"]
         )
+        XCTAssertTrue(try MCPCommand.configuration(args).allowVoiceDelete)
+        XCTAssertFalse(try MCPCommand.configuration(try CLIParser.args([], for: "mcp")).allowVoiceDelete)
         XCTAssertEqual(
             MCPCommand.serverArguments(
                 try CLIParser.args([], for: "mcp"), unshippedManifest: URL(fileURLWithPath: "/repo/Sources/Resources/c.json")

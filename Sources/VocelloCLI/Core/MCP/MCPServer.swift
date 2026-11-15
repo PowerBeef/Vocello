@@ -16,17 +16,21 @@ public final class MCPServer {
         public var allowedFolders: [URL]
         public var maxQueue: Int
         public var allowModelInstall: Bool
+        /// Offers delete_voice, which removes a saved voice for good.
+        public var allowVoiceDelete: Bool
         public var concurrency: CLIEngineConcurrency
 
         public init(
             dataDirectory: URL, manifestOverride: URL? = nil, allowedFolders: [URL] = [], maxQueue: Int = 4,
-            allowModelInstall: Bool = false, concurrency: CLIEngineConcurrency = CLIEngineConcurrency()
+            allowModelInstall: Bool = false, allowVoiceDelete: Bool = false,
+            concurrency: CLIEngineConcurrency = CLIEngineConcurrency()
         ) {
             self.dataDirectory = dataDirectory
             self.manifestOverride = manifestOverride
             self.allowedFolders = allowedFolders
             self.maxQueue = maxQueue
             self.allowModelInstall = allowModelInstall
+            self.allowVoiceDelete = allowVoiceDelete
             self.concurrency = concurrency
         }
     }
@@ -52,7 +56,9 @@ public final class MCPServer {
 
     public init(configuration: Configuration, dispatch: @escaping Dispatch, send: @escaping Send) throws {
         self.configuration = configuration
-        tools = MCPTools.catalog(allowModelInstall: configuration.allowModelInstall)
+        tools = MCPTools.catalog(
+            allowModelInstall: configuration.allowModelInstall, allowVoiceDelete: configuration.allowVoiceDelete
+        )
         policy = try MCPPathPolicy(dataDirectory: configuration.dataDirectory, allowedFolders: configuration.allowedFolders)
         gate = MCPEngineGate(maxQueue: configuration.maxQueue)
         warm = CLIWarmEngine(
@@ -301,11 +307,12 @@ public final class MCPServer {
     }
 
     var instructions: String {
-        """
+        // The engine tools this server offers: delete_voice and install_model only with their flags.
+        let engineTools = tools.filter { $0.kind == .engine }.map(\.name).joined(separator: ", ")
+        return """
         Vocello speaks text on this Mac with local Qwen3-TTS models; nothing leaves the Mac. Start with \
         get_capabilities, list_speakers or list_voices. generate_speech writes a WAV file and returns its \
-        audioPath. Engine requests (generate_speech, enroll_voice, delete_voice\
-        \(configuration.allowModelInstall ? ", install_model" : "")) run one at a time; engine_busy means retry \
+        audioPath. Engine requests (\(engineTools)) run one at a time; engine_busy means retry \
         later. Paths are absolute: clips are read from inside \(policy.readRoots.joined(separator: " or ")), and \
         audio is written inside \(policy.writeRoots.joined(separator: " or ")). Cloning or saving a voice \
         needs confirmConsent true, given only when the user owns the voice or has permission to clone it.
@@ -328,6 +335,7 @@ public final class MCPServer {
             ]),
             "calls": .integer(calls.count),
             "modelInstall": .bool(configuration.allowModelInstall),
+            "voiceDelete": .bool(configuration.allowVoiceDelete),
         ])
     }
 

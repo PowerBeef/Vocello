@@ -172,7 +172,11 @@ enum MCPTools {
     /// (an agent passes the text itself).
     static let generationFields = CLIGenerateRequest.fieldNames.subtracting(["textFile"])
 
-    static func catalog(allowModelInstall: Bool) -> [MCPTool] {
+    /// The tools offered only when the server was started with their flag: one
+    /// downloads several GB, the other deletes for good (D-3).
+    static let optInFlags = ["install_model": "allow-model-install", "delete_voice": "allow-voice-delete"]
+
+    static func catalog(allowModelInstall: Bool, allowVoiceDelete: Bool) -> [MCPTool] {
         var tools = [
             MCPTool(
                 name: "get_capabilities", title: "Vocello capabilities",
@@ -299,7 +303,8 @@ enum MCPTools {
             ),
             MCPTool(
                 name: "delete_voice", title: "Delete a saved voice",
-                description: "Delete a saved voice from the store the app shares. It cannot be undone.",
+                description: "Delete a saved voice from the store the app shares. It cannot be undone. "
+                    + "Offered because the server was started with --allow-voice-delete.",
                 kind: .engine, path: ["voices", "delete"],
                 arguments: [.init("id", string("The saved voice id (see list_voices)."), .option("id"), required: true)],
                 hints: MCPTool.Hints(readOnly: false, destructive: true, idempotent: false, openWorld: false)
@@ -317,6 +322,9 @@ enum MCPTools {
                 hints: MCPTool.Hints(readOnly: false, destructive: true, idempotent: true, openWorld: false)
             ),
         ]
+        if !allowVoiceDelete {
+            tools.removeAll { $0.name == "delete_voice" }
+        }
         if allowModelInstall {
             tools.append(MCPTool(
                 name: "install_model", title: "Install a model",

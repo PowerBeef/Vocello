@@ -213,12 +213,10 @@ public struct CLICapabilitiesDocument: Encodable, Sendable {
             eastAsianCharacterWeight: SingleTakeScriptBudget.eastAsianCharacterWeight,
             longFormMaximumSegments: CLILimits.longFormMaximumSegments
         )
-        let defaultTools = MCPTools.catalog(allowModelInstall: false).map(\.name)
         mcp = MCP(
             available: true, protocolVersions: MCPProtocol.allVersions,
-            tools: MCPTools.catalog(allowModelInstall: true).map(\.name),
-            optInTools: Dictionary(uniqueKeysWithValues: MCPTools.catalog(allowModelInstall: true).map(\.name)
-                .filter { !defaultTools.contains($0) }.map { ($0, "--allow-model-install") })
+            tools: MCPTools.catalog(allowModelInstall: true, allowVoiceDelete: true).map(\.name),
+            optInTools: MCPTools.optInFlags.mapValues { "--\($0)" }
         )
     }
 }

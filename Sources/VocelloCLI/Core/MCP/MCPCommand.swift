@@ -59,6 +59,7 @@ public enum MCPCommand {
             allowedFolders: MCPPathPolicy.folders(args.string("allow-dir")),
             maxQueue: maxQueue,
             allowModelInstall: args.flag("allow-model-install"),
+            allowVoiceDelete: args.flag("allow-voice-delete"),
             concurrency: CLIEngineConcurrency(args)
         )
     }
@@ -149,7 +150,8 @@ public enum MCPCommand {
         if args.string("manifest") == nil, let unshippedManifest {
             arguments.append("--manifest=\(unshippedManifest.standardizedFileURL.path)")
         }
-        for flag in ["allow-model-install", "allow-concurrent-engine", "wait-for-engine"] where args.flag(flag) {
+        for flag in ["allow-model-install", "allow-voice-delete", "allow-concurrent-engine", "wait-for-engine"]
+        where args.flag(flag) {
             arguments.append("--\(flag)")
         }
         return arguments

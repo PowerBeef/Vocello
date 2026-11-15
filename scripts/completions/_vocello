@@ -829,6 +829,7 @@ _vocello() {
         '--allow-dir:folders tools may read clips from and write audio to, besides <data>/outputs (several\: separate with '\''\:'\'')'
         '--max-queue:engine requests that may wait behind the running one before engine_busy (default 4)'
         '--allow-model-install:offer install_model, which downloads model packages (several GB)'
+        '--allow-voice-delete:offer delete_voice, which deletes a saved voice for good'
         '--print-config:print the setup an MCP client needs to start this server, then exit'
         '--self-test:answer a scripted session in process (no engine starts) and report'
         '--allow-concurrent-engine:run beside another Vocello engine (an 8 GB Mac refuses a second one without it)'

@@ -1586,6 +1586,13 @@
           "valueOptional": false
         },
         {
+          "name": "allow-voice-delete",
+          "summary": "offer delete_voice, which deletes a saved voice for good",
+          "takesValue": false,
+          "type": "flag",
+          "valueOptional": false
+        },
+        {
           "choices": [
             "claude-code",
             "claude-desktop"
@@ -1624,7 +1631,7 @@
       "subcommands": [],
       "summary": "Serve Vocello to AI agents over the Model Context Protocol (stdio)",
       "usage": [
-        "vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]",
+        "vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install] [--allow-voice-delete]",
         "vocello mcp --print-config claude-code|claude-desktop",
         "vocello mcp --self-test"
       ]

@@ -422,7 +422,7 @@ result could not be kept carries the warning `idempotency_not_recorded`.
 ### `mcp`: serve AI agents over the Model Context Protocol
 
 ```sh
-vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install]
+vocello mcp [--allow-dir <folder[:folder…]>] [--max-queue <n>] [--allow-model-install] [--allow-voice-delete]
 vocello mcp --print-config claude-code|claude-desktop [same options]   # the client's setup, then exit
 vocello mcp --self-test [--json]                                       # a scripted session, no engine
 claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp      # what --print-config claude-code prints
@@ -443,8 +443,16 @@ the calls still running; a signal cancels them instead.
 | `list_history`, `get_history_item`, `export_history_item` | `history list`/`search`/`show`/`export` | read |
 | `get_status` | the server: data folder, allowed folders, engine, queue | read |
 | `generate_speech` | `generate`, from a `run` request without `textFile` | engine |
-| `enroll_voice`, `delete_voice` | `voices enroll`/`delete` | engine |
+| `enroll_voice` | `voices enroll` | engine |
+| `delete_voice` | `voices delete`, offered only with `--allow-voice-delete` | engine |
 | `install_model` | `models install`, offered only with `--allow-model-install` | engine |
+
+Two tools are offered only when the server is started with their flag, so an agent that reads untrusted
+text cannot be talked into them: `delete_voice` removes a saved voice for good, and `install_model`
+downloads several GB. Without its flag a tool is absent from `tools/list` and from the server's
+instructions, and a call to it is answered `-32602` (no such tool) and runs nothing. `get_status`
+reports both as `voiceDelete` and `modelInstall`, and `capabilities` lists them under `mcp.optInTools`
+with their flags.
 
 Each tool's arguments become its command's options and operands and go through the same strict parser,
 and the command reports to that call only (as in json mode), so a tool can do nothing its command line

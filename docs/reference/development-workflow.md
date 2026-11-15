@@ -233,7 +233,7 @@ scripts/dev.sh build | run           # warm incremental macOS development build 
 npm --prefix website run check       # the website's lint, tests, build and browser tests
 scripts/hooks/commit_lint.sh --staged  # the commit safeguard, callable directly
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
-scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts, attributions
+scripts/dev.sh regen                 # regenerate roadmap render, docs index, catalog, inventories, charts, attributions
 scripts/dev.sh ci                    # every gate push CI runs, serially, when you want the push green first time
 git add <assigned-files>
 git commit
@@ -320,7 +320,8 @@ schemes, CLI identity, localization, saved-voice lifecycle, entitlements, suppor
 security (debug knobs, concurrency registry, TSan policy), owned-runtime inventory, backend wiring,
 model catalog and host availability, iOS storage protection, supply chain, release steps, benchmark
 history, README charts, the text-level delivery-instruction copy and audio QC take inputs (script
-pool, calibration-take policy), the roadmap, the exact
+pool, calibration-take policy), the roadmap, the documentation index (`docs/INDEX.md`, fresh
+against `python3 scripts/docs_index.py render`), the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 `scripts/lib/contract_gate.py` lists the validators and runs them in parallel, one per core, printing
 each one's output as one block in their fixed order; every validator runs even after one fails, and

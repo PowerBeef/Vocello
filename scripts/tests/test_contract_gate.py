@@ -161,6 +161,18 @@ class SelectionTests(unittest.TestCase):
         self.assertNotIn("scripts/benchmark_history.py validate --all", ran)
         self.assertNotIn("scripts/roadmap.py render --check", ran)
 
+    def test_a_document_change_runs_the_docs_index_check(self) -> None:
+        index = "scripts/docs_index.py render --check"
+        for changed in ("docs/reference/cli.md", "docs/audits/a-new-audit.md", "docs/decisions/a-decision.md",
+                        "docs/releases/v9.9.9.md", "docs/ARCHITECTURE.md", "docs/INDEX.md",
+                        "scripts/docs_index.py"):
+            with self.subTest(changed=changed):
+                self.assertIn(index, self.ran([changed]))
+        # The index lists neither the generated roadmap nor the checkpoint, nor anything outside docs/.
+        for changed in (ROADMAP_ONLY, ["Sources/iOS/Settings/SettingsScreen.swift"], ["website/src/App.jsx"]):
+            with self.subTest(changed=changed):
+                self.assertNotIn(index, self.ran(changed))
+
     def test_a_shared_module_change_runs_its_importers(self) -> None:
         ran = self.ran(["scripts/lib/jsonio.py"])
         for importer in ("scripts/attribution_manifest.py validate", "scripts/qwen3_core_contract.py validate",
@@ -224,6 +236,16 @@ class DeclaredInputsTests(unittest.TestCase):
                 path = ROOT / entry
                 exists = path.is_dir() if entry.endswith("/") else path.is_file()
                 self.assertTrue(exists, f"{validator.name}: declared input {entry} does not exist")
+
+    def test_the_docs_index_check_declares_everything_the_index_reads(self) -> None:
+        # A folder added to the index must join the validator's inputs, or a change to a
+        # document in it would skip the check locally.
+        import docs_index
+
+        validator = next(v for v in gate.VALIDATORS if v.name == "scripts/docs_index.py render --check")
+        read = {docs_index.RENDER_PATH, *docs_index.SINGLE_DOCUMENTS,
+                *(f"{folder}/" for folder in docs_index.FOLDERS)}
+        self.assertEqual(set(validator.inputs or ()), read | {"scripts/docs_index.py"})
 
 
 class ChangedPathsTests(unittest.TestCase):

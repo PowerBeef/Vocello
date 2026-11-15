@@ -78,6 +78,13 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         rebuild=("python3", "scripts/roadmap.py", "render"),
         stale_markers=("docs/ROADMAP.md is stale",),
     ),
+    DerivedArtifact(
+        artifact_id="docs-index",
+        description="docs/INDEX.md",
+        check=("python3", "scripts/docs_index.py", "render", "--check"),
+        rebuild=("python3", "scripts/docs_index.py", "render"),
+        stale_markers=("docs/INDEX.md is stale",),
+    ),
 )
 
 

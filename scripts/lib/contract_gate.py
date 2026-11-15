@@ -103,6 +103,10 @@ MODEL_CATALOG = (
     "config/model-catalog-schema-v2.json", "config/model-artifact-receipts.json",
 )
 ROADMAP_RENDER = ("scripts/roadmap.py", "config/roadmap.json", "config/roadmap-archive.json", "docs/ROADMAP.md")
+# The generated index and every document it describes: docs_index.py's RENDER_PATH,
+# SINGLE_DOCUMENTS and FOLDERS (scripts/tests/test_contract_gate.py compares them).
+DOCS_INDEX = ("scripts/docs_index.py", "docs/INDEX.md", "docs/ARCHITECTURE.md", "docs/reference/",
+              "docs/audits/", "docs/decisions/", "docs/releases/")
 
 VALIDATORS: tuple[Validator, ...] = (
     # Build-output ownership first in the output: it is the paths authority the others load.
@@ -224,6 +228,9 @@ VALIDATORS: tuple[Validator, ...] = (
     _always(PYTHON, "scripts/roadmap.py", "validate",
             reason="reads git history (freeze subjects, evidence commits) and the date"),
     _reads(PYTHON, "scripts/roadmap.py", "render", "--check", inputs=ROADMAP_RENDER),
+
+    # The documentation index: one line per document, from its summary or first heading.
+    _reads(PYTHON, "scripts/docs_index.py", "render", "--check", inputs=DOCS_INDEX),
 
     # Exact product-invariant greps and the privacy scan.
     _always("scripts/repo_invariants.sh",

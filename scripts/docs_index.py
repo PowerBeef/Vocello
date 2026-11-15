@@ -8,6 +8,10 @@ folder and sorted by path. Each line carries the document's front-matter
 
 The index is derived, never edited: a new, renamed or deleted document, or a
 changed summary, makes the committed file stale, and `render --check` says so.
+The contract gate runs that check (`scripts/lib/contract_gate.py`, whose inputs
+name the folders below), `scripts/dev.sh regen` rewrites a stale index
+(`scripts/refresh_derived_artifacts.py`), and the generated-file guard refuses a
+hand edit.
 
 Usage:
     python3 scripts/docs_index.py render [--check] [--root <repository>]

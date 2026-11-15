@@ -77,7 +77,7 @@ def frontmatter(path: Path) -> dict[str, str]:
     return fields
 
 
-GENERATED = ("docs/ROADMAP.md", "QwenVoice.xcodeproj/project.pbxproj",
+GENERATED = ("docs/ROADMAP.md", "docs/INDEX.md", "QwenVoice.xcodeproj/project.pbxproj",
              "benchmarks/runs/engine-generation/frozen.json",
              "Sources/Resources/qwenvoice_production_model_catalog.json",
              "Sources/Resources/third_party_attributions.json",
@@ -223,6 +223,8 @@ class EditGuardTests(unittest.TestCase):
     def test_the_refusal_names_the_generator(self):
         result = invoke("generated_file_guard.sh", edit("docs/ROADMAP.md"))
         self.assertIn("roadmap.py render", result.stderr)
+        result = invoke("generated_file_guard.sh", edit("docs/INDEX.md"))
+        self.assertIn("python3 scripts/docs_index.py render", result.stderr)
 
     def test_relative_absolute_and_symlink_paths_resolve_to_the_same_guard(self):
         with tempfile.TemporaryDirectory(prefix="vocello hooks ") as tmp:

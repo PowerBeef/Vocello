@@ -41,7 +41,7 @@ class ValidateAllTests(unittest.TestCase):
         self.assertEqual(set(calls), set(registered))
         self.assertEqual(len(calls), len(set(registered)), "a shared check runs once")
         ids = {artifact.artifact_id for artifact in MODULE.ARTIFACTS}
-        self.assertTrue({"readme-charts", "third-party-attributions"} <= ids, ids)
+        self.assertTrue({"readme-charts", "third-party-attributions", "docs-index"} <= ids, ids)
 
     def test_the_first_stale_artifact_fails_closed(self) -> None:
         charts = next(a.check for a in MODULE.ARTIFACTS if a.artifact_id == "readme-charts")
@@ -62,6 +62,7 @@ STALE_BUILDERS = {
     "readme-charts": ("render_all", {"stale-chart.svg": "stale"}),
     "third-party-attributions": ("build", {"stale": True}),
     "roadmap-render": ("render", "stale\n"),
+    "docs-index": ("render", "stale\n"),
 }
 
 

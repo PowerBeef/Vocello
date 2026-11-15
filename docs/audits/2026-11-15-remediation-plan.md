@@ -25,7 +25,7 @@ the iOS compile and the UI bundles). No UI lane has run on any of it.
 | 18 to 20 | Wait for a window with the Mac free, then the maintainer's push and tag. |
 | 21 to 26 | Go with the release, in one commit. The reference documents of step 25 and the privacy reference of step 23 are done; the website page of step 23 is not. |
 | 27 to 36 | Done, with three limits. A11 was declined: moving the Studio screens off the engine store is not mechanical and changes when state lands. Of E9, the generic unbounded `generateStream` pair stays (a protocol requirement a package test uses). Step 33 marked the actor's relief API off the shipping path and corrected the rule; the product still unloads by dropping its reference. |
-| 37 | In progress. |
+| 37 | Done, unverified in the running app. The warm command-line engine's lease follows its model; the Mac app holds a lease of kind `app` while its model is loaded, refuses a model delete while another host holds a lease, and on an 8 GB Mac with nothing loaded does not start a take beside another engine; the command line finds the app by its lease, then the workspace, then the process table. Whether ssh hides the app from the workspace was not confirmed. The coordinator has no test of its own. |
 | 38 | Done. |
 | 39 | 39a done (result under step 39); 39b does not start. |
 | 40 | Waits for three canonical benchmark runs under `cell-hash-v2`. |
@@ -38,6 +38,19 @@ the iOS compile and the UI bundles). No UI lane has run on any of it.
 | 47 to 49 | Done. |
 | 50 | The pyright baseline went from 877 to 792; the rest is ongoing. |
 | 51 to 53 | Done. `telemetry-and-benchmarking.md` is not split. |
+
+Review notes left open (each from the Swift review of the step named; none blocks):
+
+- Step 37: a lease can outlast or fall short of the weights after a failure (it is timed from the
+  failure, the unload from the last trim); a reader can see a lease for an instant as an unknown
+  host while its owner removes it; the refusal names only the command line when the other host may
+  be an MCP server or another copy of the app; a renamed app bundle is missed from ssh.
+- Step 38: on a case-sensitive volume `--out` refuses a different file whose path differs only by
+  case from a History take; `batch --long-form` does not say where a project's joined output was
+  kept when its final move failed.
+- Steps 34 and 35: the guards on a clone prime and on a take cancelled by `stop()` have no test;
+  the progress test pins the table, not the engine's use of it.
+- Step 30: a Studio result card that shows a deleted take stays on screen.
 
 Found while implementing, not in the audit:
 

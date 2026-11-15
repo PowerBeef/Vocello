@@ -44,9 +44,13 @@ changes and the playback fix are compiled and unit-tested, not measured.
   part); MCP `delete_voice` behind `--allow-voice-delete`; the CLI fixes C6 to C9, C11, C12; the
   pause-budget question measured on retained takes (no refusal on 82 en-dash takes; paragraph
   breaks unmeasured).
-- 43 (start), 44 (test half), 47 to 49, 51 to 53: the player's live preview runs under unit test;
-  the benchmark test records a refused take and goes on; the hook gaps; the shell and lock fixes;
-  `CLAUDE.md`; the tag-signer allow-list; the generated `docs/INDEX.md`.
+- 37, 42 to 45 (43 in part), 47 to 49, 51 to 53: engine leases both ways (the Mac app holds one
+  while its model is loaded, and on an 8 GB Mac with nothing loaded does not start a take beside
+  another engine; unverified in the running app); the CLI's `models`, `history`, `settings`,
+  `batch`, `doctor` and `voices` handlers in the testable module; the player's live preview under
+  unit test; the benchmark records a refused take and publishes the rest as an exploratory record;
+  the hook gaps; the shell and lock fixes; `CLAUDE.md`; the tag-signer allow-list; the generated
+  `docs/INDEX.md`.
 
 **Open**
 
@@ -56,9 +60,10 @@ changes and the playback fix are compiled and unit-tested, not measured.
   installed, capacity not guaranteed). Moving the pin means running CI and the release on that
   preview image; keeping 26.6 means installing it here and measuring again. The pin is unchanged
   until the maintainer chooses.
-- Steps not done: 37 (engine leases both ways), 40 (speed gate, needs three v2 benchmark runs),
-  41 (model update under test), 42 (CLI handlers into the testable module), the rest of 43, 46
-  (signing isolation in `release.yml`), 50 (the pyright baseline, 877 to 792 so far), and A11.
+- Steps not done: 40 (speed gate, needs three v2 benchmark runs), 41 (model update under test),
+  the rest of 43, 46 (signing isolation in `release.yml`, which only the release rehearsal can
+  prove), 50 (the pyright baseline, 877 to 791 so far), and A11. The plan's status table says why
+  for each.
 - The release sitting (step 18) needs the Mac free: the UI benchmark under `cell-hash-v2` first,
   then perf three times (ceilings and the stall gate's calibration), smoke, `release-readiness`,
   `scripts/dev.sh ci`, the engine bench, the charts.

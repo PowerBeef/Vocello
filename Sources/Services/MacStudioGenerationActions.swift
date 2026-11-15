@@ -91,6 +91,9 @@ enum MacStudioGenerationActions {
         ttsEngine: TTSEngineStore
     ) async {
         guard !priming.isSatisfied(by: ttsEngine.clonePreparationState) else { return }
+        // RF-61: the take that follows is refused while another Vocello engine
+        // holds this 8 GB Mac, so its prime does not load the model first.
+        guard !MacEngineHostCoordinator.shared.refusesEngineWork else { return }
         do {
             try await ttsEngine.ensureCloneReferencePrimed(modelID: priming.modelID, reference: priming.reference)
         } catch {

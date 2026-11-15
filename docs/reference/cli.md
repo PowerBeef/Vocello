@@ -295,6 +295,13 @@ is admitted again. A request that loads nothing gives its lease back when it end
 request the lease stays for the tier's idle window, the time the engine takes to unload weights a
 failure left loaded.
 
+The Mac app is a host too. It holds a lease of kind `app` while its model is loading or loaded and
+reads the others' from its side: on an 8 GB Mac it starts no take and no warm while a `vocello`
+command holds a lease, and it deletes no model while one does on any Mac
+([`macos-app-guide.md`](macos-app-guide.md), "Beside the `vocello` command line"). The command line
+still counts the app whenever it runs, loaded or not, since an app that is running can load a model
+at any moment.
+
 Streaming is the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates: there is no live preview player; `--play` plays the completed file.

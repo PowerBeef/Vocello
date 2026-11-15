@@ -33,6 +33,9 @@ struct MacSettingsScreen: View {
     @State private var showDeleteConfirmation = false
     /// A confirmed deletion was refused because a generation is running (MAC-20).
     @State private var showDeleteBlocked = false
+    /// A confirmed deletion was refused because another Vocello engine host
+    /// (the `vocello` command line) may have the model loaded (RF-61).
+    @State private var showDeleteBlockedByEngineHost = false
     /// Non-nil when the configured output folder is missing or unwritable
     /// (`AudioService` falls back to the default outputs folder).
     @State private var outputDirectoryIssue: String?
@@ -109,6 +112,12 @@ struct MacSettingsScreen: View {
             Button(MacInterfaceText.delete, role: .destructive) {
                 if let model = modelToDelete {
                     Task {
+                        // RF-61: another engine host may have the model loaded;
+                        // the files stay and the alert names that reason.
+                        guard !viewModel.isDeletionBlockedByAnotherEngineHost else {
+                            showDeleteBlockedByEngineHost = true
+                            return
+                        }
                         // A busy engine, or an unload it refused, kept the files.
                         if await viewModel.delete(model).showsEngineBusyAlert {
                             showDeleteBlocked = true
@@ -126,6 +135,11 @@ struct MacSettingsScreen: View {
             Button(MacInterfaceText.ok, role: .cancel) {}
         } message: {
             Text(MacInterfaceText.settingsDeleteModelBusyMessage)
+        }
+        .alert(MacInterfaceText.settingsDeleteModelEngineHostTitle, isPresented: $showDeleteBlockedByEngineHost) {
+            Button(MacInterfaceText.ok, role: .cancel) {}
+        } message: {
+            Text(MacInterfaceText.settingsDeleteModelEngineHostMessage)
         }
     }
 

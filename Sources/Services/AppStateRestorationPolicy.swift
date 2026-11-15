@@ -53,6 +53,9 @@ final class QwenVoiceApplicationDelegate: NSObject, nonisolated NSApplicationDel
         // MAC-25: recorded clips (enrollment copies and one-off Voice Cloning
         // references) do not outlive the session that recorded them.
         ReferenceClipRecordingStash.removeLeftoverRecordings(anotherCopyIsRunning: Self.anotherCopyIsRunning)
+        // RF-61: the engine lease goes with the app, so no `vocello` command
+        // waits on a model this process no longer holds.
+        MacEngineHostCoordinator.shared.releaseLease()
     }
 
     /// Another copy of this app is running (a development build beside the

@@ -373,6 +373,8 @@ struct ContentView: View {
         // Benchmark cold-start accuracy: skip proactive saved-voice clone preload when
         // warmup is suppressed (the cold generation records its own load instead).
         guard !MacGenerationWarmupCoordinator.isSuppressed else { return }
+        // RF-61: no proactive load while another Vocello engine holds this 8 GB Mac.
+        guard !MacEngineHostCoordinator.shared.refusesEngineWork else { return }
         guard let cloneModelID = plan.cloneModelID?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !cloneModelID.isEmpty else {

@@ -1208,12 +1208,23 @@ final class ModelManagerViewModel {
 
     typealias DeletionOutcome = ModelDeletionSequence.Outcome
 
+    /// RF-61: another Vocello engine host (the `vocello` command line, or
+    /// another copy of the app) holds a lease. A lease names no model, so that
+    /// host may have any of them loaded, and `delete` keeps the files while
+    /// this is true. The screen reads it first, to say why.
+    var isDeletionBlockedByAnotherEngineHost: Bool {
+        MacEngineHostCoordinator.shared.refusesModelDeletion
+    }
+
     /// MAC-20: never removes files the engine is using. A take, a line batch or
     /// long-form project between two takes, or a load, warm or prime blocks the
     /// deletion; unless another model is loaded the engine is unloaded first,
     /// and a refused unload keeps the files (`ModelDeletionSequence`).
     @discardableResult
     func delete(_ model: TTSModel) async -> DeletionOutcome {
+        // RF-61: another host's engine counts as a busy one. Nothing has changed
+        // yet, so a download of this model keeps running.
+        guard !isDeletionBlockedByAnotherEngineHost else { return .blockedByActiveGeneration }
         let modelDir = model.installDirectory(in: modelsDirectory)
         var stoppedDownloads = false
         var removalError: (any Error)?

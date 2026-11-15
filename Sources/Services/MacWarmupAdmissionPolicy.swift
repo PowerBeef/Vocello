@@ -55,13 +55,20 @@ final class MacWarmupAdmissionPolicy {
     private let hardTrimCooldown: Duration = .seconds(30)
     private var lastHardTrimAt: ContinuousClock.Instant?
     private var eventTask: Task<Void, Never>?
+    /// RF-61: whether another Vocello engine keeps this Mac to itself (on an
+    /// 8 GB Mac, a live `vocello` lease). The app wires it to
+    /// `MacEngineHostCoordinator`; it is read at each dispatch.
+    private let anotherEngineBlocksWarm: @MainActor () -> Bool
+    static let anotherEngineReason = "another engine host"
 
     init(
         mode: Mode = .fromEnvironment(),
-        deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass()
+        deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass(),
+        anotherEngineBlocksWarm: @escaping @MainActor () -> Bool = { false }
     ) {
         self.mode = mode
         self.deviceClass = deviceClass
+        self.anotherEngineBlocksWarm = anotherEngineBlocksWarm
         self.monitor = NativeMemoryPressureMonitor(
             label: "com.qwenvoice.app.memory-pressure"
         )
@@ -101,7 +108,20 @@ final class MacWarmupAdmissionPolicy {
     /// Verdict for a proactive warm about to dispatch. Always logs the
     /// observation; in `records` mode the returned verdict is `.allow` even
     /// when the raw decision deferred (the log row carries the truth).
+    ///
+    /// Another engine's hold on the Mac (RF-61) defers the warm whatever the
+    /// mode: the mode is the memory-pressure gate's diagnostic, and two
+    /// engines on an 8 GB Mac is not a pressure reading.
     func admit(contextDescription: String) -> Verdict {
+        if anotherEngineBlocksWarm() {
+            Self.recordEvent(
+                name: "mac_warm_blocked",
+                reason: Self.anotherEngineReason,
+                deviceClass: deviceClass,
+                context: contextDescription
+            )
+            return .deferred(reason: Self.anotherEngineReason)
+        }
         guard mode != .off else { return .allow }
         let raw = rawVerdict()
         if case .deferred(let reason) = raw {

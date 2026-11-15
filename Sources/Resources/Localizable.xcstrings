@@ -43453,6 +43453,138 @@
         }
       }
     },
+    "vocello.mac.settings.deleteModelEngineHostTitle": {
+      "comment": "macOS interface: alert title when a model cannot be deleted because another Vocello process has a speech model loaded. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model May Be in Use"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle peut-être en cours d’utilisation"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo puede estar en uso"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell wird möglicherweise verwendet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello potrebbe essere in uso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo pode estar em uso"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型可能正在使用"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルが使用中の可能性があります"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델이 사용 중일 수 있음"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Модель, возможно, используется"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.deleteModelEngineHostMessage": {
+      "comment": "macOS interface: alert message when a model cannot be deleted because another Vocello process (the vocello command line, or another copy of the app) has a speech model loaded. The word vocello in lowercase is the command's name and is not translated. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another Vocello engine is running and may have this model loaded. Wait for it to finish, or quit the vocello command line, before deleting a model."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un autre moteur Vocello est en cours d’exécution et a peut-être chargé ce modèle. Attendez qu’il ait terminé, ou quittez la ligne de commande vocello, avant de supprimer un modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hay otro motor de Vocello en ejecución que puede tener cargado este modelo. Espera a que termine, o cierra la línea de comandos vocello, antes de eliminar un modelo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine andere Vocello-Engine läuft und hat dieses Modell möglicherweise geladen. Warte, bis sie fertig ist, oder beende die vocello-Befehlszeile, bevor du ein Modell löschst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "È in esecuzione un altro motore Vocello che potrebbe aver caricato questo modello. Attendi che finisca, o chiudi la riga di comando vocello, prima di eliminare un modello."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro mecanismo do Vocello está em execução e pode ter este modelo carregado. Aguarde a conclusão, ou encerre a linha de comando vocello, antes de excluir um modelo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个 Vocello 引擎正在运行，可能已载入此模型。请等待它完成，或退出 vocello 命令行，然后再删除模型。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別の Vocello エンジンが動作中で、このモデルを読み込んでいる可能性があります。モデルを削除する前に、完了するまで待つか、vocello コマンドラインを終了してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 Vocello 엔진이 실행 중이며 이 모델을 불러온 상태일 수 있습니다. 모델을 삭제하기 전에 완료될 때까지 기다리거나 vocello 명령줄을 종료하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Работает другой движок Vocello, и эта модель может быть в него загружена. Прежде чем удалять модель, дождитесь его завершения или закройте командную строку vocello."
+          }
+        }
+      }
+    },
     "vocello.mac.settings.deleteModel": {
       "comment": "macOS interface: Manage menu item that deletes an installed model. Presentation only.",
       "extractionState": "manual",
@@ -61815,6 +61947,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Модель выгружена. При первой генерации она загрузится заново."
+          }
+        }
+      }
+    },
+    "vocello.mac.engineHost.busy": {
+      "comment": "macOS interface: shown in place of a take, a batch or a long-form project on an 8 GB Mac while another Vocello process (the vocello command line, or another copy of the app) has a speech model loaded. The word vocello in lowercase is the command's name and is not translated. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another Vocello engine is running, and this 8 GB Mac has memory for one at a time. Wait for it to finish, or quit the vocello command line, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un autre moteur Vocello est en cours d’exécution, et ce Mac 8 Go n’a de mémoire que pour un seul à la fois. Attendez qu’il ait terminé, ou quittez la ligne de commande vocello, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hay otro motor de Vocello en ejecución, y este Mac con 8 GB solo tiene memoria para uno a la vez. Espera a que termine, o cierra la línea de comandos vocello, y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine andere Vocello-Engine läuft bereits, und dieser Mac mit 8 GB hat nur Speicher für eine gleichzeitig. Warte, bis sie fertig ist, oder beende die vocello-Befehlszeile, und versuche es dann erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "È in esecuzione un altro motore Vocello, e questo Mac da 8 GB ha memoria per uno solo alla volta. Attendi che finisca, o chiudi la riga di comando vocello, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro mecanismo do Vocello está em execução, e este Mac com 8 GB só tem memória para um de cada vez. Aguarde a conclusão, ou encerre a linha de comando vocello, e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个 Vocello 引擎正在运行，而这台 8 GB Mac 的内存一次只够运行一个。请等待它完成，或退出 vocello 命令行，然后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別の Vocello エンジンが動作中です。この 8 GB の Mac のメモリでは、一度に 1 つしか実行できません。完了するまで待つか、vocello コマンドラインを終了してから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 Vocello 엔진이 실행 중이며, 이 8 GB Mac의 메모리로는 한 번에 하나만 실행할 수 있습니다. 완료될 때까지 기다리거나 vocello 명령줄을 종료한 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Уже работает другой движок Vocello, а памяти этого Mac с 8 ГБ хватает только на один. Дождитесь его завершения или закройте командную строку vocello, затем повторите попытку."
           }
         }
       }

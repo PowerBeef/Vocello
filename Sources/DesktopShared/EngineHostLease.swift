@@ -7,10 +7,12 @@ import System
 /// folder (`sharedFolder`; memory belongs to the Mac, not to a data folder) that
 /// it holds locked (flock) for as long as its engine may be loaded. The lock
 /// dies with the process, so a lease nobody holds is stale and is removed by the
-/// next reader. RF-27: the CLI takes a lease and reads the others'; the Mac app
-/// adopts leases with RF-30 (until then `DesktopAppPresence` stands in for it).
-/// A one-shot command holds its lease for its life; a warm engine's lease
-/// follows its model (`EngineHostLeaseKeeper`).
+/// next reader. The CLI (RF-27) and the Mac app (RF-61) each take a lease and
+/// read the others': this file is compiled into the app and into
+/// `VocelloDesktopCore`. A one-shot command holds its lease for its life; the
+/// MCP server's and the app's follow their model (`EngineHostLeaseKeeper`), so
+/// an app with nothing loaded holds none and the CLI still counts it by
+/// `DesktopAppPresence`.
 public final class EngineHostLease: Sendable {
     public struct Host: Codable, Sendable, Equatable {
         public let pid: Int32
@@ -146,6 +148,32 @@ public enum EngineHostAdmission: Equatable, Sendable {
     }
 }
 
+/// The Mac app's side of the leases (RF-61): what it decides from the other
+/// hosts' before it deletes a model, generates or warms. `otherHosts` are the
+/// live hosts other than the app's own lease.
+public enum EngineHostAppPolicy {
+    /// A lease names no model, so any other live host may have this one loaded:
+    /// its files stay until that host has unloaded or exited, as `vocello
+    /// models remove` refuses while the app or another engine runs.
+    public static func refusesModelDeletion(otherHosts: [EngineHostLease.Host]) -> Bool {
+        !otherHosts.isEmpty
+    }
+
+    /// `EngineHostAdmission`'s rule read from the app's side: on an 8 GB Mac a
+    /// take or a warm waits while another engine holds a lease, and a larger
+    /// Mac runs beside it. The app has no way to insist.
+    public static func refusesEngineWork(
+        otherHosts: [EngineHostLease.Host], deviceClass: NativeDeviceMemoryClass
+    ) -> Bool {
+        if case .refuse = EngineHostAdmission.decide(
+            otherHosts: otherHosts, appRunning: false, deviceClass: deviceClass, allowConcurrent: false
+        ) {
+            return true
+        }
+        return false
+    }
+}
+
 /// What a host's engine publishes about its model, as far as its lease goes.
 public enum EngineHostModelPresence: Equatable, Sendable {
     /// A model is loading, loaded, generating or being primed.
@@ -177,8 +205,9 @@ public enum EngineHostModelPresence: Equatable, Sendable {
 /// admitted lease over with `adopt` and brackets each request with
 /// `requestBegan` and `requestEnded`: while a request runs the lease stays,
 /// whatever the engine publishes on the way to its load. A model that shows up
-/// with no lease held gets one on the spot. A lease that cannot be written is
-/// skipped: it is advisory.
+/// with no lease held gets one on the spot: that is the Mac app's whole use of
+/// the keeper (`MacEngineHostCoordinator`), since it loads without an admission
+/// step. A lease that cannot be written is skipped: it is advisory.
 @MainActor
 public final class EngineHostLeaseKeeper {
     private let kind: String

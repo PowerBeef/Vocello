@@ -152,15 +152,17 @@ Maintained macOS subtrees and preferences:
 
 Outside the app support root, a process that hosts the engine records itself in
 `~/Library/Caches/com.qwenvoice.vocello/engine-hosts/` (`EngineHostLease`; owner-only, 0700), so a
-second engine on the same Mac can be warned about or, on an 8 GB Mac, refused. Today only the
-`vocello` command line writes a lease; the Mac app adopts them with RF-30. A lease is one small
+second engine on the same Mac can be warned about or, on an 8 GB Mac, refused. The `vocello` command
+line and the Mac app both write a lease and read the others'. A lease is one small
 JSON file, `<process id>-<UUID>.lease`, holding three fields: the process id, the host kind (`cli`
 or `app`) and the start time. It holds no path, script, voice or model name. The process keeps the
 file locked while its engine may be loaded and removes it when it finishes: a one-shot `vocello`
 command holds its lease until it exits, and the `vocello mcp` server writes one each time it is about
-to load a model and removes it when the model unloads on idle, so an idle server leaves no lease. A
-lease whose process has gone is removed by the next process that reads the folder. The folder is
-shared by every data root, the debug one included, because memory belongs to the Mac.
+to load a model and removes it when the model unloads on idle, so an idle server leaves no lease.
+The Mac app writes one when a model starts to load and removes it when the engine unloads the model
+and at quit, so an app with nothing loaded leaves no lease either. A lease whose process has gone is
+removed by the next process that reads the folder. The folder is shared by every data root, the debug
+one included, because memory belongs to the Mac.
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
 subtree above. Use the model manager for an individual model so shared components still referenced

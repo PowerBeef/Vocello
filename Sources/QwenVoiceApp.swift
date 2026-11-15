@@ -12,7 +12,12 @@ struct QwenVoiceApp: App {
     /// The shell's flip-scoped generation gate, created once with the store.
     @State private var gateModel: GenerationPerformanceGateModel?
     /// Studio warmups; its admission policy runs a memory-pressure monitor, so one per app.
-    @State private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
+    /// RF-61: on an 8 GB Mac a warm also waits while another Vocello engine holds its lease.
+    @State private var generationWarmupCoordinator = MacGenerationWarmupCoordinator(
+        admissionPolicy: MacWarmupAdmissionPolicy(
+            anotherEngineBlocksWarm: { MacEngineHostCoordinator.shared.refusesEngineWork }
+        )
+    )
     @State private var engineBootstrapDiagnostics: AppLaunchDiagnosticsSnapshot?
     @State private var didInitializeSelectedTTSEngine = false
     @State private var audioPlayer = AudioPlayerViewModel()

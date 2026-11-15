@@ -319,6 +319,29 @@ progress ingress still emits the exact final byte count. Details: [`model-delive
 The Studio's Generate CTA (`textInput_generateButton`) appears only when the mode's model
 is installed — otherwise the app prompts to download from Settings.
 
+### Beside the `vocello` command line
+
+The app is one engine host among the others on the Mac (`MacEngineHostCoordinator`, RF-61). It holds
+an engine lease of kind `app` in `~/Library/Caches/com.qwenvoice.vocello/engine-hosts/` while a model
+is loading, loaded, generating or being primed, gives it back when the engine unloads the model (the
+idle unload, memory relief) and at quit, and reads the other hosts' leases
+([`cli.md`](cli.md), "One engine at a time on an 8 GB Mac"). An app with nothing loaded holds no
+lease. After a failure the lease stays for the tier's idle window, the time the engine takes to unload
+weights the failure left loaded.
+
+- **Deleting a model.** Delete Model keeps the files while another host holds a lease (a `vocello`
+  command with a model loaded, or another copy of the app): a lease names no model, so that host may
+  have any of them loaded. The alert reads "Model May Be in Use", and nothing changes, a running
+  download of that model included. The earlier models that a model update removes are not checked
+  this way.
+- **One engine on an 8 GB Mac.** While another host holds a lease, a take, a line batch and a
+  long-form project (its start, its resume and a segment's regeneration) do not start: the take
+  fails with "Another Vocello engine is running, and this 8 GB Mac has memory for one at a time…",
+  and the batch sheet shows the same sentence. A Studio warm and a clone-reference prime wait
+  without a message and run on the next draft or destination change. A larger Mac runs beside the
+  other engine. The rule is `EngineHostAdmission`'s, the one the command line applies
+  (`EngineHostAppPolicy` reads it from the app's side), and the app has no way to override it.
+
 ---
 
 ## 4. What each option means

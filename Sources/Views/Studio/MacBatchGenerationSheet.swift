@@ -485,6 +485,7 @@ struct MacBatchGenerationSheet: View {
             validationMessage = MacInterfaceText.batchBusy
             return
         }
+        guard !refusedByAnotherEngineHost() else { return }
         guard let model else {
             validationMessage = MacInterfaceText.batchModelConfigurationMissing
             return
@@ -570,12 +571,23 @@ struct MacBatchGenerationSheet: View {
 
     private func resumeLongForm() {
         validationMessage = nil
+        guard !refusedByAnotherEngineHost() else { return }
         longForm.resume(ttsEngine: ttsEngineStore, audioPlayer: audioPlayer, studioCoordinator: coordinator)
         noteLongFormOperationStarted()
     }
 
+    /// RF-61: on an 8 GB Mac a batch or a long-form project waits while
+    /// another Vocello engine (the `vocello` command line) holds its lease;
+    /// the sheet says why instead of starting. Returns whether it refused.
+    private func refusedByAnotherEngineHost() -> Bool {
+        guard let message = MacEngineHostCoordinator.shared.generationRefusalMessage else { return false }
+        validationMessage = message
+        return true
+    }
+
     private func regenerateSegment(_ index: Int) {
         validationMessage = nil
+        guard !refusedByAnotherEngineHost() else { return }
         longForm.regenerateSegment(
             index: index,
             ttsEngine: ttsEngineStore,

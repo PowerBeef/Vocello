@@ -637,6 +637,11 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.engine.coldStartLowMemory", defaultValue: "Model unloaded to save memory. First generate reloads it — normal on 8 GB Macs.",
                comment: "macOS interface: readiness detail on 8 GB Macs when the model is unloaded. Presentation only.")
     }
+    static var engineHostBusy: String {
+        localization.string(localized: "vocello.mac.engineHost.busy",
+               defaultValue: "Another Vocello engine is running, and this 8 GB Mac has memory for one at a time. Wait for it to finish, or quit the vocello command line, then try again.",
+               comment: "macOS interface: shown in place of a take, a batch or a long-form project on an 8 GB Mac while another Vocello process (the vocello command line, or another copy of the app) has a speech model loaded. The word vocello in lowercase is the command's name and is not translated. Presentation only.")
+    }
     static func historyAudioRemovalMany(_ count: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.history.audioRemovalMany",
             defaultValue: "%@ audio files from deleted takes are still in the output folder. Retry to delete them, or reveal them in Finder.",
@@ -1570,6 +1575,15 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.settings.deleteModelBusyMessage",
                defaultValue: "Wait for the current generation to finish, or cancel it, before deleting a model.",
                comment: "macOS interface: alert message when a model cannot be deleted because a generation is running. Presentation only.")
+    }
+    static var settingsDeleteModelEngineHostTitle: String {
+        localization.string(localized: "vocello.mac.settings.deleteModelEngineHostTitle", defaultValue: "Model May Be in Use",
+               comment: "macOS interface: alert title when a model cannot be deleted because another Vocello process has a speech model loaded. Presentation only.")
+    }
+    static var settingsDeleteModelEngineHostMessage: String {
+        localization.string(localized: "vocello.mac.settings.deleteModelEngineHostMessage",
+               defaultValue: "Another Vocello engine is running and may have this model loaded. Wait for it to finish, or quit the vocello command line, before deleting a model.",
+               comment: "macOS interface: alert message when a model cannot be deleted because another Vocello process (the vocello command line, or another copy of the app) has a speech model loaded. The word vocello in lowercase is the command's name and is not translated. Presentation only.")
     }
     static var settingsDownloadRecommended: String {
         localization.string(localized: "vocello.mac.settings.downloadRecommended", defaultValue: "Download recommended",

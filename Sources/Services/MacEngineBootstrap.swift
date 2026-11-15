@@ -44,7 +44,7 @@ enum MacEngineBootstrap {
         // PA-20: errors the engine surfaces (status strip, failed load or clone
         // preparation) read catalog copy in the interface language.
         runtime.engine.visibleErrorDescription = { MacInterfaceText.generationFailureMessage($0) }
-        return TTSEngineStore(
+        let store = TTSEngineStore(
             backend: AnyTTSEngineBackend(
                 engine: runtime.engine,
                 supportsSavedVoiceMutation: true,
@@ -62,6 +62,10 @@ enum MacEngineBootstrap {
             ),
             memoryBudgetPolicy: MacMemoryBudgetPolicy.policy(for: deviceClass)
         )
+        // RF-61: the app's engine lease follows this store's model, so the
+        // `vocello` command line sees a model the app has loaded.
+        MacEngineHostCoordinator.shared.attach(store)
+        return store
     }
 
     /// Identity of the model asset store's verification cache. Changing it

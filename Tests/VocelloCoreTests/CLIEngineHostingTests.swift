@@ -777,6 +777,107 @@ final class WarmEngineLeaseTests: XCTestCase {
     }
 }
 
+/// RF-61 (audit finding C3): the Mac app takes a lease and reads the other
+/// hosts' before it deletes a model, generates or warms.
+final class EngineHostAppPolicyTests: XCTestCase {
+    private let cli = EngineHostLease.Host(pid: 42, kind: "cli", startedAt: "2026-11-15T00:00:00Z")
+
+    private func makeFolder() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EngineHostAppPolicy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return root.appendingPathComponent("engine-hosts")
+    }
+
+    func testAModelsFilesStayWhileAnotherHostHoldsALease() {
+        XCTAssertFalse(EngineHostAppPolicy.refusesModelDeletion(otherHosts: []))
+        XCTAssertTrue(EngineHostAppPolicy.refusesModelDeletion(otherHosts: [cli]),
+                      "a lease names no model, so the host may have any of them loaded")
+        let unreadable = EngineHostLease.Host(pid: 0, kind: "unknown", startedAt: "")
+        XCTAssertTrue(EngineHostAppPolicy.refusesModelDeletion(otherHosts: [unreadable]),
+                      "a held lease that cannot be read still counts")
+    }
+
+    func testTheAppAppliesTheCommandLinesRuleOnAn8GBMac() {
+        XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(otherHosts: [], deviceClass: .floor8GBMac))
+        XCTAssertTrue(EngineHostAppPolicy.refusesEngineWork(otherHosts: [cli], deviceClass: .floor8GBMac))
+        XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(otherHosts: [cli], deviceClass: .mid16GBMac),
+                       "a larger Mac runs beside the other engine")
+        // One rule: the app refuses exactly where the command line's admission does.
+        let tiers: [NativeDeviceMemoryClass] = [.floor8GBMac, .mid16GBMac, .highMemoryMac]
+        for tier in tiers {
+            var commandLineRefuses = false
+            if case .refuse = EngineHostAdmission.decide(
+                otherHosts: [cli], appRunning: false, deviceClass: tier, allowConcurrent: false
+            ) {
+                commandLineRefuses = true
+            }
+            XCTAssertEqual(
+                EngineHostAppPolicy.refusesEngineWork(otherHosts: [cli], deviceClass: tier), commandLineRefuses,
+                tier.rawValue
+            )
+        }
+    }
+
+    /// The app's lease is of kind `app`, lives while its model does, refuses a
+    /// command line on an 8 GB Mac and never refuses the app itself.
+    @MainActor
+    func testTheAppsLeaseIsReadByTheCommandLineAndNotByTheAppItself() async throws {
+        let folder = try makeFolder()
+        let keeper = EngineHostLeaseKeeper(kind: "app", folder: folder, failureWindow: .seconds(1))
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [], "an app with nothing loaded holds no lease")
+        keeper.engineChanged(loadState: .starting, clonePreparation: .idle)
+        let own = try XCTUnwrap(keeper.lease)
+        XCTAssertEqual(own.host.kind, "app")
+        XCTAssertEqual(own.host.pid, getpid())
+        func others() -> [EngineHostLease.Host] { EngineHostLease.liveHosts(in: folder, excluding: own) }
+        XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(otherHosts: others(), deviceClass: .floor8GBMac))
+        XCTAssertFalse(EngineHostAppPolicy.refusesModelDeletion(otherHosts: others()))
+
+        do {
+            _ = try await CLIRuntime.admitEngineHost(
+                deviceClass: .floor8GBMac, concurrency: CLIEngineConcurrency(), appRunning: { false },
+                sleep: { _ in XCTFail("no wait without --wait-for-engine") }, folder: folder
+            )
+            XCTFail("the app's loaded model refuses a command line on an 8 GB Mac")
+        } catch {
+            XCTAssertEqual((error as? CLIError)?.code, .engineBusy)
+        }
+
+        let commandLine = try EngineHostLease.acquire(in: folder, kind: "cli")
+        XCTAssertTrue(EngineHostAppPolicy.refusesEngineWork(otherHosts: others(), deviceClass: .floor8GBMac))
+        XCTAssertTrue(EngineHostAppPolicy.refusesModelDeletion(otherHosts: others()))
+        commandLine.release()
+        XCTAssertFalse(EngineHostAppPolicy.refusesModelDeletion(otherHosts: others()))
+
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [], "the unload gives the app's lease back")
+    }
+
+    @MainActor
+    func testAWarmWaitsWhileAnotherEngineHoldsTheMac() {
+        let anotherEngine = Flag()
+        let policy = MacWarmupAdmissionPolicy(
+            mode: .off, deviceClass: .floor8GBMac, anotherEngineBlocksWarm: { anotherEngine.isSet }
+        )
+        XCTAssertEqual(policy.admit(contextDescription: "custom/test"), .allow)
+        anotherEngine.isSet = true
+        XCTAssertEqual(
+            policy.admit(contextDescription: "custom/test"),
+            .deferred(reason: MacWarmupAdmissionPolicy.anotherEngineReason),
+            "deferred whatever the pressure gate's mode"
+        )
+        anotherEngine.isSet = false
+        XCTAssertEqual(policy.admit(contextDescription: "custom/test"), .allow)
+    }
+}
+
+@MainActor
+private final class Flag {
+    var isSet = false
+}
+
 @MainActor
 private final class EventLog {
     var lines: [String] = []

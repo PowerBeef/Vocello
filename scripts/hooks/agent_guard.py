@@ -12,8 +12,10 @@ verbs, or a recognisable shell or inline-script write: a guardrail, not a sandbo
 scripts' usage text and the
 reporting `xcodebuild -version` and `-showsdks` stay open (`-list` can resolve
 packages), but sourcing a lane script or a `scripts/lib` library does not: it leaves
-the lane's functions callable by bare name. Exit 2 with the reason on stderr blocks the call. Parser defects fail open,
-like the policy guard; the lead still integrates and reviews every agent commit. Hooks run the host's bare
+the lane's functions callable by bare name. Exit 2 with the reason on stderr blocks the call. A parser defect in
+this guard fails open: the call is allowed and the error printed. The policy guard, which screens the same Bash
+call, does not: it refuses a command its parsers cannot read. The lead still integrates and reviews every agent
+commit. Hooks run the host's bare
 `python3`, often the macOS system Python 3.9: keep this file importable there. Never
 execute or persist input.
 """

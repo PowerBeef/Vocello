@@ -716,8 +716,10 @@ mac_ui_preflight() {
     fi
   done
   # Played-audio capture (PC-01): the XCUITest runner taps the app's output and
-  # needs one System Audio Recording grant of its own; without it the lane still
-  # passes and every take's capture evidence reads "unavailable".
+  # needs one System Audio Recording grant of its own. Without it the benchmark
+  # lane runs unarmed under the default auto setting and its record carries no
+  # capture evidence; an armed benchmark run without the grant fails its
+  # played-audio gate (a silent or missing planned capture).
   if [[ "$lane" == "benchmark" || "$lane" == "smoke" ]]; then
     if ! rows="$(sqlite3 -readonly "$tcc_db" \
         "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests.xctrunner';" \
@@ -1618,13 +1620,14 @@ elif [[ "$platform" == "macos" ]]; then
   elif [[ "$lane" == "smoke" ]]; then
     # test01's ten-interface-language walk (~21 min) is the localization lane's.
     export TEST_RUNNER_QVOICE_MAC_SKIP_LANGUAGE_WALK=1
-    # The smoke class runs its fifteen ordered journeys (test00-test14: window
+    # The smoke class runs its sixteen ordered journeys (test00-test15: window
     # sizes + Settings scene, navigation/readiness, completed generation +
     # History, mid-generation cancellation, virtual-mic recording, library
     # surfaces, long-form project, line batch, Design brief/player, Clone
     # reference/player, missing models + Studio links, generation error +
     # recovery, cross-language Studio content, long-form recovery Discard,
-    # Saved Voices empty and error states) in method-name order.
+    # Saved Voices empty and error states, model update from an earlier
+    # Vocello) in method-name order; config/ui-lane-tests.json lists them.
     only_test="VocelloMacUITests/VocelloMacSmokeUITests"
     case "$scenario_argument" in
       layout) only_test+="/test00_WindowSizesAndSettingsScene" ;;
@@ -1680,7 +1683,9 @@ elif [[ "$platform" == "macos" ]]; then
     # The declared matrix's warm reallocation, empty for a uniform matrix (audit #30).
     export TEST_RUNNER_QVOICE_MAC_BENCH_ALLOCATION="$matrix_allocation"
     # Played-audio capture (PC-01): the runner taps the app's own output per take
-    # and writes take-NN-<cell>.wav/.json here; absent captures never fail the lane.
+    # and writes take-NN-<cell>.wav/.json here. Once the runner arms its tap
+    # (capture-run.json), every planned take owes a capture and a silent one
+    # fails; a lane that runs unarmed passes without capture evidence.
     if mac_bench_playback_capture_enabled; then
       bench_playback_capture_dir="$out/playback-capture"
       mkdir -p "$bench_playback_capture_dir"

@@ -1,9 +1,14 @@
-"""Calibration and derivation of the warn-only ui-perf ceilings (audit #34, #77, #78).
+"""Calibration and derivation of the ui-perf ceilings (audit #34, #77, #78).
+
+A ceiling breach is a warning, except in a scenario the macOS contract names in its
+`enforce` list, where `check_macos_ui_perf.py` fails the run (RF-61, audit T1). The
+iPhone contract has no such list and its ceilings only warn.
 
 The ceiling contracts (`config/ui-perf-thresholds.json`, `config/ui-perf-thresholds-ios.json`)
 name the hardware profile and display refresh interval they were derived on. A run on
 another profile or refresh rate gets one `uiperf.uncalibrated:<profile>` code instead
-of ceiling verdicts, so a faster host is never scored against a slower host's numbers.
+of ceiling verdicts, so a faster host is never scored against a slower host's numbers,
+and nothing is enforced on it.
 A contract whose scenarios or metrics changed meaning after its derivation names why in
 ``calibrationStale``; its runs carry the same code until a derivation replaces it (a
 derived contract never carries the field).

@@ -77609,7 +77609,7 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "This permanently deletes the long-form project, its %1$lld segment and their audio files."
+                  "value": "This permanently deletes the long-form project, its %1$lld segment and the audio files of both."
                 }
               },
               "other": {
@@ -77627,7 +77627,7 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Cette action supprimera définitivement le projet de texte long, son %1$lld segment et leurs fichiers audio."
+                  "value": "Cette action supprimera définitivement le projet de texte long, son %1$lld segment et les fichiers audio des deux."
                 }
               },
               "other": {
@@ -77777,7 +77777,7 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегмент и их аудиофайлы."
+                  "value": "Это навсегда удалит проект длинного текста, его %1$lld сегмент и соответствующие аудиофайлы."
                 }
               },
               "few": {

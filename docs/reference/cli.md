@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-28
+reviewed: 2026-11-15
 summary: The vocello CLI, the user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
@@ -33,7 +33,7 @@ sourceOfTruth:
 >   `uninstall.sh` is only for the installer package.
 >
 > Either way, the CLI uses the Mac app's models, saved voices and settings and reads its History.
-> CLI takes are saved as files and do not appear in History yet; a 3.0 update adds that with the
+> CLI takes are saved as files and do not appear in History yet; a later update adds that with the
 > cross-process History lock (RF-30). AI agents connect through [`vocello mcp`](#mcp-serve-ai-agents-over-the-model-context-protocol).
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.

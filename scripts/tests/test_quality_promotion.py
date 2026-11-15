@@ -460,6 +460,102 @@ class QualityPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(PROMOTION.PromotionError, "freshness window"):
             PROMOTION.create(self.create_args())
 
+    def bind_metadata(self, *rows: str) -> Path:
+        """release-metadata.txt beside the release evidence, bound by digest as release_evidence.py binds it."""
+        path = self.root / "release-metadata.txt"
+        path.write_text("".join(f"{row}\n" for row in ("commit_sha=" + self.commit, *rows)), encoding="utf-8")
+        self.release["artifacts"] = [
+            {"name": "Vocello-macos26.dmg", "kind": "artifact", "bytes": 1, "sha256": "b" * 64},
+            {"name": path.name, "kind": "metadata", "bytes": path.stat().st_size,
+             "sha256": PROMOTION.file_digest(path)},
+        ]
+        self.write_json(self.release_path, self.release)
+        return path
+
+    def declare_toolchain(self, **fields: str) -> Path:
+        path = self.root / "release-toolchain.json"
+        self.write_json(path, fields)
+        return path
+
+    def test_records_from_the_xcode_that_built_the_release_are_accepted(self) -> None:
+        recorded = self.record["toolchain"]
+        self.bind_metadata(f"xcode_version={recorded['xcodeVersion']}", "sdk_version=26.0",
+                           f"xcode_build={recorded['xcodeBuild']}")
+        manifest = PROMOTION.create(self.create_args())
+        path = self.root / "quality-promotion.json"
+        self.write_json(path, manifest)
+        self.assertEqual(PROMOTION.validate_manifest(self.validation_args(path))["digest"], manifest["digest"])
+
+    def test_a_record_from_another_xcode_than_the_release_is_rejected_with_both_versions(self) -> None:
+        # B1: the release is built with the pinned Xcode, the evidence came from a newer local one.
+        recorded = self.record["toolchain"]["xcodeVersion"]
+        self.bind_metadata("xcode_version=1.0-release-pin", "sdk_version=26.0")
+        with self.assertRaises(PROMOTION.PromotionError) as raised:
+            PROMOTION.create(self.create_args())
+        message = str(raised.exception)
+        self.assertIn(f"macos-ui-benchmark benchmark record was built with Xcode {recorded!r}", message)
+        self.assertIn("the release with Xcode '1.0-release-pin'", message)
+        # The same Xcode version from another build (a beta, a release candidate) is another compiler.
+        self.bind_metadata(f"xcode_version={recorded}", "xcode_build=0X000")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, r"Xcode build '[^']+', the release with Xcode build '0X000'"):
+            PROMOTION.create(self.create_args())
+
+    def test_release_metadata_the_evidence_names_must_be_present_intact_and_name_xcode(self) -> None:
+        metadata = self.bind_metadata(f"xcode_version={self.record['toolchain']['xcodeVersion']}")
+        metadata.write_text(metadata.read_text(encoding="utf-8") + "edited=after-the-evidence\n", encoding="utf-8")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "differs from the digest in the release evidence"):
+            PROMOTION.create(self.create_args())
+        metadata.unlink()
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "is missing beside it"):
+            PROMOTION.create(self.create_args())
+        self.bind_metadata("sdk_version=26.0")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "names no xcode_version"):
+            PROMOTION.create(self.create_args())
+        outside = self.root.parent / f"{self.root.name}-outside-metadata.txt"
+        outside.write_text("xcode_version=1.0\n", encoding="utf-8")
+        self.addCleanup(outside.unlink)
+        self.release["artifacts"] = [{"name": f"../{outside.name}", "kind": "metadata", "bytes": 1,
+                                      "sha256": PROMOTION.file_digest(outside)}]
+        self.write_json(self.release_path, self.release)
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "is missing beside it"):
+            PROMOTION.create(self.create_args())
+
+    def test_a_declared_release_toolchain_is_compared_when_the_evidence_binds_no_metadata(self) -> None:
+        # The iPhone release evidence binds no release-metadata.txt; nothing is compared unless declared.
+        recorded = self.record["toolchain"]
+        manifest = PROMOTION.create(self.create_args())
+        path = self.root / "quality-promotion.json"
+        self.write_json(path, manifest)
+        matching = self.declare_toolchain(xcodeVersion=recorded["xcodeVersion"], xcodeBuild=recorded["xcodeBuild"],
+                                          swiftVersion=recorded["swiftVersion"])
+        PROMOTION.create(self.create_args(release_toolchain=matching))
+        arguments = self.validation_args(path)
+        arguments.release_toolchain = matching
+        PROMOTION.validate_manifest(arguments)
+        arguments.release_toolchain = self.declare_toolchain(xcodeVersion=recorded["xcodeVersion"],
+                                                             swiftVersion="Apple Swift version 0.1")
+        with self.assertRaisesRegex(PROMOTION.PromotionError,
+                                    "built with Swift '.+', the release with Swift 'Apple Swift version 0.1'"):
+            PROMOTION.validate_manifest(arguments)
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "the release with Xcode '0.9'"):
+            PROMOTION.create(self.create_args(release_toolchain=self.declare_toolchain(xcodeVersion="0.9")))
+        for malformed in ({"xcodeBuild": "1A1"}, {"xcodeVersion": ""}, {"xcodeVersion": "1.0", "sdkVersion": "1.0"}):
+            with self.subTest(malformed=malformed), \
+                    self.assertRaisesRegex(PROMOTION.PromotionError, "--release-toolchain must be a JSON object"):
+                PROMOTION.create(self.create_args(release_toolchain=self.declare_toolchain(**malformed)))
+        # A declaration cannot contradict what the bound metadata states.
+        self.bind_metadata(f"xcode_version={recorded['xcodeVersion']}")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "--release-toolchain states Xcode '0.9' but the release "
+                                                              "metadata states"):
+            PROMOTION.create(self.create_args(release_toolchain=self.declare_toolchain(xcodeVersion="0.9")))
+
+    def test_the_command_line_accepts_the_declared_toolchain_for_create_and_validate(self) -> None:
+        for operation, extra in (("create", ["--base", "v2.3.0", "--output", "out.json"]), ("validate", ["--manifest", "m.json"])):
+            arguments = PROMOTION.parser().parse_args([
+                operation, "--platform", "ios", "--tag", "v2.4.0", "--release-evidence", "e.json",
+                "--release-toolchain", "toolchain.json", *extra])
+            self.assertEqual(arguments.release_toolchain, Path("toolchain.json"))
+
     def test_manifest_is_bound_to_release_evidence_bytes(self) -> None:
         manifest = PROMOTION.create(self.create_args())
         path = self.root / "quality-promotion.json"

@@ -357,6 +357,69 @@ def release_identity(path: Path, platform: str, tag: str, root: Path) -> tuple[d
     return evidence, commit
 
 
+# What built the release, against what built each evidence record. A record measured with another
+# Xcode proves a different binary than the one being promoted (audit B1, 2026-11-15: the release
+# built with the pinned Xcode, every acceptance record with a newer local one).
+# record field -> (release-metadata.txt key, what the error calls it)
+RELEASE_TOOLCHAIN_FIELDS = {
+    "xcodeVersion": ("xcode_version", "Xcode"),
+    "xcodeBuild": ("xcode_build", "Xcode build"),
+    "swiftVersion": ("swift_version", "Swift"),
+}
+
+
+def release_toolchain(
+    evidence: dict[str, Any], evidence_path: Path, declared_path: Path | None = None,
+) -> dict[str, str]:
+    """The toolchain that built the release, by record field; empty when nothing states it.
+
+    The macOS release evidence binds `release-metadata.txt` by digest (kind `metadata`), and
+    scripts/release.sh writes the Xcode version there: the file is read beside the evidence and
+    must match the recorded digest. Evidence without a metadata file (the iPhone's) states no
+    toolchain; `--release-toolchain` then supplies a JSON object with the same record fields.
+    Whatever is stated is compared; when both sources state a field they must agree."""
+    toolchain: dict[str, str] = {}
+    entries = [item for item in evidence.get("artifacts") or []
+               if isinstance(item, dict) and item.get("kind") == "metadata"]
+    if len(entries) > 1:
+        raise PromotionError("release evidence lists more than one metadata file")
+    if entries:
+        name = entries[0].get("name")
+        directory = evidence_path.parent.resolve()
+        path = (directory / name).resolve() if isinstance(name, str) and name else None
+        if path is None or path.parent != directory or not path.is_file():
+            raise PromotionError("release metadata named by the release evidence is missing beside it")
+        if file_digest(path) != entries[0].get("sha256"):
+            raise PromotionError("release metadata differs from the digest in the release evidence")
+        values: dict[str, str] = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator:
+                values.setdefault(key.strip(), value.strip())
+        for field, (key, _label) in RELEASE_TOOLCHAIN_FIELDS.items():
+            if values.get(key):
+                toolchain[field] = values[key]
+        if "xcodeVersion" not in toolchain:
+            raise PromotionError("release metadata names no xcode_version")
+    if declared_path is not None:
+        declared = read_json(declared_path)
+        unknown = sorted(set(declared) - set(RELEASE_TOOLCHAIN_FIELDS))
+        if unknown or not all(isinstance(value, str) and value for value in declared.values()) \
+                or "xcodeVersion" not in declared:
+            raise PromotionError(
+                "--release-toolchain must be a JSON object with xcodeVersion and optionally "
+                "xcodeBuild and swiftVersion, each a non-empty string"
+            )
+        for field, value in declared.items():
+            if toolchain.get(field, value) != value:
+                raise PromotionError(
+                    f"--release-toolchain states {RELEASE_TOOLCHAIN_FIELDS[field][1]} {value!r} but the "
+                    f"release metadata states {toolchain[field]!r}"
+                )
+            toolchain[field] = value
+    return toolchain
+
+
 PUBLIC_FACTS_PATH = "config/public-product-facts.json"
 
 
@@ -511,6 +574,7 @@ def validate_take_coverage(identity: str, record: dict[str, Any], definition: di
 def validate_record(
     identity: str, record: dict[str, Any], definition: dict[str, Any], release: dict[str, Any],
     commit: str, accepted_warnings: set[str], contract: dict[str, Any], now: datetime,
+    built_with: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     try:
         benchmark_history.validate_record(record)
@@ -538,6 +602,15 @@ def validate_record(
         or not toolchain.get("executableUUIDs")
     ):
         raise PromotionError(f"{identity} benchmark record differs from the release build identity")
+    # The same version and build number from another compiler is another binary.
+    for field, expected in (built_with or {}).items():
+        observed = toolchain.get(field)
+        if observed != expected:
+            label = RELEASE_TOOLCHAIN_FIELDS[field][1]
+            raise PromotionError(
+                f"{identity} benchmark record was built with {label} {observed!r}, the release with "
+                f"{label} {expected!r}: acceptance evidence must come from the toolchain that built the release"
+            )
     warnings = set(run.get("warnings") or [])
     if warnings - set(contract["allowedWarnings"]):
         raise PromotionError(f"{identity} uses warnings not allowed by the promotion contract")
@@ -593,6 +666,11 @@ def validate_receipt(
     return {"type": "managed-command", "receipt": receipt, "receiptDigest": receipt["digest"]}
 
 
+def declared_toolchain(args: argparse.Namespace) -> Path | None:
+    path = getattr(args, "release_toolchain", None)
+    return path.resolve() if path is not None else None
+
+
 def assignments(values: list[str], label: str) -> dict[str, Path]:
     result: dict[str, Path] = {}
     for value in values:
@@ -608,6 +686,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     contract = load_contract(root)
     validate_contract(contract, root=root)
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
+    built_with = release_toolchain(release_evidence, args.release_evidence.resolve(), declared_toolchain(args))
     base_commit, paths = changed_paths(root, args.base, commit)
     require_public_base(root, args.platform, base_commit, commit)
     impact_result = classify_paths(contract, paths)
@@ -636,7 +715,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
                 raise PromotionError(f"{identity} requires --record")
             lanes[identity] = validate_record(
                 identity, read_json(path), definition, release_evidence["release"], commit,
-                accepted, contract, now,
+                accepted, contract, now, built_with,
             )
         else:
             path = receipt_paths.get(identity)
@@ -692,6 +771,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     if claimed_digest != digest_value(unsigned):
         raise PromotionError("quality promotion manifest digest is invalid")
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
+    built_with = release_toolchain(release_evidence, args.release_evidence.resolve(), declared_toolchain(args))
     if (
         manifest.get("schemaVersion") != SCHEMA_VERSION
         or manifest.get("platform") != args.platform
@@ -739,7 +819,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
         if definition["type"] == "benchmark-record":
             expected = validate_record(
                 identity, lane.get("record"), definition, release_evidence["release"], commit,
-                set(accepted), contract, now,
+                set(accepted), contract, now, built_with,
             )
         else:
             expected = validate_receipt(
@@ -827,6 +907,13 @@ def parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("--tag", required=True)
     validate_parser.add_argument("--release-evidence", type=Path, required=True)
     validate_parser.add_argument("--manifest", type=Path, required=True)
+    for command in (create_parser, validate_parser):
+        command.add_argument(
+            "--release-toolchain", type=Path,
+            help="JSON object naming what built the release (xcodeVersion; optionally xcodeBuild, "
+                 "swiftVersion), for release evidence that binds no release-metadata.txt; every benchmark "
+                 "record must then match it",
+        )
     return result
 
 

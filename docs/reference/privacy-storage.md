@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, deletion semantics, diagnostics, and the repository's build-output ownership.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -67,6 +67,32 @@ Maintained macOS subtrees and preferences:
 - `diagnostics/metrickit-memory-exit-summaries.json` and `diagnostics/crashes/` hold MetricKit's delayed daily field diagnostics when the system delivers them (DW-03, `MacMetricKitReporter`): the same bounded, allowlisted memory/exit and responsiveness document the iPhone keeps (64 records, no raw payload, call stack, path or identity), and each crash or hang payload with its exception text and path-bearing crash metadata redacted (see [Diagnostics](#diagnostics)). A launch under an app-support override (a UI or benchmark lane) does not subscribe, so a payload is never lost with a lane's temporary root. Local only.
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder. A take is named after its time and the app (`20261016_14-03-07-512_Vocello.wav`; a long-form segment adds a UUID), never after its script, because the file keeps that name in Finder, Spotlight, the share sheet, AirDrop and Files (SEC-1). Takes from earlier builds keep their `<time>_<script opening>.wav` names on disk, and Save As and Export Recovery Files give their copies the neutral name. A take is written to a hidden staging file beside its final name (`.<name>.<UUID>.tmp.wav`) and renamed into place; each engine start removes the staging files a crash left under `outputs/` once untouched for an hour (CORE-15). A user-chosen output folder is not walked.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`telemetry-and-benchmarking.md` §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells)).
+- `outputs/cli/` stores the takes the `vocello` command line writes when it is given no destination:
+  `vocello generate` without `--out` writes `<time>_<mode>_<generation id>.wav` here, never a name
+  taken from the script; `generate --line-by-line` without `--out-dir` writes its takes here; and
+  `vocello batch` without `--out-dir` writes to `outputs/cli/batch/`. It is also the one folder
+  under the data root an MCP request may write audio to; anything else needs a folder the server
+  was started with (`--allow-dir`). The CLI writes no History rows (RF-30), so deleting or clearing
+  History never removes these files: delete them in Finder or the shell.
+- `cli/requests/` is the CLI's request ledger (`CLIRequestLedger`). It makes a repeated agent
+  request replay its result instead of generating again, and exists only once a request carries a
+  client request id (`--client-request-id`, or `clientRequestID` in a `vocello run` or MCP request).
+  The folder is readable by its owner alone (0700, its files 0600). Per id it holds a lock file and,
+  once the request succeeds, one JSON entry; both are named by the SHA-256 of the id, never by the id.
+  A failed request keeps no entry.
+  - **What an entry holds:** a schema version, the SHA-256 of the request (not the request), the
+    completion time, and the command's result as it was printed. For a single take or a long-form
+    project that result names the output paths, the generation id, the model, the seed, timings, the
+    audio check's report and digests and character counts of the script, the delivery instruction
+    and the reference; it does not hold the script. **A line-by-line request's result currently
+    includes each script line as text** (`items[].text`), with each line's output path.
+  - **How long:** an entry is replayed for seven days after it completed and never after. It is
+    deleted by the next pruning pass, which runs only when a later request with an id completes, at
+    most once an hour. With no later request the expired entry, script lines included, stays on disk
+    until the folder is deleted. The folder also holds `ledger.lock` and `ledger.pruned`, which are
+    empty.
+  - Deleting `cli/requests/` while no `vocello` process runs is safe: the only effect is that an
+    earlier request id runs again instead of replaying.
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). WAV, MP3, AIFF, and M4A are kept as they are; any other readable format (FLAC, Ogg, AIF, CAF) is converted to canonical WAV before the candidate is staged, through a transient `cache/normalized_clone_refs/saved-voice-import-<UUID>.wav` removed once the candidate holds its copy (MAC-09). Voices saved by earlier builds are not rewritten. Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
   Cloning from a voice whose audio is not already canonical 24 kHz mono WAV keeps a normalized copy and its mirrored transcript in
   `cache/normalized_clone_refs/<name>_<SHA-256>.wav` and `.txt`; deleting or replacing the voice removes them, unless another
@@ -121,6 +147,16 @@ Maintained macOS subtrees and preferences:
   audio that might still be playing or exporting.
 - Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
 - Software updates (RF-23): Sparkle keeps its own preferences in the app's defaults (`SUEnableAutomaticChecks`, set by its permission prompt on the second launch or by Settings > Updates, and its last-check time) and stages an update it downloads under `~/Library/Caches/com.qwenvoice.app/org.sparkle-project.Sparkle/` until the install finishes. A check requests the signed `appcast.xml` from the latest GitHub release over HTTPS, at most once a day with automatic checks on, and sends no system profile; an update is offered in Sparkle's window, never installed silently (`SUAllowsAutomaticUpdates` off).
+
+Outside the app support root, a process that hosts the engine records itself in
+`~/Library/Caches/com.qwenvoice.vocello/engine-hosts/` (`EngineHostLease`; owner-only, 0700), so a
+second engine on the same Mac can be warned about or, on an 8 GB Mac, refused. Today only the
+`vocello` command line writes a lease; the Mac app adopts them with RF-30. A lease is one small
+JSON file, `<process id>-<UUID>.lease`, holding three fields: the process id, the host kind (`cli`
+or `app`) and the start time. It holds no path, script, voice or model name. The process keeps the
+file locked while its engine may be loaded and removes it when it finishes; a lease whose process
+has gone is removed by the next process that reads the folder. The folder is shared by every data
+root, the debug one included, because memory belongs to the Mac.
 
 Delete local macOS app data by quitting the app and removing the app support root or the specific
 subtree above. Use the model manager for an individual model so shared components still referenced

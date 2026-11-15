@@ -259,7 +259,10 @@ Generate automatically selects long-form above the shared 900-character threshol
 or Hangul character counts three, `SingleTakeScriptBudget`). The
 line-by-line toggle overrides both single-take and long-form routing in all three Studio modes.
 Switching it off restores automatic routing. The batch sheet receives the current script and
-selected segmentation, with its existing review, Generate all, cancel and recovery actions.
+selected segmentation, with its existing review, Generate all, cancel and recovery actions. A
+`.txt` file dropped on the sheet replaces the script (`MacBatchDroppedTextFile`): the extension is
+compared without regard to case, UTF-8, marked UTF-16 or UTF-32 and an encoding macOS recorded on
+the file are decoded, and any other file is refused with its reason in `batch_errorLine`.
 
 | Element | Identifier |
 |---|---|

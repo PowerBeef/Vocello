@@ -183,15 +183,30 @@ struct MacBatchGenerationSheet: View {
             guard let provider = providers.first else { return false }
             provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { data, _ in
                 guard let data = data as? Data,
-                      let url = URL(dataRepresentation: data, relativeTo: nil),
-                      url.pathExtension == "txt",
-                      let text = try? String(contentsOf: url, encoding: .utf8)
+                      let url = URL(dataRepresentation: data, relativeTo: nil)
                 else { return }
+                // Read here, off the main actor; a file that is not taken says why (A8).
+                let dropped = MacBatchDroppedTextFile.read(url)
                 Task { @MainActor in
-                    batchText = text
+                    switch dropped {
+                    case .success(let text):
+                        validationMessage = nil
+                        batchText = text
+                    case .failure(let refusal):
+                        validationMessage = Self.dropRefusalMessage(refusal)
+                    }
                 }
             }
             return true
+        }
+    }
+
+    private static func dropRefusalMessage(_ refusal: MacBatchDroppedTextFile.Refusal) -> String {
+        switch refusal {
+        case .notPlainText: MacInterfaceText.batchDropNotText
+        case .unreadable: MacInterfaceText.batchDropUnreadable
+        case .unknownEncoding: MacInterfaceText.batchDropUnknownEncoding
+        case .empty: MacInterfaceText.batchDropEmpty
         }
     }
 

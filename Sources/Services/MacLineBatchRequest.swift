@@ -1,6 +1,64 @@
 import Foundation
 import QwenVoiceCore
 
+/// A text file dropped on the batch sheet (A8). The extension is compared
+/// without regard to case, the text is decoded in the encoding the file
+/// shows, and a file that is not taken is refused with a reason the sheet
+/// shows instead of being ignored.
+enum MacBatchDroppedTextFile {
+    enum Refusal: Error, Equatable, Sendable {
+        /// Not a `.txt` file.
+        case notPlainText
+        /// The file could not be read.
+        case unreadable
+        /// The file's text encoding could not be told, so decoding it would
+        /// be a guess.
+        case unknownEncoding
+        /// The file holds no text.
+        case empty
+    }
+
+    static func read(_ url: URL) -> Result<String, Refusal> {
+        guard url.pathExtension.caseInsensitiveCompare("txt") == .orderedSame else {
+            return .failure(.notPlainText)
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            return .failure(.unreadable)
+        }
+        guard let text = unicodeText(data) ?? systemDetectedText(at: url) else {
+            return .failure(.unknownEncoding)
+        }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .failure(.empty)
+        }
+        return .success(text)
+    }
+
+    /// UTF-16 or UTF-32 by the byte order mark the file starts with, or
+    /// UTF-8 with or without one. Nil when the bytes are not valid in it.
+    static func unicodeText(_ data: Data) -> String? {
+        let encoding: String.Encoding
+        if data.starts(with: [0xFF, 0xFE, 0x00, 0x00]) || data.starts(with: [0x00, 0x00, 0xFE, 0xFF]) {
+            encoding = .utf32
+        } else if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            encoding = .utf16
+        } else {
+            encoding = .utf8
+        }
+        guard let text = String(data: data, encoding: encoding) else { return nil }
+        // A byte order mark that survived decoding is not part of the script.
+        guard text.unicodeScalars.first == "\u{FEFF}" else { return text }
+        return String(text.unicodeScalars.dropFirst())
+    }
+
+    /// The encoding the system can tell from the file itself, such as the one
+    /// macOS recorded on it when it was saved. Nil when it cannot tell.
+    private static func systemDetectedText(at url: URL) -> String? {
+        var encoding = String.Encoding.utf8
+        return try? String(contentsOf: url, usedEncoding: &encoding)
+    }
+}
+
 /// Value types of the macOS line batch (`MacLineBatchRunner`): the request the
 /// sheet assembles from a `MacBatchSheetConfiguration`, the per-line item, the
 /// progress the sheet renders and the terminal outcome with the Studio attempt

@@ -78000,6 +78000,270 @@
           }
         }
       }
+    },
+    "vocello.mac.batch.dropEmpty": {
+      "comment": "macOS interface: batch sheet message when a dropped text file is empty. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The dropped file has no text."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier déposé ne contient aucun texte."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo soltado no contiene texto."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die abgelegte Datei enthält keinen Text."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il file rilasciato non contiene testo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O arquivo solto não contém texto."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖入的文件不包含文本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドロップされたファイルにテキストがありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "놓은 파일에 텍스트가 없습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В перетащенном файле нет текста."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.dropNotText": {
+      "comment": "macOS interface: batch sheet message when a dropped file is not a .txt file. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only a .txt file can be dropped here."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seul un fichier .txt peut être déposé ici."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aquí solo se puede soltar un archivo .txt."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier kann nur eine .txt-Datei abgelegt werden."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qui puoi rilasciare solo un file .txt."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só é possível soltar um arquivo .txt aqui."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此处只能拖入 .txt 文件。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここにドロップできるのは .txt ファイルのみです。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "여기에는 .txt 파일만 놓을 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сюда можно перетащить только файл .txt."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.dropUnknownEncoding": {
+      "comment": "macOS interface: batch sheet message when the text encoding of a dropped file cannot be determined. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't tell the text encoding of the dropped file. Save it as UTF-8 and drop it again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu déterminer l’encodage du texte du fichier déposé. Enregistrez-le en UTF-8, puis déposez-le à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo determinar la codificación de texto del archivo soltado. Guárdalo como UTF-8 y suéltalo de nuevo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte die Textkodierung der abgelegten Datei nicht erkennen. Sichere sie als UTF-8 und lege sie erneut ab."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a determinare la codifica del testo del file rilasciato. Salvalo in UTF-8 e rilascialo di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu identificar a codificação de texto do arquivo solto. Salve-o como UTF-8 e solte-o novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法识别拖入文件的文本编码。请将其存储为 UTF-8 后再次拖入。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はドロップされたファイルのテキストエンコーディングを判別できませんでした。UTF-8 で保存してから、もう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 놓은 파일의 텍스트 인코딩을 확인할 수 없습니다. UTF-8로 저장한 다음 다시 놓아 주세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось определить кодировку текста в перетащенном файле. Сохраните его в UTF-8 и перетащите снова."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.dropUnreadable": {
+      "comment": "macOS interface: batch sheet message when a dropped file cannot be opened. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't read the dropped file."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu lire le fichier déposé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo leer el archivo soltado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte die abgelegte Datei nicht lesen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a leggere il file rilasciato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu ler o arquivo solto."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法读取拖入的文件。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はドロップされたファイルを読み込めませんでした。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 놓은 파일을 읽을 수 없습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось прочитать перетащенный файл."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

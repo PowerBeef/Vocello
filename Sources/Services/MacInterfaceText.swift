@@ -105,6 +105,22 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.generateAll", defaultValue: "Generate All",
                comment: "macOS interface: batch sheet primary button that starts the batch. Presentation only.")
     }
+    static var batchDropEmpty: String {
+        localization.string(localized: "vocello.mac.batch.dropEmpty", defaultValue: "The dropped file has no text.",
+               comment: "macOS interface: batch sheet message when a dropped text file is empty. Presentation only.")
+    }
+    static var batchDropNotText: String {
+        localization.string(localized: "vocello.mac.batch.dropNotText", defaultValue: "Only a .txt file can be dropped here.",
+               comment: "macOS interface: batch sheet message when a dropped file is not a .txt file. Presentation only.")
+    }
+    static var batchDropUnknownEncoding: String {
+        localization.string(localized: "vocello.mac.batch.dropUnknownEncoding", defaultValue: "Vocello couldn't tell the text encoding of the dropped file. Save it as UTF-8 and drop it again.",
+               comment: "macOS interface: batch sheet message when the text encoding of a dropped file cannot be determined. Presentation only.")
+    }
+    static var batchDropUnreadable: String {
+        localization.string(localized: "vocello.mac.batch.dropUnreadable", defaultValue: "Vocello couldn't read the dropped file.",
+               comment: "macOS interface: batch sheet message when a dropped file cannot be opened. Presentation only.")
+    }
     static func batchGeneratingItem(_ index: String, _ total: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.batch.generatingItem",
             defaultValue: "Generating item %1$@/%2$@...",

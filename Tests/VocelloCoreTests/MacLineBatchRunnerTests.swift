@@ -2,6 +2,56 @@ import Foundation
 import QwenVoiceCore
 import XCTest
 
+/// A8: what the batch sheet takes from a dropped file, and why it refuses one.
+final class MacBatchDroppedTextFileTests: XCTestCase {
+    private func file(named name: String, bytes: [UInt8]) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacBatchDroppedTextFile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent(name)
+        try Data(bytes).write(to: url)
+        return url
+    }
+
+    func testTheExtensionIsComparedWithoutRegardToCase() throws {
+        for name in ["script.txt", "SCRIPT.TXT", "Script.Txt"] {
+            let url = try file(named: name, bytes: Array("Line one\nLine two".utf8))
+            XCTAssertEqual(MacBatchDroppedTextFile.read(url), .success("Line one\nLine two"), name)
+        }
+    }
+
+    func testUnicodeTextIsDecodedByItsByteOrderMark() throws {
+        let script = "Élan — 日本語"
+        let utf8Marked = try file(named: "utf8.txt", bytes: [0xEF, 0xBB, 0xBF] + Array(script.utf8))
+        XCTAssertEqual(MacBatchDroppedTextFile.read(utf8Marked), .success(script), "The mark is not part of the script")
+
+        let littleEndian = script.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }
+        let utf16LE = try file(named: "utf16le.txt", bytes: [0xFF, 0xFE] + littleEndian)
+        XCTAssertEqual(MacBatchDroppedTextFile.read(utf16LE), .success(script))
+
+        let bigEndian = script.utf16.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] }
+        let utf16BE = try file(named: "utf16be.txt", bytes: [0xFE, 0xFF] + bigEndian)
+        XCTAssertEqual(MacBatchDroppedTextFile.read(utf16BE), .success(script))
+    }
+
+    func testAFileThatIsNotTakenSaysWhy() throws {
+        let markdown = try file(named: "script.md", bytes: Array("Line one".utf8))
+        XCTAssertEqual(MacBatchDroppedTextFile.read(markdown), .failure(.notPlainText))
+
+        let missing = markdown.deletingLastPathComponent().appendingPathComponent("missing.txt")
+        XCTAssertEqual(MacBatchDroppedTextFile.read(missing), .failure(.unreadable))
+
+        let blank = try file(named: "blank.txt", bytes: Array(" \n\t\n".utf8))
+        XCTAssertEqual(MacBatchDroppedTextFile.read(blank), .failure(.empty))
+
+        // "café" in Latin-1, with no byte order mark and no recorded encoding:
+        // the bytes are not valid UTF-8 and nothing says what they are.
+        let latin1 = try file(named: "latin1.txt", bytes: [0x63, 0x61, 0x66, 0xE9])
+        XCTAssertEqual(MacBatchDroppedTextFile.read(latin1), .failure(.unknownEncoding))
+    }
+}
+
 /// The pure half of the macOS line batch (`MacLineBatchRequest`, items and
 /// outcome): line splitting, validation, History naming, the per-line engine
 /// request, the retry derivations and the terminal Studio transition, all

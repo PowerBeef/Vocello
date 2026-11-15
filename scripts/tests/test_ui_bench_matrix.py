@@ -93,6 +93,20 @@ class DerivationTests(unittest.TestCase):
         # The take after a cold take never counts toward a cell's spread.
         self.assertEqual(version["derivationInputs"]["custom/short"]["degreesOfFreedom"], 3)
 
+    def test_a_refused_takes_phases_are_no_sample_of_a_takes_cost(self) -> None:
+        """RF-61, audit T5: a refused take ends early and plays nothing."""
+        phases = [
+            {"takeIndex": 2, "cell": "custom/short/warm#0", "endMS": 9_000},
+            {"takeIndex": 3, "cell": "custom/short/warm#1", "endMS": 11_000},
+            {"takeIndex": 4, "cell": "custom/short/warm#2", "endMS": 2_000, "refused": True},
+            {"takeIndex": 1, "cell": "custom/medium/cold#0", "endMS": 30_000},
+        ]
+        self.assertEqual(matrix.take_costs([], phases), {"custom/short": 10.0})
+        # Without the flag the short take would drag the median down.
+        for row in phases:
+            row.pop("refused", None)
+        self.assertEqual(matrix.take_costs([], phases), {"custom/short": 9.0})
+
     def test_derivation_refuses_mixed_hosts_and_missing_cells(self) -> None:
         other = synthetic_record("run-b", {})
         other["hardware"]["profileID"] = "mac-mini-m2-8gb"

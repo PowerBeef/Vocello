@@ -947,7 +947,8 @@ before the first take.
 take, and it never retries one. The benchmark records the refusal and publishes the rest. The
 XCUITest goes on past a failed take and prints one marker for it,
 `VOCELLO_BENCH_TAKE_REFUSED=<base64 of JSON {"cell", "schemaVersion": 1, "takeIndex"}>`, and the
-take's phases line carries `"refused": true` and no playback stamps. The runner cannot tell a
+take's phases line carries `"refused": true` and no playback stamps (the allocation derivation
+leaves such a line out of its per-take cost). The runner cannot tell a
 refusal from any other failed generation, so the checker (`--xcodebuild-log`) accepts a marked take
 as refused only when its engine row proves it: the row ends `failed` and either its notes carry
 the engine's failure code `audio.quality_rejected` (with the flags in `audioQCFlags`; a take

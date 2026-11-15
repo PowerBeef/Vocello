@@ -179,10 +179,15 @@ def take_costs(
     records: list[dict[str, Any]], phases: list[dict[str, Any]] | None = None,
     overhead_seconds: float = DEFAULT_OVERHEAD_SECONDS,
 ) -> dict[str, float]:
-    """Per warm cell, the median wall seconds one take costs the lane."""
+    """Per warm cell, the median wall seconds one take costs the lane.
+
+    A take the audio check refused (`"refused": true` in its phases line) ended
+    early and played nothing, so it is no sample of what a take costs."""
     samples: dict[str, list[float]] = {}
     if phases:
         for row in phases:
+            if row.get("refused") is True:
+                continue
             cell = str(row.get("cell", ""))
             if "/warm#" in cell and isinstance(row.get("endMS"), (int, float)):
                 samples.setdefault(re.sub(r"/warm#\d+$", "", cell), []).append(row["endMS"] / 1000.0)

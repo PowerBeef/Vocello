@@ -3100,6 +3100,34 @@ class BenchmarkHistoryTests(unittest.TestCase):
         requested["run"]["seedPolicy"] = "requested"
         history.validate_seed_policy(requested)
 
+        # RF-61: cell-hash-v2 hashes each cell under its own domain. A v2 run
+        # carries v2 seeds, and v1 seeds under the v2 name are refused.
+        second = copy.deepcopy(seeded)
+        second["run"]["seedPolicy"] = "cell-hash-v2"
+        with self.assertRaises(history.HistoryError):
+            history.validate_seed_policy(second)
+        for take in second["takes"]:
+            take["seed"] = bench_seed.cell_seed(take["cell"], bench_seed.CELL_HASH_V2)
+        history.validate_seed_policy(second)
+        self.assertEqual(bench_seed.cell_seed("design/short/warm#1"), 13240896822931298179)
+        self.assertEqual(bench_seed.cell_seed("design/short/warm#1", bench_seed.CELL_HASH_V2), 4965750894796513696)
+        self.assertEqual(bench_seed.DEFAULT_LANE_SEED_POLICY, bench_seed.CELL_HASH_V2)
+        policy, failures = bench_seed.run_seed_policy([
+            ("design/short/warm#1", {
+                "samplingSeedPolicy": "cell-hash-v2", "samplingSeedSource": "requested",
+                "samplingSeed": "4965750894796513696",
+            }),
+        ])
+        self.assertEqual((policy, failures), ("cell-hash-v2", []))
+        policy, failures = bench_seed.run_seed_policy([
+            ("design/short/warm#1", {
+                "samplingSeedPolicy": "cell-hash-v2", "samplingSeedSource": "requested",
+                "samplingSeed": "13240896822931298179",
+            }),
+        ])
+        self.assertEqual(policy, "cell-hash-v2")
+        self.assertEqual(len(failures), 1)
+
         invalid = {
             "a generated run publishing a seed": lambda r: r["takes"][0].update(seed=7),
             "an unknown policy": lambda r: r["run"].update(seedPolicy="fixed"),

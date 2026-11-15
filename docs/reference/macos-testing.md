@@ -338,8 +338,8 @@ while no build input changed; a commit that only publishes records or touches do
 the roadmap keeps the skip), and write a per-test verdict sidecar
 (`test-results.json`) next to `run.json`.
 
-Benchmark accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy cell-hash-v1|generated`
-(default `cell-hash-v1`: each take's seed derives from its cell, audit #29) and `--matrix-version NAME`
+Benchmark accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy cell-hash-v2|cell-hash-v1|generated`
+(default `cell-hash-v2` since RF-61: each take's seed derives from its cell, audit #29) and `--matrix-version NAME`
 (a declared matrix in `config/ui-bench-matrix.json`; any version but the canonical one publishes
 focused records, audit #30). Filters are explicit diagnostic
 runs; invoking the command without filters is the canonical 29-take matrix on the tracked Mac mini

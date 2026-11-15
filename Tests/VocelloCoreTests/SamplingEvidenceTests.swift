@@ -115,9 +115,35 @@ final class SamplingEvidenceTests: XCTestCase {
     /// Audit #29: the benchmark seed policy hashes a cell exactly as
     /// `scripts/lib/bench_seed.py` does, so the lane checkers can recompute it.
     func testBenchSeedPolicyHashesTheCellLikeTheCheckers() {
-        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "custom/short/warm#1"), 15_229_935_581_363_691_511)
-        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "custom/medium/cold#0"), 5_885_590_677_941_928_857)
-        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "clone/long/warm#2"), 3_348_844_143_494_952_299)
+        let v1 = BenchSeedPolicy.cellHashV1
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "custom/short/warm#1", policy: v1), 15_229_935_581_363_691_511)
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "custom/medium/cold#0", policy: v1), 5_885_590_677_941_928_857)
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "clone/long/warm#2", policy: v1), 3_348_844_143_494_952_299)
+        // The cell the hybrid's take ran on in silence under v1 (RF-61).
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "design/short/warm#1", policy: v1), 13_240_896_822_931_298_179)
+    }
+
+    /// RF-61: cell-hash-v2 hashes the same cell under its own domain, so every cell gets another
+    /// seed, and a name that is no cell-hash policy gives none.
+    func testBenchSeedPolicyV2HashesUnderItsOwnDomain() {
+        let v2 = BenchSeedPolicy.cellHashV2
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "custom/short/warm#1", policy: v2), 7_540_007_277_258_031_308)
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "design/short/warm#1", policy: v2), 4_965_750_894_796_513_696)
+        XCTAssertEqual(BenchSeedPolicy.seed(forCell: "clone/long/warm#2", policy: v2), 1_728_482_150_959_437_859)
+        XCTAssertNil(BenchSeedPolicy.seed(forCell: "custom/short/warm#1", policy: "generated"))
+        let enabled = ["QWENVOICE_DEBUG": "1", BenchSeedPolicy.policyEnvironmentKey: v2]
+        XCTAssertEqual(BenchSeedPolicy.policy(environment: enabled, internalDiagnosticsAvailable: true), v2)
+        var position = 0
+        let seeded = BenchSeedPolicy.applying(
+            to: GenerationRequest(
+                mode: .custom, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
+                payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: UUID(), seed: 9
+            ),
+            environment: enabled, internalDiagnosticsAvailable: true,
+            nextSchedulePosition: { position += 1; return position - 1 },
+            currentTakeCell: { "design/short/warm#1" }
+        )
+        XCTAssertEqual(seeded.seed, 4_965_750_894_796_513_696)
     }
 
     func testBenchSeedPolicyNeedsInternalDiagnosticsAndTheMasterGate() {
@@ -176,8 +202,8 @@ final class SamplingEvidenceTests: XCTestCase {
             appliedSeed(environment: scheduled.filter { $0.key != BenchSeedPolicy.policyEnvironmentKey }), 9
         )
         XCTAssertEqual(cursor, 0)
-        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/medium/cold#0"))
-        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/short/warm#0"))
+        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/medium/cold#0", policy: BenchSeedPolicy.cellHashV1))
+        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/short/warm#0", policy: BenchSeedPolicy.cellHashV1))
         XCTAssertEqual(appliedSeed(environment: scheduled), 9)
         XCTAssertEqual(cursor, 3)
         XCTAssertEqual(currentTakeReads, 0)

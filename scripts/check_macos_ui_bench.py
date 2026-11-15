@@ -1414,7 +1414,7 @@ def main() -> int:
             )
     stall_gate = stall_gate_summary(stall_contract, stall_observed, censored_heartbeats)
 
-    # The seed policy (audit #29): under cell-hash-v1 every take sampled with its
+    # The seed policy (audit #29): under a cell-hash policy every take sampled with its
     # cell's seed; the lane's selection must match what the rows ran.
     seed_policy = None
     if len(engine_rows) == expected:

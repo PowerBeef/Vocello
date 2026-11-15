@@ -506,7 +506,7 @@ def build_manifest(
             "memoryStatus": memory.status,
             "sampleSidecarDigest": memory.sidecar_digest,
             # A seed the benchmark requested and the engine confirmed (audit
-            # #29): every take under the cell-hash-v1 policy.
+            # #29): every take under a cell-hash policy.
             **take_seed(row),
             # Cell aggregate 2 leaves it out of its cell's statistics (audit #30).
             **({"followsColdTake": True} if take["followsColdTake"] else {}),
@@ -820,7 +820,7 @@ def main() -> int:
             )
     # The seed policy, checked once the whole matrix is known (audit #29, V-1).
     # Every generation draws its own effective seed, so the earlier rule that a
-    # mode keeps one seed could never pass; under cell-hash-v1 each take must
+    # mode keeps one seed could never pass; under a cell-hash policy each take must
     # have sampled with its cell's seed instead.
     seed_policy = None
     if len(engine_rows) == expected_count:

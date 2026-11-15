@@ -34,7 +34,7 @@ Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
   scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states|model-update] [--long-form-segments N]
-  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
+  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh macos auto-language
   scripts/ui_test.sh ios localization
@@ -49,7 +49,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario long-form
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--scenario ROW] [--retain-result]
                                [--candidate-origin-attestation "STATEMENT"]
-  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated] [--matrix-version NAME]
+  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
@@ -101,8 +101,9 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
-`benchmark --seed-policy` (default cell-hash-v1, audit #29) samples every take with a seed derived
-from its cell through the registered QWENVOICE_BENCH_SEED_POLICY knob; `generated` keeps random seeds.
+`benchmark --seed-policy` (default cell-hash-v2 since RF-61; audit #29) samples every take with a seed derived
+from its cell through the registered QWENVOICE_BENCH_SEED_POLICY knob; cell-hash-v1 is the earlier derivation and
+`generated` keeps random seeds.
 `benchmark --matrix-version NAME` runs a declared matrix of config/ui-bench-matrix.json (audit #30);
 any version but the canonical one publishes focused records.
 `smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
@@ -155,7 +156,7 @@ modes="custom,design,clone"
 lengths="short,medium,long"
 warm=3
 label=""
-seed_policy="cell-hash-v1"
+seed_policy="cell-hash-v2"
 matrix_version=""
 matrix_allocation=""
 long_form_segments=""
@@ -226,8 +227,8 @@ while [[ $# -gt 0 ]]; do
 done
 validate_benchmark_label "$label"
 validate_benchmark_label "$control_resume"
-[[ "$seed_policy" == "cell-hash-v1" || "$seed_policy" == "generated" ]] \
-  || die "--seed-policy must be cell-hash-v1 or generated"
+[[ "$seed_policy" == "cell-hash-v2" || "$seed_policy" == "cell-hash-v1" || "$seed_policy" == "generated" ]] \
+  || die "--seed-policy must be cell-hash-v2, cell-hash-v1 or generated"
 if [[ "$lane" == "benchmark" ]]; then
   # The declared matrix (audit #30): the canonical version unless named.
   matrix_version="$(python3 "$ROOT_DIR/scripts/ui_bench_allocation.py" resolve \

@@ -1050,7 +1050,11 @@ class VocelloMacUITestCase: XCTestCase {
             ) {
                 guard generate.exists && generate.isEnabled && !cancel.exists else { return false }
                 if measured {
-                    return player.exists && !backendError.exists && !backendCrash.exists
+                    // The refusal is read only once the take is over and no player came
+                    // (RF-61): a take the audio check refused ends the wait at once instead
+                    // of timing out, and no poll during a take queries anything new.
+                    return (player.exists && !backendError.exists && !backendCrash.exists)
+                        || generationError.exists
                 }
                 if generationError.exists || backendError.exists || backendCrash.exists { return true }
                 return player.exists
@@ -1066,9 +1070,10 @@ class VocelloMacUITestCase: XCTestCase {
         }
         XCTAssertFalse(backendError.exists, "Generation must not expose a backend error")
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
-        if !measured {
-            XCTAssertFalse(generationError.exists, "Generation must not end on its retryable error")
-        }
+        XCTAssertFalse(
+            generationError.exists,
+            "Generation must not end on its retryable error (the mandatory audio check refused the take, or it failed)"
+        )
     }
 
     /// Waits until the visible Studio or sidebar player stops playing. The control

@@ -56,8 +56,11 @@ Speed; filtering History now stalls up to 873 ms against about 470 ms in Septemb
    1 to 12 had completed. The seed is fixed per cell, so a rerun likely fails the same way. Not yet
    known: how often the hybrid ends a short Voice Design take this way on random seeds (a 40-take
    comparison with Speed was stopped before it reported; RF-55's single-take screen saw no refusal
-   in 144 `attn` takes). ★ A decision is needed before the gate can pass: how a deterministic,
-   correct refusal in the benchmark matrix is treated.
+   in 144 `attn` takes). **Decided November 15 (maintainer): new seeds.** The lanes default to
+   `cell-hash-v2` (`BenchSeedPolicy`, `scripts/lib/bench_seed.py`), the v1 refusal stays on record,
+   and the seeds do not move again for a refused take: a refused v2 cell stands, and the lane would
+   then need to record refusals. The benchmark also reports a refused take at once, not after a
+   120 s timeout. Next: rerun `ui_test.sh macos benchmark` with the Mac free.
 2. Then, on the release commit: the full macOS smoke lane, `release-readiness`, `scripts/dev.sh ci`,
    the engine bench against the new baseline, static audits of the release diff, the README
    charts and the website's performance numbers.

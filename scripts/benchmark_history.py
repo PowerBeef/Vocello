@@ -900,7 +900,7 @@ def validate_cold_take_flags(takes: list[dict[str, Any]], aggregate_version: int
 def validate_seed_policy(record: dict[str, Any]) -> None:
     """Check run.seedPolicy against the takes' published seeds (audit #29).
 
-    cell-hash-v1 publishes every take's seed and each must be its cell's
+    A cell-hash policy publishes every take's seed and each must be its cell's
     (lib/bench_seed.py, the Swift policy's hash); generated publishes none;
     requested publishes every take's."""
     policy = record["run"]["seedPolicy"]
@@ -913,9 +913,9 @@ def validate_seed_policy(record: dict[str, Any]) -> None:
         return
     if any("seed" not in take for take in takes):
         raise HistoryError(f"run.seedPolicy {policy} needs every take's seed")
-    if policy == bench_seed.CELL_HASH_V1:
+    if policy in bench_seed.CELL_HASH_POLICIES:
         for take in takes:
-            if take["seed"] != bench_seed.cell_seed(take["cell"]):
+            if take["seed"] != bench_seed.cell_seed(take["cell"], policy):
                 raise HistoryError(
                     f"take {take['cell']} seed {take['seed']} is not its {policy} seed"
                 )

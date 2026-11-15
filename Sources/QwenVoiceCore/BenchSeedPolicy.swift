@@ -6,10 +6,11 @@ import os
 ///
 /// A Studio take normally samples with a fresh random seed, so a benchmark
 /// cell's take length (and the occasional run-on) changes from run to run. With
-/// the registered `QWENVOICE_BENCH_SEED_POLICY=cell-hash-v1` knob, which
+/// the registered `QWENVOICE_BENCH_SEED_POLICY` knob (`cell-hash-v2`, or the
+/// earlier `cell-hash-v1`), which
 /// `RuntimeDebugGate` honours only in an internal-diagnostics build under
 /// `QWENVOICE_DEBUG`, every generation instead samples with a seed derived from
-/// the benchmark cell it measures (`seed(forCell:)`: the cell ID carries the
+/// the benchmark cell it measures (`seed(forCell:policy:)`: the cell ID carries the
 /// mode, length, warm state and repetition), so two runs of one build produce
 /// the same take per cell. Shipped builds never read the knob.
 ///
@@ -28,14 +29,24 @@ public enum BenchSeedPolicy {
     /// seed = the first eight bytes, big-endian, of
     /// SHA-256("vocello-ui-bench-seed-v1" NUL <cell ID>).
     public static let cellHashV1 = "cell-hash-v1"
-    private static let cellHashDomain = "vocello-ui-bench-seed-v1"
+    /// The same hash over the domain "vocello-ui-bench-seed-v2": the lanes' default since RF-61
+    /// (maintainer decision 2026-11-15). Under v1 the hybrid model's `design/short/warm#1` take
+    /// ran on in silence and Fast QC refused it on every run; that result stays on record with v1.
+    /// The seeds do not move again for a refused take: a v2 cell that is refused stands.
+    public static let cellHashV2 = "cell-hash-v2"
+    private static let cellHashDomains = [
+        cellHashV1: "vocello-ui-bench-seed-v1",
+        cellHashV2: "vocello-ui-bench-seed-v2",
+    ]
 
     private static let scheduleCursor = OSAllocatedUnfairLock(initialState: 0)
 
-    /// The seed `cell-hash-v1` assigns to one benchmark cell ID, for example
-    /// `custom/short/warm#1`. `scripts/lib/bench_seed.py` computes the same value.
-    public static func seed(forCell cell: String) -> UInt64 {
-        var message = Data(cellHashDomain.utf8)
+    /// The seed a cell-hash policy assigns to one benchmark cell ID, for example
+    /// `custom/short/warm#1`, or nil for a name that is not a cell-hash policy.
+    /// `scripts/lib/bench_seed.py` computes the same value.
+    public static func seed(forCell cell: String, policy: String) -> UInt64? {
+        guard let domain = cellHashDomains[policy] else { return nil }
+        var message = Data(domain.utf8)
         message.append(0)
         message.append(contentsOf: cell.utf8)
         return SHA256.hash(data: message).prefix(8).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
@@ -59,7 +70,7 @@ public enum BenchSeedPolicy {
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return raw == cellHashV1 ? raw : nil
+        return raw.flatMap { cellHashDomains[$0] == nil ? nil : $0 }
     }
 
     /// The launch schedule of cells, in generation order, or nil without one.
@@ -109,9 +120,9 @@ public enum BenchSeedPolicy {
         nextSchedulePosition: () -> Int,
         currentTakeCell: () -> String?
     ) -> GenerationRequest {
-        guard policy(
+        guard let policy = policy(
             environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable
-        ) != nil else { return request }
+        ) else { return request }
         let cell: String?
         if let schedule = scheduledCells(
             environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable
@@ -121,7 +132,7 @@ public enum BenchSeedPolicy {
         } else {
             cell = currentTakeCell()
         }
-        guard let cell, !cell.isEmpty else { return request }
-        return request.withSeed(seed(forCell: cell))
+        guard let cell, !cell.isEmpty, let seed = seed(forCell: cell, policy: policy) else { return request }
+        return request.withSeed(seed)
     }
 }

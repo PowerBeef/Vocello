@@ -31,7 +31,7 @@ A plan only: nothing here is done yet. Finding IDs (A1, T3, …) are those of
 | # | Decision | Gates | Recommendation |
 |---|---|---|---|
 | D-1 | **Xcode for 3.1** (B1): move the CI pin to the 27 line, or keep 26.6 and run acceptance on it | Steps 14, 18 | Move the pin. This Mac already builds and measures on 27.2, and the nightly preview workflow already compiles on it. Keeping 26.6 means installing it here and re-measuring everything. |
-| D-2 | **CLI `models install`** (C2): keep removing every mode's earlier models, or only the installed mode's | Step 6 | Keep the rule (it is your decision of 2026-11-13), but report what was removed. |
+| D-2 | **CLI `models install`** (C2): keep removing every mode's earlier models, or only the installed mode's | Step 3 | Keep the rule (it is your decision of 2026-11-13), but report what was removed. |
 | D-3 | **MCP `delete_voice`** (C5): behind a flag, or move files to the Trash | Step 36 | Behind `--allow-voice-delete`, as `install_model` already is. |
 | D-4 | **Long-form delete** (A4): deleting a project's row deletes its segments too, or keeps them and says so | Step 28 | Delete as a unit, with the confirmation saying so. |
 | D-5 | **The benchmark's design** (T5): keep all-or-nothing, or record a refused take and publish the rest | Step 44 | Record and publish. It is the fallback you already accepted if a v2 seed is refused. |

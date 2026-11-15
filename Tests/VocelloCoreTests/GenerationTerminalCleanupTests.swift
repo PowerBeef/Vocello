@@ -155,24 +155,52 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         XCTAssertFalse(log.entries.contains("afterFinalization"))
     }
 
-    /// A cleanup call that throws (the reservation is already invalid) ends
-    /// the cleanup there and its error replaces the original one.
-    @concurrent func testACancelThatThrowsDuringCleanupSurfacesItsOwnError() async throws {
+    /// A cleanup call that throws (the reservation is already invalid, or the
+    /// lease failed revalidation) never replaces the error that ended the
+    /// take, and the cleanup steps after it still run.
+    @concurrent func testACleanupStepThatThrowsNeverReplacesTheOriginalError() async throws {
+        for failing in [["cancelGeneration"], ["acknowledge(aborted(runtime))"], ["cancelGeneration", "acknowledge(aborted(runtime))"]] {
+            let log = ChoreographyLog()
+            let take = ScriptedReservedTake(log: log, failing: Set(failing))
+
+            do {
+                _ = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in
+                    throw ScriptedTakeFailure(step: "sink")
+                })
+                XCTFail("A failed take must surface")
+            } catch let failure as ScriptedTakeFailure {
+                XCTAssertEqual(failure, ScriptedTakeFailure(step: "sink"), "the original error wins (\(failing))")
+            }
+
+            XCTAssertEqual(log.entries, [
+                "reserve", "claim", "prepareExecution", "open", "execute",
+                "cancelAudio(shutdown)", "cancelGeneration(shutdown)",
+                "waitForModelTermination", "acknowledge(aborted(runtime))",
+            ], "every cleanup step runs (\(failing))")
+        }
+    }
+
+    /// The same before the reservation opened: a refused abort does not
+    /// replace the setup failure.
+    @concurrent func testAnAbortThatThrowsNeverReplacesTheSetupFailure() async throws {
         let log = ChoreographyLog()
-        let take = ScriptedReservedTake(log: log, failing: ["cancelGeneration"])
+        let take = ScriptedReservedTake(log: log, failing: ["abortReservation"])
 
         do {
-            _ = try await ChoreographyDriver.run(take, log: log, execute: { @concurrent _ in
-                throw ScriptedTakeFailure(step: "sink")
-            })
-            XCTFail("A failed take must surface")
+            _ = try await ChoreographyDriver.run(
+                take,
+                log: log,
+                prepare: { @concurrent in throw ScriptedTakeFailure(step: "sessionDirectory") },
+                execute: { @concurrent _ in Self.completedResult }
+            )
+            XCTFail("A setup failure must surface")
         } catch let failure as ScriptedTakeFailure {
-            XCTAssertEqual(failure, ScriptedTakeFailure(step: "cancelGeneration"))
+            XCTAssertEqual(failure, ScriptedTakeFailure(step: "sessionDirectory"), "the original error wins")
         }
 
         XCTAssertEqual(log.entries, [
-            "reserve", "claim", "prepareExecution", "open", "execute",
-            "cancelAudio(shutdown)", "cancelGeneration(shutdown)",
+            "reserve", "claim", "prepareExecution",
+            "cancelAudio(shutdown)", "abortReservation(shutdown)",
         ])
     }
 
@@ -400,6 +428,7 @@ private struct ScriptedReservedTake: GenerationReservedTake {
 
     @concurrent func abortReservation(reason: VocelloQwen3CancellationReason) async throws {
         log.append("abortReservation(\(reason.rawValue))")
+        if failing.contains("abortReservation") { throw ScriptedTakeFailure(step: "abortReservation") }
     }
 
     @concurrent func acknowledgeProductFinalization(

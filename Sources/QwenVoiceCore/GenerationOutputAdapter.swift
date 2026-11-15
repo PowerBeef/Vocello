@@ -400,12 +400,30 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                 if let audio {
                     await take.cancelAudio(audio, reason: reason)
                 }
+                // The error that ended the take is the one the caller gets. A
+                // cleanup step that fails is logged and the remaining steps
+                // still run, so the lease is released as far as it can be. A
+                // cancel the actor refuses means the reservation is already
+                // gone, which only happens once the model has terminated, so
+                // the wait that follows returns.
                 if opened {
-                    try await take.cancelGeneration(reason: reason)
+                    do {
+                        try await take.cancelGeneration(reason: reason)
+                    } catch let cleanupError {
+                        Self.logCleanupFailure(step: "cancel_generation", cleanupError)
+                    }
                     _ = await take.waitForModelTermination()
-                    try await take.acknowledgeProductFinalization(.aborted(.runtime))
+                    do {
+                        try await take.acknowledgeProductFinalization(.aborted(.runtime))
+                    } catch let cleanupError {
+                        Self.logCleanupFailure(step: "acknowledge_aborted", cleanupError)
+                    }
                 } else {
-                    try await take.abortReservation(reason: reason)
+                    do {
+                        try await take.abortReservation(reason: reason)
+                    } catch let cleanupError {
+                        Self.logCleanupFailure(step: "abort_reservation", cleanupError)
+                    }
                 }
                 throw error
             }
@@ -414,6 +432,15 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             // already recorded by the admission coordinator wins.
             cancellationIngress.request(.user)
         }
+    }
+
+    /// A catch-path cleanup step of `runReservedTake` that threw. Only the
+    /// step's code-owned name and the error's type are logged.
+    private static func logCleanupFailure(step: String, _ error: any Error) {
+        let errorType = String(describing: type(of: error))
+        NativeStreamingSignposts.logger.error(
+            "Take cleanup step failed; step=\(step, privacy: .public) error=\(errorType, privacy: .public)"
+        )
     }
 
     private static func runtimeCancellationReason(

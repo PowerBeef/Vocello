@@ -1081,17 +1081,33 @@ class VocelloMacUITestCase: XCTestCase {
     /// is not running. The label is read rather than a value because the state
     /// words the app used to publish were hardcoded English; every lane pins
     /// `-AppleLanguages (en)`, so the label here is deterministic.
+    ///
+    /// Outside the measured lanes the player must first be seen playing (RF-61, audit
+    /// finding T3): a take that never started used to read as one that had finished. The
+    /// measured lanes keep their wait as their baselines ran it, and their played-audio
+    /// gate answers for a silent take.
     func waitForPlaybackToFinish(timeout: TimeInterval) -> Bool {
         let inline = button("studio_inlinePlayer_playPause")
         let control = inline.exists ? inline : button("sidebarPlayer_playPause")
         if !Self.keepsSteadyWaitCadence {
-            // Autoplay starts a moment after completion; the label reads "Play" until then.
-            _ = VocelloUIWait.settles("playback to start", timeout: 3) {
-                control.exists && control.label != "Play"
-            }
+            XCTAssertTrue(
+                waitForPlaybackToStart(timeout: 5),
+                "A finished take must start playing before its playback can be said to have ended"
+            )
         }
         return VocelloUIWait.condition("playback to finish", timeout: timeout) {
             !control.exists || control.label == "Play"
+        }
+    }
+
+    /// Whether the visible player reaches its playing state: the control reads "Pause",
+    /// the action it would perform. Autoplay starts a moment after completion, and the
+    /// label reads "Play" until then.
+    func waitForPlaybackToStart(timeout: TimeInterval) -> Bool {
+        let inline = button("studio_inlinePlayer_playPause")
+        let control = inline.exists ? inline : button("sidebarPlayer_playPause")
+        return VocelloUIWait.settles("playback to start", timeout: timeout) {
+            control.exists && control.label == "Pause"
         }
     }
 

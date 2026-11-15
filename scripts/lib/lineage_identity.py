@@ -269,6 +269,12 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # a Time Profiler one before it. The witness records no sampler but rides
     # the kind-wide version, so it starts a new lineage too.
     ("instrument-profile", "macos"): 4,
+    # 2 (2026-11-15, RF-61, audit findings T11 and A10): the History scenarios
+    # run on a profile of their own, seeded to an exact row count, instead of
+    # topping up the shared debug History (737 rows by November, past the
+    # 500-row page); history-filter marks its three cycles; history-filter-paged
+    # joins at 700 rows; delivery-menu launches with proactive warms suppressed.
+    ("ui-perf", "macos"): 2,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.

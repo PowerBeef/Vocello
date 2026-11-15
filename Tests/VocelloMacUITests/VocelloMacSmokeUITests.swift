@@ -457,6 +457,11 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             onBeforeGenerate: { capture?.markSubmit() },
             onAfterGenerateClick: { capture?.markSubmitReturned() }
         )
+        // RF-61 (audit finding T3): the journey used to pass with a take that never played.
+        XCTAssertTrue(
+            waitForPlaybackToStart(timeout: 5),
+            "A finished take must start playing on its own (autoplay is on by default)"
+        )
         if let capture, !capture.isIdle {
             let playbackEnded = waitForPlaybackToFinish(timeout: 120)
             _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {

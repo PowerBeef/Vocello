@@ -29,6 +29,26 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     override class var keepsSteadyWaitCadence: Bool { true }
 
     private static let seededHistoryRows = 400
+    /// More than one History page (500), so a search is answered by the database, not by the
+    /// loaded rows (RF-61, audit finding A1).
+    private static let pagedHistoryRows = 700
+
+    /// RF-61 (audit finding T11): the History scenarios run on a profile of their own, seeded to an
+    /// exact row count. They used to top up the shared debug History, which other lanes fill and
+    /// nothing erases, so the list they measured grew from 440 to 737 rows in seven weeks and
+    /// crossed the page size. One folder per row count, shared by the scenarios that use it and
+    /// removed when the process ends its run of this class.
+    private static let historyProfilesRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("vocello-uiperf-history-\(UUID().uuidString)", isDirectory: true)
+
+    private static func historyProfile(rows: Int) -> URL {
+        historyProfilesRoot.appendingPathComponent("rows-\(rows)", isDirectory: true)
+    }
+
+    override class func tearDown() {
+        try? FileManager.default.removeItem(at: historyProfilesRoot)
+        super.tearDown()
+    }
 
     override func setUp() {
         super.setUp()
@@ -41,17 +61,20 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     /// The running scenario's setup stamps (audit #82).
     private var setupStamps: [String: Int64] = [:]
     private var setupScenario = ""
+    private var setupArchiveCount: Int?
 
     override var additionalLaunchEnvironment: [String: String] { scenarioEnvironment }
 
     /// `suppressWarmup` sets the registered `QWENVOICE_SUPPRESS_WARMUP`, so
     /// selection and draft changes schedule no model warms (audit #33).
-    private func beginScenario(_ name: String, seedHistory: Bool = false, suppressWarmup: Bool = false) {
+    private func beginScenario(_ name: String, seedHistoryRows: Int? = nil, suppressWarmup: Bool = false) {
         setupScenario = name
         setupStamps = ["launchStart": Self.epochMS()]
+        setupArchiveCount = seedHistoryRows
         scenarioEnvironment = ["QWENVOICE_UIPERF_FRAME_PROBE": name]
-        if seedHistory {
-            scenarioEnvironment["QWENVOICE_UIPERF_SEED_HISTORY"] = String(Self.seededHistoryRows)
+        if let seedHistoryRows {
+            scenarioEnvironment["QWENVOICE_UIPERF_SEED_HISTORY"] = String(seedHistoryRows)
+            scenarioEnvironment["QWENVOICE_APP_SUPPORT_DIR"] = Self.historyProfile(rows: seedHistoryRows).path
         }
         if suppressWarmup {
             scenarioEnvironment["QWENVOICE_SUPPRESS_WARMUP"] = "1"
@@ -71,7 +94,9 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         marker.emit()
         setupStamps["windowStart"] = marker.windowStartEpochMS
         setupStamps["windowEnd"] = marker.windowEndEpochMS
-        VocelloUIPerfSetupMarker(scenario: setupScenario, stamps: setupStamps).emit()
+        VocelloUIPerfSetupMarker(
+            scenario: setupScenario, stamps: setupStamps, archiveCount: setupArchiveCount
+        ).emit()
     }
 
     private func measuredWindow(
@@ -218,7 +243,7 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     }
 
     func test03HistoryScroll() {
-        beginScenario("history-scroll", seedHistory: true)
+        beginScenario("history-scroll", seedHistoryRows: Self.seededHistoryRows)
         // Sentinel: the seeder finished before we scroll (row 0400 would be
         // absent if the top-up was still running or failed).
         unsafe assertHistoryRows(
@@ -248,23 +273,36 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     }
 
     func test04HistoryFilter() {
-        beginScenario("history-filter", seedHistory: true)
-        navigate(to: .history)
+        runHistoryFilter(scenario: "history-filter", rows: Self.seededHistoryRows, query: "uiperf-seed-03")
+    }
+
+    /// The same journey over more than one page. The query matches only the oldest hundred rows,
+    /// none of them in the newest page the screen holds, so every answer comes from the database:
+    /// the path that rebuilt the list twice per change (RF-61, audit finding A1).
+    func test04bHistoryFilterPaged() {
+        runHistoryFilter(scenario: "history-filter-paged", rows: Self.pagedHistoryRows, query: "uiperf-seed-06")
+    }
+
+    private func runHistoryFilter(scenario: String, rows: Int, query: String) {
+        beginScenario(scenario, seedHistoryRows: rows)
+        // Sentinel: the seeder finished, and the profile holds exactly the seeded rows.
+        unsafe assertHistoryRows(matching: String(format: "uiperf-seed-%04d", rows - 1), expected: 1)
         let search = element("history_searchField", type: .searchField)
         XCTAssertTrue(VocelloUIWait.exists(search, timeout: 20))
-        measuredWindow("history-filter", actionCount: 6) {
-            for _ in 0..<3 {
-                XCTAssertTrue(
-                    VocelloUITextEntry.replace(in: search, with: "uiperf-seed-03", timeout: 20))
-                Thread.sleep(forTimeInterval: 1.0)
-                XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "", timeout: 20))
-                Thread.sleep(forTimeInterval: 1.0)
-            }
+        XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "", timeout: 20))
+        Thread.sleep(forTimeInterval: 1.0)
+        measuredCycles(scenario, cycles: 3, actionsPerCycle: 2) { _ in
+            XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: query, timeout: 20))
+            Thread.sleep(forTimeInterval: 1.0)
+            XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "", timeout: 20))
+            Thread.sleep(forTimeInterval: 1.0)
         }
     }
 
     func test05DeliveryMenu() {
-        beginScenario("delivery-menu")
+        // Warms suppressed, as in sidebar-navigation (RF-61, audit finding A10): the menu's own
+        // frame cost, without a model warm starting inside the window.
+        beginScenario("delivery-menu", suppressWarmup: true)
         navigate(to: .customVoice)
         let picker = element("delivery_tonePicker")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))

@@ -825,11 +825,15 @@ public struct VocelloUIPerfSetupMarker: Codable {
     /// Ordered stamps: `launchStart`, `launchReady`, `settled`, `windowStart`,
     /// `windowEnd` (a scenario may add its own setup steps between them).
     public let stamps: [String: Int64]
+    /// How many History entries the scenario's profile held, when the scenario seeded it
+    /// (RF-61, audit finding T11): a History scenario's frame cost depends on it.
+    public let archiveCount: Int?
 
-    public init(scenario: String, stamps: [String: Int64]) {
+    public init(scenario: String, stamps: [String: Int64], archiveCount: Int? = nil) {
         self.schemaVersion = 1
         self.scenario = scenario
         self.stamps = stamps
+        self.archiveCount = archiveCount
     }
 
     public func emit() {

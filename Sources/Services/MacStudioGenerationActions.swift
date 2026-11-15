@@ -27,7 +27,14 @@ enum MacStudioGenerationActions {
         clonePriming: MacStudioClonePriming? = nil,
         onCompleted: @escaping @MainActor @Sendable (GenerationResult) -> Void = { _ in }
     ) -> Bool {
-        MacStudioSingleTakeRunner.start(
+        // RF-61: on an 8 GB Mac a take waits while another Vocello engine holds its
+        // lease. It is refused here, before anything is submitted, like every other
+        // start the Studio refuses; an app whose own model is loaded is never refused.
+        if let refusal = MacEngineHostCoordinator.shared.generationRefusalMessage {
+            coordinator.rejectStart(refusal)
+            return false
+        }
+        return MacStudioSingleTakeRunner.start(
             plan: plan,
             estimatedAudioDuration: LivePreviewEstimate(text: plan.request.text)?.estimatedAudioDuration ?? 0,
             coordinator: coordinator,

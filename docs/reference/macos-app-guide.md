@@ -349,13 +349,17 @@ weights the failure left loaded.
   have any of them loaded. The alert reads "Model May Be in Use", and nothing changes, a running
   download of that model included. The earlier models that a model update removes are not checked
   this way.
-- **One engine on an 8 GB Mac.** While another host holds a lease, a take, a line batch and a
-  long-form project (its start, its resume and a segment's regeneration) do not start: the take
-  fails with "Another Vocello engine is running, and this 8 GB Mac has memory for one at a time…",
-  and the batch sheet shows the same sentence. A Studio warm and a clone-reference prime wait
-  without a message and run on the next draft or destination change. A larger Mac runs beside the
-  other engine. The rule is `EngineHostAdmission`'s, the one the command line applies
-  (`EngineHostAppPolicy` reads it from the app's side), and the app has no way to override it.
+- **One engine on an 8 GB Mac.** While another host holds a lease and the app has no model
+  loaded, a take, a line batch and a long-form project (its start, its resume and a segment's
+  regeneration) do not start: Generate shows "Another Vocello engine is running, and this 8 GB Mac
+  has memory for one at a time…" in place of starting, before anything is submitted, and the batch
+  sheet shows the same sentence. A Studio warm and a clone-reference prime wait without a message
+  and run on the next draft or destination change. A larger Mac runs beside the other engine. The
+  rule is `EngineHostAdmission`'s, the one the command line applies (`EngineHostAppPolicy` reads it
+  from the app's side), and the app has no way to override it. Two cases never wait: an app whose
+  own model is loaded keeps working (it is the engine already in memory, and the lease it reads may
+  be a command line's that is only asking and is about to be refused), and a run whose memory tier
+  is forced or emulated for a diagnostic lane.
 
 ---
 

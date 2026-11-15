@@ -34,11 +34,7 @@ final class MacStudioSingleTakeGenerationHooks: MacStudioSingleTakeHooks {
     }
 
     func generate(_ request: GenerationRequest) async throws -> GenerationResult {
-        // RF-61: on an 8 GB Mac a take waits while another Vocello engine (the
-        // `vocello` command line) holds its lease; the take fails with that
-        // reason before it reaches the engine. A line batch stops at the line.
-        try MacEngineHostCoordinator.shared.admitGeneration()
-        return try await engine.generate(request)
+        try await engine.generate(request)
     }
 
     func generationCompleted(_ result: GenerationResult, plan: IOSSingleTakeGenerationPlan) async {

@@ -162,9 +162,18 @@ public enum EngineHostAppPolicy {
     /// `EngineHostAdmission`'s rule read from the app's side: on an 8 GB Mac a
     /// take or a warm waits while another engine holds a lease, and a larger
     /// Mac runs beside it. The app has no way to insist.
+    ///
+    /// Two cases never wait. An app that holds its own lease already has its
+    /// model resident: it is the incumbent, refusing its next take frees no
+    /// memory, and the lease it reads may be a command line's that is only
+    /// asking and is about to be refused itself (a host takes its lease before
+    /// it reads the others). And a tier that is forced or emulated for a
+    /// diagnostic lane describes a Mac that has the memory.
     public static func refusesEngineWork(
-        otherHosts: [EngineHostLease.Host], deviceClass: NativeDeviceMemoryClass
+        otherHosts: [EngineHostLease.Host], deviceClass: NativeDeviceMemoryClass,
+        holdsOwnLease: Bool = false, tierIsDiagnostic: Bool = false
     ) -> Bool {
+        guard !holdsOwnLease, !tierIsDiagnostic else { return false }
         if case .refuse = EngineHostAdmission.decide(
             otherHosts: otherHosts, appRunning: false, deviceClass: deviceClass, allowConcurrent: false
         ) {

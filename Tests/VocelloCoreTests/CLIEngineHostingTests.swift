@@ -804,6 +804,16 @@ final class EngineHostAppPolicyTests: XCTestCase {
         XCTAssertTrue(EngineHostAppPolicy.refusesEngineWork(otherHosts: [cli], deviceClass: .floor8GBMac))
         XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(otherHosts: [cli], deviceClass: .mid16GBMac),
                        "a larger Mac runs beside the other engine")
+        // The incumbent keeps working: an app whose own model is loaded is not refused its next
+        // take by a lease that may be a command line's that is only asking (review of step 37).
+        XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(
+            otherHosts: [cli], deviceClass: .floor8GBMac, holdsOwnLease: true
+        ))
+        // A forced or emulated tier describes a Mac that has the memory: a lane on the emulated
+        // 8 GB floor is not failed by a command line running beside it.
+        XCTAssertFalse(EngineHostAppPolicy.refusesEngineWork(
+            otherHosts: [cli], deviceClass: .floor8GBMac, tierIsDiagnostic: true
+        ))
         // One rule: the app refuses exactly where the command line's admission does.
         let tiers: [NativeDeviceMemoryClass] = [.floor8GBMac, .mid16GBMac, .highMemoryMac]
         for tier in tiers {

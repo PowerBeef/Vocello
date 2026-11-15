@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -101,3 +102,108 @@ class PythonSelectionTests(unittest.TestCase):
                                 env=environment, text=True, capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 1)
         self.assertIn("repository shim", result.stderr)
+
+
+class SharedShellSelectionTests(unittest.TestCase):
+    """scripts/lib/python.sh puts a shell and its children on the selected interpreter."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="vocello shell python ")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.log = self.root / "interpreter.log"
+        # The stand-in for an installed interpreter with the test packages: it records every
+        # call on one line, answers `-m pytest` itself and hands everything else to the real Python.
+        self.selected = self.root / "selected python3"
+        self.selected.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$(printf '%s' \"$*\" | tr '\\n' ' ')\" >> {shlex.quote(str(self.log))}\n"
+            "if [ \"$1\" = \"-m\" ]; then exit 0; fi\n"
+            f"exec {shlex.quote(sys.executable)} \"$@\"\n")
+        self.selected.chmod(0o755)
+        self.environment = {name: value for name, value in os.environ.items()
+                            if name not in {"CI", "GITHUB_ACTIONS", "QVOICE_GATES", "VOCELLO_PYTHON"}}
+        # The shell's own python3 is the test's interpreter, never the shim of an outer dev.sh.
+        ambient = self.root / "ambient"
+        ambient.mkdir()
+        (ambient / "python3").symlink_to(sys.executable)
+        shim = str(ROOT / "scripts/lib/python-bin")
+        self.environment["PATH"] = os.pathsep.join(
+            [str(ambient)] + [part for part in os.environ["PATH"].split(os.pathsep) if part != shim])
+
+    def calls(self):
+        return [line for line in self.log.read_text().splitlines() if not line.startswith("-c import ")]
+
+    def source(self, body, **environment):
+        script = f". {shlex.quote(str(ROOT / 'scripts/lib/python.sh'))}\n{body}"
+        return subprocess.run(["bash", "-euo", "pipefail", "-c", script], text=True, capture_output=True,
+                              env={**self.environment, **environment}, timeout=30)
+
+    def test_selects_exports_and_puts_the_shim_first_once(self):
+        result = self.source(
+            f"vocello_use_selected_python {shlex.quote(str(ROOT))}\n"
+            f"vocello_use_selected_python {shlex.quote(str(ROOT))}\n"
+            "printf '%s\\n' \"$VOCELLO_PYTHON\" \"$(command -v python3)\" \"$PATH\"\n"
+            "python3 -c 'print(40 + 2)'\n",
+            VOCELLO_PYTHON=str(self.selected))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        selected, resolved, path, answer = result.stdout.splitlines()
+        shim = str(ROOT / "scripts/lib/python-bin")
+        self.assertEqual(selected, str(self.selected))
+        self.assertEqual(resolved, shim + "/python3")
+        self.assertEqual(path.split(os.pathsep).count(shim), 1)
+        self.assertEqual(answer, "42")
+        # The second selection already runs through the shim, on the selected interpreter.
+        self.assertEqual(self.calls(), [f"{ROOT}/scripts/select_python.py", "-c print(40 + 2)"])
+
+    def test_a_refused_selection_stops_the_caller(self):
+        result = self.source(
+            f"vocello_use_selected_python {shlex.quote(str(ROOT))}\necho reached\n",
+            VOCELLO_PYTHON=str(self.root / "missing python3"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("reached", result.stdout)
+        self.assertIn("VOCELLO_PYTHON", result.stderr)
+
+    def test_the_library_refuses_to_be_executed(self):
+        result = subprocess.run(["bash", str(ROOT / "scripts/lib/python.sh")], text=True, capture_output=True,
+                                env=self.environment, timeout=30)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must be sourced", result.stderr)
+
+    def gate_sandbox(self):
+        """The shipped gate beside stand-ins for the validators and the workflow."""
+        sandbox = self.root / "repository"
+        for relative in ("scripts/check_project_inputs.sh", "scripts/select_python.py", "scripts/lib/python.sh",
+                         "scripts/lib/python-bin/python3", "config/toolchain.json"):
+            target = sandbox / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.symlink_to(ROOT / relative)
+        for relative in ("scripts/lib/contract_gate.py", "scripts/development_workflow.py"):
+            (sandbox / relative).write_text("")
+        return sandbox
+
+    def test_the_gate_runs_validators_and_the_suite_on_the_selected_interpreter(self):
+        # B3: the release preflight calls the gate without scripts/dev.sh, from a shell whose
+        # bare python3 has no pytest.
+        sandbox = self.gate_sandbox()
+        gate = str(sandbox / "scripts/check_project_inputs.sh")
+        for arguments, expected in (
+                ([], [f"{sandbox}/scripts/lib/contract_gate.py", "-m pytest -n auto"]),
+                (["--local"], [f"{sandbox}/scripts/lib/contract_gate.py --local",
+                               f"{sandbox}/scripts/development_workflow.py py"]),
+                (["--python", "none"], [f"{sandbox}/scripts/lib/contract_gate.py"])):
+            with self.subTest(arguments=arguments):
+                self.log.write_text("")
+                result = subprocess.run(["bash", gate, *arguments], text=True, capture_output=True, timeout=60,
+                                        env={**self.environment, "VOCELLO_PYTHON": str(self.selected)})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.calls(), expected)
+
+    def test_the_gate_stops_before_any_validator_when_no_interpreter_is_selected(self):
+        sandbox = self.gate_sandbox()
+        result = subprocess.run(["bash", str(sandbox / "scripts/check_project_inputs.sh")], text=True,
+                                capture_output=True, timeout=60,
+                                env={**self.environment, "VOCELLO_PYTHON": str(self.root / "missing python3")})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("Validating", result.stdout)
+        self.assertIn("VOCELLO_PYTHON", result.stderr)

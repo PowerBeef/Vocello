@@ -15,6 +15,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# The release preflight, the lanes and a direct call start here without
+# scripts/dev.sh, so the gate selects the repository interpreter itself: the
+# shell's bare python3 may have no pytest. Every python3 below, and every
+# python3 a validator starts, then runs on the selected interpreter.
+# shellcheck source=lib/python.sh
+. "$SCRIPT_DIR/lib/python.sh"
+vocello_use_selected_python "$PROJECT_DIR"
+
 LOCAL_MODE=0
 PYTHON_LANE=all
 while [[ $# -gt 0 ]]; do

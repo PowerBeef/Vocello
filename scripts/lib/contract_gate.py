@@ -46,6 +46,7 @@ GATE_INPUTS = (
     "scripts/check_project_inputs.sh",
     "scripts/lib/contract_gate.py",
     "scripts/lib/python-bin/",
+    "scripts/lib/python.sh",
     "scripts/select_python.py",
 )
 

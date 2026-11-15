@@ -8,9 +8,9 @@ cd "$ROOT_DIR"
 
 # Read-only discovery prefers an already-installed interpreter with the pinned
 # test packages. An explicit override never silently falls back to another Python.
-VOCELLO_PYTHON="$(python3 "$ROOT_DIR/scripts/select_python.py")"
-export VOCELLO_PYTHON
-export PATH="$ROOT_DIR/scripts/lib/python-bin:$PATH"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
+vocello_use_selected_python "$ROOT_DIR"
 
 case "${1:-}" in
   check|lint|contracts|py|test|ios|build|run|regen|ci)

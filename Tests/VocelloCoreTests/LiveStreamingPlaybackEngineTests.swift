@@ -5,7 +5,7 @@ import XCTest
 /// The node's clock follows what `AVAudioPlayerNode` was measured to do on macOS 27.2: it runs
 /// only while the node plays, a pause keeps it, and a stop returns it to zero.
 @MainActor
-private final class FakeLivePreviewGraph: LivePreviewAudioGraph {
+final class FakeLivePreviewGraph: LivePreviewAudioGraph {
     enum Scheduled: Equatable {
         case audio(frames: AVAudioFrameCount)
         case silence(frames: AVAudioFrameCount)
@@ -18,6 +18,8 @@ private final class FakeLivePreviewGraph: LivePreviewAudioGraph {
     var isIntact = true
     private var clock: TimeInterval = 0
     private var configurationHandler: (@MainActor () -> Void)?
+    /// The completions of the chunks still queued, in the order they were scheduled.
+    private var pendingCompletions: [@Sendable () -> Void] = []
 
     var nodeSeconds: TimeInterval? { isNodePlaying ? clock : nil }
 
@@ -26,6 +28,15 @@ private final class FakeLivePreviewGraph: LivePreviewAudioGraph {
         scheduled.append(
             onPlayedBack == nil ? .silence(frames: buffer.frameLength) : .audio(frames: buffer.frameLength)
         )
+        if let onPlayedBack { pendingCompletions.append(onPlayedBack) }
+    }
+
+    /// The node plays its oldest queued chunk to the end: the clock advances by its length and
+    /// its completion fires, as AVFAudio does off the main actor.
+    func playOldestChunk(seconds: TimeInterval) {
+        guard isNodePlaying, !pendingCompletions.isEmpty else { return }
+        clock += seconds
+        pendingCompletions.removeFirst()()
     }
 
     func startIfNeeded() throws { isRunning = true }
@@ -38,6 +49,7 @@ private final class FakeLivePreviewGraph: LivePreviewAudioGraph {
         isNodePlaying = false
         clock = 0
         scheduled.removeAll()
+        pendingCompletions.removeAll()
     }
 
     func observeConfigurationChange(_ handler: @escaping @MainActor () -> Void) {

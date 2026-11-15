@@ -616,6 +616,12 @@ targets:
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/SharedSupport/Services/AudioPlaybackResumePolicy.swift
       - path: Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift
+      - path: Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift
+      - path: Sources/iOSSupport/Services/AudioService.swift
+      - path: Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift
+      - path: Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift
+      - path: Sources/SharedSupport/ViewModels/LivePreviewDiagnostics.swift
+      - path: Sources/DesktopShared/MacAppSettingsKeys.swift
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
       - path: Sources/SharedSupport/Services/GenerationOutputVerifier.swift
       - path: Sources/SharedSupport/Services/VoiceClipTranscriber.swift

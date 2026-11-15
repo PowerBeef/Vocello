@@ -196,7 +196,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     /// AVAudioEngine graph + FIFO scheduled-buffer bookkeeping (W2-D
     /// extraction; see `LiveStreamingPlaybackEngine`). Session identity,
     /// staleness guards, published state, timers, and telemetry stay here.
-    private let livePlayback = LiveStreamingPlaybackEngine()
+    private let livePlayback: LiveStreamingPlaybackEngine
     // Smooth-first prebuffer state — set before generation starts,
     // picked up by startLiveSession, cleared at session end.
     @ObservationIgnored private var pendingLivePreviewEstimate: LivePreviewEstimate?
@@ -287,7 +287,10 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         set { playbackProgress.duration = newValue }
     }
 
-    override init() {
+    /// `livePlayback` is the live preview's audio engine; a test passes one built on its own
+    /// audio graph (RF-61, audit finding T9).
+    init(livePlayback: LiveStreamingPlaybackEngine = LiveStreamingPlaybackEngine()) {
+        self.livePlayback = livePlayback
         livePreviewConfiguration = .current()
         super.init()
         bindGenerationEventSource()
@@ -2101,7 +2104,8 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         timer = nil
     }
 
-    private func updatePlaybackProgress() {
+    /// The playhead timer's tick. Not private so a test can tick it without a run loop.
+    func updatePlaybackProgress() {
         switch playbackMode {
         case .file:
             guard let player else { return }

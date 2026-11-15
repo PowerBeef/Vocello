@@ -1653,9 +1653,9 @@ elif [[ "$platform" == "macos" ]]; then
   elif [[ "$lane" == "perf" ]]; then
     # UI-performance scenarios (frame probe + marked windows).
     only_test="VocelloMacUITests/VocelloMacPerfUITests"
-    # The app reads the benchmark's current-take file in any build with telemetry
-    # on (audit E11): one left by an interrupted benchmark would stamp its run and
-    # cell into the generation-active scenario's rows, as it would the benchmark's.
+    # An internal-diagnostics build of the app, which this lane builds, reads the
+    # benchmark's current-take file (audit E11): one left by an interrupted benchmark
+    # would stamp its run and cell into the generation-active scenario's rows.
     rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
     perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
   elif [[ "$lane" == "auto-language" ]]; then

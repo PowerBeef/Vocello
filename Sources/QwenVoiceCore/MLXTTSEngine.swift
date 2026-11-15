@@ -1255,6 +1255,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         try ensureInitialized()
         guard let operationID = beginProactiveModelOperation(.clonePriming) else { return }
         defer { finishModelOperation(id: operationID) }
+        let startedIn = stopGeneration
         cancelIdleUnload()
 
         let requestedTranscript = NativePreparedCloneConditioningCache.normalizedTranscript(
@@ -1281,6 +1282,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 modelID: modelID,
                 reference: reference
             )
+            // A prime that outlived `stop()` publishes nothing on the stopped engine.
+            guard !wasStopped(since: startedIn) else { throw CancellationError() }
             clonePreparationState = ClonePreparationState(
                 phase: .primed,
                 identityKey: result.uiIdentityKey
@@ -1295,8 +1298,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // model is still resident publishes `.loaded` and gets back the
             // idle unload this prime cancelled (AUD-10).
             await unloadAfterCapturedRuntimeFailureIfNeeded(error)
-            clonePreparationState = .idle
-            await settleCancelledModelOperation()
+            if !wasStopped(since: startedIn) {
+                clonePreparationState = .idle
+            }
+            await settleCancelledModelOperation(startedIn: startedIn)
             throw CancellationError()
         } catch let error where Self.isCloneReferenceRejection(error) {
             // The reference was refused before any model was loaded (too long
@@ -1306,8 +1311,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // refused and the resident model keeps its idle unload (a failed
             // preparation published beside a loaded model would hold the
             // weights: `idleUnloadAllowed`).
-            clonePreparationState = .idle
-            await settleCancelledModelOperation()
+            if !wasStopped(since: startedIn) {
+                clonePreparationState = .idle
+            }
+            await settleCancelledModelOperation(startedIn: startedIn)
             throw error
         } catch {
             // A captured MLX failure gets product copy, and the model it may
@@ -1529,6 +1536,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         } catch {
             throw MLXTTSEngineError.unsupportedRequest(error.localizedDescription)
         }
+        let startedIn = stopGeneration
         cancelIdleUnload()
         let decision = supportDecision(for: request)
         guard case .supported = decision else {
@@ -1598,7 +1606,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 // model before the terminal, as the failure path does, so the
                 // load state never claims a model that is gone.
                 let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
-                loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
+                // A take that `stop()` cancelled leaves the stopped engine's state alone:
+                // the stop reset it, and its own cleanup unloads the model.
+                let stopped = wasStopped(since: startedIn)
+                if !stopped {
+                    loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
+                }
                 // Preserve the UI's no-visible-error cancellation contract while
                 // still closing the service-layer transport accumulator.
                 let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
@@ -1614,7 +1627,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 )
                 let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                 await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
+                if !stopped {
+                    rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
+                }
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
@@ -1876,6 +1891,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         if let modelID = residentModelID {
             loadState = .loaded(modelID: modelID)
             await reconcilePrimedClonePreparationWithRuntime()
+            guard !wasStopped(since: startedIn) else { return }
             scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
         } else {
             loadState = .idle

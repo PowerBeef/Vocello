@@ -1535,7 +1535,8 @@ final class IncrementalPCM16WAVFileWriter {
         let handle = try FileHandle(forWritingTo: temporaryURL)
         do {
             try handle.synchronize()
-            try handle.close()
+            // The bytes are on disk; a close that fails after that costs the take nothing.
+            try? handle.close()
         } catch {
             try? handle.close()
             throw error

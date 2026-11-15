@@ -869,6 +869,10 @@ public struct SharedModelComponentStore: Sendable {
         gracePeriod: TimeInterval,
         releasedDigests: Set<String>
     ) throws -> SharedComponentPruneResult {
+        // Without a component store there is nothing to reclaim. A models folder that has only ever
+        // taken plain installs therefore keeps a killed install's `.installing.` directory until
+        // its first shared-component install creates the store (both apps and the CLI install
+        // through the store, so this is a folder from before it existed).
         guard FileManager.default.fileExists(atPath: storeRoot.path) else {
             return SharedComponentPruneResult(removedDigests: [], preservedDigests: [])
         }
@@ -1219,7 +1223,15 @@ public struct SharedModelComponentStore: Sendable {
             }
         }
 
-        try FileManager.default.removeItem(at: replica)
+        // The migration has succeeded by here. A replica that is already gone (a reclaim in
+        // another process swept it as an aged working directory) is the same outcome.
+        do {
+            try FileManager.default.removeItem(at: replica)
+        } catch CocoaError.fileNoSuchFile {
+            // Already removed.
+        } catch let error as NSError where error.domain == NSPOSIXErrorDomain && error.code == Int(ENOENT) {
+            // Already removed.
+        }
         return SharedComponentMigrationResult(
             modelIdentity: manifest.modelIdentity,
             contentDigest: manifest.contentIdentity.digest,

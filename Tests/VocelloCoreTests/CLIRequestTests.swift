@@ -108,6 +108,19 @@ final class CLIRequestTests: XCTestCase {
         XCTAssertFalse(refused(data.appendingPathComponent("outputs/cli/take.wav").path) { _ in throw Busy() })
         XCTAssertFalse(refused("/Users/example/Desktop/take.wav") { _ in throw Busy() })
         XCTAssertTrue(refused("/Users/example/Takes/Custom/a.wav", folder: "/Users/example/Takes") { _ in throw Busy() })
+        // Audit C9: the Mac's default volume ignores letter case, so another spelling of a take
+        // folder names the same takes and is protected while the app holds History.
+        let respelled = "/Users/example/library/application support/qwenvoice/OUTPUTS/custom/take.wav"
+        XCTAssertTrue(refused(respelled) { _ in throw Busy() })
+        XCTAssertTrue(refused("/users/example/takes/custom/a.wav", folder: "/Users/example/Takes") { _ in throw Busy() })
+        XCTAssertFalse(
+            refused("/Users/example/library/application support/qwenvoice/outputs/CLI/take.wav") { _ in throw Busy() },
+            "the CLI's own folder stays writable under any spelling"
+        )
+        XCTAssertTrue(GenerateCommand.isPath("/Data/Outputs/a.wav", inside: "/data/outputs"))
+        XCTAssertTrue(GenerateCommand.isPath("/data/outputs/a.wav", inside: "/data/outputs/"))
+        XCTAssertFalse(GenerateCommand.isPath("/data/outputs-old/a.wav", inside: "/data/outputs"), "a sibling folder")
+        XCTAssertFalse(GenerateCommand.isPath("/data/outputs", inside: "/data/outputs"), "the folder itself is not inside it")
     }
 
     // MARK: - Identity

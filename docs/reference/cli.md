@@ -344,7 +344,8 @@ never share a file. An explicit `--out` that names an existing file is replaced 
 successful take (QC and publication passed), and a stderr note says so before boot. It never replaces
 a History take's audio, as `history export` never does: History is asked, and while the app holds it a
 file in a folder the app writes takes to counts as one (`outputs/cli` aside); either is refused as
-`output_unavailable` (73) before boot. Failed startup,
+`output_unavailable` (73) before boot. Both checks compare paths whatever their letter case, as the
+Mac's default volume does, so another spelling of a take's path is the same take. Failed startup,
 QC, cancellation and publication preserve any previous destination. Only attempt-owned staging is
 discarded. Clone rejects a reference/output alias (including symlink and hardlink aliases).
 Two successful writers to the same explicit destination use last-publication-wins; use distinct

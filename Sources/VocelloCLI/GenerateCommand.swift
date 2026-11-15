@@ -1288,7 +1288,8 @@ public enum GenerateCommand {
     /// A take never replaces a History take's audio, as `history export` never
     /// does (RF-29): History says whether the file `--out` would replace is one,
     /// and while it cannot be read (the app holds it) a file in a folder the app
-    /// writes takes to counts as one, `outputs/cli` aside.
+    /// writes takes to counts as one, `outputs/cli` aside. Both compare paths
+    /// whatever their letter case.
     static func refuseReplacingTake(
         _ output: OutputDestination, dataDir: URL, appOutputFolder: String?, isTakeAudio: (URL) throws -> Bool
     ) throws {
@@ -1301,8 +1302,7 @@ public enum GenerateCommand {
         } catch {
             func inside(_ folder: URL) -> Bool {
                 let root = folder.standardizedFileURL.path
-                let prefix = root.hasSuffix("/") ? root : root + "/"
-                return url.path.hasPrefix(prefix) || resolved.path.hasPrefix(prefix)
+                return isPath(url.path, inside: root) || isPath(resolved.path, inside: root)
             }
             let outputs = dataDir.appendingPathComponent("outputs", isDirectory: true)
             let takeFolders = [outputs] + (appOutputFolder.map {
@@ -1316,6 +1316,14 @@ public enum GenerateCommand {
                 hint: "pass another --out path"
             )
         }
+    }
+
+    /// Whether `path` lies inside the folder `root`, compared as the Mac's
+    /// default volume names files: whatever the letter case, so `Outputs/` and
+    /// `outputs/` are one folder here as they are on disk.
+    static func isPath(_ path: String, inside root: String) -> Bool {
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return path.range(of: prefix, options: [.caseInsensitive, .anchored]) != nil
     }
 
     /// `yyyyMMdd_HHmmss` in the POSIX locale and the Gregorian calendar.

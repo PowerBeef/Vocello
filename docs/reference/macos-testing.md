@@ -49,6 +49,18 @@ request). None of them needs UI execution, installed generation models, or relea
 purpose: Xcode 26.6 can compile and then wait indefinitely before spawning `xctest` for these
 hostless bundles through `xcodebuild`, so no `.xcresult` is produced for this lane.
 
+Two of the runtime tests compare the watermark port with fixtures minted from the PyTorch
+reference (`AudioSealParityTests`: the whole-buffer parity test and the windowed-path test). The
+fixtures and the exported generator weights are not committed, so both tests skip unless
+`QWENVOICE_AUDIOSEAL_FIXTURES` names a directory that holds `parity-fixtures.safetensors` and
+`audioseal-generator-fused.safetensors`; ordinary CI never sets it, and there is no default path.
+Export the variable before the lane to run them:
+`QWENVOICE_AUDIOSEAL_FIXTURES=<fixtures directory> scripts/macos_test.sh test`. The verdict says
+which happened in its `audioseal_parity=` line (`ran (2 tests against the reference fixtures)`,
+`skipped (2 of 2 tests: QWENVOICE_AUDIOSEAL_FIXTURES is unset)`, or `not run` when the runtime
+tests never reached them); the line reports and never changes the verdict, and a run that skipped
+them is no parity evidence.
+
 `scripts/macos_test.sh test --coverage` is opt-in and non-blocking: it builds the bundles with
 `-enableCodeCoverage YES` (which flips the shared macOS cache and forces a rebuild, so it is never
 part of `scripts/dev.sh check` or push CI), runs them with `LLVM_PROFILE_FILE` under the run directory, and
@@ -76,8 +88,19 @@ The gate is release tooling, not the daily loop: `.github/workflows/release.yml`
 suite CI already ran is skipped while `scripts/` and `config/` are clean, and CI ignores it),
 `foundation-build` (`build_foundation_targets.sh macos`), `deterministic-tests` (the same bundles as
 `test`: `VocelloCoreTests`, which the gate no longer runs a second time, and the Qwen3 runtime
-tests) and the gate-fatal `crash-delta` over `.ips` files newer than the run's marker. Every step
-lands in a required-step ledger with the verdict under `build/artifacts/macos/gates/`.
+tests) and the gate-fatal `crash-delta` over the app's diagnostic reports newer than the run's
+marker. Every step lands in a required-step ledger with the verdict under
+`build/artifacts/macos/gates/`.
+
+The crash delta of the gate, of `release-readiness` and of the macOS XCUITest lanes reads the same
+reports (`mac_new_diagnostic_reports` in `scripts/lib/shared.sh`): the app's crash reports
+(`Vocello-*.ips`, and the legacy `.crash`), hang reports (`.hang`) and spin reports (`.spin`), in
+`~/Library/Logs/DiagnosticReports` and, when it can be read, `/Library/Logs/DiagnosticReports`,
+where spindump writes hangs and spins. macOS writes a report a few seconds after the process died
+or was sampled, so a read that finds nothing waits `QVOICE_CRASH_DELTA_SETTLE_SECONDS` (default 5)
+and reads once more before it passes. The engine lanes' delta, which compares content digests
+before and after the run (`scripts/publish_benchmark_history.py`), reads the same report kinds and
+settles the same way.
 
 `QWENVOICE_GATE_BENCH=1` adds two steps. A `benchmark-preflight` before step 0 takes seconds: a
 quiet host, the canonical hardware profile, the installed benchmark model and a prediction of the

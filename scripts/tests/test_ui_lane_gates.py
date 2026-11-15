@@ -9,6 +9,8 @@ nothing builds, launches the app or publishes.
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any
 import unittest
 
@@ -291,6 +293,100 @@ class RefusedTakeLaneTests(unittest.TestCase):
                 )
                 self.assertEqual(completed.returncode, 0, completed.stderr)
                 self.assertEqual(completed.stdout.strip(), f"[{expected}]")
+
+
+class MacCrashDeltaTests(unittest.TestCase):
+    """audit step 45: the crash delta reads the app's crash, hang and spin reports,
+    and waits a short settle time before the read that decides."""
+
+    ARMED_AT = 1_800_000_000
+
+    def sandbox(self):
+        shell = UIFunctionShell(self)
+        out = shell.path / "run"
+        out.mkdir()
+        user = shell.home / "Library/Logs/DiagnosticReports"
+        user.mkdir(parents=True)
+        system = shell.path / "system-reports"
+        system.mkdir()
+        marker = out / ".mac-crash-marker"
+        marker.write_text("", encoding="utf-8")
+        os.utime(marker, (self.ARMED_AT, self.ARMED_AT))
+        return shell, out, user, system
+
+    def report(self, directory: Path, name: str, *, seconds_after_arming: int = 10) -> Path:
+        path = directory / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("stand-in report", encoding="utf-8")
+        os.utime(path, (self.ARMED_AT + seconds_after_arming, self.ARMED_AT + seconds_after_arming))
+        return path
+
+    def delta(self, shell, out: Path, system: Path, *, settle: str = "0", before: str = ""):
+        (out / "new-crashes.txt").unlink(missing_ok=True)
+        completed = shell.run(
+            ("check_mac_crash_delta",),
+            f"out={quote(out)}\nmac_crash_marker={quote(out / '.mac-crash-marker')}\nstatus=0\n{before}"
+            'check_mac_crash_delta || status=$?\necho "status=$status"\n',
+            env={"QVOICE_CRASH_DELTA_SETTLE_SECONDS": settle, "QVOICE_SYSTEM_DIAGNOSTIC_REPORTS": str(system)},
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        new = out / "new-crashes.txt"
+        return int(completed.stdout.strip().rsplit("status=", 1)[1]), (
+            new.read_text(encoding="utf-8").splitlines() if new.exists() else None)
+
+    def test_the_delta_holds_crash_hang_and_spin_reports_of_the_app_only(self) -> None:
+        shell, out, user, system = self.sandbox()
+        # Reports from before the run, of other processes and of other kinds never count.
+        self.report(user, "Vocello-2026-11-01-090000.ips", seconds_after_arming=-60)
+        self.report(system, "Vocello_2026-11-01-090000_host.hang", seconds_after_arming=-60)
+        self.report(user, "VocelloMacUITests-Runner-2026-11-15-101501.ips")
+        self.report(user, "Safari_2026-11-15-101506_host.hang")
+        self.report(system, "Vocello_2026-11-15-101505_host.cpu_resource.diag")
+        self.assertEqual(self.delta(shell, out, system), (0, None))
+        expected = [
+            self.report(user, "Vocello-2026-11-15-101500.ips"),
+            self.report(user, "Retired/Vocello_2026-11-15-101504_host.crash"),
+            self.report(user, "Vocello_2026-11-15-101503_host.spin"),
+            self.report(system, "Vocello_2026-11-15-101502_host.hang"),
+        ]
+        status, new = self.delta(shell, out, system)
+        self.assertEqual(status, 1)
+        self.assertEqual(sorted(new or []), sorted(str(path) for path in expected))
+
+    def test_each_report_kind_fails_the_delta_by_itself(self) -> None:
+        for directory, name in (
+            ("user", "Vocello-2026-11-15-101500.ips"),
+            ("user", "Vocello_2026-11-15-101503_host.hang"),
+            ("system", "Vocello_2026-11-15-101502_host.hang"),
+            ("system", "Vocello_2026-11-15-101503_host.spin"),
+        ):
+            with self.subTest(directory=directory, name=name):
+                shell, out, user, system = self.sandbox()
+                report = self.report(user if directory == "user" else system, name)
+                self.assertEqual(self.delta(shell, out, system), (1, [str(report)]))
+
+    def test_a_report_that_lands_after_the_run_is_caught_by_the_settled_read(self) -> None:
+        shell, out, user, system = self.sandbox()
+        late = user / "Vocello-2026-11-15-101510.ips"
+        # macOS writes the report a moment after the process died: here, one second in.
+        write_late = f"( sleep 1; touch {quote(late)} ) &\n"
+        os.utime(out / ".mac-crash-marker", None)        # armed now, so the late report is newer
+        self.assertEqual(self.delta(shell, out, system, settle="3", before=write_late), (1, [str(late)]))
+        # The same report with no settle time is missed: the read came before it landed.
+        late.unlink()
+        self.assertEqual(self.delta(shell, out, system, settle="0", before=write_late), (0, None))
+
+    def test_a_delta_that_cannot_be_read_fails_closed(self) -> None:
+        shell, out, user, system = self.sandbox()
+        (out / ".mac-crash-marker").unlink()
+        self.assertEqual(self.delta(shell, out, system), (1, ["crash marker was never armed"]))
+        shell, out, user, system = self.sandbox()
+        user.rmdir()
+        self.assertEqual(self.delta(shell, out, system), (1, ["could not inspect macOS crash reports"]))
+        # The system directory is read when it is there; its absence is not a failure.
+        shell, out, user, system = self.sandbox()
+        system.rmdir()
+        self.assertEqual(self.delta(shell, out, system), (0, None))
 
 
 class BenchContextFileTests(unittest.TestCase):

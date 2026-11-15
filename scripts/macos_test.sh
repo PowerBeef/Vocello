@@ -285,6 +285,36 @@ write_mac_test_summary() {
   return "$status"
 }
 
+# The reference-fixture watermark parity tests of Qwen3RuntimeTests (audit T13).
+# They compare the AudioSeal port with fixtures minted from the PyTorch
+# reference; the fixtures are not committed, so the tests skip unless
+# QWENVOICE_AUDIOSEAL_FIXTURES names a directory that holds them (ordinary CI
+# never does). Reads the runtime log the lane already has and says which
+# happened, so a run that skipped them never reads as parity evidence. The
+# path itself is never printed.
+AUDIOSEAL_PARITY_TESTS='testWholeBufferParityAgainstReferenceFixtures|testWindowedPathMatchesWholeBufferExactly'
+
+audioseal_parity_outcome() {
+  local log_path="$1" ran skipped
+  local test_case="Test Case '-\[Qwen3RuntimeTests\.AudioSealParityTests ($AUDIOSEAL_PARITY_TESTS)\]'"
+  ran="$(grep -cE "$test_case (passed|failed) " "$log_path" 2>/dev/null || true)"
+  skipped="$(grep -cE "$test_case skipped " "$log_path" 2>/dev/null || true)"
+  ran="${ran:-0}"
+  skipped="${skipped:-0}"
+  if (( skipped > 0 )); then
+    if [[ -z "${QWENVOICE_AUDIOSEAL_FIXTURES:-}" ]]; then
+      printf 'skipped (%s of %s tests: QWENVOICE_AUDIOSEAL_FIXTURES is unset)\n' "$skipped" "$((ran + skipped))"
+    else
+      printf 'skipped (%s of %s tests: the QWENVOICE_AUDIOSEAL_FIXTURES directory holds no parity fixtures)\n' \
+        "$skipped" "$((ran + skipped))"
+    fi
+  elif (( ran > 0 )); then
+    printf 'ran (%s tests against the reference fixtures)\n' "$ran"
+  else
+    printf 'not run (the runtime tests never reached them)\n'
+  fi
+}
+
 # SwiftPM diagnostics can be written between fragments of an XCTest stdout line.
 # Keep both streams verbatim, with only verdict stdout entering the parser.
 run_runtime_test_command() {
@@ -1598,6 +1628,10 @@ cmd_test() {
   printf 'test_build=%s\ncore=%s\nruntime=%s\ncore_summary=%s\nruntime_summary=%s\n' \
     "$test_build_st" "$core_st" "$runtime_st" "$core_summary_st" "$runtime_summary_st" \
     > "$artifacts/verdict.txt"
+  # Whether the reference-fixture watermark parity tests ran or skipped (audit
+  # T13): reported beside the statuses, never a verdict input.
+  printf 'audioseal_parity=%s\n' "$(audioseal_parity_outcome "$artifacts/runtime.log")" \
+    >> "$artifacts/verdict.txt"
   if (( coverage )); then
     # Non-blocking in this pass: coverage is measured and retained, never a verdict input.
     if (( coverage_st == 0 )) && [[ -f "$artifacts/coverage-summary.txt" ]]; then
@@ -1821,10 +1855,12 @@ run_gate_bench() {
 gate_crash_delta() {
   local gate_dir="$1" crash_marker="$2"
   cmd_crashes >>"$gate_dir/crashes.log" 2>&1 || return 1
-  local diagnostic_root="$HOME/Library/Logs/DiagnosticReports" new_ips
-  new_ips="$(find "$diagnostic_root" -name 'Vocello-*.ips' -newer "$crash_marker" 2>/dev/null || true)"
-  if [[ -n "$new_ips" ]]; then
-    printf '%s\n' "$new_ips" >"$gate_dir/new-crashes.txt"
+  # The app's crash, hang and spin reports written during the run, read after a
+  # short settle time (scripts/lib/shared.sh, mac_new_diagnostic_reports).
+  local new_reports
+  new_reports="$(mac_new_diagnostic_reports "$crash_marker" 2>/dev/null || true)"
+  if [[ -n "$new_reports" ]]; then
+    printf '%s\n' "$new_reports" >"$gate_dir/new-crashes.txt"
     return 1
   fi
 }

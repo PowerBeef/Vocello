@@ -771,11 +771,13 @@ arm_mac_crash_marker() {
 }
 
 # Returns non-zero and records the reports; the ledger step that wraps this
-# function owns the verdict and the caller dies with the recorded status.
+# function owns the verdict and the caller dies with the recorded status. The
+# delta holds the app's crash, hang and spin reports, read after a short settle
+# time (scripts/lib/shared.sh, mac_new_diagnostic_reports).
 check_mac_crash_delta() {
-  local root="$HOME/Library/Logs/DiagnosticReports" new
+  local new
   [[ -f "$mac_crash_marker" ]] || { echo "crash marker was never armed" >"$out/new-crashes.txt"; return 1; }
-  new="$(find "$root" -name 'Vocello-*.ips' -newer "$mac_crash_marker" -print 2>"$out/crash-delta.log")" \
+  new="$(mac_new_diagnostic_reports "$mac_crash_marker" 2>"$out/crash-delta.log")" \
     || { echo "could not inspect macOS crash reports" >"$out/new-crashes.txt"; return 1; }
   [[ -z "$new" ]] || { printf '%s\n' "$new" >"$out/new-crashes.txt"; return 1; }
   return 0

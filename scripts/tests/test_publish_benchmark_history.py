@@ -7,6 +7,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import plistlib
 from types import SimpleNamespace
@@ -1752,6 +1753,75 @@ class PublisherTests(unittest.TestCase):
         (after / "crashes" / "new.ips").write_bytes(b"new")
         with self.assertRaises(publisher.PublicationError):
             publisher.crash_delta_from_snapshot(snapshot, expected_scope="ios", diagnostics=after)
+
+    def test_the_macos_crash_delta_holds_hang_and_spin_reports_and_settles_before_it_decides(self) -> None:
+        """audit step 45: a report can land a few seconds after the process died."""
+        home = self.root / "home"
+        user = home / "Library" / "Logs" / "DiagnosticReports"
+        system = self.root / "system-reports"
+        user.mkdir(parents=True)
+        system.mkdir()
+        (user / "Vocello-2026-11-01-090000.ips").write_bytes(b"an earlier crash")
+        (system / "Vocello_2026-11-01-090000_host.hang").write_bytes(b"an earlier hang")
+        snapshot = self.root / "macos" / "benchmark-source.json"
+        sleeps: list[float] = []
+        environment = {
+            publisher.SYSTEM_DIAGNOSTIC_REPORTS_VARIABLE: str(system),
+            publisher.CRASH_DELTA_SETTLE_VARIABLE: "0",
+        }
+
+        def delta() -> dict:
+            return publisher.crash_delta_from_snapshot(snapshot, expected_scope="macos")
+
+        with (
+            mock.patch.object(Path, "home", return_value=home),
+            mock.patch.dict(os.environ, environment),
+            mock.patch.object(publisher, "history_git_state", side_effect=source_fixture),
+            mock.patch.object(publisher, "macos_host_identity", return_value={}),
+            mock.patch.object(publisher.time, "sleep", side_effect=sleeps.append),
+        ):
+            publisher.capture_snapshot(snapshot, "macos")
+            self.assertEqual(delta(), {"passed": True, "count": 0})
+            # Other processes' reports and other report kinds never count.
+            (user / "VocelloMacUITests-Runner-2026-11-15-101501.ips").write_bytes(b"the runner")
+            (user / "Safari_2026-11-15-101506_host.hang").write_bytes(b"another app")
+            (system / "Vocello_2026-11-15-101505_host.cpu_resource.diag").write_bytes(b"a resource report")
+            self.assertEqual(delta(), {"passed": True, "count": 0})
+            self.assertEqual(sleeps, [])                    # a zero settle time never waits
+            for directory, name in (
+                (user, "Vocello-2026-11-15-101500.ips"),
+                (user, "Vocello_2026-11-15-101504_host.crash"),
+                (user, "Vocello_2026-11-15-101503_host.spin"),
+                (system, "Vocello_2026-11-15-101502_host.hang"),
+            ):
+                with self.subTest(report=name):
+                    report = directory / name
+                    report.write_bytes(name.encode("utf-8"))
+                    with self.assertRaisesRegex(publisher.PublicationError, "1 new crash report"):
+                        delta()
+                    report.unlink()
+
+            # A report that lands during the settle time is in the read that decides.
+            late = user / "Vocello-2026-11-15-101510.ips"
+            os.environ[publisher.CRASH_DELTA_SETTLE_VARIABLE] = "4"
+            with mock.patch.object(
+                publisher.time, "sleep",
+                side_effect=lambda seconds: (sleeps.append(seconds), late.write_bytes(b"late"))[0],
+            ):
+                with self.assertRaisesRegex(publisher.PublicationError, "1 new crash report"):
+                    delta()
+            self.assertEqual(sleeps, [4.0])
+            # A delta that already found a report does not wait.
+            with self.assertRaises(publisher.PublicationError):
+                delta()
+            self.assertEqual(sleeps, [4.0])
+        self.assertEqual(publisher.DEFAULT_CRASH_DELTA_SETTLE_SECONDS, 5.0)
+        for raw, expected in ((None, 5.0), ("", 5.0), ("0", 0.0), ("2.5", 2.5), ("-1", 5.0), ("soon", 5.0)):
+            with self.subTest(settle=raw), mock.patch.dict(os.environ, clear=False):
+                os.environ.pop(publisher.CRASH_DELTA_SETTLE_VARIABLE, None)
+                if raw is not None:
+                    os.environ[publisher.CRASH_DELTA_SETTLE_VARIABLE] = raw
+                self.assertEqual(publisher.crash_delta_settle_seconds(), expected)
 
     def test_language_hint_only_is_partial_and_ordered(self) -> None:
         matrix = self.root / "matrix.json"

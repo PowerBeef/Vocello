@@ -25,6 +25,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 import wave
 from typing import Any, Iterable
 import xml.etree.ElementTree as ET
@@ -399,15 +400,52 @@ def history_git_state() -> dict[str, Any]:
     return _load_history_module().git_state()
 
 
+# The app's macOS diagnostic reports (RF-61, audit step 45): a crash report is
+# `Vocello-<date>.ips` (the legacy form ends `.crash`); a hang or a spin is
+# `Vocello_<date>_<host>.hang` or `.spin`, which spindump writes to the system
+# directory. scripts/lib/shared.sh (mac_new_diagnostic_reports) keeps the same
+# list for the UI lanes and the gate.
+MACOS_REPORT_PATTERNS = ("Vocello-*.ips", "Vocello[-_]*.crash", "Vocello[-_]*.hang", "Vocello[-_]*.spin")
+SYSTEM_DIAGNOSTIC_REPORTS_VARIABLE = "QVOICE_SYSTEM_DIAGNOSTIC_REPORTS"
+# macOS writes a report a few seconds after the process died or was sampled, so
+# a delta that found nothing waits this long and reads once more.
+CRASH_DELTA_SETTLE_VARIABLE = "QVOICE_CRASH_DELTA_SETTLE_SECONDS"
+DEFAULT_CRASH_DELTA_SETTLE_SECONDS = 5.0
+
+
+def macos_report_paths() -> list[Path]:
+    """The app's crash, hang and spin reports in the user's report directory
+    and, when it can be read, the system's."""
+    roots = [
+        Path.home() / "Library" / "Logs" / "DiagnosticReports",
+        Path(os.environ.get(SYSTEM_DIAGNOSTIC_REPORTS_VARIABLE) or "/Library/Logs/DiagnosticReports"),
+    ]
+    paths: list[Path] = []
+    for root in roots:
+        try:
+            if not root.is_dir():
+                continue
+            for pattern in MACOS_REPORT_PATTERNS:
+                paths.extend(path for path in root.glob(pattern) if path.is_file())
+        except OSError:
+            continue
+    return paths
+
+
+def crash_delta_settle_seconds() -> float:
+    raw = os.environ.get(CRASH_DELTA_SETTLE_VARIABLE)
+    try:
+        seconds = float(raw) if raw not in (None, "") else DEFAULT_CRASH_DELTA_SETTLE_SECONDS
+    except ValueError:
+        return DEFAULT_CRASH_DELTA_SETTLE_SECONDS
+    return seconds if math.isfinite(seconds) and seconds >= 0 else DEFAULT_CRASH_DELTA_SETTLE_SECONDS
+
+
 def crash_digests(scope: str, diagnostics: Path | None = None) -> list[str]:
     if scope == "none":
         return []
     if scope == "macos":
-        root = Path.home() / "Library" / "Logs" / "DiagnosticReports"
-        candidates = [
-            path for path in root.glob("*.ips")
-            if path.name.startswith("Vocello-")
-        ] if root.is_dir() else []
+        candidates = macos_report_paths()
     elif scope == "ios":
         if diagnostics is None or not diagnostics.is_dir():
             raise PublicationError("iOS crash proof requires a pulled pre-run diagnostics directory")
@@ -510,6 +548,12 @@ def crash_delta_from_snapshot(
         raise PublicationError("pre-run crash digest set is malformed")
     after = crash_digests(expected_scope, diagnostics)
     added = sorted(set(after) - set(before))
+    if not added and expected_scope == "macos":
+        # A report can land a few seconds after the run: the final read waits for it.
+        settle = crash_delta_settle_seconds()
+        if settle > 0:
+            time.sleep(settle)
+            added = sorted(set(crash_digests(expected_scope, diagnostics)) - set(before))
     if added:
         raise PublicationError(f"benchmark produced {len(added)} new crash report(s)")
     return {"passed": True, "count": 0}

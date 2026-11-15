@@ -38,6 +38,7 @@ def _research_prefixes() -> tuple[str, ...]:
 
 
 ANALYSIS_LOCK_ROOT_VARIABLE = "QVOICE_DELIVERY_ANALYSIS_LOCK_ROOT"
+CRASH_DELTA_SETTLE_VARIABLE = "QVOICE_CRASH_DELTA_SETTLE_SECONDS"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -48,6 +49,9 @@ def pytest_configure(config: pytest.Config) -> None:
     root = tempfile.mkdtemp(prefix="vocello-analysis-lock-")
     config.stash[_LOCK_ROOT_KEY] = root
     os.environ[ANALYSIS_LOCK_ROOT_VARIABLE] = root
+    # No test waits out the crash delta's settle time (five seconds on a lane);
+    # the tests of the settle itself set it.
+    os.environ.setdefault(CRASH_DELTA_SETTLE_VARIABLE, "0")
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:

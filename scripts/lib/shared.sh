@@ -158,6 +158,42 @@ _process_tree() {
   done
 }
 
+# The app's macOS diagnostic reports that are newer than MARKER (RF-61, audit
+# step 45), one path per line: the crash delta of the UI lanes and the gate.
+#   mac_new_diagnostic_reports MARKER
+# A crash report is `Vocello-<date>.ips` (the legacy form ends `.crash`); a hang
+# or a spin is `Vocello_<date>_<host>.hang` or `.spin`, which spindump writes
+# to the system directory. macOS writes a report a few seconds after the process
+# died or was sampled, so a first read that finds nothing waits
+# QVOICE_CRASH_DELTA_SETTLE_SECONDS (default 5) and reads once more; that read
+# is the verdict. Returns non-zero when the user's report directory cannot be
+# inspected. The system directory (QVOICE_SYSTEM_DIAGNOSTIC_REPORTS, by default
+# /Library/Logs/DiagnosticReports) is read when it is readable.
+# scripts/publish_benchmark_history.py (MACOS_REPORT_PATTERNS) keeps the same
+# list for the engine lanes' digest delta.
+mac_new_diagnostic_reports() {
+  local marker="$1" settle="${QVOICE_CRASH_DELTA_SETTLE_SECONDS:-5}" found
+  found="$(_mac_diagnostic_reports_newer_than "$marker")" || return 1
+  if [[ -z "$found" && "$settle" =~ ^[0-9]+$ ]] && (( settle > 0 )); then
+    sleep "$settle"
+    found="$(_mac_diagnostic_reports_newer_than "$marker")" || return 1
+  fi
+  [[ -z "$found" ]] || printf '%s\n' "$found"
+}
+
+_mac_diagnostic_reports_newer_than() {
+  local marker="$1" user_root="$HOME/Library/Logs/DiagnosticReports"
+  local system_root="${QVOICE_SYSTEM_DIAGNOSTIC_REPORTS:-/Library/Logs/DiagnosticReports}"
+  local -a reports=(
+    \( -name 'Vocello-*.ips' -o -name 'Vocello[-_]*.crash'
+    -o -name 'Vocello[-_]*.hang' -o -name 'Vocello[-_]*.spin' \)
+  )
+  find "$user_root" -type f "${reports[@]}" -newer "$marker" -print || return 1
+  if [[ -d "$system_root" && -r "$system_root" ]]; then
+    find "$system_root" -maxdepth 1 -type f "${reports[@]}" -newer "$marker" -print 2>/dev/null || true
+  fi
+}
+
 # Publish one qualified artifact directory into benchmarks/runs; the evidence is
 # preserved and the exact repair command printed when publication fails.
 record_benchmark_history() {

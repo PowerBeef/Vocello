@@ -5,6 +5,7 @@ The shipped functions run from the sourced scripts/macos_test.sh (scripts/tests/
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import sys
 import unittest
@@ -133,6 +134,146 @@ cmd_core_test --only ExampleTests --repeat {shlex.quote(repeat)}
                 self.assertNotEqual(code, 0)
                 self.assertEqual((runs, builds), (0, []))
                 self.assertIn("--repeat must be a count", stderr)
+
+
+def runtime_log(*cases: tuple[str, str]) -> str:
+    """A `swift test` log of Qwen3RuntimeTests holding the given (test, verdict) cases."""
+    lines = ["Test Suite 'Selected tests' started at now."]
+    lines += [
+        f"Test Case '-[Qwen3RuntimeTests.{test}]' {verdict} (0.001 seconds)." for test, verdict in cases
+    ]
+    skipped = sum(1 for _, verdict in cases if verdict == "skipped")
+    failed = sum(1 for _, verdict in cases if verdict == "failed")
+    lines.append(f"Test Suite 'Selected tests' {'failed' if failed else 'passed'} at now.")
+    lines.append(
+        f"\t Executed {len(cases)} tests, with "
+        + (f"{skipped} tests skipped and " if skipped else "")
+        + f"{failed} failures (0 unexpected) in 0.010 seconds"
+    )
+    return "\n".join(lines) + "\n"
+
+
+PARITY = ("AudioSealParityTests testWholeBufferParityAgainstReferenceFixtures",
+          "AudioSealParityTests testWindowedPathMatchesWholeBufferExactly")
+# The synthetic-weight tests of the same class always run; they are not parity evidence.
+SYNTHETIC = ("AudioSealParityTests testStreamableConvPaddingPreservesFrameArithmetic", "passed")
+
+
+class WatermarkParityOutcomeTests(unittest.TestCase):
+    """audit T13: the test lane says whether the reference-fixture watermark parity
+    tests ran or skipped, from the runtime log it already has."""
+
+    def outcome(self, log_text: str | None, fixtures: str | None = None) -> str:
+        shell = LaneShell(self, "macos_test.sh")
+        log = shell.path / "runtime.log"
+        if log_text is not None:
+            log.write_text(log_text, encoding="utf-8")
+        environment = {"QWENVOICE_AUDIOSEAL_FIXTURES": fixtures} if fixtures is not None else {}
+        completed = shell.run(f"audioseal_parity_outcome {shlex.quote(str(log))}\n", env=environment)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return completed.stdout.strip()
+
+    def test_the_outcome_names_what_the_parity_tests_did(self) -> None:
+        skipped = runtime_log(SYNTHETIC, *((test, "skipped") for test in PARITY))
+        self.assertEqual(
+            self.outcome(skipped), "skipped (2 of 2 tests: QWENVOICE_AUDIOSEAL_FIXTURES is unset)")
+        # A path that holds no fixtures skips them too; the path itself is never printed.
+        with_path = self.outcome(skipped, fixtures="/fixture-root/audioseal")
+        self.assertEqual(
+            with_path,
+            "skipped (2 of 2 tests: the QWENVOICE_AUDIOSEAL_FIXTURES directory holds no parity fixtures)",
+        )
+        self.assertNotIn("/fixture-root", with_path)
+        ran = runtime_log(SYNTHETIC, *((test, "passed") for test in PARITY))
+        self.assertEqual(
+            self.outcome(ran, fixtures="/fixture-root/audioseal"), "ran (2 tests against the reference fixtures)")
+        # A parity test that ran and failed still ran; the runtime status carries the failure.
+        failed = runtime_log((PARITY[0], "failed"), (PARITY[1], "passed"))
+        self.assertEqual(self.outcome(failed, fixtures="/x"), "ran (2 tests against the reference fixtures)")
+        # The synthetic tests alone, an empty log and a missing log are no parity run.
+        for log_text in (runtime_log(SYNTHETIC), "", None):
+            with self.subTest(log=log_text):
+                self.assertEqual(self.outcome(log_text), "not run (the runtime tests never reached them)")
+
+    def run_lane(self, runtime_text: str) -> tuple[int, str, str]:
+        """The real `cmd_test` over stand-in bundles and a `swift` that prints `runtime_text`."""
+        shell = LaneShell(self, "macos_test.sh")
+        root = shell.path / "evidence"
+        core = shell.path / "core.log"
+        core.write_text(COMPLETE, encoding="utf-8")
+        runtime = shell.path / "runtime-fixture.log"
+        runtime.write_text(runtime_text, encoding="utf-8")
+        products = shell.path / "swiftpm-bin"
+        shell.tool(
+            "swift",
+            'case "$*" in\n'
+            '  *--show-bin-path*) echo "$QV_SANDBOX/swiftpm-bin" ;;\n'
+            f'  test\\ *) cat {shlex.quote(str(runtime))} ;;\n'
+            "esac\nexit 0",
+        )
+        body = f"""QVOICE_ARTIFACTS_MACOS={shlex.quote(str(root))}
+mkdir -p "$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release/mlx-swift_Cmlx.bundle" {shlex.quote(str(products))}
+qv_stub build_mac_test_bundles
+run_mac_test_bundle() {{ cp {shlex.quote(str(core))} "$2"; }}
+qv_stub acquire_native_lock
+qv_stub release_native_lock
+qv_stub ensure_swiftpm_scratch_location
+qv_stub assert_macho_arm64_only
+qv_stub write_build_provenance
+cmd_test
+"""
+        completed = shell.run(body)
+        [verdict] = list((root / "tests").glob("mac-test-*/verdict.txt"))
+        return completed.returncode, verdict.read_text(encoding="utf-8"), completed.stderr
+
+    def test_the_lanes_verdict_carries_the_outcome_and_never_depends_on_it(self) -> None:
+        code, verdict, stderr = self.run_lane(runtime_log(SYNTHETIC, *((test, "skipped") for test in PARITY)))
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("runtime=0\n", verdict)
+        self.assertIn(
+            "audioseal_parity=skipped (2 of 2 tests: QWENVOICE_AUDIOSEAL_FIXTURES is unset)\n", verdict)
+        # The verdict is printed, so the summary on screen says it too.
+        self.assertIn("audioseal_parity=skipped", stderr)
+        self.assertIn("test verdict: PASS", stderr)
+        code, verdict, stderr = self.run_lane(runtime_log(SYNTHETIC, *((test, "passed") for test in PARITY)))
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("audioseal_parity=ran (2 tests against the reference fixtures)\n", verdict)
+
+
+class GateCrashDeltaTests(unittest.TestCase):
+    """audit step 45: the gate's crash delta holds hang and spin reports too."""
+
+    def test_a_new_hang_report_fails_the_gates_crash_delta(self) -> None:
+        shell = LaneShell(self, "macos_test.sh")
+        reports = shell.home / "Library/Logs/DiagnosticReports"
+        reports.mkdir(parents=True)
+        system = shell.path / "system-reports"
+        system.mkdir()
+        gate = shell.path / "gate"
+        gate.mkdir()
+        marker = gate / ".crash-marker"
+        marker.write_text("", encoding="utf-8")
+        armed_at = 1_800_000_000
+        os.utime(marker, (armed_at, armed_at))
+        # A report from before the run never counts.
+        earlier = reports / "Vocello-2026-11-01-090000.ips"
+        earlier.write_text("stand-in crash report", encoding="utf-8")
+        os.utime(earlier, (armed_at - 60, armed_at - 60))
+        body = (
+            "qv_stub cmd_crashes\nstatus=0\n"
+            f"gate_crash_delta {shlex.quote(str(gate))} {shlex.quote(str(marker))} || status=$?\n"
+            'echo "status=$status"\n'
+        )
+        environment = {"QVOICE_CRASH_DELTA_SETTLE_SECONDS": "0", "QVOICE_SYSTEM_DIAGNOSTIC_REPORTS": str(system)}
+        completed = shell.run(body, env=environment)
+        self.assertIn("status=0", completed.stdout, completed.stderr)
+        self.assertFalse((gate / "new-crashes.txt").exists())
+        hang = system / "Vocello_2026-11-15-101502_host.hang"
+        hang.write_text("stand-in hang report", encoding="utf-8")
+        os.utime(hang, (armed_at + 10, armed_at + 10))
+        completed = shell.run(body, env=environment)
+        self.assertIn("status=1", completed.stdout, completed.stderr)
+        self.assertEqual((gate / "new-crashes.txt").read_text(encoding="utf-8"), f"{hang}\n")
 
 
 if __name__ == "__main__":

@@ -302,6 +302,12 @@ command holds a lease, and it deletes no model while one does on any Mac
 still counts the app whenever it runs, loaded or not, since an app that is running can load a model
 at any moment.
 
+The command line finds a running app three ways, in this order (`DesktopAppPresence`): a live lease
+of kind `app`, the workspace's list of running applications, and, when both find nothing, the process
+table, where it looks for the `Vocello` executable inside a `Vocello.app` bundle. The last one covers
+a session the workspace list does not reach, such as ssh, cron or a launchd job; a bundle renamed on
+disk is found only by the first two. Process paths are compared in memory and written nowhere.
+
 Streaming is the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
 **not** play audio as it generates: there is no live preview player; `--play` plays the completed file.

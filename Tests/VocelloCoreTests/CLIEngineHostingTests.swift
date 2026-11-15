@@ -878,6 +878,76 @@ private final class Flag {
     var isSet = false
 }
 
+/// RF-61 (audit finding C4): the command line finds the running app from a
+/// session the workspace cannot see into (ssh, cron, launchd).
+final class DesktopAppPresenceTests: XCTestCase {
+    func testOnlyTheAppsOwnExecutableInsideItsBundleIsTheApp() {
+        XCTAssertTrue(DesktopAppPresence.isAppExecutable("/Applications/Vocello.app/Contents/MacOS/Vocello"))
+        XCTAssertTrue(DesktopAppPresence.isAppExecutable("/Volumes/Build/Release/Vocello.app/Contents/MacOS/Vocello"),
+                      "whatever folder holds the bundle")
+        let others = [
+            "/usr/local/lib/vocello/vocello",
+            "/usr/local/bin/Vocello",
+            "/Applications/Vocello.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate",
+            "/Applications/Vocello.app/Contents/MacOS/Vocello Helper",
+            "/Volumes/Build/Release/VocelloMacUITests-Runner.app/Contents/MacOS/VocelloMacUITests-Runner",
+            "/Applications/MyVocello.app/Contents/MacOS/Vocello",
+            "/Applications/Vocello.app/Contents/MacOS/vocello",
+            "",
+        ]
+        for path in others {
+            XCTAssertFalse(DesktopAppPresence.isAppExecutable(path), path)
+        }
+    }
+
+    func testTheLeaseIsReadFirstThenTheWorkspaceThenTheProcessTable() {
+        let app = EngineHostLease.Host(pid: 7, kind: "app", startedAt: "2026-11-15T00:00:00Z")
+        let commandLine = EngineHostLease.Host(pid: 8, kind: "cli", startedAt: "2026-11-15T00:00:00Z")
+        var asked: [String] = []
+        func detects(leases: [EngineHostLease.Host], workspace: Bool, paths: [String]) -> Bool {
+            asked = []
+            return DesktopAppPresence.detectsRunningApp(
+                leaseHosts: {
+                    asked.append("leases")
+                    return leases
+                },
+                workspaceSeesApp: {
+                    asked.append("workspace")
+                    return workspace
+                },
+                executablePaths: {
+                    asked.append("processes")
+                    return paths
+                }
+            )
+        }
+        XCTAssertTrue(detects(leases: [commandLine, app], workspace: false, paths: []))
+        XCTAssertEqual(asked, ["leases"], "the app's own lease settles it")
+
+        XCTAssertTrue(detects(leases: [commandLine], workspace: true, paths: []))
+        XCTAssertEqual(asked, ["leases", "workspace"], "a command line's lease is not the app")
+
+        // From ssh the workspace may see nothing: the process table answers.
+        XCTAssertTrue(detects(
+            leases: [], workspace: false,
+            paths: ["/sbin/launchd", "/Applications/Vocello.app/Contents/MacOS/Vocello"]
+        ))
+        XCTAssertEqual(asked, ["leases", "workspace", "processes"])
+
+        XCTAssertFalse(detects(
+            leases: [commandLine], workspace: false, paths: ["/sbin/launchd", "/usr/local/lib/vocello/vocello"]
+        ), "a process named vocello is the command line, not the app")
+    }
+
+    func testTheProcessTableNamesThisProcess() throws {
+        let own = try XCTUnwrap(Bundle.main.executableURL?.lastPathComponent)
+        let paths = DesktopAppPresence.runningExecutablePaths()
+        XCTAssertTrue(paths.contains { URL(fileURLWithPath: $0).lastPathComponent == own },
+                      "the kernel lists the test host among \(paths.count) processes")
+        XCTAssertTrue(paths.allSatisfy { $0.hasPrefix("/") }, "each entry is a whole path")
+    }
+}
+
 @MainActor
 private final class EventLog {
     var lines: [String] = []

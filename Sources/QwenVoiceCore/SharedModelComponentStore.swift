@@ -966,10 +966,10 @@ public struct SharedModelComponentStore: Sendable {
     /// Working directories whose newest change is older than `cutoff`. Called under the
     /// publication lock, so an install's final exchange cannot interleave with the sweep.
     ///
-    /// The age is the newest ctime of the directory and its immediate children. That also covers a
-    /// migration replica after its swap, when it holds the original model for a possible rollback:
-    /// building the replica hard-linked every file of that model, which refreshed each file's
-    /// ctime, so the original stays fresh for the whole grace period.
+    /// The age is the newest ctime of the directory and of everything under it. That also covers
+    /// a migration replica after its swap, when it holds the original model for a possible
+    /// rollback: building the replica hard-linked every file of that model, which refreshed each
+    /// file's ctime, so the original stays fresh for the whole grace period.
     private func abandonedWorkingDirectories(olderThan cutoff: Date) -> [URL] {
         let entries = (try? FileManager.default.contentsOfDirectory(
             at: modelsRoot,
@@ -980,7 +980,7 @@ public struct SharedModelComponentStore: Sendable {
             guard Self.isWorkingDirectoryName(entry.lastPathComponent),
                   let status = SharedComponentFileSystem.linkStatus(entry),
                   status.isDirectory,
-                  let changedAt = SharedComponentFileSystem.newestChangeTime(of: entry) else {
+                  let changedAt = SharedComponentFileSystem.newestChangeTime(ofTree: entry) else {
                 return false
             }
             return changedAt < cutoff
@@ -1596,6 +1596,24 @@ private enum SharedComponentFileSystem {
             isRegularFile: (info.st_mode & S_IFMT) == S_IFREG,
             isDirectory: (info.st_mode & S_IFMT) == S_IFDIR
         )
+    }
+
+    /// The newest ctime of `root` and of every entry under it, without following symlinks. `nil`
+    /// when `root` itself cannot be read; the sweep leaves such a directory alone.
+    static func newestChangeTime(ofTree root: URL) -> Date? {
+        guard var newest = linkStatus(root)?.changedAt else { return nil }
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [],
+            errorHandler: { _, _ in true }
+        ) else { return newest }
+        for case let url as URL in enumerator {
+            if let changedAt = linkStatus(url)?.changedAt, changedAt > newest {
+                newest = changedAt
+            }
+        }
+        return newest
     }
 
     /// How many paths under `root` link each regular file. An entry that cannot be read is not

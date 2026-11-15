@@ -92,10 +92,11 @@ Sampling algorithm v2 resolves one immutable policy at the product boundary. Eve
 effective seed and owns a fresh `MLXRandom.RandomState`; categorical draws run under that
 task-local state and never advance the process-global RNG.
 
-- **Talker.** Under the default Expressive variation the talker uses the official generation
-  parameters; Balanced and Consistent lower its temperature and top-p.
-- **Code predictor (subtalker).** It samples at the reference's 0.9 / top-k 50 / top-p 1.0 for every
-  variation (RF-18 follow-up screen, 2026-10-20), remains independently configurable through
+- **Talker.** The talker uses the official generation parameters on every take. The host's Balanced
+  and Consistent variations, which lowered its temperature and top-p, were retired by RF-58; the
+  former Expressive is the only sampling.
+- **Code predictor (subtalker).** It samples at the reference's 0.9 / top-k 50 / top-p 1.0 on every
+  take (RF-18 follow-up screen, 2026-10-20), remains independently configurable through
   diagnostics, takes the talker's min-p (0 in production), and never applies the repetition penalty.
 - **Precision.** Both stages sample from float32 logits, as Qwen's reference does (SAMPLER-003,
   production since 2026-10-13); the cast is lazy inside the per-frame graph and adds no

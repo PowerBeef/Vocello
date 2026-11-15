@@ -24,7 +24,9 @@ the upstream README's model catalogue as evidence that a model is supported by t
 ## Supported model contract
 
 The owned model family is **Qwen3-TTS 12 Hz**. Vocello currently selects the 1.7B Base, CustomVoice,
-and VoiceDesign families in 4-bit and 8-bit variants. The authoritative repository IDs, pinned
+and VoiceDesign families, one mixed-precision artifact each: 4-bit weights with the talker's
+attention projections at 8 bits. The runtime still loads the uniform 4-bit and 8-bit artifacts that
+3.0 shipped. The authoritative repository IDs, pinned
 Hugging Face revisions, artifact versions, required files, tokenizer profile, and platform eligibility
 live in:
 
@@ -71,7 +73,8 @@ segment or from the host's internal-diagnostics knobs, a `VocelloQwen3ReferenceP
 Without one, production takes `VocelloQwen3ReferenceParity.production`: float32 sampling logits (D3,
 2026-10-13), the talker's EOS filtered like any token (D2, 2026-10-20) and full-text conditioning for
 streamed takes (D1, 2026-10-20, RF-21); a long-form segment turns D1 off to keep trailing text. The
-host gives the subtalker the reference sampling for every variation (RF-18).
+host gives the subtalker the reference sampling on every take (RF-18). The host's Balanced and
+Consistent variations are retired (RF-58), so every take now samples as Expressive did.
 
 The actor closes its inert-reservation and critical-relief lifecycle explicitly.
 Reserved, generating, and aborting states prevent open-after-abort and make duplicate aborts join

@@ -491,18 +491,25 @@ Deleting, clearing and recovery come with the cross-process History lock (RF-30)
 ### `settings`: read and change the app's settings
 
 `vocello settings [list|get <name>] [--json]` reads the Mac app's preferences (`com.qwenvoice.app`):
-`autoplay`, `output-folder`, `prefer-lower-memory`, `variant.custom|design|clone`
-(`automatic` when unset) and `interface-language` (read-only). Each row says whether it is the app's
-default. Voice-cloning consent is never a CLI setting.
+`autoplay`, `output-folder`, `interface-language` (read-only) and the retired settings below. Each
+row says whether it is the app's default. Voice-cloning consent is never a CLI setting.
 
 `vocello settings set <name> <value>` changes one as the app's Settings do and reports its new row:
-`autoplay` and `prefer-lower-memory` take `true` or `false` (`on`/`off`, `yes`/`no` too);
-`output-folder` an existing folder or `default`;
-`variant.<mode>` `speed`, `quality` or `automatic` (`automatic` removes the choice, `default` the folder);
-turning `prefer-lower-memory` on clears every per-mode choice, as the app's toggle does. A bad
-value or name is `invalid_input` (`variation`, retired by RF-58, is no longer a setting);
-`interface-language` stays the app's. The app reads each value when
-it next needs it, and a running app is told (`com.qwenvoice.shared.settingsDidChange`).
+`autoplay` takes `true` or `false` (`on`/`off`, `yes`/`no` too); `output-folder` an existing folder
+or `default`. A bad value or name is `invalid_input`; `interface-language` stays the app's. The app
+reads each value when it next needs it, and a running app is told
+(`com.qwenvoice.shared.settingsDidChange`).
+
+**Retired settings still resolve, so a 3.0 script keeps running.** None of them changes which model
+or sampling a take uses:
+
+- `prefer-lower-memory` (`true` or `false`) and `variant.custom|design|clone` (`speed`, `quality` or
+  `automatic`, which removes the choice and is what an unset one reads) are still read and stored, because an older app or CLI reads
+  them, and turning `prefer-lower-memory` on still clears every per-mode choice. Since RF-59 each
+  mode has one model, so every value resolves to it. `models use` and `models prefer-lower-memory`
+  say so with a `variant_retired` warning.
+- `variation` (retired by RF-58) reads `expressive`. Setting it accepts `expressive`, `balanced` or
+  `consistent`, stores nothing and warns `variation_retired`, as `--variation` does.
 
 **A running app hears every change.** Each write posts a distributed notification named for its store
 (`com.qwenvoice.shared.{savedVoices,models,settings}DidChange`; `SharedStoreChange` in
@@ -622,12 +629,12 @@ vocello models active [--json]             # the package each mode uses, as the 
 vocello models install <id> [--verbose]    # headless download into the shared models dir
 vocello models install-recommended [--plan] # the package each mode uses (`models active`); --plan downloads nothing
 vocello models remove <id>                  # an installed model, its staging and the shared files only it used
-vocello models use <mode> speed|quality|automatic   # the app's per-mode package choice
-vocello models prefer-lower-memory on|off           # the app's "Prefer lower-memory models"
+vocello models use <mode> speed|quality|automatic   # retired (RF-59): stored, changes nothing, warns variant_retired
+vocello models prefer-lower-memory on|off           # retired (RF-59): stored, changes nothing, warns variant_retired
 ```
 
-`install-recommended` installs, for each mode, the package `models active` names (the app's explicit
-choice, the lower-memory preference, then this Mac's recommendation); its result lists each with
+`install-recommended` installs, for each mode, the package `models active` names, which since RF-59
+is the mode's one model whatever the stored choice or preference says; its result lists each with
 `planned`, `update_planned` or `already_installed` with `--plan`, else `installed`, `updated` or
 `already_installed`; a failure keeps the rows already installed. `remove` deletes as the app's model
 manager does and is refused (`engine_busy`) while the Vocello app or another vocello engine runs, since
@@ -643,7 +650,9 @@ installed and whose new one is not with `↑ … update required` (`updateRequir
 the app updates it.
 
 `use` and `prefer-lower-memory` set the same preferences as `settings set variant.<mode>` and
-`settings set prefer-lower-memory`; `models active` shows what each mode then resolves to.
+`settings set prefer-lower-memory`. Both are retired: each mode has one model, so the value is stored
+and nothing else changes, and the command warns `variant_retired`. `models active` shows the model
+each mode resolves to.
 
 `verify` reads every byte of each installed model and compares it with the authenticated catalog's
 exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any difference exits 1 with
@@ -651,8 +660,10 @@ exact sizes and SHA-256 digests (`--ndjson` reports progress per file); any diff
 
 Shows each model's install state, on-disk size, and (for `status`) any missing required files.
 `install` uses the same `HuggingFaceDownloader` as the macOS app: a CLI-installed model is
-immediately usable in the app, and vice versa. Variant-scoped ids (`pro_custom_speed`, `…_quality`)
-are what `generate --variant` selects. Foreground sessions are invalidated on every terminal path;
+immediately usable in the app, and vice versa. The variant-scoped ids are `pro_custom_speed`,
+`pro_design_speed` and `pro_clone_speed`: each mode's one model, the hybrid, keeps the `speed` id,
+and no `…_quality` id exists since RF-59. `generate --variant quality` warns `variant_retired` and
+uses that model. Foreground sessions are invalidated on every terminal path;
 durable staging precedes terminal continuation, bounded progress retains the exact final count,
 transient retries preserve valid staging, explicit cancellation discards it, and compact local
 metrics are bounded under `diagnostics/model-downloads/`. See

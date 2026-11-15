@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
 sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
@@ -150,28 +150,40 @@ history for the prior artifact generation.
 
 ## Artifact provenance
 
-The six artifacts are MLX conversions of `Qwen/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}`,
-published as `PowerBeef02/Qwen3-TTS-12Hz-1.7B-<variant>-{4bit,8bit}` at the revisions the catalogs pin:
-Speed is the 4-bit tier, Quality the 8-bit one. Files, byte counts and SHA-256 digests live only in the
-catalogs: `Sources/Resources/qwenvoice_production_model_catalog.json`, generated from
-`config/model-artifact-receipts.json` (which holds the Quality receipts), and, for the iPhone's Speed
-artifacts, `Sources/Resources/qwenvoice_ios_model_catalog.json` (`scripts/model_catalog_contract.py`).
+The three shipped artifacts are the hybrids, one per mode, published as
+`PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-hybrid-attn` at the revisions the
+catalogs pin (`artifactVersion` 2026.11.13.1). Each is every tensor of Vocello's 4-bit 3.0 artifact
+of the mode, except the talker's attention projections, which come from its 8-bit 3.0 artifact
+([hybrid-model.md](hybrid-model.md)). The six 3.0 artifacts,
+`PowerBeef02/Qwen3-TTS-12Hz-1.7B-<variant>-{4bit,8bit}` (Speed was the 4-bit tier, Quality the 8-bit
+one), are no longer in the catalog; each is mlx-community's MLX conversion of
+`Qwen/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}` at a pinned revision, with the two changes
+below (the 8-bit text embedding and the marking generator). Files, byte counts and SHA-256 digests
+live only in the catalogs: the bundled iPhone catalog
+`Sources/Resources/qwenvoice_ios_model_catalog.json` holds the three hybrids' receipts, and
+`Sources/Resources/qwenvoice_production_model_catalog.json` is generated from it and from
+`config/model-artifact-receipts.json`, which holds Mac-only receipts and is empty
+(`scripts/model_catalog_contract.py`).
 
 - **Quantization.** Affine, group size 64, over every talker and code-predictor projection, the 15
-  code-predictor heads, `codec_head`, `small_to_mtp_projection` and `text_projection`. The talker's text
-  embedding is 8-bit in both tiers, Vocello's one change to the weights
+  code-predictor heads, `codec_head`, `small_to_mtp_projection` and `text_projection`: 4-bit in a
+  hybrid, except the talker's attention projections (`q_proj`, `k_proj`, `v_proj`, `o_proj` in its 28
+  layers), which are 8-bit. The talker's text
+  embedding is 8-bit in both 3.0 tiers and so in the hybrid, Vocello's one change to the weights
   (`scripts/convert_text_embedding_8bit.py`, 2026-07-26): it saved 292 MB on disk and changed
   fixed-seed output. Codec embeddings, norms and biases stay bf16, the Base speaker encoder stays float,
   and compute runs in bf16, so the talker KV cache is bf16.
 - **Shared codec.** `speech_tokenizer/model.safetensors` is fp32 and byte-identical to Qwen's release.
 - **Marking.** `marking/audioseal_wm16_generator_fp16.safetensors` is Meta's AudioSeal generator (MIT).
 - **`generation_config.json`** is upstream's, unchanged.
-- **A hybrid candidate (RF-55, not published).** `scripts/build_hybrid_model.py` assembles a
-  mixed-precision artifact per mode from the installed, verified 4-bit and 8-bit ones; its recipe,
-  identity proof, screens and delivery steps are in [hybrid-model.md](hybrid-model.md).
+- **The hybrid (RF-55, published 2026-11-13, shipped by RF-59).** `scripts/build_hybrid_model.py`
+  assembles a mixed-precision artifact per mode from the verified 4-bit and 8-bit 3.0 ones, with no
+  requantization; its recipe, identity proof, screens and delivery steps are in
+  [hybrid-model.md](hybrid-model.md).
 - **`artifactVersion` history.** 2026.04.05.2 → 2026.05.25.1 → 2026.07.26.1 (8-bit text embedding) →
   2026.08.01.1 (f16 codec, withdrawn) → 2026.08.06.1 (AudioSeal) → 2026.09.14.1 (fp32 codec restored
-  after a burst in the first 50 ms of streamed clone takes).
+  after a burst in the first 50 ms of streamed clone takes; the last two-package generation) →
+  2026.11.13.1 (one hybrid per mode).
 
 The sourced verification is section 7 of the
 [ER-13 model research](../audits/2026-10-17-qwen3-tts-model-research.md#7-vocellos-shipped-artifacts-verified).

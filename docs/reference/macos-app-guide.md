@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface — plus macOS permissions (TCC), code signing and the dev loop, the UI test runner's grants, and permissions_doctor.sh diagnosis (§7).
 sourceOfTruth:
   - Sources/Views
@@ -86,8 +86,9 @@ The dock holds Generate and Batch while idle, progress/cancellation while prepar
 inline player once live audio or a completed take is available. All three modes replace the
 idle action row with the completed player; Retry, Save As, Reveal and Dismiss remain on that card.
 Design additionally offers Save as Voice when its completed take still matches the current draft.
-The shared backdrop and per-mode accents follow iOS. Speed/Quality remain in the window toolbar;
-setup chips wrap when the actual available width cannot fit them.
+The shared backdrop and per-mode accents follow iOS. The window toolbar shows no Speed/Quality
+switch since RF-59, because each mode has one model (Settings, below); setup chips wrap when the
+actual available width cannot fit them.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 
@@ -276,7 +277,7 @@ line-by-line batch runs on `MacLineBatchRunner`, one ordinary Studio take per li
 History append, telemetry merge); a long-form project runs on the shared iOS
 `IOSLongFormCoordinator` / `IOSLongFormProjectRunner` with `MacStudioLongFormPlatformHooks`. Both run
 under the mode's `StudioGenerationCoordinator`, so the canvas behind the sheet locks and shows the
-live card exactly as during a single take, and the batch uses the Settings Speed/Quality variant.
+live card exactly as during a single take, and the batch uses the mode's one model.
 Every item — line-separated and long-form — is an ordinary sequential streaming take (mandatory
 engine Fast QC, streaming telemetry, live preview). Long-form additionally plans segments, joins
 them into one WAV, and lands a single project row in History. Resume and per-segment regeneration

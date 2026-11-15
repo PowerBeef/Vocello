@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-11
+reviewed: 2026-11-15
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -91,22 +91,39 @@ not the open checkpoints.
 | 25 Hz Base and CustomVoice, 25Hz-1.7B-VoiceEditing, Tokenizer-25Hz | — | paper only | — | never released |
 
 There is no 0.6B VoiceDesign. mlx-community publishes bf16, 4-, 5-, 6- and 8-bit conversions of all
-five models, unchanged since 2026-01-25; Vocello ships its own conversions instead (§2.2, §2.3).
+five models, unchanged since 2026-01-25; Vocello's artifacts descend from its 4-bit and 8-bit
+conversions of the three 1.7B models (§2.2, §2.3).
 
 ### 2.2 What Vocello ships
 
-Three model ids, each in two variants, all MLX conversions of the 1.7B checkpoints published as
-`PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{4bit,8bit}` at the revisions
-`qwenvoice_contract.json` pins (`artifactVersion` `2026.09.14.1`).
+Three model ids, each with one model since RF-59 (2026-11-13): a mixed-precision hybrid of the 1.7B
+checkpoint, published as `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-hybrid-attn`
+at the revisions `qwenvoice_contract.json` pins (`artifactVersion` `2026.11.13.1`). The 3.0 line-up,
+a 4-bit Speed and an 8-bit Quality artifact per mode, is retired.
 
-| Mode (id) | Model id | Upstream checkpoint | Speed, 4-bit | Quality, 8-bit |
+| Mode (id) | Model id | Upstream checkpoint | Hybrid (revision) | Platforms |
 | --- | --- | --- | --- | --- |
-| Built-in Voice (`custom`) | `pro_custom` | 1.7B-CustomVoice | iOS and macOS | macOS |
-| Voice Design (`design`) | `pro_design` | 1.7B-VoiceDesign | iOS and macOS | macOS |
-| Voice Cloning (`clone`) | `pro_clone` | 1.7B-Base | iOS and macOS | macOS |
+| Built-in Voice (`custom`) | `pro_custom` | 1.7B-CustomVoice | `…-CustomVoice-hybrid-attn` (`c36e22ed`) | iOS and macOS |
+| Voice Design (`design`) | `pro_design` | 1.7B-VoiceDesign | `…-VoiceDesign-hybrid-attn` (`6bcae41e`) | iOS and macOS |
+| Voice Cloning (`clone`) | `pro_clone` | 1.7B-Base | `…-Base-hybrid-attn` (`5af70b5c`) | iOS and macOS |
 
-- **Variant selection** (`ModelDescriptor.preferredVariant`, `SemanticTypes.swift:494-512`): the
-  iPhone always takes Speed; a Mac takes Quality unless it is in the `floor8GBMac` memory class.
+- **Lineage.** Each hybrid was built by `scripts/build_hybrid_model.py` from two of Vocello's own
+  3.0 artifacts, with no requantization: every tensor of the 4-bit artifact, except the talker's
+  attention projections (`q_proj`, `k_proj`, `v_proj`, `o_proj` in its 28 layers), taken from the
+  8-bit one ([hybrid-model.md](hybrid-model.md)). Each 3.0 artifact is in turn mlx-community's
+  conversion of the Qwen checkpoint at a pinned revision, with one tensor changed (the text embedding
+  quantized to 8 bits) and Meta's AudioSeal generator added (§2.3).
+
+  | Hybrid | 4-bit parent (revision) | 8-bit parent (revision) | mlx-community bases (4-bit, 8-bit revisions) |
+  | --- | --- | --- | --- |
+  | `…-CustomVoice-hybrid-attn` | `PowerBeef02/…-CustomVoice-4bit` (`29c4b746`) | `…-CustomVoice-8bit` (`50c40b22`) | `f35faf19`, `41d3337e` |
+  | `…-VoiceDesign-hybrid-attn` | `…-VoiceDesign-4bit` (`62f2646e`) | `…-VoiceDesign-8bit` (`bb56faf7`) | `5c390979`, `f90d6177` |
+  | `…-Base-hybrid-attn` | `…-Base-4bit` (`47ab65f7`) | `…-Base-8bit` (`f63ea141`) | `37e955a1`, `e7dd0585` |
+
+- **Variant selection** (`ModelDescriptor.preferredVariant`): each mode has one variant, whose id
+  and kind stay `speed`, so every platform and memory class resolves to the hybrid. The 3.0 rule is
+  still in the code and has nothing left to choose between: the iPhone took Speed, and a Mac took
+  Quality unless it was in the `floor8GBMac` memory class.
 - **Capabilities** (contract `qwen3Capabilities`): `supportsInstructionControl` is true for Custom
   and Design; `supportsVoiceClone`, `supportsXVectorOnlyClone` and `requiresSpeakerEncoder` are true
   only for Clone. An audio-only clone fails before model preparation on a model that does not
@@ -115,11 +132,18 @@ Three model ids, each in two variants, all MLX conversions of the 1.7B checkpoin
 
 ### 2.3 Conversion recipe
 
-- **Quantization:** affine, group size 64, 4-bit (Speed) or 8-bit (Quality), over 251 modules in the
-  4-bit CustomVoice index: every talker and code-predictor projection, the 15 code-predictor heads,
-  `codec_head`, `small_to_mtp_projection` and `text_projection`.
-- **Text embedding:** `talker.model.text_embedding` is 8-bit in both tiers. This is Vocello's one change
-  to the weights (`scripts/convert_text_embedding_8bit.py`, 2026-07-26): 292 MB less on disk, 278 MB
+This is the recipe of the 3.0 artifacts, the hybrid's two parents, followed by the rule that
+combines them.
+
+- **Quantization (the 3.0 artifacts):** affine, group size 64, 4-bit (Speed) or 8-bit (Quality), over
+  251 modules in the 4-bit CustomVoice index: every talker and code-predictor projection, the 15
+  code-predictor heads, `codec_head`, `small_to_mtp_projection` and `text_projection`.
+- **The hybrid's per-layer rule:** the 4-bit artifact's tensors throughout, except the talker's
+  `model.layers.{0..27}.self_attn.{q,k,v,o}_proj` (112 modules), which are the 8-bit artifact's.
+  `config.json` names each of them under `quantization` (`{group_size: 64, bits: 8, mode: affine}`).
+  The talker's MLP projections and the whole code predictor stay at 4 bits.
+- **Text embedding:** `talker.model.text_embedding` is 8-bit in both 3.0 tiers, and so in the hybrid.
+  This is Vocello's one change to the weights (`scripts/convert_text_embedding_8bit.py`, 2026-07-26): 292 MB less on disk, 278 MB
   less MLX peak on an 8 GB Mac, and a change to fixed-seed output.
 - **Kept unquantized:** the talker's codec embeddings, the 15 code-predictor codec embeddings, every
   norm and bias (bf16); the Base speaker encoder (float); the speech tokenizer (fp32, byte-identical to
@@ -132,8 +156,8 @@ Three model ids, each in two variants, all MLX conversions of the 1.7B checkpoin
   unavailable. A collaborator says the code predictor is "extremely sensitive to precision"
   (QwenLM#43); the context is half-precision assertion failures on CUDA, not a quality comparison
   of quantized weights (corrected 2026-11-11). No quantized checkpoint was ever evaluated upstream.
-  Vocello quantizes all 51 code-predictor linear and head modules in both tiers, which the local
-  model files confirm (2026-11-11).
+  Vocello quantizes all 51 code-predictor linear and head modules in both 3.0 tiers, which the
+  local model files confirm (2026-11-11); the hybrid takes them from the 4-bit one.
 - **Precision pre-screen (2026-11-11,
   [review §4.2](../audits/2026-11-11-qwen3-tts-quality-report-review.md#42-4-bit-against-8-bit) and
   [§4.3](../audits/2026-11-11-qwen3-tts-quality-report-review.md#43-where-the-loss-sits-mixed-precision)).**

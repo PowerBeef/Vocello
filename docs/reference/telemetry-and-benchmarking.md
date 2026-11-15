@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -340,7 +340,7 @@ benchmark keeps a fixed 150-character `long` text ([§4.7b](#47b-ios-ui-benchmar
 
 The CLI forces cold via awaited explicit unload before the cold take; unload/load failure stops the
 matrix instead of inventing a warm/cold label. Ordinary Clone uses explicit model loading and
-reference priming before its first measurement ([§4.3](#43-full-6-cell-matrix-speed--quality)).
+reference priming before its first measurement ([§4.3](#43-full-matrix-one-model-per-mode)).
 UI cold takes use an app relaunch + `QWENVOICE_DEBUG=1` + `QWENVOICE_SUPPRESS_WARMUP=1` +
 `QWENVOICE_BENCH_FORCE_COLD=1` (master-gated unload before generate); warm takes stay in-session.
 
@@ -398,19 +398,21 @@ QWENVOICE_DEBUG=1 ./build/vocello bench \
 
 `--force` clears diagnostics before run (default without `--keep`).
 
-### 4.3 Full 6-cell matrix (Speed + Quality)
+### 4.3 Full matrix (one model per mode)
 
-Default CLI includes both variants; fixture installs **Speed only**:
+Since RF-59 each mode has one model, the hybrid, whose variant id is still `speed`. `--variants`
+defaults to every package the contract offers the requested modes, which is `speed`, so the full
+matrix is three modes by three lengths:
 
 ```sh
-# Option A: Speed only (matches models ensure)
 QWENVOICE_DEBUG=1 ./build/vocello bench \
-  --variants speed --lengths short,medium,long --warm 3 --label "speed-matrix"
-
-# Option B: include Quality — ensure Quality weights installed first (~12–18 GB peak disk)
-QWENVOICE_DEBUG=1 ./build/vocello bench \
-  --variants speed,quality --lengths short,medium,long --warm 3 --label "full-matrix"
+  --lengths short,medium,long --warm 3 --label "full-matrix"
 ```
+
+`--variants quality` is refused before any model loads, because the contract offers no Quality
+package. The 3.0 Speed and Quality packages are measured only through
+`scripts/pcm_identity.py capture --stock`, which reads them from the research folder with the last
+two-package contract.
 
 **The ordinary Clone matrix is warm-only by design.** The CLI awaits explicit model loading
 and then primes the reference as Studio does (`ensureCloneReferencePrimed`, the same clone
@@ -925,12 +927,13 @@ limit, would fail, censored heartbeats) and every gated take's `cell=value`. Rec
 matrix, the watchdog definition or the host changes. A contract naming another profile than the
 registry's canonical one fails the gate.
 
-**Variant and retries.** Every take must have run the declared variant (Speed), whatever the tier
-recommends (the 16 GB tier recommends Quality). Before the first take the benchmark makes Speed the
-active variant of each measured mode through the visible toolbar switch
-(`<mode>_speedVariantButton`) and restores the original visible choice when the session ends; it
-never toggles "Prefer lower-memory models", which clears every stored choice. The checker still
-refuses any take that ran another variant. The engine runs in the app, which has exited before
+**Variant and retries.** Every take must have run the declared variant (`speed`, the id the hybrid
+keeps). Since RF-59 each mode has one model and shows no toolbar switch, so that model runs every
+take and the benchmark has nothing to select. Its selection step is still there for a contract
+that offers two packages: it would make Speed active through the visible switch
+(`<mode>_speedVariantButton`), restore the original choice when the session ends, and never toggle
+"Prefer lower-memory models", which clears every stored choice. The checker still refuses any take
+that ran another variant. The engine runs in the app, which has exited before
 validation, so the lane validates once and retries only the checker's distinct "rows not yet
 present" exit (75), for about ten seconds. Timing lanes also let the load of their own build settle
 (up to 90 s, down to the core count) and re-apply the quiet-host rule after build-for-testing,

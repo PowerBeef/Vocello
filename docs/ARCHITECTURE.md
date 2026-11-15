@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-11
+reviewed: 2026-11-15
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -1099,8 +1099,10 @@ records consent per invocation with `--confirm-consent`), `vocello.ios.interface
 macOS through `MacInterfaceLanguage`), `vocello.ios.studioDrafts.v1` (the iPhone Studio drafts,
 saved whenever the scene leaves the foreground and restored at launch so a background termination
 keeps the script; `IOSStudioDraftPersistence`, PA-21), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
-`QwenVoice.PreferSpeedEverywhere` lower-memory preference (`MacModelVariantResolution`: explicit
-choice, then Speed when the preference is on, then the hardware recommendation), and UI state
+`QwenVoice.PreferSpeedEverywhere` lower-memory preference (`MacModelVariantResolution` still reads
+both: explicit choice, then Speed when the preference is on, then the hardware recommendation; since
+RF-59 each mode has one variant, so every order resolves to the same model and the app shows no
+control for either key), and UI state
 (`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`). Debug mode is not
 persisted — `DebugMode.isEnabled` reads `RuntimeDebugGate.isEnabled()` (internal-build capability
 plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any persisted debug toggle.
@@ -1156,17 +1158,19 @@ The contract — `Sources/Resources/qwenvoice_contract.json` — is the canonica
 schema. It defines `defaultSpeaker`, `speakers` (+ `speakerMetadata`), and a
 `models[]` array. Each model entry carries: `id`, `name`, `tier`, `mode`,
 `folder`, `huggingFaceRepo`, `huggingFaceRevision`, `artifactVersion`, `iosDownloadEligible`,
-`estimatedDownloadBytes`, `outputSubfolder`, `requiredRelativePaths[]`, `qwen3Capabilities`, and
-`variants[]` (speed/quality with platforms + hardware recommendation).
+`estimatedDownloadBytes`, `outputSubfolder`, `requiredRelativePaths[]`, `qwen3Capabilities`,
+`retiredFolders[]` (the 3.0 Speed and Quality folders the model replaced) and `variants[]`. Since
+RF-59 each model has one variant, the hybrid, with id and kind `speed` on both platforms.
 
 The generated cross-platform artifact contract is
 `Sources/Resources/qwenvoice_production_model_catalog.json`, governed by
-`config/model-catalog-schema-v2.json` and exact evidence in
-`config/model-artifact-receipts.json` (the three Quality receipts) and the bundled iPhone catalog
-`Sources/Resources/qwenvoice_ios_model_catalog.json` (the three Speed receipts). It is **complete**: all three Speed and all three Quality
-artifacts have exact pinned revisions, file sizes, and SHA-256 digests for every required file.
+`config/model-catalog-schema-v2.json` and exact evidence in the bundled iPhone catalog
+`Sources/Resources/qwenvoice_ios_model_catalog.json`, which holds the receipts of the three hybrid
+artifacts both platforms ship; `config/model-artifact-receipts.json` holds Mac-only receipts and is
+empty. It is **complete**: all three artifacts, one per mode, have exact pinned revisions, file
+sizes, and SHA-256 digests for every required file.
 No missing identity may be inferred or fabricated. Schema v2 identifies the identical
-`speech_tokenizer` component shared by all six artifacts using separate content and compatibility
+`speech_tokenizer` component shared by all three artifacts using separate content and compatibility
 identities plus ordered source artifacts. macOS, CLI, and iOS all resolve an `ArtifactDeliveryPlan`:
 an already verified component store omits those exact bytes from the network, while a new install
 publishes immutable content-addressed blobs and presents ordinary regular files in the model folder
@@ -1175,22 +1179,22 @@ as hard links. Legacy schema-v1 catalog documents remain read-compatible. Determ
 while resolving a schema-v2 delivery plan now authenticates every catalog file in an existing
 installation and automatically migrates or repairs its shared-component presentation. A failed
 local authentication contributes no reusable bytes and leaves the downloader to repair from the
-network. Live validation across all six macOS artifacts and the three iOS Speed artifacts passed on
-2026-07-23 (`sharedComponentStorage` in `config/runtime-refactor-contract.json`); static validation
-and local reconciliation do not by themselves re-prove it after a catalog change.
+network. Live validation passed on 2026-07-23 for the artifacts of that time, six on macOS and
+the three iOS Speed ones (`sharedComponentStorage` in `config/runtime-refactor-contract.json`);
+static validation and local reconciliation do not by themselves re-prove it after a catalog change.
 
 The shipped model ids:
 
-| Model ID | Mode | Speed repo (4-bit) | Quality repo (8-bit) |
+| Model ID | Variant-scoped ID | Mode | Repository (mixed precision) |
 | --- | --- | --- | --- |
-| `pro_custom` | Built-in Voice | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit` | `…-8bit` |
-| `pro_design` | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit` | `…-8bit` |
-| `pro_clone` | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit` | `…-8bit` |
+| `pro_custom` | `pro_custom_speed` | Built-in Voice | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn` |
+| `pro_design` | `pro_design_speed` | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn` |
+| `pro_clone` | `pro_clone_speed` | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn` |
 
-The exact pinned revisions and file digests live in `config/model-artifact-receipts.json` (Quality)
-and `Sources/Resources/qwenvoice_ios_model_catalog.json` (Speed), from which the production catalog
-is generated (`scripts/model_catalog_contract.py`); [`model-delivery.md`](reference/model-delivery.md)
-owns the bytes, digests and artifact history.
+The exact pinned revisions and file digests live in
+`Sources/Resources/qwenvoice_ios_model_catalog.json`, from which the production catalog is generated
+(`scripts/model_catalog_contract.py`); [`model-delivery.md`](reference/model-delivery.md) owns the
+bytes, digests and artifact history, and [`hybrid-model.md`](reference/hybrid-model.md) the recipe.
 
 `ContractBackedModelRegistry` loads the contract and is expanded per-platform
 (`expandedForPlatform(_:deviceClass:includeBaseAliases:)`). Built-in speakers:

@@ -1,8 +1,8 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-12
-summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two shipped artifacts, the identity proof, the evidence that chose it, how it would be delivered, and what one model means for the backend.
+reviewed: 2026-11-15
+summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two shipped artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
   - config/quality-screens.json
@@ -12,17 +12,20 @@ sourceOfTruth:
 
 # Hybrid model (RF-55)
 
-Vocello ships each mode (Built-in Voice, Voice Design, Voice Clone) as two MLX conversions of the
-same Qwen3-TTS checkpoint: Speed, 4-bit, and Quality, 8-bit. The maintainer decided on 2026-11-12
-that a custom model may ship if it beats the stock artifacts at a similar footprint, accepting up to
-20% more generation time. If it is right, one model replaces the Speed/Quality selector. This guide
-records the candidate the screens chose, how it is built, and what it would take to ship.
+Each mode (Built-in Voice, Voice Design, Voice Cloning) has one model: the `attn` hybrid, a
+mixed-precision artifact that replaced the two 3.0 packages, Speed (4-bit) and Quality (8-bit), and
+with them the Speed/Quality selector (RF-59). The maintainer decided on 2026-11-12 that a custom
+model may ship if it beats the stock artifacts at a similar footprint, accepting up to 20% more
+generation time. This guide records the model the screens chose, how it is built, and how it was
+delivered.
 
-**Status (2026-11-12).** `attn` is the single-model candidate (`hybrid-single-model`): every rule it
-was screened by is ADOPT, at about 5% more generation time and 176 MB more weights than Speed. It beats
-Speed in every screen and does not match Quality everywhere (§4, Known limits). Left before it can
-ship: the iPhone's memory and speed, and the maintainer's decisions on publication, hosting and the
-selector's removal. Nothing ships from this guide.
+**Status (2026-11-15).** `attn` is the single model (`hybrid-single-model`): every rule it was
+screened by is ADOPT, and it has 176 MB more weights than Speed. In the formal speed lane its median
+real-time factor on the M6 is 0.303, against 0.279 for Speed and 0.412 for Quality: about 9% more
+generation time than Speed and about 27% less than Quality (per cell, 4 to 6% more than Speed; §4).
+It beats Speed in every screen and does not match Quality everywhere (§4, Known limits). The three
+artifacts were published on 2026-11-13 and the contract, catalog and apps moved to them the same day
+(§5, §6). What is left is listed at the end of §6.
 
 ## 1. The recipe: `attn`
 
@@ -239,7 +242,20 @@ change. RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution
 
-The hybrid is a derivative of Qwen/Qwen3-TTS (Apache-2.0), assembled from Vocello's own MLX
-conversions; its model card says so and names the recipe. The marking generator inside each artifact
-is Meta's AudioSeal (MIT), unchanged. The attribution manifest (`scripts/attribution_manifest.py
-rebuild`) follows the catalog.
+The hybrid is a derivative of Qwen/Qwen3-TTS (Apache-2.0). Each one was built by
+`scripts/build_hybrid_model.py` from two of Vocello's own 3.0 artifacts, with no requantization, as
+its published model card says: every tensor of the 4-bit artifact, except the talker's attention
+projections (`q_proj`, `k_proj`, `v_proj`, `o_proj` in its 28 layers), taken from the 8-bit one. Each
+3.0 artifact is in turn mlx-community's conversion of the Qwen checkpoint at a pinned revision, with
+one tensor changed (the text embedding quantized to 8 bits) and Meta's AudioSeal generator added.
+
+| Hybrid (revision) | 4-bit parent (revision) | 8-bit parent (revision) | mlx-community bases (4-bit, 8-bit revisions) |
+| --- | --- | --- | --- |
+| `…-CustomVoice-hybrid-attn` (`c36e22ed`) | `PowerBeef02/…-CustomVoice-4bit` (`29c4b746`) | `…-CustomVoice-8bit` (`50c40b22`) | `f35faf19`, `41d3337e` |
+| `…-VoiceDesign-hybrid-attn` (`6bcae41e`) | `…-VoiceDesign-4bit` (`62f2646e`) | `…-VoiceDesign-8bit` (`bb56faf7`) | `5c390979`, `f90d6177` |
+| `…-Base-hybrid-attn` (`5af70b5c`) | `…-Base-4bit` (`47ab65f7`) | `…-Base-8bit` (`f63ea141`) | `37e955a1`, `e7dd0585` |
+
+The marking generator inside each artifact is Meta's AudioSeal (MIT), unchanged. The attribution
+manifest (`scripts/attribution_manifest.py rebuild`) follows the catalog and
+`config/third-party-attribution-policy.json`, whose entry for each hybrid names the mlx-community
+4-bit base only; the 8-bit base that supplied the attention tensors is still to be added there.

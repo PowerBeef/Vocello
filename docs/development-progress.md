@@ -17,7 +17,57 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 14: the target is 3.1; the Mac and CLI ship first (resume here)
+### November 15: the remediation plan is implemented up to the lanes (resume here)
+
+The maintainer took all eight decisions of
+[audits/2026-11-15-remediation-plan.md](audits/2026-11-15-remediation-plan.md) as recommended and
+asked for the whole plan. Everything below is committed on local `main` after `9f02d2e7`; nothing is
+pushed, and `origin/main` is still `8f85011b`. The routed check (`scripts/dev.sh check --since
+9f02d2e7`: lint, contracts, every deterministic macOS test, the CLI, the iOS compile and the UI
+bundles) passes on it. **No UI lane has run since November 14**, so the History fix, the lane
+changes and the playback fix are compiled and unit-tested, not measured.
+
+**Done (by plan step)**
+
+- 1 to 5: the History list is built once per change; the CLI's `variation` setting resolves;
+  `models install` reports the folders it removes; the 3.1 notes and the CLI's leftover wording.
+- 6 to 13: the perf lane's History scenarios run on their own profile (400 and 700 rows) and
+  `delivery-menu` runs without warms; ceilings can fail a run once the contract's `enforce` names a
+  scenario (it names none yet); a silent capture, a continuity failure or an underrun fails a
+  benchmark take; lanes check which tests ran (`config/ui-lane-tests.json`); `--no-publish`.
+- 14 (part) to 17: promotion refuses evidence from another Xcode than the release's; the contract
+  gate selects its Python; promotion uses the pinned `gh`; the website check names its browsers.
+- 27 to 36, 38, 39a: the live preview keeps its playhead across a pause and an underrun and queues
+  its resume silence ahead of the audio (measured: `AVAudioPlayerNode` keeps its clock across
+  `pause()`); a long-form project deletes with its segments; player strings are localized; the small
+  app fixes except A11 (declined: not mechanical); the engine fixes E1, E2, E3, E5 to E12 (E9 in
+  part); MCP `delete_voice` behind `--allow-voice-delete`; the CLI fixes C6 to C9, C11, C12; the
+  pause-budget question measured on retained takes (no refusal on 82 en-dash takes; paragraph
+  breaks unmeasured).
+- 43 (start), 44 (test half), 47 to 49, 51 to 53: the player's live preview runs under unit test;
+  the benchmark test records a refused take and goes on; the hook gaps; the shell and lock fixes;
+  `CLAUDE.md`; the tag-signer allow-list; the generated `docs/INDEX.md`.
+
+**Open**
+
+- **★ Xcode (decision D-1, new fact).** Promotion now refuses macOS evidence built with another
+  Xcode than the release's, and the release is pinned to 26.6 while this Mac measures on 27.2.
+  GitHub offers Xcode 27 only on a preview runner image (`xcode-27`, macOS 27.0.1, Xcode 27.2
+  installed, capacity not guaranteed). Moving the pin means running CI and the release on that
+  preview image; keeping 26.6 means installing it here and measuring again. The pin is unchanged
+  until the maintainer chooses.
+- Steps not done: 37 (engine leases both ways), 40 (speed gate, needs three v2 benchmark runs),
+  41 (model update under test), 42 (CLI handlers into the testable module), the rest of 43, 46
+  (signing isolation in `release.yml`), 50 (the pyright baseline, 877 to 792 so far), and A11.
+- The release sitting (step 18) needs the Mac free: the UI benchmark under `cell-hash-v2` first,
+  then perf three times (ceilings and the stall gate's calibration), smoke, `release-readiness`,
+  `scripts/dev.sh ci`, the engine bench, the charts.
+- The publication flip (steps 21 to 26) goes with the release.
+- Found on the way, not fixed: an output-device change under a paused live preview loses the
+  queued audio (offline measurement: a stopped engine drops its node's queue and fires no
+  completion); it needs an attended check before a fix.
+
+### November 14: the target is 3.1; the Mac and CLI ship first
 
 Maintainer decision of November 14: there is no iOS 3.0 release; every platform's next release is
 3.1, and the Mac app and the CLI 3.1 ship first (RF-61), then the iPhone. `origin/main` is at
@@ -54,9 +104,9 @@ different Xcode than the release. Its "Recommended order" lists what to do befor
 release sitting (18 to 20), the publication flip (21 to 26) and what follows 3.1 (27 to 53).
 The maintainer decided D-1 to D-5 as recommended on November 15 (the Xcode pin moves to the 27 line;
 `models install` reports what it removes; MCP voice deletion behind a flag; a long-form project deletes
-with its segments; the benchmark records a refusal); D-6 to D-8 are open. Playwright's browsers are
+with its segments; the benchmark records a refusal); D-6 to D-8 followed the same day. Playwright's browsers are
 installed on this Mac since that day, and `npm --prefix website run check` passes (45 browser tests).
-No step of the plan is implemented yet.
+The section above lists what is implemented.
 
 **Open, in order** ([investigation of November 15](audits/2026-11-15-release-3-1-interruption-investigation.md):
 the refused take is a rare model ending at that seed, 0 refusals in 60 other seeds on the hybrid and on

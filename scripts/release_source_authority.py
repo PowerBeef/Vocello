@@ -13,6 +13,7 @@ the privacy-safe result.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -24,6 +25,24 @@ TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?")
 # `CI required` is the only per-push aggregate. Security analysis runs inside the
 # release workflow on the tagged commit and gates it by job dependency.
 DEFAULT_REQUIRED_CHECKS = ("CI required",)
+CONTRACT_PATH = Path(__file__).resolve().parents[1] / "config" / "release-evidence-contract.json"
+DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
+def allowed_tag_signers(contract_path: Path = CONTRACT_PATH) -> frozenset[str]:
+    """The SHA-256 digests of the tagger emails that may sign a release tag.
+
+    GitHub verifies a tag signed by any key a collaborator registered, so a
+    verified signature alone says "someone with push access", not "the
+    maintainer". The contract lists who may; an empty or malformed list fails
+    closed.
+    """
+    signers = _object(_load_json(contract_path).get("releaseTagSigners"), "releaseTagSigners")
+    digests = signers.get("taggerEmailSHA256")
+    if (not isinstance(digests, list) or not digests
+            or any(not isinstance(item, str) or DIGEST.fullmatch(item) is None for item in digests)):
+        raise ValueError("releaseTagSigners.taggerEmailSHA256 must list lowercase SHA-256 digests")
+    return frozenset(digests)
 
 
 def _load_json(path: Path) -> Any:
@@ -146,6 +165,7 @@ def validate(
     tag_object: Any,
     check_runs: Any,
     push_runs: Any,
+    allowed_signers: frozenset[str],
     required_checks: tuple[str, ...] = DEFAULT_REQUIRED_CHECKS,
 ) -> dict[str, Any]:
     if TAG.fullmatch(tag) is None:
@@ -178,6 +198,17 @@ def validate(
     for field in ("signature", "payload", "verified_at"):
         if not isinstance(verification.get(field), str) or not verification[field]:
             raise ValueError(f"verified tag response is missing {field}")
+    if not allowed_signers:
+        raise ValueError("no release tag signer is allowed")
+    tagger_email = _object(annotated.get("tagger"), "annotated tag tagger").get("email")
+    if not isinstance(tagger_email, str) or not tagger_email.strip():
+        raise ValueError("annotated tag names no tagger email")
+    signer = hashlib.sha256(tagger_email.strip().lower().encode("utf-8")).hexdigest()
+    if signer not in allowed_signers:
+        raise ValueError(
+            "the release tag's signer is not an allowed release signer "
+            "(config/release-evidence-contract.json, releaseTagSigners)"
+        )
 
     rows = _flatten_check_runs(check_runs)
     push_suites = _push_check_suites(push_runs, commit)
@@ -198,6 +229,7 @@ def validate(
         "tagVerification": {
             "reason": "valid",
             "verifiedAt": verification["verified_at"],
+            "signerAllowed": True,
         },
         "checks": checks,
     }
@@ -213,6 +245,8 @@ def main() -> int:
     parser.add_argument("--push-runs", type=Path, required=True,
                         help="actions/runs?head_sha=<commit>&event=push&branch=main pages")
     parser.add_argument("--required-check", action="append", dest="required_checks")
+    parser.add_argument("--signers-contract", type=Path, default=CONTRACT_PATH,
+                        help="the contract whose releaseTagSigners lists who may sign a release tag")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -224,6 +258,7 @@ def main() -> int:
             tag_object=_load_json(args.tag_object),
             check_runs=_load_json(args.check_runs),
             push_runs=_load_json(args.push_runs),
+            allowed_signers=allowed_tag_signers(args.signers_contract),
             required_checks=tuple(args.required_checks or DEFAULT_REQUIRED_CHECKS),
         )
         encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -20,6 +21,8 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
     tag = "v2.4.0"
     commit = "a" * 40
     tag_sha = "b" * 40
+    tagger_email = "Maintainer@Example.invalid"
+    signers = frozenset({hashlib.sha256(b"maintainer@example.invalid").hexdigest()})
 
     def fixtures(self) -> tuple[dict, dict, dict]:
         tag_ref = {
@@ -30,6 +33,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
             "sha": self.tag_sha,
             "tag": self.tag,
             "object": {"type": "commit", "sha": self.commit},
+            "tagger": {"name": "Maintainer", "email": self.tagger_email, "date": "2026-08-26T11:59:00Z"},
             "verification": {
                 "verified": True,
                 "reason": "valid",
@@ -77,6 +81,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
     def test_valid_signed_tag_and_exact_sha_checks_pass(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
         result = module.validate(
+            allowed_signers=self.signers,
             tag=self.tag,
             commit=self.commit,
             tag_ref=tag_ref,
@@ -93,6 +98,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         tag_ref["object"]["type"] = "commit"
         with self.assertRaisesRegex(ValueError, "annotated signed tag"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
@@ -102,6 +108,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         tag_object["verification"].update(verified=False, reason="unsigned")
         with self.assertRaisesRegex(ValueError, "unsigned"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
@@ -111,6 +118,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         tag_object["object"]["sha"] = "c" * 40
         with self.assertRaisesRegex(ValueError, "does not target"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
@@ -120,6 +128,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         checks["check_runs"][0]["head_sha"] = "d" * 40
         with self.assertRaisesRegex(ValueError, "CI required"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(),
             )
@@ -133,6 +142,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         # A re-run of the push: a second push run on main for the same commit.
         with self.assertRaisesRegex(ValueError, "failure"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=checks, push_runs=self.push_runs(101, 102, 103),
             )
@@ -142,6 +152,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         pages = [{"total_count": 3, "check_runs": checks["check_runs"]}]
         with self.assertRaisesRegex(ValueError, "incomplete"):
             module.validate(
+                allowed_signers=self.signers,
                 tag=self.tag, commit=self.commit, tag_ref=tag_ref,
                 tag_object=tag_object, check_runs=pages, push_runs=self.push_runs(),
             )
@@ -153,16 +164,16 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         checks["check_runs"] = [self.check(1, "CI required", conclusion="failure"),
                                 self.check(5, "CI required")]
         with self.assertRaisesRegex(ValueError, "failure"):
-            module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
-                            check_runs=checks, push_runs=self.push_runs(101))
+            module.validate(allowed_signers=self.signers, tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                                tag_object=tag_object,                             check_runs=checks, push_runs=self.push_runs(101))
         # With no push run at all, nothing authorizes it.
         # Nor does a push run of another workflow that names a job the same way.
         for runs in (self.push_runs(105, event="pull_request"), self.push_runs(101, branch="topic"),
                      self.push_runs(101, path=".github/workflows/release-rehearsal.yml"),
                      {"total_count": 0, "workflow_runs": []}):
             with self.subTest(runs=runs), self.assertRaisesRegex(ValueError, "from a push to main"):
-                module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
-                                check_runs={"total_count": 1, "check_runs": [self.check(1, "CI required")]},
+                module.validate(allowed_signers=self.signers, tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                                tag_object=tag_object,                                 check_runs={"total_count": 1, "check_runs": [self.check(1, "CI required")]},
                                 push_runs=runs)
 
     def test_paginated_run_response_must_be_complete(self) -> None:
@@ -170,8 +181,35 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
         runs = self.push_runs(101)
         runs["total_count"] = 3
         with self.assertRaisesRegex(ValueError, "workflow-run response is incomplete"):
-            module.validate(tag=self.tag, commit=self.commit, tag_ref=tag_ref, tag_object=tag_object,
-                            check_runs=checks, push_runs=runs)
+            module.validate(allowed_signers=self.signers, tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                                tag_object=tag_object,                             check_runs=checks, push_runs=runs)
+
+    def test_a_verified_tag_from_an_unlisted_signer_fails_closed(self) -> None:
+        tag_ref, tag_object, checks = self.fixtures()
+        tag_object["tagger"]["email"] = "collaborator@example.invalid"
+        with self.assertRaisesRegex(ValueError, "not an allowed release signer"):
+            module.validate(allowed_signers=self.signers, tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                            tag_object=tag_object, check_runs=checks, push_runs=self.push_runs())
+        del tag_object["tagger"]
+        with self.assertRaisesRegex(ValueError, "tagger"):
+            module.validate(allowed_signers=self.signers, tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                            tag_object=tag_object, check_runs=checks, push_runs=self.push_runs())
+        tag_ref, tag_object, checks = self.fixtures()
+        with self.assertRaisesRegex(ValueError, "no release tag signer"):
+            module.validate(allowed_signers=frozenset(), tag=self.tag, commit=self.commit, tag_ref=tag_ref,
+                            tag_object=tag_object, check_runs=checks, push_runs=self.push_runs())
+
+    def test_the_contract_lists_at_least_one_signer_digest_and_no_address(self) -> None:
+        signers = module.allowed_tag_signers()
+        self.assertTrue(signers)
+        self.assertNotIn("@", module.CONTRACT_PATH.read_text(encoding="utf-8").split('"releaseTagSigners"')[1][:400])
+        with tempfile.TemporaryDirectory() as directory:
+            for value in ({}, {"releaseTagSigners": {"taggerEmailSHA256": []}},
+                          {"releaseTagSigners": {"taggerEmailSHA256": ["not-a-digest"]}}):
+                path = Path(directory) / "contract.json"
+                path.write_text(json.dumps(value), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    module.allowed_tag_signers(path)
 
     def test_cli_output_is_privacy_safe(self) -> None:
         tag_ref, tag_object, checks = self.fixtures()
@@ -180,6 +218,8 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
             for name, value in (("ref", tag_ref), ("tag", tag_object), ("checks", checks),
                                 ("runs", self.push_runs())):
                 (root / f"{name}.json").write_text(json.dumps(value), encoding="utf-8")
+            (root / "contract.json").write_text(
+                json.dumps({"releaseTagSigners": {"taggerEmailSHA256": sorted(self.signers)}}), encoding="utf-8")
             result = subprocess.run(
                 [
                     sys.executable, str(SCRIPT), "--tag", self.tag, "--commit", self.commit,
@@ -187,6 +227,7 @@ class ReleaseSourceAuthorityTests(unittest.TestCase):
                     "--tag-object", str(root / "tag.json"),
                     "--check-runs", str(root / "checks.json"),
                     "--push-runs", str(root / "runs.json"),
+                    "--signers-contract", str(root / "contract.json"),
                 ],
                 check=False,
                 text=True,

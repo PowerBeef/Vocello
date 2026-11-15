@@ -2,6 +2,12 @@
   "schemaVersion": 1,
   "owner": "release-qa",
   "publicationPolicy": "draft-build-verify-attest-await-source-bound-promotion",
+  "releaseTagSigners": {
+    "taggerEmailSHA256": [
+      "bf35ad21b8de35a62da59fa8ad18fafeb6f831321eb4b9df07931c15e09204a3"
+    ],
+    "rule": "A release tag is accepted only when GitHub verified its signature and the SHA-256 of the tagger's lowercased email is listed here. The digest stands for the maintainer's signing identity; the address itself is not stored."
+  },
   "sourceIdentity": [
     "gitCommit",
     "treeDirty",
@@ -28,29 +34,46 @@
       "config/quality-promotion-contract.json",
       "config/orchestration-contract.json"
     ],
-    "toolchainDigest": ["config/toolchain.json"],
+    "toolchainDigest": [
+      "config/toolchain.json"
+    ],
     "projectInputsDigest": [
       "project.yml",
       "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
       "Packages/VocelloQwen3Core/Package.resolved",
       "website/package-lock.json"
     ],
-    "projectDigest": ["project.yml"],
-    "runtimeCapabilitiesDigest": ["Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json"],
-    "compatibilityDigest": ["Packages/VocelloQwen3Core/COMPATIBILITY.json"],
+    "projectDigest": [
+      "project.yml"
+    ],
+    "runtimeCapabilitiesDigest": [
+      "Packages/VocelloQwen3Core/RUNTIME_CAPABILITIES.json"
+    ],
+    "compatibilityDigest": [
+      "Packages/VocelloQwen3Core/COMPATIBILITY.json"
+    ],
     "modelCatalogDigest": [
       "Sources/Resources/qwenvoice_contract.json",
       "Sources/Resources/qwenvoice_production_model_catalog.json"
     ],
-    "qualityPromotionContractDigest": ["config/quality-promotion-contract.json"],
-    "orchestrationContractDigest": ["config/orchestration-contract.json"],
-    "releaseContractDigest": ["config/release-evidence-contract.json"]
+    "qualityPromotionContractDigest": [
+      "config/quality-promotion-contract.json"
+    ],
+    "orchestrationContractDigest": [
+      "config/orchestration-contract.json"
+    ],
+    "releaseContractDigest": [
+      "config/release-evidence-contract.json"
+    ]
   },
   "verificationFreshnessSeconds": 21600,
   "platformVerification": {
     "macos": {
       "workflow": "release-macos-candidate",
-      "requiredSteps": ["release-build", "artifact-verification"]
+      "requiredSteps": [
+        "release-build",
+        "artifact-verification"
+      ]
     },
     "ios": {
       "workflow": "release-ios-candidate",

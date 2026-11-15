@@ -75,9 +75,13 @@ rules they enforce:
   manifest to its branch; CI never writes back.
 - **Exact-source releases.** `release_source_authority.py` proves a GitHub-verified annotated `v*` tag on
   the checked-out commit, containment in `origin/main` and a successful latest `CI required` run of a
-  push to main; the release workflow runs Security on that commit first, and every later job builds
-  that authorized commit, never the tag ref again. Promotion runs from the tag under the `release`
-  environment and verifies the build attestation of each DMG and the CLI installer package from
+  push to main. The tag's signer must also be listed: `releaseTagSigners` in
+  `config/release-evidence-contract.json` holds the SHA-256 of each allowed tagger email (never the
+  address), because GitHub verifies a tag signed by any collaborator's key. A tag signed from another
+  identity is refused until its digest is added. The release workflow runs Security on that commit
+  first, and every later job builds that authorized commit, never the tag ref again. Promotion runs
+  from the tag under the `release` environment and verifies the build attestation of each DMG and the
+  CLI installer package from
   `release.yml`. Release-path jobs restore no Actions cache (`native-toolchain` with
   `pip-cache: "false"`); the Sparkle key lives only in `sparkle-feed`, a fresh runner that builds
   nothing, and only `draft-release`, which holds no secret, has `contents: write`. Lightweight tags,

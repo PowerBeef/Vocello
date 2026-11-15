@@ -184,8 +184,9 @@ and the prewarm about 160 ms, so the idle-unload timings stand as they are.
    | Built-in Voice | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn` | `c36e22eddb74ed1ae3c9f054b961b1173f7c093f` |
    | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn` | `6bcae41e75db1312816efae9792661a7e70ba75e` |
    | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn` | `5af70b5c61199b060152d80f5b232d7aa1da9618` |
-2. **Receipts:** each file's exact size and SHA-256 at that revision in
-   `config/model-artifact-receipts.json` (and the iPhone catalog for the iPhone's artifacts), then
+2. **Receipts:** each file's exact size and SHA-256 at that revision in the bundled iPhone catalog
+   (`Sources/Resources/qwenvoice_ios_model_catalog.json`), which supplies the receipts of a model both
+   platforms ship; `config/model-artifact-receipts.json` takes only a Mac-only artifact's. Then
    `python3 scripts/model_catalog_contract.py rebuild` and `validate --require-complete`. The speech
    tokenizer files are byte-identical to the shipped ones, so the shared-component identity holds.
 3. **iPhone evidence:** a farm build whose catalog names the published artifact, through

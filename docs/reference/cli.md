@@ -509,7 +509,8 @@ or sampling a take uses:
   mode has one model, so every value resolves to it. `models use` and `models prefer-lower-memory`
   say so with a `variant_retired` warning.
 - `variation` (retired by RF-58) reads `expressive`. Setting it accepts `expressive`, `balanced` or
-  `consistent`, stores nothing and warns `variation_retired`, as `--variation` does.
+  `consistent` and stores nothing; any value but `expressive` warns `variation_retired`, as
+  `--variation` does.
 
 **A running app hears every change.** Each write posts a distributed notification named for its store
 (`com.qwenvoice.shared.{savedVoices,models,settings}DidChange`; `SharedStoreChange` in

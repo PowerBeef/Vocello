@@ -2401,7 +2401,7 @@ actor NativeEngineRuntime {
         }
     }
 
-    nonisolated static func clearsRuntimeCaches(
+    static func clearsRuntimeCaches(
         deviceClass: NativeDeviceMemoryClass,
         forMemoryRelief: Bool
     ) -> Bool {

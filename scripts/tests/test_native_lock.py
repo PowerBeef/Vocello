@@ -153,6 +153,113 @@ class NativeLockTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("nested native lock", result.stderr)
 
+    def test_release_leaves_a_lock_that_names_another_process(self) -> None:
+        # B9: after a reclaim the directory can be another build's lock; removing it lets a third start.
+        result = self.bash(
+            "acquire_native_lock first || exit 1\n"
+            f'printf \'%s\\n\' {os.getpid()} > "$QVOICE_NATIVE_LOCK/pid"\n'
+            "release_native_lock || exit 3\n"
+            '[[ -z "$QVOICE_ACTIVE_PACKAGE_LOCK" ]] || exit 4\n'
+            "release_native_lock || exit 5\n"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.lock / "pid").read_text().strip(), str(os.getpid()))
+        self.assertEqual(result.stderr.count("no longer names this process"), 1)
+        self.assertIn(f"now pid {os.getpid()}", result.stderr)
+
+    def test_a_lock_replaced_while_it_is_being_created_is_not_reported_as_held(self) -> None:
+        # B9: a waiter that judged the previous lock stale renames this new directory aside before
+        # the pid file exists, and another build creates the lock. The stand-in `mv` plays both at
+        # the moment the pid file would be published.
+        result = self.bash(
+            "mv() {\n"
+            '  if [[ "$2" == "$QVOICE_NATIVE_LOCK/pid" && ! -e "$QVOICE_NATIVE_LOCK.aside" ]]; then\n'
+            '    command mv "$QVOICE_NATIVE_LOCK" "$QVOICE_NATIVE_LOCK.aside"\n'
+            '    mkdir "$QVOICE_NATIVE_LOCK"\n'
+            f'    printf \'%s\\n\' {os.getpid()} > "$QVOICE_NATIVE_LOCK/pid"\n'
+            "    return 1\n"
+            "  fi\n"
+            '  command mv "$@"\n'
+            "}\n"
+            "acquire_native_lock loser\n"
+            "status=$?\n"
+            'echo "held=${QVOICE_ACTIVE_PACKAGE_LOCK:-none}"\n'
+            "release_native_lock\n"
+            "exit $status\n"
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("held=none", result.stdout)
+        self.assertIn(f"held by pid {os.getpid()}", result.stderr)
+        self.assertIn("timed out", result.stderr)
+        self.assertEqual((self.lock / "pid").read_text().strip(), str(os.getpid()))
+
+    def test_a_lock_that_can_never_be_completed_fails_instead_of_being_reported_as_held(self) -> None:
+        # The pid file is never published (a full disk, a directory removed under the writer).
+        result = self.bash(
+            'mv() { if [[ "$2" == "$QVOICE_NATIVE_LOCK/pid" ]]; then command rm -rf "$QVOICE_NATIVE_LOCK"; '
+            'return 1; fi; command mv "$@"; }\n'
+            "acquire_native_lock unlucky\n"
+            "status=$?\n"
+            'echo "held=${QVOICE_ACTIVE_PACKAGE_LOCK:-none}"\n'
+            "exit $status\n",
+            QVOICE_NATIVE_LOCK_WAIT_SECONDS="30",
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("held=none", result.stdout)
+        self.assertIn("could not keep the native lock", result.stderr)
+
+
+class XcbRunTests(unittest.TestCase):
+    """`xcb_run` on a terminal pipes xcodebuild through xcbeautify and leaves the caller's shell as it was."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.base = Path(self.temporary.name)
+        tools = self.base / "tools"
+        tools.mkdir()
+        for name, body in (("xcodebuild", 'echo "xcodebuild $*"\nexit "${STUB_XCODEBUILD_STATUS:-0}"\n'),
+                           ("xcbeautify", f"cat\n: > {shlex.quote(str(self.base / 'beautified'))}\n")):
+            (tools / name).write_text("#!/bin/sh\n" + body)
+            (tools / name).chmod(0o755)
+
+    def on_a_terminal(self, body: str, **extra: str) -> subprocess.CompletedProcess[str]:
+        import pty
+
+        environment = os.environ.copy()
+        environment.update({
+            "QVOICE_BUILD_ROOT": str(self.base / "build"),
+            "QVOICE_XCODE_SOURCE_PACKAGES": str(self.base / "build" / "source-packages"),
+            "QVOICE_NATIVE_LOCK": str(self.base / "native-build.lock"),
+            "PATH": f"{self.base / 'tools'}{os.pathsep}{os.environ['PATH']}",
+        })
+        environment.pop("CI", None)
+        environment.update(extra)
+        script = f"ROOT_DIR={shlex.quote(str(ROOT))}\n. {shlex.quote(str(BUILD_CACHE))}\n{body}"
+        master, slave = pty.openpty()
+        try:
+            return subprocess.run(["bash", "-c", script], text=True, stdout=slave, stderr=subprocess.PIPE,
+                                  stdin=subprocess.DEVNULL, env=environment, timeout=30, check=False)
+        finally:
+            os.close(slave)
+            os.close(master)
+
+    REPORT = ('echo "status=$?" >&2\n'
+              'if [[ -o pipefail ]]; then echo "pipefail=on" >&2; else echo "pipefail=off" >&2; fi\n'
+              '[[ ! -e "$QVOICE_NATIVE_LOCK" ]] || echo "lock=left" >&2\n')
+
+    def test_the_callers_pipefail_setting_survives_the_piped_build(self) -> None:
+        # B8: xcb_run used to end with `set +o pipefail`, whatever the caller had set.
+        for setting, expected in (("set -o pipefail\n", "pipefail=on"), ("", "pipefail=off")):
+            for status in ("0", "65"):
+                with self.subTest(setting=setting.strip() or "default", status=status):
+                    result = self.on_a_terminal(f"{setting}xcb_run build -scheme QwenVoice\n{self.REPORT}",
+                                                STUB_XCODEBUILD_STATUS=status)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stderr.splitlines(), [f"status={status}", expected])
+                    self.assertTrue((self.base / "beautified").exists(), "the piped branch did not run")
+                    (self.base / "beautified").unlink()
+
 
 if __name__ == "__main__":
     unittest.main()

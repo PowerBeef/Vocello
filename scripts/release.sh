@@ -284,6 +284,9 @@ else
     rm -f "$RELEASE_ARTIFACT_DIR/xcodebuild-release.log"
     rm -rf "$DERIVED_DATA_PATH"
     rm -rf "$BUILD_RESULT_BUNDLE_PATH"
+    # The internal-diagnostics flag is pinned empty, as for the CLI below: xcodebuild
+    # reads build settings from the environment too, so a shell that exported the
+    # development value would otherwise compile the capability into the shipped app.
     set +e
     xcb_run -project "$PROJECT_FILE" \
         -scheme "$SCHEME" \
@@ -301,6 +304,7 @@ else
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
         ONLY_ACTIVE_ARCH=YES \
         ARCHS=arm64 \
+        QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG="" \
         SWIFT_OPTIMIZATION_LEVEL="-O" \
         SWIFT_COMPILATION_MODE="wholemodule" \
         build 2>&1 | tee "$RELEASE_ARTIFACT_DIR/xcodebuild-release.log"

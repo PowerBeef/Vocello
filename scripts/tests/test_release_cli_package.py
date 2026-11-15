@@ -216,6 +216,23 @@ class ReleaseCLIPackageTests(unittest.TestCase):
         self.assertFalse(self.unsigned.exists())
         self.assertEqual(self.report.read_text(encoding="utf-8"), '{"status": "passed"}\n')
 
+    def test_the_app_and_the_cli_builds_both_pin_the_internal_diagnostics_flag_empty(self) -> None:
+        # B14: xcodebuild reads build settings from the environment too, so the app build must
+        # override a development value the shell exported, as the CLI build already did.
+        flag = "QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG"
+        completed = self.sandbox.run_script(env={
+            "QWENVOICE_SIGNING_MODE": "ad-hoc", "QWENVOICE_NOTARIZE": "0", "QWENVOICE_SIGNING_IDENTITY": "",
+            "APPLE_DEV_ID_INSTALLER": "", "APPLE_TEAM_ID": TEAM, flag: "-DVOCELLO_" "INTERNAL_DIAGNOSTICS",
+        }, timeout=120)
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        builds = [call for call in self.sandbox.calls_to("xcb_run") if call[-1] == "build"]
+        self.assertEqual(len(builds), 2, builds)
+        self.assertEqual(option(builds[1], "-scheme"), "VocelloCLI")
+        self.assertNotEqual(option(builds[0], "-scheme"), "VocelloCLI")
+        for build in builds:
+            with self.subTest(scheme=option(build, "-scheme")):
+                self.assertEqual([word for word in build if word.startswith(flag)], [f"{flag}="])
+
     def test_developer_id_without_notarization_claims_no_ticket(self) -> None:
         completed = self.release(QWENVOICE_NOTARIZE="0")
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)

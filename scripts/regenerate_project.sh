@@ -34,20 +34,29 @@ if ! command -v xcodegen >/dev/null 2>&1; then
 fi
 
 ENTITLEMENTS="Sources/QwenVoice.entitlements"
-BACKUP="/tmp/QwenVoice.entitlements.backup.$$"
+# The backup lives in a private directory mktemp creates, not under a name in
+# /tmp another process could predict and create first. The backup file itself
+# appears only once the copy is complete, so the exit trap never restores an
+# empty or partial file over the entitlements.
+BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qwenvoice-entitlements.XXXXXX")"
+BACKUP="$BACKUP_DIR/QwenVoice.entitlements"
 
 cleanup() {
     if [ -f "$BACKUP" ]; then
         echo "==> Restoring entitlements..."
-        cp "$BACKUP" "$ENTITLEMENTS"
-        rm -f "$BACKUP"
+        if ! cp "$BACKUP" "$ENTITLEMENTS"; then
+            echo "error: could not restore $ENTITLEMENTS; its backup is kept at $BACKUP" >&2
+            return
+        fi
     fi
+    rm -rf "$BACKUP_DIR"
 }
 trap cleanup EXIT
 
 generation_digest="$(python3 "$SCRIPT_DIR/project_generation.py" digest)"
 echo "==> Backing up entitlements..."
-cp "$ENTITLEMENTS" "$BACKUP"
+cp "$ENTITLEMENTS" "$BACKUP.partial"
+mv "$BACKUP.partial" "$BACKUP"
 
 echo "==> Running xcodegen..."
 xcodegen generate

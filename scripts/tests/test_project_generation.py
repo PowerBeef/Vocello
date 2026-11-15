@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from shell_stubs import SANDBOX_BUILD_PATHS, ScriptSandbox
+
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("project_generation", ROOT / "scripts/project_generation.py")
 assert SPEC and SPEC.loader
@@ -176,3 +178,55 @@ python3 "$ROOT_DIR/scripts/project_generation.py" record
         (self.root / MODULE.OUTPUTS[0]).unlink()
         ensure()
         self.assertEqual(count(), 4)
+
+
+class RegenerateScriptTests(unittest.TestCase):
+    """scripts/regenerate_project.sh keeps the entitlements XcodeGen overwrites, through a private backup.
+
+    The shipped script runs from a sandbox (scripts/tests/shell_stubs.py): `xcodegen` and the Python
+    helpers are recorded stand-ins and TMPDIR is a sandbox folder, so what the script leaves behind
+    is visible."""
+
+    KEPT = "<plist>kept</plist>\n"
+
+    def setUp(self):
+        self.sandbox = ScriptSandbox(self, "scripts/regenerate_project.sh",
+                                     {"scripts/lib/build_paths.sh": SANDBOX_BUILD_PATHS})
+        self.entitlements = self.sandbox.root / "Sources/QwenVoice.entitlements"
+        self.entitlements.parent.mkdir(parents=True)
+        self.entitlements.write_text(self.KEPT, encoding="utf-8")
+        self.temporary = self.sandbox.path / "temporary files"
+        self.temporary.mkdir()
+        self.sandbox.helper("scripts/project_generation.py", 'case "$1" in digest) echo fixture-digest ;; esac')
+        for renderer in ("scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py"):
+            self.sandbox.helper(renderer, "exit 0")
+
+    def regenerate(self):
+        return self.sandbox.run_script("--fast", env={"TMPDIR": str(self.temporary)})
+
+    def test_the_entitlements_xcodegen_overwrites_are_restored_and_no_backup_is_left(self):
+        self.sandbox.tool("xcodegen", "printf overwritten > Sources/QwenVoice.entitlements")
+        completed = self.regenerate()
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertEqual(list(self.temporary.iterdir()), [])
+        self.assertEqual(self.sandbox.calls_to("scripts/project_generation.py", "record")[0][-1], "fixture-digest")
+
+    def test_a_failed_generation_still_restores_the_entitlements(self):
+        self.sandbox.tool("xcodegen", "printf overwritten > Sources/QwenVoice.entitlements\nexit 1")
+        completed = self.regenerate()
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertEqual(list(self.temporary.iterdir()), [])
+        self.assertEqual(self.sandbox.calls_to("scripts/project_generation.py", "record"), [])
+
+    def test_a_failure_before_the_backup_exists_leaves_the_entitlements_alone(self):
+        # The backup file appears only once it is complete: an empty mktemp file must never be "restored".
+        self.sandbox.helper("scripts/project_generation.py", "exit 3")
+        self.sandbox.tool("xcodegen", "printf overwritten > Sources/QwenVoice.entitlements")
+        completed = self.regenerate()
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertNotIn("Restoring entitlements", completed.stdout)
+        self.assertEqual(list(self.temporary.iterdir()), [])
+        self.assertEqual(self.sandbox.calls_to("xcodegen"), [])

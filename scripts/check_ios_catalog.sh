@@ -50,10 +50,14 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # Fetch the catalog. -f makes curl exit non-zero on HTTP errors.
+# Only a fetched catalog is a temporary file: the bundled one is a tracked
+# resource and is never removed. The trap removes exactly what mktemp returned
+# (on macOS a path under /var/folders, which a `/tmp/*` test never matched).
 catalog_body=""
+catalog_download=""
 trap '{
-  if [[ -n "${catalog_body:-}" && "$catalog_body" == /tmp/* ]]; then
-    rm -f "$catalog_body"
+  if [[ -n "${catalog_download:-}" ]]; then
+    rm -f "$catalog_download"
   fi
 }' EXIT
 
@@ -65,7 +69,8 @@ if [[ "$URL" == bundle://* ]]; then
     exit 1
   fi
 else
-  catalog_body="$(mktemp)"
+  catalog_download="$(mktemp)"
+  catalog_body="$catalog_download"
   if ! curl -fsSL --max-time 60 -A "VocelloCatalogCheck/1.0" "$URL" -o "$catalog_body"; then
     jq -n --arg url "$URL" \
       '{ok: false, catalog_url: $url, error: "failed to fetch catalog"}'

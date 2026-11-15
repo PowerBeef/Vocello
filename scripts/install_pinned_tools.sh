@@ -48,18 +48,30 @@ mkdir -p "$PREFIX"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
+# The manifest path and the tool name reach Python as arguments, never as text
+# spliced into its source: a quote in either one used to become Python code.
+#
+# One required field of a pin: pin_field TOOL FIELD.
+pin_field() {
+    python3 -c 'import json, sys
+pin = json.load(open(sys.argv[1], encoding="utf-8"))["artifactPins"][sys.argv[2]]
+print(pin[sys.argv[3]])' "$MANIFEST" "$1" "$2"
+}
+
 # The command a pin installs: its `binaryName`, else the archived binary's file name.
 pinned_binary_name() {
-    python3 -c "import json,os;pin=json.load(open('$MANIFEST'))['artifactPins']['$1'];print(pin.get('binaryName') or os.path.basename(pin['archivePath']))"
+    python3 -c 'import json, os, sys
+pin = json.load(open(sys.argv[1], encoding="utf-8"))["artifactPins"][sys.argv[2]]
+print(pin.get("binaryName") or os.path.basename(pin["archivePath"]))' "$MANIFEST" "$1"
 }
 
 install_pin() {
     local tool="$1"
     local url sha archive_path version binary_name
-    url="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['url'])")"
-    sha="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['sha256'])")"
-    archive_path="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['archivePath'])")"
-    version="$(python3 -c "import json;print(json.load(open('$MANIFEST'))['artifactPins']['$tool']['version'])")"
+    url="$(pin_field "$tool" url)"
+    sha="$(pin_field "$tool" sha256)"
+    archive_path="$(pin_field "$tool" archivePath)"
+    version="$(pin_field "$tool" version)"
     binary_name="$(pinned_binary_name "$tool")"
 
     local artifact="$workdir/$tool-artifact"
@@ -119,7 +131,9 @@ fi
 # The arguments that print a pin's version: its `versionArgs`, else `--version`
 # (Periphery answers only `periphery version`).
 pinned_version_args() {
-    python3 -c "import json;print('\n'.join(json.load(open('$MANIFEST'))['artifactPins']['$1'].get('versionArgs') or ['--version']))"
+    python3 -c 'import json, sys
+pin = json.load(open(sys.argv[1], encoding="utf-8"))["artifactPins"][sys.argv[2]]
+print("\n".join(pin.get("versionArgs") or ["--version"]))' "$MANIFEST" "$1"
 }
 
 for tool in "${TOOLS[@]}"; do

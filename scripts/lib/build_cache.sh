@@ -74,9 +74,12 @@ native_lock_is_live() {
 
 # Remove a lock judged stale, atomically: rename it aside, confirm the renamed
 # directory is the one that was judged (another waiter may have replaced it
-# meanwhile), and put a fresh lock back if it is not.
+# meanwhile), and put a fresh lock back if it is not. The owner is read again
+# just before the rename, so a lock another waiter created since the judgement
+# is normally never moved at all.
 _native_lock_reclaim() {
     local lock_dir="$1" judged_owner="$2" aside="$1.stale.$$"
+    [[ "$(cat "$lock_dir/pid" 2>/dev/null || true)" == "$judged_owner" ]] || return 0
     mv "$lock_dir" "$aside" 2>/dev/null || return 0
     if [[ "$(cat "$aside/pid" 2>/dev/null || true)" != "$judged_owner" ]] && [[ ! -e "$lock_dir" ]]; then
         mv "$aside" "$lock_dir" 2>/dev/null || rm -rf "$aside"
@@ -85,9 +88,14 @@ _native_lock_reclaim() {
     rm -rf "$aside"
 }
 
+# Succeeds when the lock directory names this process as its owner.
+_native_lock_is_mine() {
+    [[ "$(cat "$1/pid" 2>/dev/null || true)" == "$$" ]]
+}
+
 acquire_native_lock() {
     local label="${1:-native}" lock_dir="${QVOICE_NATIVE_LOCK:-}"
-    local waited=0 vanished=0 owner="" holder_label="" holder_checkout=""
+    local waited=0 vanished=0 lost=0 owner="" holder_label="" holder_checkout=""
     [[ -n "$lock_dir" ]] || {
         echo "error: QVOICE_NATIVE_LOCK is not set (build-output policy not loaded)" >&2
         return 1
@@ -102,14 +110,28 @@ acquire_native_lock() {
     }
     while :; do
         if mkdir "$lock_dir" 2>/dev/null; then
-            _native_lock_started "$$" > "$lock_dir/started"
-            printf '%s\n' "$label" > "$lock_dir/label"
-            printf '%s\n' "$ROOT_DIR" > "$lock_dir/checkout"
             # The pid file appears last and atomically: its presence means the
             # lock is complete.
-            printf '%s\n' "$$" > "$lock_dir/pid.$$" && mv "$lock_dir/pid.$$" "$lock_dir/pid"
-            QVOICE_ACTIVE_PACKAGE_LOCK="$lock_dir"
-            return 0
+            { _native_lock_started "$$" > "$lock_dir/started" \
+                && printf '%s\n' "$label" > "$lock_dir/label" \
+                && printf '%s\n' "$ROOT_DIR" > "$lock_dir/checkout" \
+                && printf '%s\n' "$$" > "$lock_dir/pid.$$" \
+                && mv "$lock_dir/pid.$$" "$lock_dir/pid"; } 2>/dev/null || true
+            # The mkdir alone does not prove ownership: a waiter that judged the
+            # previous lock stale may rename this new directory aside before the
+            # pid file exists, and a third process can then create the lock
+            # (audit B9). The lock is held only once it names this process;
+            # otherwise this attempt is lost and the wait goes on.
+            if _native_lock_is_mine "$lock_dir"; then
+                QVOICE_ACTIVE_PACKAGE_LOCK="$lock_dir"
+                return 0
+            fi
+            lost=$((lost + 1))
+            if (( lost > 5 )); then
+                echo "error: could not keep the native lock after creating it $lost times: $lock_dir" >&2
+                return 1
+            fi
+            continue
         fi
         if [[ ! -d "$lock_dir" ]]; then
             # Released between our mkdir and this check: try again, a few times. A
@@ -147,9 +169,21 @@ acquire_native_lock() {
     done
 }
 
+# Release the lock this process holds. A lock that names another process is
+# left alone: after a reclaim it is that process's lock, and removing it would
+# let a third build start beside it.
 release_native_lock() {
-    [[ -z "$QVOICE_ACTIVE_PACKAGE_LOCK" ]] || rm -rf "$QVOICE_ACTIVE_PACKAGE_LOCK"
+    local lock_dir="$QVOICE_ACTIVE_PACKAGE_LOCK"
     QVOICE_ACTIVE_PACKAGE_LOCK=""
+    if [[ -z "$lock_dir" ]]; then
+        return 0
+    fi
+    if _native_lock_is_mine "$lock_dir"; then
+        rm -rf "$lock_dir"
+    elif [[ -e "$lock_dir" ]]; then
+        echo "warning: the native lock no longer names this process (now pid $(cat "$lock_dir/pid" 2>/dev/null || echo '?')); left in place: $lock_dir" >&2
+    fi
+    return 0
 }
 
 # Print sha256 of a file, or empty string if the file is missing.
@@ -696,9 +730,18 @@ xcb_run() {
             || extra_args+=(COMPILER_INDEX_STORE_ENABLE=NO)
     fi
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
+        # pipefail makes the pipeline fail when xcodebuild does. The caller's own
+        # setting is put back: turning it off here silently changed how every
+        # later pipeline of a `set -o pipefail` script failed (audit B8).
+        local had_pipefail=0
+        if [[ -o pipefail ]]; then
+            had_pipefail=1
+        fi
         set -o pipefail
         xcodebuild "$@" "${extra_args[@]}" | xcbeautify --renderer terminal || status=${PIPESTATUS[0]}
-        set +o pipefail
+        if (( ! had_pipefail )); then
+            set +o pipefail
+        fi
     else
         xcodebuild "$@" "${extra_args[@]}" || status=$?
     fi

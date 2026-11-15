@@ -311,6 +311,13 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         _ = await model.engine.releaseCloneHandle(cloneHandle)
                     }
                     await stopSamplerIfNeeded()
+                },
+                afterFailedModelTermination: { @concurrent in
+                    // A take that failed, was refused or was cancelled returns
+                    // its MLX buffers here, once its producer has stopped. A
+                    // clear made while the producer still runs is refilled at
+                    // once and leaves the allocator cache full.
+                    Memory.clearCache()
                 }
             )
         } catch {
@@ -330,6 +337,10 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     /// with its catch-path cancel, abort and acknowledge. `run` drives it over
     /// the actor reservation (`EngineReservedTake`); deterministic tests drive
     /// the same code over a fake take, since a real reservation needs weights.
+    ///
+    /// `afterFailedModelTermination` runs on the catch path of an opened take,
+    /// after its model terminated and before its lease is released: the one
+    /// point where the take's producer has stopped and nothing else uses MLX.
     @concurrent static func runReservedTake<Take: GenerationReservedTake, Execution>(
         cancellationIngress: GenerationCancellationIngress,
         telemetryRecorder: NativeTelemetryRecorder?,
@@ -337,7 +348,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         prepareExecution: @concurrent () async throws -> Execution,
         execute: @concurrent (Execution, Take, Take.AudioConsumer, Int?) async throws -> GenerationResult,
         chunkSink: @Sendable @concurrent (GenerationEvent) async -> Void,
-        afterFinalization: @concurrent () async -> Void
+        afterFinalization: @concurrent () async -> Void,
+        afterFailedModelTermination: @concurrent () async -> Void
     ) async throws -> GenerationResult {
         try await withTaskCancellationHandler { @concurrent in
             // Cancellation can win after product preparation but before the
@@ -413,6 +425,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                         Self.logCleanupFailure(step: "cancel_generation", cleanupError)
                     }
                     _ = await take.waitForModelTermination()
+                    await afterFailedModelTermination()
                     do {
                         try await take.acknowledgeProductFinalization(.aborted(.runtime))
                     } catch let cleanupError {
@@ -2073,7 +2086,9 @@ struct StreamingExecutionContext: Sendable {
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: sessionDirectory)
-            Memory.clearCache()
+            // No allocator-cache clear here: the producer may still be running.
+            // `runReservedTake` clears once it has stopped
+            // (`afterFailedModelTermination`).
             throw error
         }
 
@@ -2122,7 +2137,8 @@ struct StreamingExecutionContext: Sendable {
             )
             finalWriter.discard()
             try? FileManager.default.removeItem(at: sessionDirectory)
-            Memory.clearCache()
+            // The allocator cache is cleared by `runReservedTake` on its way
+            // out (`afterFailedModelTermination`), as for every failed take.
             throw terminalError
         }
 

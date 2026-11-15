@@ -204,6 +204,51 @@ final class GenerationOutputAdapterChoreographyTests: XCTestCase {
         ])
     }
 
+    /// The failure-path hook (the product clears the MLX allocator cache in
+    /// it) runs once the opened take's model has terminated and before its
+    /// lease is released. A take that completes, and one that fails before it
+    /// opened, never reach it.
+    @concurrent func testTheFailureHookRunsAfterModelTerminationAndBeforeTheLeaseIsReleased() async throws {
+        let failedLog = ChoreographyLog()
+        do {
+            _ = try await ChoreographyDriver.run(
+                ScriptedReservedTake(log: failedLog),
+                log: failedLog,
+                afterFailedModelTermination: { @concurrent in failedLog.append("afterFailedModelTermination") },
+                execute: { @concurrent _ in throw ScriptedTakeFailure(step: "sink") }
+            )
+            XCTFail("A failed take must surface")
+        } catch is ScriptedTakeFailure {}
+        XCTAssertEqual(failedLog.entries, [
+            "reserve", "claim", "prepareExecution", "open", "execute",
+            "cancelAudio(shutdown)", "cancelGeneration(shutdown)",
+            "waitForModelTermination", "afterFailedModelTermination",
+            "acknowledge(aborted(runtime))",
+        ])
+
+        let completedLog = ChoreographyLog()
+        _ = try await ChoreographyDriver.run(
+            ScriptedReservedTake(log: completedLog),
+            log: completedLog,
+            afterFailedModelTermination: { @concurrent in completedLog.append("afterFailedModelTermination") },
+            execute: { @concurrent _ in Self.completedResult }
+        )
+        XCTAssertFalse(completedLog.entries.contains("afterFailedModelTermination"), "a completed take")
+
+        let unopenedLog = ChoreographyLog()
+        do {
+            _ = try await ChoreographyDriver.run(
+                ScriptedReservedTake(log: unopenedLog),
+                log: unopenedLog,
+                prepare: { @concurrent in throw ScriptedTakeFailure(step: "sessionDirectory") },
+                afterFailedModelTermination: { @concurrent in unopenedLog.append("afterFailedModelTermination") },
+                execute: { @concurrent _ in Self.completedResult }
+            )
+            XCTFail("A setup failure must surface")
+        } catch is ScriptedTakeFailure {}
+        XCTAssertFalse(unopenedLog.entries.contains("afterFailedModelTermination"), "a take that never opened")
+    }
+
     @concurrent func testAPreCancelledTakeNeverReserves() async throws {
         let log = ChoreographyLog()
         let take = ScriptedReservedTake(log: log)
@@ -307,6 +352,7 @@ private enum ChoreographyDriver {
         log: ChoreographyLog,
         duringReservation: () -> Void = {},
         prepare: @concurrent () async throws -> Void = { @concurrent in},
+        afterFailedModelTermination: @concurrent () async -> Void = { @concurrent in},
         execute: @concurrent (ScriptedReservedTake) async throws -> GenerationResult
     ) async throws -> GenerationResult {
         try await GenerationOutputAdapter.runReservedTake(
@@ -334,7 +380,8 @@ private enum ChoreographyDriver {
                 return try await execute(reserved)
             },
             chunkSink: { @concurrent event in log.append(Self.label(event)) },
-            afterFinalization: { @concurrent in log.append("afterFinalization") }
+            afterFinalization: { @concurrent in log.append("afterFinalization") },
+            afterFailedModelTermination: afterFailedModelTermination
         )
     }
 

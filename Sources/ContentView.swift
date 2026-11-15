@@ -177,6 +177,10 @@ struct ContentView: View {
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar(removing: .title)
         .environment(appModel)
+        // A Save As or recovery export that failed, shown on whichever
+        // destination the user is on by then. The modifier reads the model,
+        // so the copy's state never invalidates this body.
+        .modifier(MacFileCopyFailureAlert(appModel: appModel))
         // Inside the gate below, so the banner's glass decision sees it.
         .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
         // Generation performance gate (OPTIMIZATION.md §K): while the engine

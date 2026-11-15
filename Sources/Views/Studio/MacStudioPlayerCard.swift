@@ -42,6 +42,9 @@ struct MacStudioPlayerCard: View {
     }
 
     @Environment(AudioPlayerViewModel.self) private var audioPlayer
+    /// Owns Save As: the copy can outlast this card, and the shell shows its
+    /// failure wherever the user is by then.
+    @Environment(MacAppModel.self) private var appModel
     let phase: Phase
     let tint: Color
     let onDismiss: () -> Void
@@ -51,7 +54,6 @@ struct MacStudioPlayerCard: View {
     var onSaveAsVoice: (() -> Void)? = nil
 
     @State private var isConfirmingDismiss = false
-    @State private var saveAsFailure: String?
 
     var body: some View {
         let shape = VocelloShape.stage()
@@ -101,14 +103,6 @@ struct MacStudioPlayerCard: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(phase.accessibilityIdentifier)
-        .alert(
-            MacInterfaceText.historyExportError,
-            isPresented: Binding(get: { saveAsFailure != nil }, set: { if !$0 { saveAsFailure = nil } })
-        ) {
-            Button(MacInterfaceText.ok) { saveAsFailure = nil }
-        } message: {
-            Text(MacInterfaceText.historyExportErrorMessage(saveAsFailure ?? ""))
-        }
         .confirmationDialog(
             MacInterfaceText.studioDismissTake,
             isPresented: $isConfirmingDismiss,
@@ -234,11 +228,10 @@ struct MacStudioPlayerCard: View {
                     symbol: "square.and.arrow.down",
                     label: MacInterfaceText.historySaveAs,
                     accessibilityIdentifier: "studio_inlinePlayer_saveAs",
+                    // One Save As or recovery export copy at a time.
+                    isEnabled: !appModel.fileCopy.isCopying,
                     size: MacControl.icon.height,
-                    action: {
-                        let audioPath = item.audioURL.path
-                        Task { saveAsFailure = await MacHistoryFileActions.saveCopy(of: audioPath) }
-                    }
+                    action: { appModel.saveCopy(of: item.audioURL.path) }
                 )
                 MacIconButton(
                     symbol: "folder",

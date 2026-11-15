@@ -20,6 +20,9 @@ struct MacHistoryItemCard: View {
     let audioFileExists: Bool
     let waveformSeed: Int
     let allowsDeletion: Bool
+    /// False while a Save As or recovery export copy is in flight: the app
+    /// runs one at a time.
+    let allowsSaveAs: Bool
     let onPlay: () -> Void
     let onSaveToSavedVoices: (() -> Void)?
     let onSaveAs: () -> Void
@@ -164,7 +167,7 @@ struct MacHistoryItemCard: View {
                 symbol: "square.and.arrow.down",
                 label: MacInterfaceText.historySaveAs,
                 accessibilityIdentifier: "historyRow_saveAs_\(rowID)",
-                isEnabled: audioFileExists,
+                isEnabled: audioFileExists && allowsSaveAs,
                 action: onSaveAs
             )
             MacIconButton(

@@ -1,12 +1,15 @@
 import AppKit
 import Foundation
+import SwiftUI
 import UniformTypeIdentifiers
 
 /// Desktop file actions of the History screen: Save As, Reveal in Finder,
 /// the outputs folder and the recovery export. Panels run modal on the main
 /// actor; the copies run off it, because a long take written to an external
-/// volume takes seconds and froze the window (A7). The results are plain
-/// values the screen turns into alerts on the main actor.
+/// volume takes seconds and froze the window (A7). Save As and the recovery
+/// export are started through `MacAppModel` (`saveCopy(of:)`,
+/// `exportPendingAudio(_:)`), which allows one copy at a time and keeps the
+/// result for the shell's alert, so a screen left meanwhile loses nothing.
 @MainActor
 enum MacHistoryFileActions {
     /// Copies the take's WAV where the user chooses. Returns the failure
@@ -53,28 +56,8 @@ enum MacHistoryFileActions {
         panel.prompt = MacInterfaceText.historyExportPrompt
         guard panel.runModal() == .OK, let destination = panel.url else { return nil }
         return await Task.detached(priority: .userInitiated) { @concurrent in
-            copyPendingAudio(urls, into: destination)
+            MacRecoveryAudioExport.copy(urls, into: destination)
         }.value
-    }
-
-    /// The recovery export's copies; returns how many failed.
-    private nonisolated static func copyPendingAudio(_ urls: [URL], into destination: URL) -> Int {
-        var failures = 0
-        for source in urls {
-            let exportName = GenerationOutputFileName.exportName(forTakeNamed: source.lastPathComponent) as NSString
-            var target = destination.appendingPathComponent(exportName as String)
-            if FileManager.default.fileExists(atPath: target.path) {
-                target = destination.appendingPathComponent(
-                    "\(exportName.deletingPathExtension)-\(UUID().uuidString.prefix(8)).\(exportName.pathExtension)"
-                )
-            }
-            do {
-                try FileManager.default.copyItem(at: source, to: target)
-            } catch {
-                failures += 1
-            }
-        }
-        return failures
     }
 
     static func revealInFinder(_ path: String) {
@@ -90,6 +73,45 @@ enum MacHistoryFileActions {
             NSWorkspace.shared.open(AudioService.effectiveOutputsRoot)
         } else {
             NSWorkspace.shared.activateFileViewerSelecting(existing)
+        }
+    }
+}
+
+/// The shell's alert for a Save As or a recovery export that failed. The
+/// failure is the app model's (`MacAppModel.fileCopy`), so it is shown on
+/// whichever destination the user is on when the copy ends, with the titles
+/// and messages History and the Studio card showed for it before.
+struct MacFileCopyFailureAlert: ViewModifier {
+    let appModel: MacAppModel
+
+    func body(content: Content) -> some View {
+        // Read here, in the body, so a change presents or dismisses the alert.
+        let failure = appModel.fileCopy.failure
+        content.alert(
+            item: Binding(
+                get: { failure },
+                set: { if $0 == nil { appModel.acknowledgeFileCopyFailure() } }
+            )
+        ) { shown in
+            Alert(
+                title: Text(Self.title(for: shown)),
+                message: Text(Self.message(for: shown)),
+                dismissButton: .default(Text(MacInterfaceText.ok))
+            )
+        }
+    }
+
+    static func title(for failure: MacFileCopyActivity.Failure) -> String {
+        switch failure {
+        case .saveAs: MacInterfaceText.historyExportError
+        case .recoveryExport: MacInterfaceText.historyExportWarning
+        }
+    }
+
+    static func message(for failure: MacFileCopyActivity.Failure) -> String {
+        switch failure {
+        case .saveAs(let description): MacInterfaceText.historyExportErrorMessage(description)
+        case .recoveryExport(let failedCount): VocelloPresentationText.recoveryExportFailure(failedCount)
         }
     }
 }

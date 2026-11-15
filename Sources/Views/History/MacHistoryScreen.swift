@@ -222,6 +222,9 @@ private extension HistorySortOrder {
 struct MacHistoryScreen: View {
     @Environment(AudioPlayerViewModel.self) private var audioPlayer
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    /// Owns Save As and the recovery export, which can outlast this screen;
+    /// the body reads only whether a copy is in flight, to disable both.
+    @Environment(MacAppModel.self) private var appModel
     private let generationLibraryEvents = GenerationLibraryEvents.shared
     /// Plain reference, not `@EnvironmentObject` (W1-D): History uses the
     /// store only to forward into the saved-voice sheet and for one
@@ -290,7 +293,7 @@ struct MacHistoryScreen: View {
                         canReveal: recoverySnapshot.availableAudioCount > 0
                             || recoverySnapshot.pendingAudioRemovalCount > 0
                             || recoverySnapshot.unreadableAudioRemovalCount > 0,
-                        canExport: !recoveryAudioURLs.isEmpty,
+                        canExport: !recoveryAudioURLs.isEmpty && !appModel.fileCopy.isCopying,
                         canDiscard: ((recoverySnapshot.notice == .unverifiedRecord
                             && recoverySnapshot.unverifiableRecordCount > 0)
                             || recoverySnapshot.notice == .longFormRecovery)
@@ -491,6 +494,7 @@ struct MacHistoryScreen: View {
                 audioFileExists: item.audioFileExists,
                 waveformSeed: item.waveformSeed,
                 allowsDeletion: !databaseUnavailable,
+                allowsSaveAs: !appModel.fileCopy.isCopying,
                 onPlay: {
                     audioPlayer.playFile(item.generation.audioPath, title: item.textPreview,
                                          generationMode: GenerationMode(rawValue: item.generation.mode))
@@ -874,27 +878,15 @@ private extension MacHistoryScreen {
         reloadCoalescer.cancelRead(readToken)
     }
 
-    /// The copy runs off the main actor (A7); its failure comes back here for the alert.
+    /// The copy runs off the main actor (A7) and can outlast this screen, so
+    /// the app model owns it: one copy at a time, and its failure is shown by
+    /// the shell wherever the user is by then.
     func exportGeneration(_ item: MacHistoryListItem) {
-        let audioPath = item.generation.audioPath
-        Task {
-            guard let failure = await MacHistoryFileActions.saveCopy(of: audioPath) else { return }
-            presentActionAlert(
-                title: MacInterfaceText.historyExportError,
-                message: MacInterfaceText.historyExportErrorMessage(failure)
-            )
-        }
+        appModel.saveCopy(of: item.generation.audioPath)
     }
 
     func exportPendingAudio() {
-        let urls = recoveryAudioURLs
-        Task {
-            guard let failures = await MacHistoryFileActions.exportPendingAudio(urls), failures > 0 else { return }
-            presentActionAlert(
-                title: MacInterfaceText.historyExportWarning,
-                message: VocelloPresentationText.recoveryExportFailure(failures)
-            )
-        }
+        appModel.exportPendingAudio(recoveryAudioURLs)
     }
 
     func refreshRecoveryState() {

@@ -167,6 +167,11 @@ Corrupt long-form journals leave unrelated standalone clips readable while proje
 remain gated. Export Recovery Files retains bounded journals for repair with a private-text/path
 warning; it does not repair or delete them.
 
+Save As (a History row, the Studio result card) and the recovery banner's export copy off the main
+thread. `MacAppModel` owns the copy (`fileCopy`, a `MacFileCopyActivity`): one runs at a time, the
+Save As buttons and `historyRecovery_export` are disabled meanwhile, and a failure is presented by
+the shell (`MacFileCopyFailureAlert`) on whichever destination the user is on when the copy ends.
+
 History date headings render as transparent List rows (`history_sectionHeading_<bucket>`),
 without native pinned-header material or section rules. Search still renders a flat result list.
 

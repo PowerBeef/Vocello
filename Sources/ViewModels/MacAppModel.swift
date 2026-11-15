@@ -60,6 +60,12 @@ final class MacAppModel {
     let lineBatch = MacLineBatchRunner()
     let longForm = IOSLongFormCoordinator(hooks: MacStudioLongFormPlatformHooks())
 
+    /// Save As and the recovery export: the one copy in flight and the
+    /// failure not yet acknowledged. It lives here because the copy runs off
+    /// the main actor and can outlast the screen that asked for it; the shell
+    /// presents the failure (`MacFileCopyFailureAlert`) wherever the user is.
+    private(set) var fileCopy = MacFileCopyActivity()
+
     func coordinator(for mode: GenerationMode) -> StudioGenerationCoordinator {
         switch mode {
         case .custom: return customCoordinator
@@ -107,5 +113,29 @@ final class MacAppModel {
 
     func persistVoiceCloningSavedVoiceID(_ id: String?) {
         defaults.set(id ?? "", forKey: Self.lastVoiceCloningSavedVoiceIDKey)
+    }
+
+    /// Save As for a take, from its History row or its Studio card. Nothing
+    /// starts while another copy is in flight; the controls are disabled then.
+    func saveCopy(of audioPath: String) {
+        guard fileCopy.begin() else { return }
+        Task {
+            let failure = await MacHistoryFileActions.saveCopy(of: audioPath)
+            fileCopy.finish(failure.map(MacFileCopyActivity.Failure.saveAs))
+        }
+    }
+
+    /// The recovery banner's export, under the same one-copy rule.
+    func exportPendingAudio(_ urls: [URL]) {
+        guard fileCopy.begin() else { return }
+        Task {
+            let failures = await MacHistoryFileActions.exportPendingAudio(urls) ?? 0
+            fileCopy.finish(MacFileCopyActivity.Failure.afterRecoveryExport(failures: failures))
+        }
+    }
+
+    /// The user dismissed the copy failure alert.
+    func acknowledgeFileCopyFailure() {
+        fileCopy.acknowledgeFailure()
     }
 }

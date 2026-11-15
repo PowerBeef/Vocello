@@ -31,8 +31,28 @@ A plan only: nothing here is done yet. Finding IDs (A1, T3, …) are those of
 **Decided on 2026-11-15:** D-1 to D-5, each as recommended. The CI pin moves to the Xcode 27 line;
 `models install` keeps removing every mode's earlier models and reports them; MCP `delete_voice`
 goes behind `--allow-voice-delete`; deleting a long-form project deletes its segments, and the
-confirmation says so; the benchmark records a refused take and publishes the rest. **Open:** D-6
-(attribution), D-7 (pause budget, measured first) and D-8 (tag signer).
+confirmation says so; the benchmark records a refused take and publishes the rest. **Open:** D-7
+(pause budget, measured first) and D-8 (tag signer).
+
+**D-6 is settled by the record (2026-11-15).** Each hybrid was built by
+`scripts/build_hybrid_model.py` from two of Vocello's own 3.0 artifacts, with no requantization, as
+its published model card says: every tensor of the 4-bit artifact, except the talker's attention
+projections (`q_proj`, `k_proj`, `v_proj`, `o_proj` in its 28 layers), taken from the 8-bit one. Each
+3.0 artifact is in turn mlx-community's conversion of the Qwen checkpoint at a pinned revision, with
+one tensor changed (the text embedding quantized to 8 bits) and Meta's AudioSeal generator added.
+
+| Hybrid (revision) | 4-bit parent (revision) | 8-bit parent (revision) | mlx-community bases (4-bit, 8-bit revisions) |
+|---|---|---|---|
+| `…-CustomVoice-hybrid-attn` (`c36e22ed`) | `PowerBeef02/…-CustomVoice-4bit` (`29c4b746`) | `…-CustomVoice-8bit` (`50c40b22`) | `f35faf19`, `41d3337e` |
+| `…-VoiceDesign-hybrid-attn` (`6bcae41e`) | `…-VoiceDesign-4bit` (`62f2646e`) | `…-VoiceDesign-8bit` (`bb56faf7`) | `5c390979`, `f90d6177` |
+| `…-Base-hybrid-attn` (`5af70b5c`) | `…-Base-4bit` (`47ab65f7`) | `…-Base-8bit` (`f63ea141`) | `37e955a1`, `e7dd0585` |
+
+So the attribution policy's entry for each hybrid is incomplete, not wrong: it names the
+mlx-community 4-bit base and omits the 8-bit one that supplied the attention tensors. Step 22 adds
+it (the policy takes one `baseRepo` per entry today, so the entry needs a second base or a list),
+and corrects two sentences that say Vocello ships "its own conversions": `hybrid-model.md` §7 and
+`qwen3-tts-guide.md:93`. `redistributionDecision: pending-qualified-review` is unchanged from the
+3.0 artifacts, which shipped with it; it is a standing item, not a 3.1 regression.
 
 | # | Decision | Gates | Recommendation |
 |---|---|---|---|
@@ -41,7 +61,7 @@ confirmation says so; the benchmark records a refused take and publishes the res
 | D-3 | **MCP `delete_voice`** (C5): behind a flag, or move files to the Trash | Step 36 | Behind `--allow-voice-delete`, as `install_model` already is. |
 | D-4 | **Long-form delete** (A4): deleting a project's row deletes its segments too, or keeps them and says so | Step 28 | Delete as a unit, with the confirmation saying so. |
 | D-5 | **The benchmark's design** (T5): keep all-or-nothing, or record a refused take and publish the rest | Step 44 | Record and publish. It is the fallback you already accepted if a v2 seed is refused. |
-| D-6 | **Hybrid attribution** (D9): which base the published models name | Step 22 | Needs your knowledge of how the artifacts were built; I cannot settle it from the tree. |
+| D-6 | **Hybrid attribution** (D9): which base the published models name | Step 22 | Settled from the record, below: both parents and both mlx-community bases. |
 | D-7 | **Fast QC pause budget** (E4): pursue, or leave | Step 39 | Measure first (step 39a costs nothing); decide on the numbers. |
 | D-8 | **Release tag signer** (B10): allow-list your key | Step 52 | Yes; one line of configuration. |
 

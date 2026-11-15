@@ -217,7 +217,7 @@ A dash means the research report lists no difference from 1.7B.
 - **Text path.** `text_projection` is a SiLU MLP with bias; `codec_head` is untied.
 - **Step input.** Each step's input is the sum of the previous frame's 16 codebook embeddings
   (codebook 0 from the talker's `codec_embedding`, 1–15 from the code predictor's) plus the text track
-  (`Qwen3TTS.swift:2835-2859`).
+  (`Qwen3TTS.swift:2776-2798`).
 - `position_id_per_seconds: 13` is in the config and read by no code.
 
 ### 3.2 Codec vocabulary and control ids
@@ -250,7 +250,7 @@ template. Special ids: `<|im_start|>` 151644, `<|im_end|>` 151645, `assistant` 7
 
 Hidden 1,024, 5 layers, 16 heads / 8 KV heads, θ 1e6, vocabulary 2,048, with 15 codec embeddings at
 talker width, 15 heads and `small_to_mtp_projection` (2,048 → 1,024; identity on 0.6B). Each frame
-runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:2763-2833`), with its own
+runs 15 sequential passes, one per residual codebook (`Qwen3TTS.swift:2703-2771`), with its own
 sampling settings, no EOS and no repetition penalty (MQ L1671-1680, L1276-1299). The weights sit
 under `talker.code_predictor.model.codec_embedding.{0…14}` and `talker.code_predictor.lm_head.{0…14}`
 (`Qwen3TTSCodePredictor.swift:212`, `:273`).
@@ -607,11 +607,11 @@ either stage for a screen.
 
 ### 9.3 Decoding
 
-The talker's sampler (`Qwen3TTSSampling.swift:173-372`, called at `Qwen3TTS.swift:2679-2692`) runs in this order:
+The talker's sampler (`Qwen3TTSSampling.swift:173-372`, called at `Qwen3TTS.swift:2617-2653`) runs in this order:
 
 1. **Float32 logits.** Logits are cast to float32 before sampling, as the reference does (D3,
    production since 2026-10-13; `QWENVOICE_SAMPLER_FLOAT32=off` samples in the model's precision).
-2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:2342-2343`), and EOS stays
+2. **Suppression.** Ids 2048–3071 are set to −∞ except EOS (`Qwen3TTS.swift:2262-2263`), and EOS stays
    suppressed until two frames exist (`productionMinimumGeneratedCodeTokensBeforeEOS`,
    `Qwen3TTS.swift:213`), matching upstream's `min_new_tokens=2`.
 3. **Repetition penalty.** 1.05 over the talker's previously generated codebook-0 ids.
@@ -626,7 +626,7 @@ The talker's sampler (`Qwen3TTSSampling.swift:173-372`, called at `Qwen3TTS.swif
 The code predictor runs the same sampler with the subtalker stage, float32 logits, no suppression,
 no EOS and no penalty; in production that stage is plain temperature and top-k, and since RF-46 it
 runs inside the frame's one compiled function on keys the loop resolves from the request's random
-state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:2792-2831`). Both production constants live in one value,
+state, drawing the same codes (`CompiledPassSampling`). The eager form serves the other stages and observed takes (`Qwen3TTS.swift:2731-2769`). Both production constants live in one value,
 `.production = (fullTextConditioning: true, filtersEOS: true, float32Sampling: true)`, defined
 twice and kept equal: `Qwen3ReferenceParity` in `Generation.swift` and `VocelloQwen3ReferenceParity`
 in `Contracts.swift`. A long-form segment's request turns D1 off.
@@ -641,7 +641,7 @@ How the target text reaches the talker is generation semantics. The token-level 
   (`non_streaming_mode=True`, WM L642, L738), and stream only the audio. **D1 was adopted for them
   on 2026-10-20** (RF-21, §11.2, §12).
 - **Long-form segments and x-vector clones** use the streaming text layout: after the prefix, the
-  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:2837-2843`).
+  text trails one token per codec frame, then `tts_pad` once it runs out (`Qwen3TTS.swift:2776-2783`).
   Text enters at 12.5 tokens/s against about 4–5 spoken, so an ~860-character segment's text is
   used up after about 16 s and the talker sees only `tts_pad` for the remaining ~40 s (A-01). RF-18's
   screen kept this layout for long-form segments.

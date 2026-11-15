@@ -325,13 +325,13 @@ Each frame builds one graph (talker forward, the 15 code-predictor passes, sampl
 step's input embedding) and submits it once. Production uses the `.pipelined` step policy
 (`Qwen3StreamStepEvalPolicy`, `Qwen3TTSGenerationProfiles.swift:285-298`):
 
-1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:2844-2852`);
+1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:2802-2816`);
 2. the previous chunk's materialization and channel sends run while it computes;
 3. the sampled-token `item` read is the step's first blocking read.
 
 `.full` (a synchronous `eval`) remains a diagnostic for exact per-stage attribution. Nothing else
 reads the GPU inside the step. The next input sums the codebook embeddings with serial bf16 adds
-(`Qwen3TTS.swift:2834-2839`), where the reference uses one reduction (A-17).
+(`Qwen3TTS.swift:2786-2798`), where the reference uses one reduction (A-17).
 
 ### 4.4 The audio decoder
 
@@ -417,8 +417,8 @@ so one generation cannot change another's.
 ### 5.4 Cache clearing and what it costs
 
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
-each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:2008-2078`), and
-every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:2269`). Outside that policy,
+each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:1926-1996`), and
+every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:2189`). Outside that policy,
 marking clears the cache four times per take: before the pass, after its frame-rate stage, after
 the pass and once the generator is dropped (B-09; its per-window clears went with RF-48, see
 `Packages/VocelloQwen3Core/PERFORMANCE.md`, Publication marking). The sources hold 29

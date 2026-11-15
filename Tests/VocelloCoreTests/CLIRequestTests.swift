@@ -328,6 +328,55 @@ final class CLIRequestTests: XCTestCase {
                        "a line batch replays only while every take exists")
     }
 
+    /// Audit C7: an entry keeps digests, never script text, and an entry past its retention
+    /// goes when the next request is claimed, not only when one completes.
+    func testTheLedgerKeepsNoScriptTextAndPrunesWhenARequestIsClaimed() throws {
+        let root = try makeRoot()
+        let ledger = CLIRequestLedger(dataDirectory: root)
+        let request = try json(#"{"text":"Lines"}"#)
+        let take = root.appendingPathComponent("0.wav")
+        try Data([1]).write(to: take)
+        let line = "A sentence only this fixture speaks."
+        let lines: CLIJSONValue = .object([
+            "lineByLine": true,
+            "items": .array([.object(["index": 0, "text": .string(line), "audioPath": .string(take.path)])]),
+        ])
+        let longAgo = Date(timeIntervalSinceNow: -(CLIRequestLedger.retention + 60))
+        guard case .run(let held) = try ledger.start(id: "lines-2", request: request) else { return XCTFail() }
+        XCTAssertTrue(ledger.complete(held, result: lines, now: longAgo))
+
+        func entries() throws -> [URL] {
+            try FileManager.default.contentsOfDirectory(at: ledger.directory, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "json" }
+        }
+        let entry = try XCTUnwrap(try entries().first)
+        let stored = try String(contentsOf: entry, encoding: .utf8)
+        XCTAssertFalse(stored.contains("fixture speaks"), "the entry holds no script text")
+        guard case .replay(let replayed) = try ledger.claim(id: "lines-2", request: request, now: longAgo),
+              case .array(let items)? = replayed.field("items"), let item = items.first else {
+            return XCTFail("the entry replays while it is within its retention")
+        }
+        XCTAssertNil(item.field("text"))
+        XCTAssertEqual(item.field("textCharacters"), .integer(line.count))
+        XCTAssertEqual(
+            item.field("textDigest"), "d5b9721bc6a5fedd1a8fa6183c39e90f5ded3427260f074627e66470c869a86d",
+            "the SHA-256 of the line's UTF-8 bytes"
+        )
+        XCTAssertEqual(item.field("audioPath"), .string(take.path), "everything else is kept")
+        XCTAssertEqual(CLIRequestLedger.audioPaths(of: replayed), [take.path])
+        XCTAssertEqual(CLIRequestLedger.storable(.object(["audioPath": "/x.wav"])), .object(["audioPath": "/x.wav"]))
+        XCTAssertEqual(CLIRequestLedger.storable(.string("plain")), .string("plain"))
+
+        // Another id is claimed a week later: the old entry and its lock file go with that claim.
+        guard case .fresh(let other) = try ledger.claim(id: "other-1", request: request) else { return XCTFail() }
+        XCTAssertEqual(try entries(), [], "an entry past retention is pruned by a claim")
+        ledger.abandon(other)
+        guard case .fresh(let again) = try ledger.claim(id: "lines-2", request: request) else {
+            return XCTFail("the pruned id runs again")
+        }
+        ledger.abandon(again)
+    }
+
     private func code(_ body: () throws -> CLIRequestLedger.Start) -> VocelloErrorCode? {
         do {
             _ = try body()

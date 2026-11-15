@@ -332,7 +332,9 @@ Auto resolved once over the whole script; the Neutral delivery when none is give
 a package with instruction control); every line streamed at the app's cadence, on one model load. The
 takes are `<stamp>_<mode>_<id>_<NNN>.wav` in `--out-dir`. The result is `{lineByLine: true, mode,
 variant, variantSource, modelID, language, batchSeed, count, wallSeconds, items[]}`, each item `{index,
-text, audioPath, durationSeconds, finishReason, seed, generationID}`. It stops at the first failed line
+text, textDigest, textCharacters, audioPath, durationSeconds, finishReason, seed, generationID}`
+(`textDigest` is the SHA-256 of the line's UTF-8 bytes; a replayed result carries it without `text`,
+see Idempotency). It stops at the first failed line
 and then keeps every planned row, as `batch` does. `--out`, `--long-form` and `--no-stream` are
 refused with it (`--long-form auto`, the default, is accepted). Unlike `batch`, whose items sample on their seed and text alone (the QC lanes resume a
 batch from any item on that property), these takes follow the app.
@@ -407,7 +409,11 @@ never reads unnamed stdin, so one without `text` or `textFile` is a usage error.
 
 **Idempotency:** a request's `clientRequestID` (or `generate --client-request-id <id>`, which also becomes
 the envelope's `requestID`) is kept with its result under `<data>/cli/requests` for seven days, named by
-the id's digest and private to the user. The same id with the same request replays the stored result
+the id's digest and private to the user. An entry holds the request's digest and the result without
+script text: a line-by-line result's items keep `textDigest` and `textCharacters` and drop `text`, so
+the folder never holds words that were spoken, and a replay reports the result in that form. Entries
+past seven days are removed when a request with a client id is next claimed or completed. The same id
+with the same request replays the stored result
 (`meta.replayed: true`) instead of running again; the same id with a different request is
 `idempotency_conflict` (2); the same id while another process runs it is `request_in_progress` (75). A
 failed request keeps nothing, so a retry runs again. "The same request" means the same take: the text

@@ -11,6 +11,9 @@ import System
 /// `<data>/cli/requests`, named by the id's digest, each with a lock file held
 /// (flock) for as long as its request runs. A ledger-wide lock serializes
 /// claims and pruning, so a prune never removes what a claim is about to use.
+/// An entry holds the request's digest and its result without script text
+/// (`storable`): a line names what it spoke by `textDigest`. Entries past
+/// `retention` are pruned when a request is claimed and when one completes.
 public struct CLIRequestLedger: Sendable {
     public enum Claim: Sendable {
         case fresh(Reservation)
@@ -78,8 +81,32 @@ public struct CLIRequestLedger: Sendable {
         return hex(SHA256.hash(data: data))
     }
 
-    /// Pruning runs at most this often, so a completion rarely reads the whole ledger.
+    /// Pruning runs at most this often, so a claim or a completion rarely reads the whole ledger.
     static let pruneInterval: TimeInterval = 3600
+
+    /// What the ledger keeps of a result: everything but script text. A `text`
+    /// field, the result's own or one of its `items`' (a line batch's lines),
+    /// is replaced by `textDigest` (the SHA-256 of its UTF-8 bytes) and
+    /// `textCharacters`, so no entry holds words that were spoken; a replay
+    /// reports the result in this form.
+    public static func storable(_ result: CLIJSONValue) -> CLIJSONValue {
+        guard case .object(var fields) = result else { return result }
+        replaceText(in: &fields)
+        if case .array(let items)? = fields["items"] {
+            fields["items"] = .array(items.map { item in
+                guard case .object(var itemFields) = item else { return item }
+                replaceText(in: &itemFields)
+                return .object(itemFields)
+            })
+        }
+        return .object(fields)
+    }
+
+    private static func replaceText(in fields: inout [String: CLIJSONValue]) {
+        guard let removed = fields.removeValue(forKey: "text"), case .string(let text) = removed else { return }
+        fields["textDigest"] = .string(hex(SHA256.hash(data: Data(text.utf8))))
+        fields["textCharacters"] = .integer(text.count)
+    }
 
     private static func hex(_ digest: SHA256.Digest) -> String {
         digest.map { unsafe String(format: "%02x", $0) }.joined()
@@ -133,6 +160,9 @@ public struct CLIRequestLedger: Sendable {
             throw CLIError(.ioError, "could not create the request ledger: \(error.localizedDescription)")
         }
         return try withLedgerLock {
+            // An entry past its retention goes as soon as any request is claimed,
+            // not only when one completes.
+            pruneHoldingLedgerLock(now: now, force: false)
             let lock = try openLock(key: key)
             guard flock(lock.rawValue, LOCK_EX | LOCK_NB) == 0 else {
                 let failure = Errno(rawValue: errno)
@@ -164,7 +194,7 @@ public struct CLIRequestLedger: Sendable {
         defer { release(reservation.lock) }
         let entry = Entry(
             schemaVersion: 1, requestDigest: reservation.requestDigest,
-            completedAt: ISO8601DateFormatter().string(from: now), result: result
+            completedAt: ISO8601DateFormatter().string(from: now), result: Self.storable(result)
         )
         let kept: Bool
         do {
@@ -186,38 +216,42 @@ public struct CLIRequestLedger: Sendable {
     /// of ids that kept nothing (abandoned) for as long, skipping any id a process
     /// holds; at most once per `pruneInterval` unless `force`.
     func prune(now: Date, force: Bool = false) {
-        _ = try? withLedgerLock {
-            let marker = directory.appendingPathComponent("ledger.pruned")
-            if !force, let last = Self.modified(marker), last <= now, now.timeIntervalSince(last) < Self.pruneInterval {
-                return
-            }
-            FileManager.default.createFile(atPath: marker.path, contents: nil)
-            try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: marker.path)
-            let urls = (try? FileManager.default.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
-            )) ?? []
-            let names = Set(urls.map(\.lastPathComponent))
-            for url in urls {
-                let age = now.timeIntervalSince(Self.modified(url) ?? now)
-                switch url.pathExtension {
-                case "tmp":
-                    // A write that never reached its rename.
-                    if age > 3600 { try? FileManager.default.removeItem(at: url) }
-                case "json":
-                    let key = url.deletingPathExtension().lastPathComponent
-                    // A damaged entry, which no claim can use, ages out by its file date.
-                    let expired = if let entry = try? readEntry(key: key) {
-                        isExpired(entry, now: now)
-                    } else {
-                        age > Self.retention
-                    }
-                    if expired { removeIdle(key: key, entry: url) }
-                case "lock" where url.lastPathComponent != "ledger.lock":
-                    let key = url.deletingPathExtension().lastPathComponent
-                    if !names.contains("\(key).json"), age > Self.retention { removeIdle(key: key, entry: nil) }
-                default:
-                    continue
+        _ = try? withLedgerLock { pruneHoldingLedgerLock(now: now, force: force) }
+    }
+
+    /// `prune`, for a caller that holds the ledger lock (a second lock on the
+    /// same file from this process would wait on the first forever).
+    private func pruneHoldingLedgerLock(now: Date, force: Bool) {
+        let marker = directory.appendingPathComponent("ledger.pruned")
+        if !force, let last = Self.modified(marker), last <= now, now.timeIntervalSince(last) < Self.pruneInterval {
+            return
+        }
+        FileManager.default.createFile(atPath: marker.path, contents: nil)
+        try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: marker.path)
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        let names = Set(urls.map(\.lastPathComponent))
+        for url in urls {
+            let age = now.timeIntervalSince(Self.modified(url) ?? now)
+            switch url.pathExtension {
+            case "tmp":
+                // A write that never reached its rename.
+                if age > 3600 { try? FileManager.default.removeItem(at: url) }
+            case "json":
+                let key = url.deletingPathExtension().lastPathComponent
+                // A damaged entry, which no claim can use, ages out by its file date.
+                let expired = if let entry = try? readEntry(key: key) {
+                    isExpired(entry, now: now)
+                } else {
+                    age > Self.retention
                 }
+                if expired { removeIdle(key: key, entry: url) }
+            case "lock" where url.lastPathComponent != "ledger.lock":
+                let key = url.deletingPathExtension().lastPathComponent
+                if !names.contains("\(key).json"), age > Self.retention { removeIdle(key: key, entry: nil) }
+            default:
+                continue
             }
         }
     }

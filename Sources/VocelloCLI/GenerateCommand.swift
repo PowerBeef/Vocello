@@ -651,6 +651,10 @@ public enum GenerateCommand {
     public struct LineTakeJSON: Encodable, Sendable {
         let index: Int
         let text: String
+        /// The SHA-256 of the line's UTF-8 bytes, and its length in characters:
+        /// what a replayed result names the line by (the request ledger keeps no text).
+        let textDigest: String
+        let textCharacters: Int
         let audioPath: String
         let durationSeconds: Double
         let finishReason: String?
@@ -764,7 +768,8 @@ public enum GenerateCommand {
         }
         let items = outcome.results.enumerated().map { index, result in
             LineTakeJSON(
-                index: index, text: lines[index], audioPath: result.audioPath, durationSeconds: result.durationSeconds,
+                index: index, text: lines[index], textDigest: sha256(Data(lines[index].utf8)),
+                textCharacters: lines[index].count, audioPath: result.audioPath, durationSeconds: result.durationSeconds,
                 finishReason: result.finishReason?.rawValue,
                 // The seed the engine's receipt records, as for a single take.
                 seed: String(result.completionReceipt?.request.seed ?? batch.seed(forLineAt: index)),

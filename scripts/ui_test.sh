@@ -34,8 +34,8 @@ Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
   scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors|design-enrollment|clone-reference|long-form|line-batch|long-form-recovery|saved-voices-states|model-update] [--long-form-segments N]
-  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME]
-  scripts/ui_test.sh macos perf
+  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME] [--no-publish]
+  scripts/ui_test.sh macos perf [--label RUN_ID] [--no-publish]
   scripts/ui_test.sh macos auto-language
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
@@ -49,8 +49,8 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario long-form
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--scenario ROW] [--retain-result]
                                [--candidate-origin-attestation "STATEMENT"]
-  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME]
-  scripts/ui_test.sh ios perf [--label RUN_ID]
+  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v2|cell-hash-v1|generated] [--matrix-version NAME] [--no-publish]
+  scripts/ui_test.sh ios perf [--label RUN_ID] [--no-publish]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
   scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession|chunked-bounded]
@@ -106,6 +106,14 @@ from its cell through the registered QWENVOICE_BENCH_SEED_POLICY knob; cell-hash
 `generated` keeps random seeds.
 `benchmark --matrix-version NAME` runs a declared matrix of config/ui-bench-matrix.json (audit #30);
 any version but the canonical one publishes focused records.
+A passing `benchmark` run, and a passing `perf` run on the canonical hardware profile, publishes: it
+writes a tracked record under benchmarks/runs/ and rewrites benchmarks/HISTORY.md (never staged or
+committed), and says so in one line when it starts. `--no-publish` (benchmark and perf, both platforms)
+keeps the run's artifacts and verdict and writes no tracked file; the run directory then holds
+publication-skipped.json, and `python3 scripts/benchmark_history.py record --artifact-dir RUN_DIR`
+publishes it later if wanted.
+A full macOS `smoke`, `perf` or `benchmark` run must have run every test config/ui-lane-tests.json
+lists for its lane, none skipped; a `--scenario` run checks nothing.
 `smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
 It generates no audio and exports its raw transcript untracked; success is an observation, not full smoke acceptance.
 `--preinstalled-candidate` runs black-box journeys on an already installed, matching non-development
@@ -177,6 +185,7 @@ control_resume_take_start=0
 control_take_limit=5
 control_take_limit_explicit=0
 retain_result=0
+no_publish=0
 candidate_evidence=""
 candidate_attestation=""
 candidate_collection_needed=0
@@ -221,6 +230,7 @@ while [[ $# -gt 0 ]]; do
     --long-form-segments) long_form_segments="${2:?--long-form-segments requires a value}"; shift 2 ;;
     --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
     --retain-result) retain_result=1; shift ;;
+    --no-publish) no_publish=1; shift ;;
     -h|--help|help) usage ;;
     *) die "unknown flag: $1" ;;
   esac
@@ -301,6 +311,9 @@ fi
 if [[ "$lane" != "benchmark" && ( "$modes" != "custom,design,clone" || "$lengths" != "short,medium,long" || "$warm" != 3 ) ]]; then
   die "benchmark flags are accepted only by the benchmark lane"
 fi
+if (( no_publish == 1 )) && [[ "$lane" != "benchmark" && "$lane" != "perf" ]]; then
+  die "--no-publish is accepted only by the benchmark and perf lanes (no other lane publishes)"
+fi
 if [[ "$lane" != "delivery-cohort" ]] && [[ "$cohort_takes" != 20 || -n "$cohort_text" ]]; then
   die "--takes and --text are accepted only by the delivery-cohort lane"
 fi
@@ -356,6 +369,21 @@ if [[ -n "$long_form_segments" ]]; then
 fi
 
 python3 "$UI_LANE_DATA" matrix "$modes" "$lengths" "$warm" || exit $?
+
+# The two lanes that write tracked files say so before anything runs (audit B4):
+# a probe run used to leave a record under benchmarks/runs and a rewritten
+# benchmarks/HISTORY.md behind with no warning and no opt-out.
+announce_publication() {
+  [[ "$lane" == "benchmark" || "$lane" == "perf" ]] || return 0
+  if (( no_publish == 1 )); then
+    note "--no-publish: this $platform $lane run keeps its artifacts and verdict and writes no tracked record under benchmarks/"
+  elif [[ "$lane" == "benchmark" ]]; then
+    note "this run will publish: a passing $platform benchmark writes a tracked record under benchmarks/runs/ and rewrites benchmarks/HISTORY.md (--no-publish keeps the run local)"
+  else
+    note "this run will publish: a passing $platform perf run on the canonical hardware profile writes a tracked record under benchmarks/runs/ and rewrites benchmarks/HISTORY.md (--no-publish keeps the run local)"
+  fi
+}
+announce_publication
 
 if [[ "$platform" == "ios" ]]; then
   require_ios_xcode_platform \
@@ -1622,6 +1650,10 @@ elif [[ "$platform" == "macos" ]]; then
   elif [[ "$lane" == "perf" ]]; then
     # UI-performance scenarios (frame probe + marked windows).
     only_test="VocelloMacUITests/VocelloMacPerfUITests"
+    # The app reads the benchmark's current-take file in any build with telemetry
+    # on (audit E11): one left by an interrupted benchmark would stamp its run and
+    # cell into the generation-active scenario's rows, as it would the benchmark's.
+    rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"
     perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
   elif [[ "$lane" == "auto-language" ]]; then
     only_test="VocelloMacUITests/VocelloMacAutoLanguageUITests/testAutoLanguageReachesTheEngine"
@@ -2172,24 +2204,43 @@ if [[ "$lane" == "benchmark" || "$lane" == "perf" ]]; then
   write_run_metadata passed "$finished_at" 0
 fi
 
-if [[ "$lane" == "benchmark" ]]; then
-  if ! history_record="$(required_step_run "$step_ledger" history-publication \
-      python3 "$ROOT_DIR/scripts/benchmark_history.py" record --artifact-dir "$out")"; then
-    die "benchmark passed, but history publication failed; evidence is preserved in $out (repair: python3 scripts/benchmark_history.py record --artifact-dir '$out')"
-  fi
-  note "tracked benchmark record → $history_record"
-fi
+# What --no-publish leaves instead of a tracked record (audit B4).
+record_publication_skipped() {
+  printf '{"schemaVersion":1,"published":false,"reason":"--no-publish"}\n' >"$out/publication-skipped.json"
+}
 
-# UI-7 (macOS) / IUI-6 (iOS): perf runs publish only when the checker emitted
-# evidence (canonical hardware); non-canonical hosts keep local-only reports
-# by design.
-if [[ "$lane" == "perf" && -f "$out/benchmark-evidence.json" ]]; then
+# Publication of a passed benchmark or perf run. A benchmark always has
+# evidence. UI-7 (macOS) / IUI-6 (iOS): a perf run publishes only when the
+# checker emitted evidence (canonical hardware); non-canonical hosts keep
+# local-only reports by design. With --no-publish neither lane calls
+# benchmark_history.py, so no file under benchmarks/ changes.
+publish_lane_history() {
+  local kind history_record
+  case "$lane" in
+    benchmark) kind="benchmark" ;;
+    perf) kind="ui-perf"; [[ -f "$out/benchmark-evidence.json" ]] || return 0 ;;
+    *) return 0 ;;
+  esac
+  if (( no_publish == 1 )); then
+    if [[ "$lane" == "benchmark" ]]; then
+      # history-publication is a required step of the benchmark workflows
+      # (config/orchestration-contract.json): it runs, and what it does is
+      # record that the publication was skipped on request.
+      required_step_run "$step_ledger" history-publication record_publication_skipped \
+        || die "could not record the skipped publication in $out"
+    else
+      record_publication_skipped
+    fi
+    note "not published (--no-publish): no tracked $kind record; to publish this run later: python3 scripts/benchmark_history.py record --artifact-dir '$out'"
+    return 0
+  fi
   if ! history_record="$(required_step_run "$step_ledger" history-publication \
       python3 "$ROOT_DIR/scripts/benchmark_history.py" record --artifact-dir "$out")"; then
-    die "perf lane passed, but history publication failed; evidence is preserved in $out (repair: python3 scripts/benchmark_history.py record --artifact-dir '$out')"
+    die "$lane lane passed, but history publication failed; evidence is preserved in $out (repair: python3 scripts/benchmark_history.py record --artifact-dir '$out')"
   fi
-  note "tracked ui-perf record → $history_record"
-fi
+  note "tracked $kind record → $history_record"
+}
+publish_lane_history
 
 # Control audits remain running until all required steps finish. Retention
 # leaves their unfinalized bundle untouched and can prune older completed runs.

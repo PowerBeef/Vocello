@@ -227,7 +227,7 @@ enum MCPTools {
             ),
             MCPTool(
                 name: "list_models", title: "List models",
-                description: "List the model packages (Speed and Quality per mode) and whether each is installed.",
+                description: "List the models (one per mode) and whether each is installed or needs its update.",
                 kind: .read, path: ["models", "list"],
                 arguments: [.init("id", string("Show only this model."), .operand)],
                 hints: readHints

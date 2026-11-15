@@ -6,8 +6,8 @@
   "result": {
     "schemaVersion": 2,
     "mode": "custom",
-    "variant": "quality",
-    "modelID": "pro_custom_quality",
+    "variant": "speed",
+    "modelID": "pro_custom_speed",
     "plannedCount": 3,
     "completedCount": 1,
     "wallSeconds": 9.6,
@@ -40,7 +40,7 @@
     "message": "The engine stopped item 1 under critical memory pressure, so no audio was written for it.",
     "retryable": true,
     "retryAfterMs": null,
-    "hint": "Free memory (quit other apps) or use --variant speed, then rerun the items not attempted.",
+    "hint": "Free memory (quit other apps), then rerun the items not attempted.",
     "detail": {
       "stoppedAt": 1
     }

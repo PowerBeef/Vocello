@@ -86,7 +86,7 @@ public enum CLIFailure {
                 code: stopped.contractCode,
                 message: stopped.errorDescription ?? stopped.errorCode,
                 hint: stopped.contractCode == .memoryPressure
-                    ? "retry once memory is free; --variant speed needs less" : "retry shortly",
+                    ? "retry once memory is free (quit other apps)" : "retry shortly",
                 detail: ["reason": .string(stopped.errorCode)]
             )
         }
@@ -216,7 +216,7 @@ public enum CLIFailure {
     private static func hint(for reason: GenerationFailurePresentationReason) -> String? {
         switch reason {
         case .memoryPressure, .insufficientMemory:
-            return "free memory (quit other apps) or use --variant speed, then retry"
+            return "free memory (quit other apps), then retry"
         case .engineBusy, .engineReleasingMemory:
             return "a take is running or memory is being released, in this or another Vocello process; retry shortly"
         case .savedVoiceStoreBusy:

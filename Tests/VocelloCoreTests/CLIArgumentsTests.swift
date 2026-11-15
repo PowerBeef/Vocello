@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import os
 import XCTest
 @testable import VocelloCLICore
 import VocelloDesktopCore
@@ -596,4 +597,28 @@ final class CLIArgumentsTests: XCTestCase {
             "the /private firmlinks never cause an exec"
         )
     }
+    /// RF-61 (audit finding C1): the v1 contract never removes a name. Every setting 3.0.0 listed
+    /// still resolves, and `variation`, retired by RF-58, reads Expressive and stores nothing.
+    func testEverySettingThreePointZeroShippedStillResolves() throws {
+        let writes = OSAllocatedUnfairLock(initialState: [String]())
+        let settings = DesktopAppSettings(
+            domain: DesktopAppSettings.releaseDomain, read: { _ in nil },
+            write: { key, _ in writes.withLock { $0.append(key) }; return true }
+        )
+        let shippedInThreePointZero = [
+            "autoplay", "output-folder", "variation", "prefer-lower-memory",
+            "variant.custom", "variant.design", "variant.clone", "interface-language",
+        ]
+        for name in shippedInThreePointZero {
+            XCTAssertNotNil(settings.entry(name), "\(name) was a 3.0.0 setting")
+            XCTAssertTrue(DesktopAppSettings.names.contains(name), "\(name) is still listed")
+        }
+        XCTAssertEqual(settings.entry("variation")?.value, "expressive")
+        for value in ["consistent", "Balanced", "expressive"] {
+            XCTAssertEqual(try settings.set("variation", to: value).value, "expressive")
+        }
+        XCTAssertEqual(writes.withLock { $0 }, [], "a retired setting stores nothing")
+        XCTAssertThrowsError(try settings.set("variation", to: "loud"))
+    }
+
 }

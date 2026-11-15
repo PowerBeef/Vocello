@@ -202,6 +202,19 @@ enum SettingsCommand {
                 throw CLIError(.ioError, "could not store \(name) in the app's preferences (\(settings.domain))")
             }
         }
+        if name == "variation" {
+            // Nothing was stored, so the app is not told. A value other than Expressive warns, as
+            // `--variation` does.
+            let requested = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if requested != entry.value {
+                CLIPresenter.warn(
+                    "variation_retired",
+                    "the variation setting is retired: every take samples as expressive",
+                    detail: ["requested": .string(requested), "sampled": .string(entry.value)]
+                )
+            }
+            return entry
+        }
         DesktopChangeNotice.settings.post()
         return entry
     }

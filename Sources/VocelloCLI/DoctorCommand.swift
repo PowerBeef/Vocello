@@ -82,7 +82,7 @@ enum DoctorCommand {
         checks.append(Check(
             name: "memory", status: memoryClass == .floor8GBMac ? "warn" : "ok",
             message: memoryClass == .floor8GBMac
-                ? "an 8 GB Mac: prefer --variant speed and quit other apps for long takes"
+                ? "an 8 GB Mac: quit other apps for long takes"
                 : "memory tier \(memoryClass.rawValue)"
         ))
 

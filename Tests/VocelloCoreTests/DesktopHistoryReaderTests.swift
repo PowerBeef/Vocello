@@ -257,7 +257,10 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(settings.explicitVariantID(for: .design), "turbo", "any stored id counts; the resolution skips it")
         XCTAssertNil(settings.explicitVariantID(for: .custom))
         XCTAssertNil(settings.entry("consent"), "consent is never a CLI setting")
-        XCTAssertNil(settings.entry("variation"), "the Variation setting is retired (RF-58)")
+        XCTAssertEqual(
+            settings.entry("variation"), DesktopAppSettings.retiredVariationEntry,
+            "retired by RF-58, and still a name 3.0 scripts read (RF-61): it reads Expressive"
+        )
         XCTAssertEqual(DesktopAppSettings(debug: false).domain, "com.qwenvoice.app")
     }
 
@@ -323,7 +326,9 @@ final class DesktopHistoryReaderTests: XCTestCase {
         XCTAssertEqual(code("autoplay", "maybe"), .invalidValue(name: "autoplay", value: "maybe", accepted: "true | false"))
         XCTAssertEqual(code("interface-language", "fr"), .notSettable("interface-language"))
         XCTAssertEqual(code("consent", "true"), .unknownSetting("consent"), "consent is never a CLI setting")
-        XCTAssertEqual(code("variation", "consistent"), .unknownSetting("variation"), "retired by RF-58")
+        XCTAssertNil(code("variation", "consistent"), "retired by RF-58: a set is accepted and stores nothing (RF-61)")
+        XCTAssertEqual(code("variation", "loud"),
+                       .invalidValue(name: "variation", value: "loud", accepted: "expressive | balanced | consistent"))
         XCTAssertEqual(stored("generationVariation") as? String, "balanced", "an old stored value is left alone")
 
         let readOnly = DesktopAppSettings(domain: DesktopAppSettings.debugDomain, read: { _ in nil })

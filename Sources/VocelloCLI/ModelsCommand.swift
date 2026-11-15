@@ -52,6 +52,9 @@ enum ModelsCommand {
         let modelID: String
         let status: String
         let installedBytes: Int64
+        /// RF-61: the earlier models' folders this install removed (RF-59 removes every mode's once
+        /// one new model is in place), so a script or an agent sees it; empty when none went.
+        let removedRetiredFolders: [String]
     }
 
     /// `install-recommended`: the package each mode uses, as `models active`
@@ -378,8 +381,11 @@ enum ModelsCommand {
             let stale = catalog.installedFileSizeMismatches(for: artifact, modelsRoot: ctx.modelsDirectory)
             if stale.isEmpty {
                 note("Already installed: \(modelID)")
-                reclaimRetiredFolders(of: modelID, ctx: ctx)
-                return Installed(modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir))
+                let removed = reclaimRetiredFolders(of: modelID, ctx: ctx)
+                return Installed(
+                    modelID: modelID, status: "already_installed", installedBytes: directorySize(targetDir),
+                    removedRetiredFolders: removed
+                )
             }
             repairingStaleInstall = true
             note("Updating \(modelID): \(stale.count) file(s) no longer match the pinned catalog identity")
@@ -474,9 +480,10 @@ enum ModelsCommand {
         }
 
         DesktopChangeNotice.models.post()
-        reclaimRetiredFolders(of: modelID, ctx: ctx)
+        let removed = reclaimRetiredFolders(of: modelID, ctx: ctx)
         return Installed(
-            modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: directorySize(targetDir)
+            modelID: modelID, status: repairingStaleInstall ? "updated" : "installed", installedBytes: directorySize(targetDir),
+            removedRetiredFolders: removed
         )
     }
 
@@ -486,8 +493,9 @@ enum ModelsCommand {
     /// as the apps remove them; never while the app or another engine runs, since an older one may
     /// still load them.
     @MainActor
-    static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) {
-        guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return }
+    @discardableResult
+    static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) -> [String] {
+        guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return [] }
         let modelsDirectory = ctx.modelsDirectory
         let registry = ctx.registry
         let result = registry.reclaimRetiredFolders(
@@ -501,6 +509,15 @@ enum ModelsCommand {
         for folder in result.removed {
             note("Removed the retired model folder \(folder)")
         }
+        if !result.removed.isEmpty {
+            // Also in the machine formats (RF-61): the other modes' earlier models went too, so
+            // they need their own install before they generate again.
+            CLIPresenter.warn(
+                "retired_folders_removed",
+                "\(result.removed.count) earlier model folder(s) were removed; every mode now needs its current model",
+                detail: ["folders": .array(result.removed.sorted().map { .string($0) })]
+            )
+        }
         if !result.failed.isEmpty {
             CLIPresenter.warn(
                 "retired_folders_kept",
@@ -508,6 +525,7 @@ enum ModelsCommand {
                 detail: ["folders": .array(result.failed.keys.sorted().map { .string($0) })]
             )
         }
+        return result.removed.sorted()
     }
 
     /// `vocello models install-recommended [--plan]`: installs the package each

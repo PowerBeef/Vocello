@@ -92,6 +92,13 @@ public struct DesktopAppSettings: Sendable {
                 }
                 stored = folder.path
             }
+        case "variation":
+            // Retired by RF-58: every take samples as Expressive. 3.0 shipped this setting, so it
+            // still resolves (the v1 contract never removes a name); a set stores nothing.
+            guard Qwen3SamplingVariation(rawValue: value.lowercased()) != nil else {
+                throw SetError.invalidValue(name: name, value: raw, accepted: "expressive | balanced | consistent")
+            }
+            return Self.retiredVariationEntry
         case "variant.custom", "variant.design", "variant.clone":
             switch value.lowercased() {
             case "automatic", "auto": stored = nil
@@ -142,9 +149,14 @@ public struct DesktopAppSettings: Sendable {
         }
     }
 
+    /// `variation` as it reads since RF-58: always Expressive, whatever an earlier build stored.
+    public static let retiredVariationEntry = Entry(
+        name: "variation", value: Qwen3SamplingVariation.expressive.rawValue, isDefault: true, settable: true
+    )
+
     /// The CLI names, in display order.
     public static let names = [
-        "autoplay", "output-folder", "prefer-lower-memory",
+        "autoplay", "output-folder", "variation", "prefer-lower-memory",
         "variant.custom", "variant.design", "variant.clone", "interface-language",
     ]
 
@@ -158,6 +170,8 @@ public struct DesktopAppSettings: Sendable {
             let stored = (read(MacAppSettingsKeys.outputDirectory) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let isDefault = stored?.isEmpty ?? true
             return Entry(name: name, value: isDefault ? "default" : stored!, isDefault: isDefault, settable: true)
+        case "variation":
+            return Self.retiredVariationEntry
         case "prefer-lower-memory":
             return bool(name, key: MacAppSettingsKeys.preferSpeedEverywhere, default: false)
         case "variant.custom", "variant.design", "variant.clone":

@@ -50,7 +50,7 @@ public struct CLIEngineCancellation: Error, LocalizedError, Equatable {
         switch reason {
         case .memoryPressure:
             return "the engine stopped this take under critical memory pressure, so no audio was written. "
-                + "Free memory (quit other apps) or use --variant speed, then retry."
+                + "Free memory (quit other apps), then retry."
         case .user, .superseded, .shutdown:
             return "the engine stopped this take on its own (\(reason.rawValue)), so no audio was written."
         }

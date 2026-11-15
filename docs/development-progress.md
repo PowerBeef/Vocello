@@ -54,14 +54,12 @@ changes and the playback fix are compiled and unit-tested, not measured.
 
 **Open**
 
-- **★ Xcode: the pin stays at 26.6 (maintainer, 2026-11-15), and one question is left.** GitHub
-  offers Xcode 27 only on a preview runner image (`xcode-27`), so D-1's move was reversed: CI and
-  the release keep Xcode 26.6. Promotion now refuses macOS evidence built with another Xcode than
-  the release's, and that evidence is built on this Mac, which has only Xcode 27.2 and runs macOS
-  27.2.1; Apple lists Xcode 26.6 as supported on macOS 26.2 to 26.x. The maintainer chooses between
-  trying 26.6 here unsupported (a download through their Apple ID; it may not run), recording the
-  difference in promotion as an accepted exception, or moving the pin after all. Nothing is
-  installed and `config/toolchain.json` is unchanged.
+- **Xcode is settled (maintainer, 2026-11-15).** The pin stays at 26.6 for CI and the release
+  (GitHub offers Xcode 27 only on a preview runner image). This Mac runs macOS 27.2.1, where Apple
+  does not support Xcode 26.6, so the lanes stay on Xcode 27.2 and the difference is accepted by
+  name: at promotion, `quality_promotion.py create --accept-toolchain-difference "REASON"` writes
+  what differs and why into `quality-promotion.json`; without it the records are refused. The 3.1
+  notes say the measurements came from Xcode 27.2 builds. Audit finding B1 is disclosed, not closed.
 - Steps not done: 40 (speed gate, needs three v2 benchmark runs), 41 (model update under test),
   the rest of 43, 46 (signing isolation in `release.yml`, which only the release rehearsal can
   prove), 50 (the pyright baseline, 877 to 791 so far), and A11. The plan's status table says why

@@ -984,6 +984,13 @@ struct PCM16LeadingSilenceGate: Sendable {
         var trimmedSamples = 0
         var retainedPreRollSamples = 0
         var maximumBufferedSamples = 0
+
+        /// The gate was on, received audio and never opened: every frame the
+        /// model emitted stayed under the silence floor, so nothing was
+        /// passed on to the writer.
+        var suppressedAllAudio: Bool {
+            algorithmVersion != nil && !opened && maximumBufferedSamples > 0
+        }
     }
 
     static let algorithmVersion = 1
@@ -2107,7 +2114,8 @@ struct StreamingExecutionContext: Sendable {
 
         if let terminalError = Self.postStreamTerminalError(
             totalFramesWritten: totalFramesWritten,
-            isTaskCancelled: Task.isCancelled
+            isTaskCancelled: Task.isCancelled,
+            leadingSilenceGateSuppressedAllAudio: leadingSilenceMetrics.suppressedAllAudio
         ) {
             signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             await writeFailureTelemetry(
@@ -2554,14 +2562,23 @@ struct StreamingExecutionContext: Sendable {
     /// interpreting an empty stream as an engine failure so memory-pressure
     /// cancellation retains its typed terminal reason and never surfaces a
     /// false "no audio chunks" error in the frontend.
+    ///
+    /// A Clone take whose every frame stayed under the leading-silence gate's
+    /// floor also wrote nothing, but the model did emit audio: it ends as the
+    /// no-speech refusal Fast QC gives an empty take, not as an engine that
+    /// emitted nothing.
     static func postStreamTerminalError(
         totalFramesWritten: Int64,
-        isTaskCancelled: Bool
+        isTaskCancelled: Bool,
+        leadingSilenceGateSuppressedAllAudio: Bool = false
     ) -> Error? {
         if isTaskCancelled {
             return CancellationError()
         }
         guard totalFramesWritten > 0 else {
+            if leadingSilenceGateSuppressedAllAudio {
+                return Self.finalAudioQCRejectionError(flags: ["empty"])
+            }
             return MLXTTSEngineError.generationFailed(
                 "The native engine did not emit any audio chunks."
             )

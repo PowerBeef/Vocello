@@ -568,9 +568,23 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             sampleRate: 1_000
         )
 
+        XCTAssertFalse(gate.metrics.suppressedAllAudio, "a gate that received nothing suppressed nothing")
         XCTAssertTrue(gate.filter([Float](repeating: 0, count: 60_000)).isEmpty)
         XCTAssertFalse(gate.metrics.opened)
         XCTAssertLessThanOrEqual(gate.metrics.maximumBufferedSamples, 100)
+        XCTAssertTrue(gate.metrics.suppressedAllAudio, "every frame stayed under the floor")
+    }
+
+    func testAGateThatOpenedOrIsOffSuppressedNothing() {
+        var opened = PCM16LeadingSilenceGate(policy: .cloneEdgeV1, sampleRate: 1_000)
+        _ = opened.filter([Float](repeating: 0, count: 500))
+        _ = opened.filter([Float](repeating: 0.2, count: 100))
+        XCTAssertTrue(opened.metrics.opened)
+        XCTAssertFalse(opened.metrics.suppressedAllAudio)
+
+        var disabled = PCM16LeadingSilenceGate(policy: .disabled, sampleRate: 1_000)
+        _ = disabled.filter([Float](repeating: 0, count: 500))
+        XCTAssertFalse(disabled.metrics.suppressedAllAudio, "only the Clone edge gate drops audio")
     }
 
     func testCloneLeadingSilenceGateDoesNotLeakAcrossScratchBufferLeases() {
@@ -1320,6 +1334,43 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
                 totalFramesWritten: 1,
                 isTaskCancelled: false
             )
+        )
+    }
+
+    /// A Clone take whose every frame stayed under the leading-silence gate's
+    /// floor wrote nothing, but the model did emit audio: it ends as the
+    /// no-speech refusal, not as an engine that emitted no audio chunks.
+    func testAnAllQuietCloneTakeEndsAsTheNoSpeechRefusal() throws {
+        let refusal = try XCTUnwrap(
+            StreamingExecutionContext.postStreamTerminalError(
+                totalFramesWritten: 0,
+                isTaskCancelled: false,
+                leadingSilenceGateSuppressedAllAudio: true
+            ) as? NativeRuntimeError
+        )
+        XCTAssertEqual(refusal.failureCode, .audioQualityRejected)
+        XCTAssertEqual(NativeAudioQualityRejection(diagnosticDetail: refusal.diagnosticDetail), .noSpeech)
+        XCTAssertEqual(
+            refusal.localizedDescription,
+            StreamingExecutionContext.finalAudioQCRejectionError(flags: ["silent"]).localizedDescription,
+            "the same copy as a take Fast QC found silent"
+        )
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: refusal), .failed)
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(refusal))
+
+        let cancelled = StreamingExecutionContext.postStreamTerminalError(
+            totalFramesWritten: 0,
+            isTaskCancelled: true,
+            leadingSilenceGateSuppressedAllAudio: true
+        )
+        XCTAssertTrue(cancelled is CancellationError, "cancellation still wins")
+        XCTAssertNil(
+            StreamingExecutionContext.postStreamTerminalError(
+                totalFramesWritten: 1,
+                isTaskCancelled: false,
+                leadingSilenceGateSuppressedAllAudio: true
+            ),
+            "a take that wrote audio goes on to Fast QC"
         )
     }
 

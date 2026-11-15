@@ -113,6 +113,15 @@ same line, so `scripts/dev.sh ci` and `supply_chain_contract.py --installed webs
 dependencies themselves stay exact through `website/package-lock.json`. Vercel deploys through its Git
 integration; `vercel link --repo` is needed only to use the Vercel CLI.
 
+`npm ci` does not download Playwright's browser builds, and the check's last part, the browser
+tests, needs chromium, the chromium headless shell and webkit. `scripts/dev.sh doctor` reports
+whether they are in the Playwright cache (`PLAYWRIGHT_BROWSERS_PATH`, else the platform cache) in
+one line and as `websiteBrowsers` in `--json`. When `scripts/dev.sh check` or `ci` reaches the
+website check on a host without them, it stops before the step, names the missing builds and the
+install command (`npm --prefix website exec playwright install chromium webkit`) and installs
+nothing: the download needs the maintainer's word. The probe is presence only, so a build left by
+another Playwright version counts and Playwright itself names the revision it wants.
+
 ### 5. Git
 
 Set a global identity (`git config --global user.name …` and `user.email …`) and do not add a
@@ -170,7 +179,8 @@ the lead session on the repository folder itself, without a worktree
 ([The Claude desktop app](#the-claude-desktop-app)).
 
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
-models or touching devices. Detect MCP tools in the live session.
+models or touching devices: tools and their pins, the selected Python and its test packages, and
+Playwright's browser builds for the website check. Detect MCP tools in the live session.
 
 The maintainer's toolset is optional assistance, never a CI dependency. The list below is the
 repository-relevant part as of 2026-11-02; the desktop app and the maintainer's account add other
@@ -275,12 +285,32 @@ be missed locally; the Linux CI job still runs the whole suite.
 checkout, or a `worktree-*` (agent) or `claude/*` (desktop side session) branch in a registered
 linked worktree; pushes only from `main` in the main checkout; a whitespace-clean staged diff
 (`git diff --cached --check`); and a clean `scripts/privacy_scan.py --staged` (no developer home path,
-no credential-shaped token, no key file). It never builds or tests. Its one advisory check
-returns a warning, not a block, when behaviour-bearing Swift is committed without the Swift review's
-trailer (see Operating defaults); a message it cannot read skips the check. Two more guards block
-Simulator destinations, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made
-branches, `project.pbxproj` writes and hand edits of generated files;
-`scripts/tests/test_agent_hooks.py` pins all of them.
+no credential-shaped token, no key file). It never builds or tests.
+
+Two checks only advise. Each returns a warning, never a block, and a message the hook cannot read
+(an editor, a computed or reused message) skips it:
+
+- behaviour-bearing Swift committed without the Swift review's trailer (see Operating defaults);
+- while `config/roadmap.json` records a freeze (`focusLock.freeze`), a commit whose subject names
+  no item of the focus plan, as in `... (RF-61)`. It is the rule `roadmap.py validate` applies to
+  every commit after the freeze, said before the commit exists; the plan's open and archived items
+  and their legacy ids count.
+
+Two more guards (`policy_guard.sh` and `generated_file_guard.sh`) block Simulator destinations,
+whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made branches, broad staging,
+`git commit -a`, stashing, `project.pbxproj` writes and hand edits of generated files. Staging is
+judged on the parsed command, so every spelling is refused:
+
+- `git add` with `-A`, `--all`, `-u` or `--update` anywhere among its options, or with a pathspec
+  that names the current directory, a parent or the whole tree (`.`, `./`, `..`, `:/`, `:(top)`,
+  `*`, `"$PWD"`, an exclusion such as `:!docs`);
+- `git commit -a` or `--all`, alone or in a cluster such as `-am`;
+- every `git stash` but `list` and `show`.
+
+Named files, directories and globs below the current directory, and computed paths such as
+`"$file"`, stay allowed. A command one of the policy parsers (git, build-output and project-file,
+Simulator) cannot read is refused with the reason, never allowed unjudged: run it in a simpler
+form, one command per call. `scripts/tests/test_agent_hooks.py` pins all of them.
 
 ## The contract gate
 
@@ -348,12 +378,19 @@ that no longer occur, `--update` removes them, and nothing adds one.
 
 ## Python tests
 
-`scripts/dev.sh` selects an already-installed Python and propagates it to its child commands.
+`scripts/dev.sh` and the contract gate (`scripts/check_project_inputs.sh`) each select an
+already-installed Python and propagate it to their child commands. Both source
+`scripts/lib/python.sh`, which exports `VOCELLO_PYTHON` from `scripts/select_python.py` and puts the
+repository shim (`scripts/lib/python-bin`) first on `PATH`, so every `python3` of the gate, of its
+validators and of the Python suite runs on the selected interpreter. The release preflight, the
+lanes and a direct call therefore reach the gate with the right interpreter without going through
+`scripts/dev.sh`, even when the shell's bare `python3` has no pytest.
 Use `VOCELLO_PYTHON=/absolute/path/to/python3 scripts/dev.sh ...` for an explicit interpreter;
-this changes only that invocation, with no global PATH or package installation. `doctor --json`
+this changes only that invocation, with no global PATH or package installation, and an explicit
+interpreter never falls back to another. `doctor --json`
 reports the selected executable, installed test-package versions and their pin compatibility.
 Keep CI's declared Python environment; a missing local package is a prerequisite failure, not a
-reason to skip tests. Standalone `python3` commands still use the caller's shell environment.
+reason to skip tests. Other standalone `python3` commands still use the caller's shell environment.
 
 pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs
 in about 65 to 90 seconds on the development Mac (Mac mini M6). `scripts/tests/conftest.py` marks
@@ -565,7 +602,7 @@ and never builds or touches a phone.
 | Event | Tool/event matcher | Handler | Effect |
 | --- | --- | --- | --- |
 | SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; the agent rules for a session started in a linked worktree; bounded local Git/status/checkpoint context |
-| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent and side-session limits |
+| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent and side-session limits |
 | PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents and side sessions never edit the roadmap or checkpoint |
 | PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py | Refuses unsupported-destination tool routes |
 | PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
@@ -576,8 +613,9 @@ always run the main checkout's copy, while the guards judge each tool action by 
 follows an agent worktree. Bash payloads carry `tool_input.command`; file tools carry
 `tool_input.file_path` (`notebook_path` for NotebookEdit). Any other tool, including the retired Codex
 patch tool, fails closed in the file guard. Tokenized Git parsing handles global options, literal `-C`,
-chains, subshells and heredocs. These cooperative guards cannot sandbox interpreter indirection or
-arbitrary external programs.
+chains, subshells and heredocs. `policy_guard.sh` refuses a command its parsers cannot read (exit 2
+with the reason); `agent_guard.py` allows one on a defect of its own parser and prints the error.
+These cooperative guards cannot sandbox interpreter indirection or arbitrary external programs.
 
 The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
 the routine loop: read-only Git, scoped staging and commits, worktree integration (`worktree-*` and
@@ -603,7 +641,9 @@ is not matched by them (BKL-62), so a connector write still needs an explicit re
 `origin claude/*`), `checkout -b`, `switch -c` and `worktree add`, `update-ref`, stashing, broad
 staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
 `hf auth token`, which prints the stored credential. Any other non-main push and `git branch <name>`
-are refused by the `policy_guard.sh` hook, not by a permission rule. It
+are refused by the `policy_guard.sh` hook, not by a permission rule. The deny rules match literal
+prefixes (`git add -A`, `git stash`); the hook refuses every other spelling of broad staging,
+`git commit -a` and stashing ([The commit lint](#the-commit-lint)). It
 also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
 desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
 simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the

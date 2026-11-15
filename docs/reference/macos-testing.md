@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-10-28
+reviewed: 2026-11-15
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -10,6 +10,10 @@ sourceOfTruth:
   - scripts/lib/mac_lane_data.py
   - scripts/lib/host_preflight.sh
   - config/ui-perf-thresholds.json
+  - config/ui-lane-tests.json
+  - scripts/check_macos_ui_perf.py
+  - scripts/check_macos_ui_bench.py
+  - scripts/lib/playback_capture.py
   - Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift
   - Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift
 ---
@@ -160,6 +164,8 @@ scripts/ui_test.sh macos localization
 scripts/ui_test.sh macos benchmark
 # Filtered benchmark example:
 scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --label "focused"
+# A probe run that writes no tracked record (benchmark and perf):
+scripts/ui_test.sh macos benchmark --no-publish
 # Scaled long-form memory evidence (local only, 2–12 segments; default 2):
 scripts/ui_test.sh macos smoke --long-form-segments 10
 # SwiftUI performance / animation-smoothness scenarios (local evidence only):
@@ -216,21 +222,43 @@ audio output for one take per cell (the last warm repetition that does not start
 Core Audio process tap, physical output muted while tapped, one
 manual System Audio Recording grant for the lane-re-signed `com.qwenvoice.app.uitests.xctrunner`), writes the captures under the run's
 `playback-capture/` directory and the checker compares each one with the published take WAV
-(`playbackCapture*` metrics, warn codes, and since 2026-09-14 a gate on captured takes; the smoke lane captures its completed-generation take as well; see
-[`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) §4.10). A missing or denied capture never
-fails the lane; a planned take reads `playbackCaptureStatus: unavailable`.
+(`playbackCapture*` metrics, warn codes, and since 2026-09-14 a gate on captured takes; see
+[`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) §4.10). The gate
+(`scripts/lib/playback_capture.py` `gate_failures`) fails the lane on a captured take outside its
+thresholds and on a silent take: the tap ran and the app played nothing audible. When the runner
+armed capture (its `capture-run.json` is in the capture directory), every planned take owes a
+capture, and one that ends `unavailable`, `referenceUnresolved` or `aborted` fails the run. A run
+that was never armed (`QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=off`, or the default `auto` on a host
+whose TCC database shows no grant) passes, and its record carries no capture evidence.
+
+The benchmark checker also fails a take on playback health: any playback continuity failure
+(`playbackContinuityFailures` above zero) and more underruns than `--max-playback-underruns`
+allows (default 0, which the lane uses), each named with its take and cell. The iPhone checker
+prints the same two findings as report-only warnings that change neither the verdict nor the
+record, until a phone run calibrates them.
+
+The smoke lane captures its completed-generation take (`test02`) as well, always armed; its
+capture analysis is advisory. What fails the journey is playback itself: `test02` asserts that the
+finished take starts playing on its own, and outside the measured lanes `waitForPlaybackToFinish`
+requires the player to have been seen playing (its control reads "Pause") before playback counts
+as ended. The benchmark and perf lanes keep the wait their baselines ran with; the benchmark's
+played-audio gate answers for a silent take there.
 
 ## UI-performance lane (`macos perf`)
 
-Eleven XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
+Twelve XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
 animation smoothness: idle-baseline, sidebar-navigation (pure UI: proactive warms
 suppressed with `QWENVOICE_SUPPRESS_WARMUP`, audit #33), harness-control (exploratory,
 audit #32: sidebar-navigation's readiness queries with no click, so its hitch time is
 the harness's own accessibility cost), history-scroll (400 seeded rows; exploratory),
-history-filter (exploratory), delivery-menu, settings-scroll, composer-typing,
-window-resize (exploratory), sidebar-navigation-warms (exploratory: the same navigation
-with the product's warms on, run late because it loads models) and generation-active
-(exploratory; gate ON, engine busy). The navigation scenarios and the control mark
+history-filter (400 seeded rows, three type/clear cycles of the search field;
+exploratory), history-filter-paged (exploratory: the same journey over 700 seeded rows,
+more than one 500-row History page, with a query whose matches all lie outside the
+newest page, so every answer comes from the database), delivery-menu (warms suppressed,
+as in sidebar-navigation, so no model warm starts inside the window), settings-scroll,
+composer-typing, window-resize (exploratory), sidebar-navigation-warms (exploratory: the
+same navigation with the product's warms on, run late because it loads models) and
+generation-active (exploratory; gate ON, engine busy). The navigation scenarios and the control mark
 phases inside their windows (`query` for readiness polls, `action` for clicks,
 `verify` for the wait on the destination), and the report lists each phase's hitch
 rate. Every scenario prints its setup stamps (`VOCELLO_UIPERF_SETUP=`), and the
@@ -246,14 +274,26 @@ excluded from their windows at all. Each scenario launches the app once with the
 the probe streams 500 ms display-link blocks (frames delivered vs expected, excess
 frame time, max gap, gap histogram, CPU, footprint, thermal) to
 `diagnostics/ui-perf/`, and `scripts/check_macos_ui_perf.py` joins windows to rows
-and writes `ui-perf-report.json` under the run directory. History seeding uses
-`QWENVOICE_UIPERF_SEED_HISTORY` (registered knob; idempotent, debug-store only).
+and writes `ui-perf-report.json` under the run directory. The three History scenarios
+launch on an isolated profile: `QWENVOICE_APP_SUPPORT_DIR` points the app at a temporary
+folder per row count, which `QWENVOICE_UIPERF_SEED_HISTORY` seeds to exactly 400 or 700
+rows (registered knobs; the seeder tops up to the count and is idempotent), so the
+shared debug History, which other lanes fill and nothing erases, never sets the size of
+the list they measure. Each asserts its last seeded row before the window opens, the
+setup stamp carries the seeded count (`archiveCount`), and the folders are removed when
+the class finishes. The isolated profile, the History cycle marks, the paged scenario and
+delivery-menu's suppressed warms are measurement version 2 of Mac `ui-perf` (2026-11-15,
+`scripts/lib/lineage_identity.py`), a lineage of its own.
 
 Registry posture (UI-7): the structural gate is unchanged (every scenario
 present once, probe coverage ≥90% of each window, monotonic blocks, sane
-refresh interval). On a PASS the checker evaluates the **warn-only** ceilings
-in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
-(a breach marks the run `passedWithWarnings`, never fails it). The contract names the profile and
+refresh interval). On a PASS the checker evaluates the ceilings
+in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json).
+A breach is a warning that marks the run `passedWithWarnings`, unless the contract's `enforce`
+list names the scenario: there a hitch or max-gap breach fails the run (exit 1, report status
+`failed`, no evidence manifest). An enforced scenario must have both ceilings, ceilings may cover
+scenarios outside the confirmatory set, and an uncalibrated run enforces nothing. The committed
+`enforce` list is empty, so every ceiling warns. The contract names the profile and
 refresh interval its ceilings were derived on (`calibrationProfile`,
 `calibrationRefreshIntervalMS`); a run on any other carries one `uiperf.uncalibrated:<profile>`
 code instead of ceiling verdicts. A contract whose scenarios changed meaning after its derivation
@@ -269,14 +309,17 @@ window; audit #32, #33, #81). A re-derivation runs
 config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, max(1.3 × the
 median, the median + 3 × the run-to-run range), which is the median times max(1.3, 1 + 3 × the
 relative range) whenever the median is above zero; hitch rounded up to 0.5 ms/s with a 5 ms/s floor,
-gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the retired M2 ceilings). The derivation
+gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the retired M2 ceilings; `--scenarios a,b,c`
+derives ceilings for a list other than the confirmatory scenarios, and must cover every confirmatory
+and every enforced one). The derivation
 accepts only canonical records of one comparison lineage (one `comparison.key`), so dirty or
 exploratory sessions and other builds never shape the contract. A confirmatory
 window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a warn-only
 `uiperf.footprint:<scenario>` code: since the engine moved in-process, sidebar-navigation's own
 product warms grew it by about 1-2.4 GB, which is why it now runs with warms suppressed and
 sidebar-navigation-warms measures them apart. Scenarios that repeat a cycle (sidebar-navigation,
-delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
+history-filter, history-filter-paged, delivery-menu, composer-typing) mark each cycle, and the
+report lists a hitch rate per cycle;
 records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action, and the
 generation-active take names the memory samplers' cadence during its take (`samplerTargetIntervalMS`,
 from the probe's environment row: 100 or 250 ms by tier (the floor tiers sampled at 500 ms before
@@ -314,7 +357,7 @@ source). Ceilings come only from the counted runs' own spread, through `--derive
 
 | Lane | Scope |
 | --- | --- |
-| Smoke | Sixteen journeys in method-name order (`test00`–`test15`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states\|model-update` runs `test00`, `test12`, `test11`, `test08`, `test09`, `test06`, `test07`, `test13`, `test14` or `test15` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard), `test14` (Saved Voices empty and error states) and `test15` (RF-59: an earlier Vocello's models on an isolated profile read Update required, Studio says Update in Settings, the banner offers the update; with automatic start on it starts by itself, Cancel stops it and a relaunch leaves it stopped; it needs a network and every other journey launches with `QWENVOICE_MODEL_UPDATE_AUTOSTART=off`, since the debug root's models folder links the host's real one), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows; while it runs, Navigate ▸ History is disabled and File ▸ Open Output Folder is not, read from the open menus) |
+| Smoke | Sixteen journeys in method-name order (`test00`–`test15`), each in a fresh app session (`--scenario layout\|studio-content\|generation-errors\|design-enrollment\|clone-reference\|long-form\|line-batch\|long-form-recovery\|saved-voices-states\|model-update` runs `test00`, `test12`, `test11`, `test08`, `test09`, `test06`, `test07`, `test13`, `test14` or `test15` alone); generated diagnostic-store audio and History are retained, not automatically erased. Besides `test00` (window sizes, Settings scene), `test08`/`test09` (Design brief, Clone reference, completed player), `test10` (missing models, Studio links), `test11` (output-folder failure and recovery), `test12` (cross-language content), `test13` (long-form recovery Discard), `test14` (Saved Voices empty and error states) and `test15` (RF-59: an earlier Vocello's models on an isolated profile read Update required, Studio says Update in Settings, the banner offers the update; with automatic start on it starts by itself, Cancel stops it and a relaunch leaves it stopped; it needs a network and every other journey launches with `QWENVOICE_MODEL_UPDATE_AUTOSTART=off`, since the debug root's models folder links the host's real one), the journeys are: (1) navigation + visible model/clone readiness, (2) one real Custom generation whose finished take must start playing on its own, with the completed take asserted exactly once in History, (3) mid-generation cancellation — clean reset, no error badge, no History row, (4) the virtual-microphone recording flow through capture and review (registered `QWENVOICE_FAKE_MIC_WAV` knob, `/tmp` fixture; cancels before the permission-sensitive accept), (5) library surfaces, (6) a long-form project (default ~1,900-character script; report the actual planner segment count rather than assuming a fixed count; `--long-form-segments N` scales the same journey up to 12 planned segments for local memory-scaling evidence — the summary then adds a per-segment engine physical-footprint table and retains the compact per-generation diagnostics beside the run artifacts; joined WAV, one History project row with a working segment map; the lane prints the project wall clock and writes `long-form-project-summary.txt`), (7) a two-line batch (two streamed takes → two History rows; while it runs, Navigate ▸ History is disabled and File ▸ Open Output Folder is not, read from the open menus) |
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching
@@ -337,6 +380,17 @@ speech-recognition TCC grant is undecided; they execute in two phases
 while no build input changed; a commit that only publishes records or touches docs, the website or
 the roadmap keeps the skip), and write a per-test verdict sidecar
 (`test-results.json`) next to `run.json`.
+
+A full smoke, perf or benchmark run must also have run the tests its lane promises.
+[`config/ui-lane-tests.json`](../../config/ui-lane-tests.json) lists them per lane (`macos-smoke`,
+`macos-perf`, `macos-benchmark`, as `Suite/method`), and the lane passes its name to
+`scripts/lib/xctest_summary.py --expect-lane` for the run's last summary: a listed test that is
+missing from the results or was skipped ends the run with exit 4 and no PASS, and the summary's
+`expected` block names it. A test that ran and failed is the run's own failure. A `--scenario` run
+is one journey by design and checks nothing, and neither do the collectors of a failed run.
+`scripts/tests/test_xctest_summary.py` compares each list with the test methods under
+`Tests/VocelloMacUITests`, so a renamed, added or deleted journey changes the file in the same
+commit.
 
 Benchmark accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy cell-hash-v2|cell-hash-v1|generated`
 (default `cell-hash-v2` since RF-61: each take's seed derives from its cell, audit #29) and `--matrix-version NAME`
@@ -367,7 +421,11 @@ The validator atomically writes an untracked `benchmark-evidence.json` containin
 ordered generation IDs/cells and verdicts. The summarizer consumes that manifest plus the run ID,
 never the diagnostics directory's historical population. A PASS publishes one privacy-safe record
 under `benchmarks/runs/ui-generation/` and regenerates `benchmarks/HISTORY.md`. Raw telemetry, WAVs,
-screenshots, and `.xcresult` remain untracked; publication never stages, commits, or pushes.
+screenshots, and `.xcresult` remain untracked; publication never stages, commits, or pushes. The
+benchmark and perf lanes say in one line when they start that a passing run publishes;
+`--no-publish` keeps the artifacts and the verdict, writes no file under `benchmarks/` and leaves
+`publication-skipped.json` in the run directory, from which
+`python3 scripts/benchmark_history.py record --artifact-dir <run-dir>` publishes the run later.
 
 New publishable generation runs use telemetry schema v8 and evidence manifest v2. Their exact
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required

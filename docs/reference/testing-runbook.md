@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-15
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -9,6 +9,7 @@ sourceOfTruth:
   - scripts/ios_device.sh
   - scripts/ui_test.sh
   - config/orchestration-contract.json
+  - config/ui-lane-tests.json
 ---
 # Testing runbook
 
@@ -32,7 +33,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Checks XCUITest cannot cover (system dialogs, installs, Finder, visual inspection) | [Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover), `/vocello-ui-autonomy` | Computer use (iPhone through iPhone Mirroring, the Mac directly) in announced windows, never during a lane; a record closes a row only when the maintainer confirms it; never automated evidence |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |
 | Model download lifecycle | [Model delivery](model-delivery.md) | Explicit isolated root; preserve canonical data and failed evidence |
-| Benchmark operation / publication | [Benchmarking procedure](telemetry-and-benchmarking.md) | Exact-source qualified PASS only; no automatic Git changes |
+| Benchmark operation / publication | [Benchmarking procedure](telemetry-and-benchmarking.md) | Exact-source qualified PASS only; no automatic Git changes; the UI `benchmark` and `perf` lanes publish on a PASS and say so when they start, `--no-publish` keeps a probe run local |
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
 | Delivery bench | [Benchmarking procedure §4.6](telemetry-and-benchmarking.md#46-delivery--prosody-cells) | Paired instructed/neutral takes with fail-closed instruction receipts; acoustic effects, not listener-proven delivery |
 | Audio QC | [QC v2](qc.md) | Models run one at a time after TTS exits; report execution, coverage and qualification separately. Missing, stale or unqualified required evidence is NOT_ASSESSED; frozen thresholds and held-out qualification are required for acceptance |
@@ -84,6 +85,16 @@ cleanup and receipt writing; an earlier native failure retains precedence over a
 Read the collection receipt as well as the required-step ledger; neither a clean
 receipt nor passed test cases alone establishes successful run completion.
 
+A full macOS `smoke`, `perf` or `benchmark` run also owes every test
+[`config/ui-lane-tests.json`](../../config/ui-lane-tests.json) lists for its lane. A listed test that
+is missing from the results or was skipped ends the run without a PASS (`xctest_summary.py
+--expect-lane` exits 4), and `test-results.json` names it under `expected`. A `--scenario` run is one
+journey by design and checks nothing. The file changes in the same commit as any renamed, added or
+deleted journey ([macOS testing](macos-testing.md)).
+
+A benchmark or perf run started with `--no-publish` holds `publication-skipped.json` in its run
+directory instead of a tracked record; its verdict and artifacts are those of a published run.
+
 ## Model readiness
 
 Generation UI tests require visible Settings readiness, Generate enabled, and the exact required
@@ -104,6 +115,12 @@ never an implicit smoke/benchmark bootstrap. Restart the affected lane after rep
   A zero-observation shard provides no cursor; changed source cannot reuse old acceptance.
 - Generated audio, transcripts, database copies, raw telemetry, screenshots, traces and result
   bundles remain untracked. Compact published benchmark records must be privacy-safe and qualified.
+- On the Mac UI benchmark, playback is part of the verdict: a silent played-audio capture, a
+  planned capture missing from a run that armed capture, a playback continuity failure or an
+  underrun above `--max-playback-underruns` (default 0) fails the take. The iPhone checker reports
+  continuity failures and underruns without changing the verdict. Outside the measured lanes a take
+  must be seen playing before its playback counts as ended, and smoke `test02` asserts it
+  ([macOS testing](macos-testing.md)).
 - Partial-utterance ASR consensus is a verifier gap, not product failure or PASS. Warnings do not
   become clean promotion evidence merely because an operational lane completed.
 

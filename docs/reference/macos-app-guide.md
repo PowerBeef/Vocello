@@ -341,7 +341,7 @@ owns each lane's journeys, flags and evidence:
 | `scripts/ui_test.sh macos smoke` | Sixteen journeys, `test00`–`test15` in `VocelloMacSmokeUITests` and its `+Acceptance` extension, with named screenshots and on-failure desktop and element-tree evidence; `--scenario` runs one |
 | `scripts/ui_test.sh macos localization` | `test01` with the ten-language walk |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
-| `scripts/ui_test.sh macos perf` | Eleven frame-health scenarios (`VocelloMacPerfUITests`) against warn-only ceilings |
+| `scripts/ui_test.sh macos perf` | Twelve frame-health scenarios (`VocelloMacPerfUITests`) against ceilings that warn unless `config/ui-perf-thresholds.json` enforces the scenario |
 | `scripts/ui_test.sh macos marketing` | Product image refresh; never acceptance or benchmark evidence |
 | `scripts/ui_test.sh macos auto-language` | Studio's Auto language reaches the engine |
 
@@ -466,10 +466,16 @@ identities matter:
   grant survives rebuilds; an ad-hoc one binds to a single code hash and needs redoing after
   every rebuild. The prompt blocks the runner until it is answered, so an unattended benchmark
   lane arms capture only when it can: `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=auto` (default) skips
-  capture when the TCC database shows no grant, `off` always skips it, `on` always arms it.
-  Unarmed, the takes pace and play out the same and the record carries no capture evidence. The
-  smoke lane has no such switch: its one capture is always armed, and its `ui-preflight` warns when
-  the runner has no System Audio Recording decision.
+  capture when the TCC database shows no grant and arms it when the database shows one or cannot
+  be read, `off` always skips it, `on` always arms it.
+  Unarmed, the takes pace and play out the same, the record carries no capture evidence and the
+  run passes without it. An armed benchmark run owes a capture for every planned take, so without
+  the grant it fails: on macOS 26 the tap hears silence and a silent take fails the played-audio
+  gate, and a planned take left `unavailable`, `referenceUnresolved` or `aborted` fails it too
+  (`scripts/lib/playback_capture.py`). Run with `QVOICE_MAC_BENCH_PLAYBACK_CAPTURE=off` on a host
+  without the grant. The
+  smoke lane has no such switch: its one capture is always armed and its analysis is advisory, and
+  its `ui-preflight` warns when the runner has no System Audio Recording decision.
   Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
   Every macOS lane also verifies the runner's signature before launching it and re-signs it in
   place when a build interrupted between Xcode's Info.plist rewrite and its CodeSign step left

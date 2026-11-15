@@ -82,8 +82,12 @@ rules they enforce:
   first, and every later job builds that authorized commit, never the tag ref again. Promotion runs
   from the tag under the `release` environment and verifies the build attestation of each DMG and the
   CLI installer package from
-  `release.yml`. Release-path jobs restore no Actions cache (`native-toolchain` with
-  `pip-cache: "false"`); the Sparkle key lives only in `sparkle-feed`, a fresh runner that builds
+  `release.yml`. The jobs that sign or ship (`package`, `sparkle-feed`, `draft-release`,
+  `archive-ios`) restore no Actions cache (`native-toolchain` with `pip-cache: "false"`; the signed
+  builds resolve packages cold from `Package.resolved`). `compile-ios`, the unsigned compile-safety
+  check whose products are scratch, restores a SwiftPM source cache
+  (`build/cache/xcode/source-packages`, keyed on the pinned Xcode and `Package.resolved`). The
+  Sparkle key lives only in `sparkle-feed`, a fresh runner that builds
   nothing, and only `draft-release`, which holds no secret, has `contents: write`. Lightweight tags,
   cross-SHA checks and incomplete check-run pagination fail closed. Every release step matches its
   `config/orchestration-contract.json` template; schema-v2 release evidence accepts only a clean
@@ -91,10 +95,22 @@ rules they enforce:
   `scripts/check_release_notes.py` gates the tag's curated notes under `docs/releases/`.
 - **Separate public promotion.** A public macOS release or external TestFlight/App Review needs
   exact-tag `quality-promotion.json` validated by `scripts/quality_promotion.py`; candidate production
-  never waits for device availability.
+  never waits for device availability. Evidence comes from the toolchain that built the release:
+  `create` and `validate` read the Xcode version from the `release-metadata.txt` that the release
+  evidence binds by digest (the file must sit beside the evidence, match the digest and name
+  `xcode_version`; an `xcode_build` or `swift_version` row is compared when present) and refuse a
+  benchmark record whose toolchain differs, naming both values. Release evidence that binds no
+  metadata file (the iPhone's) states no toolchain; `--release-toolchain <json>` (`xcodeVersion`,
+  optionally `xcodeBuild` and `swiftVersion`) supplies it, and what it states is enforced.
 - **Evidence retention.** Only qualified privacy-safe PASS records enter `benchmarks/runs/` (≤ 256 KB
   each, strict allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
-  xcresult and traces stay untracked; publication never stages, commits or pushes. Successful profiles
+  xcresult and traces stay untracked; publication never stages, commits or pushes. The `benchmark` and
+  `perf` lanes of `scripts/ui_test.sh` (macOS and iPhone) say in one line when they start that a
+  passing run writes a tracked record and rewrites `benchmarks/HISTORY.md` (a perf run only on the
+  canonical hardware profile). `--no-publish` keeps the run local: the artifacts and the verdict
+  stay, no file under `benchmarks/` changes, the run directory holds `publication-skipped.json`, and
+  `python3 scripts/benchmark_history.py record --artifact-dir <run-dir>` publishes it later; no
+  other lane accepts the flag. Successful profiles
   publish their digest and summary first; a CPU profile's raw trace is then deleted (`--keep-trace` is
   explicit), while a memory profile keeps its trace by default (`keptByDefault`).
 - **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every RTF-bearing
@@ -148,11 +164,21 @@ rules they enforce:
   (`config/qc/models.json`).
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
-  a contract calibrated with its run IDs fails a run. ui-perf ceilings stay warn-only; a
-  recalibration derives them from the run-to-run spread of at least three counted runs with a 1.25-1.3x
-  floor, and a run off the contract's calibration profile or refresh interval, or under a contract
-  marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
-  instead of ceiling verdicts.
+  a contract calibrated with its run IDs fails a run. A calibrated gate fails a run with a take above
+  the limit, and a run with a take it could not judge: every take of the selected matrix must be
+  gated, except the forced non-floor tiers, which are the declared diagnostic simulation
+  (`scripts/check_macos_ui_bench.py`; the failure names each unjudged take, and the stall summary
+  records `expectedTakeCount`, `exemptTakeCount` and `coversMatrix`). A ui-perf ceiling breach is a
+  warning unless the contract's `enforce` list names the scenario (`config/ui-perf-thresholds.json`,
+  `scripts/check_macos_ui_perf.py`): a hitch or max-gap breach in an enforced scenario fails the run
+  (exit 1, report status `failed`, no evidence manifest, so nothing is published). An enforced
+  scenario must have both ceilings, or the contract is refused at load; ceilings may cover scenarios
+  outside the confirmatory set, and the committed `enforce` list is empty. A recalibration derives the
+  ceilings from the run-to-run spread of at least three counted runs with a 1.25-1.3x floor
+  (`--derive-thresholds`, with `--scenarios` for a list other than the confirmatory one). A run off
+  the contract's calibration profile or refresh interval, or under a contract marked
+  `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
+  instead of ceiling verdicts and enforces nothing.
 - **Targeted local acceptance.** Local device/UI/model/benchmark validation is authorized at coherent
   checkpoints. Choose the smallest relevant existing lane; full matrices remain task/release-specific.
   Run source-bound measurements on committed checkpoints in the lead session after joining workers.
@@ -189,6 +215,8 @@ rules they enforce:
   native builds outside the host-wide lock (MobileBuildMCP/XcodeBuildMCP builds bypass it).
 - Editing, committing or integrating agent work while a UI or benchmark lane runs: publication compares
   the pre- and post-run tree fingerprints, and a mismatch demotes the record to exploratory.
+- Running a probe of the `benchmark` or `perf` lane without `--no-publish`: a passing run leaves a
+  tracked record under `benchmarks/runs/` and a rewritten `benchmarks/HISTORY.md` in the tree.
 - Publishing a canonical macOS UI benchmark record without, in the same commit, running
   `generate_readme_charts.py` (public medians pool the warm takes of up to five canonical records of the
   newest record's lineage and build, a new lineage or build starting a pool of one, never repinned to one

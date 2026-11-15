@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
+reviewed: 2026-11-15
 summary: Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.
 sourceOfTruth:
   - config/quality-promotion-contract.json
@@ -45,7 +45,16 @@ an untrusted or unverified release source.
   by `scripts/benchmark_history.py`.
 
 Benchmark records must be clean, fingerprint-stable, no more than seven days old, and produced by
-the exact tag commit. Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
+the exact tag commit and by the toolchain that built the release. `create` and `validate` read the
+Xcode version from the `release-metadata.txt` the release evidence binds by digest: the file must sit
+beside `release-evidence.json`, match the recorded digest and name `xcode_version`
+(`scripts/release.sh` writes it). A record whose `toolchain.xcodeVersion` differs is refused, with
+both values named; an `xcode_build` or `swift_version` row in the metadata is compared with the
+record's `xcodeBuild` or `swiftVersion` as well. Release evidence that binds no metadata file (the
+iPhone's) states no toolchain, so `--release-toolchain <json>` supplies it: an object with
+`xcodeVersion` and optionally `xcodeBuild` and `swiftVersion`. Every record must then match it, and
+where the metadata states the same field the two must agree. Capture the promotion records with the
+Xcode the release was built with (`config/toolchain.json`), not a newer local one. Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
 `run.rtfDefinition: "wall/audio"` (`rtf` is synthesis wall time divided by audio duration, lower is
 faster; `scripts/benchmark_history.py validate` rejects a newer record without the field), and the
 v1/v2 records already in `benchmarks/runs/` are read-only history that never share a comparison key
@@ -109,11 +118,11 @@ lane requirements and exact contract digest; they are not reinterpreted as curre
 2. Check out that exact tag with a clean tree. Run only the lanes `classify` selects.
    Publish successful benchmark records locally but do not create another source commit: exact-tag
    promotion records are external draft evidence, avoiding a self-referential commit.
-3. Download the draft's exact release evidence for assembly (or download every asset and validate
-   the complete deterministic bundle):
+3. Download the draft's exact release evidence and the metadata file it binds, into one folder,
+   for assembly (or download every asset and validate the complete deterministic bundle):
 
    ```sh
-   gh release download vX.Y.Z --pattern release-evidence.json \
+   gh release download vX.Y.Z --pattern release-evidence.json --pattern release-metadata.txt \
      --dir build/artifacts/quality-promotion/release
    ```
 
@@ -162,7 +171,8 @@ python3 scripts/quality_promotion.py validate \
 ```
 
 Warning acceptance is explicit and restricted by the checked-in allowlist. Omit
-`--accept-warning` when every required record passed without warnings.
+`--accept-warning` when every required record passed without warnings. For iOS, whose release
+evidence binds no metadata file, add `--release-toolchain <json>` to both commands.
 
 For macOS, upload the validated manifest to the existing draft, then manually dispatch **Promote
 verified release** with the tag:

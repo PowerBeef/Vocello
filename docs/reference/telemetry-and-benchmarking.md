@@ -141,7 +141,7 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
-| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Eleven scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Twelve scripted SwiftUI scenarios with the in-app frame probe; ceilings that warn unless the contract enforces the scenario; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
 | **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [the 2026-08 iOS UI audit](../audits/2026-08-29-ios-ui-refresh.md)) |
 | **Language bench** | `scripts/macos_test.sh lang-bench` / `scripts/ios_device.sh lang-bench` | In-process | Language hint contract and spoken-output verification ([§5](#5-language-bench)) |
 
@@ -919,7 +919,10 @@ decision 2026-09-25): a **provisional** limit reports only and never fails a run
 records `stallGate.enforced: false` and `stallGate.wouldFail` in the evidence manifest, and a run
 over the limit publishes with the run warning `stall.provisional.wouldfail(<takes above>/<gated
 takes>)`); a **calibrated** contract, which must name its calibrating run IDs in
-`calibrationRuns`, fails a run with a take above the limit. The committed contract is calibrated on
+`calibrationRuns`, fails a run with a take above the limit, and a run with a take it could not
+judge: every take of the selected matrix must be gated, except forced non-floor tiers, the declared
+diagnostic simulation. A row with no Mac device class is unjudged, the failure names it, and
+`stallGate` records `expectedTakeCount`, `exemptTakeCount` and `coversMatrix`. The committed contract is calibrated on
 the canonical M6; its limit, calibrating run and derivation are in the contract's `maximumAllowed`,
 `calibrationRuns` and `basis`. Apple's 250 ms hang threshold stays a report. The checker prints the
 distribution to `benchmark-gate.txt` either way: the summary (median, p90, maximum, takes above the
@@ -1027,9 +1030,12 @@ onset about 1.8 s after scheduling on final-file playback — `.dropouts`, `.low
 0.95, `.high_residual` above −20 dBFS, `.silent`). Since 2026-09-14 (PC-02) a **captured** take also
 fails the lane when it breaks the gate set from the first three canonical captured runs (87 takes):
 coverage below 0.98, residual above −25 dBFS, any dropout, or an audible onset more than 500 ms
-from `playbackScheduledMS`. Without a grant the lane passes: an unarmed run carries no capture
-evidence, and unavailable, silent and unresolved captures stay warnings so an ungranted host still
-passes. The macOS smoke lane captures its completed-generation take too;
+from `playbackScheduledMS`. A **silent** take fails the lane as well: the tap ran and the app played
+nothing audible, which is also what a tap without the grant hears. When the runner armed capture
+(its `capture-run.json` is in the capture directory; the capture `summary.json` records it as
+`armed`), every planned take owes a capture, and one that ends `unavailable`, `referenceUnresolved` or
+`aborted` fails the run. A run that was never armed passes and carries no capture evidence. The
+macOS smoke lane captures its completed-generation take too;
 `scripts/analyze_playback_capture.py` writes its `summary.json` (advisory there).
 
 The benchmark `.xcresult`, smoke result, and seeded telemetry-overhead result
@@ -1959,6 +1965,9 @@ The macOS UI benchmark judges this statistic under its stall contract
 App telemetry also records bounded playback health: chunks received, continuity failures,
 underruns, queued chunks/audio at playback scheduling, and minimum queue duration. This makes UI
 benchmarks sensitive to streaming health while keeping raw audio and user content out of telemetry.
+The macOS UI benchmark fails a take with any continuity failure or with more underruns than
+`--max-playback-underruns` allows (default 0); the iPhone checker prints the same findings as
+report-only warnings that change neither the verdict nor the record.
 
 ### 6.12 Overhead and observer effect
 
@@ -2239,7 +2248,7 @@ otherwise, `ui-perf` records are v2; schema-v1 history is read-only) are:
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of the canonical profile's RAM |
 | `prosody-calibration` | `publish_benchmark_history.py prosody` (producer `prosody_calibration.py` deleted 2026-10-01, `c44d0205`) | Required corpus coverage with no analysis failure |
-| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` (registered 2026-08 with the macOS frame-health lane) | Structural gate PASS (every expected scenario once each: eleven on macOS, nine on iOS; coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`); iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
+| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` (registered 2026-08 with the macOS frame-health lane) | Structural gate PASS (every expected scenario once each: twelve on macOS, nine on iOS; coverage/refresh sanity), canonical hardware profile, and crash delta; a threshold breach warns (`passedWithWarnings`) unless the contract's `enforce` list names the scenario, where it fails the run; iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
 
 Schema-v1 `telemetry-overhead` records remain readable historical evidence, but new overhead runs
 are local observer-effect diagnostics and do not publish ([§4.12](#412-telemetry-overhead-parity-lane)).

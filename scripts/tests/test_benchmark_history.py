@@ -3092,6 +3092,71 @@ class BenchmarkHistoryTests(unittest.TestCase):
         with self.assertRaises(history.HistoryError):
             history.cell_aggregate_version({"evidence": {"cellAggregateVersion": 3}})
 
+    def test_a_record_with_refused_takes_states_and_follows_its_rule(self) -> None:
+        """RF-61, audit T5: the takes the audio check refused are named, never measured."""
+        def record(**evidence) -> dict:
+            return {
+                "run": {"kind": "ui-generation", "classification": "exploratory"},
+                "evidence": {
+                    "refusedCells": [{"takeIndex": 2, "cell": "custom/short/warm#0"}],
+                    "refusedTakeRule": history.REFUSED_TAKE_RULE, **evidence,
+                },
+            }
+
+        self.assertEqual(history.refused_cells_of({"run": {}, "evidence": {}}), [])
+        self.assertEqual(history.refused_cells_of(record()), [{"takeIndex": 2, "cell": "custom/short/warm#0"}])
+        # The record itself names the rule, and the rule makes it exploratory.
+        self.assertEqual(history.REFUSED_TAKE_RULE, "recorded-exploratory-v1")
+        for name, broken in (
+            ("canonical", {**record(), "run": {"kind": "ui-generation", "classification": "canonical"}}),
+            ("focused", {**record(), "run": {"kind": "ui-generation", "classification": "focused"}}),
+            ("an engine record", {**record(), "run": {"kind": "engine-generation", "classification": "exploratory"}}),
+            ("no rule", {"run": record()["run"], "evidence": {"refusedCells": record()["evidence"]["refusedCells"]}}),
+            ("no cells", {"run": record()["run"], "evidence": {"refusedTakeRule": history.REFUSED_TAKE_RULE}}),
+            ("another rule", record(refusedTakeRule="kept-v1")),
+            ("an empty list", record(refusedCells=[])),
+            ("an extra key", record(refusedCells=[{"takeIndex": 2, "cell": "custom/short/warm#0", "seed": 1}])),
+            ("a boolean index", record(refusedCells=[{"takeIndex": True, "cell": "custom/short/warm#0"}])),
+            ("out of order", record(refusedCells=[
+                {"takeIndex": 3, "cell": "custom/medium/warm#0"}, {"takeIndex": 2, "cell": "custom/short/warm#0"},
+            ])),
+            ("named twice", record(refusedCells=[{"takeIndex": 2, "cell": "custom/short/warm#0"}] * 2)),
+            ("not a cell", record(refusedCells=[{"takeIndex": 2, "cell": "custom short"}])),
+            ("not a matrix cell", record(refusedCells=[{"takeIndex": 2, "cell": "custom/short"}])),
+        ):
+            with self.subTest(name), self.assertRaises(history.HistoryError):
+                history.refused_cells_of(broken)
+
+        # A record's take indices are the matrix's, less the refused ones.
+        self.assertEqual(history.expected_take_indices(3, []), [1, 2, 3])
+        self.assertEqual(history.expected_take_indices(3, [{"takeIndex": 2, "cell": "custom/short/warm#0"}]), [1, 3, 4])
+        self.assertEqual(history.expected_take_indices(2, [{"takeIndex": 3, "cell": "custom/long/warm#0"}]), [1, 2])
+        with self.assertRaises(history.HistoryError):
+            history.expected_take_indices(2, [{"takeIndex": 9, "cell": "custom/long/warm#0"}])
+
+        # A refused take stays the predecessor of the take that ran after it.
+        def take(index: int, cell: str, state: str, **extra) -> dict:
+            return {"takeIndex": index, "cell": cell, "warmState": state, "metrics": {}, **extra}
+
+        cold_refused = [{"takeIndex": 1, "cell": "custom/medium/cold#0"}]
+        after_cold = [take(2, "custom/short/warm#0", "warm", followsColdTake=True), take(3, "custom/short/warm#1", "warm")]
+        history.validate_cold_take_flags(after_cold, 2, cold_refused)
+        unflagged = [take(2, "custom/short/warm#0", "warm"), take(3, "custom/short/warm#1", "warm")]
+        with self.assertRaises(history.HistoryError):
+            history.validate_cold_take_flags(unflagged, 2, cold_refused)
+        warm_refused = [{"takeIndex": 2, "cell": "custom/short/warm#0"}]
+        around = [take(1, "custom/medium/cold#0", "cold"), take(3, "custom/short/warm#1", "warm")]
+        history.validate_cold_take_flags(around, 2, warm_refused)
+        flagged = [take(1, "custom/medium/cold#0", "cold"), take(3, "custom/short/warm#1", "warm", followsColdTake=True)]
+        with self.assertRaises(history.HistoryError):
+            history.validate_cold_take_flags(flagged, 2, warm_refused)
+        # Without refused takes the positional rule is what it was.
+        history.validate_cold_take_flags(flagged, 2)
+
+        # HISTORY names the refused takes beside the takes the record holds.
+        self.assertEqual(history.history_take_count({"takes": [{}, {}], "evidence": {}}), "2")
+        self.assertEqual(history.history_take_count({"takes": [{}, {}], **record()}), "2 (1 refused)")
+
     def test_the_seed_policy_matches_the_published_take_seeds(self) -> None:
         """audit #29: run.seedPolicy is checked against every take's seed."""
         from lib import bench_seed

@@ -904,7 +904,8 @@ python3 scripts/check_macos_ui_bench.py ~/Library/Application\ Support/QwenVoice
 For the strict contract, use `scripts/ui_test.sh macos benchmark`. Internally it passes the exact
 `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy`, `--allocation` and `--matrix-version`
 values plus `--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed
---build-provenance <run-artifact-dir>/last-build.json --outputs-dir <QwenVoice-Debug>/outputs`, and
+--build-provenance <run-artifact-dir>/last-build.json --xcodebuild-log <run-artifact-dir>/xcodebuild.log
+--outputs-dir <QwenVoice-Debug>/outputs`, and
 `--playback-capture-dir <run-artifact-dir>/playback-capture` when capture is armed. The build receipt names the app executable
 and its digest, and the gate copies its optimization level into `toolchain.optimization` only after
 re-hashing that executable. Never add the crash-delta assertion to a manual command unless the
@@ -942,6 +943,42 @@ present" exit (75), for about ten seconds. Timing lanes also let the load of the
 (up to 90 s, down to the core count) and re-apply the quiet-host rule after build-for-testing,
 before the first take.
 
+**Refused takes (RF-61, decision of 2026-11-15).** The app's mandatory audio check can refuse a
+take, and it never retries one. The benchmark records the refusal and publishes the rest. The
+XCUITest goes on past a failed take and prints one marker for it,
+`VOCELLO_BENCH_TAKE_REFUSED=<base64 of JSON {"cell", "schemaVersion": 1, "takeIndex"}>`, and the
+take's phases line carries `"refused": true` and no playback stamps. The runner cannot tell a
+refusal from any other failed generation, so the checker (`--xcodebuild-log`) accepts a marked take
+as refused only when its engine row proves it: the row ends `failed` and either its notes carry
+the engine's failure code `audio.quality_rejected` (with the flags in `audioQCFlags`; a take
+stopped mid-stream for runaway trailing silence leaves only this) or its `audioQC` report has the
+verdict `fail`. A marked take with no engine row, or with a row that failed another way, fails the
+run, as does a marker that names a take or a cell the matrix does not hold, and a refused row that
+has no marker. A refused take's app and merged rows are not required; an app row that reports the
+take as completed fails the run.
+
+A refused take keeps its place in the matrix and is measured by nothing. The evidence manifest
+lists every take in order, a refused one with `status: "refused"`, its finish reason, the refusal
+flags and its seed, and no output, playback or timing field; `refusedCells` names each one's take
+index and cell. The take is out of the telemetry digest, the memory qualification, the stall gate
+(whose summary counts only the takes that completed and adds `refusedTakeCount`), the playback
+health check and the capture plan: a planned capture that falls on a refused take is owed by no
+one, and the plan does not move to another repetition. The seed check still covers it, since it
+was refused at its cell's seed. The checker prints `REFUSED <n> take(s): take <i> (<cell>), ...`,
+exits 0 when nothing else failed, and the lane repeats that line in its last line.
+
+The record such a run publishes holds the takes that completed, with their matrix take indices,
+and its cells aggregate only those: a cell whose every repetition was refused has no aggregate.
+`evidence.refusedCells` lists the refused takes, `evidence.refusedTakeRule` names the rule
+(`recorded-exploratory-v1`), `evidence.expectedTakeCount` counts the matrix and
+`actualTakeCount` the takes held, and the run carries the warning `takes.refused(<n>/<matrix
+takes>)`. The record is `exploratory` whatever matrix it ran, and the validator refuses any other
+classification, so it is never comparable, never a baseline, never in the README chart pool and
+never promotion evidence; HISTORY shows its take count as `28 (1 refused)`. More than
+`--max-refused-takes` refusals (default 1) fail the run as a product failure. The seeds never move
+for a refused take, and a run without a marker writes the manifest it always wrote. The iPhone
+benchmark does not record refusals: a refused take still fails that lane.
+
 **Take harness.** One repetition of each cell is captured (audit #31): the last warm repetition of
 each mode and length, never a take that starts an app session (the first take, a cold take, the
 first Clone take). Those takes play out before the next begins, with a half-second tail; every
@@ -974,8 +1011,8 @@ model's `design/short/warm#1` take ran on in silence at its seed and Fast QC ref
 (`macos-xcui-benchmark-20261114-195242-cfbe3925`, kept as failed evidence;
 [the investigation](../audits/2026-11-15-release-3-1-interruption-investigation.md)). The hybrid
 starts a new lineage anyway, and the policy is part of the comparison key. The seeds do not move
-again for a refused take: a v2 cell that is refused stands, and the lane then needs a way to record
-a refusal, not another derivation. Under either policy
+again for a refused take: a v2 cell that is refused stands, and the lane records the refusal
+(Refused takes, above) instead of deriving the seeds again. Under either policy
 the runner hands the registered `QWENVOICE_BENCH_SEED_POLICY` knob to the app, every take samples
 with the seed of its cell, the checker refuses a take that sampled with any other seed (an app
 built without internal diagnostics ignores the knob and fails here), and the record names
@@ -2347,7 +2384,8 @@ bumps its measurement version. `python3 scripts/benchmark_history.py lineage-rep
 --platform P]` replays the current contract over committed records from their own source commits,
 read-only. Consequently a historical `-Onone` record cannot become the baseline for a new `-O`
 record; the first clean optimized record reports an explicit no-baseline state. Dirty runs are
-exploratory; dirty, instrumented, partial, and forced-profile runs are excluded from canonical
+exploratory, and so is a macOS UI benchmark record with a refused take (`evidence.refusedCells`);
+dirty, instrumented, partial, forced-profile and refused-take runs are excluded from canonical
 comparisons and normal timing trends.
 
 ### Baseline comparison (JSON, machine-gated)

@@ -186,6 +186,9 @@ SECTION_KEYS = {
         "streamingTelemetryV9PublicationReadyCount",
         # How the cells summarize the takes (audit #30); absent means 1.
         "cellAggregateVersion",
+        # The takes the mandatory audio check refused, and the rule the record
+        # follows for them (audit T5): both or neither, schema v2 and later.
+        "refusedCells", "refusedTakeRule",
     },
     "comparison": {"key", "comparable", "baselineRunID", "deltas", "deltaMetrics"},
     "listening": {"status", "note", "annotatedAt"},
@@ -389,6 +392,7 @@ SCHEMA_REQUIRED_KEYS = {
         "retainedMemoryV2",
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount", "cellAggregateVersion",
+        "refusedCells", "refusedTakeRule",
     },
     # deltaMetrics is declared only by records published from 2026-09-14 on;
     # older records keep their full delta blocks and never claim it.
@@ -423,7 +427,18 @@ V2_ONLY_EVIDENCE_KEYS = {
     "retainedMemoryV2",
     "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
     "streamingTelemetryV9PublicationReadyCount", "cellAggregateVersion",
+    "refusedCells", "refusedTakeRule",
 }
+# A record that keeps the takes that completed around a take the mandatory
+# audio check refused (RF-61, audit T5, decision D-5 of 2026-11-15). The rule
+# `evidence.refusedTakeRule` names: the refused takes are listed in
+# `evidence.refusedCells` (take index and cell) and are in no take, cell or
+# median of the record; the record is exploratory, so it is never comparable,
+# never a baseline, never in a public chart pool and never promotion evidence;
+# and its take indices are the matrix's, less the refused ones.
+REFUSED_TAKE_RULE = "recorded-exploratory-v1"
+REFUSED_CELL_KEYS = {"takeIndex", "cell"}
+REFUSED_TAKE_KINDS = {"ui-generation"}
 # schema-v1 is frozen history; the first-chunk definition arrived after it.
 V2_ONLY_RUN_KEYS = {"ttfcDefinition", "runtimePolicy", "seedPolicy"}
 V2_ONLY_TAKE_KEYS = {
@@ -894,14 +909,70 @@ def validate_runtime_policy(run: dict[str, Any]) -> None:
         raise HistoryError("run.runtimePolicy device class does not match the platform")
 
 
-def validate_cold_take_flags(takes: list[dict[str, Any]], aggregate_version: int) -> None:
+def refused_cells_of(record: dict[str, Any]) -> list[dict[str, Any]]:
+    """The record's validated `evidence.refusedCells`, empty when it has none.
+
+    The rule (`REFUSED_TAKE_RULE`): a run of the macOS UI benchmark whose
+    mandatory audio check refused a take records it and publishes the takes
+    that completed. Such a record names the rule, lists each refused take's
+    matrix index and cell in take order, is exploratory (so never comparable,
+    never a baseline, never in a chart pool) and owes one take fewer per
+    refusal than its matrix. Its take indices are checked by the caller."""
+    evidence = record.get("evidence") or {}
+    declared = evidence.get("refusedCells")
+    rule = evidence.get("refusedTakeRule")
+    if declared is None and rule is None:
+        return []
+    run = record.get("run") or {}
+    if declared is None or rule is None:
+        raise HistoryError("evidence.refusedCells and evidence.refusedTakeRule are published together")
+    if rule != REFUSED_TAKE_RULE:
+        raise HistoryError(f"evidence.refusedTakeRule is unsupported: {rule!r}")
+    if run.get("kind") not in REFUSED_TAKE_KINDS:
+        raise HistoryError("evidence.refusedCells belongs only to a UI benchmark record")
+    if not isinstance(declared, list) or not declared:
+        raise HistoryError("evidence.refusedCells must list at least one refused take")
+    previous = 0
+    for item in declared:
+        if not isinstance(item, dict) or set(item) != REFUSED_CELL_KEYS:
+            raise HistoryError("each refused cell names exactly its takeIndex and cell")
+        index, cell = item["takeIndex"], item["cell"]
+        if isinstance(index, bool) or not isinstance(index, int) or index <= previous:
+            raise HistoryError("refused take indices must be positive and ascending")
+        if not isinstance(cell, str) or not SAFE_CELL_RE.fullmatch(cell) or len(cell.split("/")) != 3:
+            raise HistoryError("a refused cell must be a benchmark cell identifier")
+        previous = index
+    if run.get("classification") != "exploratory":
+        raise HistoryError("a record with refused takes must be exploratory")
+    return declared
+
+
+def expected_take_indices(take_count: int, refused: list[dict[str, Any]]) -> list[int]:
+    """The take indices a record owes: one-based and contiguous, less the takes
+    the audio check refused (which keep their place in the matrix)."""
+    skipped = {item["takeIndex"] for item in refused}
+    indices = [index for index in range(1, take_count + len(skipped) + 1) if index not in skipped]
+    if len(indices) != take_count:
+        raise HistoryError("a refused take index lies outside the record's matrix")
+    return indices
+
+
+def validate_cold_take_flags(
+    takes: list[dict[str, Any]], aggregate_version: int, refused: list[dict[str, Any]] | None = None,
+) -> None:
     """`followsColdTake` marks exactly the take after a cold take (audit #30).
 
     It is true when present and only on a take whose predecessor is cold; a
     record aggregated under version 2 must flag every such take, since its
-    cell statistics leave the flagged takes out."""
+    cell statistics leave the flagged takes out. A refused take stays the
+    predecessor of the take that ran after it: its cell names its warm state."""
+    refused_by_index = {item["takeIndex"]: item["cell"] for item in refused or []}
     for position, take in enumerate(takes):
         follows = position > 0 and takes[position - 1].get("warmState") == "cold"
+        if refused_by_index:
+            predecessor = refused_by_index.get(take.get("takeIndex", 0) - 1)
+            if predecessor is not None:
+                follows = predecessor.split("/")[2].startswith("cold#")
         flag = take.get("followsColdTake")
         if flag is not None and (flag is not True or not follows):
             raise HistoryError(f"take {take.get('cell')} carries followsColdTake but does not follow a cold take")
@@ -3256,6 +3327,10 @@ def validate_record(
     accuracy_control = isinstance(declared_verification, dict) and (
         declared_verification.get("negativeControlKind") == NEGATIVE_CONTROL_KIND
     )
+    # Takes the audio check refused keep their matrix index (audit T5); every
+    # other record's take indices are 1..n.
+    refused_cells = refused_cells_of(record)
+    take_indices = expected_take_indices(len(takes), refused_cells)
     for position, take in enumerate(takes, start=1):
         if not isinstance(take, dict):
             raise HistoryError(f"takes[{position - 1}] must be an object")
@@ -3268,8 +3343,11 @@ def validate_record(
         required = {"takeIndex", "generationID", "cell", "status", "metrics", "warnings"}
         if missing := sorted(required - set(take)):
             raise HistoryError(f"takes[{position - 1}] is missing: {', '.join(missing)}")
-        if take["takeIndex"] != position:
-            raise HistoryError("take indices must be contiguous and one-based")
+        if take["takeIndex"] != take_indices[position - 1]:
+            raise HistoryError(
+                "take indices must be contiguous and one-based"
+                + (", less the refused takes" if refused_cells else "")
+            )
         if "seed" in take and (
             isinstance(take["seed"], bool)
             or not isinstance(take["seed"], int)
@@ -3630,7 +3708,7 @@ def validate_record(
     aggregate_version = cell_aggregate_version(record)
     if aggregate_version >= 2 and version < 2:
         raise HistoryError("schema-v1 records cannot declare a cell aggregate version")
-    validate_cold_take_flags(takes, aggregate_version)
+    validate_cold_take_flags(takes, aggregate_version, refused_cells)
     if cells != aggregate_cells(takes, aggregate_version):
         raise HistoryError("cell aggregates do not match the exact ordered takes")
 
@@ -3639,7 +3717,11 @@ def validate_record(
         raise HistoryError("validator and crash-delta gates must pass")
     if evidence.get("crashCount") != 0:
         raise HistoryError("successful evidence cannot contain a crash delta")
-    if evidence.get("expectedTakeCount") != evidence.get("actualTakeCount") or evidence.get("actualTakeCount") != len(takes):
+    # A refused take is owed by the matrix and absent from the takes (audit T5).
+    if (
+        evidence.get("actualTakeCount") != len(takes)
+        or evidence.get("expectedTakeCount") != len(takes) + len(refused_cells)
+    ):
         raise HistoryError("take counts do not match the selected evidence")
     for key in ("manifestDigest", "resultBundleDigest", "rawTelemetryDigest"):
         require_digest(evidence.get(key), f"evidence.{key}")
@@ -4322,6 +4404,14 @@ def history_classification(run: dict[str, Any]) -> str:
     return f"{run['classification']} ({tier})"
 
 
+def history_take_count(record: dict[str, Any]) -> str:
+    """The HISTORY takes cell: the takes the record holds, and beside them the
+    takes the audio check refused when it has any (audit T5)."""
+    refused = (record.get("evidence") or {}).get("refusedCells") or []
+    count = str(len(record["takes"]))
+    return f"{count} ({len(refused)} refused)" if refused else count
+
+
 def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
     grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
     for _, record in records:
@@ -4385,7 +4475,7 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
                 "| {date} | [`{run_id}`]({relative}) | {scope} | {classification} | {status} | {memory} | {takes} | {rtf} | `{sha}`{dirty} | `{comparison}` | {trend} | {label} |".format(
                     date=run["finishedAt"].split("T", 1)[0], run_id=markdown_escape(run["id"]),
                     relative=relative, scope=run["matrixScope"], classification=history_classification(run),
-                    status=run["status"], takes=len(record["takes"]),
+                    status=run["status"], takes=history_take_count(record),
                     rtf=rtf_semantics.format_rtf(rtf_value, rtf_derived),
                     sha=source["commit"][:12],
                     memory=memory_contract_status(record),

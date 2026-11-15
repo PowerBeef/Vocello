@@ -196,6 +196,10 @@ def load_evidence_selection(path, requested_run_id=""):
             raise TelemetrySelectionError(f"duplicate evidence generationID: {generation_id}")
         if not isinstance(cell, str) or cell != ordered_cell or len(cell.split("/")) != 3:
             raise TelemetrySelectionError(f"evidence take {index} has an invalid ordered cell")
+        if take.get("status") == "refused":
+            # The mandatory audio check refused the take (check_macos_ui_bench.py):
+            # it keeps its place in the matrix and is in no selection or median.
+            continue
         if take.get("status") not in {"pass", "passedWithWarnings"}:
             raise TelemetrySelectionError(f"evidence take {index} is not successful")
         if take.get("finishReason") not in _BENCHMARK_SUCCESS_FINISH_REASONS:
@@ -212,6 +216,8 @@ def load_evidence_selection(path, requested_run_id=""):
             raise TelemetrySelectionError(f"evidence take {index} has incomplete layers")
         generation_ids.append(generation_id)
         cell_by_id[generation_id] = cell
+    if not generation_ids:
+        raise TelemetrySelectionError("evidence manifest has no completed take")
     return payload, run_id, generation_ids, cell_by_id
 
 
@@ -316,14 +322,29 @@ def _load_non_ui_evidence_selection(payload, *, requested_run_id=""):
     return payload, run_id, generation_ids, cell_by_id
 
 
-def _select_rows(rows, *, run_id="", generation_ids=None, layer="telemetry"):
-    """Select and deterministically order one run's rows."""
+def refused_generation_ids(evidence_payload):
+    """The generation IDs of the takes a UI benchmark manifest records as refused.
+
+    Their rows belong to the run and to no selection: a strict selection leaves
+    them out instead of reading them as unexpected rows."""
+    takes = evidence_payload.get("takes") if isinstance(evidence_payload, dict) else None
+    return frozenset(
+        take["generationID"] for take in takes or []
+        if isinstance(take, dict) and take.get("status") == "refused"
+        and isinstance(take.get("generationID"), str)
+    )
+
+
+def _select_rows(rows, *, run_id="", generation_ids=None, layer="telemetry", ignored_ids=frozenset()):
+    """Select and deterministically order one run's rows; `ignored_ids` are never selected."""
     selected = list(rows)
     if run_id:
         selected = [
             row for row in selected
             if (row.get("notes") or {}).get("benchRunID") == run_id
         ]
+    if ignored_ids:
+        selected = [row for row in selected if row.get("generationID") not in ignored_ids]
     ids = [row.get("generationID") for row in selected]
     if any(not isinstance(value, str) or not value for value in ids):
         raise TelemetrySelectionError(f"one or more selected {layer} rows has no generationID")
@@ -468,7 +489,7 @@ def load_merged_runs(diag_dir, *, run_id="", generation_ids=None, strict=False):
     return runs
 
 
-def _app_index(diag_dir, *, run_id="", generation_ids=None, strict=False):
+def _app_index(diag_dir, *, run_id="", generation_ids=None, strict=False, ignored_ids=frozenset()):
     """Stream app/generations.jsonl and keep only the fields needed for joining."""
     index = {}
     path = os.path.join(diag_dir, "app", "generations.jsonl")
@@ -477,6 +498,7 @@ def _app_index(diag_dir, *, run_id="", generation_ids=None, strict=False):
         run_id=run_id,
         generation_ids=generation_ids,
         layer="app",
+        ignored_ids=ignored_ids,
     ) if (run_id or generation_ids is not None) else iter_jsonl(path, strict=strict)
     for a in rows:
         gid = a.get("generationID")
@@ -836,6 +858,7 @@ def aggregate_runs(
     cell_by_id=None,
     strict=False,
     engine_only=False,
+    ignored_ids=frozenset(),
 ):
     """Stream engine + app rows and aggregate them into finalized cell summaries.
 
@@ -843,13 +866,15 @@ def aggregate_runs(
     materialized list of per-run dicts, and the cell dicts are keyed by
     (mode, modelID, warmState, bucket) with delivery cells keyed by
     (mode, modelID, warmState, delivery). Rows with finishReason
-    failed/superseded/cancelled are omitted from aggregates.
+    failed/superseded/cancelled are omitted from aggregates. `ignored_ids` are
+    the run's refused takes (`refused_generation_ids`): never selected.
     """
     app_lookup = {} if engine_only else _app_index(
         diag_dir,
         run_id=run_id,
         generation_ids=generation_ids,
         strict=strict,
+        ignored_ids=ignored_ids,
     )
     accumulators = {}
     delivery_accumulators = {}
@@ -861,6 +886,7 @@ def aggregate_runs(
         run_id=run_id,
         generation_ids=generation_ids,
         layer="engine",
+        ignored_ids=ignored_ids,
     ) if (run_id or generation_ids is not None) else iter_jsonl(path, strict=strict)
     for e in engine_rows:
         if not _engine_row_counts_for_benchmark(e):
@@ -1794,6 +1820,9 @@ def seed_baseline(path, cells, evidence_payload, *, states=None, minimum_takes=3
     """
     if evidence_payload is None:
         raise SeedRefused("seeding requires --evidence-manifest (the baseline identity comes from the run's evidence)")
+    if evidence_payload.get("refusedCells"):
+        # A run that recorded a refused take is exploratory (audit T5).
+        raise SeedRefused("a run with a refused take never seeds a baseline")
     # The host verdict comes first, as in a comparison (audit V-7): a loaded run
     # is inconclusive whatever else is wrong with its evidence.
     load_reasons = host_load_verdict(evidence_payload, cpu_count=cpu_count, states=states)
@@ -2207,6 +2236,7 @@ def main():
             cell_by_id=cell_by_id,
             strict=strict_selection,
             engine_only=args.engine_only,
+            ignored_ids=refused_generation_ids(evidence_payload),
         )
     except TelemetrySelectionError as error:
         print(f"FAIL: {error}")

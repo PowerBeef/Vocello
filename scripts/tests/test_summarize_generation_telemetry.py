@@ -250,6 +250,79 @@ def test_evidence_manifest_controls_exact_order_and_cells():
         assert [run["lenBucket"] for run in runs] == ["short", "long"]
 
 
+def test_a_refused_take_keeps_its_place_and_is_in_no_selection(monkeypatch):
+    """RF-61, audit T5: the macOS UI checker records a take the audio check refused."""
+    with tempfile.TemporaryDirectory() as tmp:
+        run_id = "refused-run"
+        refused_row = _scoped_engine_row("gen-2", run_id, 150)
+        refused_row["finishReason"] = "failed"
+        _write_jsonl(
+            os.path.join(tmp, "engine", "generations.jsonl"),
+            [_scoped_engine_row("gen-1", run_id, 150), refused_row, _scoped_engine_row("gen-3", run_id, 150)],
+        )
+        _write_jsonl(
+            os.path.join(tmp, "app", "generations.jsonl"),
+            [_scoped_app_row("gen-1", run_id), _scoped_app_row("gen-3", run_id)],
+        )
+        cells = ["custom/short/warm#0", "custom/short/warm#1", "custom/long/warm#0"]
+        manifest = _evidence_manifest(run_id, ["gen-1", "gen-2", "gen-3"], cells)
+        manifest["takes"][1] = {
+            "takeIndex": 2, "generationID": "gen-2", "cell": cells[1], "status": "refused",
+            "finishReason": "failed", "audioQC": {"verdict": "fail", "flags": ["terminal_silence:3425ms"]},
+            "layerCompleteness": {"engine": True, "app": False},
+        }
+        manifest["refusedCells"] = [{"takeIndex": 2, "cell": cells[1]}]
+        manifest_path = os.path.join(tmp, "benchmark-evidence.json")
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        payload, selected_run, generation_ids, cell_by_id = sgt.load_evidence_selection(manifest_path)
+        assert generation_ids == ["gen-1", "gen-3"]
+        assert "gen-2" not in cell_by_id
+        assert sgt.refused_generation_ids(payload) == {"gen-2"}
+        runs, _, _, _ = sgt.aggregate_runs(
+            tmp, run_id=selected_run, generation_ids=generation_ids, cell_by_id=cell_by_id, strict=True,
+            ignored_ids=sgt.refused_generation_ids(payload),
+        )
+        assert [run["generationID"] for run in runs] == ["gen-1", "gen-3"]
+        # The lane's own call (--run-id, --evidence-manifest, --merged) summarizes the run.
+        _write_jsonl(os.path.join(tmp, "generations-merged.jsonl"), [
+            {"generationID": gid, "app": {}, "engine": {}} for gid in ("gen-1", "gen-2", "gen-3")
+        ])
+        monkeypatch.setattr(sys, "argv", [
+            "summarize_generation_telemetry.py", tmp, "--run-id", run_id,
+            "--evidence-manifest", manifest_path, "--merged", "--show-variance",
+        ])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            assert sgt.main() == 0, output.getvalue()
+        # A strict selection without the manifest's refusal still reads the row as unexpected.
+        try:
+            sgt.aggregate_runs(
+                tmp, run_id=selected_run, generation_ids=generation_ids, cell_by_id=cell_by_id, strict=True,
+            )
+        except sgt.TelemetrySelectionError as error:
+            assert "unexpected=['gen-2']" in str(error)
+        else:
+            raise AssertionError("an unlisted row of the run was selected silently")
+        # Its place in the matrix is still checked, and a run of it never seeds a baseline.
+        manifest["takes"][1]["cell"] = "custom/long/warm#9"
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        try:
+            sgt.load_evidence_selection(manifest_path)
+        except sgt.TelemetrySelectionError as error:
+            assert "invalid ordered cell" in str(error)
+        else:
+            raise AssertionError("a refused take outside its matrix cell was accepted")
+        try:
+            sgt.seed_baseline(os.path.join(tmp, "baseline.json"), [], payload)
+        except sgt.SeedRefused as error:
+            assert "refused take never seeds a baseline" in str(error)
+        else:
+            raise AssertionError("a run with a refused take seeded a baseline")
+        assert not os.path.exists(os.path.join(tmp, "baseline.json"))
+
+
 def test_evidence_manifest_rejects_duplicate_generation_ids():
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "benchmark-evidence.json")

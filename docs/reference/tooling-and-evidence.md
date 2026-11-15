@@ -136,6 +136,18 @@ rules they enforce:
   floored by the between-run spread and printed), and reports a loaded, throttled or low-power host as
   inconclusive (`GATE: INCONCLUSIVE`, exit 3), never as pass or fail. A timing take whose own one-minute
   load exceeded the core count marks its engine or UI benchmark record (macOS or iPhone) exploratory.
+- **A refused take is recorded, not retried (maintainer decision 2026-11-15).** A macOS UI benchmark
+  take that the app's mandatory audio check refuses no longer loses the run: the XCUITest marks it
+  and goes on, and `scripts/check_macos_ui_bench.py` accepts the mark only when the take's engine row
+  shows the audio check's refusal (any other failed take fails the lane, as does a mark without a
+  row). The refused take is in no median, gate or capture expectation. The run publishes the takes
+  that completed as an `exploratory` record that lists `evidence.refusedCells` and names its rule
+  (`evidence.refusedTakeRule`); the validator refuses such a record under any other classification,
+  so it is never canonical, never a baseline, never in a chart pool and never promotion evidence.
+  More than one refused take (`--max-refused-takes`) fails the lane as a product failure. The seeds
+  never move for a refused take, and a run without one publishes what it always published
+  (`docs/reference/telemetry-and-benchmarking.md`, Refused takes). The iPhone benchmark still fails
+  on a refused take.
 - **Memory-qualified publication.** Telemetry schema v8 or newer (records are v8; streaming v9 is a
   digest-bound sidecar), manifest v2, exact sidecar digests, memory contract v2 (one series per
   process; no gap between samples above `unobservedGapBound` in

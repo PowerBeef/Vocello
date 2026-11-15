@@ -237,6 +237,16 @@ allows (default 0, which the lane uses), each named with its take and cell. The 
 prints the same two findings as report-only warnings that change neither the verdict nor the
 record, until a phone run calibrates them.
 
+A benchmark take that the app's mandatory audio check refuses does not fail the lane by itself
+(RF-61, maintainer decision 2026-11-15). The test goes on to the next take, the checker records the
+refusal when the take's engine row proves it, and the run publishes the takes that completed as an
+exploratory record that names the refused cells and is never canonical. The lane's last line then
+reads `macos benchmark PASS · REFUSED 1 take(s): take 13 (design/short/warm#1) · exploratory
+record, never canonical · <run directory>`. The lane fails when more than one take is refused (the
+checker's `--max-refused-takes`), when a take failed any other way, and when a take the test marked
+left no engine row. A refused take is never retried and the seeds never move for one
+([`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md), Refused takes).
+
 The smoke lane captures its completed-generation take (`test02`) as well, always armed; its
 capture analysis is advisory. What fails the journey is playback itself: `test02` asserts that the
 finished take starts playing on its own, and outside the measured lanes `waitForPlaybackToFinish`

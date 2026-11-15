@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import datetime as dt
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 from typing import TypeGuard
 import sys
 import tempfile
@@ -65,6 +68,25 @@ CELL_AGGREGATE_VERSION = 2
 # Some rows or layer files are not there yet (sysexits EX_TEMPFAIL). The lane
 # retries only this outcome, briefly; every other failure is deterministic.
 ROWS_NOT_YET_PRESENT_EXIT = 75
+# A take the mandatory audio check refused (RF-61, audit T5, decision D-5 of
+# 2026-11-15). The XCUITest prints one marker per failed take and goes on:
+# `VOCELLO_BENCH_TAKE_REFUSED=<base64 of UTF-8 JSON {"cell", "schemaVersion": 1,
+# "takeIndex"}>`. The runner cannot tell a refusal from any other failed
+# generation, so the marker alone proves nothing: the take's engine row must
+# show the audio check's refusal (`audio_qc_refusal`).
+REFUSED_MARKER = "VOCELLO_BENCH_TAKE_REFUSED="
+REFUSED_MARKER_RE = re.compile(r"VOCELLO_BENCH_TAKE_REFUSED=([A-Za-z0-9+/=]+)")
+REFUSED_MARKER_SCHEMA_VERSION = 1
+# NativeRuntimeFailureCode.audioQualityRejected, which a failure row stamps in
+# `notes.nativeRuntimeFailureCode` (with the flags in `notes.audioQCFlags`).
+AUDIO_QC_REFUSAL_CODE = "audio.quality_rejected"
+# Refused takes a run may record before the lane fails as a product failure.
+DEFAULT_MAX_REFUSED_TAKES = 1
+# The run-level code a record with refused takes carries: `(<refused>/<matrix takes>)`.
+REFUSED_TAKES_WARNING = "takes.refused"
+# `evidence.refusedTakeRule` (benchmark_history.REFUSED_TAKE_RULE): the record
+# keeps the takes that completed, is exploratory and is never canonical.
+REFUSED_TAKE_RULE = "recorded-exploratory-v1"
 THERMAL_RANK = {"unknown": -1, "nominal": 0, "fair": 1, "serious": 2, "critical": 3}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 # NativeDeviceMemoryClass Mac tiers. Engine rows stamp `notes.deviceClass` with
@@ -139,6 +161,148 @@ def run_runtime_policy(rows: list[dict]) -> dict | None:
         return publisher.runtime_policy_provenance(rows)
     except publisher.PublicationError as error:
         raise ValueError(str(error)) from error
+
+
+def read_refused_markers(log_path: Path | None, cells: list[str]) -> tuple[dict[int, str], list[str]]:
+    """The takes the runner marked refused, {1-based take index: cell}, and failures.
+
+    A marker that is not base64 JSON of the declared shape, or that names a take
+    or a cell the selected matrix does not hold, is a failure: the run's own
+    account of itself cannot be trusted. A repeated identical marker is one marker.
+    """
+    if log_path is None:
+        return {}, []
+    try:
+        text = Path(log_path).read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        return {}, [f"unreadable xcodebuild log {log_path}: {type(error).__name__}"]
+    markers: dict[int, str] = {}
+    failures: list[str] = []
+    for line in text.splitlines():
+        if REFUSED_MARKER not in line:
+            continue
+        matches = REFUSED_MARKER_RE.findall(line)
+        if not matches:
+            failures.append("a refused-take marker carries no base64 payload")
+        for encoded in matches:
+            try:
+                marker = json.loads(base64.b64decode(encoded, validate=True).decode("utf-8"))
+            except (binascii.Error, UnicodeDecodeError, ValueError) as error:
+                failures.append(f"a refused-take marker is not base64 JSON: {type(error).__name__}")
+                continue
+            index = marker.get("takeIndex") if isinstance(marker, dict) else None
+            cell = marker.get("cell") if isinstance(marker, dict) else None
+            if (
+                not isinstance(marker, dict)
+                or marker.get("schemaVersion") != REFUSED_MARKER_SCHEMA_VERSION
+                or isinstance(index, bool) or not isinstance(index, int)
+                or not isinstance(cell, str)
+            ):
+                failures.append(
+                    'a refused-take marker is not {"cell", "schemaVersion": '
+                    f'{REFUSED_MARKER_SCHEMA_VERSION}, "takeIndex"}}'
+                )
+                continue
+            if not 1 <= index <= len(cells):
+                failures.append(
+                    f"a refused-take marker names take {index} ({cell!r}), outside the matrix's 1..{len(cells)}"
+                )
+                continue
+            if cell != cells[index - 1]:
+                failures.append(
+                    f"a refused-take marker names take {index} as {cell!r}; the matrix runs "
+                    f"{cells[index - 1]!r} there"
+                )
+                continue
+            markers[index] = cell
+    return markers, failures
+
+
+def audio_qc_refusal(row: dict) -> list[str] | None:
+    """The flags of the mandatory audio check's refusal, or None when the engine
+    row shows none.
+
+    A refused take ends `failed` and names the refusal one of two ways: the
+    engine's failure code `audio.quality_rejected` in its notes (a take stopped
+    mid-stream for runaway trailing silence carries only this, with the flags
+    in `notes.audioQCFlags`), or an `audioQC` report whose verdict is `fail`
+    (the final check). Any other failed generation returns None."""
+    if str(row.get("finishReason")).lower() != "failed":
+        return None
+    notes = row.get("notes")
+    if not isinstance(notes, dict):
+        notes = {}
+    qc = raw_audio_qc(row)
+    flags = [flag for flag in qc.get("flags") or [] if isinstance(flag, str)]
+    if qc.get("verdict") == "fail":
+        return flags
+    if notes.get("nativeRuntimeFailureCode") == AUDIO_QC_REFUSAL_CODE:
+        noted = notes.get("audioQCFlags")
+        return flags or ([noted] if isinstance(noted, str) and noted else [])
+    return None
+
+
+def classify_refused_takes(
+    markers: dict[int, str], engine_rows: list[dict],
+) -> tuple[dict[int, dict], list[str]]:
+    """The marked takes whose engine row proves the refusal, and why the others fail.
+
+    The runner prints its marker for any failed generation, so each marked take
+    must have exactly one engine row, naming the same cell, that shows the audio
+    check's refusal. A marked take with no engine row, or with a row that failed
+    another way or did not fail, stays a failed take."""
+    by_index: dict[int, list[dict]] = {}
+    for row in engine_rows:
+        try:
+            index = int(str((row.get("notes") or {}).get("benchTakeIndex")))
+        except ValueError:
+            continue
+        by_index.setdefault(index, []).append(row)
+    refused: dict[int, dict] = {}
+    failures: list[str] = []
+    for index, cell in sorted(markers.items()):
+        take = f"take {index} ({cell})"
+        rows = by_index.get(index, [])
+        if not rows:
+            failures.append(
+                f"{take} is marked refused but left no engine row; a refusal without its "
+                "audio-check evidence is a failed take"
+            )
+            continue
+        if len(rows) > 1:
+            failures.append(f"{take} is marked refused and has {len(rows)} engine rows")
+            continue
+        row = rows[0]
+        notes = row.get("notes") or {}
+        generation_id = row.get("generationID")
+        flags = audio_qc_refusal(row)
+        if notes.get("benchCell") != cell:
+            failures.append(
+                f"{take} is marked refused, but its engine row names cell {notes.get('benchCell')!r}"
+            )
+        elif flags is None:
+            failures.append(
+                f"{take} is marked refused, but its engine row does not show the mandatory audio "
+                f"check's refusal (finishReason={row.get('finishReason')!r}, "
+                f"nativeRuntimeFailureCode={notes.get('nativeRuntimeFailureCode')!r}); "
+                "a generation that failed another way is a failed take"
+            )
+        elif not isinstance(generation_id, str) or not generation_id:
+            failures.append(f"{take} is marked refused, but its engine row has no generationID")
+        else:
+            refused[index] = {"cell": cell, "generationID": generation_id, "flags": flags}
+    return refused, failures
+
+
+def refused_cells(refused: dict[int, dict]) -> list[dict]:
+    """`refusedCells`: each refused take's index and cell, in take order."""
+    return [{"takeIndex": index, "cell": refused[index]["cell"]} for index in sorted(refused)]
+
+
+def refused_takes_line(refused: dict[int, dict]) -> str:
+    """The lane's one-line account of its refused takes."""
+    listed = ", ".join(f"take {index} ({refused[index]['cell']})" for index in sorted(refused))
+    return f"REFUSED {len(refused)} take(s): {listed}"
 
 
 def take_seed(notes: dict) -> tuple[int | None, str | None]:
@@ -219,7 +383,7 @@ def stall_statistic_value(app_row: dict, statistic: str):
 
 def stall_gate_summary(
     contract: dict, observed: list[tuple[str, int]], censored: int,
-    *, expected: int | None = None, exempt: int = 0,
+    *, expected: int | None = None, exempt: int = 0, refused: int = 0,
 ) -> dict:
     """What the gate saw, for calibration: the per-take distribution of the statistic.
 
@@ -227,6 +391,8 @@ def stall_gate_summary(
     them all, because calibrating the contract needs the whole distribution.
     `expected` is the selected matrix's take count and `exempt` the forced-tier
     diagnostic takes among them; `coversMatrix` says every other take was gated.
+    A take the audio check `refused` is outside the gate: `expected` counts only
+    the takes that completed, and the summary names how many were refused.
     """
     values = sorted(value for _, value in observed)
 
@@ -252,6 +418,7 @@ def stall_gate_summary(
             "expectedTakeCount": expected, "exemptTakeCount": exempt,
             "coversMatrix": len(values) + exempt >= expected,
         } if expected is not None else {}),
+        **({"refusedTakeCount": refused} if refused else {}),
         "takesAboveLimit": above,
         "median": quantile(0.5),
         "p90": quantile(0.9),
@@ -872,20 +1039,29 @@ def capture_plan(cells: list[str]) -> set[int]:
     return {position + 1 for position in last.values() if not starts_session(cells, position)}
 
 
+def owed_captures(cells: list[str], refused: frozenset[int] | set[int] = frozenset()) -> set[int]:
+    """The planned takes that owe a capture: the plan less the takes the audio
+    check refused. The plan itself never moves: a cell whose captured repetition
+    was refused has no played-audio evidence in that run."""
+    return capture_plan(cells) - set(refused)
+
+
 def evaluate_all_captures(
     cells: list[str], engine_rows: list[dict], app_rows: list[dict],
     playback_capture_dir: Path | None, outputs_dir: Path | None,
+    refused: frozenset[int] | set[int] = frozenset(),
 ) -> dict[int, dict]:
     """The capture evidence of every planned take, keyed by take index, before the
     verdict is decided; takes outside the capture plan carry none. When the runner
     armed capture (its run manifest is in the directory), every planned take must
-    end captured (RF-61, audit T3)."""
+    end captured (RF-61, audit T3). A `refused` take owes none, and whatever its
+    aborted capture left is not read."""
     if playback_capture_dir is None:
         return {}
     armed = playback_capture.capture_armed(playback_capture_dir)
     captures = playback_capture.collect_captures(playback_capture_dir)
     app_by_id = {row.get("generationID"): row for row in app_rows}
-    planned = capture_plan(cells)
+    planned = owed_captures(cells, refused)
     results: dict[int, dict] = {}
     for index, (row, cell) in enumerate(zip(engine_rows, cells, strict=True), start=1):
         if index not in planned:
@@ -926,7 +1102,25 @@ def build_manifest(
     seed_policy: str | None = None,
     allocation: dict[str, int] | None = None,
     matrix_version: str | None = None,
+    refused: dict[int, dict] | None = None,
 ) -> dict:
+    """The run's evidence manifest and the tracked record it publishes.
+
+    `refused` maps a take index to a take the mandatory audio check refused
+    (`classify_refused_takes`). Such a take stays in the manifest's `takes` with
+    status `refused` and no metrics, and is left out of everything else: the
+    record's takes and cells, the memory qualification, the telemetry digest and
+    the capture plan. The record then names it in `evidence.refusedCells` and is
+    exploratory. Without refused takes the manifest is what it always was."""
+    refused = refused or {}
+    all_engine_rows = engine_rows
+    all_app_ids = {row.get("generationID") for row in app_rows}
+    all_merged_ids = {row.get("generationID") for row in merged_rows}
+    if refused:
+        refused_ids = {item["generationID"] for item in refused.values()}
+        engine_rows = [row for row in engine_rows if row.get("generationID") not in refused_ids]
+        app_rows = [row for row in app_rows if row.get("generationID") not in refused_ids]
+        merged_rows = [row for row in merged_rows if row.get("generationID") not in refused_ids]
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
         rows=engine_rows,
@@ -938,14 +1132,41 @@ def build_manifest(
     memory_by_id = {item.generation_id: item for item in memory_evidence}
     app_by_id = {row.get("generationID"): row for row in app_rows}
     if capture_results is None:
-        capture_results = evaluate_all_captures(cells, engine_rows, app_rows, playback_capture_dir, outputs_dir)
+        capture_results = evaluate_all_captures(
+            cells, all_engine_rows, app_rows, playback_capture_dir, outputs_dir, set(refused),
+        )
     capture_by_index: dict[int, dict] = {}
     capture_summary: list[dict] = []
     takes = []
     warning_count = 0
-    for index, (row, cell) in enumerate(zip(engine_rows, cells, strict=True), start=1):
+    for index, (row, cell) in enumerate(zip(all_engine_rows, cells, strict=True), start=1):
         mode, length, state_repetition = cell.split("/")
         state, repetition = state_repetition.split("#")
+        if index in refused:
+            seed, seed_source = take_seed(row.get("notes") or {})
+            takes.append({
+                "takeIndex": index,
+                "generationID": row["generationID"],
+                "cell": cell,
+                "mode": mode,
+                "length": length,
+                "warmState": state,
+                "repetition": int(repetition),
+                # Refused by the mandatory audio check: recorded, never retried,
+                # and it carries no timing, output or playback evidence.
+                "status": "refused",
+                "finishReason": row.get("finishReason"),
+                "audioQC": {"verdict": "fail", "flags": refused[index]["flags"]},
+                "layerCompleteness": {
+                    "engine": True,
+                    "app": row["generationID"] in all_app_ids,
+                    "merged": row["generationID"] in all_merged_ids,
+                },
+                "samplingSeed": seed,
+                "samplingSeedSource": seed_source,
+                "followsColdTake": index > 1 and "/cold#" in cells[index - 2],
+            })
+            continue
         output = row.get("outputMetrics") or {}
         qc = row.get("audioQC") or output.get("audioQC") or {}
         memory = memory_by_id[row["generationID"]]
@@ -988,13 +1209,16 @@ def build_manifest(
     stall_warning = stall_report_warning(stall_gate) if stall_gate else None
     if stall_warning:
         run_warnings.append(stall_warning)
+    expected = len(cells)
+    if refused:
+        run_warnings.append(f"{REFUSED_TAKES_WARNING}({len(refused)}/{expected})")
     status = "passedWithWarnings" if warning_count or run_warnings else "pass"
     scope = matrix_scope(modes, lengths, warm, allocation)
-    expected = len(cells)
     hardware = run_hardware_context(engine_rows, canonical_macos_profile_id())
+    # The run's span covers every take it ran, a refused one included.
     recorded = sorted(
-        row.get("recordedAt") for row in engine_rows
-        if isinstance(row.get("recordedAt"), str) and row.get("recordedAt")
+        stamp for stamp in (row.get("recordedAt") for row in all_engine_rows)
+        if isinstance(stamp, str) and stamp
     )
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     started_at = recorded[0] if recorded else now
@@ -1020,7 +1244,8 @@ def build_manifest(
     )
     qc_algorithm = qc_algorithm_version(engine_rows)
     history_takes = []
-    for take, row in zip(takes, engine_rows, strict=True):
+    completed_takes = [take for take in takes if take["status"] != "refused"]
+    for take, row in zip(completed_takes, engine_rows, strict=True):
         generation_id = take["generationID"]
         model_identity = row.get("modelRuntimeIdentity") or {}
         memory = memory_by_id[generation_id]
@@ -1089,7 +1314,14 @@ def build_manifest(
     if busy_takes:
         listed = ", ".join(f"take {index} at {load:.2f}" for index, load in busy_takes)
         print(f"note: {listed} exceeded the per-take load limit; the record is exploratory")
-    exploratory = diagnostic_memory_tier(engine_rows) or bool(busy_takes)
+    if refused:
+        print(
+            f"note: {len(refused)} take(s) refused by the mandatory audio check; the record keeps the "
+            f"{len(history_takes)} that completed, is exploratory and is never canonical"
+        )
+    # A refused take leaves the matrix incomplete (decision D-5): never canonical.
+    exploratory = diagnostic_memory_tier(engine_rows) or bool(busy_takes) or bool(refused)
+    planned_captures = owed_captures(cells, set(refused))
     if playback_capture_dir is not None:
         write_json_atomic(Path(playback_capture_dir) / "summary.json", {
             "schemaVersion": 1,
@@ -1099,8 +1331,10 @@ def build_manifest(
             # Whether the runner armed capture, so every planned take owed one (audit T3).
             "armed": playback_capture.capture_armed(playback_capture_dir),
             # One captured repetition per cell (audit #31): the plan, not every take.
-            "expected": len(capture_plan(cells)),
-            "plannedTakes": sorted(capture_plan(cells)),
+            "expected": len(planned_captures),
+            "plannedTakes": sorted(planned_captures),
+            # Planned takes the audio check refused owe no capture.
+            **({"refusedTakes": sorted(capture_plan(cells) & set(refused))} if refused else {}),
             "gate": {
                 "coverageMin": playback_capture.GATE_COVERAGE_MIN,
                 "residualMaxDBFS": playback_capture.GATE_RESIDUAL_MAX_DBFS,
@@ -1125,8 +1359,9 @@ def build_manifest(
             # How every take chose its sampling seed (audit #29); lineage
             # contract 2 keys a seeded matrix apart from random seeds.
             **({"seedPolicy": seed_policy} if seed_policy is not None else {}),
-            # A forced or emulated memory tier (audit #11) or a take above the
-            # per-take load limit (audit #28) is exploratory evidence.
+            # A forced or emulated memory tier (audit #11), a take above the
+            # per-take load limit (audit #28) or a refused take (audit T5) is
+            # exploratory evidence.
             **({"classification": "exploratory"} if exploratory else {}),
             # The tier the takes ran under, forced or emulated included; never
             # part of the comparison key.
@@ -1151,9 +1386,22 @@ def build_manifest(
             # The cells leave the take after a cold take out and publish an
             # IQR only from four takes (audit #30).
             "cellAggregateVersion": CELL_AGGREGATE_VERSION,
+            # The takes the mandatory audio check refused, and the rule the
+            # record follows for them (audit T5): they are in no take, cell or
+            # median here, and the record is exploratory, never canonical.
+            **({
+                "refusedCells": refused_cells(refused),
+                "refusedTakeRule": REFUSED_TAKE_RULE,
+            } if refused else {}),
         },
         "takes": history_takes,
     }
+    refused_layers = [take["layerCompleteness"] for take in takes if take["status"] == "refused"]
+    layer_counts = {
+        "engine": expected,
+        "app": len(app_rows) + sum(1 for layers in refused_layers if layers["app"]),
+        "merged": len(merged_rows) + sum(1 for layers in refused_layers if layers["merged"]),
+    } if refused else {"engine": expected, "app": expected, "merged": expected}
     return {
         "schemaVersion": 2,
         "benchmarkKind": "ui-generation",
@@ -1175,12 +1423,15 @@ def build_manifest(
             "expectedTakeCount": expected,
             "orderedCells": cells,
         },
+        # Every take that completed has all three layers; a refused take's app
+        # and merged rows are counted when it left them.
         "layers": {
-            "engine": {"count": expected, "complete": True},
-            "app": {"count": expected, "complete": True},
-            "merged": {"count": expected, "complete": True},
+            "engine": {"count": layer_counts["engine"], "complete": True},
+            "app": {"count": layer_counts["app"], "complete": True},
+            "merged": {"count": layer_counts["merged"], "complete": True},
         },
         "takes": takes,
+        **({"refusedCells": refused_cells(refused)} if refused else {}),
         # The bundle the lane built and drove; the record step hashes its
         # executables instead of assuming an arena.
         **({"appBundleRelativePath": app_bundle_relative_path} if app_bundle_relative_path else {}),
@@ -1258,9 +1509,25 @@ def main() -> int:
         help="playback underruns a take may report before it fails (default 0; audit T4). "
              "A playback continuity failure always fails the take",
     )
+    parser.add_argument(
+        "--xcodebuild-log", type=Path, metavar="PATH",
+        help="the run's xcodebuild log, read for the runner's refused-take markers "
+             f"({REFUSED_MARKER}<base64 JSON>). A marked take is recorded as refused only when its "
+             "engine row shows the mandatory audio check's refusal; any other marked take fails the run. "
+             "Without the log no take can be recorded as refused",
+    )
+    parser.add_argument(
+        "--max-refused-takes", type=int, default=DEFAULT_MAX_REFUSED_TAKES, metavar="N",
+        help="takes the mandatory audio check may refuse before the run fails as a product failure "
+             f"(default {DEFAULT_MAX_REFUSED_TAKES}). A refused take is recorded and the takes that "
+             "completed are published as an exploratory record that is never canonical. A refused "
+             "take is never retried and the seeds never move for one (decision of 2026-11-15)",
+    )
     args = parser.parse_args()
     if args.max_playback_underruns < 0:
         parser.error("--max-playback-underruns must be 0 or more")
+    if args.max_refused_takes < 0:
+        parser.error("--max-refused-takes must be 0 or more")
 
     if args.evidence_manifest and args.evidence_manifest.exists():
         args.evidence_manifest.unlink()
@@ -1318,12 +1585,45 @@ def main() -> int:
     engine_id_set = set(valid_engine_ids)
     merged_rows = [row for row in loaded["merged"] if row.get("generationID") in engine_id_set]
 
+    # Refused takes (audit T5): the runner's markers, each proven by its engine
+    # row. A refused take is recorded and left out of every gate below; the
+    # checks that follow judge only the takes that completed.
+    markers, marker_failures = read_refused_markers(args.xcodebuild_log, expected_cell_order)
+    failures.extend(marker_failures)
+    refused, refusal_failures = classify_refused_takes(markers, engine_rows)
+    failures.extend(refusal_failures)
+    refused_ids = {item["generationID"] for item in refused.values()}
+    if len(refused) > args.max_refused_takes:
+        failures.append(
+            f"{len(refused)} take(s) refused by the mandatory audio check, above the allowance of "
+            f"{args.max_refused_takes} (--max-refused-takes): "
+            + ", ".join(f"take {index} ({refused[index]['cell']})" for index in sorted(refused))
+            + "; a product failure, not a benchmark result"
+        )
+    all_engine_rows, all_app_rows, all_merged_rows = engine_rows, app_rows, merged_rows
+    if refused:
+        engine_rows = [row for row in engine_rows if row.get("generationID") not in refused_ids]
+        app_rows = [row for row in app_rows if row.get("generationID") not in refused_ids]
+        merged_rows = [row for row in merged_rows if row.get("generationID") not in refused_ids]
+        valid_engine_ids = [value for value in valid_engine_ids if value not in refused_ids]
+        engine_id_set = set(valid_engine_ids)
+        # The app records a failed generation as failed; a row that reports the
+        # refused take as completed contradicts the engine.
+        for row in all_app_rows:
+            if row.get("generationID") in refused_ids and str(row.get("finishReason")).lower() in SUCCESS_FINISH:
+                failures.append(
+                    f"app generation {row.get('generationID', '?')} reports finishReason="
+                    f"{row.get('finishReason')!r} for a take the audio check refused"
+                )
+    completed_expected = expected - len(refused)
+
     # Rows that are simply not there yet: a missing layer file, fewer engine
     # rows than the matrix, or an engine take whose app or merged row has not
-    # landed. Only this outcome is worth a short retry (audit #6, #21).
+    # landed. Only this outcome is worth a short retry (audit #6, #21). A
+    # refused take's app and merged rows are not waited for.
     rows_pending: list[str] = [f"{layer} file absent" for layer, path in paths.items() if not path.is_file()]
-    if len(engine_rows) < expected:
-        rows_pending.append(f"engine rows {len(engine_rows)} of {expected}")
+    if len(all_engine_rows) < expected:
+        rows_pending.append(f"engine rows {len(all_engine_rows)} of {expected}")
     for layer, rows in (("app", app_rows), ("merged", merged_rows)):
         missing = engine_id_set - {row.get("generationID") for row in rows}
         if missing:
@@ -1336,22 +1636,22 @@ def main() -> int:
             f"{canonical_macos_profile_id()!r}; re-declare it for this host"
         )
 
-    if len(engine_rows) != expected:
-        failures.append(f"engine rows {len(engine_rows)} != expected {expected}")
+    if len(all_engine_rows) != expected:
+        failures.append(f"engine rows {len(all_engine_rows)} != expected {expected}")
     if any(not isinstance(value, str) or not value for value in engine_ids):
         failures.append("one or more engine rows has no generationID")
     if len(set(engine_ids)) != len(engine_ids):
         failures.append("engine generationIDs are not unique")
-    failures.extend(validate_layer("app", app_rows, valid_engine_ids, expected))
-    failures.extend(validate_take_identity(engine_rows, app_rows))
-    failures.extend(validate_merged(merged_rows, valid_engine_ids, expected))
+    failures.extend(validate_layer("app", app_rows, valid_engine_ids, completed_expected))
+    failures.extend(validate_take_identity(all_engine_rows, all_app_rows))
+    failures.extend(validate_merged(merged_rows, valid_engine_ids, completed_expected))
     failures.extend(
         validate_process_ownership(engine_rows, app_rows, merged_rows, valid_engine_ids)
     )
 
     actual_cells: list[str] = []
     actual_indices: list[int] = []
-    for row in engine_rows:
+    for row in all_engine_rows:
         notes = row.get("notes") or {}
         cell = notes.get("benchCell")
         if isinstance(cell, str):
@@ -1362,6 +1662,10 @@ def main() -> int:
             actual_indices.append(int(notes.get("benchTakeIndex")))
         except (TypeError, ValueError):
             failures.append(f"generation {row.get('generationID', '?')} has no valid benchTakeIndex")
+        if row.get("generationID") in refused_ids:
+            # A refused take keeps its place in the matrix and owes nothing else:
+            # it published no audio and its row is a failure row by design.
+            continue
         finish = row.get("finishReason")
         if str(finish).lower() not in SUCCESS_FINISH:
             failures.append(
@@ -1439,9 +1743,15 @@ def main() -> int:
                 f"app generation {row.get('generationID', '?')} requires telemetry schema "
                 f"v{REQUIRED_TELEMETRY_SCHEMA} or newer for memory qualification"
             )
+    # The takes that completed, each with its place in the matrix; a refused
+    # take is in none of the gates below (playback health, stalls, captures).
+    completed_takes = [
+        (index, row) for index, row in enumerate(all_engine_rows, start=1)
+        if row.get("generationID") not in refused_ids
+    ]
     # Playback health (RF-61, audit T4): a take whose stream broke or whose
     # player ran dry fails, named by its place in the matrix.
-    for index, engine_row in enumerate(engine_rows, start=1):
+    for index, engine_row in completed_takes:
         gid = engine_row.get("generationID")
         frontend = (app_by_id.get(gid) or {}).get("frontendMetrics")
         if not isinstance(frontend, dict):
@@ -1459,7 +1769,7 @@ def main() -> int:
     stall_exempt = 0
     stall_unjudged: list[str] = []
     censored_heartbeats = 0
-    for index, engine_row in enumerate(engine_rows, start=1):
+    for index, engine_row in completed_takes:
         gid = engine_row.get("generationID")
         notes = engine_row.get("notes") or {}
         if not stall_gate_applies(notes):
@@ -1490,7 +1800,8 @@ def main() -> int:
                 f"stall contract {stall_contract['policyID']}, {stall_contract['calibrationStatus']})"
             )
     stall_gate = stall_gate_summary(
-        stall_contract, stall_observed, censored_heartbeats, expected=expected, exempt=stall_exempt,
+        stall_contract, stall_observed, censored_heartbeats,
+        expected=completed_expected, exempt=stall_exempt, refused=len(refused),
     )
     # The gate cannot pass empty (RF-61, audit T6): a row without a Mac device
     # class used to skip it silently, so a calibrated limit could judge nothing.
@@ -1499,17 +1810,19 @@ def main() -> int:
     # above (a missing row or statistic) is not reported a second time.
     if stall_enforced and not stall_gate["coversMatrix"] and (stall_unjudged or not failures):
         failures.append(
-            f"stall gate {stall_contract['policyID']} judged {len(stall_observed)} of {expected} takes "
+            f"stall gate {stall_contract['policyID']} judged {len(stall_observed)} of {completed_expected} takes "
             f"({stall_exempt} forced-tier diagnostic take(s) exempt); a calibrated gate must cover the matrix"
             + (f": unjudged {'; '.join(stall_unjudged)}" if stall_unjudged else "")
         )
 
     # The seed policy (audit #29): under a cell-hash policy every take sampled with its
     # cell's seed; the lane's selection must match what the rows ran.
+    # A refused take is judged with the rest: it was refused at its cell's seed,
+    # and the seeds never move for one (decision of 2026-11-15).
     seed_policy = None
-    if len(engine_rows) == expected:
+    if len(all_engine_rows) == expected:
         seed_policy, seed_failures = bench_seed.run_seed_policy([
-            (cell, row.get("notes") or {}) for cell, row in zip(expected_cell_order, engine_rows, strict=True)
+            (cell, row.get("notes") or {}) for cell, row in zip(expected_cell_order, all_engine_rows, strict=True)
         ])
         failures.extend(seed_failures)
         failures.extend(bench_seed.expected_policy_failure(args.seed_policy, seed_policy))
@@ -1541,7 +1854,8 @@ def main() -> int:
     capture_results: dict[int, dict] | None = None
     if not failures and args.playback_capture_dir is not None:
         capture_results = evaluate_all_captures(
-            expected_cell_order, engine_rows, app_rows, args.playback_capture_dir, args.outputs_dir,
+            expected_cell_order, all_engine_rows, app_rows, args.playback_capture_dir, args.outputs_dir,
+            set(refused),
         )
         if not playback_capture.capture_armed(args.playback_capture_dir):
             print(
@@ -1553,15 +1867,18 @@ def main() -> int:
                 failures.append(f"take {index} ({expected_cell_order[index - 1]}): {reason}")
 
     print(
-        f"macOS UI bench gate: expected={expected} engine={len(engine_rows)} "
-        f"app={len(app_rows)} merged={len(merged_rows)}"
+        f"macOS UI bench gate: expected={expected} engine={len(all_engine_rows)} "
+        f"app={len(all_app_rows)} merged={len(all_merged_rows)}"
     )
+    if refused:
+        # One line the lane repeats in its summary; the gates below judged the rest.
+        print(refused_takes_line(refused))
     enforcement = "enforced" if stall_enforced else "report only, never fails the run"
     would_fail = "yes" if stall_gate["wouldFail"] else "no"
     print(
         f"stall gate {stall_gate['policyID']} ({stall_gate['calibrationStatus']} on "
         f"{stall_gate['calibrationProfile']}, {enforcement}): {statistic} <= {stall_limit} over "
-        f"{stall_gate['gatedTakeCount']} gated take(s) of {expected} "
+        f"{stall_gate['gatedTakeCount']} gated take(s) of {completed_expected} "
         f"({stall_exempt} exempt); median={stall_gate['median']} "
         f"p90={stall_gate['p90']} max={stall_gate['maximum']} "
         f"above={stall_gate['takesAboveLimit']} wouldFail={would_fail} "
@@ -1591,9 +1908,9 @@ def main() -> int:
             lengths,
             args.warm,
             expected_cell_order,
-            engine_rows,
-            app_rows,
-            merged_rows,
+            all_engine_rows,
+            all_app_rows,
+            all_merged_rows,
             optimization=optimization,
             playback_capture_dir=args.playback_capture_dir,
             outputs_dir=args.outputs_dir,
@@ -1605,6 +1922,7 @@ def main() -> int:
             seed_policy=seed_policy,
             allocation=allocation,
             matrix_version=args.matrix_version or None,
+            refused=refused,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

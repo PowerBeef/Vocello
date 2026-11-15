@@ -112,6 +112,10 @@ committed), and says so in one line when it starts. `--no-publish` (benchmark an
 keeps the run's artifacts and verdict and writes no tracked file; the run directory then holds
 publication-skipped.json, and `python3 scripts/benchmark_history.py record --artifact-dir RUN_DIR`
 publishes it later if wanted.
+A macOS `benchmark` take that the app's mandatory audio check refuses is recorded, never retried, and the
+seeds never move for one: the run goes on, publishes the takes that completed as an exploratory record
+that is never canonical, and names the refused cells in its last line. More than one refused take (the
+checker's --max-refused-takes) fails the lane, and so does a take that failed any other way.
 A full macOS `smoke`, `perf` or `benchmark` run must have run every test config/ui-lane-tests.json
 lists for its lane, none skipped; a `--scenario` run checks nothing.
 `smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
@@ -1367,13 +1371,16 @@ validate_macos_benchmark() {
   # rows are final: validate once. Only the checker's distinct "rows not yet
   # present" outcome (75) is retried, for about ten seconds (audit #21). The
   # stall gate reads config/macos-ui-stall-gate.json, and every take must have
-  # run the Speed variant (audit #6, #17).
+  # run the Speed variant (audit #6, #17). The checker reads the runner's
+  # refused-take markers from the log (audit T5): a take the audio check
+  # refused is recorded, within the checker's allowance, and the rest publish.
   while :; do
     status=0
     "$NUMPY_PYTHON" "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
         --build-provenance "$out/last-build.json" \
+        --xcodebuild-log "$out/xcodebuild.log" \
         --crash-delta-passed \
         --stall-contract "$ROOT_DIR/config/macos-ui-stall-gate.json" \
         --variant speed \
@@ -1392,6 +1399,17 @@ validate_macos_benchmark() {
     --run-id "$run_id" --evidence-manifest "$evidence" \
     --label "${label:-$run_id}" --merged --show-variance \
     >"$out/telemetry-summary.txt" 2>&1
+}
+
+# What the lane's last line adds for a macOS benchmark that recorded a refused
+# take (audit T5): the benchmark gate's one-line account of how many takes the
+# mandatory audio check refused and which cells, and that the record is
+# exploratory. Empty for every other run.
+benchmark_refused_suffix() {
+  local refused
+  [[ "$platform" == "macos" && "$lane" == "benchmark" && -f "$out/benchmark-gate.txt" ]] || return 0
+  refused="$(grep -m1 -E '^REFUSED [0-9]+ take\(s\): ' "$out/benchmark-gate.txt" 2>/dev/null || true)"
+  [[ -z "$refused" ]] || printf ' · %s · exploratory record, never canonical' "$refused"
 }
 
 validate_macos_auto_language() {
@@ -2271,5 +2289,5 @@ if [[ "$final_run_status" == "diagnosedFailure" ]]; then
 elif [[ "$final_run_status" == "passedWithWarnings" ]]; then
   note "$platform $lane COMPLETED WITH QUALITY WARNINGS (not promotion PASS) · $out"
 else
-  note "$platform $lane PASS · $out"
+  note "$platform $lane PASS$(benchmark_refused_suffix) · $out"
 fi

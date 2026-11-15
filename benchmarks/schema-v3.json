@@ -451,6 +451,32 @@
             1,
             2
           ]
+        },
+        "refusedCells": {
+          "description": "The takes of a UI benchmark run that the mandatory audio check refused, in take order: each one's matrix take index and cell. Optional, always with refusedTakeRule. A refused take is in no take, cell or median of the record; expectedTakeCount counts it and actualTakeCount does not, and the record's take indices are the matrix's, less the refused ones.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "cell": {
+                "maxLength": 160,
+                "type": "string"
+              },
+              "takeIndex": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "takeIndex",
+              "cell"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "refusedTakeRule": {
+          "const": "recorded-exploratory-v1",
+          "description": "The rule a record with refused takes follows (RF-61, decision of 2026-11-15): the run records each refused take and publishes the takes that completed; the record is exploratory, so it is never canonical, never comparable, never a baseline, never in a public chart pool and never promotion evidence. A refused take is never retried and the seeds never move for one."
         }
       },
       "required": [

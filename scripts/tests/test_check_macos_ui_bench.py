@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import hashlib
 import io
@@ -197,6 +198,7 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         """Run the checker on a fixture; `in_process` is the imported checker
         module to call directly (so a test can observe it) instead of a subprocess."""
         self.last_manifest: Any = None
+        self.last_manifest_bytes: bytes | None = None
         with tempfile.TemporaryDirectory() as temp:
             diagnostics = Path(temp)
             engine_rows = [
@@ -295,7 +297,8 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
                     check=False,
                 )
             if manifest_path.is_file():
-                self.last_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                self.last_manifest_bytes = manifest_path.read_bytes()
+                self.last_manifest = json.loads(self.last_manifest_bytes.decode("utf-8"))
             return result
 
     def test_in_process_memory_is_one_series_not_the_sum_of_two_samplers(self) -> None:
@@ -1292,3 +1295,379 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
         for take in self.last_manifest["historyRecord"]["takes"]:
             self.assertNotIn("playbackCaptureStatus", take)
             self.assertFalse([k for k in take["metrics"] if k.startswith("playbackCapture")])
+
+
+# --------------------------------------------------------------------------- #
+# Refused takes (RF-61, audit T5, decision D-5 of 2026-11-15)
+# --------------------------------------------------------------------------- #
+
+def refused_marker(index: Any, cell: str, **overrides: Any) -> str:
+    """The line the XCUITest prints for a failed take: base64 of sorted-key JSON."""
+    payload = {"cell": cell, "schemaVersion": 1, "takeIndex": index, **overrides}
+    encoded = base64.b64encode(json.dumps(payload, sort_keys=True).encode("utf-8")).decode("ascii")
+    return f"VOCELLO_BENCH_TAKE_REFUSED={encoded}"
+
+
+def write_marker_log(directory: Path, *lines: str) -> Path:
+    """An xcodebuild log holding the given marker lines among ordinary test output."""
+    path = directory / "xcodebuild.log"
+    path.write_text(
+        "Test Case '-[VocelloMacUITests.VocelloMacBenchmarkUITests testOrderedConfigurableMatrix]' started.\n"
+        + "".join(f"{line}\n" for line in lines)
+        + "** TEST EXECUTE SUCCEEDED **\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def refuse_take(
+    layers: dict[str, list[dict]], position: int, *,
+    flags: str = "terminal_silence:3425ms", final_check: bool = False,
+) -> None:
+    """Turn the take at 0-based `position` into what a refused take leaves.
+
+    The shape is the one the retained run of 2026-11-14 left for a take stopped
+    mid-stream for runaway trailing silence: an engine failure row with the
+    refusal code and flags in its notes, no `audioQC` report and empty output
+    metrics; an app row that ends `failed` with the live preview's playback
+    counters and no playback-start buffer or first-chunk-to-playback span.
+    `final_check` is the other path, a refusal by the final audio check, which
+    also leaves the `audioQC` report."""
+    engine = layers["engine"][position]
+    engine["finishReason"] = "failed"
+    engine["outputMetrics"] = {}
+    engine["derivedMetrics"] = {"kvCacheEstimatedPeakMB": 96.0}
+    engine["backendMetrics"] = {"finishReason": "failed", "timings": [], "stages": []}
+    engine.pop("audioQC", None)
+    for key in ("quality_registry_outcome", "quality_registry_required_gates"):
+        engine["notes"].pop(key, None)
+    engine["notes"].update({"nativeRuntimeFailureCode": "audio.quality_rejected", "audioQCFlags": flags})
+    if final_check:
+        engine["audioQC"] = {"verdict": "fail", "flags": flags.split(",")}
+    for app in layers["app"]:
+        if app["generationID"] != engine["generationID"]:
+            continue
+        app["finishReason"] = "failed"
+        frontend = app["frontendMetrics"]
+        frontend.pop("firstChunkToPlaybackScheduledMS", None)
+        frontend.pop("playbackStartBufferedAudioMS", None)
+        frontend["playbackStartSource"] = "liveStream"
+
+
+class RefusedTakeTests(unittest.TestCase):
+    """A take the mandatory audio check refuses is recorded and the rest publish."""
+
+    expected_order = CheckMacOSUIBenchmarkTests.expected_order
+    PROVISIONAL_STALL_FIXTURE = CheckMacOSUIBenchmarkTests.PROVISIONAL_STALL_FIXTURE
+    PLANNED_CAPTURES = PlaybackCaptureEvidenceTests.PLANNED_CAPTURES
+    run_checker = CheckMacOSUIBenchmarkTests.run_checker
+    write_stall_contract = CheckMacOSUIBenchmarkTests.write_stall_contract
+    enforced_stall_contract_args = CheckMacOSUIBenchmarkTests.enforced_stall_contract_args
+    _capture_fixture = PlaybackCaptureEvidenceTests._capture_fixture
+    # What the borrowed `run_checker` leaves behind after each run.
+    last_manifest: Any = None
+    last_manifest_bytes: bytes | None = None
+
+    def log_args(self, *lines: str) -> list[str]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        return ["--xcodebuild-log", str(write_marker_log(Path(temporary.name), *lines))]
+
+    def marked(self, *positions: int) -> list[str]:
+        """The log arguments for refusal markers of the takes at these 0-based positions."""
+        return self.log_args(*(refused_marker(position + 1, self.expected_order[position]) for position in positions))
+
+    def run_refused(self, *positions: int, extra_args: list[str] | None = None, mutate=None, **arguments):
+        def refuse(layers: dict[str, list[dict]]) -> None:
+            for position in positions:
+                refuse_take(layers, position)
+            if mutate is not None:
+                mutate(layers)
+
+        return self.run_checker(
+            self.expected_order, mutate_layers=refuse, evidence=True,
+            extra_args=[*self.marked(*positions), *(extra_args or [])], **arguments,
+        )
+
+    def test_one_refused_take_is_recorded_and_the_rest_publish_as_exploratory(self) -> None:
+        def unhealthy_refused_take(layers: dict[str, list[dict]]) -> None:
+            # What would fail a completed take under each gate a refused take is outside.
+            layers["app"][2]["frontendMetrics"].update({
+                "maximumDelayedHeartbeatMS": 9_000, "delayedHeartbeatCount250": 4,
+                "playbackUnderruns": 7, "playbackContinuityFailures": 3,
+            })
+
+        result = self.run_refused(
+            2, extra_args=self.enforced_stall_contract_args(), mutate=unhealthy_refused_take,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("REFUSED 1 take(s): take 3 (custom/medium/warm#0)", result.stdout)
+        self.assertEqual(result.stdout.strip().splitlines()[-1], "PASS")
+        manifest = self.last_manifest
+        self.assertEqual(manifest["status"], "passedWithWarnings")
+        self.assertEqual(manifest["refusedCells"], [{"takeIndex": 3, "cell": "custom/medium/warm#0"}])
+        self.assertEqual(manifest["matrix"]["expectedTakeCount"], 5)
+        self.assertEqual(
+            [take["status"] for take in manifest["takes"]], ["pass", "pass", "refused", "pass", "pass"],
+        )
+        refused = manifest["takes"][2]
+        self.assertEqual(
+            (refused["takeIndex"], refused["cell"], refused["generationID"], refused["finishReason"]),
+            (3, "custom/medium/warm#0", "fixture-3", "failed"),
+        )
+        self.assertEqual(refused["audioQC"], {"verdict": "fail", "flags": ["terminal_silence:3425ms"]})
+        self.assertEqual(refused["layerCompleteness"], {"engine": True, "app": True, "merged": True})
+        # It carries no output, playback or timing evidence.
+        for key in ("readableWAV", "atomicPublish", "outputDurationSeconds", "playbackStartSource", "metrics"):
+            self.assertNotIn(key, refused)
+
+        record = manifest["historyRecord"]
+        self.assertEqual(record["run"]["classification"], "exploratory")
+        self.assertEqual(record["run"]["status"], "passedWithWarnings")
+        self.assertIn("takes.refused(1/5)", record["run"]["warnings"])
+        self.assertEqual(record["evidence"]["refusedCells"], manifest["refusedCells"])
+        self.assertEqual(record["evidence"]["refusedTakeRule"], "recorded-exploratory-v1")
+        self.assertEqual(
+            (record["evidence"]["expectedTakeCount"], record["evidence"]["actualTakeCount"]), (5, 4),
+        )
+        self.assertEqual(record["evidence"]["sampleSidecarCount"], 8)
+        # The takes that completed keep their place in the matrix.
+        self.assertEqual([take["takeIndex"] for take in record["takes"]], [1, 2, 4, 5])
+        self.assertNotIn("custom/medium/warm#0", [take["cell"] for take in record["takes"]])
+        # The stall gate judged the four takes that completed, and covers them.
+        stall = manifest["stallGate"]
+        self.assertEqual(
+            (stall["gatedTakeCount"], stall["expectedTakeCount"], stall["refusedTakeCount"], stall["coversMatrix"]),
+            (4, 4, 1, True),
+        )
+        self.assertEqual(
+            [take["cell"] for take in stall["takes"]],
+            [cell for cell in self.expected_order if cell != "custom/medium/warm#0"],
+        )
+        self.assertEqual(stall["maximum"], 0)
+
+    def test_an_unmarked_refusal_fails_the_run_as_it_always_did(self) -> None:
+        def refuse(layers: dict[str, list[dict]]) -> None:
+            refuse_take(layers, 2)
+
+        result = self.run_checker(self.expected_order, mutate_layers=refuse, evidence=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("generation fixture-3 has unsuccessful finishReason='failed'", result.stdout)
+        self.assertNotIn("REFUSED", result.stdout)
+        self.assertIsNone(self.last_manifest)
+        # A log that marks another take does not excuse it either.
+        result = self.run_checker(
+            self.expected_order, mutate_layers=refuse, evidence=True, extra_args=self.marked(1),
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIsNone(self.last_manifest)
+
+    def test_refusals_above_the_allowance_fail_the_run(self) -> None:
+        result = self.run_refused(1, 2)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("2 take(s) refused by the mandatory audio check, above the allowance of 1", result.stdout)
+        self.assertIn("take 2 (custom/short/warm#0), take 3 (custom/medium/warm#0)", result.stdout)
+        self.assertIn("REFUSED 2 take(s)", result.stdout)
+        self.assertIsNone(self.last_manifest)
+        # The allowance is the lane's to widen or close.
+        result = self.run_refused(1, 2, extra_args=["--max-refused-takes", "2"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([take["takeIndex"] for take in self.last_manifest["historyRecord"]["takes"]], [1, 4, 5])
+        self.assertIn("takes.refused(2/5)", self.last_manifest["historyRecord"]["run"]["warnings"])
+        result = self.run_refused(2, extra_args=["--max-refused-takes", "0"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("above the allowance of 0", result.stdout)
+
+    def test_a_refused_take_owes_no_capture(self) -> None:
+        def planned_durations(rows: list[dict]) -> None:
+            for take_index in self.PLANNED_CAPTURES:
+                rows[take_index - 1]["outputMetrics"]["durationSeconds"] = 3.0
+
+        with tempfile.TemporaryDirectory() as temp:
+            captures = outputs = Path(temp)
+            for take_index, cell in self.PLANNED_CAPTURES.items():
+                # Take 3 is refused: the runner ended its capture early, with nothing recorded.
+                captures, outputs = self._capture_fixture(
+                    Path(temp), take_index=take_index, cell=cell, duration=3.0, no_buffers=take_index == 3,
+                )
+            arguments = ["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)]
+            result = self.run_refused(2, extra_args=arguments, mutate_engine_rows=planned_durations)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(
+                [take.get("playbackCaptureStatus") for take in self.last_manifest["historyRecord"]["takes"]],
+                [None, "captured", None, "captured"],
+            )
+            summary = json.loads((captures / "summary.json").read_text())
+            self.assertEqual((summary["armed"], summary["captured"], summary["expected"]), (True, 2, 2))
+            self.assertEqual((summary["plannedTakes"], summary["refusedTakes"]), ([2, 5], [3]))
+            self.assertEqual(summary["gate"]["failedTakes"], [])
+            # Without the refusal the same silent capture fails the lane.
+            result = self.run_checker(
+                self.expected_order, mutate_engine_rows=planned_durations, evidence=True, extra_args=arguments,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("take 3 (custom/medium/warm#0): playback capture is silent", result.stdout)
+
+    def test_a_marker_that_names_an_unknown_take_or_cell_fails(self) -> None:
+        garbage = "VOCELLO_BENCH_TAKE_REFUSED=" + base64.b64encode(b"not json").decode("ascii")
+        for name, line, reason in (
+            ("unknown take", refused_marker(9, "custom/short/warm#0"), "outside the matrix's 1..5"),
+            ("take zero", refused_marker(0, "custom/medium/cold#0"), "outside the matrix's 1..5"),
+            ("another cell", refused_marker(2, "design/short/warm#0"), "the matrix runs 'custom/short/warm#0' there"),
+            ("unknown schema", refused_marker(2, "custom/short/warm#0", schemaVersion=2), 'is not {"cell"'),
+            ("a string index", refused_marker("2", "custom/short/warm#0"), 'is not {"cell"'),
+            ("not JSON", garbage, "is not base64 JSON"),
+            ("no payload", "VOCELLO_BENCH_TAKE_REFUSED=", "carries no base64 payload"),
+        ):
+            with self.subTest(name):
+                # Every take completed: the marker alone condemns the run.
+                result = self.run_checker(self.expected_order, evidence=True, extra_args=self.log_args(line))
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(reason, result.stdout)
+                self.assertIsNone(self.last_manifest)
+        result = self.run_checker(
+            self.expected_order, evidence=True, extra_args=["--xcodebuild-log", "/nonexistent/xcodebuild.log"],
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("unreadable xcodebuild log", result.stdout)
+
+    def test_a_marked_take_must_show_the_audio_checks_refusal(self) -> None:
+        """The runner marks any failed generation; only the engine row proves a refusal."""
+        def another_failure(layers: dict[str, list[dict]]) -> None:
+            refuse_take(layers, 2)
+            layers["engine"][2]["notes"]["nativeRuntimeFailureCode"] = "runtime.failed"
+            layers["engine"][2]["notes"].pop("audioQCFlags")
+
+        def no_failure_code(layers: dict[str, list[dict]]) -> None:
+            refuse_take(layers, 2)
+            layers["engine"][2]["notes"].pop("nativeRuntimeFailureCode")
+
+        def no_rows(layers: dict[str, list[dict]]) -> None:
+            for key in ("engine", "app", "merged"):
+                layers[key].pop(2)
+
+        for name, mutate, reason in (
+            ("the take completed", None, "does not show the mandatory audio check's refusal (finishReason='completed'"),
+            ("it failed another way", another_failure, "nativeRuntimeFailureCode='runtime.failed'"),
+            ("a failure with no code", no_failure_code, "nativeRuntimeFailureCode=None"),
+            ("it left no engine row", no_rows, "take 3 (custom/medium/warm#0) is marked refused but left no engine row"),
+        ):
+            with self.subTest(name):
+                result = self.run_checker(
+                    self.expected_order, mutate_layers=mutate, evidence=True, extra_args=self.marked(2),
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(reason, result.stdout)
+                self.assertNotIn("REFUSED", result.stdout)
+                self.assertIsNone(self.last_manifest)
+
+        # The final check's refusal names itself in the audioQC report, with or without the code.
+        def final_check(layers: dict[str, list[dict]]) -> None:
+            refuse_take(layers, 2, flags="long_silence,low_level", final_check=True)
+            layers["engine"][2]["notes"].pop("nativeRuntimeFailureCode")
+
+        result = self.run_checker(
+            self.expected_order, mutate_layers=final_check, evidence=True, extra_args=self.marked(2),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.last_manifest["takes"][2]["audioQC"], {"verdict": "fail", "flags": ["long_silence", "low_level"]},
+        )
+
+    def test_a_refused_take_may_leave_no_app_or_merged_row(self) -> None:
+        def drop_frontend_rows(layers: dict[str, list[dict]]) -> None:
+            for key in ("app", "merged"):
+                layers[key].pop(2)
+
+        result = self.run_refused(2, mutate=drop_frontend_rows)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.last_manifest["takes"][2]["layerCompleteness"], {"engine": True, "app": False, "merged": False},
+        )
+        self.assertEqual(
+            {layer: detail["count"] for layer, detail in self.last_manifest["layers"].items()},
+            {"engine": 5, "app": 4, "merged": 4},
+        )
+
+        # A completed take still owes both rows.
+        def drop_a_completed_app_row(layers: dict[str, list[dict]]) -> None:
+            layers["app"].pop(0)
+
+        result = self.run_refused(2, mutate=drop_a_completed_app_row)
+        self.assertEqual(result.returncode, 75, result.stdout + result.stderr)
+
+    def test_an_app_row_that_completed_contradicts_the_refusal(self) -> None:
+        def app_completed(layers: dict[str, list[dict]]) -> None:
+            layers["app"][2]["finishReason"] = "completed"
+
+        result = self.run_refused(2, mutate=app_completed)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("reports finishReason='completed' for a take the audio check refused", result.stdout)
+
+    def test_a_refused_take_is_held_to_its_cells_seed(self) -> None:
+        """The seeds never move for a refused take: it was refused at its cell's seed."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from lib import bench_seed
+
+        def seeded(layers: dict[str, list[dict]]) -> None:
+            for row in layers["engine"]:
+                row["notes"].update({
+                    "samplingSeed": str(bench_seed.cell_seed(row["notes"]["benchCell"], "cell-hash-v2")),
+                    "samplingSeedSource": "requested", "samplingSeedPolicy": "cell-hash-v2",
+                })
+
+        arguments = ["--seed-policy", "cell-hash-v2"]
+        result = self.run_refused(2, extra_args=arguments, mutate=seeded)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.last_manifest["takes"][2]["samplingSeed"],
+            bench_seed.cell_seed("custom/medium/warm#0", "cell-hash-v2"),
+        )
+        self.assertEqual(self.last_manifest["historyRecord"]["run"]["seedPolicy"], "cell-hash-v2")
+
+        def another_seed(layers: dict[str, list[dict]]) -> None:
+            seeded(layers)
+            layers["engine"][2]["notes"]["samplingSeed"] = "42"
+
+        result = self.run_refused(2, extra_args=arguments, mutate=another_seed)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("take custom/medium/warm#0 sampled with seed '42'", result.stdout)
+
+    def test_the_take_after_a_refused_cold_take_still_follows_a_cold_take(self) -> None:
+        def flags() -> list[tuple[int, bool]]:
+            return [
+                (take["takeIndex"], take.get("followsColdTake", False))
+                for take in self.last_manifest["historyRecord"]["takes"]
+            ]
+
+        result = self.run_refused(0)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(flags(), [(2, True), (3, False), (4, False), (5, False)])
+        # The take after the cold take is refused: the next one ran third, warm.
+        result = self.run_refused(1)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(flags(), [(1, False), (3, False), (4, False), (5, False)])
+
+    # The manifest of the fixture run below, as the checker wrote it before it
+    # read refused-take markers (commit f97255ca). A run without a marker keeps
+    # these bytes; a deliberate change to the manifest's shape replaces the
+    # digest in the change that makes it.
+    MARKERLESS_MANIFEST_SHA256 = "82115a9f2802973f7e07b1f02df604a9ebc3763e7e91e346be1dd6ae3d4df573"
+
+    def test_a_run_without_markers_writes_the_manifest_it_always_wrote(self) -> None:
+        def stamp(rows: list[dict]) -> None:
+            for index, row in enumerate(rows, start=1):
+                row["recordedAt"] = f"2026-11-15T10:00:{index:02d}Z"
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        contract = ["--stall-contract", str(self.write_stall_contract(Path(temporary.name)))]
+        for name, log in (("no log", []), ("a log without a marker", self.log_args())):
+            with self.subTest(name):
+                result = self.run_checker(self.expected_order, stamp, evidence=True, extra_args=[*contract, *log])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotIn("REFUSED", result.stdout)
+                assert self.last_manifest_bytes is not None
+                self.assertEqual(
+                    hashlib.sha256(self.last_manifest_bytes).hexdigest(), self.MARKERLESS_MANIFEST_SHA256,
+                )

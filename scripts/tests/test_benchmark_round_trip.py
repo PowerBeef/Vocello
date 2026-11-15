@@ -298,6 +298,126 @@ class UICheckerRoundTripTests(unittest.TestCase):
         self.assertEqual(len(record["takes"]), 29)
         self.assertLessEqual(size, history.MAX_RECORD_BYTES)
 
+    def refused_run(self, cells: list[str], position: int, *, extra_args: tuple[str, ...] = ()) -> dict:
+        """The checker's manifest for a run whose take at 0-based `position` the audio check refused."""
+        def realistic(layers: dict[str, list[dict]]) -> None:
+            make_rows_realistic(layers["engine"])
+            mac_ui.refuse_take(layers, position)
+
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        with tempfile.TemporaryDirectory() as temporary:
+            log = mac_ui.write_marker_log(
+                Path(temporary), mac_ui.refused_marker(position + 1, cells[position]),
+            )
+            result = checker.run_checker(
+                cells, mutate_layers=realistic, evidence=True,
+                extra_args=[*extra_args, "--xcodebuild-log", str(log)],
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return checker.last_manifest
+
+    def test_a_canonical_run_with_a_refused_take_publishes_an_exploratory_record(self) -> None:
+        """RF-61, audit T5: one refused take no longer loses the other 28."""
+        cells = canonical_cells()
+        canonical_matrix = ("--modes", "custom,design,clone", "--lengths", "short,medium,long", "--warm", "3")
+        self.assertEqual(cells[12], "design/short/warm#1")       # the take the 2026-11-14 run lost
+        manifest = self.refused_run(cells, 12, extra_args=canonical_matrix)
+        record, size = publish_through_registry(manifest, screenshots=True)
+        self.assertLessEqual(size, history.MAX_RECORD_BYTES)
+        # The matrix it ran is the canonical one; the record is not canonical.
+        self.assertEqual(record["run"]["matrixScope"], "canonical")
+        self.assertEqual(record["run"]["classification"], "exploratory")
+        self.assertEqual(record["run"]["status"], "passedWithWarnings")
+        self.assertIn("takes.refused(1/29)", record["run"]["warnings"])
+        self.assertEqual(record["evidence"]["refusedCells"], [{"takeIndex": 13, "cell": "design/short/warm#1"}])
+        self.assertEqual(record["evidence"]["refusedTakeRule"], history.REFUSED_TAKE_RULE)
+        self.assertEqual(
+            (record["evidence"]["expectedTakeCount"], record["evidence"]["actualTakeCount"], len(record["takes"])),
+            (29, 28, 28),
+        )
+        self.assertEqual([take["takeIndex"] for take in record["takes"]], [*range(1, 13), *range(14, 30)])
+        by_cell = {cell["key"]: cell for cell in record["cells"]}
+        self.assertEqual(by_cell["design/short/warm"]["count"], 2)
+        self.assertEqual(by_cell["custom/short/warm"]["count"], 3)
+        self.assertEqual(history.history_take_count(record), "28 (1 refused)")
+        # Never comparable, so never a baseline; never in the chart pool, which reads canonical records.
+        self.assertFalse(record["comparison"]["comparable"])
+        self.assertIsNone(record["comparison"]["baselineRunID"])
+        self.assertFalse(history.record_is_comparable(record))
+
+        # The same run with nothing refused: its record takes no baseline from the refused one.
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        result = checker.run_checker(
+            cells, mutate_layers=lambda layers: make_rows_realistic(layers["engine"]), evidence=True,
+            extra_args=list(canonical_matrix),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        complete, _size = publish_through_registry(checker.last_manifest, screenshots=True)
+        self.assertNotIn("refusedCells", complete["evidence"])
+        # A test tree may be dirty, which alone makes a record exploratory: judge both as clean-source records.
+        clean = {"dirty": False, "fingerprintsMatch": True}
+        complete["source"].update(clean)
+        complete["run"]["classification"] = "canonical"
+        earlier = copy.deepcopy(record)
+        earlier["source"].update(clean)
+        earlier["run"]["finishedAt"] = "2026-09-19T12:05:00Z"
+        control = copy.deepcopy(complete)
+        control["run"].update(id="macos-xcui-benchmark-20260919-000000-control0", finishedAt="2026-09-19T12:05:00Z")
+        # Even under one comparison key, the refused record is no baseline; a complete one is.
+        key = history.comparison_key(complete)
+        keys = {id(complete): key, id(earlier): key, id(control): key}
+        self.assertTrue(history.record_is_comparable(complete))
+        self.assertFalse(history.record_is_comparable(earlier))
+        self.assertIsNone(history.expected_comparison_metadata(
+            complete, [(Path("earlier.json"), earlier)], keys=keys)["baselineRunID"])
+        self.assertEqual(
+            history.expected_comparison_metadata(
+                complete, [(Path("earlier.json"), earlier), (Path("control.json"), control)], keys=keys,
+            )["baselineRunID"],
+            control["run"]["id"],
+        )
+
+        # The rule is the record's own: it cannot claim a refused take and be anything but exploratory.
+        for name, mutate, reason in (
+            ("canonical", lambda item: item["run"].update(classification="canonical"), "must be exploratory"),
+            ("no rule", lambda item: item["evidence"].pop("refusedTakeRule"), "published together"),
+            ("another rule", lambda item: item["evidence"].update(refusedTakeRule="kept-canonical-v1"),
+             "schema constant"),
+            ("no cells", lambda item: item["evidence"].pop("refusedCells"), "published together"),
+            ("an uncounted take", lambda item: item["evidence"].update(expectedTakeCount=28),
+             "take counts do not match"),
+            ("a take at the refused index", lambda item: item["evidence"]["refusedCells"][0].update(takeIndex=12),
+             "less the refused takes"),
+        ):
+            with self.subTest(name):
+                tampered = copy.deepcopy(record)
+                tampered["source"].update(clean)
+                mutate(tampered)
+                with self.assertRaisesRegex(history.HistoryError, reason):
+                    history.validate_record(tampered)
+
+    def test_a_refused_take_anywhere_in_the_matrix_publishes(self) -> None:
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        cells = checker.expected_order
+        for position in range(len(cells)):
+            with self.subTest(cell=cells[position]):
+                record, _size = publish_through_registry(self.refused_run(cells, position), screenshots=True)
+                self.assertEqual(
+                    record["evidence"]["refusedCells"], [{"takeIndex": position + 1, "cell": cells[position]}],
+                )
+                self.assertEqual(
+                    [take["takeIndex"] for take in record["takes"]],
+                    [index for index in range(1, len(cells) + 1) if index != position + 1],
+                )
+                keys = {cell["key"] for cell in record["cells"]}
+                # A cell whose only repetition was refused has no aggregate.
+                self.assertEqual(keys, {cell.rsplit("#", 1)[0] for index, cell in enumerate(cells) if index != position})
+                # The take after the cold take is flagged whether or not the cold take was refused.
+                self.assertEqual(
+                    [take["takeIndex"] for take in record["takes"] if take.get("followsColdTake")],
+                    [] if position == 1 else [2],
+                )
+
     def test_ios_ui_benchmark_manifest_publishes(self) -> None:
         original = ios_ui.upgrade_rows_to_v8
 

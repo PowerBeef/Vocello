@@ -212,6 +212,87 @@ class PublicationTests(unittest.TestCase):
         self.assertIn("benchmark lane passed, but history publication failed", completed.stderr)
 
 
+CHECKER = "scripts/check_macos_ui_bench.py"
+SUMMARIZER = "scripts/summarize_generation_telemetry.py"
+REFUSED_LINE = "REFUSED 1 take(s): take 13 (design/short/warm#1)"
+
+
+class RefusedTakeLaneTests(unittest.TestCase):
+    """audit T5: a benchmark whose XCUITest passed around a refused take reaches the
+    checker with its log, and the lane's last line names what was refused."""
+
+    def validate(self, gate_output: str, *, checker_status: int = 0):
+        """`validate_macos_benchmark` and the lane's last line, over a checker that prints `gate_output`."""
+        shell = UIFunctionShell(self)
+        shell.helper(CHECKER, f"cat <<'GATE'\n{gate_output}\nGATE\nexit {checker_status}")
+        shell.helper(SUMMARIZER, "echo summary")
+        out = shell.path / "run"
+        out.mkdir()
+        (out / "xcodebuild.log").write_text(
+            'VOCELLO_BENCH_TAKE_PHASES={"cell":"design/short/warm#1","refused":true,"takeIndex":13}\n',
+            encoding="utf-8",
+        )
+        completed = shell.run(
+            ("validate_macos_benchmark", "benchmark_refused_suffix"),
+            f"ROOT_DIR={quote(shell.path)}\nout={quote(out)}\nplatform=macos\nlane=benchmark\n"
+            "NUMPY_PYTHON=python3\nrun_id=fixture-run\nmodes=custom,design,clone\nlengths=short,medium,long\n"
+            "warm=3\nlabel=\nseed_policy=cell-hash-v2\nmatrix_allocation=\nmatrix_version=\n"
+            "bench_playback_capture_dir=\nstatus=0\n"
+            "validate_macos_benchmark || status=$?\n"
+            'echo "validation=$status"\n'
+            # The lane's last line, as its PASS branch composes it.
+            'echo "$platform $lane PASS$(benchmark_refused_suffix) · $out"\n',
+        )
+        return shell, out, completed
+
+    def test_the_checker_reads_the_runs_log_and_the_last_line_names_the_refused_cells(self) -> None:
+        shell, out, completed = self.validate(
+            f"macOS UI bench gate: expected=29 engine=29 app=29 merged=29\n{REFUSED_LINE}\nPASS")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("validation=0", completed.stdout)
+        (call,) = shell.calls_to(CHECKER)
+        self.assertEqual(call[call.index("--xcodebuild-log") + 1], str(out / "xcodebuild.log"))
+        self.assertIn(REFUSED_LINE, (out / "benchmark-gate.txt").read_text(encoding="utf-8"))
+        # The refused take's phases line is kept with the others.
+        self.assertIn('"refused":true', (out / "take-phases.jsonl").read_text(encoding="utf-8"))
+        self.assertEqual(
+            completed.stdout.strip().splitlines()[-1],
+            f"macos benchmark PASS · {REFUSED_LINE} · exploratory record, never canonical · {out}",
+        )
+
+    def test_a_run_without_a_refused_take_ends_as_it_always_did(self) -> None:
+        _, out, completed = self.validate("macOS UI bench gate: expected=29 engine=29 app=29 merged=29\nPASS")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip().splitlines()[-1], f"macos benchmark PASS · {out}")
+
+    def test_a_refusal_the_checker_fails_still_fails_the_lane(self) -> None:
+        # Above the allowance, or a marked take without its audio-check evidence.
+        shell, _, completed = self.validate(f"{REFUSED_LINE}\nFAIL:\n  - 2 take(s) refused", checker_status=1)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("validation=1", completed.stdout)
+        self.assertEqual(shell.calls_to(SUMMARIZER), [])
+
+    def test_only_the_macos_benchmark_names_refused_takes(self) -> None:
+        shell = UIFunctionShell(self)
+        out = shell.path / "run"
+        out.mkdir()
+        (out / "benchmark-gate.txt").write_text(f"{REFUSED_LINE}\nPASS\n", encoding="utf-8")
+        for platform, lane, expected in (
+            ("macos", "benchmark", f" · {REFUSED_LINE} · exploratory record, never canonical"),
+            ("ios", "benchmark", ""),
+            ("macos", "perf", ""),
+            ("macos", "smoke", ""),
+        ):
+            with self.subTest(platform=platform, lane=lane):
+                completed = shell.run(
+                    ("benchmark_refused_suffix",),
+                    f"out={quote(out)}\nplatform={platform}\nlane={lane}\n"
+                    'echo "[$(benchmark_refused_suffix)]"\n',
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertEqual(completed.stdout.strip(), f"[{expected}]")
+
+
 class BenchContextFileTests(unittest.TestCase):
     """audit E11: the app reads the benchmark's current-take file in any telemetry build,
     so the perf lane clears a stale one before its first launch, as the benchmark does."""

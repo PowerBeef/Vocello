@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -485,6 +486,69 @@ class QualityPromotionTests(unittest.TestCase):
     def test_unaccepted_warning_is_rejected(self) -> None:
         with self.assertRaisesRegex(PROMOTION.PromotionError, "not explicitly accepted"):
             PROMOTION.create(self.create_args(accept_warning=[]))
+
+    def record_with_warnings(self, *warnings: str) -> None:
+        """The fixture record claiming `warnings` too. The registry's own validation is bypassed
+        by the tests that use it: they pin promotion's rule, not the shape of a warned take."""
+        self.record["run"]["warnings"] = sorted({*self.record["run"]["warnings"], *warnings})
+        self.record["digest"] = PROMOTION.benchmark_history.record_digest(self.record)
+        self.write_json(self.record_path, self.record)
+
+    def test_a_warning_family_is_accepted_by_its_prefix_and_only_by_name(self) -> None:
+        # The audio check's cadence warning carries its counts, so no exact name can be listed
+        # before a run (the Mac language record of 2026-11-16 had two of them).
+        accepted = ["memory.pressure.soft_trim", "cadence:excess", "written-output-warn"]
+        with mock.patch.object(PROMOTION.benchmark_history, "validate_record"):
+            self.record_with_warnings("cadence:excess1(1/0)", "cadence:excess2(2/0)", "written-output-warn")
+            with self.assertRaisesRegex(
+                PROMOTION.PromotionError,
+                "not explicitly accepted: --accept-warning cadence:excess --accept-warning written-output-warn",
+            ):
+                PROMOTION.create(self.create_args())
+            manifest = PROMOTION.create(self.create_args(accept_warning=accepted))
+            self.assertEqual(manifest["acceptedWarnings"], sorted(accepted))
+            path = self.root / "quality-promotion.json"
+            self.write_json(path, manifest)
+            PROMOTION.validate_manifest(self.validation_args(path))
+
+            # A manifest cannot claim a name the contract does not allow.
+            manifest["acceptedWarnings"] = sorted([*accepted, "dropout:"])
+            manifest["digest"] = PROMOTION.digest_value(
+                {key: value for key, value in manifest.items() if key != "digest"}
+            )
+            self.write_json(path, manifest)
+            with self.assertRaisesRegex(PROMOTION.PromotionError, "exceed the promotion allowlist"):
+                PROMOTION.validate_manifest(self.validation_args(path))
+
+    def test_a_warning_outside_every_family_is_refused_whatever_is_accepted(self) -> None:
+        with mock.patch.object(PROMOTION.benchmark_history, "validate_record"):
+            self.record_with_warnings("dropout:120ms")
+            with self.assertRaisesRegex(
+                PROMOTION.PromotionError, "not allowed by the promotion contract: dropout:120ms"
+            ):
+                PROMOTION.create(self.create_args(accept_warning=["memory.pressure.soft_trim", "cadence:excess"]))
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "exceed the promotion allowlist"):
+            PROMOTION.create(self.create_args(accept_warning=["memory.pressure.soft_trim", "dropout:"]))
+
+    def test_warning_families_are_validated_in_the_contract(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        self.assertEqual(PROMOTION.warning_acceptance_name(contract, "cadence:excess2(2/0)"), "cadence:excess")
+        self.assertEqual(PROMOTION.warning_acceptance_name(contract, "written-output-warn"), "written-output-warn")
+        self.assertIsNone(PROMOTION.warning_acceptance_name(contract, "cadence"))
+        self.assertIsNone(PROMOTION.warning_acceptance_name(contract, "instability-warn"))
+        for families, message in (
+            (["cadence:excess"], "map each warning prefix"),
+            ({"cadence:excess": " "}, "map each warning prefix"),
+            ({"": "reason"}, "map each warning prefix"),
+            ({"memory.pressure": "covers a listed warning"}, "must not overlap"),
+            ({"cadence:": "wide", "cadence:excess": "narrow"}, "must not overlap"),
+        ):
+            with self.subTest(families=families):
+                broken = dict(contract, allowedWarningFamilies=families)
+                with self.assertRaisesRegex(PROMOTION.PromotionError, message):
+                    PROMOTION.validate_contract(broken, root=self.root)
+        # A contract without the key is the contract as it was.
+        PROMOTION.validate_contract({k: v for k, v in contract.items() if k != "allowedWarningFamilies"}, root=self.root)
 
     def test_stale_record_is_rejected(self) -> None:
         self.rebind_record(age=timedelta(days=8))

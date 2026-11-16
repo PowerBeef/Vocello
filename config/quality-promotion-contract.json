@@ -8,8 +8,12 @@
   "publicPromotionPolicy": "source-bound-quality-evidence",
   "maxEvidenceAgeSeconds": 604800,
   "allowedWarnings": [
-    "memory.pressure.soft_trim"
+    "memory.pressure.soft_trim",
+    "written-output-warn"
   ],
+  "allowedWarningFamilies": {
+    "cadence:excess": "The audio check counted more pauses in a passing take than its script's punctuation predicts. Advisory: unusual, not defective (maintainer decision 2026-11-16). The name carries the counts, so it is accepted by this prefix."
+  },
   "platformMinimumEvidence": {
     "macos": [
       "macos-ui-benchmark"

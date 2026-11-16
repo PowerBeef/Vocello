@@ -119,6 +119,16 @@ def validate_contract(contract: dict[str, Any], *, root: Path = ROOT) -> None:
         not isinstance(item, str) or not item for item in warnings
     ):
         raise PromotionError("allowedWarnings must be a unique string array")
+    families = contract.get("allowedWarningFamilies", {})
+    if not isinstance(families, dict) or any(
+        not isinstance(prefix, str) or not prefix or not isinstance(reason, str) or not reason.strip()
+        for prefix, reason in families.items()
+    ):
+        raise PromotionError("allowedWarningFamilies must map each warning prefix to its recorded reason")
+    # One warning has one name: a family may not cover a listed warning or another family.
+    names = [*warnings, *families]
+    if any(other != prefix and other.startswith(prefix) for prefix in families for other in names):
+        raise PromotionError("allowedWarningFamilies must not overlap a listed warning or another family")
     definitions = contract.get("evidence")
     if not isinstance(definitions, dict) or not definitions:
         raise PromotionError("quality promotion evidence definitions are missing")
@@ -610,6 +620,23 @@ def validate_take_coverage(identity: str, record: dict[str, Any], definition: di
         )
 
 
+def allowed_warning_names(contract: dict[str, Any]) -> set[str]:
+    """Every name `--accept-warning` may give: a listed warning, or a family's prefix."""
+    return set(contract["allowedWarnings"]) | set(contract.get("allowedWarningFamilies", {}))
+
+
+def warning_acceptance_name(contract: dict[str, Any], warning: str) -> str | None:
+    """The name a record's warning is accepted under: itself when the contract lists it, the
+    prefix of the family it belongs to, or None when the contract allows neither. A family covers
+    warnings whose names carry measured values (`cadence:excess2(2/0)`), which no exact list can
+    name before the run."""
+    if warning in contract["allowedWarnings"]:
+        return warning
+    return next(
+        (prefix for prefix in contract.get("allowedWarningFamilies", {}) if warning.startswith(prefix)), None
+    )
+
+
 def validate_record(
     identity: str, record: dict[str, Any], definition: dict[str, Any], release: dict[str, Any],
     commit: str, accepted_warnings: set[str], contract: dict[str, Any], now: datetime,
@@ -658,11 +685,19 @@ def validate_record(
                 "release (or the maintainer accepts the difference by name: create "
                 "--accept-toolchain-difference \"REASON\")"
             )
-    warnings = set(run.get("warnings") or [])
-    if warnings - set(contract["allowedWarnings"]):
-        raise PromotionError(f"{identity} uses warnings not allowed by the promotion contract")
-    if warnings - accepted_warnings:
-        raise PromotionError(f"{identity} has warnings that were not explicitly accepted")
+    warnings = sorted(set(run.get("warnings") or []))
+    names = {warning: warning_acceptance_name(contract, warning) for warning in warnings}
+    refused = [warning for warning in warnings if names[warning] is None]
+    if refused:
+        raise PromotionError(
+            f"{identity} uses warnings not allowed by the promotion contract: {', '.join(refused)}"
+        )
+    unaccepted = sorted({name for name in names.values() if name is not None and name not in accepted_warnings})
+    if unaccepted:
+        raise PromotionError(
+            f"{identity} has warnings that were not explicitly accepted: --accept-warning "
+            + " --accept-warning ".join(unaccepted)
+        )
     finished = parse_time(run.get("finishedAt"), f"{identity}.run.finishedAt")
     age = (now - finished).total_seconds()
     if age < -300 or age > contract["maxEvidenceAgeSeconds"]:
@@ -749,7 +784,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     if missing or extra:
         raise PromotionError(f"promotion evidence set differs from required set: missing={missing} extra={extra}")
     accepted = set(args.accept_warning)
-    if accepted - set(contract["allowedWarnings"]):
+    if accepted - allowed_warning_names(contract):
         raise PromotionError("accepted warnings exceed the promotion allowlist")
     now = datetime.now(timezone.utc).replace(microsecond=0)
     contract_digest = digest_value(contract)
@@ -867,6 +902,8 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     accepted = manifest.get("acceptedWarnings")
     if not isinstance(accepted, list) or accepted != sorted(set(accepted)):
         raise PromotionError("quality promotion accepted warnings are malformed")
+    if set(accepted) - allowed_warning_names(contract):
+        raise PromotionError("quality promotion accepted warnings exceed the promotion allowlist")
     lanes = manifest.get("lanes")
     if not isinstance(lanes, dict) or sorted(lanes) != required:
         raise PromotionError("quality promotion lane set is incomplete")

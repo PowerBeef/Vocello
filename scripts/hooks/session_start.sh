@@ -50,7 +50,7 @@ public_links() {
 }
 
 cache_health() {
-  local links link kind dangling="" unbuilt="" count=0 available_kb notes=""
+  local links link kind dangling="" unbuilt="" count=0 available_kb notes="" df_deadline
   links="$(public_links)"
   [[ -n "$links" ]] || links="$(printf '%s\n' build/vocello build/Vocello.app)"
   while IFS=$'\t' read -r link kind; do
@@ -71,7 +71,12 @@ EOF
     notes="$notes (a lost Xcode build arena: the next native build is cold, never a measurement)"
   fi
   # POSIX df output; Available is the field before the Capacity percentage, whatever the device name holds.
-  available_kb="$(with_deadline 2 df -Pk . \
+  # Two seconds bound the probe. The hook's tests raise the bound through the environment: their
+  # stand-in df is a script written a moment earlier, whose first run has taken over two seconds
+  # on this Mac about one time in five (BKL-71), and what they pin is the report, not the bound.
+  df_deadline="${QVOICE_SESSION_START_DF_DEADLINE:-2}"
+  case "$df_deadline" in ''|*[!0-9]*|0*|???*) df_deadline=2 ;; esac
+  available_kb="$(with_deadline "$df_deadline" df -Pk . \
     | awk 'NR == 2 { for (i = 2; i <= NF; i++) if ($i ~ /^[0-9]+%$/) { print $(i - 1); exit } }')"
   case "$available_kb" in
     ''|*[!0-9]*)

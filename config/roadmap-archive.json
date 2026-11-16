@@ -6130,6 +6130,27 @@
         "BKL-30"
       ],
       "supersededBy": "BKL-71"
+    },
+    {
+      "id": "BKL-71",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The session-start hook's free-space test fails now and then",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.",
+      "sourceOfTruth": [
+        "scripts/hooks/session_start.sh",
+        "scripts/tests/test_agent_hooks.py"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated. Closed 2026-11-16: the hook reads its df bound from QVOICE_SESSION_START_DF_DEADLINE (1 to 99 seconds, default 2) and the tests that pin its report raise it; the hook's own bound is unchanged and now has a test of its own. The test passed 50 solo runs in a row and five runs of the parallel suite; before, it failed about one run in five at the two-second bound, on a quiet Mac as well as a loaded one. Why the stand-in df's first run is sometimes that slow is not identified.",
+      "legacyIds": [
+        "BKL-40"
+      ],
+      "evidence": [
+        "file:scripts/hooks/session_start.sh",
+        "file:scripts/tests/test_agent_hooks.py"
+      ]
     }
   ]
 }

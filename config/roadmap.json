@@ -2427,24 +2427,6 @@
       "notes": "Parked 2026-11-11 from the phone window: device_diagnostics_env_json forwards every QVOICE_* and QWENVOICE_* variable, which includes the absolute build-output paths that scripts/lib/build_paths.sh exports and QVOICE_WORKER_SESSION. They reach only the development app's environment on the maintainer's own phone; no file or record was seen to carry them. Not investigated."
     },
     {
-      "id": "BKL-71",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The session-start hook's free-space test fails now and then",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes 50 times in a row on a loaded Mac, or the probe's deadline is explained.",
-      "sourceOfTruth": [
-        "scripts/hooks/session_start.sh",
-        "scripts/tests/test_agent_hooks.py"
-      ],
-      "updated": "2026-11-11",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated.",
-      "legacyIds": [
-        "BKL-40"
-      ]
-    },
-    {
       "id": "BKL-73",
       "plan": "post-3-0-backlog-2026-10",
       "title": "A cancelled explicit prewarm unloads the model",

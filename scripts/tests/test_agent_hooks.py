@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1596,8 +1597,13 @@ class SessionStartTests(unittest.TestCase):
                         self.assertIn("cache health: ", result.stdout)
                         self.assertFalse((root / "unexpected-operation").exists())
 
-    def session(self, root: Path, progress: str, *, available_kb: int = 400 * 1024 * 1024) -> str:
-        """The hook's output in a fixture checkout whose volume reports `available_kb` free."""
+    def session(self, root: Path, progress: str, *, available_kb: int = 400 * 1024 * 1024,
+                df_seconds: int = 0, df_deadline: str | None = "12") -> str:
+        """The hook's output in a fixture checkout whose volume reports `available_kb` free.
+
+        The stand-in df is a script written here, and its first run has outlasted the hook's
+        two-second bound about one time in five on a quiet Mac (BKL-71). These tests pin what
+        the hook reports, so they raise the bound; `df_deadline=None` leaves the hook's own."""
         hooks = fixture_hooks(root)
         (root / "docs").mkdir(exist_ok=True)
         (root / "docs/development-progress.md").write_text(progress, encoding="utf-8")
@@ -1606,13 +1612,21 @@ class SessionStartTests(unittest.TestCase):
         fake_bin = root / "bin"
         fake_bin.mkdir(exist_ok=True)
         df = fake_bin / "df"
-        df.write_text("#!/bin/sh\necho 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"
-                      f"echo 'map volume 900000000 1 {available_kb} 99% /Volumes/Fixture Disk'\n")
+        # One process, as the real df is: the hook's alarm ends the probe by ending that
+        # process, and a child left holding the pipe would keep the hook reading past it.
+        df.write_text("#!/usr/bin/perl\n"
+                      f"sleep {df_seconds};\n"
+                      'print "Filesystem 1024-blocks Used Available Capacity Mounted on\\n";\n'
+                      f'print "map volume 900000000 1 {available_kb} 99% /Volumes/Fixture Disk\\n";\n')
         df.chmod(0o755)
         shell = "/bin/bash" if Path("/bin/bash").exists() else "bash"   # macOS: the system bash 3.2
+        environment = dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}")
+        environment.pop("QVOICE_SESSION_START_DF_DEADLINE", None)
+        if df_deadline is not None:
+            environment["QVOICE_SESSION_START_DF_DEADLINE"] = df_deadline
         result = subprocess.run([shell, str(hooks / "session_start.sh")],
-                                cwd=root, env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
-                                capture_output=True, text=True, timeout=15)
+                                cwd=root, env=environment,
+                                capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
@@ -1665,6 +1679,21 @@ class SessionStartTests(unittest.TestCase):
             (root / "build/fixture-cli").unlink()
             output = self.session(root, "## Resume now\n### Current\nCheckpoint\n")
             self.assertIn("cache health: ok (400 GiB free; no public build link dangles)", output)
+
+    def test_the_free_space_probe_keeps_its_two_second_bound(self):
+        # BKL-71: the tests raise the bound; the hook's own stays two seconds, and a value that
+        # is not a whole number of seconds from 1 to 99 changes nothing.
+        progress = "## Resume now\n### Current\nCheckpoint\n"
+        for deadline in (None, "", "0", "soon", "-5", "100"):
+            with self.subTest(deadline=deadline), tempfile.TemporaryDirectory() as temp:
+                started = time.monotonic()
+                output = self.session(Path(temp), progress, df_seconds=6, df_deadline=deadline)
+                self.assertIn("cache health: WARN free space unknown", output)
+                self.assertLess(time.monotonic() - started, 5.5, "the probe outlived its bound")
+        with tempfile.TemporaryDirectory() as temp:
+            # A slow answer inside a raised bound is read.
+            output = self.session(Path(temp), progress, df_seconds=3, df_deadline="12")
+            self.assertIn("cache health: ok (400 GiB free", output)
 
     def test_a_dangling_optional_link_is_an_unbuilt_trial_not_a_lost_arena(self):
         # B12: build/vocello-enhanced-security dangled as a leftover of the Enhanced Security trial

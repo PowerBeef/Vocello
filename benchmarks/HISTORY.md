@@ -1135,6 +1135,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-02 | [`mac-lang-bench-20260902-024501-bd2df074`](runs/language/mac-lang-bench-20260902-024501-bd2df074.json) | partial | exploratory | passedWithWarnings | qualified-with-warnings | 19 | — | `f7600f678425` dirty | `excluded` | baseline | av08-mac-full-20260901 |
 
+## language / macos / mac-mini-m6-16gb / config `a15677ea8b87`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-16 | [`mac-lang-bench-20261116-143641-abf41ae2`](runs/language/mac-lang-bench-20261116-143641-abf41ae2.json) | focused | focused | passedWithWarnings | qualified | 23 | 0.29 | `047a125b84f3` | `a15677ea8b87` | baseline | mac-lang-bench-20261116-143641-abf41ae2 |
+
 ## language / macos / mac-mini-m6-16gb / config `da2ede623b98`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

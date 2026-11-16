@@ -645,7 +645,16 @@ class DerivationTests(unittest.TestCase):
     """audit #34, #78: ceilings derived from counted runs, reproducibly."""
 
     def setUp(self):
-        self.base = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
+        # The shipped contract with nothing enforced and ceilings on the confirmatory scenarios
+        # only: these tests are about the derivation, whatever the shipped contract enforces today.
+        shipped = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
+        confirmatory = shipped["confirmatoryScenarios"]
+        self.base = {
+            **shipped,
+            "enforce": [],
+            "hitchCeilingMSPerS": {name: shipped["hitchCeilingMSPerS"][name] for name in confirmatory},
+            "maxGapCeilingMS": {name: shipped["maxGapCeilingMS"][name] for name in confirmatory},
+        }
 
     # The baseline-v3 M2 ceilings (2026-09-15) the contract carried until the
     # M6 re-derivation of 2026-09-27; the v3 rule must still reproduce them.
@@ -726,8 +735,10 @@ class DerivationTests(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 paths.append(str(path))
             output = root / "derived.json"
+            base = root / "base.json"
+            base.write_text(json.dumps(self.base))
             with mock.patch.object(sys, "argv", ["check_macos_ui_perf.py", "--derive-thresholds", *paths,
-                                                 "--write", str(output)]):
+                                                 "--thresholds", str(base), "--write", str(output)]):
                 self.assertEqual(checker.main(), 0)
             derived = checker.load_thresholds(output)
         self.assertEqual(derived["calibrationProfile"], "mac-mini-m6-16gb")
@@ -816,10 +827,21 @@ class ThresholdsContractTests(unittest.TestCase):
             # RF-61: the History filter over 700 rows, uncalibrated like history-filter.
             "history-filter-paged",
         })
-        self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]))
-        # RF-61: the field exists and is documented in the contract; nothing is enforced
-        # until the ceilings are re-derived.
-        self.assertEqual(contract["enforce"], [])
+        # RF-61 (calibration of 2026-11-15): ceilings also cover the History scenarios, the window
+        # resize and navigation with warms; four confirmatory scenarios and both History filters
+        # fail a run. The delivery menu is confirmatory and deliberately not enforced.
+        self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]) | {
+            "history-filter", "history-filter-paged", "history-scroll", "window-resize",
+            "sidebar-navigation-warms",
+        })
+        self.assertEqual(contract["enforce"], [
+            "idle-baseline", "sidebar-navigation", "settings-scroll", "composer-typing",
+            "history-filter", "history-filter-paged",
+        ])
+        self.assertEqual(
+            (contract["hitchCeilingMSPerS"]["delivery-menu"], contract["maxGapCeilingMS"]["delivery-menu"]),
+            (89.0, 150.0), "the September ceiling stays until the menu's slowdown is explained",
+        )
         self.assertIn("enforce", contract["enforceDescription"])
         self.assertIs(contract["warnOnly"], True)
 

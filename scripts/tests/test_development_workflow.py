@@ -149,11 +149,23 @@ class CheckPlanTests(unittest.TestCase):
                             "qv_stub ensure_project_regenerated\nqv_stub ensure_spm_resolved\n"
                             "qv_stub require_ios_xcode_platform\n"
                         ),
+                        "scripts/lib/dev_signing.sh": (
+                            "resolve_dev_signing_identity() { echo 'Apple Development: Fixture (ABCDE12345)'; }\n"
+                        ),
                     })
                     sandbox.executable("scripts/ui_test.sh")
                     completed = sandbox.run_script(mode, *gate)
                     self.assertEqual(completed.returncode, 0, completed.stderr)
                     builds = sandbox.calls_to("xcb_run")
+                    # BKL-19: the lane-arena compile re-signs the lane's app, so it signs as the
+                    # lane does; the gate arena keeps the deterministic build's ad hoc signature.
+                    for build in builds:
+                        if "VocelloMacUI" in build:
+                            self.assertIn(
+                                "CODE_SIGN_IDENTITY=-" if gate else
+                                "CODE_SIGN_IDENTITY=Apple Development: Fixture (ABCDE12345)",
+                                build,
+                            )
                     # Every Xcode invocation is a compile that stops: no test action runs anything.
                     self.assertEqual({build[0] for build in builds}, {"build-for-testing"})
                     for build in builds:

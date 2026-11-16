@@ -477,6 +477,7 @@ identities matter:
 | Build | Identity | Hardened runtime | TCC stability |
 |---|---|---|---|
 | `build.sh build`/`run` (dev) | auto-detected **Apple Development** cert (fallback: ad-hoc + warning) | OFF (lldb-friendly) | **Stable** — grants survive rebuilds |
+| `ui_test.sh macos …` (UI lanes) | the same **Apple Development** cert (fallback: ad-hoc; a run that reaches Speech Recognition then stops in its preflight) | project default | **Stable**, and shared with the dev build: one designated requirement |
 | `release.sh` (default) | ad-hoc, re-signed from scratch | ON (`--options runtime`) | n/a (packaging check only) |
 | `release.sh --signing-mode developer-id` / CI | **Developer ID Application** | ON | **Stable** for end users |
 
@@ -529,17 +530,24 @@ identities matter:
   place when a build interrupted between Xcode's Info.plist rewrite and its CodeSign step left
   it invalid (launchd otherwise refuses to spawn it: "Runningboard has returned error 5" with
   zero tests executed); the repair drops the UI-build fingerprint so the next lane rebuilds it.
-- **UI-lane builds are ad-hoc signed** (`scripts/ui_test.sh` builds with
-  `CODE_SIGN_IDENTITY="-"`), so they never match the dev identity's TCC grant: any *real*
-  microphone request from a lane-built app prompts fresh, and answering it re-keys the row to that
-  build's throwaway identity (the next real-mic use of the dev-signed app may then prompt once —
-  grant it; stable signing keeps it). In practice lane builds only reach the real-mic path when the
-  virtual-microphone fixture is broken, which the smoke suite asserts explicitly. Speech
-  Recognition has no such fixture: on 2026-10-18 the smoke journey `test08` asked for it at its
-  save-voice step after a lane rebuild, and the unanswered dialog covered the window, so `test12`,
-  `test13` and `test14` failed on controls that were not hittable until a human answered it
-  (BKL-19, parked). The TCC part of the lane's `ui-preflight` is advisory: it checks TCC row
-  existence per bundle id and cannot see this identity mismatch.
+- **UI-lane builds are signed with the development identity** (BKL-19). `scripts/ui_test.sh`
+  builds the lane's app, test bundle and runner with the identity `build.sh` uses, so the lane's
+  app and the development app share one designated requirement and one set of privacy grants:
+  answer the Speech Recognition prompt once and it holds across rebuilds. The identity is part
+  of the lane's build fingerprint (as a digest), so changing it rebuilds and re-signs, and
+  `scripts/build_ui_test_bundles.sh`, whose default compile writes into the lane's own build
+  folder, signs with the same identity so a routed check cannot swap the signature under the
+  lane. Until 2026-11-16 these builds were ad hoc signed: macOS then ties a grant to one
+  build's code hash, every rebuild asked again, and Speech Recognition has no fixture, so the
+  unanswered dialog covered the window and the journeys behind it timed out (2026-10-18, and
+  twice on the 3.1 release tree). Without an Apple Development certificate the lanes still
+  sign ad hoc: a run that reaches Speech Recognition (the full smoke lane, and its
+  `design-enrollment` and `clone-reference` scenarios) then stops in `ui-preflight` with the
+  cause named, unless `QVOICE_UI_ALLOW_ADHOC_SIGNING=1` says someone is there to answer the
+  dialog; other lanes warn and run. The first run after the change may ask once, because the
+  row left by an ad hoc build does not match the new signature. The TCC part of `ui-preflight`
+  stays advisory: it checks that a row exists per bundle id and cannot see which identity the
+  row belongs to.
 
 ### Permission map (which process touches what)
 

@@ -28,6 +28,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 # shellcheck source=lib/build_cache.sh
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
+# shellcheck source=lib/dev_signing.sh
+. "$ROOT_DIR/scripts/lib/dev_signing.sh"
 
 USAGE="usage: ./scripts/build_ui_test_bundles.sh [macos|ios|all] [--gate]"
 MODE="all"
@@ -95,9 +97,12 @@ if [[ "$MODE" == "macos" || "$MODE" == "all" ]]; then
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       "${QVOICE_OWNED_DEV_SETTINGS[@]}"
   else
-    # The same settings as scripts/ui_test.sh's macOS build-for-testing.
+    # The same settings as scripts/ui_test.sh's macOS build-for-testing, its signing identity
+    # included: this compile re-signs the lane's app in the lane's own arena, and an ad hoc
+    # signature here would cost the lane its Speech Recognition grant (BKL-19).
+    lane_identity="$(resolve_dev_signing_identity)"
     build VocelloMacUI "platform=macOS,arch=arm64" "$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED" \
-      CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+      CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="${lane_identity:--}" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       SWIFT_OPTIMIZATION_LEVEL=-O
   fi

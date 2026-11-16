@@ -570,10 +570,10 @@ export_attachments() {
 # (docs/reference/macos-app-guide.md); never blocks the lane. Degrades
 # gracefully when the terminal lacks Full Disk Access to read the TCC database.
 # Known limitation: this checks row EXISTENCE for the bundle id only — TCC keys
-# grants to bundle id + code identity, and the lane's ad-hoc-signed app may not
-# match an existing row, so a prompt can still appear despite a decided row.
-# That path is only reachable when the virtual-microphone fixture is broken;
-# the smoke suite asserts the fixture explicitly.
+# grants to bundle id + code identity, so a row left by another identity (an ad
+# hoc build, the installed release) does not match the lane's app, and a prompt
+# can still appear once despite a decided row. The lane's app is signed with the
+# development identity, so one answer then lasts across rebuilds.
 # Whether the benchmark lane arms played-audio capture (PC-01). The runner needs
 # its own System Audio Recording grant; on macOS 27 the first process tap raises
 # that prompt and blocks the runner until it is answered, so an unattended run
@@ -693,9 +693,34 @@ ensure_ios_candidate_runner_signature() {
     --generate-entitlement-der "$runner" && codesign --verify --deep --strict "$runner"
 }
 
+# The identity the macOS lanes sign their app, test bundle and runner with: the development
+# identity (scripts/lib/dev_signing.sh), ad hoc ("-") when the keychain has none.
+mac_lane_signing_identity() {
+  local identity
+  identity="$(resolve_dev_signing_identity)"
+  printf '%s\n' "${identity:--}"
+}
+
+# Whether this run reaches Speech Recognition, which has no fixture: the full smoke lane and
+# the two smoke scenarios that open a reference or save a voice.
+mac_lane_requests_speech_recognition() {
+  [[ "$lane" == "smoke" ]] || return 1
+  [[ -z "$scenario_argument" || "$scenario_argument" == "design-enrollment" \
+      || "$scenario_argument" == "clone-reference" ]]
+}
+
 mac_ui_preflight() {
   local tcc_db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
   local svc rows automation console
+  # An ad hoc signed lane app is asked for Speech Recognition again after every rebuild, and the
+  # dialog covers the window until someone answers it (BKL-19). A run that reaches it cannot
+  # finish unattended, so it stops here, before the build, unless someone is there to answer.
+  if [[ "$(mac_lane_signing_identity)" == "-" ]]; then
+    if mac_lane_requests_speech_recognition && [[ "${QVOICE_UI_ALLOW_ADHOC_SIGNING:-0}" != "1" ]]; then
+      die "ui-preflight: no Apple Development signing identity, so the lane's app would be signed ad hoc and macOS would ask for Speech Recognition after every rebuild, covering the window mid-run. Install one (Xcode, Settings, Accounts, Manage Certificates) or set QWENVOICE_DEV_SIGNING_IDENTITY; QVOICE_UI_ALLOW_ADHOC_SIGNING=1 runs it attended, with someone to answer the dialog"
+    fi
+    warn "ui-preflight: no Apple Development signing identity; the lane's app is signed ad hoc and its privacy grants last one build (docs/reference/macos-app-guide.md)"
+  fi
   # XCUITest drives the app through macOS Automation Mode. Where enabling it
   # needs authentication, an unattended run times out "enabling automation
   # mode" after the build instead of testing; a locked session cannot be
@@ -716,7 +741,7 @@ mac_ui_preflight() {
       continue
     fi
     if [[ -z "$rows" ]]; then
-      warn "ui-preflight: no $svc decision recorded for com.qwenvoice.app — a system permission dialog may appear mid-run; settle it once (docs/reference/macos-app-guide.md). Note: an existing row keyed to a different code identity can still prompt for the ad-hoc lane build."
+      warn "ui-preflight: no $svc decision recorded for com.qwenvoice.app — a system permission dialog may appear mid-run; settle it once (docs/reference/macos-app-guide.md). Note: a row keyed to another code identity (an ad hoc build, the installed release) still prompts once for this one."
     fi
   done
   # Played-audio capture (PC-01): the XCUITest runner taps the app's output and
@@ -1747,6 +1772,14 @@ elif [[ "$platform" == "macos" ]]; then
   mac_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)"
   # An Xcode update changes the binary with no source change.
   mac_fingerprint="$mac_fingerprint|$(xcodebuild -version 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+  # The lane's app is signed as the development app is (scripts/lib/dev_signing.sh). macOS keys
+  # a privacy grant to the bundle id and the code's designated requirement: a stable Apple
+  # Development identity keeps that requirement across rebuilds, while an ad hoc signature
+  # derives it from one build's code hash, so every rebuild asked for Speech Recognition again
+  # and the unanswered dialog covered the window (BKL-19). The identity is part of the
+  # fingerprint, as a digest, so a change of identity rebuilds and re-signs.
+  mac_signing_identity="$(mac_lane_signing_identity)"
+  mac_fingerprint="$mac_fingerprint|sign:$(printf '%s' "$mac_signing_identity" | shasum -a 256 | awk '{print $1}')"
   mac_build_marker="$MAC_DERIVED/.vocello-ui-build-fingerprint"
   mac_products_ready="$(find "$MAC_DERIVED/Build/Products" -maxdepth 1 \
     -name 'VocelloMacUI_*.xctestrun' -print -quit 2>/dev/null || true)"
@@ -1762,7 +1795,7 @@ elif [[ "$platform" == "macos" ]]; then
       -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
       -disableAutomaticPackageResolution \
       -onlyUsePackageVersionsFromResolvedFile \
-      CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+      CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$mac_signing_identity" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
       SWIFT_OPTIMIZATION_LEVEL=-O \
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"

@@ -431,5 +431,59 @@ class BenchContextFileTests(unittest.TestCase):
         self.assertFalse(self.cleared_before_preflight(self.run_until_preflight("smoke", "--scenario", "layout")))
 
 
+class MacLaneSigningTests(unittest.TestCase):
+    """BKL-19: the macOS lanes sign their app with the development identity, so a Speech
+    Recognition grant survives rebuilds, and a run that would be signed ad hoc and reaches
+    that prompt stops before its build with the cause named."""
+
+    FUNCTIONS = ("mac_lane_signing_identity", "mac_lane_requests_speech_recognition", "mac_ui_preflight")
+    # The preflight's other probes, answered as a Mac with nothing to report would.
+    PROBES = (
+        "automationmodetool() { :; }\nioreg() { :; }\nplutil() { :; }\nsqlite3() { return 1; }\n"
+    )
+
+    def preflight(self, identity: str, lane: str, scenario: str = "", *, env: dict[str, str] | None = None):
+        shell = UIFunctionShell(self)
+        return shell.run(
+            self.FUNCTIONS,
+            f"resolve_dev_signing_identity() {{ printf '%s\\n' {quote(identity)}; }}\n" + self.PROBES
+            + f"lane={quote(lane)}\nscenario_argument={quote(scenario)}\n"
+            'echo "identity=$(mac_lane_signing_identity)"\nmac_ui_preflight\necho preflight-passed\n',
+            env=env,
+        )
+
+    def test_the_lane_signs_with_the_development_identity_and_falls_back_to_ad_hoc(self) -> None:
+        completed = self.preflight("Apple Development: Fixture (ABCDE12345)", "smoke")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("identity=Apple Development: Fixture (ABCDE12345)", completed.stdout)
+        self.assertIn("preflight-passed", completed.stdout)
+        self.assertNotIn("ad hoc", completed.stderr)
+        # A resolver that answers nothing (a stand-in, a broken keychain) is ad hoc, never empty.
+        completed = self.preflight("", "perf")
+        self.assertIn("identity=-", completed.stdout)
+
+    def test_an_ad_hoc_run_that_reaches_speech_recognition_stops_with_the_cause(self) -> None:
+        for scenario in ("", "design-enrollment", "clone-reference"):
+            with self.subTest(scenario=scenario):
+                completed = self.preflight("-", "smoke", scenario)
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertNotIn("preflight-passed", completed.stdout)
+                self.assertIn("no Apple Development signing identity", completed.stderr)
+                self.assertIn("Speech Recognition", completed.stderr)
+                self.assertIn("QVOICE_UI_ALLOW_ADHOC_SIGNING=1", completed.stderr)
+
+    def test_an_ad_hoc_run_elsewhere_or_attended_only_warns(self) -> None:
+        cases = (
+            ("perf", "", None), ("benchmark", "", None), ("smoke", "layout", None), ("smoke", "long-form", None),
+            ("smoke", "", {"QVOICE_UI_ALLOW_ADHOC_SIGNING": "1"}),
+        )
+        for lane, scenario, env in cases:
+            with self.subTest(lane=lane, scenario=scenario, attended=env is not None):
+                completed = self.preflight("-", lane, scenario, env=env)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertIn("preflight-passed", completed.stdout)
+                self.assertIn("signed ad hoc and its privacy grants last one build", completed.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

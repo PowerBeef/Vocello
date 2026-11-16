@@ -189,6 +189,12 @@ Nothing is owed before the push.
   until then. The deterministic test build still signs the app ad hoc in the development
   arena, so `build/Vocello.app` is ad hoc after any `dev.sh test`; launching that copy and
   reaching Speech Recognition would re-key the grant away from the lane's app.
+- **BKL-71 is fixed and closed** (the session-start hook's free-space test, which failed the
+  routed check twice on November 16 and would have run in the release commit's CI): the
+  tests raise the probe's bound through the environment, the hook's own two seconds are
+  unchanged and now tested, 50 solo runs and five parallel-suite runs pass. This is a commit
+  outside docs after the last smoke run, so the UI lanes rebuild the app once more; under
+  the new signing that should bring no prompt, and the app's sources are unchanged.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

@@ -282,6 +282,29 @@ final class GenerationHistoryPageTests: XCTestCase {
         )
     }
 
+    func testANarrowedPageThatLandsOverANewerChangeIsFollowedByARead() {
+        typealias Request = GenerationHistoryPageRequest
+        let clone = Request(mode: "clone")
+        let design = Request(mode: "design")
+        XCTAssertTrue(
+            Request.landedPageNeedsRead(landed: clone, hasMoreItems: false, current: design, followUpPending: false),
+            "the regression: the clone rows, filtered to design, showed No matches until the next change"
+        )
+        XCTAssertFalse(
+            Request.landedPageNeedsRead(landed: clone, hasMoreItems: false, current: design, followUpPending: true),
+            "a read is already queued behind it"
+        )
+        XCTAssertFalse(Request.landedPageNeedsRead(landed: clone, hasMoreItems: false, current: clone, followUpPending: false))
+        XCTAssertFalse(
+            Request.landedPageNeedsRead(landed: Request(), hasMoreItems: false, current: design, followUpPending: false),
+            "the whole archive landed: the change is answered from its rows"
+        )
+        XCTAssertTrue(
+            Request.landedPageNeedsRead(landed: Request(), hasMoreItems: true, current: design, followUpPending: false),
+            "more rows match beyond the page that landed"
+        )
+    }
+
     private func row(
         _ text: String,
         mode: String = "custom",

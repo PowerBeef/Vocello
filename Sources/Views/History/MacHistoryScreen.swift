@@ -807,24 +807,37 @@ private extension MacHistoryScreen {
 
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    items = loadedItems
-                    loadedRequest = request
-                    hasMoreItems = hasMore
-                    archiveCount = count
-                    // In this same update, not through `itemsRevision`: the page and its
-                    // sections reach the list in one pass (RF-61). A page overtaken by a newer
-                    // search, filter or sort waits for the read queued behind it.
-                    if GenerationHistoryPageRequest.showsLandedPage(
-                        landed: request, current: currentPageRequest(),
+                    let current = currentPageRequest()
+                    if GenerationHistoryPageRequest.landedPageNeedsRead(
+                        landed: request, hasMoreItems: hasMore, current: current,
                         followUpPending: reloadCoalescer.followUpPending
                     ) {
-                        recomputeFilteredItems()
+                        // This page was read for inputs the user has since changed, the change
+                        // was answered in memory, and these rows cannot answer it (RF-61). The
+                        // page is not adopted: the rows on screen and the session cache keep
+                        // describing the archive they came from, and the read for the current
+                        // inputs follows this one (it is still the current read).
+                        reloadHistory(reconciling: false)
+                    } else {
+                        items = loadedItems
+                        loadedRequest = request
+                        hasMoreItems = hasMore
+                        archiveCount = count
+                        // In this same update, not through `itemsRevision`: the page and its
+                        // sections reach the list in one pass (RF-61). A page overtaken by a
+                        // newer search, filter or sort waits for the read queued behind it.
+                        if GenerationHistoryPageRequest.showsLandedPage(
+                            landed: request, current: current,
+                            followUpPending: reloadCoalescer.followUpPending
+                        ) {
+                            recomputeFilteredItems()
+                        }
+                        MacHistorySessionCache.items = loadedItems
+                        MacHistorySessionCache.pageLimit = request.limit
+                        MacHistorySessionCache.loadedRequest = request
+                        MacHistorySessionCache.hasMoreItems = hasMore
+                        MacHistorySessionCache.archiveCount = count
                     }
-                    MacHistorySessionCache.items = loadedItems
-                    MacHistorySessionCache.pageLimit = request.limit
-                    MacHistorySessionCache.loadedRequest = request
-                    MacHistorySessionCache.hasMoreItems = hasMore
-                    MacHistorySessionCache.archiveCount = count
                     loadError = nil
                     databaseUnavailable = false
                     isLoading = false

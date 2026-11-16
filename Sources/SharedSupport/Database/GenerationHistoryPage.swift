@@ -81,6 +81,20 @@ struct GenerationHistoryPageRequest: Equatable, Sendable {
         landed == current || !followUpPending
     }
 
+    /// Whether a page that just landed must be followed by a read for the current inputs
+    /// (RF-61). A change made while the whole archive was loaded is answered in memory and
+    /// queues no read; if a narrowed page, or one with more rows beyond it, was in flight at
+    /// that moment, it would land as the only rows there are, and the change filtered over
+    /// them would show a partial or empty list until something else reloaded it. Such a page
+    /// is not adopted; the read for the current inputs follows it.
+    static func landedPageNeedsRead(
+        landed: GenerationHistoryPageRequest, hasMoreItems: Bool,
+        current: GenerationHistoryPageRequest, followUpPending: Bool
+    ) -> Bool {
+        landed != current && !followUpPending
+            && answerToChange(loaded: landed, hasMoreItems: hasMoreItems) == .readFirstPage
+    }
+
     /// The query as the screen matches it.
     var normalizedQuery: String {
         switch searchStyle {

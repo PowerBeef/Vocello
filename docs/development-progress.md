@@ -126,6 +126,29 @@ Nothing is owed before the push.
   maintainer's.
 - Plan steps 40, 41 and 46 follow the release; the review notes left open are in the plan.
 
+**Found on November 16: promotion cannot pass as the tooling stands (fix before the tag)**
+
+- **The Mac language benchmark cannot publish its record.** Promotion needs
+  `macos-language-benchmark` with all ten languages, which is the full 23-cell matrix (since
+  `cb1f92c0`, October). A rehearsal on this tree (`mac-lang-bench-20261116-092648-774394b0`,
+  kept locally) passed its hint gate and its spoken-content gate, then publication refused the
+  record: 296,630 bytes against the 256 KiB cap. A language record has one cell per take, so
+  23 cells repeat 23 takes' metrics as five-number summaries. No Mac language record has been
+  published since September 27 (7 cells); October's two runs failed earlier, on BKL-23's
+  one-recognizer rule, which today's takes do not trip.
+- **Nothing can be committed between the tag and the end of promotion capture**
+  (`quality_promotion.py` wants a clean tag checkout), so the fix belongs to the tagged
+  commit. It is the maintainer's choice between a larger cap for the language kind and a
+  compact form for single-take cells.
+- **Two more promotion lanes have no Mac record on the hybrid:** `macos-engine-benchmark` and
+  `macos-delivery-benchmark` (the last Mac `macos-engine` records are from September; 3.0
+  was promoted on October 23 without a promotion record). `macos-model-download-lifecycle`
+  downloads a model into a scratch folder. A rehearsal of each before the tag is the cheap
+  way to learn whether the tag can be promoted; retained memory passed on November 14.
+- The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
+  duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
+  rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.
+
 **Next, in order (each the maintainer's word)**
 
 1. ★ Push `main` (it deploys the website, whose download links name `v3.1.0` before the release

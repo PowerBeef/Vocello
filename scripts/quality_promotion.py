@@ -441,27 +441,48 @@ def release_toolchain(
 PUBLIC_FACTS_PATH = "config/public-product-facts.json"
 
 
-def previous_public_release(root: Path, commit: str) -> tuple[str, str]:
-    """The previous public macOS release, as the candidate's own public facts name it: its tag
-    and commit. Every lane a candidate must prove is derived from the paths changed since it, so
-    the base cannot be a nearer commit the manifest author picks."""
+def facts_stable_tag(root: Path, commit: str) -> str | None:
+    """The tag `stableMacRelease` names in the public facts as committed at `commit`, if any."""
     try:
         facts = json.loads(git(root, "show", f"{commit}:{PUBLIC_FACTS_PATH}"))
-    except (PromotionError, json.JSONDecodeError) as error:
-        raise PromotionError(f"cannot read the previous public release from {PUBLIC_FACTS_PATH} at the candidate") from error
+    except (PromotionError, json.JSONDecodeError):
+        return None
     release = facts.get("stableMacRelease") if isinstance(facts, dict) else None
     tag = release.get("tag") if isinstance(release, dict) else None
-    if not isinstance(tag, str) or TAG_RE.fullmatch(tag) is None:
-        raise PromotionError(f"{PUBLIC_FACTS_PATH} names no previous public macOS release tag")
+    return tag if isinstance(tag, str) and TAG_RE.fullmatch(tag) is not None else None
+
+
+def previous_public_release(root: Path, commit: str, candidate_tag: str | None = None) -> tuple[str, str]:
+    """The previous public macOS release, as the candidate's own public facts name it: its tag
+    and commit. Every lane a candidate must prove is derived from the paths changed since it, so
+    the base cannot be a nearer commit the manifest author picks.
+
+    The facts flip to the new release before its tag (the tag's CI holds the README and the
+    website to them), so a candidate's facts usually name the candidate itself. The previous
+    release is then the last one the facts named before that: the file's own history decides."""
+    tag = facts_stable_tag(root, commit)
+    if tag is None:
+        raise PromotionError(f"{PUBLIC_FACTS_PATH} names no previous public macOS release tag at the candidate")
+    if candidate_tag is not None and tag == candidate_tag:
+        history = git(root, "log", "--format=%H", commit, "--", PUBLIC_FACTS_PATH).splitlines()
+        earlier = (facts_stable_tag(root, older) for older in history)
+        tag = next((value for value in earlier if value is not None and value != candidate_tag), None)
+        if tag is None:
+            raise PromotionError(
+                f"{PUBLIC_FACTS_PATH} names the candidate {candidate_tag} as the public macOS release "
+                "and its history names no release before it"
+            )
     return tag, resolve_commit(root, f"refs/tags/{tag}")
 
 
-def require_public_base(root: Path, platform: str, base_commit: str, commit: str) -> None:
+def require_public_base(
+    root: Path, platform: str, base_commit: str, commit: str, candidate_tag: str | None = None
+) -> None:
     # iOS has no public App Store release yet (the facts name only a TestFlight beta), so its
     # base stays the manifest author's choice until the facts name a previous public iOS release.
     if platform != "macos":
         return
-    tag, expected = previous_public_release(root, commit)
+    tag, expected = previous_public_release(root, commit, candidate_tag)
     if base_commit != expected:
         raise PromotionError(f"promotion base must be the previous public macOS release {tag} ({expected[:12]})")
 
@@ -714,7 +735,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
     built_with = release_toolchain(release_evidence, args.release_evidence.resolve(), declared_toolchain(args))
     base_commit, paths = changed_paths(root, args.base, commit)
-    require_public_base(root, args.platform, base_commit, commit)
+    require_public_base(root, args.platform, base_commit, commit, args.tag)
     impact_result = classify_paths(contract, paths)
     required = required_evidence(contract, impact_result, args.platform)
     capabilities, unsupported_dimensions = capability_coverage(
@@ -829,7 +850,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     }:
         raise PromotionError("quality promotion manifest differs from release evidence")
     base_commit, paths = changed_paths(root, str(manifest.get("baseCommit", "")), commit)
-    require_public_base(root, args.platform, base_commit, commit)
+    require_public_base(root, args.platform, base_commit, commit, args.tag)
     impact_result = classify_paths(contract, paths)
     impact = manifest.get("impact")
     expected_impact = impact_result

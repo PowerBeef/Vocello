@@ -199,6 +199,37 @@ class QualityPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(PROMOTION.PromotionError, "names no previous public macOS release"):
             PROMOTION.previous_public_release(self.root, self.git("rev-parse", "HEAD"))
 
+    def flip_facts_to(self, tag: str) -> str:
+        self.write_json(self.root / "config/public-product-facts.json",
+                        {"stableMacRelease": {"version": tag.removeprefix("v"), "tag": tag}})
+        self.git("add", "config/public-product-facts.json")
+        self.git("commit", "-qm", f"facts name {tag}")
+        return self.git("rev-parse", "HEAD")
+
+    def test_facts_flipped_before_the_tag_still_name_the_release_before_it(self) -> None:
+        # The flip lands before the tag, so the candidate's facts name the candidate itself.
+        flipped = self.flip_facts_to("v2.4.0")
+        (self.root / "README.md").write_text("candidate, after the flip\n", encoding="utf-8")
+        self.git("add", "README.md")
+        self.git("commit", "-qm", "candidate, after the flip")
+        candidate = self.git("rev-parse", "HEAD")
+        self.git("tag", "-f", "v2.4.0")
+        self.assertEqual(PROMOTION.previous_public_release(self.root, candidate, "v2.4.0"), ("v2.3.0", self.base))
+        PROMOTION.require_public_base(self.root, "macos", self.base, candidate, "v2.4.0")
+        # The flip commit is no base: it is nearer than the release the facts named before it.
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "previous public macOS release v2.3.0"):
+            PROMOTION.require_public_base(self.root, "macos", flipped, candidate, "v2.4.0")
+        # Without the candidate's tag the facts are read as written, as before.
+        self.assertEqual(PROMOTION.previous_public_release(self.root, candidate)[0], "v2.4.0")
+
+    def test_flipped_facts_whose_history_names_no_earlier_release_fail_closed(self) -> None:
+        self.git("rm", "-q", "config/public-product-facts.json")
+        self.git("commit", "-qm", "no facts")
+        self.git("checkout", "-q", "--orphan", "fresh")
+        candidate = self.flip_facts_to("v2.4.0")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "history names no release before it"):
+            PROMOTION.previous_public_release(self.root, candidate, "v2.4.0")
+
     def test_changed_paths_route_to_lanes_through_the_contract(self) -> None:
         contract = PROMOTION.load_contract(self.root)
         docs_only = PROMOTION.classify_paths(contract, ["docs/reference/cli.md", "./README.md"])

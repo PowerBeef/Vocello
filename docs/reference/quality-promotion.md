@@ -89,7 +89,9 @@ release commit (committed `<base>..HEAD` only: the base must be a distinct ances
 edits are invisible, so commit first), and `create` embeds that result in the manifest, so the lanes it demands can be
 audited from the contract and the diff alone. For macOS, `create` and `validate` accept only the
 previous public release as the base: the tag `stableMacRelease` names in the candidate's own
-`config/public-product-facts.json`. A nearer base would shrink the evidence a candidate must prove.
+`config/public-product-facts.json`. The facts flip to the new release before its tag, so they
+usually name the candidate itself; the base is then the last release the file named before that,
+read from the file's own history. A nearer base would shrink the evidence a candidate must prove.
 iOS has no public App Store release yet, so its base stays the manifest author's choice until the
 facts name one.
 Every tracked product file routes to a class or is listed in `promotionRouting.unrouted` with the

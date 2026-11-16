@@ -60,11 +60,23 @@ routed check and the Mac build pass on them.
   are one parked line, BKL-76. A forced exit of the CLI was probed with 38 double Ctrl-C runs:
   every one exited 130, no crash report.
 
-**Owed before the tag, in a Mac window (the maintainer's word)**
+**The two lanes rerun on the final Swift (November 15, 23:00)**
 
-- `scripts/ui_test.sh macos smoke` and one `scripts/ui_test.sh macos perf` on the final commit:
-  the two late fixes touch the player and the History list, which those lanes cover, and the perf
-  ceilings are now enforced for both History filters.
+- **`ui_test.sh macos perf`: PASS**, 12 of 12 scenarios with the ceilings enforced
+  (`macos-xcui-perf-20261116-040404-5f7cf75d`). `history-filter` 72.4 ms/s and 82.8 ms,
+  `history-filter-paged` 69.6 ms/s and 82.3 ms, the delivery menu 84.8 ms/s.
+- **`ui_test.sh macos smoke`: FAIL, 13 of 16** (`macos-xcui-smoke-20261116-041749-6f1b77b3`, kept).
+  The macOS Speech Recognition prompt for the development build opened in the clone journey
+  (test09, which passed) and stayed on screen over every later launch. Tests 12, 13 and 15 timed
+  out waiting for a control under it (`voiceDesign_briefStarters`, `historyRecovery_discard`, the
+  model update's cancel button); the desktop capture at each failure shows the prompt over the
+  control. No crash, and no assertion about the app failed. The first sitting's smoke met the same
+  prompt and passed.
+
+**Owed before the tag (the maintainer's)**
+
+- Answer the Speech Recognition prompt for the development build (Autoriser or Refuser; either
+  ends it), then give a Mac window for one more smoke run, which gets a new run ID.
 
 **Still open, none blocking the push**
 
@@ -85,7 +97,7 @@ routed check and the Mac build pass on them.
 
 **Next, in order (each the maintainer's word)**
 
-0. Smoke and one perf run on the final commit, in a Mac window (above).
+0. The Speech Recognition prompt answered, then smoke again in a Mac window (above).
 1. ★ Push `main` (it deploys the website, whose download links name `v3.1.0` before the release
    exists, so the tag and the promotion follow closely) and wait for `CI required` on that commit.
    CI compiles with Xcode 26.6, which no local build has done for these commits.

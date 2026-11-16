@@ -100,8 +100,20 @@ Nothing is owed before the push.
     move to `@Observable`, the accessibility pass of October 6).
   - Window resize (exploratory) is a separate rise, inside this week: 34 ms per action on
     November 14, 50 to 61 since, longest gap 66 to about 83 ms. Not looked into.
-  - Not separated yet. A sampler on the app's main thread during the menu scenario
-    (one unpublished perf run, a Mac window) shows whose code runs in those chunks.
+  - **Settled with a sampler** (one unpublished perf run, `macos-xcui-perf-20261116-072851-f48789f6`,
+    whose gate failed because sampling every millisecond slows the two sampled scenarios about
+    threefold). Of the app's busy main-thread time in the menu scenario, 79% is XCUITest's
+    accessibility snapshots running inside the app (`XCTAutomationSupport`, mostly under its
+    runtime-issue capture), 12% is AppKit opening, tracking and closing the menu, and SwiftUI
+    updates plus Vocello's own code are under 2%. In sidebar navigation the snapshots are 64%,
+    SwiftUI and CoreAnimation 26%, Vocello's code 3%. Each snapshot walks the whole
+    application, the menu bar included: AppKit opens every menu for inspection (the Apple
+    menu's Recent Items over synchronous XPC, Services, Window), 16% of the snapshot time.
+  - So the scenario mostly measures the test driver, and its rise is not a slower menu for a
+    user: Vocello's share is too small to hold 40 ms per cycle. What made the snapshots
+    dearer (Xcode 27.2's XCUITest, macOS 27.2.1, or more accessibility elements since the
+    October 6 pass) is not separated and no longer matters for the release. The ceiling stays
+    warn-only; BKL-77 is the lane change that would make the scenario measure the menu.
 - **Five screenshots still show retired controls** (`docs/screenshots`, `docs/readme/hero*` and
   `modes*`, `website/public/assets/screens`). They need `scripts/ui_test.sh macos marketing`, which
   takes over the Mac, then `scripts/readme_art/render.sh`.

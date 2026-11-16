@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 24/77 (31%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 24/78 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -627,6 +627,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-73` | parked | A cancelled explicit prewarm unloads the model | — |
 | `BKL-74` | parked | The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework | — |
 | `BKL-76` | parked | Notes from the 3.1 release review of the command line, the MCP server and the player | — |
+| `BKL-77` | parked | The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -837,6 +838,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-76`** (parked) — Notes from the 3.1 release review of the command line, the MCP server and the player.
   gate: Each note is fixed with a test or declined with its reason: an opt-in flag for the MCP history and saved-voice transcript tools (a maintainer decision); the forced exit uses _exit; models install reports success when a cancel lands after the swap; a text-mode take that finished exits 0 on a late signal; an interrupted bench sweep records cancelled cells as cancelled; models remove takes the staging lock; the live preview's audio engine stops at the hand-off to the file.
+  unparkWhen: The 3.1 iOS submission is done and the maintainer picks the next plan.
+
+- **`BKL-77`** (parked) — The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots.
+  gate: The delivery-menu and sidebar-navigation readings separate the app's frame cost from the harness's: either the checker reports hitch time outside the phases in which XCUITest queries or snapshots the app, or the scenarios drive the app without a snapshot inside the measured window; the ceilings are recalibrated on the separated number.
   unparkWhen: The 3.1 iOS submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).

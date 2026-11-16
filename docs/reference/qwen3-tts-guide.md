@@ -120,6 +120,10 @@ a 4-bit Speed and an 8-bit Quality artifact per mode, is retired.
   | `…-VoiceDesign-hybrid-attn` | `…-VoiceDesign-4bit` (`62f2646e`) | `…-VoiceDesign-8bit` (`bb56faf7`) | `5c390979`, `f90d6177` |
   | `…-Base-hybrid-attn` | `…-Base-4bit` (`47ab65f7`) | `…-Base-8bit` (`f63ea141`) | `37e955a1`, `e7dd0585` |
 
+  The attribution policy (`config/third-party-attribution-policy.json`) and the bundled manifest
+  built from it name both mlx-community bases and both parents of each hybrid at their full
+  revisions ([hybrid-model.md §7](hybrid-model.md#7-licence-and-attribution)).
+
 - **Variant selection** (`ModelDescriptor.preferredVariant`): each mode has one variant, whose id
   and kind stay `speed`, so every platform and memory class resolves to the hybrid. The 3.0 rule is
   still in the code and has nothing left to choose between: the iPhone took Speed, and a Mac took

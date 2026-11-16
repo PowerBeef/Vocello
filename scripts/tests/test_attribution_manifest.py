@@ -106,6 +106,56 @@ class AttributionManifestTests(unittest.TestCase):
         self.assertEqual(first_bytes, second_bytes)
         self.assertEqual(value["summary"]["pendingContentRightsCount"], 4)
 
+    def test_every_model_names_each_base_it_was_built_from(self) -> None:
+        """A hybrid takes tensors from two conversions; the manifest names both, pinned (RF-61)."""
+        manifest = json.loads((ROOT / "Sources/Resources/third_party_attributions.json").read_text())
+        self.assertEqual(len(manifest["modelArtifacts"]), 3)
+        for model in manifest["modelArtifacts"]:
+            with self.subTest(model=model["repo"]):
+                bases = [(model["baseRepo"], model["baseRevision"])] + [
+                    (row["baseRepo"], row["baseRevision"]) for row in model["additionalBases"]]
+                self.assertEqual(sorted(repo.rsplit("-", 1)[1] for repo, _ in bases), ["4bit", "8bit"])
+                self.assertTrue(all(len(revision) == 40 for _, revision in bases))
+                self.assertTrue(all(row["contribution"] for row in model["additionalBases"]))
+                self.assertEqual(len(model["builtFrom"]), 2)
+                self.assertTrue(model["redistributionDecision"])
+
+    def test_rejects_an_unpinned_duplicate_or_undecided_model_lineage(self) -> None:
+        def short_revision(card: dict) -> None:
+            card["additionalBases"][0]["baseRevision"] = card["additionalBases"][0]["baseRevision"][:8]
+
+        def duplicate_base(card: dict) -> None:
+            card["additionalBases"][0]["baseRepo"] = card["baseRepo"]
+
+        def no_contribution(card: dict) -> None:
+            card["additionalBases"][0]["contribution"] = " "
+
+        def no_base(card: dict) -> None:
+            del card["baseRepo"]
+
+        def self_parent(card: dict) -> None:
+            card["builtFrom"][0]["repo"] = card["repo"]
+
+        def no_decision(card: dict) -> None:
+            del card["redistributionDecision"]
+
+        mutations = {
+            "exact baseRevision": short_revision, "twice": duplicate_base, "contributed": no_contribution,
+            "names no baseRepo": no_base, "other than itself": self_parent,
+            "carries no redistributionDecision": no_decision,
+        }
+        for expected, mutate in mutations.items():
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.fixture(root)
+                path = root / "config/third-party-attribution-policy.json"
+                value = json.loads(path.read_text())
+                mutate(value["modelCards"][0])
+                path.write_text(json.dumps(value), encoding="utf-8")
+                result = self.run_checker(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+
     @staticmethod
     def mutate_revision(root: Path) -> None:
         path = root / "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"

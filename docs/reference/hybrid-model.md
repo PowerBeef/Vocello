@@ -237,9 +237,9 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
 - **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
   top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
 
-**Left:** the iPhone's memory, speed and footprint bands, the benchmark baselines, and
-`config/public-product-facts.json`, the README and the website with the release that ships the
-change. RF-58 (one take variation, Expressive) landed first.
+**Left:** the iPhone's memory, speed and footprint bands and the benchmark baselines.
+`config/public-product-facts.json`, the README and the website moved to the one model with the 3.1
+publication (RF-61). RF-58 (one take variation, Expressive) landed first.
 
 ## 7. Licence and attribution
 
@@ -258,5 +258,18 @@ one tensor changed (the text embedding quantized to 8 bits) and Meta's AudioSeal
 
 The marking generator inside each artifact is Meta's AudioSeal (MIT), unchanged. The attribution
 manifest (`scripts/attribution_manifest.py rebuild`) follows the catalog and
-`config/third-party-attribution-policy.json`, whose entry for each hybrid names the mlx-community
-4-bit base only; the 8-bit base that supplied the attention tensors is still to be added there.
+`config/third-party-attribution-policy.json`, whose entry for each hybrid names this lineage at full
+40-character revisions:
+
+- `baseRepo` and `baseRevision`: the mlx-community 4-bit conversion, which supplied every tensor but
+  the attention projections;
+- `additionalBases`: the mlx-community 8-bit conversion, with what it contributed (the talker's
+  attention projections);
+- `builtFrom`: the two Vocello 3.0 artifacts the builder read.
+
+The manifest carries the same fields for each model, and the tool refuses an entry whose base or
+parent is not pinned to an exact revision, or that carries no `redistributionDecision`. That decision
+reads `pending-qualified-review` for all three hybrids, as it did for the 3.0 artifacts when they
+shipped: it is a standing item, not a change of 3.1. The iPhone's Open Source Licenses screen reads
+`baseRepo` and `baseRevision` only, so it shows the 4-bit base; the 8-bit base is in the bundled
+manifest and not yet on that screen.

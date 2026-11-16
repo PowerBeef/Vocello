@@ -73,6 +73,66 @@ def https_url(value: object, label: str) -> str:
     return value
 
 
+REPOSITORY = re.compile(r"[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*")
+REVISION = re.compile(r"[0-9a-f]{40}")
+
+
+def repository_at(row: object, repo_key: str, revision_key: str, label: str) -> tuple[str, str]:
+    """A Hugging Face repository pinned to an immutable 40-character revision."""
+    repo = row.get(repo_key) if isinstance(row, dict) else None
+    revision = row.get(revision_key) if isinstance(row, dict) else None
+    if not isinstance(repo, str) or not REPOSITORY.fullmatch(repo):
+        raise ContractError(f"{label} names no {repo_key}")
+    if not isinstance(revision, str) or not REVISION.fullmatch(revision):
+        raise ContractError(f"{label} pins {repo} to no exact {revision_key}")
+    return repo, revision
+
+
+def model_lineage(rule: dict, repo: str) -> dict:
+    """The repositories a model artifact derives from, each at an exact revision.
+
+    `baseRepo` is the third-party conversion that supplied most of the artifact, and the one the
+    iPhone's license screen reads. A mixed-precision artifact takes tensors from a second
+    conversion: `additionalBases` names each with what it contributed. `builtFrom` names the
+    Vocello artifacts the build read, when it read published artifacts and not a base directly."""
+    label = f"model {repo}"
+    base_repo, base_revision = repository_at(rule, "baseRepo", "baseRevision", label)
+    lineage: dict = {"baseRepo": base_repo, "baseRevision": base_revision}
+    named = {base_repo}
+    if "additionalBases" in rule:
+        rows = rule["additionalBases"]
+        if not isinstance(rows, list) or not rows:
+            raise ContractError(f"{label} additionalBases must be a non-empty array")
+        additional = []
+        for row in rows:
+            other_repo, other_revision = repository_at(row, "baseRepo", "baseRevision", f"{label} additional base")
+            contribution = row.get("contribution")
+            if not isinstance(contribution, str) or not contribution.strip():
+                raise ContractError(f"{label} does not say what {other_repo} contributed")
+            if other_repo in named:
+                raise ContractError(f"{label} names base {other_repo} twice")
+            named.add(other_repo)
+            additional.append({"baseRepo": other_repo, "baseRevision": other_revision, "contribution": contribution})
+        lineage["additionalBases"] = additional
+    if "builtFrom" in rule:
+        rows = rule["builtFrom"]
+        if not isinstance(rows, list) or not rows:
+            raise ContractError(f"{label} builtFrom must be a non-empty array")
+        parents = [repository_at(row, "repo", "revision", f"{label} parent") for row in rows]
+        if len({parent for parent, _ in parents}) != len(parents) or repo in {parent for parent, _ in parents}:
+            raise ContractError(f"{label} builtFrom must name distinct artifacts other than itself")
+        lineage["builtFrom"] = [{"repo": parent, "revision": revision} for parent, revision in parents]
+    return lineage
+
+
+def redistribution_decision(rule: dict, repo: str) -> str:
+    """Every shipped model artifact carries its recorded redistribution decision; none is implied."""
+    decision = rule.get("redistributionDecision")
+    if not isinstance(decision, str) or not decision.strip():
+        raise ContractError(f"model {repo} carries no redistributionDecision")
+    return decision
+
+
 def resolved_pins(document: dict, label: str) -> dict[str, dict]:
     if document.get("version") != 3:
         raise ContractError(f"{label} must use Package.resolved schema 3")
@@ -252,9 +312,8 @@ def build(root: Path) -> dict:
             "revision": artifact["revision"],
             "modelCardSHA256": readmes[0]["sha256"],
             "licenseID": rule["licenseID"],
-            "baseRepo": rule.get("baseRepo"),
-            "baseRevision": rule.get("baseRevision"),
-            "redistributionDecision": rule.get("redistributionDecision"),
+            **model_lineage(rule, artifact["repo"]),
+            "redistributionDecision": redistribution_decision(rule, artifact["repo"]),
             "sourceURL": f"https://huggingface.co/{artifact['repo']}/tree/{artifact['revision']}",
         })
 

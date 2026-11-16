@@ -2,15 +2,10 @@
   "schemaVersion": 1,
   "boundary": "Hand-curated PUBLIC product policy: what we state publicly about releases, platform support, and canonical benchmark hardware. Validated against project.yml and README by scripts/public_facts_contract.py. If a value can be read out of the tree it belongs there; if it is a decision about what we publish it belongs here.",
   "stableMacRelease": {
-    "version": "3.0.0",
-    "tag": "v3.0.0",
-    "minimumOS": "macOS 26.0",
-    "distribution": "signed-notarized-dmg"
-  },
-  "candidateRelease": {
     "version": "3.1.0",
     "tag": "v3.1.0",
-    "distributionStatus": "unpublished"
+    "minimumOS": "macOS 26.0",
+    "distribution": "signed-notarized-dmg"
   },
   "fallbackMacRelease": {
     "version": "1.2.3",

@@ -164,6 +164,15 @@ Nothing is owed before the push.
   (`quality_promotion.py` wants a clean tag checkout), so these fixes had to precede the tag.
   They change scripts and a contract, not the app; the UI lanes will rebuild it all the same,
   so one more smoke run on the final commit is owed before the tag.
+- **Smoke on the final commit: FAIL, 15 of 16** (`macos-xcui-smoke-20261116-151149-8442eb17`,
+  kept). The scripts changed, so the lane rebuilt the app, and the rebuilt app raised the
+  macOS Speech Recognition prompt again in the clone journey (test09), as BKL-19 describes:
+  the lane app is signed ad hoc, so the grant is bound to one build. XCUITest reported the
+  dialog (`alerte`, from `com.apple.UserNotificationCenter`) as an unhandled interruption and
+  the reference panel never showed its transcript. The fifteen other journeys passed,
+  tests 12, 13 and 15 included, so the prompt was gone after test09. A rerun passes only if
+  the prompt was answered for this build; no commit outside docs may follow it, or the app
+  is rebuilt and the prompt returns.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

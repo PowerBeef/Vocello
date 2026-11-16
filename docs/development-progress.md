@@ -173,6 +173,14 @@ Nothing is owed before the push.
   tests 12, 13 and 15 included, so the prompt was gone after test09. A rerun passes only if
   the prompt was answered for this build; no commit outside docs may follow it, or the app
   is rebuilt and the prompt returns.
+- **BKL-19's fix is in (`fe6c7003`): the Mac UI lanes sign their app with the development
+  identity**, as `build.sh` does, the identity joins the build fingerprint, and the routed
+  check's compile into the lane's folder signs the same way. First run on it
+  (`macos-xcui-smoke-20261116-165753-d2e1573a`, kept): the build signed every target with the
+  identity and succeeded, and the clone journey passed. The Speech Recognition prompt came up
+  once, as expected after a change of signature, and nobody answered it: it stayed on screen to
+  the end, so tests 12, 13 and 15 timed out behind it (13 of 16). Still to show: one answer,
+  then a passing run, then a passing run after a rebuild with no prompt.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

@@ -451,10 +451,12 @@ website, so the push is the maintainer's word.
    so they change in this commit, with their tests in `scripts/tests`:
    - `scripts/public_facts_contract.py` requires the README's Mac and iPhone model-availability rows
      to carry exact wording. Change the required wording when the model line-up changed.
-   - `scripts/generate_readme_charts.py` labels the chart's pool from the take's variant
-     (`VARIANT_LABELS`), and the `scripts/readme_art/performance.html` and
-     `performance-narrow.html` templates name the models in their source lines. Change the labels
-     when the models' public names changed.
+   - `scripts/generate_readme_charts.py` names the models the chart's pool ran
+     (`pool_model_label`: "Vocello 3.1 models" for the one model per mode, from the pool's app
+     version; a variant name from `VARIANT_LABELS` only for a pool of the earlier two-package
+     line-up), and the `scripts/readme_art/performance.html` and `performance-narrow.html`
+     templates name the models in their source lines. Change the labels when the models' public
+     names changed.
 3. **The README lines.** The release badge and the download and installer links (they name the
    tag), the model table and its captions, the requirements and download sizes, the performance
    captions and alt text, and the command-line section. Search the file for the old version, the

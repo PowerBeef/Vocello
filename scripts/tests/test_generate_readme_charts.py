@@ -48,7 +48,7 @@ class GenerateReadmeChartsTests(unittest.TestCase):
         medians, _ = MODULE.load_rtf_medians(pool)
         self.assertEqual(
             MODULE.README_PATH.read_text(encoding="utf-8"),
-            MODULE.render_readme(medians, MODULE.pool_variant_label(pool)),
+            MODULE.render_readme(medians, MODULE.pool_model_label(pool)),
             "README rtf-chart block is stale — run scripts/generate_readme_charts.py",
         )
         alt = MODULE.readme_alt_text(medians)
@@ -80,7 +80,7 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
                  classification: str = "canonical", key: str = "lineage-a",
                  rtf: float = 0.5, app_build: str = "24", lock: str = "lock-a",
-                 variant: str = "speed") -> None:
+                 variant: str = "speed", app_version: str = "3.0.0", repository: str | None = None) -> None:
     marketing = {
         "mac-mini-m2-8gb": "Mac mini (M2, 8 GB)",
         "mac-mini-m6-16gb": "Mac mini (M6, 16 GB)",
@@ -91,11 +91,12 @@ def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
             "classification": classification, "rtfDefinition": "wall/audio",
         },
         "hardware": {"profileID": profile, "marketingName": marketing},
-        "toolchain": {"appVersion": "3.0.0", "appBuild": app_build},
+        "toolchain": {"appVersion": app_version, "appBuild": app_build},
         "inputs": {"dependencyLockHash": lock},
         "comparison": {"key": key},
         "takes": [
-            {"cell": f"{mode}/{length}/warm#{index}", "variant": variant, "metrics": {"rtf": rtf + index / 100}}
+            {"cell": f"{mode}/{length}/warm#{index}", "variant": variant, "metrics": {"rtf": rtf + index / 100},
+             **({"modelRepository": repository} if repository else {})}
             for mode in MODULE.MODES for length in MODULE.LENGTHS for index in range(3)
         ],
     }), encoding="utf-8")
@@ -188,20 +189,42 @@ class ChartPoolTests(unittest.TestCase):
         self.assertEqual(MODULE.provenance_text(pooled), "median of 2 records through pooledm2")
         self.assertIn("Median of 2 records through pooledm2", MODULE.website_medians_text(pooled, medians))
 
-    def test_the_label_names_the_one_variant_the_pool_ran(self) -> None:
+    def test_the_label_names_the_models_the_pool_ran(self) -> None:
         """audit #17: the chart never publishes numbers under a hardware-only label."""
-        self.assertEqual(MODULE.pool_variant_label(self.pool(), self.records), "Speed")
+        self.assertEqual(MODULE.pool_model_label(self.pool(), self.records), "Speed models")
         anchor = MODULE.chart_pool()
-        self.assertIn(f"{MODULE.pool_variant_label(anchor)} models", MODULE.render_all()["rtf-by-mode-dark.svg"])
+        self.assertIn(f"· {MODULE.pool_model_label(anchor)}<", MODULE.render_all()["rtf-by-mode-dark.svg"])
         self.assertIn("of the Speed models", MODULE.readme_alt_text(
-            {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}, "Speed",
+            {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}, "Speed models",
         ))
         write_record(self.records, "macos-xcui-benchmark-20260915-000000-quality", "mac-mini-m2-8gb",
                      "2026-09-15T00:00:00Z", variant="quality")
         pool = self.pool()
-        self.assertEqual(MODULE.pool_variant_label(pool[:1], self.records), "Quality")
+        self.assertEqual(MODULE.pool_model_label(pool[:1], self.records), "Quality models")
         with self.assertRaises(SystemExit):
-            MODULE.pool_variant_label(pool, self.records)
+            MODULE.pool_model_label(pool, self.records)
+
+    def test_the_one_model_per_mode_is_never_called_speed(self) -> None:
+        """Since 3.1 each mode has one model whose variant id is still `speed` (RF-59)."""
+        hybrid = "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn"
+        first = "macos-xcui-benchmark-20261115-000000-onemodel"
+        write_record(self.records, first, "mac-mini-m2-8gb", "2026-11-15T00:00:00Z",
+                     key="lineage-one-model", app_build="31", app_version="3.1.0", repository=hybrid)
+        self.assertEqual(self.pool(), [first])
+        label = MODULE.pool_model_label(self.pool(), self.records)
+        self.assertEqual(label, "Vocello 3.1 models")
+        self.assertNotIn("Speed", MODULE.readme_alt_text(
+            {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}, label,
+        ))
+        # A pool that mixes the one model with the 3.0 Speed package is never charted under one label.
+        with self.assertRaises(SystemExit):
+            MODULE.pool_model_label([first, "macos-xcui-benchmark-20260914-000000-latestm2"], self.records)
+        # Nor is one whose record states no app version to name the models by.
+        unversioned = "macos-xcui-benchmark-20261116-000000-noversion"
+        write_record(self.records, unversioned, "mac-mini-m2-8gb", "2026-11-16T00:00:00Z",
+                     key="lineage-one-model", app_build="31", app_version="", repository=hybrid)
+        with self.assertRaises(SystemExit):
+            MODULE.pool_model_label([unversioned], self.records)
 
     def test_pooled_medians_take_every_take_of_the_pool(self) -> None:
         write_record(self.records, "macos-xcui-benchmark-20260915-000000-second", "mac-mini-m2-8gb",

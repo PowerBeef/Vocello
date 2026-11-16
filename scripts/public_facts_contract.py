@@ -117,10 +117,13 @@ def validate_readme(root: Path, public: dict) -> list[str]:
         errors.append(f"README.md: stable {version} install CTA must link directly to the DMG asset")
     if "[mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift)" not in readme:
         errors.append("README.md: acknowledgements must identify the actual mlx-audio-swift upstream")
-    if not re.search(r"(?is)\|\s*Mac\s*\|[^\n]+Speed \(4-bit\) and Quality \(8-bit\)", readme):
-        errors.append("README.md: Mac model availability must state Speed and Quality")
-    if not re.search(r"(?is)\|\s*iPhone\s*\|[^\n]+\|\s*Speed \(4-bit\)\s*\|", readme):
-        errors.append("README.md: iPhone model availability must state Speed only")
+    # Since 3.1 each mode has one model on both platforms (RF-59): the Speed and Quality
+    # packages, their switch and the lower-memory preference are gone.
+    for platform in ("Mac", "iPhone"):
+        if not re.search(rf"(?im)^\|\s*{platform}\s*\|[^\n]+\|\s*One model per mode\s*\|\s*$", readme):
+            errors.append(f"README.md: {platform} model availability must state one model per mode")
+    if re.search(r"(?i)Speed \(4-bit\)|Quality \(8-bit\)", readme):
+        errors.append("README.md: the Speed (4-bit) and Quality (8-bit) line-up is retired; each mode has one model")
     if not re.search(r"(?i)Voice Cloning follows the reference voice", readme):
         errors.append("README.md: clone delivery must be attributed to the reference voice")
     # Product imagery comes from the repository, as markdown images or as <img> tags: the

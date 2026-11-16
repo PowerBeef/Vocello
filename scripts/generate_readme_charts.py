@@ -23,9 +23,12 @@ Data provenance:
     until they are regenerated (and the website medians and provenance line
     updated from the printed values). Records from different hardware
     profiles are never pooled; the subtitle names the anchor's hardware and
-    the one model variant every pooled take ran (audit #17: the benchmark
-    measures Speed whatever the tier recommends, and the label says so), and
-    the footer the anchor and the pool size. RTF is the standard
+    the models every pooled take ran (audit #17: the numbers never appear
+    under a hardware-only label), and the footer the anchor and the pool
+    size. Since 3.1 each mode has one model, whose variant id is still
+    `speed`; the label names it by its release, never as "Speed", and only a
+    pool of the earlier two-package line-up is named by its variant. RTF is
+    the standard
     real-time factor (generation seconds per audio second, lower is faster).
     A record published before the 2026-09-12 cutover stores the inverted
     decode-loop speedup under `rtf`; for those the chart derives a standard
@@ -87,11 +90,17 @@ LONGFORM_SEGMENTS = (
 
 MODES = ("custom", "design", "clone")
 MODE_LABELS = {"custom": "Built-in Voice", "design": "Voice Design", "clone": "Voice Cloning"}
-# The take-level model variant (`takes[].variant`) the chart label names.
+# How the chart names the models of the two-package line-up (Vocello 3.0 and
+# earlier), from the take-level variant (`takes[].variant`).
 VARIANT_LABELS = {
     "speed": "Speed", "quality": "Quality",
     "compact_speed": "Compact Speed", "compact_quality": "Compact Quality",
 }
+# Since 3.1 each mode has one model (RF-59), a mixed-precision hybrid published
+# under this repository suffix. Its variant id is still `speed`, so a take's
+# repository, not its variant, tells it from the 3.0 Speed package; public copy
+# names it by the release that ships it and never calls it "Speed".
+SINGLE_MODEL_REPOSITORY_SUFFIX = "-hybrid-attn"
 LENGTHS = ("short", "medium", "long")
 
 # Palette validated with the dataviz six-checks validator against each
@@ -148,21 +157,35 @@ def hardware_label(record: dict) -> str:
     return f"{match.group(1)} {match.group(2)}"
 
 
-def pool_variant_label(record_ids: list[str], records_dir: Path | None = None) -> str:
-    """The one model variant every take of the pool ran, as the chart names it (audit #17).
+def pool_model_label(record_ids: list[str], records_dir: Path | None = None) -> str:
+    """The models every take of the pool ran, as the chart names them (audit #17).
 
     Pooled records share a comparison key, which names their models, so a pool
-    runs one variant; a pool that does not is never charted under one label."""
-    variants = {
-        take.get("variant")
-        for record_id in record_ids
-        for take in load_record(record_id, records_dir)["takes"]
+    runs one line-up; a pool that does not is never charted under one label.
+    The one model per mode that 3.1 introduced is "Vocello <major.minor> models",
+    from the app version the pool shares; the earlier two-package line-up is
+    named by the variant its takes ran ("Speed models")."""
+    records = [load_record(record_id, records_dir) for record_id in record_ids]
+    takes = [take for record in records for take in record["takes"]]
+    variants = {take.get("variant") for take in takes}
+    single_model = {
+        str(take.get("modelRepository") or "").endswith(SINGLE_MODEL_REPOSITORY_SUFFIX) for take in takes
     }
-    if len(variants) != 1 or (variant := variants.pop()) not in VARIANT_LABELS:
+    if len(variants) != 1 or len(single_model) != 1:
         raise SystemExit(
-            f"error: the pooled records do not share one chartable model variant: {sorted(map(str, variants))}"
+            "error: the pooled records do not share one chartable model line-up: "
+            f"variants {sorted(map(str, variants))}"
         )
-    return VARIANT_LABELS[variant]
+    if single_model == {True}:
+        version = str((records[0].get("toolchain") or {}).get("appVersion") or "")
+        match = re.fullmatch(r"(\d+\.\d+)(?:\.\d+)*", version)
+        if not match:
+            raise SystemExit(f"error: the anchor record has no chartable app version: {version!r}")
+        return f"Vocello {match.group(1)} models"
+    variant = variants.pop()
+    if variant not in VARIANT_LABELS:
+        raise SystemExit(f"error: the pooled records ran a variant the chart cannot name: {variant!r}")
+    return f"{VARIANT_LABELS[variant]} models"
 
 
 def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> tuple[dict[str, float], bool]:
@@ -255,12 +278,12 @@ def website_medians_text(pool: list[str], medians: dict[str, float]) -> str:
     ])
 
 
-def readme_alt_text(medians: dict[str, float], variant: str | None = None) -> str:
+def readme_alt_text(medians: dict[str, float], models: str | None = None) -> str:
     parts = []
     for mode in MODES:
         values = [medians[f"{mode}/{length}/warm"] for length in LENGTHS]
         parts.append(f"{MODE_LABELS[mode]} {min(values):.2f} to {max(values):.2f}")
-    measured = f" of the {variant} models" if variant else ""
+    measured = f" of the {models}" if models else ""
     return (
         f"Grouped bar chart: warm real-time factor{measured} by script length, lower is faster: "
         + ", ".join(parts)
@@ -268,8 +291,8 @@ def readme_alt_text(medians: dict[str, float], variant: str | None = None) -> st
     )
 
 
-def readme_block(medians: dict[str, float], variant: str | None = None) -> str:
-    alt = readme_alt_text(medians, variant)
+def readme_block(medians: dict[str, float], models: str | None = None) -> str:
+    alt = readme_alt_text(medians, models)
     return "\n".join([
         README_MARKERS[0],
         "<picture>",
@@ -280,14 +303,14 @@ def readme_block(medians: dict[str, float], variant: str | None = None) -> str:
     ])
 
 
-def render_readme(medians: dict[str, float], variant: str | None = None) -> str:
+def render_readme(medians: dict[str, float], models: str | None = None) -> str:
     text = README_PATH.read_text(encoding="utf-8")
     start, end = README_MARKERS
     if text.count(start) != 1 or text.count(end) != 1:
         raise SystemExit("error: README.md must contain exactly one rtf-chart marker pair")
     head, rest = text.split(start, 1)
     _, tail = rest.split(end, 1)
-    return head + readme_block(medians, variant) + tail
+    return head + readme_block(medians, models) + tail
 
 
 def svg_open(width: int, height: int) -> list[str]:
@@ -322,9 +345,9 @@ def rtf_chart(theme_name: str) -> str:
     parts = svg_open(width, height)
     parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
     hardware = hardware_label(load_record(anchor))
-    variant = pool_variant_label(pool)
+    models = pool_model_label(pool)
     parts.append(text(16, 47, "Warm real-time factor: seconds of generation per second of audio "
-                              f"(lower is faster) · {hardware} · {variant} models",
+                              f"(lower is faster) · {hardware} · {models}",
                       fill=theme["muted"], size=12))
 
     bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
@@ -522,7 +545,7 @@ def main() -> int:
     pool = chart_pool()
     rendered = render_all()
     medians, _ = load_rtf_medians(pool)
-    readme = render_readme(medians, pool_variant_label(pool))
+    readme = render_readme(medians, pool_model_label(pool))
     if args.check:
         stale = [
             name for name, content in rendered.items()

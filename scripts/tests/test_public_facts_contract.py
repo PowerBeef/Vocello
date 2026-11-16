@@ -83,6 +83,40 @@ class ReadmeImageryTests(unittest.TestCase):
         self.assertEqual(len(self.imagery_errors(readme.replace("art4", "art3"), files)), 1)
 
 
+class ReadmeModelLineUpTests(unittest.TestCase):
+    """Since 3.1 each mode has one model on the Mac and the iPhone (RF-59)."""
+
+    PUBLIC = {"stableMacRelease": {"version": "3.1.0", "tag": "v3.1.0"}}
+    ROWS = (
+        "| Platform | Requirements | Models |\n| --- | --- | --- |\n"
+        "| Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM | {mac} |\n"
+        "| Command line | macOS 26.0 or newer, Apple Silicon | Shared with the Mac app |\n"
+        "| iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | {iphone} |\n"
+    )
+
+    def line_up_errors(self, mac: str, iphone: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(self.ROWS.format(mac=mac, iphone=iphone), encoding="utf-8")
+            return [e for e in MODULE.validate_readme(root, self.PUBLIC) if "model" in e]
+
+    def test_both_rows_state_one_model_per_mode(self) -> None:
+        self.assertEqual(self.line_up_errors("One model per mode", "One model per mode"), [])
+
+    def test_the_two_package_line_up_fails_on_either_row(self) -> None:
+        errors = self.line_up_errors("Speed (4-bit) and Quality (8-bit)", "One model per mode")
+        self.assertTrue(any("Mac model availability" in e for e in errors), errors)
+        self.assertTrue(any("retired" in e for e in errors), errors)
+        errors = self.line_up_errors("One model per mode", "Speed (4-bit)")
+        self.assertTrue(any("iPhone model availability" in e for e in errors), errors)
+        self.assertFalse(any("Mac model availability" in e for e in errors), errors)
+
+    def test_the_command_line_row_does_not_stand_in_for_a_platform(self) -> None:
+        errors = self.line_up_errors("Shared with the iPhone app", "One model per mode")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("Mac model availability", errors[0])
+
+
 class CandidateClaimTests(unittest.TestCase):
     PUBLIC = {
         "stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"},

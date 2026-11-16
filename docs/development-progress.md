@@ -201,6 +201,25 @@ Nothing is owed before the push.
   BKL-19's proof. `release-readiness` and `scripts/dev.sh ci` pass on the same commit.
   **Nothing is owed before the push.** Only docs, the roadmap and benchmark records may be
   committed from here to the end of promotion without making the lanes build again.
+- **`main` was pushed on November 16 (`19598822`) and its CI failed on one step**
+  (run 43925421388): "Compile the macOS XCUITest bundle". Xcode 26.6 does not treat an XCTest
+  `class func tearDown()` override as main-actor isolated although the class is, and refused
+  `VocelloMacPerfUITests`' read of a main-actor static; Xcode 27.2 accepts it, so no local
+  build could see it. Every other job passed, the deterministic tests, the TSan subset and
+  the iOS compile (which builds the iPhone UI bundles with 26.6) included. Fixed locally
+  (`9cb9d2ce`: the constant is `nonisolated`), not pushed: only CI can confirm it. The push
+  also started the release rehearsal (run 43925421015), still running when this was written.
+  The fix changes the Mac UI-test bundle's source, so the lanes rebuild that bundle; the app
+  is unchanged.
+- **The three open Dependabot pull requests were reviewed and none belongs before the tag.**
+  #115 (GitHub Actions pins in the release and security workflows) wants
+  `supply_chain_contract.py --sync-actions` and lands after promotion. #119 (website
+  development packages) passes its website checks, does not fix the open minimatch alert
+  (the fix is a major version ESLint 10 does not accept) and needs Playwright's new
+  browsers. #120 (swift-transformers 1.4.0) changes tokenizer behaviour, adds a
+  dependency and is an engine move under `mlx-guide.md` §9: declined for 3.1. A Dependabot
+  commit's subject names no release item, so none of them can be merged as it is during the
+  freeze; each is redone as a commit on `main`.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

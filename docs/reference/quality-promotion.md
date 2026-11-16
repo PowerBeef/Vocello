@@ -145,7 +145,7 @@ lane requirements and exact contract digest; they are not reinterpreted as curre
    | `macos-language-benchmark` | `scripts/macos_test.sh lang-bench` (the full matrix: all ten languages) |
    | `macos-delivery-benchmark` | `QWENVOICE_DEBUG=1 ./build/vocello bench --modes custom --variants speed --lengths medium --warm 1 --delivery happy.strong,calm.normal,whisper.normal --seed 19790615 --label promo-delivery`, after the gate lane built the CLI |
    | `macos-retained-memory` | `scripts/macos_test.sh memory` |
-   | `macos-model-download-lifecycle` | the managed capture of step 4 |
+   | `macos-model-download-lifecycle` | the managed capture of step 4; remove `build/scratch/transient/model-download-acceptance` first if an earlier run left it, or the command finds the model installed and downloads nothing |
 
    Run the delivery bench with the repository's Python first on the `PATH`
    (`PATH="$(dirname "$(python3 scripts/select_python.py)"):$PATH"`): the bench starts its

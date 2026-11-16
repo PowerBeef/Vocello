@@ -152,11 +152,14 @@ Nothing is owed before the push.
   `python3`, and the `PATH`'s (Homebrew 3.15) has no NumPy. It passes with the repository's
   Python first on the `PATH`; `docs/reference/quality-promotion.md` now lists each lane's
   command and that step.
-- **Not rehearsed:** `macos-model-download-lifecycle`, which downloads a model (about 2.2 GB)
-  into a scratch folder and needs the maintainer's word, and the assembly itself
-  (`quality_promotion.py create`), which needs the tag and the release workflow's evidence.
-  3.0 was promoted on October 23 without a promotion record, so the path has still never run
-  end to end.
+- **The model-download lane was rehearsed too** (the maintainer's word for the download):
+  the contract's exact command installed `pro_custom_speed` into a fresh scratch data
+  folder, 2.23 GB downloaded, verified and installed, exit 0. The folder was removed
+  afterwards, so the capture on the tag downloads again instead of finding the model there.
+- **Not rehearsable before the tag:** the capture wrapper and the assembly
+  (`quality_promotion.py capture` and `create`), which need the tag and the release
+  workflow's evidence. 3.0 was promoted on October 23 without a promotion record, so the
+  path has still never run end to end.
 - **Nothing can be committed between the tag and the end of promotion capture**
   (`quality_promotion.py` wants a clean tag checkout), so these fixes had to precede the tag.
   They change scripts and a contract, not the app; the UI lanes will rebuild it all the same,

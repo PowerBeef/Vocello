@@ -85,7 +85,7 @@ Models download once from Hugging Face and are never bundled. From 3.1, Built-in
 
 From Vocello 3.0, choose **Vocello > Check for Updates**, or install the new DMG. History, saved voices and settings carry over. On first launch Vocello replaces the models you installed with 3.0 by the new one for each mode, on its own on an unmetered network: a banner shows the progress, and **Not Now** stops it. Updating all three modes downloads about 4.7 GB, and your earlier models are removed once a new one is ready.
 
-From Vocello 2.x, install the new DMG by hand once: 2.x has no updater. History, saved voices and settings carry over, and each mode needs the new model, which you install from **Settings > Models & Files**.
+From Vocello 2.x, install the new DMG by hand once: 2.x has no updater. History, saved voices and settings carry over, and the models you had installed are replaced the same way. If a mode reads Not installed afterwards, install its model from **Settings > Models & Files**.
 
 Vocello was called QwenVoice before 2.2.0, and old repository links redirect here. Macs on macOS 15 can use the legacy [QwenVoice 1.2.3](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3).
 

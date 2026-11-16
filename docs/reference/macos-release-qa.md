@@ -436,13 +436,16 @@ streaming/memory/determinism discipline, and the benchmark rigor as one curated 
 
 ## Publication checklist (the flip to a new release)
 
-Until a release is published, every public surface keeps describing the last published one: the
-README, the website and `config/public-product-facts.json` still name it, and the new version is
-only the declared, unpublished candidate. The flip to the new release is **one commit, made when
-the release is published**, never spread over the work that precedes it. A surface flipped early
-advertises a download that does not exist; one flipped late keeps describing a product nobody can
-install. Work the list in order, then run the checks at the end. Pushing the commit deploys the
-website, so the push is the maintainer's word.
+While a release is being prepared, every public surface keeps describing the last published one:
+the README, the website and `config/public-product-facts.json` still name it, and the new version
+is only the declared, unpublished candidate. The flip to the new release is **one set of commits on
+the release commit, before the tag**, never spread over the work that precedes it: the tag needs
+`CI required` to pass on its commit, CI's chart check needs the charts of the release's canonical
+record, and the release item's gate asks that the charts, the website and the public facts describe
+the release before the tag. The commits stay local until the maintainer pushes, and the push, the
+tag and the promotion follow one another closely: pushing deploys the website, so from the push
+until promotion the public pages name a download that is not there yet. Work the list in order,
+then run the checks at the end.
 
 1. **The public facts file.** In `config/public-product-facts.json`, set `stableMacRelease` to the
    new version and tag, and remove `candidateRelease`. `scripts/public_facts_contract.py` holds the

@@ -81,9 +81,25 @@ Nothing is owed before the push.
 
 **Still open, none blocking the push**
 
-- **The delivery menu** reads 82.0 to 85.8 ms/s with warms suppressed, against 67 to 70 in
-  September (ceiling 89). App CPU is flat and macOS went from 27.0 to 27.2.1 in between; an A/B of
-  the September commit on today's macOS would settle app against system.
+- **The delivery menu** reads 82.0 to 85.8 ms/s, against 67 to 70 in September (ceiling 89).
+  Investigated on November 16 from the published records and the last run's frame rows
+  (`macos-xcui-perf-20261116-040404-5f7cf75d`), no new run:
+  - It predates this week's work: the record of November 14 already reads 80.9 ms/s. The M6
+    has no record between September 27 (macOS 27.0, Xcode 27.0) and November 14 (27.2.1, 27.2).
+  - The rise is about 40 ms of main-thread delay per open-and-close (243 ms against 197 to
+    206), 2 to 3 more dropped frames. The count of late frames is the same; the p95 moved
+    from 16.7 to 22 ms only because late frames went from just under 5% to 5.25%.
+  - One cycle today, aligned with the test log: opening blocks the main thread in three
+    chunks (about 78, 44 and 45 ms), an accessibility query against the open menu adds 43 and
+    23 ms, closing 49 and 18 ms, and two later chunks 50 and 33 ms. The menu's content is
+    nine items of dictionary lookups; its code changed once (`9d978d6d`, bindings only).
+  - The other click-driven scenarios rose too (sidebar navigation 229 to 255 ms per action,
+    window resize 41 to 55), while scrolling, typing and idle are equal or better. So the
+    cause is common to clicks, not the menu: the system or XCUITest's click path (macOS and
+    Xcode both moved), or an app-wide change (the October move to `@Observable`, the
+    accessibility pass of October 6).
+  - Not separated yet. A sampler on the app's main thread during the menu scenario
+    (one unpublished perf run, a Mac window) shows whose code runs in those chunks.
 - **Five screenshots still show retired controls** (`docs/screenshots`, `docs/readme/hero*` and
   `modes*`, `website/public/assets/screens`). They need `scripts/ui_test.sh macos marketing`, which
   takes over the Mac, then `scripts/readme_art/render.sh`.

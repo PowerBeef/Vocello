@@ -59,7 +59,7 @@ Keep content in the existing boundaries:
 
 - `src/sections/`: page sections. The home page (`src/pages/HomePage.jsx`) renders, in order:
   `Hero`, `Modes` (`#workflows`, the mode switcher), `Listen`, `Privacy` (`#how-it-runs`),
-  `Capabilities`, `IphoneBeta`, `WhatsNew` (`#whats-new`, "What's new in 3.0"), `Developers` (the
+  `Capabilities`, `IphoneBeta`, `WhatsNew` (`#whats-new`, "What's new in 3.1"), `Developers` (the
   `#cli` and `#engineering` tiles), `Limitations` (`summary`) and `FinalCTA` (`#download`).
   - `CommandLine.jsx`: `CommandLineGuide` (`/cli/`);
   - `Engineering.jsx`: `EngineeringDetail` (`/engineering/`), with the HTML speed chart;

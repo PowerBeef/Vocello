@@ -599,7 +599,7 @@
         "config/public-product-facts.json"
       ],
       "updated": "2026-11-15",
-      "notes": "Opened 2026-11-14: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The audit of 2026-11-15 and its plan (docs/audits/2026-11-15-remediation-plan.md; its status table is current) are implemented except steps 40, 41, 46, 50 and the rest of 43. Xcode (decisions 2026-11-15): the pin stays at 26.6; the lanes stay on this Mac's Xcode 27.2 and promotion accepts that difference only by name (create --accept-toolchain-difference). Release sitting of 2026-11-15, paused: UI benchmark PASS canonical under cell-hash-v2 (29 of 29 takes, none refused, 9 of 9 captures, stall 250 ms); ui perf PASS three times (History filter 71 to 80 ms/s and 72 to 86 ms longest gap, against 201 and 873 on 2026-11-14); smoke PASS 16 of 16. Open: release-readiness and dev.sh ci fail on one validator, the README charts, which wait for the publication flip (plan steps 19, 21 to 24); the delivery menu still 82 to 86 ms/s against September's 67 to 70, cause open; the perf ceilings to apply; the engine gate bench; static audits; then the maintainer's push, tag and promotion. docs/development-progress.md, Resume now, has the order."
+      "notes": "Opened 2026-11-14: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The audit of 2026-11-15 and its plan (docs/audits/2026-11-15-remediation-plan.md; its status table is current) are implemented except steps 40, 41, 46, 50 and the rest of 43. Xcode (decisions 2026-11-15): the pin stays at 26.6; the lanes run on this Mac's Xcode 27.2 and promotion accepts that difference only by name. Release sitting of 2026-11-15, all PASS on the M6: UI benchmark canonical under cell-hash-v2 (29 of 29 takes, stall 250 ms); ui perf three times; smoke 16 of 16; release-readiness; dev.sh ci; engine gate bench (RTF 0.294 against 0.291). The publication flip is on local main. Static audits: no blocker; two fixes after the UI lanes (live preview under an output change, a stale History page), the rest parked as BKL-76. Owed before the tag: smoke and one perf run on the final commit, in a Mac window. Then the maintainer's push, tag and promotion (seven macOS lanes on the tag checkout). Open: the delivery menu at 82 to 86 ms/s against September's 67 to 70; five stale screenshots. docs/development-progress.md, Resume now, has the order."
     },
     {
       "id": "RF-16",
@@ -2506,6 +2506,23 @@
       "updated": "2026-11-13",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-13, found while verifying RF-60. In two warm builds in a row after Xcode re-copied Sparkle.framework, the phase ran between the copy and Xcode's CodeSign of Versions/B: once lipo met CodeSign's .cstemp file, once CodeSign could not read the framework the phase had just thinned. The next build ordered them correctly and passed. The phase's input is a node CodeSign mutates rather than produces (Xcode warns of a missing creator for a mutated node), so the order is not guaranteed. A failed build ships nothing; whether a cold release build can hit it is not known."
+    },
+    {
+      "id": "BKL-76",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Notes from the 3.1 release review of the command line, the MCP server and the player",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "Each note is fixed with a test or declined with its reason: an opt-in flag for the MCP history and saved-voice transcript tools (a maintainer decision); the forced exit uses _exit; models install reports success when a cancel lands after the swap; a text-mode take that finished exits 0 on a late signal; an interrupted bench sweep records cancelled cells as cancelled; models remove takes the staging lock; the live preview's audio engine stops at the hand-off to the file.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/Core/MCP/MCPTools.swift",
+        "Sources/VocelloCLI/CLIProcessSupervisor.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift"
+      ],
+      "updated": "2026-11-15",
+      "unparkWhen": "The 3.1 iOS submission is done and the maintainer picks the next plan.",
+      "notes": "Parked 2026-11-15 from the static audits of the 3.1 release diff (three read-only reviews: app, command line, security and privacy); none is a release blocker. The MCP server lets a connected agent read History text and saved-voice transcripts with no flag, while delete_voice and install_model need one. The forced exit calls exit() with engine threads running: 38 double Ctrl-C runs on the M6 all exited 130 with no crash report and one reached the forced path, so the teardown race is unobserved. The other notes were confirmed by reading only. The same review's two fixes shipped in 3.1: an output-device change under a paused or underrun-held live preview, and a filtered History page landing over a newer filter."
     },
     {
       "id": "ER-01",

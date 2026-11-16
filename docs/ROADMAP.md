@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 24/76 (32%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 24/77 (31%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -626,6 +626,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-71` | parked | The session-start hook's free-space test fails now and then | — |
 | `BKL-73` | parked | A cancelled explicit prewarm unloads the model | — |
 | `BKL-74` | parked | The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework | — |
+| `BKL-76` | parked | Notes from the 3.1 release review of the command line, the MCP server and the player | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -833,6 +834,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-74`** (parked) — The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework.
   gate: An incremental macOS build that re-copies Sparkle.framework always runs the prepare phase after Xcode's CodeSign of Sparkle.framework/Versions/B (for example the embed signs nothing on copy and the phase alone signs it inside-out), shown by repeated warm builds.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
+
+- **`BKL-76`** (parked) — Notes from the 3.1 release review of the command line, the MCP server and the player.
+  gate: Each note is fixed with a test or declined with its reason: an opt-in flag for the MCP history and saved-voice transcript tools (a maintainer decision); the forced exit uses _exit; models install reports success when a cancel lands after the swap; a text-mode take that finished exits 0 on a late signal; an interrupted bench sweep records cancelled cells as cancelled; models remove takes the staging lock; the live preview's audio engine stops at the hand-off to the file.
+  unparkWhen: The 3.1 iOS submission is done and the maintainer picks the next plan.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

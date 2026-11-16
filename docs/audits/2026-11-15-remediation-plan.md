@@ -12,18 +12,18 @@ sourceOfTruth:
 Finding IDs (A1, T3, …) are those of [the audit](2026-11-15-project-audit.md). Every finding has a
 step, the low-priority ones included.
 
-## Status (2026-11-15, local `main`, nothing pushed)
+## Status (2026-11-15, late evening, local `main`, nothing pushed)
 
 Implemented and passing the routed check (lint, contracts, every deterministic macOS test, the CLI,
-the iOS compile and the UI bundles). No UI lane has run on any of it.
+the iOS compile and the UI bundles). The release lanes have run and passed (steps 18 to 20).
 
 | Steps | State |
 |---|---|
-| 1 to 13 | Done, and measured on 2026-11-15: the History stall is gone (longest frame gap 72 to 86 ms, from 873 ms). Step 7's ceilings are derived from the three runs but not yet applied (`enforce` is still empty). Step 8 did not clear the delivery menu: with warms suppressed it reads 82 to 86 ms/s against September's 67 to 70, so finding A10's guess was wrong and the cause is open. |
+| 1 to 13 | Done, and measured on 2026-11-15: the History stall is gone (longest frame gap 72 to 86 ms, from 873 ms). Step 7's ceilings are applied from the three runs: `enforce` names the four confirmatory scenarios other than the delivery menu and both History filters; the delivery menu keeps its ceiling, warn-only. Step 8 did not clear the delivery menu: with warms suppressed it reads 82 to 86 ms/s against September's 67 to 70, so finding A10's guess was wrong and the cause is open. |
 | 14 | Done as decided on 2026-11-15, in two steps. The pin stays at Xcode 26.6: GitHub offers Xcode 27 only on a preview runner image, so D-1's move was reversed. And the toolchain difference is accepted by name: the benchmark Mac runs macOS 27.2.1, where Apple does not support Xcode 26.6, so the 3.1 promotion records are built with Xcode 27.2 and `create --accept-toolchain-difference "REASON"` writes that into the promotion record; without the option such a record is still refused. Audit finding B1 is therefore disclosed, not closed: the records prove the same source under another compiler and SDK than the release's. |
 | 15 to 17 | Done. |
-| 18 to 20 | Step 18 is half run (2026-11-15, paused): the UI benchmark passed as canonical under `cell-hash-v2`, the perf lane passed three times and smoke passed 16 of 16. `release-readiness` and `scripts/dev.sh ci` fail on the README chart check, which waits for the publication flip; the engine gate bench and the static audits are not run. The checkpoint's "Resume now" has the results and the order. Then the maintainer's push and tag. |
-| 21 to 26 | Go with the release, in one commit. The reference documents of step 25 and the privacy reference of step 23 are done; the website page of step 23 is not. |
+| 18 to 20 | Run on 2026-11-15 on the M6 with Xcode 27.2, all PASS: the UI benchmark as canonical under `cell-hash-v2`, the perf lane three times, smoke 16 of 16, `release-readiness`, `scripts/dev.sh ci` and the engine gate bench (warm median RTF 0.294 against 0.291). The run IDs are in `docs/releases/v3.1.0.md`. Step 19's charts are regenerated from the canonical record. Step 20's static audits (app, command line, security and privacy, read-only) found no release blocker; two of their findings were fixed in Swift after the UI lanes ran (the two entries under "Found while implementing"), so smoke and one perf run are owed on the final commit before the tag, and the rest are parked as BKL-76. The promotion lanes run again on the tagged commit. |
+| 21 to 26 | Done on local `main`, as one set of commits before the tag: the public facts, the README and its charts, the website, the attribution, the reference documents and the release notes say 3.1. Two things remain: the screenshots that still show retired controls need a `ui_test.sh macos marketing` capture (a Mac window), and promotion now reads the previous public release from the facts file's history, because the flipped facts name the candidate itself. |
 | 27 to 36 | Done, with three limits. A11 was declined: moving the Studio screens off the engine store is not mechanical and changes when state lands. Of E9, the generic unbounded `generateStream` pair stays (a protocol requirement a package test uses). Step 33 marked the actor's relief API off the shipping path and corrected the rule; the product still unloads by dropping its reference. |
 | 37 | Done, unverified in the running app. The warm command-line engine's lease follows its model; the Mac app holds a lease of kind `app` while its model is loaded, refuses a model delete while another host holds a lease, and on an 8 GB Mac with nothing loaded does not start a take beside another engine; the command line finds the app by its lease, then the workspace, then the process table. Whether ssh hides the app from the workspace was not confirmed. The coordinator has no test of its own. |
 | 38 | Done. |
@@ -54,10 +54,15 @@ Review notes left open (each from the Swift review of the step named; none block
 
 Found while implementing, not in the audit:
 
-- **An output-device change under a paused live preview loses the queued audio.** In offline
-  rendering a stopped engine drops its node's queue and fires no completion, so the preview's
-  bookkeeping waits for buffers that will never play. It needs an attended check (pause a preview,
-  unplug the headphones, press Play) before a fix.
+- **An output-device change under a paused live preview lost the queued audio.** A stopped engine
+  drops its node's queue and fires no completion, so the preview's bookkeeping waited for buffers
+  that would never play and the take never handed off to its file. Fixed after the static audit
+  of the release diff: a preview whose node has played is handed to the take's file at the heard
+  position whether it is audible, paused or held by an underrun. Unit-tested on the fake graph;
+  not checked on hardware (pause a preview, change the output, press Play).
+- **A filtered History page that landed over a newer filter** showed a partial or empty list
+  until the next change, when the newer filter had been answered in memory and queued no read.
+  Found by the same audit and fixed: the landing queues the read.
 - **A second History change during a page read** flashed a partial list; fixed in the review of
   step 1.
 

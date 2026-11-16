@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 24/78 (31%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 26/78 (33%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -592,13 +592,11 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
 | `BKL-32` | parked | Give each shared iOS folder a single group in the generated project | — |
 | `BKL-33` | parked | An unwritable output folder is reported as an internal engine error on the Mac | — |
-| `BKL-34` | parked | The CLI installer round-trip test fails on a macOS 27 host | — |
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
 | `BKL-36` | parked | A short drag that starts on an iPhone Settings toggle row can flip the switch | — |
 | `BKL-37` | parked | Mac History shows the Built-in speaker in lowercase | — |
 | `BKL-38` | parked | iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description | — |
 | `BKL-39` | parked | iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33% | — |
-| `BKL-40` | parked | The session-start hook's free-space test flakes under parallel pytest | — |
 | `BKL-41` | parked | Release Vocello for iPhone in the EU with trader status | — |
 | `BKL-42` | parked | The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard | — |
 | `BKL-43` | parked | The iPhone crash-baseline pull fails when a download journal is pruned mid-copy | — |
@@ -700,10 +698,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: With the output folder unwritable, the Mac Studio's failure card and toast show the storage message (storageUnavailable), not the runtime-failure copy, and the status line does not say the engine needs attention; test11_GenerationErrorAndRecovery asserts the message.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
-- **`BKL-34`** (parked) — The CLI installer round-trip test fails on a macOS 27 host.
-  gate: scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as it does on the macOS 26 release runner.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-35`** (parked) — A failed iPhone model download shows the raw system error, in the phone's language.
   gate: A model download that fails on the iPhone explains the failure in Vocello's own copy, in the App Language, instead of the URL loading system's localized description and error code.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
@@ -722,10 +716,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-39`** (parked) — iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33%.
   gate: A model download that waits for a network says it is waiting, not Downloading, and the shared speech tokenizer reused from an installed model reads as already on the iPhone rather than as download progress, in all ten interface languages, with the byte accounting unchanged.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-40`** (parked) — The session-start hook's free-space test flakes under parallel pytest.
-  gate: SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes under the routed check's parallel pytest run without depending on the hook's 2-second df deadline, and the hook's real deadline is unchanged.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`BKL-41`** (parked) — Release Vocello for iPhone in the EU with trader status.

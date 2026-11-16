@@ -1998,25 +1998,6 @@
       "notes": "Seen 2026-10-24 by the maintainer and in macos-xcui-smoke-20261024-205357-0952e758 (mac-custom-write-error screenshots): test11 makes each mode's folder unwritable; Studio shows \"The on-device voice engine hit an internal error, so this take was not saved\" and \"Engine needs attention\". The mapping sends storage.write_failed and permission_denied to storageUnavailable, so the write error reaches presentation without its storage code. The test passes because it asserts only a retryable error. Not a release blocker (Mac copy; the iPhone's output folder is not user-changeable). Not investigated (focus rules)."
     },
     {
-      "id": "BKL-34",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The CLI installer round-trip test fails on a macOS 27 host",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "scripts/tests/test_cli_package.py::CLIInstallerPackageTests::test_real_package_round_trip_installs_upgrades_and_refuses_without_root passes on a macOS 27 host as it does on the macOS 26 release runner.",
-      "sourceOfTruth": [
-        "scripts/cli_package.py",
-        "scripts/tests/test_cli_package.py"
-      ],
-      "updated": "2026-10-24",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-24 on the maintainer's Mac (macOS 27.0.1) in a routed check's full Python run: cli_package.py raises \"CLI installer Bom differs from the payload\", twice in a row. The shipped 3.0.0 package was built and verified on the macos-26 release runner (CLI package smoke PASS, run 40020993733). Not investigated (focus rules); installing the shipped package on macOS 27 is not shown to be affected. 2026-10-28: still fails alone and deterministically with the same message during RF-38's routed check (BKL-44, closed as its duplicate).",
-      "legacyIds": [
-        "BKL-44",
-        "BKL-29"
-      ]
-    },
-    {
       "id": "BKL-35",
       "plan": "post-3-0-backlog-2026-10",
       "title": "A failed iPhone model download shows the raw system error, in the phone's language",
@@ -2092,24 +2073,6 @@
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
       "notes": "Maintainer, 2026-10-27 on build 26: on 5G with no Wi-Fi and the cellular switch off, Voice Design showed Downloading, 33% · 682.3 MB of 2.05 GB, with Cancel, and the maintainer asked why a download never starts at zero. The 682.3 MB is speech_tokenizer/model.safetensors reused from another installed model (preverified bytes), with no network transfer. Not a release blocker: the download waits as designed and no data or privacy is affected (RF-35)."
-    },
-    {
-      "id": "BKL-40",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The session-start hook's free-space test flakes under parallel pytest",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "SessionStartTests.test_cache_health_reports_dangling_public_links_and_low_free_space passes under the routed check's parallel pytest run without depending on the hook's 2-second df deadline, and the hook's real deadline is unchanged.",
-      "sourceOfTruth": [
-        "scripts/hooks/session_start.sh",
-        "scripts/tests/test_agent_hooks.py"
-      ],
-      "updated": "2026-10-27",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "2026-10-27: one routed check failed it with 'free space unknown': the fixture's fake df missed the hook's 2-second deadline under pytest -n auto load. Alone it passed three times out of three. Not a release blocker: test tooling only.",
-      "legacyIds": [
-        "BKL-30"
-      ]
     },
     {
       "id": "BKL-41",
@@ -2476,7 +2439,10 @@
       ],
       "updated": "2026-11-11",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated."
+      "notes": "Parked 2026-11-11: the test failed in one routed check and in 1 of 3 solo reruns, reporting free space unknown where the stubbed df answers 10 GiB. The hook reads df under a 2 s deadline (with_deadline). Not investigated.",
+      "legacyIds": [
+        "BKL-40"
+      ]
     },
     {
       "id": "BKL-73",

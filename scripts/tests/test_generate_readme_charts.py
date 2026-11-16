@@ -6,6 +6,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -192,8 +193,14 @@ class ChartPoolTests(unittest.TestCase):
     def test_the_label_names_the_models_the_pool_ran(self) -> None:
         """audit #17: the chart never publishes numbers under a hardware-only label."""
         self.assertEqual(MODULE.pool_model_label(self.pool(), self.records), "Speed models")
-        anchor = MODULE.chart_pool()
-        self.assertIn(f"· {MODULE.pool_model_label(anchor)}<", MODULE.render_all()["rtf-by-mode-dark.svg"])
+        # The drawn subtitle names the committed pool's models, without "models" when it would
+        # run past the chart's width.
+        drawn = MODULE.pool_model_label(MODULE.chart_pool()).removesuffix(" models")
+        subtitle = re.search(r"<text[^>]*>(Warm real-time factor[^<]*)</text>",
+                             MODULE.render_all()["rtf-by-mode-dark.svg"])
+        assert subtitle is not None
+        self.assertRegex(subtitle.group(1), rf"· {re.escape(drawn)}(?: models)?$")
+        self.assertLessEqual(len(subtitle.group(1)), MODULE.SUBTITLE_MAX_CHARS)
         self.assertIn("of the Speed models", MODULE.readme_alt_text(
             {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}, "Speed models",
         ))

@@ -101,6 +101,10 @@ VARIANT_LABELS = {
 # repository, not its variant, tells it from the 3.0 Speed package; public copy
 # names it by the release that ships it and never calls it "Speed".
 SINGLE_MODEL_REPOSITORY_SUFFIX = "-hybrid-attn"
+# The RTF chart's subtitle fills its 720 px at 12 px type: this is the longest one drawn that
+# fits ("... Mac mini M6, 16 GB · Speed models"). A longer one names its models without the
+# word "models" ("... · Vocello 3.1"); the README alt text always carries the full name.
+SUBTITLE_MAX_CHARS = 118
 LENGTHS = ("short", "medium", "long")
 
 # Palette validated with the dataviz six-checks validator against each
@@ -345,10 +349,11 @@ def rtf_chart(theme_name: str) -> str:
     parts = svg_open(width, height)
     parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
     hardware = hardware_label(load_record(anchor))
-    models = pool_model_label(pool)
-    parts.append(text(16, 47, "Warm real-time factor: seconds of generation per second of audio "
-                              f"(lower is faster) · {hardware} · {models}",
-                      fill=theme["muted"], size=12))
+    subtitle = ("Warm real-time factor: seconds of generation per second of audio "
+                f"(lower is faster) · {hardware} · {pool_model_label(pool)}")
+    if len(subtitle) > SUBTITLE_MAX_CHARS:
+        subtitle = subtitle.removesuffix(" models")
+    parts.append(text(16, 47, subtitle, fill=theme["muted"], size=12))
 
     bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
     y = top + 14.0

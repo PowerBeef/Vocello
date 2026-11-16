@@ -38,7 +38,10 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     /// nothing erases, so the list they measured grew from 440 to 737 rows in seven weeks and
     /// crossed the page size. One folder per row count, shared by the scenarios that use it and
     /// removed when the process ends its run of this class.
-    private static let historyProfilesRoot = FileManager.default.temporaryDirectory
+    ///
+    /// `nonisolated`: `class func tearDown()` reads it, and the pinned CI Xcode (26.6) does not
+    /// treat that override as main-actor isolated although the class is, where Xcode 27 does.
+    private nonisolated static let historyProfilesRoot = FileManager.default.temporaryDirectory
         .appendingPathComponent("vocello-uiperf-history-\(UUID().uuidString)", isDirectory: true)
 
     private static func historyProfile(rows: Int) -> URL {

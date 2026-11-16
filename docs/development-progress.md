@@ -93,11 +93,13 @@ Nothing is owed before the push.
     chunks (about 78, 44 and 45 ms), an accessibility query against the open menu adds 43 and
     23 ms, closing 49 and 18 ms, and two later chunks 50 and 33 ms. The menu's content is
     nine items of dictionary lookups; its code changed once (`9d978d6d`, bindings only).
-  - The other click-driven scenarios rose too (sidebar navigation 229 to 255 ms per action,
-    window resize 41 to 55), while scrolling, typing and idle are equal or better. So the
-    cause is common to clicks, not the menu: the system or XCUITest's click path (macOS and
-    Xcode both moved), or an app-wide change (the October move to `@Observable`, the
-    accessibility pass of October 6).
+  - Sidebar navigation, the other confirmatory scenario driven by clicks, rose with it (229
+    to 255 ms per action, already 251 on November 14), while scrolling, typing and idle are
+    equal or better. So the cause looks common to clicks, not the menu's own: the system or
+    XCUITest's click path (macOS and Xcode both moved), or an app-wide change (the October
+    move to `@Observable`, the accessibility pass of October 6).
+  - Window resize (exploratory) is a separate rise, inside this week: 34 ms per action on
+    November 14, 50 to 61 since, longest gap 66 to about 83 ms. Not looked into.
   - Not separated yet. A sampler on the app's main thread during the menu scenario
     (one unpublished perf run, a Mac window) shows whose code runs in those chunks.
 - **Five screenshots still show retired controls** (`docs/screenshots`, `docs/readme/hero*` and

@@ -162,8 +162,9 @@ Nothing is owed before the push.
   path has still never run end to end.
 - **Nothing can be committed between the tag and the end of promotion capture**
   (`quality_promotion.py` wants a clean tag checkout), so these fixes had to precede the tag.
-  They change scripts and a contract, not the app; the UI lanes will rebuild it all the same,
-  so one more smoke run on the final commit is owed before the tag.
+  They change scripts and a contract, not the app. The smoke run on the final source is the
+  one under BKL-19 below; no commit outside docs may follow it before promotion ends, or the
+  lanes rebuild the app.
 - **Smoke on the final commit: FAIL, 15 of 16** (`macos-xcui-smoke-20261116-151149-8442eb17`,
   kept). The scripts changed, so the lane rebuilt the app, and the rebuilt app raised the
   macOS Speech Recognition prompt again in the clone journey (test09), as BKL-19 describes:
@@ -179,8 +180,15 @@ Nothing is owed before the push.
   (`macos-xcui-smoke-20261116-165753-d2e1573a`, kept): the build signed every target with the
   identity and succeeded, and the clone journey passed. The Speech Recognition prompt came up
   once, as expected after a change of signature, and nobody answered it: it stayed on screen to
-  the end, so tests 12, 13 and 15 timed out behind it (13 of 16). Still to show: one answer,
-  then a passing run, then a passing run after a rebuild with no prompt.
+  the end, so tests 12, 13 and 15 timed out behind it (13 of 16). The maintainer then answered
+  it and the rerun passed, 16 of 16, with no dialog (`macos-xcui-smoke-20261116-171346-3d1da266`):
+  this is the smoke run on the final source. The lane app's designated requirement is now its
+  bundle id and the certificate (`codesign -d -r-`), where an ad hoc build's is one code hash,
+  so a rebuild keeps what macOS matches the grant against. Not yet shown by a run: smoke after
+  a rebuild that changes the binary, which the next Swift change brings; BKL-19 stays open
+  until then. The deterministic test build still signs the app ad hoc in the development
+  arena, so `build/Vocello.app` is ad hoc after any `dev.sh test`; launching that copy and
+  reaching Speech Recognition would re-key the grant away from the lane's app.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

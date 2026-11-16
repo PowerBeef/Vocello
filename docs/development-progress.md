@@ -128,23 +128,30 @@ Nothing is owed before the push.
 
 **Found on November 16: promotion cannot pass as the tooling stands (fix before the tag)**
 
-- **The Mac language benchmark cannot publish its record.** Promotion needs
-  `macos-language-benchmark` with all ten languages, which is the full 23-cell matrix (since
-  `cb1f92c0`, October). A rehearsal on this tree (`mac-lang-bench-20261116-092648-774394b0`,
-  kept locally) passed its hint gate and its spoken-content gate, then publication refused the
-  record: 296,630 bytes against the 256 KiB cap. A language record has one cell per take, so
-  23 cells repeat 23 takes' metrics as five-number summaries. No Mac language record has been
-  published since September 27 (7 cells); October's two runs failed earlier, on BKL-23's
-  one-recognizer rule, which today's takes do not trip.
+- **The Mac language benchmark could not publish its record; fixed.** Promotion needs
+  `macos-language-benchmark` with all ten languages, the full 23-cell matrix (since `cb1f92c0`,
+  October). A rehearsal passed both gates and was refused at publication: 296,630 bytes against
+  the 256 KiB cap, because a language record has one cell per take. The maintainer chose a
+  larger cap for the language kind alone (384 KiB, `047a125b`). The rerun passes and publishes
+  (`mac-lang-bench-20261116-143641-abf41ae2`), the first Mac language record since September
+  27; BKL-23's one-recognizer rule does not trip on today's takes.
+- **Still blocking: promotion refuses that record for its warnings.** Two Spanish takes
+  (`custom-es-auto`, `design-es-pinned`) pass with a Fast QC warning, so the record lists
+  `cadence:excess1(1/0)`, `cadence:excess2(2/0)` and `written-output-warn`.
+  `quality_promotion.py` refuses any record warning outside the contract's `allowedWarnings`,
+  which holds only `memory.pressure.soft_trim`, and the cadence names carry counts, so an exact
+  name cannot be listed ahead of a run. Seeds are fixed, so the takes do not change. The
+  maintainer decides: let promotion accept the audio check's advisory warnings by family, each
+  still accepted by name at `create`, or promote 3.1 by a recorded exception as 3.0 was.
 - **Nothing can be committed between the tag and the end of promotion capture**
-  (`quality_promotion.py` wants a clean tag checkout), so the fix belongs to the tagged
-  commit. It is the maintainer's choice between a larger cap for the language kind and a
-  compact form for single-take cells.
-- **Two more promotion lanes have no Mac record on the hybrid:** `macos-engine-benchmark` and
-  `macos-delivery-benchmark` (the last Mac `macos-engine` records are from September; 3.0
-  was promoted on October 23 without a promotion record). `macos-model-download-lifecycle`
-  downloads a model into a scratch folder. A rehearsal of each before the tag is the cheap
-  way to learn whether the tag can be promoted; retained memory passed on November 14.
+  (`quality_promotion.py` wants a clean tag checkout), so whatever is decided belongs to the
+  tagged commit.
+- **The delivery benchmark has no Mac record on the hybrid** (`macos-delivery-benchmark`,
+  `vocello bench --delivery`), and its earlier records carry `delivery_gate:*` warnings, which
+  the same rule would refuse. The engine benchmark is covered: the gate bench's record is a
+  focused `engine-generation` record with no warning. `macos-model-download-lifecycle`
+  downloads a model into a scratch folder. Retained memory passed on November 14. 3.0 was
+  promoted on October 23 without a promotion record, so this path has never run end to end.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

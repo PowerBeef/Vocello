@@ -14,11 +14,11 @@ sourceOfTruth:
 ---
 # The `vocello` CLI
 
-> **Install (Vocello 3.0.0):** the [v3.0.0 release](https://github.com/PowerBeef/Vocello/releases/tag/v3.0.0)
+> **Install (Vocello 3.1.0):** the [v3.1.0 release](https://github.com/PowerBeef/Vocello/releases/tag/v3.1.0)
 > ships `vocello` two ways, both signed with Developer ID and notarized, for Apple Silicon (arm64
 > only) on macOS 26.0 or later:
 >
-> - **Installer package,** [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.pkg).
+> - **Installer package,** [`Vocello-macos26-cli.pkg`](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26-cli.pkg).
 >   Open it and follow Installer, which asks for an administrator password. It puts the CLI folder at
 >   `/usr/local/lib/vocello`, links `/usr/local/bin/vocello` to it and adds zsh completion in
 >   `/usr/local/share/zsh/site-functions`; the shell profile is not changed. It adds a link only in a
@@ -27,7 +27,7 @@ sourceOfTruth:
 >   `/usr/local/lib/vocello/vocello` or link it into your path yourself. A newer package replaces
 >   the previous files. `sudo sh /usr/local/lib/vocello/uninstall.sh` removes it and leaves the
 >   models, saved voices and History untouched.
-> - **Folder copy,** [`Vocello-macos26-cli.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v3.0.0/Vocello-macos26-cli.dmg).
+> - **Folder copy,** [`Vocello-macos26-cli.dmg`](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26-cli.dmg).
 >   Copy the whole **Vocello CLI** folder to a folder you own, keep the executable and its resource
 >   bundles together, and run it by its quoted path. Delete the folder to remove it; its
 >   `uninstall.sh` is only for the installer package.

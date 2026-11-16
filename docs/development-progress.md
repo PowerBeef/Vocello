@@ -193,8 +193,14 @@ Nothing is owed before the push.
   routed check twice on November 16 and would have run in the release commit's CI): the
   tests raise the probe's bound through the environment, the hook's own two seconds are
   unchanged and now tested, 50 solo runs and five parallel-suite runs pass. This is a commit
-  outside docs after the last smoke run, so the UI lanes rebuild the app once more; under
-  the new signing that should bring no prompt, and the app's sources are unchanged.
+  outside docs after the earlier smoke run, so the lane ran its build again.
+- **Smoke on the final commit: PASS, 16 of 16** (`macos-xcui-smoke-20261116-175419-e92baeed`,
+  at `39bdaa39`), no failure frame, no system dialog, no new crash report. The lane's build
+  step ran and had nothing to do (no compile, link or re-sign: the app's sources were
+  unchanged), so this run is the gate's smoke on the release commit and adds nothing to
+  BKL-19's proof. `release-readiness` and `scripts/dev.sh ci` pass on the same commit.
+  **Nothing is owed before the push.** Only docs, the roadmap and benchmark records may be
+  committed from here to the end of promotion without making the lanes build again.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

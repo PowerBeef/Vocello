@@ -134,6 +134,26 @@ lane requirements and exact contract digest; they are not reinterpreted as curre
 2. Check out that exact tag with a clean tree. Run only the lanes `classify` selects.
    Publish successful benchmark records locally but do not create another source commit: exact-tag
    promotion records are external draft evidence, avoiding a self-referential commit.
+   The Mac lanes, each rehearsed on the 3.1 tree on 2026-11-16 (run the UI lanes in a window
+   the maintainer gives; the others are headless):
+
+   | Evidence | Lane |
+   |---|---|
+   | `macos-ui-benchmark` | `scripts/ui_test.sh macos benchmark` |
+   | `macos-ui-performance` | `scripts/ui_test.sh macos perf` |
+   | `macos-engine-benchmark` | `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` (its record is a focused `engine-generation` record) |
+   | `macos-language-benchmark` | `scripts/macos_test.sh lang-bench` (the full matrix: all ten languages) |
+   | `macos-delivery-benchmark` | `QWENVOICE_DEBUG=1 ./build/vocello bench --modes custom --variants speed --lengths medium --warm 1 --delivery happy.strong,calm.normal,whisper.normal --seed 19790615 --label promo-delivery`, after the gate lane built the CLI |
+   | `macos-retained-memory` | `scripts/macos_test.sh memory` |
+   | `macos-model-download-lifecycle` | the managed capture of step 4 |
+
+   Run the delivery bench with the repository's Python first on the `PATH`
+   (`PATH="$(dirname "$(python3 scripts/select_python.py)"):$PATH"`): the bench starts its
+   prosody analysis with `python3`, and a `python3` without NumPy fails the run after its takes.
+   Before the CLI-hosted lanes, check that the shell exports no runtime knob
+   (`env | grep -E '^(QWENVOICE|QVOICE)_'` should show at most `QVOICE_WORKER_SESSION`): they
+   inherit the shell's environment, and publication does not read a take's active overrides
+   (BKL-22).
 3. Download the draft's exact release evidence and the metadata file it binds, into one folder,
    for assembly (or download every asset and validate the complete deterministic bundle):
 

@@ -1875,7 +1875,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-20 in RF-20's control run (mac-lang-bench-20261020-220248-067bb65c, production streaming text): custom-es-auto came out inconclusive because Whisper labelled a correct Spanish take English (word error rate 0.048; Qwen3-ASR heard Spanish at 0), which fails spoken content and the lane. Parked without investigation under the focus lock: no release gate runs this bench."
+      "notes": "Found 2026-10-20 in RF-20's control run (mac-lang-bench-20261020-220248-067bb65c, production streaming text): custom-es-auto came out inconclusive because Whisper labelled a correct Spanish take English (word error rate 0.048; Qwen3-ASR heard Spanish at 0), which fails spoken content and the lane. Parked without investigation under the focus lock: no release gate runs this bench. 2026-11-16: the note's claim that no release gate runs this bench is out of date: macos-language-benchmark is a promotion requirement. A full run on the 3.1 tree passed both gates on all 23 takes, so the rule does not trip on today's takes; it still can."
     },
     {
       "id": "BKL-24",

@@ -135,23 +135,32 @@ Nothing is owed before the push.
   larger cap for the language kind alone (384 KiB, `047a125b`). The rerun passes and publishes
   (`mac-lang-bench-20261116-143641-abf41ae2`), the first Mac language record since September
   27; BKL-23's one-recognizer rule does not trip on today's takes.
-- **Still blocking: promotion refuses that record for its warnings.** Two Spanish takes
+- **Promotion refused that record for its warnings; fixed.** Two Spanish takes
   (`custom-es-auto`, `design-es-pinned`) pass with a Fast QC warning, so the record lists
-  `cadence:excess1(1/0)`, `cadence:excess2(2/0)` and `written-output-warn`.
-  `quality_promotion.py` refuses any record warning outside the contract's `allowedWarnings`,
-  which holds only `memory.pressure.soft_trim`, and the cadence names carry counts, so an exact
-  name cannot be listed ahead of a run. Seeds are fixed, so the takes do not change. The
-  maintainer decides: let promotion accept the audio check's advisory warnings by family, each
-  still accepted by name at `create`, or promote 3.1 by a recorded exception as 3.0 was.
+  `cadence:excess1(1/0)`, `cadence:excess2(2/0)` and `written-output-warn`, and promotion
+  refused any warning but `memory.pressure.soft_trim`. The maintainer chose to accept the
+  audio check's advisory warnings: the contract now lists `written-output-warn` and the
+  `cadence:excess` family with its reason, a family is accepted by its prefix at assembly
+  (`--accept-warning cadence:excess`), and any other warning is still refused (`5dc4be0a`).
+- **Every benchmark lane promotion needs was rehearsed on the 3.1 tree, and each record
+  passes promotion's own record check** (run against `validate_record` with the 3.1 build
+  identity): the UI benchmark and UI performance records of November 15, the gate bench's
+  record as the engine benchmark, the language record above, the delivery benchmark
+  (`macos-engine-20261116-145238-b3fffea8`, no warning) and retained memory
+  (`mac-memory-qualification-20261116-145341-abe17f56`; the earlier one was of the 3.0 build).
+  The delivery bench first failed after its takes: it starts its prosody analysis with
+  `python3`, and the `PATH`'s (Homebrew 3.15) has no NumPy. It passes with the repository's
+  Python first on the `PATH`; `docs/reference/quality-promotion.md` now lists each lane's
+  command and that step.
+- **Not rehearsed:** `macos-model-download-lifecycle`, which downloads a model (about 2.2 GB)
+  into a scratch folder and needs the maintainer's word, and the assembly itself
+  (`quality_promotion.py create`), which needs the tag and the release workflow's evidence.
+  3.0 was promoted on October 23 without a promotion record, so the path has still never run
+  end to end.
 - **Nothing can be committed between the tag and the end of promotion capture**
-  (`quality_promotion.py` wants a clean tag checkout), so whatever is decided belongs to the
-  tagged commit.
-- **The delivery benchmark has no Mac record on the hybrid** (`macos-delivery-benchmark`,
-  `vocello bench --delivery`), and its earlier records carry `delivery_gate:*` warnings, which
-  the same rule would refuse. The engine benchmark is covered: the gate bench's record is a
-  focused `engine-generation` record with no warning. `macos-model-download-lifecycle`
-  downloads a model into a scratch folder. Retained memory passed on November 14. 3.0 was
-  promoted on October 23 without a promotion record, so this path has never run end to end.
+  (`quality_promotion.py` wants a clean tag checkout), so these fixes had to precede the tag.
+  They change scripts and a contract, not the app; the UI lanes will rebuild it all the same,
+  so one more smoke run on the final commit is owed before the tag.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

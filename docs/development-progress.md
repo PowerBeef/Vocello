@@ -226,6 +226,25 @@ Nothing is owed before the push.
   dependency and is an engine move under `mlx-guide.md` §9: declined for 3.1. A Dependabot
   commit's subject names no release item, so none of them can be merged as it is during the
   freeze; each is redone as a commit on `main`.
+- **The tag is signed and the draft exists (November 16).** The maintainer signed and pushed
+  `v3.1.0` on `693f13d1`; GitHub verifies it, and the release workflow passed every job (run
+  43936706114): the draft holds both DMGs, the CLI package, the appcast and the evidence.
+- **The promotion sitting passed on the tag checkout**, unattended, with no rebuild and no
+  system dialog: the model-download capture, the gate bench (`mac-gate-bench-20261116-220213-9eace02f`),
+  delivery (`macos-engine-20261116-220421-6c6226b3`), the UI benchmark
+  (`macos-xcui-benchmark-20261116-220447-0b6bc26b`, 29 of 29 takes, longest stall 232 ms),
+  UI performance (`macos-xcui-perf-20261116-221550-845d6880`), language
+  (`mac-lang-bench-20261116-222829-f1b6f4ab`) and retained memory
+  (`mac-memory-qualification-20261116-223138-dc5abae6`). The capture wrapper and the assembly
+  ran for the first time: `quality_promotion.py create` and `validate` both PASS
+  (`build/artifacts/quality-promotion/quality-promotion.json`, base `v3.0.0` from the facts
+  file's history, the Xcode difference and the two warning names accepted by name).
+- **Left for the release to be public:** upload the manifest to the draft
+  (`gh release upload v3.1.0 build/artifacts/quality-promotion/quality-promotion.json --clobber`)
+  and the maintainer's dispatch of **Promote verified release**.
+- **Left in the tree:** the six promotion records are untracked on `main`. The new canonical UI
+  benchmark record makes the README charts stale, so they are committed together with the
+  regenerated charts and the website's medians, in one change.
 - The backlog was triaged against today's code the same day: BKL-34 was already fixed, BKL-40
   duplicated BKL-71, and the rest still hold. Their fixes change paths that make the UI lanes
   rebuild the app, so they follow promotion unless the maintainer wants them in 3.1.

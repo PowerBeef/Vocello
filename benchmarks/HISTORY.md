@@ -1273,6 +1273,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-10-20 | [`mac-memory-qualification-20261020-233325-d9f14b0a`](runs/memory-qualification/mac-memory-qualification-20261020-233325-d9f14b0a.json) | focused | focused | passed | qualified | 11 | 0.27 | `9cd075bdb0eb` | `82fd4e3aa017` | baseline | memory-qualification |
 
+## memory-qualification / macos / mac-mini-m6-16gb / config `a04b77a16c46`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-16 | [`mac-memory-qualification-20261116-145341-abe17f56`](runs/memory-qualification/mac-memory-qualification-20261116-145341-abe17f56.json) | focused | focused | passed | qualified | 11 | 0.29 | `a960e28d9d91` | `a04b77a16c46` | baseline | memory-qualification |
+
 ## memory-qualification / macos / mac-mini-m6-16gb / config `af84ca583018`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -17,7 +17,65 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 15: the remediation plan is implemented up to the lanes (resume here)
+### November 15, evening: the release sitting is paused halfway (resume here)
+
+The maintainer gave the Mac for the release lanes and then paused the session. Nothing is running
+and the tree is clean. `main` is at the commit that records perf run 3, far ahead of `origin`
+(`8f85011b`); nothing is pushed.
+
+**Lanes run on the hybrid, all on the M6 with Xcode 27.2**
+
+| Lane | Result | Run |
+|---|---|---|
+| UI benchmark, `cell-hash-v2` | PASS, canonical: 29 of 29 takes, none refused, 9 of 9 captures, stall gate 250 ms against 600 ms, warm median RTF 0.315 | `macos-xcui-benchmark-20261115-233746-ecd24c7b` |
+| UI performance, three runs | PASS three times, no warning | `macos-xcui-perf-20261115-234925-dae0f970`, `-20261116-000214-b26d443d`, `-20261116-001436-4d575c18` |
+| Smoke | PASS, 16 of 16 journeys | `macos-xcui-smoke-20261116-002710-d237bd00` (local) |
+| `release-readiness`, `scripts/dev.sh ci` | **FAIL, both on one validator**: `generate_readme_charts.py --check` says the README charts are stale, because a new canonical benchmark record exists | |
+| Engine gate bench | not run | |
+
+**What the lanes showed**
+
+- **The History stall is gone.** `history-filter`: 71 to 80 ms/s with a longest frame gap of 72 to
+  86 ms, against 201 ms/s and 873 ms on November 14 and 124 to 126 ms/s and 464 to 474 ms in
+  September. `history-filter-paged` (700 rows, the database path): 71 to 84 ms/s, 77 to 82 ms.
+- **The delivery menu is still slower than September, and the warm was not the cause.** With warms
+  suppressed it reads 82.0 to 85.8 ms/s (p95 gap 22 ms), against 67 to 70 ms/s (p95 16.7 ms) in
+  September; the ceiling is 89. The app's CPU in the window is flat, the main-thread heartbeat's
+  longest delay is 67 ms, and the menu's code has one refactor since (`9d978d6d`). macOS went from
+  27.0 to 27.2.1 in between. Audit finding A10's guess is disproved; the cause is open. An A/B of
+  the September commit on today's macOS would settle app against system.
+- **New code that ran for the first time and passed:** the benchmark's refused-take path was not
+  needed (no refusal); smoke's "a finished take starts playing" assertion; the perf lane's isolated
+  History profiles; the expected-test lists.
+- **Smoke met the macOS Speech Recognition prompt** for the development build in the clone journey
+  (the runner cannot read the TCC database); the journey passed on the manual transcript route.
+  Granting it is the maintainer's.
+
+**Next, in order**
+
+1. **Charts and the publication flip come before the gate can pass.** The chart check fails until
+   `python3 scripts/generate_readme_charts.py` runs against the new canonical record, and that
+   rewrites the README's performance images and block, which are public surfaces held for the
+   release. So steps 19 and 21 to 24 of the plan (chart labels, `public_facts_contract.py`, README,
+   website numbers and copy, public facts, attribution) land together, then `release-readiness` and
+   `scripts/dev.sh ci` run again. Until then a push of `main` would fail CI on this validator.
+2. **Apply the perf ceilings** from the three runs (`check_macos_ui_perf.py --derive-thresholds
+   <the three ids> --scenarios idle-baseline,sidebar-navigation,delivery-menu,settings-scroll,
+   composer-typing,history-filter,history-filter-paged,history-scroll,window-resize,
+   sidebar-navigation-warms`). The derivation gives `history-filter` 98 ms/s and 130 ms and
+   `history-filter-paged` 124 ms/s and 110 ms. It would loosen `delivery-menu` to 109.5 ms/s:
+   keep that one at 89 ms/s and 150 ms, warn-only, and enforce the four other confirmatory
+   scenarios and both History filters.
+3. **The engine gate bench** (`QWENVOICE_GATE_BENCH=1 QWENVOICE_GATE_BENCH_SEED=1
+   scripts/macos_test.sh gate`), then the static audits of the release diff and each lane's run ID
+   in `docs/releases/v3.1.0.md`.
+4. ★ The maintainer's push, the signed `v3.1.0` tag and the draft's approval; then the promotion
+   lanes on the tag checkout, with `quality_promotion.py create --accept-toolchain-difference
+   "REASON"` (the release is built with Xcode 26.6, this Mac measures with 27.2).
+
+The UI lanes take over the Mac: each needs the maintainer's word again in the next session.
+
+### November 15: the remediation plan is implemented up to the lanes
 
 The maintainer took all eight decisions of
 [audits/2026-11-15-remediation-plan.md](audits/2026-11-15-remediation-plan.md) as recommended and

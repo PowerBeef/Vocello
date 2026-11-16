@@ -13,7 +13,7 @@
 
 [![Release 3.1.0](https://img.shields.io/badge/release-3.1.0-EDCC8A?style=flat-square&labelColor=1C1E26)](https://github.com/PowerBeef/Vocello/releases/tag/v3.1.0) [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-EDCC8A?style=flat-square&logo=apple&logoColor=F5F6F8&labelColor=1C1E26)](#get-vocello) [![iPhone beta](https://img.shields.io/badge/iPhone-TestFlight%20beta-BFAADB?style=flat-square&logo=apple&logoColor=F5F6F8&labelColor=1C1E26)](https://testflight.apple.com/join/Cvp6yCv7) [![Swift 6 and MLX](https://img.shields.io/badge/Swift%206-MLX-DBA887?style=flat-square&logo=swift&logoColor=F5F6F8&labelColor=1C1E26)](#for-developers) [![MIT license](https://img.shields.io/badge/license-MIT-8C8F9B?style=flat-square&labelColor=1C1E26)](LICENSE)
 
-**[Features](#three-ways-to-make-a-voice)** · **[Get Vocello](#get-vocello)** · **[Command line](#command-line-and-ai-agents)** · **[For developers](#for-developers)**
+**[Features](#three-ways-to-make-a-voice)** · **[One model](#one-model-per-mode-tuned-where-it-counts)** · **[Get Vocello](#get-vocello)** · **[Command line](#command-line-and-ai-agents)** · **[For developers](#for-developers)**
 
 </div>
 
@@ -52,8 +52,25 @@ Vocello is a voice studio for your Mac and iPhone. Write a script, pick one of n
 - **Long scripts.** Paste a whole chapter: Vocello plans it into segments that play one after another while the rest generates, then joins them into one file.
 - **Ten languages.** Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish and Italian, detected from your script. The interface comes in ten languages too, set apart from the speech language.
 - **Your library.** Saved voices, and a searchable History of every take. Pin a take's seed from History to make it again with the same settings.
-- **Marked as AI-generated.** From 3.0, every take Vocello generates carries an inaudible AudioSeal watermark and a note naming the model and mode. Reference clips you record or import are never marked.
+- **Marked as AI-generated.** Every take Vocello generates carries an inaudible AudioSeal watermark and a note naming the model and mode. Reference clips you record or import are never marked.
 - **Up to date by itself.** The Mac app is signed and notarized, and installs signed updates from **Vocello > Check for Updates**.
+
+## One model per mode, tuned where it counts
+
+Vocello used to ask you to choose: Speed, or Quality at the cost of time, memory and disk space. Each mode now has one mixed-precision model instead. It keeps the compact model's size and gives the talker's attention layers 8 bits instead of 4, the place where extra precision bought the most for the least weight.
+
+| | Speed, before | **One model, now** | Quality, before |
+| --- | :---: | :---: | :---: |
+| Time to generate one second of speech | 0.28 s | **0.30 s** | 0.41 s |
+| Long projects finished, out of 72 | 56 | **65** | 68 |
+| Download per mode | 2.05 GB | **2.23 GB** | 2.82 GB |
+
+- **Close to Speed's pace.** About 9% more time than the old Speed model, and about 27% less than Quality.
+- **More dependable than Speed.** In Vocello's automated screens it makes fewer mistakes on single takes and on long projects, and finishes more of the long ones.
+- **Nothing to choose.** Every supported Mac runs the same model, the 8 GB ones included, so a take never depends on a setting.
+- **Lighter than Quality.** About 0.6 GB less to download per mode, and one package to keep instead of two.
+
+It does not match Quality everywhere: it clones a voice as closely as Speed did, and its accuracy on long projects sits between the two. Timings are medians on a Mac mini M6 with 16 GB, and the comparisons come from automated screens with fixed seeds, not from listening. → [How the model was chosen](docs/reference/hybrid-model.md)
 
 ## Performance
 
@@ -67,7 +84,7 @@ The speed figures come from a Vocello 3.1.0 build on the benchmark Mac; the memo
 ## Get Vocello
 
 **On a Mac:** [download Vocello](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26.dmg), drag it to Applications, then install the model of the mode you want from **Settings > Models & Files**.<br>
-**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta runs Vocello 3.0. The iPhone app's 3.1, on the same engine and model as the Mac app's, follows through TestFlight and the App Store.<br>
+**On iPhone:** [join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta still runs Vocello 3.0; the one-model update follows there.<br>
 **In Terminal:** see [Command line and AI agents](#command-line-and-ai-agents).
 
 | Platform | Requirements | Models |
@@ -76,16 +93,14 @@ The speed figures come from a Vocello 3.1.0 build on the benchmark Mac; the memo
 | Command line | macOS 26.0 or newer, Apple Silicon | Shared with the Mac app |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | One model per mode |
 
-Models download once from Hugging Face and are never bundled. From 3.1, Built-in Voice, Voice Design and Voice Cloning each have one model, a download of about 2.2 GB, on every supported Mac: there is no Speed or Quality to choose between. → [What's new in 3.1.0](docs/releases/v3.1.0.md) · [All releases](https://github.com/PowerBeef/Vocello/releases)
+Models download once from Hugging Face and are never bundled: one per mode, about 2.2 GB each. → [What's new in 3.1.0](docs/releases/v3.1.0.md) · [All releases](https://github.com/PowerBeef/Vocello/releases)
 
 <details>
 <summary><b>Upgrading, and older Macs</b></summary>
 
 <br>
 
-From Vocello 3.0, choose **Vocello > Check for Updates**, or install the new DMG. History, saved voices and settings carry over. On first launch Vocello replaces the models you installed with 3.0 by the new one for each mode, on its own on an unmetered network: a banner shows the progress, and **Not Now** stops it. Updating all three modes downloads about 4.7 GB, and your earlier models are removed once a new one is ready.
-
-From Vocello 2.x, install the new DMG by hand once: 2.x has no updater. History, saved voices and settings carry over, and the models you had installed are replaced the same way. If a mode reads Not installed afterwards, install its model from **Settings > Models & Files**.
+History, saved voices and settings carry over from any earlier version. From 3.0, choose **Vocello > Check for Updates**; from 2.x, install the new DMG by hand once. Vocello then replaces the models you had with the new one for each mode, on its own on an unmetered network (about 4.7 GB for all three modes; **Not Now** stops it). The [release notes](docs/releases/v3.1.0.md) have the details.
 
 Vocello was called QwenVoice before 2.2.0, and old repository links redirect here. Macs on macOS 15 can use the legacy [QwenVoice 1.2.3](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3).
 
@@ -98,7 +113,7 @@ Vocello was called QwenVoice before 2.2.0, and old repository links redirect her
 
 `vocello` brings the Mac app's features to Terminal, sharing its models, saved voices and settings: every mode, long scripts, saved voices, models and History, with JSON output for scripts and an MCP server for AI agents.
 
-Install it with the signed [installer package](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26-cli.pkg), which asks for an administrator password, then, from a new Terminal window, check it, install the Built-in Voice model (about 2.2 GB; its id keeps the name it had in 3.0) and play a first take:
+Install it with the signed [installer package](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26-cli.pkg), which asks for an administrator password, then, from a new Terminal window, check it, install the Built-in Voice model (about 2.2 GB; its id still says `speed`, a name kept from earlier versions) and play a first take:
 
 ```sh
 vocello --version

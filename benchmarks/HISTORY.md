@@ -1950,3 +1950,4 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-16 | [`macos-xcui-perf-20261115-234925-dae0f970`](runs/ui-perf/macos-xcui-perf-20261115-234925-dae0f970.json) | canonical | canonical | passed | not-applicable | 12 | — | `5c5ce519906c` | `bfddc9ec378c` | baseline | macos-xcui-perf-20261115-234925-dae0f970 |
+| 2026-11-16 | [`macos-xcui-perf-20261116-000214-b26d443d`](runs/ui-perf/macos-xcui-perf-20261116-000214-b26d443d.json) | canonical | canonical | passed | not-applicable | 12 | — | `962c2cd05ba9` | `bfddc9ec378c` | vs macos-xcui-perf-20261115-234925-dae0f970: compatible | macos-xcui-perf-20261116-000214-b26d443d |

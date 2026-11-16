@@ -33,9 +33,10 @@ export const FinalCTA = () => (
         <a className="cta-meta-link" href={CLI_PKG}>Get the command line package</a>
       </p>
       <p className="cta-models">
-        Needs macOS 26 on Apple Silicon with 8 GB of memory, 16 GB or more for the Quality models.
-        Open the disk image and drag Vocello to Applications. Models are not bundled: each
-        downloads once from Hugging Face, and the three Speed models take about 4.8 GB together.
+        Needs macOS 26 on Apple Silicon with 8 GB of memory, 16 GB or more for long projects.
+        Open the disk image and drag Vocello to Applications. Models are not bundled: each mode's
+        model downloads once from Hugging Face, about 2.2 GB on its own. Coming from 3.0, the Mac
+        app updates the models you installed, about 4.7 GB for all three.
       </p>
       <p className="cta-meta">
         <a href={RELEASE_NOTES} target="_blank" rel="noreferrer" className="cta-meta-link">Release notes</a>

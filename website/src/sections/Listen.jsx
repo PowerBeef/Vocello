@@ -36,7 +36,7 @@ export const Listen = () => {
           <p className="section-sub">
             Four takes made locally, from a built-in speaker or a voice described in words,
             including a Japanese line and a 31 second narration. They were made with versions
-            before 3.0, so one uses Excited, a delivery 3.0 folds into Happy.
+            before 3.0, so one uses Excited, a delivery folded into Happy since 3.0.
           </p>
         </div>
 

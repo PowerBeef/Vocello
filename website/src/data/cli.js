@@ -1,4 +1,4 @@
-// The vocello command line, as docs/releases/v3.0.0.md and docs/reference/cli.md
+// The vocello command line, as docs/releases/v3.1.0.md and docs/reference/cli.md
 // describe it. Commands are copied from those documents (their examples and the
 // install, uninstall and MCP lines); change them only with the CLI reference.
 
@@ -20,8 +20,10 @@ export const UNINSTALL = {
   lines: ["sudo sh /usr/local/lib/vocello/uninstall.sh"],
 };
 
-// pro_custom_speed is the Built-in Voice Speed model (about 2 GB in the catalog),
-// the one model the take below needs.
+// pro_custom_speed is the Built-in Voice model (about 2.2 GB in the catalog), the one
+// model the take below needs. Each mode has one model since 3.1 and its id keeps the
+// 3.0 name, so no command names a variant: without --variant, generate uses the mode's
+// model (docs/reference/cli.md, generate).
 export const FIRST_COMMANDS = {
   label: "First commands",
   copyName: "the first commands",
@@ -29,18 +31,18 @@ export const FIRST_COMMANDS = {
     "vocello speakers list",
     "vocello models list",
     "vocello models install pro_custom_speed",
-    'vocello generate --mode custom --variant speed --text "The train left at dawn." --out ~/Desktop/hello.wav',
+    'vocello generate --mode custom --text "The train left at dawn." --out ~/Desktop/hello.wav',
   ],
 };
 
-// Both takes use the Built-in Voice Speed model that FIRST_COMMANDS installs.
+// Both takes use the Built-in Voice model that FIRST_COMMANDS installs.
 export const MACHINE_COMMANDS = {
   label: "Machine-readable commands",
   copyName: "the machine-readable commands",
   lines: [
-    'echo "Hello there." | vocello generate --variant speed --text - --json',
+    'echo "Hello there." | vocello generate --text - --json',
     "vocello capabilities --json",
-    `echo '{"mode":"custom","variant":"speed","text":"Good evening."}' | vocello run --request - --json`,
+    `echo '{"mode":"custom","text":"Good evening."}' | vocello run --request - --json`,
   ],
 };
 
@@ -63,7 +65,7 @@ export const EXIT_STATUSES = [
 export const MCP_TOOLS = [
   "List voices, models, speakers and languages",
   "Generate speech, with progress and cancellation",
-  "Enroll and delete saved voices",
+  "Enroll saved voices, and delete one only when started with --allow-voice-delete",
   "Read History and export takes",
 ];
 
@@ -71,7 +73,7 @@ export const MCP_TOOLS = [
 export const CLI_LIMITS = [
   {
     k: "Not in History yet",
-    v: "Command-line takes are saved as files and do not appear in History yet; a 3.0 update adds that. Reading History from the command line needs the Mac app closed for now.",
+    v: "Command-line takes are saved as files and do not appear in History yet; a later update adds that. Reading History from the command line needs the Mac app closed for now.",
   },
   {
     k: "Consent every time",

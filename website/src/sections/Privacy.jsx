@@ -78,8 +78,10 @@ export const Privacy = () => (
           </tbody>
         </table>
         <p className="privacy-footnote">
-          Setup needs the internet once: each model downloads from Hugging Face, and the Mac app
-          checks GitHub for updates when you allow it. After that, generation runs locally.
+          Vocello uses the internet for two things: each mode's model downloads once from
+          Hugging Face, and the Mac app checks GitHub for updates when you allow it. After an
+          update from 3.0, the Mac app also updates the models you had installed, on its own on
+          an unmetered network, and Not Now stops it. Generation itself runs locally.
         </p>
       </div>
     </div>

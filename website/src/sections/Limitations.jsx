@@ -9,7 +9,7 @@ const LIMITATIONS = [
   },
   {
     k: "Apple Silicon and memory",
-    v: "Vocello needs an Apple Silicon Mac with at least 8 GB of unified memory. Quality models use larger 8-bit packages and need more headroom than Speed models; 16 GB or more is recommended for them and for long projects.",
+    v: "Vocello needs an Apple Silicon Mac with at least 8 GB of unified memory; 16 GB or more is recommended for long projects. Each mode has one model, so there is no lighter or heavier package to choose.",
   },
   {
     k: "Command line install",
@@ -17,7 +17,7 @@ const LIMITATIONS = [
   },
   {
     k: "Command line and History",
-    v: "Takes made with the command line, including through vocello mcp, are saved as files and do not appear in History yet; a 3.0 update adds that. The command line reads History only while the Vocello app is closed.",
+    v: "Takes made with the command line, including through vocello mcp, are saved as files and do not appear in History yet; a later update adds that. The command line reads History only while the Vocello app is closed.",
   },
   {
     k: "Take quality",
@@ -25,19 +25,23 @@ const LIMITATIONS = [
   },
   {
     k: "Rejected takes",
-    v: "Some French and Chinese takes fail the mandatory audio check, and rarely a long-form take develops a long silent gap without finishing. Vocello rejects such a take instead of saving it and never regenerates one silently; generate it again.",
+    v: "The mandatory audio check can still refuse a take in any language, and rarely a take says its text and then runs on in silence: Vocello stops it after three seconds and the check refuses it. Vocello rejects such a take instead of saving it and never silently regenerates, substitutes or accepts one; generate it again.",
   },
   {
-    k: "Consistent long-form stalls",
-    v: "Long-form projects using the Consistent take variation can still stall, though far less often than in earlier builds: a segment of about a minute may pause for several seconds or never finish. Audio QC rejects that segment instead of saving it, and Resume retries it with a fresh seed. This was not observed with Expressive, the default.",
+    k: "Korean long-form projects",
+    v: "Korean long-form projects still stop on about half the scripts in Vocello's automated screens, so Studio shows a caution before you start one. When a segment is refused, Resume continues with a new take of it.",
+  },
+  {
+    k: "Against 3.0's models",
+    v: "The 3.1 model clones a voice about as closely as the 3.0 Speed model, not as closely as Quality, and its long-form error rate sits between the two.",
   },
   {
     k: "Seeds from earlier versions",
-    v: "Sampling changed in 3.0, so a seed pinned in an earlier version does not reproduce its old take.",
+    v: "The model changed in 3.1, so a seed pinned with 3.0 or earlier does not reproduce its old take.",
   },
   {
     k: "iPhone is in beta",
-    v: "The iPhone app is a public TestFlight beta that runs Vocello 3.0, and the App Store release follows. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
+    v: "The iPhone app is a public TestFlight beta that runs Vocello 3.0; its 3.1 version follows through TestFlight and the App Store. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
   },
   {
     k: "Cloning varies",

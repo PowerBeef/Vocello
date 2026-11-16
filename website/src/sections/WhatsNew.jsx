@@ -1,24 +1,28 @@
 import React from "react";
 import { Icon } from "../components/Icon.jsx";
 import { RELEASE_NOTES } from "../data/credits.js";
-import { MAC_HIGHLIGHTS, SHARED_HIGHLIGHTS, UPGRADE_NOTE, WHATS_NEW_VERSION } from "../data/whatsnew.js";
+import { HIGHLIGHTS, IPHONE_NOTE, UPGRADE_NOTE, WHATS_NEW_VERSION } from "../data/whatsnew.js";
 
 // The home page names the changes people notice; the release notes carry every one.
-const SHARED_ON_HOME = ["Generated audio is marked", "Takes read the whole script first", "Interface in ten languages"];
-const highlights = [
-  ...MAC_HIGHLIGHTS,
-  ...SHARED_ON_HOME.map((k) => SHARED_HIGHLIGHTS.find((item) => item.k === k)).filter((item) => item !== undefined),
+const ON_HOME = [
+  "One improved model per mode",
+  "Your models update themselves",
+  "Voice cloning follows its reference more faithfully",
+  "Clearer feedback on references",
+  "One way to sample a take",
+  "A leaner, quicker engine",
 ];
+const highlights = ON_HOME.map((k) => HIGHLIGHTS.find((item) => item.k === k)).filter((item) => item !== undefined);
 
 export const WhatsNew = () => (
   <section className="section whatsnew-section" id="whats-new" aria-labelledby="whatsnew-title">
     <div className="container">
       <header className="section-head">
-        <p className="section-note">Released October 2026</p>
+        <p className="section-note">Released November 2026</p>
         <h2 id="whatsnew-title" className="section-title">What's new in {WHATS_NEW_VERSION}</h2>
         <p className="section-sub">
-          A redesigned Mac app that updates itself, and a command line for scripts and AI agents.
-          The iPhone app's 3.0 version is in the public TestFlight beta.
+          One improved model for each mode, in the Mac app and the command line, and the models
+          you already have update on their own. {IPHONE_NOTE}
         </p>
       </header>
       <ul className="whatsnew-grid" role="list">

@@ -4,7 +4,7 @@ import { Screenshot } from "../components/Screenshot.jsx";
 import { MAC_DMG, TESTFLIGHT } from "../data/credits.js";
 import { STABLE_MAC_RELEASE } from "../data/release.js";
 
-// "3.0.0" reads as "3.0" in the eyebrow; the button keeps the exact version.
+// "3.1.0" reads as "3.1" in the eyebrow; the button keeps the exact version.
 const releaseLabel = STABLE_MAC_RELEASE.version.replace(/\.0$/, "");
 
 // Centered: the promise first, then the product. The Mac window carries the

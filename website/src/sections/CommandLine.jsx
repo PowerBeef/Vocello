@@ -2,6 +2,7 @@ import React from "react";
 import { CodeBlock } from "../components/CodeBlock.jsx";
 import { Icon } from "../components/Icon.jsx";
 import { CLI_DMG, CLI_PKG, CLI_REFERENCE, RELEASES } from "../data/credits.js";
+import { STABLE_MAC_RELEASE } from "../data/release.js";
 import {
   CLI_LIMITS,
   EXIT_STATUSES,
@@ -20,12 +21,15 @@ const withCode = (text) =>
     i % 2 === 1 ? <code key={i} className="cli-inline cli-flag">{part}</code> : part,
   );
 
+// "3.1.0" reads as "3.1" in the note above the title, as in the home page's hero.
+const releaseLabel = STABLE_MAC_RELEASE.version.replace(/\.0$/, "");
+
 // /cli/: the full guide.
 export const CommandLineGuide = () => (
   <section className="section cli-section cli-page" aria-labelledby="cli-title">
     <div className="container">
       <header className="cli-head page-head">
-        <p className="section-note">New in Vocello 3.0</p>
+        <p className="section-note">Part of Vocello {releaseLabel}</p>
         <h1 id="cli-title" className="section-title page-title">Command line and agents.</h1>
         <p className="section-sub">
           <code className="cli-inline">vocello</code> brings the Mac app's features to the
@@ -114,13 +118,26 @@ export const CommandLineGuide = () => (
           <p className="cli-sub-body">
             Model files are not bundled. Install one once, in the app or from the terminal, and
             both use it. These commands list the speakers and models, download the Built-in Voice
-            Speed model (about 2 GB, once), and save a first take to your Desktop.
+            model (about 2.2 GB, once), and save a first take to your Desktop.
           </p>
           <CodeBlock block={FIRST_COMMANDS} />
           <p className="cli-note">
             Voice Design and Voice Cloning each use their own model.{" "}
             <code className="cli-inline">vocello models install-recommended --plan</code> lists
             the model each mode uses and its download size, and downloads nothing.
+          </p>
+          <p className="cli-note">
+            Coming from 3.0? Each mode now has one model, and the model ids are unchanged.{" "}
+            <code className="cli-inline">vocello models list</code> marks a mode whose 3.0 model
+            needs its update, and <code className="cli-inline">vocello models install</code>{" "}
+            installs the new model and removes the earlier folders. Scripts written for 3.0 keep
+            running: <code className="cli-inline">--variant quality</code>,{" "}
+            <code className="cli-inline">models use</code> and{" "}
+            <code className="cli-inline">models prefer-lower-memory</code> print a{" "}
+            <code className="cli-inline">variant_retired</code> warning and use the mode's one
+            model, and <code className="cli-inline">--variation balanced</code> or{" "}
+            <code className="cli-inline">consistent</code> prints{" "}
+            <code className="cli-inline">variation_retired</code> and generates as Expressive.
           </p>
         </div>
       </div>
@@ -134,7 +151,7 @@ export const CommandLineGuide = () => (
             documented exit statuses and progress events. Text output is for people and is not a
             contract. These commands pipe a script in for the JSON envelope, describe every
             command, option, error code and exit status, and send a JSON request on standard
-            input; both takes use the Built-in Voice Speed model installed above.
+            input; both takes use the Built-in Voice model installed above.
           </p>
           <CodeBlock block={MACHINE_COMMANDS} />
           <table className="cli-exit-table">

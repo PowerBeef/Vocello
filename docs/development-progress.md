@@ -73,10 +73,11 @@ routed check and the Mac build pass on them.
   control. No crash, and no assertion about the app failed. The first sitting's smoke met the same
   prompt and passed.
 
-**Owed before the tag (the maintainer's)**
+- **Smoke again, once the maintainer had answered the prompt: PASS, 16 of 16**
+  (`macos-xcui-smoke-20261116-043438-94229258`), no failure frame, no new crash report. The
+  playback journeys ran on the player fix.
 
-- Answer the Speech Recognition prompt for the development build (Autoriser or Refuser; either
-  ends it), then give a Mac window for one more smoke run, which gets a new run ID.
+Nothing is owed before the push.
 
 **Still open, none blocking the push**
 
@@ -97,7 +98,6 @@ routed check and the Mac build pass on them.
 
 **Next, in order (each the maintainer's word)**
 
-0. The Speech Recognition prompt answered, then smoke again in a Mac window (above).
 1. ★ Push `main` (it deploys the website, whose download links name `v3.1.0` before the release
    exists, so the tag and the promotion follow closely) and wait for `CI required` on that commit.
    CI compiles with Xcode 26.6, which no local build has done for these commits.

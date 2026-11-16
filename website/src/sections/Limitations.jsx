@@ -9,7 +9,7 @@ const LIMITATIONS = [
   },
   {
     k: "Apple Silicon and memory",
-    v: "Vocello needs an Apple Silicon Mac with at least 8 GB of unified memory; 16 GB or more is recommended for long projects. Each mode has one model, so there is no lighter or heavier package to choose.",
+    v: "Vocello needs an Apple Silicon Mac with at least 8 GB of unified memory; 16 GB or more is recommended for long projects. Each mode has one model, the same on an 8 GB Mac as on a larger one.",
   },
   {
     k: "Command line install",

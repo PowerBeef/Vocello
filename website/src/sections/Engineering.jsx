@@ -47,7 +47,7 @@ const LEDGER = [
   },
   {
     k: "One model per mode",
-    v: "Each mode runs a single model, so there is no Speed or Quality choice to make. It keeps the 4-bit model's size and puts its attention layers at 8 bits, about 180 MB more. It was chosen by machine screens whose decision rules were recorded before their takes were generated: 192 clone takes in six languages, 72 long-form projects and 144 single takes, against both 3.0 models.",
+    v: "Each mode runs a single mixed-precision model, so there is no Speed or Quality choice to make. It keeps the 4-bit model's size and puts its attention layers at 8 bits, about 180 MB more. On the benchmark Mac mini M6 it takes 0.30 s to generate a second of speech, against 0.28 s for the 3.0 Speed model and 0.41 s for Quality; it finished 65 of 72 long-form projects, against 56 and 68; and its download is 2.23 GB per mode, against 2.05 GB and 2.82 GB. It was chosen by machine screens whose decision rules were recorded before their takes were generated: 192 clone takes in six languages, 72 long-form projects and 144 single takes, against both 3.0 models.",
   },
   {
     k: "One engine, three hosts",

@@ -10,7 +10,7 @@ export const WHATS_NEW_VERSION = "3.1";
 export const HIGHLIGHTS = [
   {
     k: "One improved model per mode",
-    short: "Each mode uses a single model. The Speed/Quality switch and the lower-memory setting are gone.",
+    short: "One model per mode replaces Speed and Quality: close to Speed's pace, fewer mistakes on long scripts, and nothing to choose.",
     v: "Built-in Voice, Voice Design and Voice Cloning each use a single model that keeps the 4-bit model's size and puts its attention layers at 8 bits (about 180 MB more). In Vocello's automated screens it makes fewer mistakes than the 3.0 Speed model on single takes and long projects, finishes more long projects, and clones a voice as closely as Speed did. On the benchmark Mac mini M6 it takes about 9% more time than the 3.0 Speed model and about 27% less than Quality. The Speed/Quality switch and the \"Prefer lower-memory models\" setting are gone, and each mode's package row reads Model.",
   },
   {

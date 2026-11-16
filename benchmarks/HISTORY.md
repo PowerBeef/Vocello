@@ -1944,3 +1944,9 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-14 | [`macos-xcui-perf-20261114-193957-54115c9c`](runs/ui-perf/macos-xcui-perf-20261114-193957-54115c9c.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `5cee46dd01bf` | `684283851ab3` | baseline | macos-xcui-perf-20261114-193957-54115c9c |
+
+## ui-perf / macos / mac-mini-m6-16gb / config `bfddc9ec378c`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-16 | [`macos-xcui-perf-20261115-234925-dae0f970`](runs/ui-perf/macos-xcui-perf-20261115-234925-dae0f970.json) | canonical | canonical | passed | not-applicable | 12 | — | `5c5ce519906c` | `bfddc9ec378c` | baseline | macos-xcui-perf-20261115-234925-dae0f970 |

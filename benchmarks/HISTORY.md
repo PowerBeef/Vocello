@@ -1034,6 +1034,12 @@ their harness files differ from the baseline's.
 | 2026-09-25 | [`mac-gate-bench-20260925-172329-a73cdc6a`](runs/engine-generation/mac-gate-bench-20260925-172329-a73cdc6a.json) | focused | focused | passed | qualified | 6 | 0.27 | `848e140a24aa` | `1be7d302eadb` | vs mac-gate-bench-20260925-172105-c3bfdf05: RTF +0.1% (within noise), TTFC -0.1% (within noise), RAM -1.9% (within noise) | mac-gate-bench |
 | 2026-09-25 | [`mac-gate-bench-20260925-200552-0c056a16`](runs/engine-generation/mac-gate-bench-20260925-200552-0c056a16.json) | focused | focused | passed | qualified | 6 | 0.27 | `2871108b28aa` | `1be7d302eadb` | vs mac-gate-bench-20260925-172329-a73cdc6a: RTF +1.8% (within noise), TTFC +1.9% (within noise), RAM +3.5% (within noise), harness changed | mac-gate-bench |
 
+## engine-generation / macos / mac-mini-m6-16gb / config `5450b2687f95`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-16 | [`macos-engine-20261116-145238-b3fffea8`](runs/engine-generation/macos-engine-20261116-145238-b3fffea8.json) | focused | focused | passed | qualified | 5 | 0.30 | `5dc4be0aa762` | `5450b2687f95` | baseline | promo-delivery |
+
 ## engine-generation / macos / mac-mini-m6-16gb / config `7ede380f740e`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -599,7 +599,7 @@
         "config/public-product-facts.json"
       ],
       "updated": "2026-11-15",
-      "notes": "Opened 2026-11-14: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The audit of 2026-11-15 and its plan (docs/audits/2026-11-15-remediation-plan.md; its status table is current) are implemented except steps 40, 41, 46, 50 and the rest of 43. Xcode (decisions 2026-11-15): the pin stays at 26.6; the lanes run on this Mac's Xcode 27.2 and promotion accepts that difference only by name. Release sitting of 2026-11-15, all PASS on the M6: UI benchmark canonical under cell-hash-v2 (29 of 29 takes, stall 250 ms); ui perf four times, the last with ceilings enforced; smoke 16 of 16 twice; release-readiness; dev.sh ci; engine gate bench (RTF 0.294 against 0.291). The publication flip is on local main. Static audits: no blocker; two fixes (live preview under an output change, a stale History page), then smoke and perf again on the final commit; the rest parked as BKL-76. Nothing is owed before the push. Next: the maintainer's push, tag and promotion (seven macOS lanes on the tag checkout). Open: the delivery menu at 82 to 86 ms/s against September's 67 to 70; five stale screenshots. docs/development-progress.md, Resume now, has the order."
+      "notes": "Opened 2026-11-14: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The audit of 2026-11-15 and its plan (docs/audits/2026-11-15-remediation-plan.md) are implemented except steps 40, 41, 46, 50 and the rest of 43. Xcode: the pin stays at 26.6; the lanes run on this Mac's Xcode 27.2 and promotion accepts that difference only by name. Pushed 2026-11-16: CI required is green on 571b968e and the release rehearsal passed. Lanes on the 3.1 tree, all PASS: UI benchmark (canonical, cell-hash-v2), UI perf with ceilings enforced, smoke 16 of 16 on 571b968e, gate bench, language (ten languages), delivery, retained memory, model download, release-readiness, dev.sh ci. Fixed on the way: the language record's size cap, promotion's advisory-warning families, the lanes' signing (BKL-19), a flaky hook test (BKL-71), one Xcode 26.6 compile error. Next: the maintainer's signed v3.1.0 tag on a green commit, then the seven promotion lanes on the tag checkout and the assembly, which has never run end to end. Only docs, roadmap and records may be committed until promotion ends. docs/development-progress.md, Resume now, has the detail."
     },
     {
       "id": "RF-16",
@@ -2369,20 +2369,6 @@
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, D-1."
-    },
-    {
-      "id": "BKL-67",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The release rehearsal's Sparkle signatures job was cancelled on November 4",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "The scheduled release rehearsal passes again, or the Sparkle signatures job's cancellation is explained.",
-      "sourceOfTruth": [
-        ".github/workflows/release-rehearsal.yml"
-      ],
-      "updated": "2026-11-10",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10: the scheduled rehearsal of 2026-11-04 on e223d3e1 failed because the Sparkle signatures job was cancelled; the macOS package and iOS prerequisite jobs passed. It was the first failure after eight green pushes. Not investigated (focus rules)."
     },
     {
       "id": "BKL-68",

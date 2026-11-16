@@ -207,10 +207,16 @@ Nothing is owed before the push.
   `VocelloMacPerfUITests`' read of a main-actor static; Xcode 27.2 accepts it, so no local
   build could see it. Every other job passed, the deterministic tests, the TSan subset and
   the iOS compile (which builds the iPhone UI bundles with 26.6) included. Fixed locally
-  (`9cb9d2ce`: the constant is `nonisolated`), not pushed: only CI can confirm it. The push
-  also started the release rehearsal (run 43925421015), still running when this was written.
-  The fix changes the Mac UI-test bundle's source, so the lanes rebuild that bundle; the app
-  is unchanged.
+  (`9cb9d2ce`: the constant is `nonisolated`) and pushed with the maintainer's word:
+  **`CI required` is green on `571b968e`** (run 43928927385), the first clean Xcode 26.6
+  compile of this work. **The release rehearsal passed** on `19598822` (run 43925421015): the
+  cold macOS package build, the Sparkle signatures job, the release evidence job and the iOS
+  archive prerequisites. **Smoke passed 16 of 16 on `571b968e`**
+  (`macos-xcui-smoke-20261116-185119-b9a09517`), no system dialog: the fix changed the Mac
+  UI-test bundle's source, the app is unchanged.
+- **Ready for the tag.** The tag goes on a pushed commit whose `CI required` is green; the
+  promotion lanes then need a clean checkout of that commit. From here to the end of
+  promotion only docs, the roadmap and benchmark records may be committed.
 - **The three open Dependabot pull requests were reviewed and none belongs before the tag.**
   #115 (GitHub Actions pins in the release and security workflows) wants
   `supply_chain_contract.py --sync-actions` and lands after promotion. #119 (website

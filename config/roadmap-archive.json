@@ -6151,6 +6151,22 @@
         "file:scripts/hooks/session_start.sh",
         "file:scripts/tests/test_agent_hooks.py"
       ]
+    },
+    {
+      "id": "BKL-67",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The release rehearsal's Sparkle signatures job was cancelled on November 4",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The scheduled release rehearsal passes again, or the Sparkle signatures job's cancellation is explained.",
+      "sourceOfTruth": [
+        ".github/workflows/release-rehearsal.yml"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-10: the scheduled rehearsal of 2026-11-04 on e223d3e1 failed because the Sparkle signatures job was cancelled; the macOS package and iOS prerequisite jobs passed. It was the first failure after eight green pushes. Not investigated (focus rules). Closed 2026-11-16: the release rehearsal passed on 19598822 (push-triggered run 43925421015), its Sparkle signatures job included. The cancelled run of November 4 was never read; the workflow's own 20-minute job limit and an unbounded download in the signing-tool install are what could cancel that job.",
+      "evidence": [
+        "run:43925421015"
+      ]
     }
   ]
 }

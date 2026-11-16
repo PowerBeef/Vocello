@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 27/78 (35%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 28/78 (36%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -617,7 +617,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-64` | parked | Private load_json copies beside scripts/lib/jsonio.py | — |
 | `BKL-65` | parked | The App Store privacy and support URLs sit on a vercel.app subdomain | — |
 | `BKL-66` | parked | SECURITY.md has no supported row for the App Store iPhone app | — |
-| `BKL-67` | parked | The release rehearsal's Sparkle signatures job was cancelled on November 4 | — |
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
 | `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
@@ -795,10 +794,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-66`** (parked) — SECURITY.md has no supported row for the App Store iPhone app.
   gate: SECURITY.md's supported-versions table covers the iPhone app distributed through the App Store and TestFlight.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-67`** (parked) — The release rehearsal's Sparkle signatures job was cancelled on November 4.
-  gate: The scheduled release rehearsal passes again, or the Sparkle signatures job's cancellation is explained.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-68`** (parked) — The Cancel download dialog may show no Keep Download button on the iPhone.

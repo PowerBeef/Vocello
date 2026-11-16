@@ -147,4 +147,66 @@ final class AudioPlayerLivePreviewTests: XCTestCase {
             "a resume with audio queued schedules no silence"
         )
     }
+
+    /// An output-device change stops the real engine, which drops what the node had queued and
+    /// fires no completion. A paused preview that kept its graph would resume past audio nobody
+    /// heard and never drain, so it is handed to the take's file at the heard position instead.
+    func testAnOutputChangeUnderAPausedPreviewRetiresItsGraphAtTheHeardPosition() async throws {
+        _ = await deliverChunksUntilPlaying()
+        let graph = try XCTUnwrap(graphs.last)
+        graph.advance(1.25)
+        player.updatePlaybackProgress()
+        player.pause()
+
+        graph.reportConfigurationChange()
+        XCTAssertTrue(graph.retired, "the regression: a paused preview kept a graph whose queue was gone")
+        XCTAssertFalse(player.isPlaying)
+        XCTAssertEqual(player.currentTime, 1.25, accuracy: 1e-6, "the heard position is kept for the file")
+        XCTAssertEqual(player.livePreviewPhase, .buffering)
+        XCTAssertEqual(player.livePreviewQueueDepth, 0)
+
+        // Play before the take completes plays nothing from the retired graph, and the take's
+        // later chunks build no new one: the file continues from the heard position.
+        let graphCount = graphs.count
+        player.play()
+        XCTAssertFalse(player.isPlaying)
+        await deliverChunk()
+        XCTAssertEqual(graphs.count, graphCount)
+        XCTAssertFalse(graph.isNodePlaying)
+        XCTAssertEqual(player.currentTime, 1.25, accuracy: 1e-6)
+    }
+
+    func testAnOutputChangeUnderAnUnderrunHoldRetiresItsGraphToo() async throws {
+        let delivered = await deliverChunksUntilPlaying()
+        let graph = try XCTUnwrap(graphs.last)
+        graph.advance(1.0)
+        player.updatePlaybackProgress()
+        for _ in 0..<delivered { graph.playOldestChunk(seconds: 0) }
+        await settle { !player.isPlaying }
+        XCTAssertFalse(graph.isNodePlaying, "the underrun holds the node")
+        let heard = player.currentTime
+        XCTAssertEqual(heard, 1.0, accuracy: 1e-6)
+
+        graph.reportConfigurationChange()
+        XCTAssertTrue(graph.retired)
+        XCTAssertEqual(player.currentTime, heard, accuracy: 1e-6)
+        let graphCount = graphs.count
+        await deliverChunk()
+        XCTAssertEqual(graphs.count, graphCount, "the rest of the take waits for its file")
+        XCTAssertFalse(player.isPlaying)
+    }
+
+    /// A preview that never played has started no engine, so nothing was dropped: it keeps
+    /// its graph and plays from it.
+    func testAnOutputChangeBeforeThePreviewPlaysKeepsItsGraph() async throws {
+        player.pause()
+        await deliverChunk()
+        XCTAssertFalse(player.isPlaying, "a held take waits for Play")
+        let graph = try XCTUnwrap(graphs.last)
+        graph.reportConfigurationChange()
+        XCTAssertFalse(graph.retired)
+        player.play()
+        XCTAssertTrue(player.isPlaying)
+        XCTAssertTrue(graph.isNodePlaying)
+    }
 }

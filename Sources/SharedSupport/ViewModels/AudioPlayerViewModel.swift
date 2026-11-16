@@ -360,11 +360,14 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     /// the preview is not scheduled, and the take continues from the published
     /// file at that position: at once when it exists, otherwise when the take
     /// completes (the handoff `completeStreamingPreview` already makes).
-    /// Only an audible preview is handed over: a paused or buffering one
-    /// restarts its engine on the next Play or chunk. File playback
-    /// (`AVAudioPlayer`) follows the new device by itself.
+    /// A preview whose node has played is handed over whether it is audible,
+    /// paused or held by an underrun: the stopped engine dropped the node's
+    /// queue without a completion, so a resume in place would skip that audio
+    /// and never drain (RF-61). One still filling its first prebuffer has not
+    /// started its engine and starts it on the next Play or chunk. File
+    /// playback (`AVAudioPlayer`) follows the new device by itself.
     private func handleLiveOutputConfigurationChange() {
-        guard playbackMode == .live, isPlaying else { return }
+        guard playbackMode == .live, isPlaying || livePlaybackStarted else { return }
         AppPerformanceSignposts.emit("Live Preview Output Changed")
         retireLiveGraphKeepingHeardPosition()
     }

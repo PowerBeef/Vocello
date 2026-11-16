@@ -270,7 +270,9 @@ out="$(find scripts -name 'test_*.py' -not -path 'scripts/tests/*' -print
     -exec rg -l '^\s*def test_|^class \w+\(.*TestCase\)' {} + || true)"
 [[ -z "$out" ]] || fail "Python tests live only in scripts/tests as test_*.py (pytest collects nothing else):\n$out"
 
-# Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB.
+# Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB; a language
+# record, which has one cell per take over the ten-language matrix, at most 384 KB
+# (MAX_RECORD_BYTES_BY_KIND in scripts/benchmark_history.py).
 if [[ -d benchmarks ]]; then
   raw="$(find benchmarks \
     \( -type f \( \
@@ -287,8 +289,9 @@ if [[ -d benchmarks ]]; then
       -iname '*.xcresult' -o -iname '*.trace' -o -iname '*.xcarchive' -o -iname '*.dsym' \
     \) \) -print)"
   [[ -z "$raw" ]] || fail "raw benchmark telemetry, audio, screenshots, logs and bundles must stay untracked:\n$raw"
-  oversized="$(find benchmarks -type f -size +262144c -print)"
-  [[ -z "$oversized" ]] || fail "committed benchmark file exceeds the 256 KB cap:\n$oversized"
+  oversized="$(find benchmarks -type f -size +262144c -not -path 'benchmarks/runs/language/*' -print
+    find benchmarks/runs/language -type f -size +393216c -print 2>/dev/null)"
+  [[ -z "$oversized" ]] || fail "committed benchmark file exceeds its size cap (256 KB; a language record 384 KB):\n$oversized"
 fi
 
 echo "==> Repository invariants hold" >&2

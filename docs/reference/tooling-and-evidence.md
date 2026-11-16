@@ -111,7 +111,8 @@ rules they enforce:
   (`docs/reference/quality-promotion.md`; the 3.1 Mac release, built with Xcode 26.6 and measured on
   a Mac whose macOS runs only Xcode 27, is the case).
 - **Evidence retention.** Only qualified privacy-safe PASS records enter `benchmarks/runs/` (≤ 256 KB
-  each, strict allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
+  each, a language record ≤ 384 KB because it has one cell per take over ten languages; strict
+  allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
   xcresult and traces stay untracked; publication never stages, commits or pushes. The `benchmark` and
   `perf` lanes of `scripts/ui_test.sh` (macOS and iPhone) say in one line when they start that a
   passing run writes a tracked record and rewrites `benchmarks/HISTORY.md` (a perf run only on the

@@ -93,6 +93,17 @@ SCHEMA_PATHS = {
 SCHEMA_PATH = SCHEMA_PATHS[1]
 HISTORY_PATH = BENCHMARK_ROOT / "HISTORY.md"
 MAX_RECORD_BYTES = 256 * 1024
+# A language record has one cell per take, and promotion requires the full matrix (23 cells for
+# the ten languages), which stores about 290 KiB. That kind alone has a larger cap (maintainer
+# decision 2026-11-16); `scripts/repo_invariants.sh` holds the committed files to the same sizes.
+MAX_RECORD_BYTES_BY_KIND = {"language": 384 * 1024}
+
+
+def max_record_bytes(record: Any) -> int:
+    """The stored-size cap of a record: its kind's, or the general one."""
+    run = record.get("run") if isinstance(record, dict) else None
+    kind = run.get("kind") if isinstance(run, dict) else None
+    return MAX_RECORD_BYTES_BY_KIND.get(kind, MAX_RECORD_BYTES) if isinstance(kind, str) else MAX_RECORD_BYTES
 SCHEMA_VERSION = 2
 SUPPORTED_SCHEMA_VERSIONS = frozenset(SCHEMA_PATHS)
 
@@ -831,8 +842,9 @@ def load_json(path: Path) -> Any:
 
 def atomic_json_write(path: Path, value: Any) -> None:
     encoded = stored_json_bytes(value)
-    if len(encoded) > MAX_RECORD_BYTES:
-        raise HistoryError(f"record exceeds {MAX_RECORD_BYTES} bytes ({len(encoded)} bytes)")
+    limit = max_record_bytes(value)
+    if len(encoded) > limit:
+        raise HistoryError(f"record exceeds {limit} bytes ({len(encoded)} bytes)")
     jsonio.atomic_write_bytes(path, encoded)
 
 
@@ -3865,8 +3877,10 @@ def validate_record(
     if record.get("digest") != expected_digest:
         raise HistoryError("record digest does not match its canonical content")
     encoded = stored_json_bytes(record)
-    if len(encoded) > MAX_RECORD_BYTES:
-        raise HistoryError("record exceeds the per-file size limit")
+    if len(encoded) > max_record_bytes(record):
+        raise HistoryError(
+            f"record exceeds the per-file size limit ({len(encoded)} bytes against {max_record_bytes(record)})"
+        )
     if expected_path is not None:
         expected_parent = RUNS_ROOT / run["kind"]
         if expected_path.parent != expected_parent or expected_path.name != f"{run['id']}.json":

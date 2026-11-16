@@ -61,7 +61,8 @@ If a validated benchmark cannot publish, do not move or rewrite its evidence: re
 - **No raw `*.jsonl`.** The per-generation diagnostics JSONL is large and lives on disk under
   `~/Library/Application Support/QwenVoice[-Debug]/diagnostics/` (gitignored, and auto-pruned to a size
   budget by `GenerationTelemetryJSONLSink`). Commit a distilled summary, not the raw stream.
-- **Each committed file ≤ 256 KB.** Keep it a summary, not a dump.
+- **Each committed file ≤ 256 KB.** Keep it a summary, not a dump. A `language` record may reach
+  384 KB: it has one cell per take, and the ten-language matrix has 23.
 - **Successful evidence only.** Failed, interrupted, crashed, incomplete-layer, unreadable-output, or failed-QC
   runs must leave the tracked registry unchanged.
 - **Strict privacy allowlist.** Records reject serial numbers, UDIDs, ECIDs, device/host/user names,

@@ -2267,7 +2267,7 @@ python3 scripts/benchmark_history.py rebuild-index --check
 ```
 
 Publication creates one allowlisted `<kind>/<run-id>.json` record under `benchmarks/runs/` (one
-directory per kind, ≤256 KB per record) and regenerates `benchmarks/HISTORY.md`; direct Markdown
+directory per kind, ≤256 KB per record, ≤384 KB for a `language` record) and regenerates `benchmarks/HISTORY.md`; direct Markdown
 append is unsupported, and publication never stages, commits, or pushes. Re-recording
 byte-identical evidence is idempotent. A conflicting run ID, duplicate evidence digest, privacy
 violation, oversized record, failed QC, failed finish, crash delta, missing layer, wrong take
@@ -2490,7 +2490,7 @@ publication needs (`GenerationTelemetrySidecarBudget`). No manual clearing is ne
 
 | Path | Rule |
 |------|------|
-| `benchmarks/runs/` | One canonical allowlisted `<kind>/<run-id>.json` record per successful run, ≤ 256 KB; only `annotate` may update listening review |
+| `benchmarks/runs/` | One canonical allowlisted `<kind>/<run-id>.json` record per successful run, ≤ 256 KB (`language` ≤ 384 KB); only `annotate` may update listening review |
 | `benchmarks/HISTORY.md` | Generated registry index (`scripts/benchmark_history.py rebuild-index`, run by publication; `rebuild-index --check` runs in the contract gate); the generated-file guard hook refuses hand edits |
 | `benchmarks/LEGACY_HISTORY.md` | Preserved incomplete manual history; never promoted to complete registry evidence |
 | `benchmarks/hardware-profiles.json`, `schema-v3.json`, `schema-v2.json` (both published today), `schema-v1.json` (read-only) | Canonical hardware identities plus the record contracts |

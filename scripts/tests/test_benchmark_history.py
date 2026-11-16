@@ -2915,6 +2915,25 @@ class BenchmarkHistoryTests(unittest.TestCase):
             self.publish(record)
         self.assertEqual(history.all_record_paths(), [])
 
+    def test_only_a_language_record_has_the_larger_size_cap(self) -> None:
+        # A language record has one cell per take; the ten-language matrix promotion requires
+        # stores about 290 KiB, which the general cap refused (2026-11-16).
+        self.assertEqual(history.max_record_bytes({"run": {"kind": "language"}}), 384 * 1024)
+        for kind in ("ui-generation", "engine-generation", "ui-perf", "memory-qualification", None, 7):
+            self.assertEqual(history.max_record_bytes({"run": {"kind": kind}}), history.MAX_RECORD_BYTES)
+        self.assertEqual(history.max_record_bytes([]), history.MAX_RECORD_BYTES)
+        self.assertEqual(history.max_record_bytes({"run": None}), history.MAX_RECORD_BYTES)
+
+        padding = "x" * 300_000
+        history.atomic_json_write(self.root / "language.json", {"run": {"kind": "language"}, "pad": padding})
+        with self.assertRaisesRegex(history.HistoryError, "record exceeds 262144 bytes"):
+            history.atomic_json_write(self.root / "ui.json", {"run": {"kind": "ui-generation"}, "pad": padding})
+        self.assertFalse((self.root / "ui.json").exists())
+        with self.assertRaisesRegex(history.HistoryError, "record exceeds 393216 bytes"):
+            history.atomic_json_write(
+                self.root / "language-2.json", {"run": {"kind": "language"}, "pad": "x" * 400_000}
+            )
+
     def test_index_check_detects_drift(self) -> None:
         self.publish(record_fixture())
         history.rebuild_index(check=True)

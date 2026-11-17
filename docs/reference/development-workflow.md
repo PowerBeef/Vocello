@@ -631,7 +631,9 @@ allows pytest by itself: run it through `scripts/dev.sh py` or
 
 `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
 installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
-External writes include GitHub, the Vercel CLI and App Store Connect. The GitHub connector arrives
+External writes include GitHub, the Vercel CLI and App Store Connect; `scripts/ci/failure_issue.py`,
+which files and comments on issues, asks although `python3 scripts/ci/*` is allowed (an ask rule
+outranks an allow rule). The GitHub connector arrives
 under a server name the client chooses (`claude_ai_Github` in the CLI, a per-install UUID in the
 desktop app), so its ask rules name the writing tools under any server (`mcp__*__push_files`,
 `mcp__*__*_write` and the rest), and `connector_write_guard.py` asks on the same tools by their own
@@ -644,10 +646,16 @@ neither touches its reads (`get_*`, `list_*`, `search_*`, `*_read`). On Hugging 
 `deny` covers force pushes and the named non-main push forms (`origin HEAD`, `origin worktree-*`,
 `origin claude/*`), `checkout -b`, `switch -c` and `worktree add`, `update-ref`, stashing, broad
 staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
-`hf auth token`, which prints the stored credential. Any other non-main push and `git branch <name>`
-are refused by the `policy_guard.sh` hook, not by a permission rule. The deny rules match literal
-prefixes (`git add -A`, `git stash`); the hook refuses every other spelling of broad staging,
-`git commit -a` and stashing ([The commit lint](#the-commit-lint)). It
+`hf auth token`, which prints the stored credential. Any other non-main push, a push to any
+repository but `origin` (another remote, a URL, a path) and `git branch <name>` are refused by the
+`policy_guard.sh` hook, not by a permission rule, and so are local history rewrites (BKL-63):
+`git commit --amend`, `--fixup` and `--squash`, `git rebase` (but `--abort` and `--quit`),
+`git pull --rebase`, a `git reset` that moves the branch to another commit (unstaging a path and
+resetting to `HEAD` stay open; `git reset --hard` asks), `git filter-branch` and `filter-repo`. The
+deny rules match literal prefixes (`git add -A`, `git stash`); the hook refuses every other spelling of
+broad staging (a pathspec a substitution computes included), `git commit -a` and stashing, and a
+variable in command position that holds git or precedes a judged subcommand (`$G push`) is judged
+as git ([The commit lint](#the-commit-lint)). It
 also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
 desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
 simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the

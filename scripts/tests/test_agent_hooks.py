@@ -612,6 +612,28 @@ class PermissionTests(unittest.TestCase):
                      "Bash(git reset --hard*)", "Bash(hf download*)"):
             self.assertIn(rule, self.ask)
 
+    def test_the_failure_issue_script_asks_although_the_ci_scripts_are_allowed(self):
+        """BKL-63 (audit G-2): `Bash(python3 scripts/ci/*)` approved failure_issue.py, which files and comments
+        on GitHub issues, while `gh issue create` itself asks. An ask rule outranks an allow rule."""
+        def matches(command: str, rules: list[str]) -> bool:
+            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
+                       for rule in rules)
+
+        arguments = "--label nightly --title 'Nightly lane failing' --heading 'Nightly run failed'"
+        for command in (f"python3 scripts/ci/failure_issue.py {arguments}",
+                        f"python3 scripts/ci/failure_issue.py --dry-run {arguments}",
+                        f'"$(python3 scripts/select_python.py)" scripts/ci/failure_issue.py {arguments}',
+                        f"./scripts/ci/failure_issue.py {arguments}",
+                        f"RESULTS='{{}}' RUN_URL=x python3 scripts/ci/failure_issue.py {arguments}"):
+            with self.subTest(command=command):
+                self.assertTrue(matches(command, self.ask))
+        for command in ("python3 scripts/ci/classify_changes.py --base origin/main",
+                        "python3 scripts/ci/summarize_test_failures.py build/x"):
+            with self.subTest(allowed=command):
+                self.assertTrue(matches(command, self.allow))
+                self.assertFalse(matches(command, self.ask))
+        self.assertFalse(matches("cat scripts/ci/failure_issue.py", self.ask))
+
     def test_hugging_face_cli_and_mcp_reads_are_allowed_while_writes_ask_and_the_token_stays_hidden(self):
         def matches(command: str, rules: list[str], tool: str = "Bash") -> bool:
             if tool != "Bash":
@@ -948,13 +970,18 @@ class PolicyGuardTests(unittest.TestCase):
                         "git push --all", "git push --mirror", "git push --tags", "git push origin --delete main",
                         "git push origin :main", "git push -u origin topic", "git push origin main topic",
                         "git push origin v3.0.0", "git -C wt/a push origin worktree-a",
-                        "git status && git push origin topic"):
+                        "git status && git push origin topic",
+                        # BKL-63: main goes only to origin, never another remote, a URL or a path.
+                        "git push upstream main", "git push https://example.invalid/r.git main",
+                        "git push git@example.invalid:o/r.git main", "git push ../other main",
+                        "git push --repo=https://example.invalid/r.git main", "git push --repo upstream main",
+                        "git push upstream", '"$G" push origin topic', "G=git; $G push upstream main"):
             with self.subTest(command=command):
                 result = self.guard(command)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("only main is ever pushed", result.stderr)
         for command in ("git push", "git push origin", "git push origin main", "git push -q origin main",
-                        "git push origin main:main"):
+                        "git push origin main:main", "git push --repo=origin main", "git -C . push origin main"):
             with self.subTest(command=command):
                 self.assertEqual(self.guard(command).returncode, 0)
 
@@ -986,6 +1013,11 @@ class PolicyGuardTests(unittest.TestCase):
             "git -calias.x=status x", "git --config-env alias.x=VAR x",
             f"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0={push} git x origin topic",
             "git send-pack https://example.invalid/r.git topic", "git fetch . main:x", "git tag v9",
+            # BKL-63: a variable holding git, a computed subcommand, and config that makes a pull rebase
+            f"G=git; $G {push} --force origin main", f"export GIT=/usr/bin/git; $GIT {push} origin topic",
+            f"$GIT {push} -f origin main", f"${{GIT:-git}} {push} origin topic", f"$X {push} origin topic",
+            f"git `echo {push}` origin topic", "git config pull.rebase true", "git -c pull.rebase=true pull",
+            "git config branch.main.rebase true",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -1002,12 +1034,44 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)
 
     def test_lead_integration_commands_are_allowed(self):
-        for command in ("git merge --ff-only worktree-agent-1", "git cherry-pick abc1234",
-                        "git branch -d worktree-agent-1", "git worktree remove .claude/worktrees/agent-1",
-                        "git worktree list --porcelain", "git worktree prune"):
+        commit = "git com" "mit"
+        for command, result in run_all(self.guard, (
+                "git merge --ff-only worktree-agent-1", "git merge --ff-only origin/main", "git cherry-pick abc1234",
+                "git cherry-pick -n abc1234", "git cherry-pick --abort", "git branch -d worktree-agent-1",
+                "git branch -D worktree-agent-1", "git worktree remove .claude/worktrees/agent-1",
+                "git worktree list --porcelain", "git worktree prune", "git push origin main",
+                f"{commit} -F - <<'EOF'\nsubject\n\nnever git {'com' 'mit'} --amend or git rebase -i\nEOF\n",
+                f"{commit} -C abc1234 --trailer 'Reviewed-by: vocello-swift-review'",
+                f'{commit} -m "fix: --amend is refused"', f"{commit} -qm --fixup",
+                # Unstaging and resetting to HEAD move no branch; `git reset --hard` still asks (a rule).
+                "git reset", "git reset -q", "git reset HEAD", "git reset --hard", "git reset --hard HEAD",
+                "git reset -- scripts/x.py", "git reset HEAD -- scripts/x.py", "git reset scripts/hooks/git_commands.py",
+                "git reset -p", "git reset --merge", "git reset abc1234 -- scripts/x.py",
+                "git rebase --abort", "git rebase --quit", "git rebase --help", "git pull --ff-only",
+                "git pull --no-rebase", "git pull --rebase=false", "git log --grep=rebase", 'rg -n "git rebase" docs',
+                "git config --get pull.rebase", "$EDITOR notes.md", "$PYTHON -m pytest -q", "echo $G push")):
             with self.subTest(command=command):
-                result = self.guard(command)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_local_history_rewrites_are_refused(self):
+        # BKL-63 (audit G-3): amend, rebase, a reset onto another commit and filter-branch passed every hook.
+        commit = "com" "mit"
+        refused = (
+            f"git {commit} --amend --no-edit", f"git {commit} --amend -m x", f"git {commit} -q --am --no-edit",
+            f"git -C . {commit} --amend", f"git {commit} --fixup HEAD~2", f"git {commit} --fixup=amend:HEAD~1",
+            f"git {commit} --squash=abc1234 -m x", f"bash -lc 'git {commit} --amend --no-edit'",
+            "git rebase -i HEAD~3", "git rebase main", "git rebase --autosquash -i origin/main", "git rebase --continue",
+            "git -c rebase.autoSquash=true rebase -i HEAD~2", "git pull --rebase", "git pull -r origin main",
+            "git pull --rebase=merges", "git reset --soft HEAD~1", "git reset --mixed HEAD~1", "git reset HEAD~1",
+            "git reset HEAD^", "git reset abc1234", "git reset --hard origin/main", "git reset --hard HEAD~2",
+            "git reset --keep HEAD^", "git reset -q HEAD~1 --", "git filter-branch --tree-filter x HEAD",
+            "git filter-repo --path x", f"G=git; $G {commit} --amend", "git status && git reset --soft HEAD~1",
+        )
+        for command, result in run_all(self.guard, refused):
+            with self.subTest(command=command):
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("preserve prior commits", result.stderr)
+                self.assertIn("git cherry-pick or git merge --ff-only", result.stderr)
 
     def test_shell_writes_to_pbxproj_are_blocked(self):
         for command in (
@@ -1083,6 +1147,10 @@ class PolicyGuardTests(unittest.TestCase):
             'git add "$CLAUDE_PROJECT_DIR"', f'git add "{ROOT}"', "git stage -A", "git -C . add -A",
             "git -c color.ui=never add .", "bash -c 'git add -A'", "git status && git add .",
             "cd scripts && git add ..", "cd scripts && git add .", "sh <<'EOF'\ngit add -A\nEOF\n",
+            # BKL-63: another directory, a variable holding git, and paths a substitution computes.
+            "git -C scripts add .", 'git -C "$PWD" add -A', "G=git; $G add -A", "${GIT:-git} add .",
+            '"$GIT" add --all', "$X add -u", "git add $(git ls-files -m)", 'git add "$(git diff --name-only)"',
+            "git add `git ls-files`", "git add scripts/x.py $(cat list)",
         )
         for command, result in run_all(self.guard, refused):
             with self.subTest(command=command):
@@ -1095,7 +1163,8 @@ class PolicyGuardTests(unittest.TestCase):
                    "git stash push -u -m tag", "git stash save wip", "git stash pop", "git stash apply abc1234",
                    "git stash drop stash@{0}", "git stash clear", "git stash create", "git stash store abc1234",
                    "git stash branch topic", "git -c color.ui=never stash", "bash -lc 'git stash'",
-                   "git status; git stash pop", "git stash -- scripts/x.py")
+                   "git status; git stash pop", "git stash -- scripts/x.py", "git stash push",
+                   "$GIT stash", "G=/usr/bin/git; $G stash push -u", "export GIT=git; $GIT -C . stash")
         for command, result in run_all(self.guard, refused):
             with self.subTest(command=command):
                 self.assertEqual(result.returncode, 2, result.stderr)
@@ -1128,7 +1197,7 @@ class PolicyGuardTests(unittest.TestCase):
             "git add scripts/x.py && git status", f"git add a.py b.py && git {commit} -q -F - <<'EOF'\nmsg\nEOF",
             # An option's value is not a flag, and a message is text.
             f'git {commit} -m "fix: handle -a flag"', f"git {commit} -qm -a", f"git {commit} -Spatrice -m x",
-            f"git {commit} -uno -m x", f"git {commit} --amend --no-edit", f"git {commit} --allow-empty -m x",
+            f"git {commit} -uno -m x", f"git {commit} --signoff -m x", f"git {commit} --allow-empty -m x",
             f"git {commit} --author 'A <a@example.invalid>' -m x", f"git {commit} -m x -- notes.md",
             f"git {commit} -F - <<'EOF'\nnever git add -A, git {commit} -a or git stash pop\nEOF\n",
             "cat > notes.md <<'EOF'\ngit add -A\ngit stash\nEOF\n", "git diff --stat", "git add --help",

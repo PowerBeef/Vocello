@@ -7,13 +7,17 @@
 #
 #   * Simulator destinations and simulator lifecycle commands (Physical iPhone only)
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
-#   * force pushes, pushes of any ref but main, hand-made branches and
-#     worktrees, and ref rewrites (Main is the only published branch; agent
-#     worktrees come only from Claude Code Agent isolation, EnterWorktree or a
-#     desktop app session)
-#   * broad staging (`git add -A`, `-u`, `.`, `:/`), `git commit -a` and every
-#     `git stash` but `list` and `show`, in any spelling (stage explicit paths,
-#     never stash or broadly stage)
+#   * force pushes, pushes of any ref but main or to any repository but origin,
+#     hand-made branches and worktrees, and ref rewrites (Main is the only
+#     published branch; agent worktrees come only from Claude Code Agent
+#     isolation, EnterWorktree or a desktop app session)
+#   * local history rewrites: `git commit --amend`/`--fixup`/`--squash`,
+#     `git rebase`, `git pull --rebase`, a `git reset` that moves the branch to
+#     another commit, `git filter-branch`/`filter-repo` (preserve prior commits)
+#   * broad staging (`git add -A`, `-u`, `.`, `:/`, a computed pathspec),
+#     `git commit -a` and every `git stash` but `list` and `show`, in any
+#     spelling, a variable holding git included (stage explicit paths, never
+#     stash or broadly stage)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
 #
 # Everything else exits 0 immediately. The Simulator and cache checks judge each
@@ -83,6 +87,9 @@ if [[ -n "$git_violation" ]]; then
     staging)
       block "$reason (CLAUDE.md: stage explicit paths, never stash or broadly stage)." \
         "Stage the assigned files by name (git add <path> ...) and commit the index; set work aside with a commit on the branch, never the stash." ;;
+    history)
+      block "$reason (CLAUDE.md: preserve prior commits; Main is the only published branch)." \
+        "Record a follow-up commit (or git revert) instead; integrate with git cherry-pick or git merge --ff-only; unstage a path with git reset -- <path>. A rewrite the maintainer wants is theirs to run." ;;
     *)
       block "$reason (CLAUDE.md: Main is the only published branch)." \
         "Work on main, or use a Claude Code agent worktree (Agent isolation, EnterWorktree or a desktop app session); the lead integrates it." ;;

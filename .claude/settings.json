@@ -227,6 +227,8 @@
       "Bash(gh pr create*)",
       "Bash(gh pr merge*)",
       "Bash(gh issue create*)",
+      "Bash(python3 scripts/ci/failure_issue.py*)",
+      "Bash(*scripts/ci/failure_issue.py*--label*)",
       "Bash(gh api -X *)",
       "Bash(gh api --method POST*)",
       "Bash(gh api --method PATCH*)",

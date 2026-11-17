@@ -6,7 +6,9 @@ raw text misses real spellings (`git -C "a b" commit`, `git -c x=y push -f`,
 other commit`), so this module tokenizes the command once and yields every git
 invocation with the directory it runs in, its global options, subcommand and
 arguments. A token whose basename is `git` starts an invocation wherever it
-appears (after `xargs`, `sudo`, `if ... then`, `{`), command substitutions and
+appears (after `xargs`, `sudo`, `if ... then`, `{`), and so does a variable in
+command position that holds git or precedes a judged subcommand (`G=git; $G push`,
+`$GIT stash`), failing closed. Command substitutions and
 shell heredocs are parsed recursively, and long options match by unambiguous
 prefix the way git accepts them.
 
@@ -36,11 +38,21 @@ ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
                         "--config-env", "--exec-path", "--list-cmds", "--attr-source"}
 UNSAFE_GLOBALS = {"--git-dir", "--work-tree", "--namespace", "--super-prefix"}
-# Config keys that change which command runs, what a push publishes or which hooks run.
+# Config keys that change which command runs, what a push publishes or which hooks run, or make a
+# later `git pull` rebase local commits.
 UNSAFE_CONFIG = re.compile(
-    r"^(alias\.|remote\..*\.(push|mirror|url|pushurl)|push\.|branch\..*\.merge|core\.hookspath|url\.|include)",
+    r"^(alias\.|remote\..*\.(push|mirror|url|pushurl)|push\.|branch\..*\.(merge|rebase)|core\.hookspath|url\.|"
+    r"include|pull\.rebase)",
     re.I,
 )
+# A command word that is a variable (`$G`, `"${GIT}"`, `${GIT:-git}`): git when the command assigned it
+# git, when its name says git, or when the next word is a subcommand the policy judges (BKL-63).
+VARIABLE_WORD = re.compile(r"^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:[:]?[-=?+][^}]*)?\}|([A-Za-z_][A-Za-z0-9_]*))$")
+JUDGED_SUBCOMMANDS = {"add", "stage", "stash", "commit", "push", "send-pack", "subtree", "config", "checkout",
+                      "switch", "branch", "fetch", "pull", "worktree", "tag", "update-ref", "symbolic-ref", "reset",
+                      "rebase", "filter-branch", "filter-repo"}
+# The backtick substitution stand-in: a computed word, never a literal name.
+SUBSTITUTED = "$SUBST"
 REDIRECT = re.compile(r"^[0-9]*[<>]")
 # `$(which git)`, `"$(command -v git)"`, `` `type -P git` ``: spellings of the git binary itself.
 GIT_LOOKUP = re.compile(r"""["']?(?:\$\(\s*(?:which|command\s+-v|type\s+-P)\s+git\s*\)|`\s*(?:which|command\s+-v|type\s+-P)\s+git\s*`)["']?""")
@@ -140,6 +152,17 @@ def _is_git(token: str) -> bool:
     return token.rsplit("/", 1)[-1] == "git"
 
 
+def _variable_git(token: str, following: str, git_variables: set[str]) -> bool:
+    """Whether a command word that is a variable runs git: one this command set to git, one whose
+    name says git, or one followed by a subcommand the policy judges. It fails closed: `$X push`
+    is judged as a push whatever `$X` holds."""
+    match = VARIABLE_WORD.match(token)
+    if not match:
+        return False
+    name = match.group(1) or match.group(2)
+    return name in git_variables or "git" in name.lower() or following in JUDGED_SUBCOMMANDS
+
+
 def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocation]:
     """Every git invocation in the command, in order."""
     found: list[GitInvocation] = []
@@ -155,7 +178,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             found.extend(git_invocations(body, cwd, depth + 1))
     for body in _substitutions(text):
         found.extend(git_invocations(body, cwd, depth + 1))
-    text = re.sub(r"`[^`]*`", "SUBST", text)
+    text = re.sub(r"`[^`]*`", SUBSTITUTED, text)
     text = join_quoted_newlines(text)                # a message that spans lines is one word
 
     tokens: list[str] = []
@@ -167,6 +190,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
     at_start = True
     env_unsafe = exported_unsafe = ""
     env_config = exported_config = ""
+    git_variables: set[str] = set()                  # `G=git`, `export GIT=/usr/bin/git`
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -190,6 +214,8 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                     exported_unsafe = tokens[cursor].split("=", 1)[0]
                 if GIT_CONFIG_ENV.match(tokens[cursor]):
                     exported_config = tokens[cursor].split("=", 1)[0]
+                if ASSIGNMENT.match(tokens[cursor]) and _is_git(tokens[cursor].split("=", 1)[1]):
+                    git_variables.add(tokens[cursor].split("=", 1)[0])
                 cursor += 1
             env_unsafe, env_config = exported_unsafe, exported_config
             index = cursor
@@ -199,6 +225,8 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 env_unsafe = token.split("=", 1)[0]
             if GIT_CONFIG_ENV.match(token):
                 env_config = token.split("=", 1)[0]
+            if _is_git(token.split("=", 1)[1]):
+                git_variables.add(token.split("=", 1)[0])
             index += 1
             continue
         name = token.rsplit("/", 1)[-1]
@@ -234,7 +262,8 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 words.append(tokens[cursor])
                 cursor += 1
             found.extend(git_invocations(" ".join(words), directory or cwd, depth + 1))
-        if not _is_git(token):
+        following = tokens[index + 1] if index + 1 < len(tokens) else ""
+        if not (_is_git(token) or (at_start and _variable_git(token, following, git_variables))):
             at_start = False
             index += 1
             continue
@@ -276,6 +305,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
 # --- policy ----------------------------------------------------------------
 
 PUSH_ALLOWED_REFSPECS = {"main", "main:main", "refs/heads/main", "refs/heads/main:refs/heads/main"}
+PUSH_ALLOWED_REMOTES = {"origin"}
 PUSH_BLOCKED_OPTIONS = ("--all", "--branches", "--mirror", "--tags", "--follow-tags", "--delete",
                         "--set-upstream", "--prune")
 PUSH_BLOCKED_SHORT = {"-d", "-u"}
@@ -304,12 +334,14 @@ def _short_has(argument: str, letters: str) -> bool:
 
 def _push_violation(args: list[str]) -> str:
     positional: list[str] = []
-    repo = False
+    repositories: list[str] = []                     # `--repo` values
     index = 0
     while index < len(args):
         argument = args[index]
         if argument == "-o" or _long(argument, *PUSH_VALUE_OPTIONS):
-            repo = repo or _long(argument, "--repo") == "--repo"
+            if _long(argument, *PUSH_VALUE_OPTIONS) == "--repo":
+                repositories.append(argument.split("=", 1)[1] if "=" in argument
+                                    else (args[index + 1] if index + 1 < len(args) else ""))
             index += 1 if "=" in argument else 2
             continue
         if _long(argument, "--force", "--force-with-lease", "--force-if-includes") or _short_has(argument, "f"):
@@ -320,12 +352,89 @@ def _push_violation(args: list[str]) -> str:
         if not argument.startswith("-"):
             positional.append(argument)
         index += 1
-    refspecs = positional if repo else positional[1:]
+    refspecs = positional if repositories else positional[1:]
+    if any(refspec.startswith("+") for refspec in refspecs):
+        return "FORCE"
+    # Only origin is published: another remote, a URL or a path is another repository (BKL-63).
+    for remote in repositories or positional[:1]:
+        if remote not in PUSH_ALLOWED_REMOTES:
+            return f"`git push {remote}` publishes to a repository other than origin"
     for refspec in refspecs:
-        if refspec.startswith("+"):
-            return "FORCE"
         if refspec not in PUSH_ALLOWED_REFSPECS:
             return f"`git push ... {refspec}` publishes a ref other than main"
+    return ""
+
+
+def _reset_moves_head(invocation: GitInvocation) -> str:
+    """The commit a `git reset` moves the branch to, else '' (a reset of the index or the working
+    tree to HEAD, or of named paths, rewrites no history). `--soft`, `--hard`, `--keep` and
+    `--merge` take a commit; without one of them a single operand is a commit unless it names an
+    existing path, and operands after `--` are paths."""
+    mode, operands, paths, index = "", [], False, 0
+    args = invocation.args
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if paths:
+            return ""                                 # pathspecs: the index only
+        if argument == "--":
+            paths = True
+            continue
+        if argument.startswith("--"):
+            name = _long(argument, "--soft", "--mixed", "--hard", "--keep", "--merge", "--patch",
+                         "--pathspec-from-file")
+            if name in ("--patch", "--pathspec-from-file"):
+                return ""
+            mode = name or mode
+            continue
+        if argument.startswith("-") and len(argument) > 1:
+            if "p" in argument[1:]:
+                return ""                             # `-p`: the index, hunk by hunk
+            continue
+        operands.append(argument)
+    if not operands or operands[0] in ("HEAD", "@"):
+        return ""
+    if mode in ("--soft", "--hard", "--keep", "--merge"):
+        return operands[0]
+    if len(operands) > 1:
+        return ""                                     # `git reset <tree-ish> <paths>`: the index only
+    target = operands[0]
+    if not paths and (any(char in target for char in "*?[") or (
+            invocation.directory is not None and (invocation.directory / target).exists())):
+        return ""                                     # an existing path: unstage it
+    return target
+
+
+HISTORY_READS = {"--help", "-h"}
+REBASE_EXITS = {"--abort", "--quit", "--show-current-patch"}
+
+
+def _history_violation(invocation: GitInvocation) -> str:
+    """Why a git invocation rewrites local history (BKL-63), else ''. The lead records new commits
+    and integrates with `git cherry-pick` or `git merge --ff-only`; a rewrite is the maintainer's."""
+    sub, args = invocation.subcommand, invocation.args
+    if args and args[0] in HISTORY_READS:
+        return ""
+    if sub == "commit":
+        name = _commit_rewrite(args)
+        if name == "--amend":
+            return "`git commit --amend` rewrites the last commit"
+        if name:
+            return f"`git commit {name}` records a commit only an autosquash rebase applies"
+    elif sub == "rebase":
+        if not (args and all(_long(a, *REBASE_EXITS) in REBASE_EXITS for a in args)):
+            return "`git rebase` rewrites commits"
+    elif sub in ("filter-branch", "filter-repo"):
+        return f"`git {sub}` rewrites history"
+    elif sub == "reset":
+        target = _reset_moves_head(invocation)
+        if target:
+            return f"`git reset ... {target}` moves the branch to another commit"
+    elif sub == "pull":
+        for argument in args:
+            if argument == "-r" or (_long(argument, "--rebase") == "--rebase"
+                                    and argument.partition("=")[2].lower() not in ("false", "no", "0")):
+                return "`git pull --rebase` rewrites local commits onto the remote's"
     return ""
 
 
@@ -421,6 +530,8 @@ def _add_violation(invocation: GitInvocation) -> str:
         argument = args[index]
         index += 1
         if only_paths or not argument.startswith("-") or argument == "-":
+            if argument == "$" or "$(" in argument or SUBSTITUTED in argument:
+                return "`git add $(...)` stages the paths a substitution computes, not named files"
             if _whole_tree_pathspec(argument, invocation.directory):
                 return f"`git add {argument}` stages a whole tree, not named files"
         elif argument == "--":
@@ -465,6 +576,32 @@ def _commit_takes_all(args: list[str]) -> bool:
     return False
 
 
+def _commit_rewrite(args: list[str]) -> str:
+    """`--amend`, `--fixup` or `--squash` when a `git commit` carries one (by any unambiguous
+    prefix), else ''. Option values, a message included, are not options."""
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        index += 1
+        if argument == "--":
+            break
+        if argument.startswith("--"):
+            name = _long(argument, "--amend", "--fixup", "--squash")
+            if name:
+                return name
+            if _long(argument, *COMMIT_VALUE_OPTIONS) and "=" not in argument:
+                index += 1
+        elif argument.startswith("-") and len(argument) > 1:
+            for position, letter in enumerate(argument[1:], 1):
+                if letter in "Su":
+                    break                             # `-S<keyid>`, `-u<mode>`: the rest is a value
+                if letter in COMMIT_VALUE_SHORT:
+                    if position == len(argument) - 1:
+                        index += 1                    # the value is the next word
+                    break
+    return ""
+
+
 def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
     """(category, reason) for a git invocation the repository forbids, else ("", "")."""
     sub, args = invocation.subcommand, invocation.args
@@ -488,6 +625,9 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
                                "worktree and session shares; only `git stash list` and `git stash show` read it")
     elif sub == "commit" and _commit_takes_all(args):
         return "staging", "`git commit -a` records every tracked change, not the files staged by name"
+    reason = _history_violation(invocation)
+    if reason:
+        return "history", reason
     if sub in ("push", "send-pack") or (sub == "subtree" and "push" in args):
         reason = _push_violation(args if sub == "push" else ["origin", *args])
         if sub == "push" and any("$" in a or "`" in a for a in args if not a.startswith("-")):

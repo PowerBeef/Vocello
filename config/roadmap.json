@@ -496,7 +496,7 @@
         "Sources/iOS/TTSEngineStore.swift"
       ],
       "needs": [
-        "mac",
+        "keyboard",
         "iphone"
       ],
       "updated": "2026-11-10",
@@ -516,7 +516,6 @@
         "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-11",
@@ -575,7 +574,6 @@
         "docs/reference/qwen3-tts-guide.md"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-13",
@@ -618,7 +616,6 @@
         "config/quality-screens.json"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-12",
@@ -641,7 +638,6 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-14",
@@ -660,7 +656,6 @@
         "docs/reference/qwen3-tts-guide.md"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-13",
@@ -840,7 +835,6 @@
         "Sources/iOS/IOSShellPrimitives.swift"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-10-12",
@@ -1820,7 +1814,6 @@
         "config/public-product-facts.json"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. README/site claims are build-scoped, source facts and AudioSeal revision attribution are maintained, and website security-header configuration plus local browser/contracts checks pass. This does not prove deployed headers. The README and Hero explicitly disclose the historical 2.x iPhone capture. Open: replace those historical screenshots with genuine current-source physical-iPhone captures, then review the assets and update the disclosure. Keep the version-scoped claims and historical label until replacement; do not imply 3.0 device acceptance. Phone capture is deferred by the maintainer. Evidence: ORIGINS.md, NOTICES.md, generated attributions, website/vercel.json and the October 10 audit. 2026-11-10 review: the README and Hero no longer carry the historical-capture disclosure; the Hero still shows ios-studio.png from 2026-08-01.",
@@ -3030,8 +3023,7 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
       "needs": [
-        "mac",
-        "iphone"
+        "keyboard"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",

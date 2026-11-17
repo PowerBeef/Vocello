@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (97)
+### Mac, remotely (88)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -85,7 +85,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BT-04` (parked) Lineage identity, history and CI evidence tests
 - `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: iPhone)
 - `DA-02` (parked) Studio state and window ownership
-- `DA-03` (parked) Accessibility, localization and glass gating (also: iPhone)
 - `DA-07` (parked) Playback and recording defects that need a device (also: iPhone)
 - `DA-12` (parked) Guard, tooling, docs and website hygiene
 - `DA-13` (parked) Follow-ups from the audit's second fix pass (also: iPhone)
@@ -98,7 +97,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `ER-04` (parked) Clone pipeline parity
 - `ER-05` (parked) Sampling and input normalization parity
 - `ER-06` (parked) Lifecycle, cancellation and memory
-- `ER-07` (parked) iPhone memory budget from measured limits (also: iPhone)
 - `ER-08` (parked) Identity-safe performance (also: iPhone)
 - `ER-09` (parked) Numerically shifting performance
 - `ER-10` (parked) Delivery, storage and persistence
@@ -114,7 +112,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `PA-08` (parked) Consolidate duplicated platform logic and misleading names
 - `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: At the keyboard)
 - `PA-16` (parked) Speech-tokenizer attention honors the model's sliding windows
-- `PA-18` (parked) Public claims match what each download ships (also: iPhone)
 - `PA-20` (parked) Accessibility and localization reach every surface (also: iPhone)
 - `PA-25` (parked) Docs and tooling stay proportional
 - `PA-26` (parked) Low-severity backlog from the external audit
@@ -130,18 +127,12 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-45` (planned) Core overhaul, stage 1: submission layer (also: iPhone)
 - `RF-46` (planned) Core overhaul, stage 2a: the frame pipeline, identity-preserving
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
-- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
-- `RF-51` (planned) Quality remediation, stage 1: clone input correctness (also: iPhone)
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
 - `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
-- `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model (also: iPhone)
 - `RF-57` (planned) Audit the tooling the quality remediation relies on
-- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: iPhone)
-- `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: iPhone)
-- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: iPhone)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (16)
+### At the keyboard (18)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -153,16 +144,18 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `BKL-54` (parked) A farm runner restart drops the test filter and reruns the whole UI bundle
 - `BKL-65` (parked) The App Store privacy and support URLs sit on a vercel.app subdomain
 - `BKL-86` (parked) Attended check of the output-device change under a paused live preview
+- `ER-07` (parked) iPhone memory budget from measured limits
 - `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: Mac, remotely)
 - `RF-02` (planned) complete Apple prerequisites and the consolidated qualified-decision packet
 - `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
 - `RF-16` (planned) Submit 3.1.0 for App Review on the maintainer's explicit go
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
+- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-61` (planned) Ship Vocello and the vocello CLI 3.1 on the Mac
 - `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.1.0
 - `RF-63` (planned) Fit the 3.1 App Review notes into what is left of the 4,000 characters
 
-### iPhone (62)
+### iPhone (61)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -195,10 +188,9 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `BKL-68` (parked) The Cancel download dialog may show no Keep Download button on the iPhone
 - `BKL-69` (parked) The iPhone frame-health lane's player scenarios open whatever take is newest in History
 - `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: Mac, remotely)
-- `DA-03` (parked) Accessibility, localization and glass gating (also: Mac, remotely)
+- `DA-03` (parked) Accessibility, localization and glass gating
 - `DA-07` (parked) Playback and recording defects that need a device (also: Mac, remotely)
 - `DA-13` (parked) Follow-ups from the audit's second fix pass (also: Mac, remotely)
-- `ER-07` (parked) iPhone memory budget from measured limits (also: Mac, remotely)
 - `ER-08` (parked) Identity-safe performance (also: Mac, remotely)
 - `ICA-04` (parked) Execute the complete physical-device campaign
 - `ICA-06` (parked) P1 — localize the long-Chinese non-EOS generation failure and terminal message
@@ -207,7 +199,7 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `ISR-06` (parked) Complete exact-script and broader closure evidence
 - `ISU-4` (parked) Refine Settings hub and shared purchase sheet; qualify the new navigation
 - `ISU-5` (parked) AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows
-- `PA-18` (parked) Public claims match what each download ships (also: Mac, remotely)
+- `PA-18` (parked) Public claims match what each download ships
 - `PA-20` (parked) Accessibility and localization reach every surface (also: Mac, remotely)
 - `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: Mac, remotely)
 - `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
@@ -219,12 +211,12 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-44` (planned) Core overhaul, stage 0: instruments and the regression net (also: Mac, remotely)
 - `RF-45` (planned) Core overhaul, stage 1: submission layer (also: Mac, remotely)
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: Mac, remotely)
-- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: Mac, remotely)
-- `RF-51` (planned) Quality remediation, stage 1: clone input correctness (also: Mac, remotely)
-- `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model (also: Mac, remotely)
-- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: Mac, remotely)
-- `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: Mac, remotely)
-- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: Mac, remotely)
+- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: At the keyboard)
+- `RF-51` (planned) Quality remediation, stage 1: clone input correctness
+- `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model
+- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does
+- `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired
+- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report

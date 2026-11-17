@@ -50,7 +50,11 @@ public final class CLIProcessSupervisor: Sendable {
 
     init(children: CLIChildProcesses = CLIChildProcesses(), forceExit: @escaping @Sendable (Int32) -> Void = { code in
         CLIStandardError.write("Cancellation cleanup did not finish; forced exit. Recovery artifacts may remain.\n")
-        exit(code)
+        // `_exit`, not `exit`: the engine's threads are still running, and `exit`
+        // would run atexit handlers and static destructors under them (BKL-76).
+        // The notice above is written straight to the descriptor; nothing
+        // buffered in stdio is owed to a forced exit.
+        _exit(code)
     }) {
         self.children = children
         self.forceExit = forceExit

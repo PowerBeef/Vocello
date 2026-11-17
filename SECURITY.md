@@ -3,16 +3,18 @@
 ## Supported versions
 
 Security fixes are applied to the current source on `main` and, when practical, to the latest
-public macOS release. That release covers the Mac app, the `vocello` command line in both of its forms (the signed
+public macOS release and the latest iPhone build. The macOS release covers the Mac app, the `vocello` command line in both of its forms (the signed
 and notarized installer package, including the `uninstall.sh` it installs, and the folder in
-`Vocello-macos26-cli.dmg`) and the `vocello mcp` server. Older
-releases and development snapshots are not supported security branches.
+`Vocello-macos26-cli.dmg`) and the `vocello mcp` server. The iPhone app reaches people through the
+public TestFlight beta, and through the App Store once it is published there; a fix ships in a new
+build of that channel. Older releases and development snapshots are not supported security branches.
 
 | Surface | Supported |
 | --- | --- |
 | Current `main` | Yes |
 | Latest signed and notarized macOS release (the Mac app, the CLI package and folder, `vocello mcp`) | Yes |
-| Older releases and beta snapshots | No |
+| Latest iPhone build in the public TestFlight beta or the App Store | Yes |
+| Older releases, earlier iPhone builds and development snapshots | No |
 | iPhone builds distributed outside an official project channel | No |
 
 ## Dependency monitoring

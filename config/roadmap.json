@@ -2794,6 +2794,25 @@
       "notes": "Parked 2026-11-16 from the delivery-menu investigation: window resize is exploratory (not enforced), rose from 34 ms per action on November 14 to 50-61 since, longest gap 66 to about 83 ms, and was not looked into."
     },
     {
+      "id": "BKL-87",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "CI never runs the iOS control-audit tests on a push that changes only iPhone sources",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "A push that changes a Swift file under Sources/iOS or Sources/SharedSupport/Views runs scripts/tests/test_ios_control_audit.py in CI (selected on its own, without the whole research suite), with a classify_changes test pinning it.",
+      "sourceOfTruth": [
+        "scripts/ci/classify_changes.py",
+        ".github/workflows/ci.yml",
+        "scripts/tests/conftest.py"
+      ],
+      "needs": [
+        "mac"
+      ],
+      "updated": "2026-11-16",
+      "unparkWhen": "Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.",
+      "notes": "Parked 2026-11-16 from BKL-25's fix: the routed local check now selects the control-audit tests for such an edit, but in CI the test is research-marked (RESEARCH_PREFIXES has ios_control_audit) and the research job runs only when research scripts or config change, so a drifted interactive count reaches main unnoticed until a full gate run."
+    },
+    {
       "id": "BKL-86",
       "plan": "post-3-0-backlog-2026-10",
       "title": "Attended check of the output-device change under a paused live preview",

@@ -145,6 +145,10 @@ import Foundation
     private let windowEnergy: Double
     private let bandEdges: [Int]
     private var pending: [Double] = []
+    /// Samples still to skip before the next frame starts. Only a rate whose
+    /// 10 ms hop exceeds the FFT size (above 102.4 kHz) leaves any: the next
+    /// frame then starts past the buffered samples (ER-02 C-13).
+    private var samplesToSkipBeforeNextFrame = 0
     private var stftFrameIndex = 0
     private var windowed: [Double]
     private var realParts: [Double]
@@ -443,7 +447,9 @@ import Foundation
 
     private func observeSpectrum(_ block: UnsafeBufferPointer<Double>) {
         guard fftSize > 0, unsafe fftSetup != nil else { return }
-        unsafe pending.append(contentsOf: block)
+        let skipped = min(samplesToSkipBeforeNextFrame, block.count)
+        samplesToSkipBeforeNextFrame -= skipped
+        unsafe pending.append(contentsOf: block.dropFirst(skipped))
         var start = 0
         while pending.count - start >= fftSize {
             pending.withBufferPointer { samples in
@@ -452,7 +458,11 @@ import Foundation
             start += hop
         }
         if start > 0 {
-            pending.removeFirst(start)
+            // A hop longer than the FFT can step past the buffer; the rest of
+            // the step is skipped from the samples that arrive next.
+            let consumed = min(start, pending.count)
+            pending.removeFirst(consumed)
+            samplesToSkipBeforeNextFrame += start - consumed
         }
     }
 

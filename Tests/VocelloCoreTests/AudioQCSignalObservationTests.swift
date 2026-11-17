@@ -165,6 +165,30 @@ final class AudioQCSignalObservationTests: XCTestCase {
 
     // MARK: - Record
 
+    /// ER-02 C-13: above 102.4 kHz the 10 ms hop is longer than the FFT, so a
+    /// frame can start past the buffered samples. The observer used to trap
+    /// there (removeFirst past the end); it now skips into the next block, and
+    /// how the samples are split into blocks changes nothing.
+    func testARateWhoseHopExceedsTheFFTIsObservedWholeInAnyBlocking() {
+        let rate = 192_000
+        let samples: [Float] = (0 ..< rate).map { index in
+            Float(0.25 * sin(2 * Double.pi * 440 * Double(index) / Double(rate)))
+        }
+        func observed(block: Int) -> AudioQCSignalObservations {
+            let observer = AudioQCSignalObserver(sampleRate: rate)
+            var start = 0
+            while start < samples.count {
+                let end = min(samples.count, start + block)
+                observer.append(Array(samples[start ..< end]))
+                start = end
+            }
+            return observer.finish()
+        }
+        let whole = observed(block: samples.count)
+        XCTAssertEqual(observed(block: 1_100), whole, "a block shorter than the hop")
+        XCTAssertEqual(observed(block: 7_001), whole)
+    }
+
     func testConstantsEqualTheRecord() throws {
         let record = try json("config/audio-qc-stage0-observations.json")
         XCTAssertEqual(record["algorithmVersion"] as? Int, AudioQCSignalObservations.currentAlgorithmVersion)

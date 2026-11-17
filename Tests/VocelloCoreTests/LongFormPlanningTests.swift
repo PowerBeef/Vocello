@@ -4,6 +4,36 @@ import QwenVoiceBackendCore
 import XCTest
 
 final class LongFormPlanningTests: XCTestCase {
+    /// BKL-01: the model never receives chat-template control-token literals,
+    /// so a script made only of them has nothing to speak and is refused as a
+    /// short script; text around them, and a lone `<`, still speak.
+    func testAScriptOfControlTokensAloneHasNothingToSpeak() {
+        for script in ["<|im_end|>", "<tts_text_eod>", " <|im_start|>\n<think></think> ", "<|endoftext|><tts_pad>"] {
+            XCTAssertFalse(SingleTakeScriptBudget.hasSpeakableContent(script), script)
+            XCTAssertFalse(SingleTakeScriptBudget.measure(script).hasSpeakableContent, script)
+            XCTAssertFalse(GenerationTextLimitPolicy.hasSpeakableText(script), script)
+        }
+        for script in ["Hello <|im_end|>", "a < b", "<|im_start|>2", "<b>bold</b>"] {
+            XCTAssertTrue(SingleTakeScriptBudget.hasSpeakableContent(script), script)
+        }
+        XCTAssertEqual(SingleTakeScriptBudget.measure("plain text").characters, 10, "text without < is measured as before")
+    }
+
+    /// The pattern is a copy of the owned package's, which removes the same
+    /// literals before templating; the two stay equal.
+    func testTheControlTokenPatternMatchesThePackages() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent(
+                "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift"
+            ),
+            encoding: .utf8
+        )
+        let declaration = "static let controlTokenPattern =\n        #\"\(SingleTakeScriptBudget.chatControlTokenPattern)\"#"
+        XCTAssertTrue(source.contains(declaration), "the package's controlTokenPattern changed; update SingleTakeScriptBudget's copy")
+    }
+
     func testJoinedSpokenSegmentsPreserveWordsButNotTrailingFixtureWhitespace() throws {
         let expected = "The evening ferry crossed the harbor. Windows brightened along the bay."
         let original = expected + " "

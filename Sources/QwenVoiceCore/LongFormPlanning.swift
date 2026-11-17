@@ -596,7 +596,7 @@ public enum SingleTakeScriptBudget {
         var characters = 0
         var eastAsian = 0
         var otherLettersAndDigits = 0
-        for character in text {
+        for character in spokenText(text) {
             characters += 1
             if character.isEastAsianScriptCharacter {
                 eastAsian += 1
@@ -622,7 +622,22 @@ public enum SingleTakeScriptBudget {
     }
 
     public static func hasSpeakableContent(_ text: String) -> Bool {
-        text.contains { $0.isEastAsianScriptCharacter || $0.isLetter || $0.isNumber }
+        spokenText(text).contains { $0.isEastAsianScriptCharacter || $0.isLetter || $0.isNumber }
+    }
+
+    /// The model's chat-template control-token literals, which the owned
+    /// package removes from user text before templating
+    /// (`Qwen3ChatTemplateText.controlTokenPattern`; a test pins the two equal).
+    static let chatControlTokenPattern =
+        #"<\|[A-Za-z0-9_]+\|>|<tts_[A-Za-z0-9_]+>|</?(?:think|tool_call|tool_response)>"#
+
+    /// The text as the model receives it: without control-token literals, so a
+    /// script made only of them (`<|im_end|>`) has nothing to speak and is
+    /// refused as a short script instead of reaching the model empty (BKL-01).
+    /// Text without `<` is returned unchanged.
+    static func spokenText(_ text: String) -> String {
+        guard text.contains("<") else { return text }
+        return text.replacingOccurrences(of: chatControlTokenPattern, with: " ", options: .regularExpression)
     }
 }
 

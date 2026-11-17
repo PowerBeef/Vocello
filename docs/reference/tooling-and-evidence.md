@@ -44,9 +44,8 @@ rules they enforce:
   check 2 forbids execution in any workflow (`test-without-building`, `scripts/ui_test.sh`, an
   `xcodebuild`/`xcb_run` `test` action), not compilation.
 - Generated files (`docs/ROADMAP.md`, the documentation index `docs/INDEX.md`, the production model
-  catalog, the owned-package inventory and
-  facade baseline, `docs/charts/*.svg`, `Sources/Resources/third_party_attributions.json`, the Swift
-  copy of the Chinese fold table `Sources/SharedSupport/Services/HantHansFoldTable.swift`) are
+  catalog, the owned-package inventory and facade baseline, the README images `docs/readme/*.svg`,
+  `Sources/Resources/third_party_attributions.json`, the Swift copy of the Chinese fold table `Sources/SharedSupport/Services/HantHansFoldTable.swift`) are
   regenerated with `scripts/dev.sh regen` (`scripts/refresh_derived_artifacts.py`, which validates
   every artifact it registers) in the same change as their inputs; the attributions follow the
   attribution policy (`config/third-party-attribution-policy.json` and the license and notice files it

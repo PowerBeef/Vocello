@@ -2160,25 +2160,6 @@
       "notes": "Found 2026-10-21 by the RF-08 security review: the macOS Application and Installer imports gained -x in 2d3ed9e5; the iOS import was left unchanged so the release path the 3.0 submission uses does not move before it."
     },
     {
-      "id": "BKL-28",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The Mac Voice Design save shows no \"Voice added\" alert after Keep voice",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
-        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
-        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-10-24",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Found 2026-10-24 in macos-xcui-marketing-20261024-145129-78cc21e5, which proved the capture's Keep-voice fix (cd9541df): the warning appeared, Keep was clicked and the voice saved. The test then waited 20 s for the OK of the \"Voice added\" alert, which handleSavedVoice sets while the save sheet dismisses itself, and none appeared. The lane was interrupted in teardown, so the result bundle has no screenshot. Parked without investigation under the focus lock: Mac-only and not a release blocker. 2026-11-16: fixed in 0c0c1d5a (the alert waits for the save sheet's onDismiss, or shows at once with no sheet up). Closes when scripts/ui_test.sh macos marketing passes test00_WebsiteRefresh."
-    },
-    {
       "id": "BKL-31",
       "plan": "post-3-0-backlog-2026-10",
       "title": "Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping",
@@ -2734,9 +2715,9 @@
       "needs": [
         "mac"
       ],
-      "updated": "2026-11-16",
+      "updated": "2026-11-17",
       "unparkWhen": "Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.",
-      "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The Mac images date from 2026-09-20; 3.1 retired the model selector (RF-59) and the Variation setting (RF-58). The lane takes over the Mac, so it runs only in a window the maintainer gives."
+      "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The Mac images date from 2026-09-20; 3.1 retired the model selector (RF-59) and the Variation setting (RF-58). The lane takes over the Mac, so it runs only in a window the maintainer gives. 2026-11-17: the marketing lane (macos-xcui-marketing-20261117-143331-f334603e) recaptured the six Mac images in docs/screenshots, and the rewritten README uses them with generated art. Left for the gate: website/public/assets/screens (PNG and AVIF, full and 1040 px) still shows the 3.0 screens."
     },
     {
       "id": "BKL-85",
@@ -2792,6 +2773,24 @@
       "updated": "2026-11-16",
       "unparkWhen": "The maintainer is at the keyboard after the 3.1.0 promotion.",
       "notes": "Parked 2026-11-16. The fix shipped in 3.1 with unit tests (d6f5981a); the audio route itself is hardware and the maintainer's ears, which computer use cannot confirm."
+    },
+    {
+      "id": "BKL-88",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "test_host_preflight's cache-only ownership test failed once under the parallel suite",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_host_preflight.py::HostPreflightTests::test_cache_only_analysis_retains_worker_ownership_checks passes under pytest -n auto in repeated full runs, or its dependence on the host's real worker leases is removed.",
+      "sourceOfTruth": [
+        "scripts/tests/test_host_preflight.py",
+        "scripts/lib/host_preflight.sh"
+      ],
+      "needs": [
+        "mac"
+      ],
+      "updated": "2026-11-17",
+      "unparkWhen": "Authorized now (it needs no iPhone); fix it when it recurs or with the next host-preflight change.",
+      "notes": "Seen 2026-11-17 in a scripts/dev.sh check of the README change: the test expected exit 1 and got 2 (\"worker tracking has unreadable ownership\"). It passed alone and in the next full run (3,132 passed). Parked without investigation."
     },
     {
       "id": "ER-01",

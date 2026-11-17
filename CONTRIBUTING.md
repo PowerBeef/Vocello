@@ -39,6 +39,23 @@ docs-only changes) count as passing, and a red push is fixed forward or reverted
 
 The Xcode project is generated from [`project.yml`](project.yml). Never edit `QwenVoice.xcodeproj/project.pbxproj` directly. Native output belongs under the paths declared by [`config/build-output-policy.json`](config/build-output-policy.json); do not add another DerivedData root or a `.build` directory inside vendored source.
 
+## Project layout
+
+```text
+Sources/                 the apps and the engine
+  QwenVoiceApp.swift       macOS app (Views/, ViewModels/, Services/)
+  iOS/                     iPhone app
+  QwenVoiceCore/           engine host: runtime factory, generation, model delivery
+  VocelloCLI/              the vocello command line
+Packages/VocelloQwen3Core/ the owned Qwen3-TTS runtime on MLX, with its own tests
+Tests/                   unit and iPhone logic tests, Mac and iPhone UI tests
+scripts/                 build, test, benchmark and release lanes, and the README art generator
+config/                  machine-readable contracts: models, privacy, release, roadmap
+benchmarks/              published benchmark records and the optimization ledger
+website/                 vocello.vercel.app (React and Vite)
+docs/                    architecture, references, audits, release notes, README images
+```
+
 ## Platform and UI rules
 
 - macOS and iOS application UI acceptance uses XCUITest only.
@@ -54,6 +71,26 @@ scripts/ui_test.sh ios smoke
 - Do not add hidden test routes, seeded production UI, invisible markers, fixed-coordinate actions, or fixed sleeps.
 
 See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for platform lanes and prerequisites.
+
+## Design system
+
+Dark-first, warm neutrals on a charcoal canvas, and one accent per mode. Liquid Glass stays on chrome
+and falls back to solid surfaces under Reduce Transparency and while audio generates. The tokens live
+in the app's theme and in [`website/src/tokens.css`](website/src/tokens.css).
+
+| Token | Color | Use |
+| --- | --- | --- |
+| Gold | `#EDCC8A` | Built-in Voice, the brand accent |
+| Lavender | `#BFAADB` | Voice Design |
+| Terracotta | `#DBA887` | Voice Cloning |
+| Charcoal | `#16181E` | The canvas |
+| Text | `#F5F6F8` | Primary text |
+
+The README's images are generated, never drawn by hand: `python3 scripts/generate_readme_charts.py`
+writes every SVG under `docs/readme/` from these tokens (`scripts/lib/readme_art.py`), the app's launch
+lockup, the benchmark records and `config/public-product-facts.json`, and `--check` fails when one is
+stale. The screenshots under `docs/screenshots/` come from the marketing capture lane
+(`scripts/ui_test.sh macos marketing`).
 
 ## Source and documentation expectations
 

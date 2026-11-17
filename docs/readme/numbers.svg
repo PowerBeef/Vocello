@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="304" viewBox="0 0 880 304" role="img" aria-labelledby="title desc">
+<title id="title">Vocello by the numbers</title>
+<desc id="desc">1.7 billion parameters in each mode's model; 8-bit attention layers on a 4-bit model; about 36,000 upstream lines removed from the owned runtime; 24 kHz mono audio from a native decoder; Swift 6 strict concurrency, with actors owning the engine; no Python at runtime.</desc>
+<defs><linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1C1E26"/><stop offset="1" stop-color="#111318"/></linearGradient><radialGradient id="glow0" cx="880" cy="0" r="616" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#BFAADB" stop-opacity="0.08"/><stop offset="1" stop-color="#BFAADB" stop-opacity="0"/></radialGradient></defs>
+<rect width="880" height="304" rx="24" fill="url(#canvas)"/><rect width="880" height="304" rx="24" fill="url(#glow0)"/><rect x="0.5" y="0.5" width="879" height="303" rx="23.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.07"/>
+<text x="50" y="84" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#EDCC8A" letter-spacing="-0.5">1.7B</text>
+<text x="50" y="110" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">parameters</text>
+<text x="50" y="129" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">in each mode's model</text>
+<rect x="302.67" y="48" width="1" height="84" fill="#2A2C36"/>
+<text x="324.67" y="84" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#BFAADB" letter-spacing="-0.5">8-bit</text>
+<text x="324.67" y="110" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">attention layers</text>
+<text x="324.67" y="129" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">on a 4-bit model</text>
+<rect x="577.33" y="48" width="1" height="84" fill="#2A2C36"/>
+<text x="599.33" y="84" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#DBA887" letter-spacing="-0.5">36k</text>
+<text x="599.33" y="110" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">upstream lines removed</text>
+<text x="599.33" y="129" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">from the owned runtime</text>
+<rect x="50" y="152" width="230.67" height="1" fill="#2A2C36"/>
+<text x="50" y="208" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#EDCC8A" letter-spacing="-0.5">24 kHz</text>
+<text x="50" y="234" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">mono audio</text>
+<text x="50" y="253" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">from a native decoder</text>
+<rect x="302.67" y="172" width="1" height="84" fill="#2A2C36"/>
+<rect x="324.67" y="152" width="230.67" height="1" fill="#2A2C36"/>
+<text x="324.67" y="208" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#BFAADB" letter-spacing="-0.5">Swift 6</text>
+<text x="324.67" y="234" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">strict concurrency</text>
+<text x="324.67" y="253" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">actors own the engine</text>
+<rect x="577.33" y="172" width="1" height="84" fill="#2A2C36"/>
+<rect x="599.33" y="152" width="230.67" height="1" fill="#2A2C36"/>
+<text x="599.33" y="208" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#DBA887" letter-spacing="-0.5">0</text>
+<text x="599.33" y="234" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8">lines of Python</text>
+<text x="599.33" y="253" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">at runtime</text>
+</svg>

@@ -391,15 +391,17 @@ communication, written for both non-technical and technical readers:
 
 ## Performance surfaces ship current numbers (standing per-release step)
 
-The README charts and the website Performance section publish measured numbers; a release
-must not ship while they describe a superseded build. In the same change set as the
-version bump:
+The README's speed chart and performance card and the website Performance section publish
+measured numbers; a release must not ship while they describe a superseded build. In the same
+change set as the version bump:
 
-- Regenerate the charts (`python3 scripts/generate_readme_charts.py`; its `--check`
+- Regenerate the README images (`python3 scripts/generate_readme_charts.py`; its `--check`
   fail-closes on stale SVGs and README alt text). The chart anchors on the newest
   canonical macOS UI matrix record and pools the warm takes of up to five canonical
   records that share its comparison key, app version and build, and dependency lock;
-  a lineage change or a new build resets the pool, so it never spans builds.
+  a lineage change or a new build resets the pool, so it never spans builds. The performance
+  card's memory span needs a passed, memory-qualified memory-qualification record of the
+  release on the same hardware profile; the generator refuses to draw without one.
 - Update `website/src/sections/Engineering.jsx`: the `MODES` medians and the
   provenance line (the generator prints both), and the aria-label ranges. The
   provenance line mirrors the chart footer: "Record <anchor>" for a pool of one,
@@ -416,7 +418,7 @@ version bump:
 
 ## Technical sections are maintained surfaces (standing per-release step)
 
-The README's "For developers" section (chiefly "Engineering highlights") and the website Engineering
+The README's "Under the hood" section (chiefly its highlights) and the website Engineering
 section (`website/src/sections/Engineering.jsx`) are long-term whole-package surfaces: they
 present the owned-runtime derivation, the host architecture, the
 streaming/memory/determinism discipline, and the benchmark rigor as one curated story.
@@ -457,19 +459,19 @@ then run the checks at the end.
    - `scripts/generate_readme_charts.py` names the models the chart's pool ran
      (`pool_model_label`: "Vocello 3.1 models" for the one model per mode, from the pool's app
      version; a variant name from `VARIANT_LABELS` only for a pool of the earlier two-package
-     line-up), and the `scripts/readme_art/performance.html` and `performance-narrow.html`
-     templates name the models in their source lines. Change the labels when the models' public
-     names changed.
+     line-up), and its performance card names the release ("Vocello 3.1") from the same app
+     version. Change the labels when the models' public names changed.
 3. **The README lines.** The release badge and the download and installer links (they name the
    tag), the model table and its captions, the requirements and download sizes, the performance
    captions and alt text, and the command-line section. Search the file for the old version, the
    old tag and every retired product term; do not rely on a list of line numbers.
-4. **The README images.** Re-render the hero, modes and performance art
-   (`scripts/readme_art/render.sh`, which needs Chrome) when a screenshot, a number or a model name
-   in them changed; edit `docs/readme/download-mac.svg` and `install-cli.svg`, which carry the
-   version; regenerate the charts (`python3 scripts/generate_readme_charts.py`) from the release's
-   canonical record ("Performance surfaces ship current numbers", above). Replace any screenshot
-   that shows a retired control.
+4. **The README images.** Every SVG under `docs/readme/` is generated: run
+   `python3 scripts/generate_readme_charts.py`, which draws the art (`scripts/lib/readme_art.py`),
+   versions the download, installer and beta buttons from the public facts file, and draws the speed
+   chart and performance card from the release's records ("Performance surfaces ship current
+   numbers", above). Edit the copy in `scripts/lib/readme_art.py` when a feature or a mode's
+   description changed. Replace any screenshot under `docs/screenshots/` that shows a retired
+   control with a capture from `scripts/ui_test.sh macos marketing`.
 5. **The website data.** `website/src/data/release.js` (the stable release's version and tag),
    `website/src/data/whatsnew.js` and `website/src/data/cli.js`.
 6. **The website sections.** `FinalCTA`, `Limitations`, `IphoneBeta`, `CommandLine`, `Engineering`

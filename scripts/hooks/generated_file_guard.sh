@@ -34,7 +34,7 @@ while IFS= read -r file_path; do
     block "edit config/third-party-attribution-policy.json or its inputs, then python3 scripts/attribution_manifest.py rebuild" ;;
   Sources/SharedSupport/Services/HantHansFoldTable.swift)
     block "python3 scripts/generate_hant_hans_fold_swift.py (from config/language-normalization/hant-hans-v1.txt)" ;;
-  docs/charts/*.svg)
+  docs/readme/*.svg)
     block "python3 scripts/generate_readme_charts.py" ;;
   benchmarks/HISTORY.md)
     block "python3 scripts/benchmark_history.py (regenerated from benchmarks/runs)" ;;

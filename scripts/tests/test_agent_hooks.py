@@ -93,7 +93,7 @@ GENERATED = ("docs/ROADMAP.md", "docs/INDEX.md", "QwenVoice.xcodeproj/project.pb
              "Sources/Resources/qwenvoice_production_model_catalog.json",
              "Sources/Resources/third_party_attributions.json",
              "Sources/SharedSupport/Services/HantHansFoldTable.swift",
-             "docs/charts/architecture-dark.svg", "benchmarks/HISTORY.md",
+             "docs/readme/architecture.svg", "benchmarks/HISTORY.md",
              "Packages/VocelloQwen3Core/CURRENT_INVENTORY.json",
              "Packages/VocelloQwen3Core/FACADE_API_BASELINE.json")
 SIM_SUFFIX = "_" + "sim"

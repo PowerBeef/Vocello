@@ -127,7 +127,7 @@ def validate_readme(root: Path, public: dict) -> list[str]:
     if not re.search(r"(?i)Voice Cloning follows the reference voice", readme):
         errors.append("README.md: clone delivery must be attributed to the reference voice")
     # Product imagery comes from the repository, as markdown images or as <img> tags: the
-    # screenshots, the banner, and the README art rendered from them under docs/readme/.
+    # screenshots, the banner, and the generated README art under docs/readme/.
     local_assets = set(re.findall(
         r"(?:\]\(|src=\")(docs/(?:screenshots/[^)\"]+|readme/[^)\"]+|readme_banner_vocello\.png))[)\"]", readme))
     if len(local_assets) < 5:

@@ -6523,6 +6523,25 @@
         "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20261116-220447-0b6bc26b.json",
         "doc:docs/releases/v3.1.0.md"
       ]
+    },
+    {
+      "id": "BKL-28",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac Voice Design save shows no \"Voice added\" alert after Keep voice",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift"
+      ],
+      "updated": "2026-11-17",
+      "notes": "Found 2026-10-24 in macos-xcui-marketing-20261024-145129-78cc21e5, which proved the capture's Keep-voice fix (cd9541df): the warning appeared, Keep was clicked and the voice saved. The test then waited 20 s for the OK of the \"Voice added\" alert, which handleSavedVoice sets while the save sheet dismisses itself, and none appeared. The lane was interrupted in teardown, so the result bundle has no screenshot. Parked without investigation under the focus lock: Mac-only and not a release blocker. 2026-11-16: fixed in 0c0c1d5a (the alert waits for the save sheet's onDismiss, or shows at once with no sheet up). Closes when scripts/ui_test.sh macos marketing passes test00_WebsiteRefresh. 2026-11-17: scripts/ui_test.sh macos marketing passed test00_WebsiteRefresh (85.8 s) on the fixed build; its captures replace the Mac images in docs/screenshots (BKL-84).",
+      "evidence": [
+        "commit:0c0c1d5a",
+        "run:macos-xcui-marketing-20261117-143331-f334603e"
+      ]
     }
   ]
 }

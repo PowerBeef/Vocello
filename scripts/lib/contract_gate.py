@@ -208,8 +208,10 @@ VALIDATORS: tuple[Validator, ...] = (
     _reads(PYTHON, "scripts/benchmark_history.py", "rebuild-index", "--check", heavy=True,
            inputs=BENCHMARK_HISTORY),
     _reads(PYTHON, "scripts/generate_readme_charts.py", "--check", inputs=(
-        "scripts/generate_readme_charts.py", "scripts/lib/rtf.py", "README.md", "benchmarks/",
-        "docs/charts/")),
+        "scripts/generate_readme_charts.py", "scripts/lib/readme_art.py", "scripts/lib/rtf.py", "README.md",
+        "benchmarks/", "config/public-product-facts.json", "docs/readme/",
+        # The hero embeds the app's own lockup.
+        "Sources/Assets.xcassets/VocelloLaunchLogo.imageset/")),
 
     # Delivery copy and the audio QC take inputs (text-level; audio never gates ordinary CI).
     _reads(PYTHON, "scripts/check_delivery_instructions.py", inputs=(

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="968" viewBox="0 0 400 968" role="img" aria-labelledby="title desc">
+<title id="title">How Vocello works</title>
+<desc id="desc">The Mac app, the iPhone app and the vocello command line host one engine; the VocelloQwen3Engine actor runs the talker, code predictor and speech decoder on MLX and Metal; audio streams to the preview, a limiter, a watermarked WAV and an audio check before History.</desc>
+<defs><linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1C1E26"/><stop offset="1" stop-color="#111318"/></linearGradient><radialGradient id="glow0" cx="200" cy="470" r="320" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#BFAADB" stop-opacity="0.08"/><stop offset="1" stop-color="#BFAADB" stop-opacity="0"/></radialGradient><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#8C8F9B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="400" height="968" rx="24" fill="url(#canvas)"/><rect width="400" height="968" rx="24" fill="url(#glow0)"/><rect x="0.5" y="0.5" width="399" height="967" rx="23.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.07"/>
+<text x="24" y="44" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#8C8F9B" letter-spacing="1.2">ONE ENGINE, THREE HOSTS</text>
+<rect x="24" y="62" width="108" height="86" rx="14" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<rect x="59" y="74" width="38" height="38" rx="10.64" fill="#EDCC8A" fill-opacity="0.12" stroke="#EDCC8A" stroke-opacity="0.38"/><g transform="translate(67.36 82.36) scale(0.89)" fill="none" stroke="#EDCC8A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/></g>
+<text x="78" y="134" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">Mac app</text>
+<rect x="146" y="62" width="108" height="86" rx="14" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<rect x="181" y="74" width="38" height="38" rx="10.64" fill="#EDCC8A" fill-opacity="0.12" stroke="#EDCC8A" stroke-opacity="0.38"/><g transform="translate(189.36 82.36) scale(0.89)" fill="none" stroke="#EDCC8A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></g>
+<text x="200" y="134" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">iPhone app</text>
+<rect x="268" y="62" width="108" height="86" rx="14" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<rect x="303" y="74" width="38" height="38" rx="10.64" fill="#EDCC8A" fill-opacity="0.12" stroke="#EDCC8A" stroke-opacity="0.38"/><g transform="translate(311.36 82.36) scale(0.89)" fill="none" stroke="#EDCC8A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 10l2.8 2.5-2.8 2.5"/><path d="M12.5 15.5h4"/></g>
+<text x="322" y="134" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">vocello</text>
+<path d="M200 148 L200 176" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="24" y="182" width="352" height="76" rx="14" fill="#23262F" fill-opacity="0.75" stroke="#EDCC8A" stroke-opacity="0.35"/>
+<text x="42" y="210" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#EDCC8A">Engine store</text>
+<text x="42" y="232" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#C9CBD4">Admission, memory policy, typed cancellation</text>
+<path d="M200 258 L200 286" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="24" y="292" width="352" height="330" rx="14" fill="#111318" fill-opacity="0.6" stroke="#BFAADB" stroke-opacity="0.4"/>
+<text x="42" y="322" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="15" font-weight="600" fill="#BFAADB">VocelloQwen3Engine</text>
+<text x="42" y="343" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">an actor on MLX and Metal</text>
+<rect x="42" y="362" width="316" height="62" rx="14" fill="#23262F" fill-opacity="0.85" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="58" y="389" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#F5F6F8">Talker</text>
+<text x="58" y="409" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">script to codec frames</text>
+<path d="M200 424 L200 438" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="42" y="440" width="316" height="62" rx="14" fill="#23262F" fill-opacity="0.85" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="58" y="467" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#F5F6F8">Code predictor</text>
+<text x="58" y="487" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">fills each frame's codebooks</text>
+<path d="M200 502 L200 516" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="42" y="518" width="316" height="62" rx="14" fill="#23262F" fill-opacity="0.85" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="58" y="545" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#F5F6F8">Speech decoder</text>
+<text x="58" y="565" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">codec frames to 24 kHz audio</text>
+<text x="42" y="610" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#C9CBD4">8-bit attention, 4-bit everything else</text>
+<path d="M200 622 L200 650" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<text x="212" y="642" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#8C8F9B">PCM, chunk by chunk</text>
+<rect x="84" y="656" width="232" height="34" rx="17" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="200" y="678" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">Limiter</text>
+<path d="M200 690 L200 710" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="84" y="712" width="232" height="34" rx="17" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="200" y="734" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">Atomic WAV</text>
+<path d="M200 746 L200 766" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="84" y="768" width="232" height="34" rx="17" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="200" y="790" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">AudioSeal mark</text>
+<path d="M200 802 L200 822" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="84" y="824" width="232" height="34" rx="17" fill="#23262F" fill-opacity="0.75" stroke="#FFFFFF" stroke-opacity="0.08"/>
+<text x="200" y="846" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#F5F6F8" text-anchor="middle">Audio check</text>
+<path d="M200 858 L200 878" stroke="#8C8F9B" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+<rect x="84" y="880" width="232" height="34" rx="17" fill="#23262F" fill-opacity="0.75" stroke="#DBA887" stroke-opacity="0.3"/>
+<text x="200" y="902" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#DBA887" text-anchor="middle">History</text>
+<text x="24" y="942" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B">A cancelled take never reaches History.</text>
+</svg>

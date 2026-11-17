@@ -59,7 +59,7 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
     ),
     DerivedArtifact(
         artifact_id="readme-charts",
-        description="docs/charts/*.svg (README performance charts)",
+        description="docs/readme/*.svg (the README images) and the README speed-chart block",
         check=("python3", "scripts/generate_readme_charts.py", "--check"),
         rebuild=("python3", "scripts/generate_readme_charts.py"),
         stale_markers=("README charts are stale",),

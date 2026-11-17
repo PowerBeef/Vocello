@@ -1,47 +1,42 @@
 #!/usr/bin/env python3
-"""Generate the README performance charts as deterministic SVGs.
+"""Generate every README image as deterministic, Vocello-branded SVG.
 
-Reads tracked benchmark registry records and emits dark + light SVG variants
-under docs/charts/. Output is byte-deterministic (no timestamps, fixed float
-formatting), so `--check` can fail-close on staleness exactly like the other
-derived artifacts. Python stdlib only — no plotting dependency joins the
-toolchain for this.
+Writes docs/readme/ (the art in scripts/lib/readme_art.py, the speed chart and
+the measured performance card drawn here from tracked records) and the README's
+speed-chart block. Output is byte-deterministic (no timestamps, fixed float
+formatting), so `--check` fails closed on staleness exactly like the other
+derived artifacts, and every SVG under docs/readme/ must be one this script
+writes. Python stdlib only: no plotting dependency joins the toolchain.
 
 Data provenance:
-  - The RTF chart pools canonical macOS ui-generation records (audit #72): its
-    anchor is the newest canonical record on the canonical macOS profile of
+  - The speed chart pools canonical macOS ui-generation records (audit #72):
+    its anchor is the newest canonical record on the canonical macOS profile of
     benchmarks/hardware-profiles.json (while that profile has none yet, the
     newest canonical record on any profile), and the pool is the anchor plus
     the canonical records just before it on the same profile that share its
     comparison key, app version and build, and dependency lock, at most
     POOL_SIZE records; a lineage change or a new build resets the pool, so it
-    never spans builds and the bars describe the anchor's build (a lineage
-    key leaves the app version and pins out). Each bar is the median of every
-    warm take of its cell across the pool, so one run's noise no longer moves
-    the public numbers at each new record. The anchor is derived, never
-    pinned: a new canonical record changes the charts, so `--check` fails
-    until they are regenerated (and the website medians and provenance line
-    updated from the printed values). Records from different hardware
-    profiles are never pooled; the subtitle names the anchor's hardware and
-    the models every pooled take ran (audit #17: the numbers never appear
-    under a hardware-only label), and the footer the anchor and the pool
-    size. Since 3.1 each mode has one model, whose variant id is still
-    `speed`; the label names it by its release, never as "Speed", and only a
-    pool of the earlier two-package line-up is named by its variant. RTF is
-    the standard
-    real-time factor (generation seconds per audio second, lower is faster).
-    A record published before the 2026-09-12 cutover stores the inverted
-    decode-loop speedup under `rtf`; for those the chart derives a standard
-    value from each take's app submit→completed span (scripts/lib/rtf.py) and
-    says so in its footer. The README alt text is generated from the same
-    numbers between the markers in README.md, so prose cannot drift from the
-    drawing. The retired gate-delta chart's pinned A/B pair remains history in
-    benchmarks/HISTORY.md and OPTIMIZATION.md §K; it is never re-promoted to a
-    chart (technical sections are maintained whole-package surfaces).
-  - The long-form memory chart embeds the per-segment table from the local
-    lane evidence run named in LONGFORM_RUN_ID (smoke lane
-    `--long-form-segments 10`; lane evidence is never a registry record, so
-    the privacy-safe numbers are pinned here with their run ID).
+    never spans builds and the bars describe the anchor's build. Each bar is
+    the median of every warm take of its cell across the pool. The anchor is
+    derived, never pinned: a new canonical record changes the images, so
+    `--check` fails until they are regenerated (and the website medians and
+    provenance line updated from the printed values). Records from different
+    hardware profiles are never pooled; the chart names the anchor's hardware
+    and the models every pooled take ran (audit #17), and its footer the anchor
+    and the pool size. Since 3.1 each mode has one model, whose variant id is
+    still `speed`; the label names it by its release, never as "Speed". RTF is
+    the standard real-time factor (generation seconds per audio second, lower
+    is faster); a record published before the 2026-09-12 cutover gets a value
+    derived from each take's app submit-to-completed span (scripts/lib/rtf.py),
+    and the chart says so. The README alt text comes from the same numbers.
+  - The performance card's minute of speech is the median warm take of the
+    same pool times 60, and its first-audio span the fastest and slowest mode's
+    median warm submit-to-first-chunk time. Its memory span is the lowest and
+    highest per-mode peak physical footprint of the newest passed,
+    memory-qualified memory-qualification record on the anchor's profile for
+    the anchor's release (MiB shown as GB, as Activity Monitor does).
+  - The calls to action take their version and minimum OS from
+    config/public-product-facts.json.
 
 Usage:
   python3 scripts/generate_readme_charts.py            # rebuild
@@ -58,35 +53,22 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT / "docs" / "charts"
+OUTPUT_DIR = ROOT / "docs" / "readme"
 README_PATH = ROOT / "README.md"
 RECORDS_DIR = ROOT / "benchmarks" / "runs" / "ui-generation"
+MEMORY_RECORDS_DIR = ROOT / "benchmarks" / "runs" / "memory-qualification"
 HARDWARE_PROFILES_PATH = ROOT / "benchmarks" / "hardware-profiles.json"
+FACTS_PATH = ROOT / "config" / "public-product-facts.json"
 README_MARKERS = ("<!-- rtf-chart:start (generated by scripts/generate_readme_charts.py) -->",
                   "<!-- rtf-chart:end -->")
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
+from lib import readme_art as art  # noqa: E402
 from lib import rtf as rtf_semantics  # noqa: E402
 
 # At most this many canonical records (the anchor and its same-lineage
 # predecessors) pool into the published medians.
 POOL_SIZE = 5
-LONGFORM_RUN_ID = "macos-xcui-smoke-20260725-062451-8f15c1fd"
-# (audio seconds, engine phys-footprint end MB, peak MB) per segment.
-LONGFORM_SEGMENTS = (
-    (49.9, 2454.7, 3037.4),
-    (53.0, 2479.2, 2995.3),
-    (61.1, 2507.0, 3040.3),
-    (57.4, 2486.4, 3040.2),
-    (57.6, 2505.5, 3040.8),
-    (48.7, 2301.5, 3040.1),
-    (55.8, 2476.3, 3040.9),
-    (60.6, 2490.3, 3042.4),
-    (56.6, 2302.3, 3041.5),
-    (53.3, 2480.9, 3041.1),
-    (54.7, 2505.8, 3041.6),
-    (17.2, 2427.0, 2952.1),
-)
 
 MODES = ("custom", "design", "clone")
 MODE_LABELS = {"custom": "Built-in Voice", "design": "Voice Design", "clone": "Voice Cloning"}
@@ -101,36 +83,11 @@ VARIANT_LABELS = {
 # repository, not its variant, tells it from the 3.0 Speed package; public copy
 # names it by the release that ships it and never calls it "Speed".
 SINGLE_MODEL_REPOSITORY_SUFFIX = "-hybrid-attn"
-# The RTF chart's subtitle fills its 720 px at 12 px type: this is the longest one drawn that
-# fits ("... Mac mini M6, 16 GB · Speed models"). A longer one names its models without the
-# word "models" ("... · Vocello 3.1"); the README alt text always carries the full name.
-SUBTITLE_MAX_CHARS = 118
 LENGTHS = ("short", "medium", "long")
-
-# Palette validated with the dataviz six-checks validator against each
-# surface (brand hue families deepened until every check passed).
-THEMES = {
-    "dark": {
-        "ink": "#e6edf3",
-        "muted": "#9198a1",
-        "grid": "#30363d",
-        "modes": {"custom": "#BE8A24", "design": "#9070E6", "clone": "#E26034"},
-        "series": ("#9070E6", "#E26034"),
-        "pre_bar": "#484f58",
-        "box_fill": "#161b22",
-    },
-    "light": {
-        "ink": "#1f2328",
-        "muted": "#656d76",
-        "grid": "#d1d9e0",
-        "modes": {"custom": "#8A6410", "design": "#6C47C8", "clone": "#B4471B"},
-        "series": ("#6C47C8", "#B4471B"),
-        "pre_bar": "#afb8c1",
-        "box_fill": "#f6f8fa",
-    },
-}
-
-FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+# Bar fills, validated with the dataviz six-checks validator against the card
+# (#1C1E26): the brand's mode hues deepened until every check passed. Text never
+# takes a series color.
+BAR_COLORS = {"custom": "#BE8A24", "design": "#9070E6", "clone": "#E26034"}
 
 
 def load_record(record_id: str, records_dir: Path | None = None) -> dict:
@@ -161,6 +118,15 @@ def hardware_label(record: dict) -> str:
     return f"{match.group(1)} {match.group(2)}"
 
 
+def release_minor(record: dict) -> str:
+    """The record's app version as major.minor ("3.1")."""
+    version = str((record.get("toolchain") or {}).get("appVersion") or "")
+    match = re.fullmatch(r"(\d+\.\d+)(?:\.\d+)*", version)
+    if not match:
+        raise SystemExit(f"error: the record has no chartable app version: {version!r}")
+    return match.group(1)
+
+
 def pool_model_label(record_ids: list[str], records_dir: Path | None = None) -> str:
     """The models every take of the pool ran, as the chart names them (audit #17).
 
@@ -181,38 +147,101 @@ def pool_model_label(record_ids: list[str], records_dir: Path | None = None) -> 
             f"variants {sorted(map(str, variants))}"
         )
     if single_model == {True}:
-        version = str((records[0].get("toolchain") or {}).get("appVersion") or "")
-        match = re.fullmatch(r"(\d+\.\d+)(?:\.\d+)*", version)
-        if not match:
-            raise SystemExit(f"error: the anchor record has no chartable app version: {version!r}")
-        return f"Vocello {match.group(1)} models"
+        return f"Vocello {release_minor(records[0])} models"
     variant = variants.pop()
     if variant not in VARIANT_LABELS:
         raise SystemExit(f"error: the pooled records ran a variant the chart cannot name: {variant!r}")
     return f"{VARIANT_LABELS[variant]} models"
 
 
+def warm_takes(record_ids: list[str], records_dir: Path | None = None):
+    """(run id, record, take, cell) for every warm take the public numbers use.
+
+    The first warm take after a cold take pays a settling cost and stays out,
+    as it does out of its cell's statistics (audit #30; records before
+    2026-09-25 never flag it)."""
+    for record_id in record_ids:
+        payload = load_record(record_id, records_dir)
+        for take in payload["takes"]:
+            cell = re.sub(r"#\d+$", "", take["cell"])
+            if take.get("followsColdTake") is True or not cell.endswith("/warm"):
+                continue
+            yield record_id, payload, take, cell
+
+
 def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> tuple[dict[str, float], bool]:
-    """Per-cell median standard RTF over the records' takes (less any flagged
-    followsColdTake), and whether it was derived.
+    """Per-cell median standard RTF over the pool's warm takes, and whether it was derived.
 
     Pooled records share one comparison key, so they share one RTF definition."""
     per_cell: dict[str, list[float]] = {}
     derived = False
-    for record_id in record_ids:
-        payload = load_record(record_id, records_dir)
+    for record_id, payload, take, cell in warm_takes(record_ids, records_dir):
         derived = derived or not rtf_semantics.is_standard(payload)
-        for take in payload["takes"]:
-            # The first warm take after a cold take pays a settling cost and
-            # stays out of the public medians, as it does out of its cell's
-            # statistics (audit #30; records before 2026-09-25 never flag it).
-            if take.get("followsColdTake") is True:
-                continue
-            value, _ = rtf_semantics.take_rtf(payload, take)
-            if value is None:
-                raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")
-            per_cell.setdefault(re.sub(r"#\d+$", "", take["cell"]), []).append(value)
+        value, _ = rtf_semantics.take_rtf(payload, take)
+        if value is None:
+            raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")
+        per_cell.setdefault(cell, []).append(value)
     return {key: statistics.median(values) for key, values in per_cell.items()}, derived
+
+
+def median_warm_rtf(record_ids: list[str], records_dir: Path | None = None) -> float:
+    """The median standard RTF of every warm take of the pool, across modes and lengths."""
+    values = []
+    for record_id, payload, take, _ in warm_takes(record_ids, records_dir):
+        value, _ = rtf_semantics.take_rtf(payload, take)
+        if value is None:
+            raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")
+        values.append(value)
+    return statistics.median(values)
+
+
+def first_audio_seconds(record_ids: list[str], records_dir: Path | None = None) -> dict[str, float]:
+    """Each mode's median warm submit-to-first-chunk time, in seconds."""
+    per_mode: dict[str, list[float]] = {}
+    for record_id, _, take, cell in warm_takes(record_ids, records_dir):
+        value = (take.get("metrics") or {}).get("submitToFirstChunkMS")
+        if not isinstance(value, (int, float)):
+            raise SystemExit(f"error: {record_id} take {take.get('cell')} has no submitToFirstChunkMS")
+        per_mode.setdefault(cell.split("/")[0], []).append(value / 1000)
+    if set(per_mode) != set(MODES):
+        raise SystemExit(f"error: the pool has no warm first-chunk time for every mode: {sorted(per_mode)}")
+    return {mode: statistics.median(values) for mode, values in per_mode.items()}
+
+
+def memory_peaks(profile: str, release: str, records_dir: Path | None = None) -> tuple[str, dict[str, float]]:
+    """(run id, peak GB per mode) from the newest qualifying memory-qualification record.
+
+    It must have passed, be memory-qualified, ran on `profile` and come from the
+    `release` (major.minor) the speed figures describe."""
+    candidates = []
+    for path in (records_dir or MEMORY_RECORDS_DIR).glob("mac-*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        run = payload.get("run") or {}
+        version = str((payload.get("toolchain") or {}).get("appVersion") or "")
+        if (run.get("status") == "passed" and run.get("platform") == "macos"
+                and (payload.get("hardware") or {}).get("profileID") == profile
+                and (payload.get("evidence") or {}).get("memoryQualified") is True
+                and re.fullmatch(rf"{re.escape(release)}(?:\.\d+)*", version)):
+            candidates.append((str(run.get("finishedAt")), str(run.get("id")), payload))
+    for _, run_id, payload in sorted(candidates, reverse=True):
+        peaks: dict[str, float] = {}
+        for take in payload.get("takes") or []:
+            value = (take.get("metrics") or {}).get("kernelPhysFootprintPeakMB")
+            if take.get("mode") in MODES and isinstance(value, (int, float)):
+                peaks[take["mode"]] = max(peaks.get(take["mode"], 0.0), value / 1024)
+        if set(peaks) == set(MODES):
+            return run_id, peaks
+    raise SystemExit(f"error: no passed, memory-qualified record of Vocello {release} on {profile} "
+                     "measures every mode")
+
+
+def chart_pool_identity(payload: dict) -> tuple[str, ...]:
+    toolchain = payload.get("toolchain") or {}
+    return (
+        str((payload.get("comparison") or {}).get("key", "")),
+        str(toolchain.get("appVersion", "")), str(toolchain.get("appBuild", "")),
+        str((payload.get("inputs") or {}).get("dependencyLockHash", "")),
+    )
 
 
 def canonical_records(records_dir: Path | None = None) -> dict[str, list[tuple[str, str, tuple[str, ...]]]]:
@@ -225,14 +254,8 @@ def canonical_records(records_dir: Path | None = None) -> dict[str, list[tuple[s
         payload = json.loads(path.read_text(encoding="utf-8"))
         run = payload["run"]
         if run.get("classification") == "canonical":
-            toolchain = payload.get("toolchain") or {}
-            identity = (
-                str((payload.get("comparison") or {}).get("key", "")),
-                str(toolchain.get("appVersion", "")), str(toolchain.get("appBuild", "")),
-                str((payload.get("inputs") or {}).get("dependencyLockHash", "")),
-            )
             by_profile.setdefault(payload.get("hardware", {}).get("profileID"), []).append(
-                (run["finishedAt"], run["id"], identity)
+                (run["finishedAt"], run["id"], chart_pool_identity(payload))
             )
     return {profile: sorted(rows) for profile, rows in by_profile.items()}
 
@@ -289,7 +312,7 @@ def readme_alt_text(medians: dict[str, float], models: str | None = None) -> str
         parts.append(f"{MODE_LABELS[mode]} {min(values):.2f} to {max(values):.2f}")
     measured = f" of the {models}" if models else ""
     return (
-        f"Grouped bar chart: warm real-time factor{measured} by script length, lower is faster: "
+        f"Bar chart: warm real-time factor{measured} by script length, lower is faster: "
         + ", ".join(parts)
         + ". Every bar sits below the real-time line at 1.0."
     )
@@ -300,8 +323,8 @@ def readme_block(medians: dict[str, float], models: str | None = None) -> str:
     return "\n".join([
         README_MARKERS[0],
         "<picture>",
-        '  <source media="(prefers-color-scheme: dark)" srcset="docs/charts/rtf-by-mode-dark.svg">',
-        f'  <img alt="{alt}" src="docs/charts/rtf-by-mode-light.svg">',
+        '  <source media="(max-width: 700px)" srcset="docs/readme/rtf-by-mode-narrow.svg">',
+        f'  <img src="docs/readme/rtf-by-mode.svg" width="100%" alt="{alt}">',
         "</picture>",
         README_MARKERS[1],
     ])
@@ -317,246 +340,140 @@ def render_readme(medians: dict[str, float], models: str | None = None) -> str:
     return head + readme_block(medians, models) + tail
 
 
-def svg_open(width: int, height: int) -> list[str]:
-    return [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" role="img">',
-        f'<g font-family="{FONT}">',
-    ]
-
-
-def text(x: float, y: float, value: str, *, fill: str, size: int = 12,
-         weight: str = "normal", anchor: str = "start") -> str:
-    return (
-        f'<text x="{x:.1f}" y="{y:.1f}" fill="{fill}" font-size="{size}" '
-        f'font-weight="{weight}" text-anchor="{anchor}">{value}</text>'
-    )
-
-
-def rtf_chart(theme_name: str) -> str:
-    theme = THEMES[theme_name]
+def rtf_chart(*, narrow: bool = False) -> str:
+    """The speed chart: warm RTF per mode and script length, on the brand card."""
     pool = chart_pool()
-    anchor = pool[0]
     medians, derived = load_rtf_medians(pool)
-    width, height = 720, 440
-    left, right, top = 110.0, 84.0, 64.0
-    x0, x1 = left, width - right
-    scale_max = 1.2
+    hardware = hardware_label(load_record(pool[0]))
+    models = pool_model_label(pool)
+    width = art.NARROW if narrow else art.WIDE
+    margin = 24.0 if narrow else 36.0
+    x0 = 96.0 if narrow else 250.0
+    x1 = width - (62.0 if narrow else 78.0)
+    scale_max = 1.1
+    bar_h, bar_gap = 18.0, 6.0
+    group_h = 3 * bar_h + 2 * bar_gap
+    header = 236.0 if narrow else 150.0
+    group_gap = 52.0 if narrow else 30.0
+    plot_top = header + (28.0 if narrow else 0.0)
+    plot_bottom = plot_top + 3 * group_h + 2 * group_gap
+    height = plot_bottom + 92.0
 
     def x_for(value: float) -> float:
         return x0 + (x1 - x0) * min(value, scale_max) / scale_max
 
-    parts = svg_open(width, height)
-    parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
-    hardware = hardware_label(load_record(anchor))
-    subtitle = ("Warm real-time factor: seconds of generation per second of audio "
-                f"(lower is faster) · {hardware} · {pool_model_label(pool)}")
-    if len(subtitle) > SUBTITLE_MAX_CHARS:
-        subtitle = subtitle.removesuffix(" models")
-    parts.append(text(16, 47, subtitle, fill=theme["muted"], size=12))
+    defs, background = art.card(width, height, glows=((width * 0.1, 0, width * 0.6, art.GOLD, 0.1),))
+    body = [background, art.text(margin, 44 if narrow else 50, "SPEED BY MODE AND SCRIPT LENGTH",
+                                 size=11.5 if narrow else 12, fill=art.MUTED, weight=600, spacing=1.3)]
+    if narrow:
+        for index, line in enumerate(("Faster than real time,", "in every mode")):
+            body.append(art.text(margin, 80 + index * 30, line, size=25, weight=600, family=art.DISPLAY))
+        sub, after = art.paragraph(margin, 148, "Warm real-time factor: seconds of generation per second of "
+                                   "audio, lower is faster", size=13.5, width=width - 2 * margin, leading=19)
+        body.append(sub)
+        body.append(art.text(margin, after + 22, f"{hardware} · {models}", size=12.5, fill=art.MUTED))
+    else:
+        body.append(art.text(margin, 86, "Faster than real time in every mode", size=26, weight=600,
+                             family=art.DISPLAY))
+        body.append(art.text(margin, 112, "Warm real-time factor: seconds of generation per second of audio, "
+                             "lower is faster", size=14.5, fill=art.SECONDARY))
+        body.append(art.text(margin, 133, f"{hardware} · {models}", size=13, fill=art.MUTED))
 
-    bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
-    y = top + 14.0
     for grid_value in (0.25, 0.5, 0.75, 1.0):
         gx = x_for(grid_value)
-        emphasized = grid_value == 1.0
-        stroke = theme["muted"] if emphasized else theme["grid"]
-        dash = "" if emphasized else ' stroke-dasharray="3 3"'
-        parts.append(
-            f'<line x1="{gx:.1f}" y1="{top:.1f}" x2="{gx:.1f}" y2="{height - 52}" '
-            f'stroke="{stroke}" stroke-width="1"{dash}/>'
-        )
-        label = "1.0 · realtime" if emphasized else f"{grid_value:.2f}"
-        parts.append(text(gx, height - 34, label, fill=theme["muted"], size=11, anchor="middle"))
+        real_time = grid_value == 1.0
+        stroke = art.SECONDARY if real_time else art.FIELD
+        dash = "" if real_time else ' stroke-dasharray="3 4"'
+        body.append(f'<line x1="{art.num(gx)}" y1="{art.num(plot_top - 12)}" x2="{art.num(gx)}" '
+                    f'y2="{art.num(plot_bottom + 10)}" stroke="{stroke}" stroke-opacity="{0.7 if real_time else 1}" '
+                    f'stroke-width="{1.5 if real_time else 1}"{dash}/>')
+        if narrow and grid_value == 0.75:
+            continue  # its label would run into the real-time label
+        label = "1.0 · real time" if real_time else f"{grid_value:.2f}"
+        body.append(art.text(gx, plot_bottom + 30, label, size=12, fill=art.SECONDARY if real_time else art.MUTED,
+                             weight=600 if real_time else 400, anchor="middle"))
 
-    for mode in MODES:
-        color = theme["modes"][mode]
-        parts.append(f'<circle cx="{22}" cy="{y + 2:.1f}" r="5" fill="{color}"/>')
-        parts.append(text(32, y + 6, MODE_LABELS[mode], fill=theme["ink"], size=13, weight="600"))
-        y += 16.0
-        for length in LENGTHS:
+    for group, mode in enumerate(MODES):
+        top = plot_top + group * (group_h + group_gap)
+        if narrow:
+            dot_y = top - 13
+            body.append(f'<circle cx="{art.num(margin + 5)}" cy="{art.num(dot_y)}" r="5" fill="{BAR_COLORS[mode]}"/>')
+            body.append(art.text(margin + 17, dot_y + 5, MODE_LABELS[mode], size=14.5, weight=600))
+        else:
+            middle = top + group_h / 2
+            body.append(f'<circle cx="{art.num(margin + 6)}" cy="{art.num(middle)}" r="6" fill="{BAR_COLORS[mode]}"/>')
+            body.append(art.text(margin + 20, middle + 5.5, MODE_LABELS[mode], size=16, weight=600,
+                                 family=art.DISPLAY))
+        for row, length in enumerate(LENGTHS):
             value = medians[f"{mode}/{length}/warm"]
+            y = top + row * (bar_h + bar_gap)
             bw = x_for(value) - x0
-            parts.append(text(x0 - 8, y + bar_h - 4, length, fill=theme["muted"], size=11, anchor="end"))
-            parts.append(
-                f'<path d="M{x0:.1f} {y:.1f} h{bw - 4:.1f} a4 4 0 0 1 4 4 v{bar_h - 8:.1f} '
-                f'a4 4 0 0 1 -4 4 h-{bw - 4:.1f} z" fill="{color}"/>'
-            )
-            parts.append(text(x0 + bw + 6, y + bar_h - 4, f"{value:.2f}", fill=theme["ink"], size=11))
-            y += bar_h + in_gap
-        y += group_gap - in_gap
+            body.append(art.text(x0 - 10, y + bar_h - 4.5, length, size=12.5, fill=art.MUTED, anchor="end"))
+            body.append(f'<path d="M{art.num(x0)} {art.num(y)} h{art.num(bw - 4)} a4 4 0 0 1 4 4 '
+                        f'v{art.num(bar_h - 8)} a4 4 0 0 1 -4 4 h-{art.num(bw - 4)} z" fill="{BAR_COLORS[mode]}"/>')
+            body.append(art.text(x0 + bw + 8, y + bar_h - 4.5, f"{value:.2f}", size=12.5, fill=art.TEXT, weight=600))
+
+    footer = f"{provenance_text(pool)} · benchmarks/HISTORY.md"
     if derived:
-        parts.append(text(16, height - 6,
-                          "RTF derived from each take's app submit→completed span (record predates the 2026-09-12 RTF cutover)",
-                          fill=theme["muted"], size=10))
-    parts.append(text(width - 16, height - 6, f"{provenance_text(pool)} · benchmarks/HISTORY.md",
-                      fill=theme["muted"], size=10, anchor="end"))
-    parts.extend(("</g>", "</svg>"))
-    return "\n".join(parts) + "\n"
+        footer = f"RTF derived from app timings (pre-2026-09-12 record) · {footer}"
+    body.append(art.text(width - margin, height - 24, footer, size=11.5, fill=art.MUTED, anchor="end"))
+    return art.svg(width, height, "Speed by mode and script length", readme_alt_text(medians, models), body, defs)
 
 
-def memory_chart(theme_name: str) -> str:
-    theme = THEMES[theme_name]
-    width, height = 720, 340
-    left, right, top, bottom = 64.0, 44.0, 72.0, 58.0
-    x0, x1 = left, width - right
-    y0, y1 = float(height - bottom), top
-    y_max = 3200.0
-    count = len(LONGFORM_SEGMENTS)
-
-    def x_for(index: int) -> float:
-        return x0 + (x1 - x0) * index / (count - 1)
-
-    def y_for(mb: float) -> float:
-        return y0 - (y0 - y1) * mb / y_max
-
-    ends = [row[1] for row in LONGFORM_SEGMENTS]
-    peaks = [row[2] for row in LONGFORM_SEGMENTS]
-    growth = 100.0 * (ends[-1] - ends[0]) / ends[0]
-    cumulative: list[float] = []
-    running = 0.0
-    for row in LONGFORM_SEGMENTS:
-        running += row[0]
-        cumulative.append(running)
-
-    parts = svg_open(width, height)
-    parts.append(text(16, 28, "Memory stays flat at audiobook scale", fill=theme["ink"], size=16, weight="600"))
-    parts.append(text(16, 47, "Engine physical footprint across a 12-segment long-form project "
-                              f"({cumulative[-1] / 60:.1f} min of audio)", fill=theme["muted"], size=12))
-
-    for grid_mb in (1000, 2000, 3000):
-        gy = y_for(grid_mb)
-        parts.append(
-            f'<line x1="{x0:.1f}" y1="{gy:.1f}" x2="{x1:.1f}" y2="{gy:.1f}" '
-            f'stroke="{theme["grid"]}" stroke-width="1" stroke-dasharray="3 3"/>'
-        )
-        parts.append(text(x0 - 8, gy + 4, f"{grid_mb / 1000:.0f} GB", fill=theme["muted"], size=11, anchor="end"))
-    parts.append(f'<line x1="{x0:.1f}" y1="{y0:.1f}" x2="{x1:.1f}" y2="{y0:.1f}" '
-                 f'stroke="{theme["grid"]}" stroke-width="1"/>')
-
-    series = (("peak while generating", peaks, theme["series"][1]),
-              ("after each segment", ends, theme["series"][0]))
-    for label, values, color in series:
-        points = " ".join(f"{x_for(i):.1f},{y_for(v):.1f}" for i, v in enumerate(values))
-        parts.append(f'<polyline points="{points}" fill="none" stroke="{color}" '
-                     f'stroke-width="2" stroke-linejoin="round"/>')
-        for i, v in enumerate(values):
-            parts.append(f'<circle cx="{x_for(i):.1f}" cy="{y_for(v):.1f}" r="3" fill="{color}"/>')
-
-    legend_x = x1 - 170.0
-    for offset, (label, values, color) in enumerate(series):
-        ly = 20.0 + offset * 16
-        parts.append(f'<rect x="{legend_x:.1f}" y="{ly - 8:.1f}" width="10" height="10" rx="2" fill="{color}"/>')
-        parts.append(text(legend_x + 16, ly + 1, label, fill=theme["muted"], size=11))
-
-    parts.append(text(x_for(count - 1), y_for(ends[-1]) + 20, f"first→last {growth:+.1f}%",
-                      fill=theme["ink"], size=11, weight="600", anchor="end"))
-    for index in (0, 5, count - 1):
-        anchor = "end" if index == count - 1 else ("start" if index == 0 else "middle")
-        parts.append(text(x_for(index), y0 + 16, f"seg {index}", fill=theme["muted"], size=11, anchor=anchor))
-        parts.append(text(x_for(index), y0 + 30, f"{cumulative[index]:.0f}s audio",
-                          fill=theme["muted"], size=10, anchor=anchor))
-    parts.append(text(width - 16, height - 6, f"smoke run {LONGFORM_RUN_ID[-8:]} · --long-form-segments 10",
-                      fill=theme["muted"], size=10, anchor="end"))
-    parts.extend(("</g>", "</svg>"))
-    return "\n".join(parts) + "\n"
-
-
-def architecture_chart(theme_name: str) -> str:
-    theme = THEMES[theme_name]
-    width, height = 720, 252
-    violet = theme["modes"]["design"]
-    parts = svg_open(width, height)
-
-    def box(x: float, y: float, w: float, h: float, lines: tuple[str, ...], *,
-            stroke: str, title: bool = False) -> None:
-        parts.append(
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="8" '
-            f'fill="{theme["box_fill"]}" stroke="{stroke}" stroke-width="1.5"/>'
-        )
-        line_height = 16.0
-        start = y + h / 2 - line_height * (len(lines) - 1) / 2 + 4.5
-        for index, label in enumerate(lines):
-            weight = "600" if title and index == 0 else "normal"
-            fill = theme["ink"] if index == 0 else theme["muted"]
-            parts.append(text(x + w / 2, start + index * line_height, label,
-                              fill=fill, size=12, weight=weight, anchor="middle"))
-
-    def arrow(x1: float, y1: float, x2: float, y2: float) -> None:
-        parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
-                     f'stroke="{theme["muted"]}" stroke-width="1.5"/>')
-        if x2 > x1:  # rightward head
-            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-7 -4 v8 z" fill="{theme["muted"]}"/>')
-        elif y2 > y1:  # downward head
-            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-4 -7 h8 z" fill="{theme["muted"]}"/>')
-        else:  # upward head
-            parts.append(f'<path d="M{x2:.1f} {y2:.1f} l-4 7 h8 z" fill="{theme["muted"]}"/>')
-
-    # Owned-runtime group.
-    parts.append(
-        f'<rect x="356" y="30" width="348" height="164" rx="10" fill="{violet}" '
-        f'fill-opacity="0.07" stroke="{violet}" stroke-width="1.5"/>'
+def measured() -> art.Measured:
+    pool = chart_pool()
+    anchor = load_record(pool[0])
+    release = release_minor(anchor)
+    memory_id, peaks = memory_peaks(str(anchor["hardware"]["profileID"]), release)
+    first = first_audio_seconds(pool)
+    return art.Measured(
+        seconds_per_minute=median_warm_rtf(pool) * 60,
+        first_audio_low=min(first.values()), first_audio_high=max(first.values()),
+        peak_low_gb=min(peaks.values()), peak_high_gb=max(peaks.values()),
+        hardware=hardware_label(anchor), release=f"Vocello {release}",
+        provenance=provenance_text(pool), memory_record=memory_id[-8:],
     )
-    parts.append(text(372, 50, "VocelloQwen3Core", fill=violet, size=12, weight="600"))
-    parts.append(text(496, 50, "· the owned runtime", fill=theme["muted"], size=11))
-
-    box(16, 84, 116, 44, ("SwiftUI app",), stroke=theme["grid"], title=True)
-    box(180, 84, 132, 44, ("Engine store", "same process"), stroke=theme["grid"], title=True)
-    box(372, 62, 128, 52, ("Engine actor", "owns each session"), stroke=theme["grid"], title=True)
-    box(532, 62, 156, 52, ("Qwen3-TTS talker", "+ code predictor"), stroke=theme["grid"], title=True)
-    box(532, 128, 156, 48, ("Mimi decoder", "streams audio"), stroke=theme["grid"], title=True)
-    box(372, 128, 128, 48, ("MLX · Metal", "unified memory"), stroke=theme["grid"], title=True)
-
-    arrow(132, 106, 176, 106)
-    parts.append(text(154, 76, "in-process", fill=theme["muted"], size=11, anchor="middle"))
-    arrow(312, 106, 368, 106)
-    arrow(500, 88, 528, 88)
-    arrow(610, 114, 610, 124)
-    # Talker and decoder execute on MLX (plain connector, no direction).
-    parts.append(f'<line x1="500" y1="152" x2="528" y2="152" '
-                 f'stroke="{theme["muted"]}" stroke-width="1.5" stroke-dasharray="3 3"/>')
-
-    # Streaming return path: decoder → app, chunk by chunk.
-    parts.append(
-        f'<path d="M610 176 v46 h-536 v-83" fill="none" stroke="{violet}" stroke-width="1.5"/>'
-    )
-    parts.append(f'<path d="M74 132 l-4 7 h8 z" fill="{violet}"/>')
-    parts.append(text(360, 240, "PCM audio streams back chunk by chunk — playback starts before generation finishes",
-                      fill=theme["muted"], size=11, anchor="middle"))
-    parts.extend(("</g>", "</svg>"))
-    return "\n".join(parts) + "\n"
 
 
-CHARTS = {
-    "architecture": architecture_chart,
-    "rtf-by-mode": rtf_chart,
-    "longform-memory": memory_chart,
-}
+def release_facts(facts_path: Path | None = None) -> art.Release:
+    facts = json.loads((facts_path or FACTS_PATH).read_text(encoding="utf-8"))
+
+    def major(value: str, prefix: str) -> str:
+        match = re.fullmatch(rf"{prefix} (\d+)(?:\.0)*(\.\d+)*", value)
+        if not match:
+            raise SystemExit(f"error: config/public-product-facts.json has no chartable {prefix} minimum: {value!r}")
+        return match.group(1) + (match.group(2) or "")
+
+    mac = facts["stableMacRelease"]
+    return art.Release(version=mac["version"], mac_minimum=major(mac["minimumOS"], "macOS"),
+                       ios_minimum=major(facts["ios"]["minimumOS"], "iOS"))
 
 
 def render_all() -> dict[str, str]:
-    rendered: dict[str, str] = {}
-    for chart_name, renderer in sorted(CHARTS.items()):
-        for theme_name in ("dark", "light"):
-            rendered[f"{chart_name}-{theme_name}.svg"] = renderer(theme_name)
-    return rendered
+    """Every generated file, by path under docs/readme/."""
+    rendered = art.render(ROOT, measured(), release_facts())
+    rendered["rtf-by-mode.svg"] = rtf_chart()
+    rendered["rtf-by-mode-narrow.svg"] = rtf_chart(narrow=True)
+    return dict(sorted(rendered.items()))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="fail if committed charts are stale")
+    parser.add_argument("--check", action="store_true", help="fail if the committed README images are stale")
     args = parser.parse_args()
 
     pool = chart_pool()
     rendered = render_all()
     medians, _ = load_rtf_medians(pool)
     readme = render_readme(medians, pool_model_label(pool))
+    on_disk = {path.relative_to(OUTPUT_DIR).as_posix() for path in OUTPUT_DIR.rglob("*.svg")}
     if args.check:
         stale = [
             name for name, content in rendered.items()
             if not (OUTPUT_DIR / name).is_file()
             or (OUTPUT_DIR / name).read_text(encoding="utf-8") != content
         ]
+        stale += [f"{name} (not generated; delete it)" for name in sorted(on_disk - set(rendered))]
         if README_PATH.read_text(encoding="utf-8") != readme:
             stale.append("README.md (rtf-chart block)")
         if stale:
@@ -570,11 +487,13 @@ def main() -> int:
         print(f"README charts: fresh ({len(rendered)} files + README block)")
         return 0
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    for name, content in sorted(rendered.items()):
+    for name in sorted(on_disk - set(rendered)):
+        (OUTPUT_DIR / name).unlink()
+    for name, content in rendered.items():
+        (OUTPUT_DIR / name).parent.mkdir(parents=True, exist_ok=True)
         (OUTPUT_DIR / name).write_text(content, encoding="utf-8")
     README_PATH.write_text(readme, encoding="utf-8")
-    print(f"Rendered {len(rendered)} chart files → {OUTPUT_DIR.relative_to(ROOT)} and the README rtf-chart block")
+    print(f"Rendered {len(rendered)} files → {OUTPUT_DIR.relative_to(ROOT)} and the README rtf-chart block")
     print(website_medians_text(pool, medians))
     return 0
 

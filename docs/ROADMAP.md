@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 46/88 (52%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 47/89 (53%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -58,7 +58,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-09` (parked) Privacy and security hygiene (also: iPhone)
 - `BKL-19` (parked) macOS UI smoke raises a Speech Recognition prompt after every lane rebuild
 - `BKL-23` (parked) The Mac language bench fails production on a single recognizer's language call
-- `BKL-28` (parked) The Mac Voice Design save shows no "Voice added" alert after Keep voice
 - `BKL-33` (parked) An unwritable output folder is reported as an internal engine error on the Mac
 - `BKL-50` (parked) The CLI cancellation package test can time out on the Linux runner
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
@@ -76,6 +75,7 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-84` (parked) The Mac images in docs/screenshots predate the one-model screens of 3.1
 - `BKL-85` (parked) Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week
 - `BKL-87` (parked) CI never runs the iOS control-audit tests on a push that changes only iPhone sources
+- `BKL-88` (parked) test_host_preflight's cache-only ownership test failed once under the parallel suite
 - `BT-01` (parked) Trustworthy memory evidence
 - `BT-03` (parked) UI benchmark and ui-perf lanes ready for the M6
 - `BT-04` (parked) Lineage identity, history and CI evidence tests
@@ -774,7 +774,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
 | `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
 | `BKL-27` | parked | Import the iOS signing identity non-extractable in the release workflow | — |
-| `BKL-28` | parked | The Mac Voice Design save shows no "Voice added" alert after Keep voice | — |
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
 | `BKL-33` | parked | An unwritable output folder is reported as an internal engine error on the Mac | — |
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
@@ -809,6 +808,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-85` | parked | Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week | — |
 | `BKL-86` | parked | Attended check of the output-device change under a paused live preview | — |
 | `BKL-87` | parked | CI never runs the iOS control-audit tests on a push that changes only iPhone sources | — |
+| `BKL-88` | parked | test_host_preflight's cache-only ownership test failed once under the parallel suite | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -835,10 +835,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-27`** (parked) — Import the iOS signing identity non-extractable in the release workflow.
   gate: release.yml's iOS distribution-certificate import passes -x like the macOS imports (RF-08 security review L5), with the credential-hygiene test covering it, and a signed iOS archive still exports.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-28`** (parked) — The Mac Voice Design save shows no "Voice added" alert after Keep voice.
-  gate: After Keep voice on the reference-range warning, the Mac Voice Design screen confirms the saved voice as the no-warning save does, or the capture test stops expecting it by a recorded decision; scripts/ui_test.sh macos marketing then passes test00_WebsiteRefresh.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-31`** (parked) — Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping.
@@ -976,6 +972,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-87`** (parked) — CI never runs the iOS control-audit tests on a push that changes only iPhone sources.
   gate: A push that changes a Swift file under Sources/iOS or Sources/SharedSupport/Views runs scripts/tests/test_ios_control_audit.py in CI (selected on its own, without the whole research suite), with a classify_changes test pinning it.
   unparkWhen: Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.
+
+- **`BKL-88`** (parked) — test_host_preflight's cache-only ownership test failed once under the parallel suite.
+  gate: scripts/tests/test_host_preflight.py::HostPreflightTests::test_cache_only_analysis_retains_worker_ownership_checks passes under pytest -n auto in repeated full runs, or its dependence on the host's real worker leases is removed.
+  unparkWhen: Authorized now (it needs no iPhone); fix it when it recurs or with the next host-preflight change.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

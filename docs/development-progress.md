@@ -167,9 +167,9 @@ Nothing is owed before the push.
     dearer (Xcode 27.2's XCUITest, macOS 27.2.1, or more accessibility elements since the
     October 6 pass) is not separated and no longer matters for the release. The ceiling stays
     warn-only; BKL-77 is the lane change that would make the scenario measure the menu.
-- **Five screenshots still show retired controls** (`docs/screenshots`, `docs/readme/hero*` and
-  `modes*`, `website/public/assets/screens`). They need `scripts/ui_test.sh macos marketing`, which
-  takes over the Mac, then `scripts/readme_art/render.sh`.
+- **The website's screenshots still show retired controls** (`website/public/assets/screens`,
+  BKL-84). On November 17 the marketing lane recaptured `docs/screenshots` (and closed BKL-28), and
+  the README was rewritten around them with generated art (`scripts/generate_readme_charts.py`).
 - **The output-device fix is unit-tested, not checked on hardware** (attended: pause a live
   preview, change the output, press Play).
 - **The MCP server lets a connected agent read History text and saved-voice transcripts with no

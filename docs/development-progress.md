@@ -30,8 +30,11 @@ The post-promotion refresh is committed on local `main` (`ac173582`): the six pr
 and the README chart, performance art and website pooled over the two build-31 records through
 `0b6bc26b` (0.29 to 0.41 warm RTF). It is not pushed; pushing deploys the website.
 
-Left on RF-61: the CLI's signed-candidate qualification (`cli_package.py qualify`) has no 3.1.0
-record, and the website deploys with the next push.
+The published, notarized 3.1.0 CLI then passed `cli_package.py qualify` on this Mac: Built-in
+English, French Voice Design and Clone (a Vocello-generated reference) each with a strict QC pass
+and EOS, the two-item batch, cancellation (exit 130, cleanup acknowledged, no output) and the error
+exits. Its report stays untracked under `build/artifacts/macos/release`. RF-61 is closed. The 3.1
+website is live; its pooled performance numbers deploy with the next push of `main`.
 
 ### November 16, night: the follow-up release's Mac backlog, first wave
 

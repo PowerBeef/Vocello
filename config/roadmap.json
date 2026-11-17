@@ -662,26 +662,6 @@
       "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment. Implemented 2026-11-13: GenerationSemantics.resolvesToKorean (Auto's East Asian branch, so digits do not count and a Latin run is one word) drives a caution under the Studio script on both apps, hidden while a take runs, and before Generate All in the Mac batch sheet, in all ten interface languages; vocello adds long_form_korean (generate before boot; batch names its lines). Left: the iPhone view in the next announced phone window."
     },
     {
-      "id": "RF-61",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Ship Vocello and the vocello CLI 3.1 on the Mac",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Vocello and the vocello CLI 3.1.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.1.0 with a build number above the last release tag's; the hybrid's Mac lanes recorded (the formal speed lane against the 3.0 Speed and Quality packages, the Mac memory bands and the prewarm and idle-unload timings re-derived from its measured peak, benchmark baselines reseeded as a new lineage and the Mac gate bench reseeded); RF-50's long-form screen run against itself; docs/releases/v3.1.0.md passes check_release_notes.py; the README charts, the website's performance numbers and copy, and config/public-product-facts.json describe 3.1; scripts/dev.sh ci, release-readiness, the full macOS smoke lane and the engine bench pass on the release commit, with static audits of the release diff. UI acceptance (maintainer request 2026-11-14: responsiveness, smooth animations, reliable playback and streaming preview): ui_test.sh macos perf passes with no hitch-ceiling warning; ui_test.sh macos benchmark passes its stall gate and its playback-capture gate on every captured take, with no playback underrun or continuity failure in any take; the smoke lane's playback journeys pass; anything short of that is fixed before the tag. Then the maintainer's signed v3.1.0 tag builds a verified draft through release.yml; the macOS promotion lanes and the CLI's signed-candidate qualification pass on the tag checkout; the maintainer promotes the release. The website deploys with it.",
-      "sourceOfTruth": [
-        "docs/reference/macos-release-qa.md",
-        "docs/reference/quality-promotion.md",
-        "docs/reference/hybrid-model.md",
-        "project.yml",
-        "config/public-product-facts.json"
-      ],
-      "needs": [
-        "keyboard"
-      ],
-      "updated": "2026-11-15",
-      "notes": "Mac and CLI 3.1.0 published 2026-11-17 by the maintainer: the signed v3.1.0 tag on 693f13d1 built a verified draft (release run 43936706114), the seven macOS promotion lanes passed on the tag checkout and the assembled manifest validated, and Promote verified release (run 44036811898, approved on the release environment) made it public at 07:17 UTC as the latest, with 13 assets; releases/latest's appcast.xml resolves to v3.1.0. The promotion records and the charts and website pooled over them are in ac173582. Left before closing: the CLI's signed-candidate qualification (cli_package.py qualify) has no 3.1.0 record, and the website deploys with the next push of main. Earlier history: git log -p -- config/roadmap.json; docs/development-progress.md has the detail."
-    },
-    {
       "id": "RF-62",
       "plan": "release-first-3-0-2026-09",
       "title": "Answer the new App Store age-rating descriptors when filing 3.1.0",

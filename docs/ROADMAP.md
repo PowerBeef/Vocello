@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 49/89 (55%) |
+| `release-first-3-0-2026-09` | active | release-qa | 50/89 (56%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -128,7 +128,7 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-57` (planned) Audit the tooling the quality remediation relies on
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (18)
+### At the keyboard (17)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -147,7 +147,6 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-16` (planned) Submit 3.1.0 for App Review on the maintainer's explicit go
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
-- `RF-61` (planned) Ship Vocello and the vocello CLI 3.1 on the Mac
 - `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.1.0
 - `RF-63` (planned) Fit the 3.1 App Review notes into what is left of the 4,000 characters
 
@@ -262,7 +261,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-58` | planned | One take variation: the Variation setting is retired and every take samples as the model's reference does | — |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
 | `RF-60` | planned | Korean long-form: a caution before the project starts, and a documented known limitation | — |
-| `RF-61` | planned | Ship Vocello and the vocello CLI 3.1 on the Mac | — |
 | `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.1.0 | — |
 | `RF-63` | planned | Fit the 3.1 App Review notes into what is left of the 4,000 characters | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
@@ -379,9 +377,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-60`** (planned) — Korean long-form: a caution before the project starts, and a documented known limitation.
   gate: Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.
-
-- **`RF-61`** (planned) — Ship Vocello and the vocello CLI 3.1 on the Mac.
-  gate: Vocello and the vocello CLI 3.1.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.1.0 with a build number above the last release tag's; the hybrid's Mac lanes recorded (the formal speed lane against the 3.0 Speed and Quality packages, the Mac memory bands and the prewarm and idle-unload timings re-derived from its measured peak, benchmark baselines reseeded as a new lineage and the Mac gate bench reseeded); RF-50's long-form screen run against itself; docs/releases/v3.1.0.md passes check_release_notes.py; the README charts, the website's performance numbers and copy, and config/public-product-facts.json describe 3.1; scripts/dev.sh ci, release-readiness, the full macOS smoke lane and the engine bench pass on the release commit, with static audits of the release diff. UI acceptance (maintainer request 2026-11-14: responsiveness, smooth animations, reliable playback and streaming preview): ui_test.sh macos perf passes with no hitch-ceiling warning; ui_test.sh macos benchmark passes its stall gate and its playback-capture gate on every captured take, with no playback underrun or continuity failure in any take; the smoke lane's playback journeys pass; anything short of that is fixed before the tag. Then the maintainer's signed v3.1.0 tag builds a verified draft through release.yml; the macOS promotion lanes and the CLI's signed-candidate qualification pass on the tag checkout; the maintainer promotes the release. The website deploys with it.
 
 - **`RF-62`** (planned) — Answer the new App Store age-rating descriptors when filing 3.1.0.
   gate: In App Store Connect the age-rating questionnaire answers Apple's new Shared Location and Dating and Relationships descriptors (no for both, which is what the app does) before submission and well before the January 12, 2027 deadline, the standing rating decision is unchanged, and the read-back is recorded with ASR-11's live audit.

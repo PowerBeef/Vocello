@@ -362,8 +362,10 @@ fails once an entry is 30 days old.
 
 CI's `contracts` job lints the whole tree through `scripts/lint_baseline.py`: shellcheck
 (`-x -S warning`) over every tracked shell script, ruff over every tracked Python file with only
-syntax errors (`E9`) and pyflakes (`F`) selected in `ruff.toml` (Python 3.10; 3.9 for the hooks and
-`scripts/select_python.py`), and SwiftLint's `.swiftlint.yml` rules over every tracked Swift file its
+defect rules selected in `ruff.toml`: syntax errors (`E9`), pyflakes (`F`), invalid escapes (`W6`),
+pylint's errors (`PLE`), mutable defaults (`B006`) and debugger calls (`T10`); the file records why
+the style families stay out (Python 3.10; 3.9 for the hooks and `scripts/select_python.py`), and
+SwiftLint's `.swiftlint.yml` rules over every tracked Swift file its
 `excluded` list leaves in (`Sources/`, `Tests/` and `scripts/`; not `Packages/`). All three are
 SHA-pinned in `config/toolchain.json` (`artifactPins`; the runner installs the `-linux-x86_64`
 entries, for SwiftLint its fully static binary, which needs no Swift toolchain because none of the

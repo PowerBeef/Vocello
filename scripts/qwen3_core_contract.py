@@ -124,7 +124,7 @@ def sha256(path: Path) -> str:
 
 
 def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return jsonio.load_json(path, error=ValueError, require_object=False)
 
 
 def resolved_pin_descriptors(payload: bytes | str | dict) -> dict[str, dict] | None:

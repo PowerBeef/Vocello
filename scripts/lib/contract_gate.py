@@ -141,7 +141,7 @@ VALIDATORS: tuple[Validator, ...] = (
         # The policy's scannedSourceRoots.
         "Sources/", "Packages/VocelloQwen3Core/Sources/")),
     _reads(PYTHON, "scripts/support_contact_contract.py", "validate", inputs=(
-        "scripts/support_contact_contract.py", "config/support-contact.json", "website/public/",
+        "scripts/support_contact_contract.py", *JSONIO, "config/support-contact.json", "website/public/",
         "website/src/", "Sources/iOS/")),
     _reads(PYTHON, "scripts/public_facts_contract.py", "validate", inputs=(
         "scripts/public_facts_contract.py", *JSONIO, "config/public-product-facts.json", "project.yml",

@@ -3,8 +3,19 @@
 # whole tree through scripts/lint_baseline.py, where only findings absent from
 # config/lint-baseline/ruff.json fail; that baseline may only shrink.
 #
-# Narrow on purpose: syntax errors (E9) and pyflakes (F). Widening the selection is a separate,
-# reviewed change that re-seeds the baseline.
+# Narrow on purpose: rules that catch defects, never style. Widening is a reviewed change that adds
+# no baseline entry, since the baseline may only shrink.
+#
+# Reviewed 2026-11-16 (BKL-64) with the pinned ruff 0.17.1 over the whole tree:
+#   E9, F  syntax errors and pyflakes (undefined names, unused imports): the original selection.
+#   W6     invalid escape sequences, a SyntaxWarning since Python 3.12 and an error to come.
+#   PLE    pylint's error class: code that raises or misbehaves when it runs.
+#   B006   a mutable default argument shared across calls.
+#   T10    a debugger breakpoint left in a script, which hangs a lane or CI.
+# The four additions had no finding when they were added. Left out, each with its count then:
+# pycodestyle E7 (69) and E4 (16), the rest of bugbear B (140), flake8-executable EXE (162: the
+# shebang and the executable bit disagree), RUF100 (219: noqa comments for rules not selected) and
+# flake8-pie PIE (5). They are style or bookkeeping, and each would add baseline entries.
 
 # Workflow scripts need Python 3.10 (scripts/select_python.py enforces it).
 target-version = "py310"
@@ -14,4 +25,4 @@ per-file-target-version = { "scripts/hooks/**/*.py" = "py39", "scripts/select_py
 extend-exclude = ["build", "website", ".claude/worktrees"]
 
 [lint]
-select = ["E9", "F"]
+select = ["E9", "F", "W6", "PLE", "B006", "T10"]

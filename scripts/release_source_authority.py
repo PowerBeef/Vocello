@@ -19,6 +19,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from lib import jsonio
+
 
 SHA = re.compile(r"[0-9a-f]{40}")
 TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[+-][0-9A-Za-z.-]+)?")
@@ -46,10 +48,8 @@ def allowed_tag_signers(contract_path: Path = CONTRACT_PATH) -> frozenset[str]:
 
 
 def _load_json(path: Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"cannot read JSON from {path}: {error}") from error
+    # API pages may be lists; every shape is checked where it is read.
+    return jsonio.load_json(path, error=ValueError, require_object=False)
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:

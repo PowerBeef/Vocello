@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 import re
 import sys
 from urllib.parse import urlparse
+
+from lib import jsonio
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,13 +17,7 @@ PLACEHOLDERS = ("example.com", "your-email", "todo", "tbd", "placeholder")
 
 
 def _load_json(path: Path) -> dict:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"cannot read {path.name}: {error}") from error
-    if not isinstance(value, dict):
-        raise ValueError(f"{path.name} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=ValueError, redact="name")
 
 
 def _required_text(value: object, field: str) -> str:

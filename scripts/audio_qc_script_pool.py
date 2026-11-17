@@ -86,6 +86,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib import language_metrics as lm  # noqa: E402
+from lib import jsonio  # noqa: E402
 from lib.jsonio import atomic_write_bytes, canonical_bytes, pretty_bytes  # noqa: E402
 
 REPO = SCRIPT_DIR.parent
@@ -430,13 +431,8 @@ def pool_digest(entries: Sequence[Mapping[str, Any]]) -> str:
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ScriptPoolError(f"{path.name} cannot be read: {type(error).__name__}") from None
-    if not isinstance(value, dict):
-        raise ScriptPoolError(f"{path.name} is not a JSON object")
-    return value
+    # The file name and the failure's type only: a report never echoes a host path.
+    return jsonio.load_json(path, error=ScriptPoolError, redact="type")
 
 
 def sources_issues(sources: Any, languages: Sequence[str] = lm.PRODUCT_LANGUAGES) -> list[str]:

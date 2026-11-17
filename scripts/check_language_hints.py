@@ -33,11 +33,11 @@ from language_bench_evidence import (
     validate_plan_against_sources,
     stable_default_seed,
 )
+from lib import jsonio  # noqa: E402
 
 
-def load_json(path: str) -> dict[str, Any]:
-    with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+def load_json(path: str | Path) -> dict[str, Any]:
+    return jsonio.load_json(Path(path), error=ValueError)
 
 
 def corpus_scripts(corpus: dict[str, Any]) -> dict[str, str]:

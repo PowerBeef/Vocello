@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from datetime import date
 from pathlib import Path
+
+from lib import jsonio
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,13 +107,7 @@ PHASE4_DIRECT_MODE_CALL_PATTERN = re.compile(
 
 
 def load_json(path: Path) -> dict:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"cannot read {path.relative_to(ROOT)}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise ValueError(f"{path.relative_to(ROOT)} must contain an object")
-    return value
+    return jsonio.load_json(path, error=ValueError, redact="name")
 
 
 def swift_files(roots: list[str]) -> list[Path]:

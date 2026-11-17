@@ -16,10 +16,16 @@ import math
 import pathlib
 import re
 import struct
+import sys
 import zlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable
+
+SCRIPTS = pathlib.Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:  # ui_test.sh also imports this module by name
+    sys.path.insert(0, str(SCRIPTS))
+from lib import jsonio  # noqa: E402
 
 
 OBSERVATION_PREFIX = "VOCELLO_MODEL_OBSERVATION="
@@ -86,7 +92,8 @@ def duplicate_byte_allowance(success: dict[str, Any], records: list[dict[str, An
 
 
 def load_json(path: pathlib.Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    # A trace event is an object; the attachments manifest may be a list.
+    return jsonio.load_json(path, error=ValueError, require_object=False)
 
 
 def write_json(path: pathlib.Path, value: Any) -> None:

@@ -33,10 +33,15 @@ required_step_run() {
   return "$status"
 }
 
+# A step recorded rather than run through required_step_run: a skipped build, or
+# work the caller ran itself (the result retention). It starts at the optional
+# fourth argument, the UTC second that work began, or when it is recorded if
+# nothing ran, so every recorded step carries startedAt as a run step does.
 required_step_record() {
-  local ledger="$1" step="$2" status="$3"
+  local ledger="$1" step="$2" status="$3" step_started_at="${4:-}"
+  [[ -n "$step_started_at" ]] || step_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   python3 "$QVOICE_REQUIRED_STEP_TOOL" record --ledger "$ledger" \
-    --step "$step" --exit-code "$status"
+    --step "$step" --exit-code "$status" --started-at "$step_started_at"
 }
 
 required_steps_finalize() {

@@ -284,6 +284,45 @@ class RequiredStepLedgerTests(unittest.TestCase):
                 self.assertNotEqual(refused.returncode, 0, bad)
             self.assertNotIn("app-build", json.loads(ledger.read_text(encoding="utf-8"))["results"])
 
+    def test_a_step_recorded_without_running_carries_a_start_time(self) -> None:
+        # BKL-48: required_step_record (a skipped ui-build, the result retention) gives
+        # its step a startedAt as required_step_run does: the start its caller passes,
+        # else the moment it is recorded.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / "contract.json"
+            self.write_fixture_contract(fixture)
+            ledger = root / "ledger.json"
+            quoted = shlex.quote(str(ledger))
+            script = f"""
+set -euo pipefail
+ROOT_DIR={shlex.quote(str(ROOT))}
+. {shlex.quote(str(LIBRARY))}
+required_steps_init {quoted} fixture-optional-lane fixture
+required_step_run {quoted} source-provenance true
+required_step_record {quoted} primary-run 0
+required_step_record {quoted} crash-delta 0 2026-10-25T17:05:20Z
+required_step_record {quoted} result-retention 1 ""
+required_steps_finalize {quoted}
+"""
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in {"QWENVOICE_TEST_ORCHESTRATION_FAULTS",
+                                          "QWENVOICE_TEST_FAIL_REQUIRED_STEP"}}
+            environment["QVOICE_ORCHESTRATION_CONTRACT"] = str(fixture)
+            before = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            completed = subprocess.run(["bash", "-c", script], text=True, capture_output=True,
+                                       env=environment, check=False)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            results = json.loads(ledger.read_text(encoding="utf-8"))["results"]
+            for step in ("source-provenance", "primary-run", "crash-delta", "result-retention"):
+                with self.subTest(step=step):
+                    self.assertRegex(results[step]["startedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+                    self.assertLessEqual(results[step]["startedAt"], results[step]["completedAt"])
+            self.assertEqual(results["crash-delta"]["startedAt"], "2026-10-25T17:05:20Z")
+            for step in ("primary-run", "result-retention"):
+                self.assertGreaterEqual(results[step]["startedAt"], before)
+            self.assertEqual(results["result-retention"]["status"], "failed")
+
     def test_duplicate_and_stale_ledger_writes_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             ledger = Path(directory) / "ledger.json"

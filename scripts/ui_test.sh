@@ -2303,6 +2303,7 @@ publish_lane_history
 # Control audits remain running until all required steps finish. Retention
 # leaves their unfinalized bundle untouched and can prune older completed runs.
 retention_status=0
+retention_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "retained correctly classified diagnostic failure evidence"
 elif "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 --quick \
@@ -2312,7 +2313,7 @@ else
   retention_status=1
   warn "could not prune superseded XCUITest results (see $out/result-retention.log)"
 fi
-required_step_record "$step_ledger" result-retention "$retention_status"
+required_step_record "$step_ledger" result-retention "$retention_status" "$retention_started_at"
 
 required_steps_finalize "$step_ledger" \
   || die "$platform $lane required-step ledger did not pass"

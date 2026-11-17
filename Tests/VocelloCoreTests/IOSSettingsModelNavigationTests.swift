@@ -47,6 +47,32 @@ final class IOSSettingsModelNavigationTests: XCTestCase {
         XCTAssertNil(navigation.takeDownloadAwaitingConfirmation())
     }
 
+    /// BKL-60: a request made while the model's status is still being read waits for
+    /// it instead of being dropped; once the status says Install or Update the
+    /// confirmation is handed over once, and a row that needs none consumes it silently.
+    func testARequestWaitsForTheModelsStatusInsteadOfBeingDropped() throws {
+        let navigation = IOSSettingsModelNavigation()
+        let model = try model(for: .custom)
+        navigation.requestInstallation(of: model, selectSettings: {})
+
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .pending }))
+        XCTAssertEqual(navigation.downloadAwaitingConfirmation, model, "a checking status keeps the request")
+        XCTAssertEqual(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .confirm }), model)
+        XCTAssertNil(navigation.downloadAwaitingConfirmation)
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .confirm }), "handed over once")
+
+        navigation.requestInstallation(of: model, selectSettings: {})
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .showRow }))
+        XCTAssertNil(navigation.downloadAwaitingConfirmation, "a row that needs no confirmation consumes it")
+
+        // Leaving Voice Models while the request still waits drops it, so a later
+        // visit never presents it unprompted.
+        navigation.requestInstallation(of: model, selectSettings: {})
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .pending }))
+        navigation.dropDownloadAwaitingConfirmation()
+        XCTAssertNil(navigation.takeDownloadAwaitingConfirmation(readiness: { _ in .confirm }))
+    }
+
     /// A request Voice Models never showed must not replay on a later visit to Settings.
     func testLeavingSettingsDropsAConfirmationVoiceModelsNeverShowed() throws {
         let navigation = IOSSettingsModelNavigation()

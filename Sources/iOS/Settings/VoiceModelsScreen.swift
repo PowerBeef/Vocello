@@ -146,12 +146,18 @@ struct VoiceModelsScreen: View {
             await modelManager.refresh()
         }
         // A Studio install request arrives here as a confirmation, never as a download. A model
-        // already transferring, or offering Repair or Retry, just shows its row.
+        // already transferring, or offering Repair or Retry, just shows its row; one whose status
+        // is still being read waits for it (BKL-60).
         .onChange(of: appModel.settingsModelNavigation.downloadAwaitingConfirmation, initial: true) {
-            if let model = appModel.settingsModelNavigation.takeDownloadAwaitingConfirmation(),
-               startsNewDownload(model) {
-                presentDownloadConfirmation(for: model)
-            }
+            presentWaitingConfirmationIfReady()
+        }
+        .onChange(of: modelManager.statuses) {
+            presentWaitingConfirmationIfReady()
+        }
+        // A request still waiting for its status when the person leaves Voice Models
+        // goes with them, so it never appears unprompted on a later visit.
+        .onDisappear {
+            appModel.settingsModelNavigation.dropDownloadAwaitingConfirmation()
         }
         .confirmationDialog(
             IOSSettingsText.cancelDownloadTitle,
@@ -231,6 +237,21 @@ struct VoiceModelsScreen: View {
             ? IOSSettingsText.updateModelTitle(IOSSettingsText.modeName(model.mode))
             : IOSSettingsText.downloadModelTitle(IOSSettingsText.modeName(model.mode))
         modelPendingDownload = model
+    }
+
+    private func presentWaitingConfirmationIfReady() {
+        if let model = appModel.settingsModelNavigation.takeDownloadAwaitingConfirmation(
+            readiness: confirmationReadiness
+        ) {
+            presentDownloadConfirmation(for: model)
+        }
+    }
+
+    private func confirmationReadiness(_ model: TTSModel) -> IOSSettingsModelNavigation.ConfirmationReadiness {
+        if case .idle = modelInstaller.state(for: model), effectiveStatus(for: model) == .checking {
+            return .pending
+        }
+        return startsNewDownload(model) ? .confirm : .showRow
     }
 
     /// The states whose row offers Install or Update, the two actions that ask first.

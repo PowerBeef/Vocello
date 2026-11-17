@@ -317,6 +317,20 @@ enum StudioModeSwitchPolicy {
     ) -> Bool {
         target == current || busyMode == nil || busyMode == target
     }
+
+    /// Whether a saved voice may still be read, so Saved Voices' Delete waits:
+    /// a take the engine runs; a Studio attempt that holds its mode, since a
+    /// Clone take primes its saved voice before the engine reserves it; a Mac
+    /// line batch; or a long-form project, which reads it again for every
+    /// segment (F-01, BKL-13 on the Mac, BKL-18 on the iPhone).
+    static func mayReadSavedVoices(
+        hasActiveGeneration: Bool,
+        busyMode: GenerationMode?,
+        isLongFormProcessing: Bool,
+        isLineBatchProcessing: Bool = false
+    ) -> Bool {
+        hasActiveGeneration || busyMode != nil || isLongFormProcessing || isLineBatchProcessing
+    }
 }
 
 /// VoiceOver announcements for Studio generation state changes (PA-20, IOS-12):

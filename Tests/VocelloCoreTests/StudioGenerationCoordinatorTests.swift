@@ -394,6 +394,32 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
         XCTAssertTrue(allows(.custom, from: .clone))
     }
 
+    /// BKL-18: Saved Voices' Delete waits from the moment a Studio attempt
+    /// starts, before the engine reserves the take (a Clone take primes its
+    /// saved voice first), and while a long-form project or a line batch runs.
+    func testASavedVoiceMayBeReadFromTheStartOfAnAttempt() throws {
+        let clone = StudioGenerationCoordinator(mode: .clone)
+        let coordinators = [StudioGenerationCoordinator(mode: .custom), clone]
+        func mayRead(engineReserved: Bool = false, longForm: Bool = false, lineBatch: Bool = false) -> Bool {
+            StudioModeSwitchPolicy.mayReadSavedVoices(
+                hasActiveGeneration: engineReserved,
+                busyMode: StudioModeSwitchPolicy.busyMode(coordinators: coordinators, longFormMode: nil),
+                isLongFormProcessing: longForm,
+                isLineBatchProcessing: lineBatch
+            )
+        }
+
+        XCTAssertFalse(mayRead())
+        let attempt = try XCTUnwrap(clone.start())
+        XCTAssertTrue(mayRead(), "a Clone take priming its reference, before the engine reserves it")
+        XCTAssertTrue(mayRead(engineReserved: true))
+        XCTAssertTrue(clone.beginFinalization(attempt: attempt))
+        XCTAssertTrue(clone.complete(completedItem(), attempt: attempt))
+        XCTAssertFalse(mayRead())
+        XCTAssertTrue(mayRead(longForm: true))
+        XCTAssertTrue(mayRead(lineBatch: true))
+    }
+
     func testARunningLongFormProjectOwnsTheStudioMode() {
         let coordinators = [StudioGenerationCoordinator(mode: .custom)]
         let busy = StudioModeSwitchPolicy.busyMode(coordinators: coordinators, longFormMode: .clone)

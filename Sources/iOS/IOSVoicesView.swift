@@ -506,11 +506,16 @@ struct IOSVoicesView: View {
         .accessibilityLabel(isPlaying ? IOSInterfaceText.stopPreview : IOSInterfaceText.previewVoice)
     }
 
-    /// A take or a long-form project may still read a saved voice: a long-form
-    /// Clone project reads it again for every segment, between which no take
-    /// is active (F-01).
+    /// A take, a Studio attempt that holds its mode (a Clone take primes its
+    /// saved voice before the engine reserves it, BKL-18) or a long-form project
+    /// may still read a saved voice: a long-form Clone project reads it again
+    /// for every segment, between which no take is active (F-01).
     private var isGenerationUsingVoices: Bool {
-        ttsEngine.hasActiveGeneration || appModel.longForm.isProcessing
+        StudioModeSwitchPolicy.mayReadSavedVoices(
+            hasActiveGeneration: ttsEngine.hasActiveGeneration,
+            busyMode: appModel.studioBusyMode,
+            isLongFormProcessing: appModel.longForm.isProcessing
+        )
     }
 
     @ViewBuilder

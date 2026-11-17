@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import fnmatch
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -45,6 +46,15 @@ def invoke(name, tool_input, *, tool_name="Edit", cwd=None, root=ROOT, event="Pr
 
 def edit(path, tool="Edit"):
     return {EDIT_TOOLS[tool]: path}
+
+
+def importlib_module(path: Path):
+    """Load a hook module by path, as the hook commands run it."""
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def matches(matcher: str, tool: str) -> bool:
@@ -328,7 +338,7 @@ class SettingsWiringTests(unittest.TestCase):
         ("SessionStart", "startup|resume|clear|compact|fork"): {"worker_lifecycle.py", "session_start.sh"},
         ("PreToolUse", "^Bash$"): {"commit_lint.sh", "policy_guard.sh", "agent_guard.py"},
         ("PreToolUse", EDIT_MATCHER): {"generated_file_guard.sh", "agent_guard.py"},
-        ("PreToolUse", "^mcp__"): {"simulator_tool_guard.py"},
+        ("PreToolUse", "^mcp__"): {"simulator_tool_guard.py", "connector_write_guard.py"},
         ("PostToolUse", EDIT_MATCHER): {"project_yml_reminder.sh"},
         ("SubagentStart", "*"): {"worker_lifecycle.py"},
         ("SubagentStop", "*"): {"worker_lifecycle.py"},
@@ -381,6 +391,9 @@ class SettingsWiringTests(unittest.TestCase):
                  for event in ("SessionStart", "SubagentStart", "SubagentStop", "SessionEnd")]
         cases += [("simulator_tool_guard.py", {"tool_name": "mcp__x__list_schemes"}, 0),
                   ("simulator_tool_guard.py", {"tool_name": "mcp__x__boot" + SIM_SUFFIX}, 2),
+                  ("connector_write_guard.py", {"tool_name": "mcp__x__get_me"}, 0),
+                  ("connector_write_guard.py", {"tool_name": "mcp__x__push_files"}, 0),
+                  ("connector_write_guard.py", {"tool_name": "mcp__x__push_files", "agent_id": "a"}, 2),
                   ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
                                       "tool_input": {"command": "scripts/dev.sh build"}}, 2),
                   ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
@@ -706,6 +719,97 @@ class SimulatorToolGuardTests(unittest.TestCase):
             with self.subTest(tool=tool):
                 result = invoke("simulator_tool_guard.py", tool_input, tool_name="mcp__computer-use__" + tool)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+
+# The GitHub connector's tools as the desktop app offered them on 2026-11-16 (True: writes).
+GITHUB_CONNECTOR_TOOLS = {
+    **dict.fromkeys(("add_comment_to_pending_review", "add_issue_comment", "add_reply_to_pull_request_comment",
+                     "create_branch", "create_or_update_file", "create_pull_request", "create_repository",
+                     "delete_file", "fork_repository", "issue_write", "merge_pull_request",
+                     "pull_request_review_write", "push_files", "request_copilot_review", "sub_issue_write",
+                     "update_issue_comment", "update_pull_request", "update_pull_request_branch"), True),
+    **dict.fromkeys(("get_commit", "get_file_contents", "get_label", "get_latest_release", "get_me",
+                     "get_release_by_tag", "get_tag", "get_team_members", "get_teams", "issue_read",
+                     "list_branches", "list_commits", "list_issue_fields", "list_issue_types", "list_issues",
+                     "list_pull_requests", "list_releases", "list_repository_collaborators", "list_tags",
+                     "pull_request_read", "run_secret_scanning", "search_code", "search_commits", "search_issues",
+                     "search_pull_requests", "search_repositories", "search_users"), False),
+}
+# The connector's server name is the client's: a per-install UUID in the desktop app (a stand-in here),
+# `claude_ai_Github` in the CLI.
+GITHUB_SERVERS = ("mcp__0f1e2d3c-4b5a-4697-8877-665544332211__", "mcp__claude_ai_Github__", "mcp__github__")
+
+
+class ConnectorWriteGuardTests(unittest.TestCase):
+    """BKL-62: a GitHub connector write asks or is blocked whatever the connector's server name."""
+
+    def setUp(self):
+        settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
+        self.permissions = settings["permissions"]
+        self.mcp_hooks = [hook["command"] for entry in settings["hooks"]["PreToolUse"]
+                          if matches(entry["matcher"], "mcp__x__push_files") for hook in entry["hooks"]]
+
+    def guard(self, tool_name, *, agent=False):
+        payload = {"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": {}, "cwd": str(ROOT),
+                   **({"agent_id": "agent-1"} if agent else {})}
+        # Every hook the settings wire to the tool, as Claude Code runs them.
+        return [subprocess.run(["bash", "-c", command], input=json.dumps(payload), text=True, capture_output=True,
+                               cwd=ROOT, timeout=20, env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
+                for command in self.mcp_hooks]
+
+    @staticmethod
+    def decision(results):
+        if any(result.returncode == 2 for result in results):
+            return "deny"
+        answers = [json.loads(result.stdout) for result in results if result.stdout.strip()]
+        return next((a["hookSpecificOutput"]["permissionDecision"] for a in answers), "")
+
+    def test_connector_writes_ask_under_any_server_name_and_reads_pass(self):
+        names = [(server + tool, write) for server in GITHUB_SERVERS for tool, write in GITHUB_CONNECTOR_TOOLS.items()]
+        for (name, write), results in run_all(lambda item: self.guard(item[0]), names):
+            with self.subTest(tool=name):
+                self.assertTrue(all(result.returncode in (0, 2) for result in results), results)
+                self.assertEqual(self.decision(results), "ask" if write else "")
+                if write:
+                    answer = json.loads(next(r.stdout for r in results if r.stdout.strip()))["hookSpecificOutput"]
+                    self.assertEqual(answer["hookEventName"], "PreToolUse")
+                    self.assertIn("explicit request", answer["permissionDecisionReason"])
+
+    def test_a_subagents_connector_write_is_refused(self):
+        for server in GITHUB_SERVERS:
+            with self.subTest(server=server):
+                results = self.guard(server + "create_pull_request", agent=True)
+                self.assertEqual(self.decision(results), "deny")
+                self.assertIn("agents never write outside their worktree", "".join(r.stderr for r in results))
+                self.assertEqual(self.decision(self.guard(server + "pull_request_read", agent=True)), "")
+
+    def test_other_servers_tools_and_malformed_input_pass(self):
+        for name in ("mcp__1a2b3c4d-0000-4000-8000-000000000001__create_draft", "mcp__drive__create_file",
+                     "mcp__ccd_sidebar__create_group", "mcp__computer-use__request_access",
+                     "mcp__plugin_huggingface-skills_huggingface-skills__hf_fs", "push_files", "mcp__push_files"):
+            with self.subTest(tool=name):
+                self.assertEqual(self.decision(self.guard(name)), "")
+        for raw in ("not json", "[]", '{"tool_name": 3}'):
+            with self.subTest(payload=raw):
+                result = subprocess.run(["python3", str(HOOKS / "connector_write_guard.py")], input=raw, text=True,
+                                        capture_output=True, timeout=20)
+                self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+
+    def test_the_ask_rules_name_the_writes_under_any_server_and_no_read(self):
+        rules = [rule for rule in self.permissions["ask"] if rule.startswith("mcp__")]
+        for server in GITHUB_SERVERS:
+            for tool, write in GITHUB_CONNECTOR_TOOLS.items():
+                with self.subTest(tool=server + tool):
+                    self.assertEqual(any(fnmatch.fnmatchcase(server + tool, rule) for rule in rules), write)
+                    self.assertFalse(any(fnmatch.fnmatchcase(server + tool, rule)
+                                         for rule in (*self.permissions["allow"], *self.permissions["deny"])))
+        self.assertFalse([rule for rule in rules if rule.startswith("mcp__claude_ai_Github__")])
+        guard = importlib_module(HOOKS / "connector_write_guard.py")
+        for rule in rules:
+            if rule.startswith("mcp__*__"):
+                with self.subTest(rule=rule):
+                    tool = rule[len("mcp__*__"):]
+                    self.assertTrue(tool == "*_write" or tool in guard.GITHUB_WRITE_TOOLS, rule)
 
 
 class PolicyGuardTests(unittest.TestCase):

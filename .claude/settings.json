@@ -64,6 +64,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/simulator_tool_guard.py\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/connector_write_guard.py\"",
+            "timeout": 5
           }
         ]
       }
@@ -267,12 +272,22 @@
       "Bash(xcode-select --switch*)",
       "Bash(vercel *)",
       "Bash(asc *)",
-      "mcp__claude_ai_Github__create_*",
-      "mcp__claude_ai_Github__update_*",
-      "mcp__claude_ai_Github__delete_*",
-      "mcp__claude_ai_Github__push_files",
-      "mcp__claude_ai_Github__merge_pull_request",
-      "mcp__claude_ai_Github__fork_repository"
+      "mcp__*__add_comment_to_pending_review",
+      "mcp__*__add_issue_comment",
+      "mcp__*__add_reply_to_pull_request_comment",
+      "mcp__*__create_branch",
+      "mcp__*__create_or_update_file",
+      "mcp__*__create_pull_request",
+      "mcp__*__create_repository",
+      "mcp__*__delete_file",
+      "mcp__*__fork_repository",
+      "mcp__*__merge_pull_request",
+      "mcp__*__push_files",
+      "mcp__*__request_copilot_review",
+      "mcp__*__update_issue_comment",
+      "mcp__*__update_pull_request",
+      "mcp__*__update_pull_request_branch",
+      "mcp__*__*_write"
     ],
     "deny": [
       "Bash(git push --force*)",

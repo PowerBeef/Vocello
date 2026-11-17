@@ -605,7 +605,7 @@ and never builds or touches a phone.
 | SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; the agent rules for a session started in a linked worktree; bounded local Git/status/checkpoint context |
 | PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent and side-session limits |
 | PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents and side sessions never edit the roadmap or checkpoint |
-| PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py | Refuses unsupported-destination tool routes |
+| PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py, connector_write_guard.py | Refuses unsupported-destination tool routes; a GitHub connector write asks under any server name, and a subagent's is refused |
 | PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
 | SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration with agent rules, completion and conservative teardown |
 
@@ -631,9 +631,12 @@ allows pytest by itself: run it through `scripts/dev.sh py` or
 
 `ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
 installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
-External writes include GitHub, the Vercel CLI and App Store Connect. The GitHub connector's ask
-rules name the server `mcp__claude_ai_Github__*`; a connector that arrives under another server name
-is not matched by them (BKL-62), so a connector write still needs an explicit request. On Hugging Face they include
+External writes include GitHub, the Vercel CLI and App Store Connect. The GitHub connector arrives
+under a server name the client chooses (`claude_ai_Github` in the CLI, a per-install UUID in the
+desktop app), so its ask rules name the writing tools under any server (`mcp__*__push_files`,
+`mcp__*__*_write` and the rest), and `connector_write_guard.py` asks on the same tools by their own
+name whatever the server, without depending on how a rule's wildcard meets a server name (BKL-62);
+neither touches its reads (`get_*`, `list_*`, `search_*`, `*_read`). On Hugging Face they include
 `hf download`/`upload`, `repos`, `cp`/`sync`/`buckets`, `jobs`/`sandbox`/`endpoints`, `spaces`,
 `collections`, `discussions`, `webhooks`, CLI `extensions`/`skills`/`update`, `auth login`/`logout`/
 `switch` and cache removal, and the MCP's Space-running tools (`dynamic_space`, `gr*`).

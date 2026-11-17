@@ -30,7 +30,8 @@ HEREDOC = re.compile(
 )
 SEPARATORS = {"&&", "||", ";", "|", "&", ";;", "|&", "\n", "{", "}", "!", "then", "do", "else", "elif"}
 TRANSPARENT_PREFIXES = {"command", "exec", "nohup", "time", "builtin", "noglob", "sudo", "nice",
-                        "xargs", "caffeinate", "watch", "timeout", "coproc", "if", "while", "until", "--"}
+                        "xargs", "caffeinate", "watch", "timeout", "coproc", "if", "while", "until", "--",
+                        "arch", "stdbuf"}
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "fish"}
 GIT_ENV = re.compile(r"^(GIT_DIR|GIT_WORK_TREE|GIT_INDEX_FILE|GIT_NAMESPACE|GIT_COMMON_DIR)=")
 GIT_CONFIG_ENV = re.compile(r"^(GIT_CONFIG[A-Z0-9_]*|GIT_EXEC_PATH)=")
@@ -57,6 +58,24 @@ DASHED_GIT = re.compile(r"^git-([a-z][a-z-]*)$")
 # command position; `env` options that take a value, so a later `-S` is still found.
 DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
 ENV_VALUE_OPTIONS = {"-u", "--unset", "-C", "--chdir", "-P"}
+ENV_VALUE_LETTERS = "uCP"
+# The wrapper options whose value is the next word; any other option takes none, so the word after
+# it is the command (`xargs -r grep ...`).
+WRAPPER_VALUE_OPTIONS = {
+    "timeout": {"-s", "-k", "--signal", "--kill-after"},
+    "nice": {"-n", "--adjustment"},
+    "sudo": {"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U", "-T", "--user", "--group", "--chdir",
+             "--host", "--prompt", "--role", "--type", "--other-user", "--close-from", "--command-timeout"},
+    "xargs": {"-n", "-I", "-L", "-P", "-s", "-E", "-d", "-a", "--max-args", "--max-lines", "--max-procs",
+              "--max-chars", "--delimiter", "--arg-file", "--eof", "--replace"},
+    "env": {"-u", "-C", "-P", "--unset", "--chdir"},
+    "arch": {"-arch"},
+    "stdbuf": {"-i", "-o", "-e"},
+    "caffeinate": {"-t", "-w"},
+    "watch": {"-n", "-d", "--interval"},
+    "time": {"-f", "-o", "--format", "--output"},
+    "exec": {"-a"},
+}
 # `git remote` verbs that change where a remote points, or which remote a name means (BKL-63).
 REMOTE_RETARGETS = {"add", "rename", "remove", "rm", "set-url"}
 # The backtick substitution stand-in: a computed word, never a literal name.
@@ -200,6 +219,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
     env_config = exported_config = ""
     git_variables: set[str] = set()                  # `G=git`, `export GIT=/usr/bin/git`
     in_wrapper = after_option = False                # inside a wrapper's arguments (`timeout 60 ...`)
+    wrapper = ""                                     # the wrapper whose arguments these are
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -253,23 +273,34 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             while cursor < len(tokens) and tokens[cursor] not in SEPARATORS:
                 option = tokens[cursor]
                 split = ""
-                if option in ("-S", "--split-string") and cursor + 1 < len(tokens):
-                    split = tokens[cursor + 1]
+                following_word = tokens[cursor + 1] if cursor + 1 < len(tokens) else ""
+                skip_value = option in ENV_VALUE_OPTIONS
+                if option == "--split-string":
+                    split = following_word
                 elif option.startswith("--split-string="):
                     split = option.split("=", 1)[1]
-                elif re.fullmatch(r"-[A-Za-z]*S.*", option) and not option.startswith("--"):
-                    split = option[option.index("S") + 1:] or (tokens[cursor + 1] if cursor + 1 < len(tokens) else "")
+                elif option.startswith("-") and not option.startswith("--") and len(option) > 1:
+                    # A short cluster, letter by letter: `-iu HOME`, `-uUSER` (u's value is USER, not
+                    # an S), `-iS'git push'`.
+                    for position, letter in enumerate(option[1:], 1):
+                        rest = option[position + 1:]
+                        if letter == "S":
+                            split = rest or following_word
+                            break
+                        if letter in ENV_VALUE_LETTERS:
+                            skip_value = not rest     # the value is the rest, or the next word
+                            break
                 if split:
                     found.extend(git_invocations(split, directory or cwd, depth + 1))
                     break
-                if option in ENV_VALUE_OPTIONS:
+                if skip_value:
                     cursor += 2                       # `env -u HOME -S ...`: the value, then on
                     continue
                 if not option.startswith("-") and not ASSIGNMENT.match(option):
                     break
                 cursor += 1
         if at_start and (name in TRANSPARENT_PREFIXES or name == "env"):
-            in_wrapper, after_option = True, False
+            in_wrapper, after_option, wrapper = True, False, name
             index += 1
             continue
         if at_start and name == "cd":
@@ -311,7 +342,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 token.startswith("-") or DURATION.match(token) or after_option):
             # A wrapper's option, its value or a duration: the command is still to come. A value
             # that is itself a dashed git word is judged above, failing closed.
-            after_option = token.startswith("-") and "=" not in token
+            after_option = token in WRAPPER_VALUE_OPTIONS.get(wrapper, ())
             index += 1
             continue
         if dashed:

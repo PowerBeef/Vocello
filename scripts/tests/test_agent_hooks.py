@@ -1047,6 +1047,10 @@ class PolicyGuardTests(unittest.TestCase):
             f"xargs -n1 git-{push} --force origin main", "timeout 60 /opt/homebrew/bin/git-filter-repo --force",
             f"env -u HOME -S 'git {push} --force origin main'", f"env -C /tmp -S 'git {push} --force origin main'",
             f"local -x GIT_DIR=/tmp/o/.git; git {push} origin main",
+            # the third re-review: arch and stdbuf are wrappers, and env's short clusters
+            f"arch -arm64 env GIT_DIR=/o/.git git {push} origin main",
+            f"stdbuf -oL env GIT_DIR=/o/.git git {push} origin main", "arch -arm64 git-filter-repo --force",
+            f"env -iu HOME -S 'git {push} --force origin main'", f"env -uUSER -S 'git {push} --force origin main'",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -1066,6 +1070,8 @@ class PolicyGuardTests(unittest.TestCase):
                         f"grep -rn 'GIT_DIR=' scripts/hooks; git {push} origin main",
                         f"rg 'GIT_CONFIG_COUNT=' scripts && git {push} origin main",
                         "ls /opt/homebrew/bin/git-filter-repo", "xargs grep -n foo", "nice -n 5 scripts/dev.sh check",
+                        "git ls-files | xargs -r grep -n git-rebase", "xargs -0 grep -l git-stash",
+                        f"xargs -r grep -n git-{push}", "arch -arm64 scripts/dev.sh build",
                         f"git commit -F - <<'EOF'\nmention git {push} origin topic\nEOF"):
             with self.subTest(command=command):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)

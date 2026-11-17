@@ -523,16 +523,23 @@ class CLIPackageTests(unittest.TestCase):
                                           "durationMs": 500, "replayed": False}},
     })
 
+    # The probe's whole budget: the fake CLI's interpreter start, its event, the SIGINT and
+    # its exit. The probe returns as soon as the fake exits, so the budget costs a passing
+    # run nothing; 3 s once ran out on a loaded Linux runner (BKL-50). The fake sleeps past
+    # the budget, so an unhandled SIGINT still ends in the probe's timeout, never in a
+    # natural exit that the not-clean cases would accept.
+    CANCELLATION_BUDGET_SECONDS = 120
+
     def fake_cancellable_cli(self, on_interrupt: str) -> list[str]:
         started = '{"schemaVersion":1,"seq":0,"t":0,"requestID":"fixture","type":"generation_started","data":{}}'
         code = (f"import os,signal,time; signal.signal(signal.SIGINT, lambda *_: ({on_interrupt}, os._exit(130))); "
-                f"os.write(1, {started.encode()!r}); time.sleep(30)")
+                f"os.write(1, {started.encode()!r}); time.sleep({2 * self.CANCELLATION_BUDGET_SECONDS})")
         return [sys.executable, "-c", code]
 
     def test_cancellation_observes_the_generation_started_event(self):
         result = package._run_qualification_cancellation(
             self.fake_cancellable_cli(f"os.write(1, b'\\n' + {self.CANCELLED_RESULT.encode()!r} + b'\\n')"),
-            self.root, dict(os.environ), 3)
+            self.root, dict(os.environ), self.CANCELLATION_BUDGET_SECONDS)
         self.assertEqual(result, {"generationStartObserved": True, "exitStatus": 130, "cleanupAcknowledged": True})
 
     def test_an_exit_without_the_cancellation_envelope_is_not_clean(self):
@@ -540,7 +547,8 @@ class CLIPackageTests(unittest.TestCase):
                              f"os.write(1, b'\\n' + {self.CANCELLED_RESULT.replace('SIGINT', 'SIGTERM').encode()!r})"):
             with self.subTest(on_interrupt=on_interrupt), self.assertRaisesRegex(ValueError, "terminate cleanly"):
                 package._run_qualification_cancellation(
-                    self.fake_cancellable_cli(on_interrupt), self.root, dict(os.environ), 3)
+                    self.fake_cancellable_cli(on_interrupt), self.root, dict(os.environ),
+                    self.CANCELLATION_BUDGET_SECONDS)
 
     def test_partial_progress_timeout_terminates_process(self):
         with self.assertRaisesRegex(ValueError, "did not reach generation"):

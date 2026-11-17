@@ -964,7 +964,7 @@ private struct IOSHistoryItemCard: View {
 
                         HStack(spacing: 6) {
                             IOSModeDot(tint: modeTint)
-                            if let voice = item.voice, !voice.isEmpty {
+                            if let voice = voiceDisplayName {
                                 Text(voice)
                                 // The mode must not become color-only when the
                                 // voice name displaces its label (hard rule;
@@ -1085,8 +1085,12 @@ private struct IOSHistoryItemCard: View {
         presentPlayerSheet(playerItem)
     }
 
+    private var voiceDisplayName: String? {
+        item.voiceDisplayName(speakerName: { TTSModel.speakerDescriptor(id: $0)?.displayName })
+    }
+
     private var accessibilityMetadata: String {
-        let parts = [item.voice, modeText, item.formattedDate(in: IOSAppLanguage.shared.localization), durationText]
+        let parts = [voiceDisplayName, modeText, item.formattedDate(in: IOSAppLanguage.shared.localization), durationText]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         return parts.joined(separator: ", ")

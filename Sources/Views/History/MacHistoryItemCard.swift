@@ -49,7 +49,7 @@ struct MacHistoryItemCard: View {
 
     private var metadataParts: [String] {
         var parts: [String] = []
-        if let voice = generation.voice?.trimmingCharacters(in: .whitespacesAndNewlines), !voice.isEmpty {
+        if let voice = generation.voiceDisplayName(speakerName: { TTSModel.speakerDescriptor(id: $0)?.displayName }) {
             parts.append(voice)
         }
         parts.append(modeText)

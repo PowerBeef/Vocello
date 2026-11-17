@@ -389,7 +389,8 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             modeTint = Theme.Brand.library
             modeLabel = history.mode.capitalized
         }
-        let voiceName = history.voice ?? IOSInterfaceText.voice
+        let voiceName = history.voiceDisplayName(speakerName: { TTSModel.speakerDescriptor(id: $0)?.displayName })
+            ?? IOSInterfaceText.voice
         return IOSPlayerSheetItem(
             audioURL: URL(fileURLWithPath: history.audioPath),
             transcript: history.text,

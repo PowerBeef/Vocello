@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import QwenVoiceCore
 import XCTest
 
 /// AUD-05: History reads a bounded page at a time, and the mode filter and the
@@ -303,6 +304,29 @@ final class GenerationHistoryPageTests: XCTestCase {
             Request.landedPageNeedsRead(landed: Request(), hasMoreItems: true, current: design, followUpPending: false),
             "more rows match beyond the page that landed"
         )
+    }
+
+    /// BKL-37: a Built-in Voice take stores its speaker's ID and History names
+    /// the speaker as Studio does: the registry's display name, or the
+    /// capitalized ID when the registry does not know it. Other modes read as
+    /// stored, and a blank voice reads as none.
+    func testHistoryNamesABuiltInSpeakerAsStudioDoes() {
+        let registry: (String) -> String? = { ["aiden": "Aiden", "uncle_fu": "Uncle Fu"][$0] }
+        XCTAssertEqual(row("hello", voice: "aiden", at: 0).voiceDisplayName(speakerName: registry), "Aiden")
+        XCTAssertEqual(row("hello", voice: " uncle_fu ", at: 0).voiceDisplayName(speakerName: registry), "Uncle Fu")
+        XCTAssertEqual(row("hello", voice: "ryan", at: 0).voiceDisplayName(speakerName: registry), "Ryan",
+                       "an ID the registry does not know reads capitalized, as Studio's fallback does")
+        XCTAssertEqual(
+            row("hello", mode: "clone", voice: "aiden", at: 0).voiceDisplayName(speakerName: registry),
+            "aiden",
+            "a saved voice keeps the name its owner gave it"
+        )
+        XCTAssertEqual(
+            row("hello", mode: "design", voice: "a calm low voice", at: 0).voiceDisplayName(speakerName: registry),
+            "a calm low voice"
+        )
+        XCTAssertNil(row("hello", voice: "  ", at: 0).voiceDisplayName(speakerName: registry))
+        XCTAssertNil(row("hello", voice: nil, at: 0).voiceDisplayName(speakerName: registry))
     }
 
     private func row(

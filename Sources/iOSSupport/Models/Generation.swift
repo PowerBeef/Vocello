@@ -31,6 +31,20 @@ struct Generation: Identifiable, Codable, Hashable, Sendable {
         localization.dateTime(createdAt)
     }
 
+    /// The voice as Studio named it. A Built-in Voice take stores its
+    /// speaker's ID (`aiden`), which reads as the speaker's display name
+    /// (`Aiden`), falling back as Studio does to the capitalized ID when the
+    /// registry does not know it; a saved voice or a voice description reads
+    /// as stored (BKL-37). `speakerName` looks a speaker ID up in the
+    /// platform's registry, which the desktop core does not compile.
+    func voiceDisplayName(speakerName: (String) -> String?) -> String? {
+        guard let voice = voice?.trimmingCharacters(in: .whitespacesAndNewlines), !voice.isEmpty else {
+            return nil
+        }
+        guard mode == GenerationMode.custom.rawValue else { return voice }
+        return speakerName(voice) ?? voice.capitalized
+    }
+
     /// Short text preview (first 60 chars)
     var textPreview: String {
         if text.count <= 60 { return text }

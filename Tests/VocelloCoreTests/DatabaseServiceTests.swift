@@ -113,7 +113,8 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
     }
 
     /// A database with no deleted takes keeps the bound its live rows give, and
-    /// an empty one gets no sequence row until its first take.
+    /// an empty one starts from nothing (SQLite may leave a zero sequence row
+    /// after the empty copy), so its first take is id 1.
     func testV3RebuildWithoutADeletedTakeKeepsTheLiveBound() throws {
         let seeded = try seededQueue(upTo: "v2_add_sortOrder")
         try GenerationMigrations.makeMigrator().migrate(seeded)
@@ -125,7 +126,7 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
         try GenerationMigrations.makeMigrator().migrate(empty, upTo: "v2_add_sortOrder")
         try GenerationMigrations.makeMigrator().migrate(empty)
         try empty.write { db in
-            XCTAssertNil(try sequence(in: db))
+            XCTAssertEqual(try sequence(in: db) ?? 0, 0)
             try insertNext(in: db)
             XCTAssertEqual(db.lastInsertedRowID, 1)
         }

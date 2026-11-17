@@ -119,8 +119,11 @@ jobs:
         run: |
           set -euo pipefail
           echo "$RESULTS"
-          if printf '%s' "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
-            echo "::error::a security job failed or was cancelled"
+          # Every job must report success: a matrix leg no runner picked up reports
+          # `abandoned`, which a failure-or-cancelled list let through as a pass
+          # (release run 44164671041, 2026-11-17, Swift CodeQL never ran).
+          if ! printf '%s' "$RESULTS" | jq -e 'length > 0 and all(.[]; .result == "success")' > /dev/null; then
+            echo "::error::a security job did not succeed (failed, cancelled, abandoned or skipped)"
             exit 1
           fi
           echo "all security jobs succeeded"

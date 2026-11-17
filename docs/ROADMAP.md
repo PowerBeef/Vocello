@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 49/90 (54%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 49/91 (54%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (83)
+### Mac, remotely (84)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -75,6 +75,7 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-85` (parked) Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week
 - `BKL-87` (parked) CI never runs the iOS control-audit tests on a push that changes only iPhone sources
 - `BKL-88` (parked) test_host_preflight's cache-only ownership test failed once under the parallel suite
+- `BKL-90` (parked) The nightly and rehearsal issue reports may not fire for an abandoned job
 - `BT-01` (parked) Trustworthy memory evidence
 - `BT-03` (parked) UI benchmark and ui-perf lanes ready for the M6
 - `BT-04` (parked) Lineage identity, history and CI evidence tests
@@ -797,6 +798,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-87` | parked | CI never runs the iOS control-audit tests on a push that changes only iPhone sources | — |
 | `BKL-88` | parked | test_host_preflight's cache-only ownership test failed once under the parallel suite | — |
 | `BKL-89` | parked | The iPhone Settings reveal cannot scroll a page whose only free text is its title | — |
+| `BKL-90` | parked | The nightly and rehearsal issue reports may not fire for an abandoned job | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -960,6 +962,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-89`** (parked) — The iPhone Settings reveal cannot scroll a page whose only free text is its title.
   gate: VocelloUISettingsReveal scrolls a Settings page whose only text outside a control is its title (it drags from that title toward a text that does not exist), with a test of that page shape, and scripts/ui_test.sh ios localization passes, its AX-L phase included.
   unparkWhen: Authorized backlog; fix it in the next phone window that runs the localization lane.
+
+- **`BKL-90`** (parked) — The nightly and rehearsal issue reports may not fire for an abandoned job.
+  gate: The issue-filing report jobs of nightly.yml and release-rehearsal.yml file their issue when a job they watch is abandoned (no runner picked it up), proven by a test of the shipped condition, or a recorded decision accepts that they do not.
+  unparkWhen: Authorized backlog (it needs no iPhone): fix it in the change that next touches those workflows.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

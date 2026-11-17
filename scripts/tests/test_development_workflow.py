@@ -704,12 +704,28 @@ class PushWorkflowTests(unittest.TestCase):
 
     def test_the_aggregate_reads_the_submission_job_like_any_other(self) -> None:
         # The job still gates when its snapshot cannot be generated; a POST failure leaves it passing.
+        # Only success and a skip pass: a job no runner picked up reports `abandoned`, which a
+        # failure-or-cancelled list let through on 2026-11-17 (release run 44164671041).
         jobs = ("changes", "contracts", "python", "website", "dependency-submission")
-        for submission, expected in (("success", 0), ("skipped", 0), ("failure", 1)):
+        for submission, expected in (("success", 0), ("skipped", 0), ("failure", 1), ("cancelled", 1),
+                                     ("abandoned", 1)):
             with self.subTest(submission=submission):
                 results = {job: {"result": "success"} for job in jobs} | {"dependency-submission": {"result": submission}}
                 result, _ = self.run_step("ci-required", "Aggregate required results",
                                           env={"RESULTS": json.dumps(results, indent=2), "EVENT_NAME": "push"})
+                self.assertEqual(result.returncode, expected, result.stdout)
+
+    def test_security_required_passes_only_when_every_security_job_succeeded(self) -> None:
+        """An abandoned CodeQL leg passed `Security required` on 2026-11-17 (release run 44164671041)."""
+        script = workflow_step_script((ROOT / ".github/workflows/security.yml").read_text(encoding="utf-8"),
+                                      "security-required", "Aggregate security results")
+        for codeql, expected in (("success", 0), ("abandoned", 1), ("cancelled", 1), ("failure", 1), ("skipped", 1)):
+            with self.subTest(codeql=codeql):
+                results = {"npm-advisory-audit": {"result": "success", "outputs": {}},
+                           "codeql": {"result": codeql, "outputs": {}}}
+                result = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script],
+                                        capture_output=True, text=True, timeout=20,
+                                        env=dict(os.environ, RESULTS=json.dumps(results, indent=2)))
                 self.assertEqual(result.returncode, expected, result.stdout)
 
 

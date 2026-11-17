@@ -2735,6 +2735,24 @@
       "notes": "Found 2026-11-17 on build 31 (iOS 27): the App Language walk could not reveal the 日本語, 한국어 and Русский rows (ios-xcui-localization-20261117-161921-89c62b0a, 162702-4c15d69f, 163118-1d3d5704, 163600-8de8348d). A swipe on the options' scroll view now covers that page, and every language passed (164638-2f2ddbb5); the same limit then failed the AX-L phase on a Settings category row (VocelloiOSUITestCase.swift, openSettingsPage). Test tooling only; RF-58's iPhone proof came from smoke and the control audit."
     },
     {
+      "id": "BKL-90",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The nightly and rehearsal issue reports may not fire for an abandoned job",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "The issue-filing report jobs of nightly.yml and release-rehearsal.yml file their issue when a job they watch is abandoned (no runner picked it up), proven by a test of the shipped condition, or a recorded decision accepts that they do not.",
+      "sourceOfTruth": [
+        ".github/workflows/nightly.yml",
+        ".github/workflows/release-rehearsal.yml"
+      ],
+      "needs": [
+        "mac"
+      ],
+      "updated": "2026-11-17",
+      "unparkWhen": "Authorized backlog (it needs no iPhone): fix it in the change that next touches those workflows.",
+      "notes": "Found 2026-11-17 while fixing the CI required and Security required aggregates, which passed an abandoned job (release run 44164671041). Those reports run on if: failure(), and whether failure() is true for an abandoned job is undocumented. Parked without investigation."
+    },
+    {
       "id": "ER-01",
       "plan": "engine-remediation-2026-10",
       "title": "Measurement and test scaffolding",

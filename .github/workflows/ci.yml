@@ -707,8 +707,10 @@ jobs:
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             echo "pull request: Linux lanes only; the macOS lanes run on the push to main"
           fi
-          if printf '%s' "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
-            echo "::error::a required CI job failed or was cancelled"
+          # Only success and a path-routing skip pass: a job no runner picked up reports
+          # `abandoned`, which a failure-or-cancelled list let through (2026-11-17).
+          if ! printf '%s' "$RESULTS" | jq -e 'length > 0 and all(.[]; .result == "success" or .result == "skipped")' > /dev/null; then
+            echo "::error::a required CI job failed, was cancelled or was abandoned"
             exit 1
           fi
           echo "all required jobs succeeded or were skipped by path routing"

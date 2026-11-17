@@ -249,7 +249,10 @@ rules they enforce:
 - Bumping a roadmap item's `updated` without a status, gate or evidence change, or superseding without
   `supersededBy` on the loser and `legacyIds` on the winner. Park device-blocked work with a precise
   `unparkWhen`; change items with `roadmap.py set`, `note` and `close` (one validated call that also
-  re-renders), and end any hand edit with `roadmap.py validate` and `render`.
+  re-renders), and end any hand edit with `roadmap.py validate` and `render`. Tag an open item with
+  `needs` (`roadmap.py set ID --needs mac,keyboard,iphone`: the Mac with nobody at the keyboard, the
+  maintainer present, or the paired iPhone) when it is parked or planned, so `docs/ROADMAP.md` groups
+  open work by who can do it; a closed item carries none.
 - Breaking a focus-lock rule: work outside the focus plan other than what `focusLock.decision`
   authorizes (backlog items that need no iPhone, Mac-only requests as plan items), `primaryPlan`
   moved without a new dated `focusLock` decision, a commit after the freeze that names no item of

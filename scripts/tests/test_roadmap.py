@@ -189,6 +189,18 @@ class ObligationTests(Harness):
         self.assertIn("status must be one of",
                       self.errors_from(lambda d: d["items"][0].update(status="mostly-done")))
 
+    def test_needs_names_distinct_known_values(self):
+        self.assertTrue(self.check(lambda d: d["items"][0].update(needs=["mac", "iphone"]))["ok"])
+        for bad in ([], ["mac", "mac"], ["laptop"], "mac", ["mac", 3]):
+            with self.subTest(needs=bad):
+                self.assertIn("needs must be a non-empty list of distinct values from mac, keyboard, iphone",
+                              self.errors_from(lambda d, bad=bad: d["items"][0].update(needs=bad)))
+
+    def test_a_closed_item_carries_no_needs(self):
+        self.assertIn("a closed item needs nothing; remove needs",
+                      self.errors_from(lambda d: d["items"][0].update(
+                          status="declined", reason="not needed", needs=["mac"])))
+
 
 class IntegrityTests(Harness):
     def test_primary_plan_must_exist(self):
@@ -669,6 +681,68 @@ class SetTests(EditHarness):
         self.assertEqual(code, 0)
         self.assertIn("no change", out)
         self.assertEqual(self.snapshot(), before)
+
+
+class NeedsTests(EditHarness):
+    SECTION = "## Open work by what it needs"
+
+    def rendered(self):
+        return (self.root / roadmap.RENDER_PATH).read_text(encoding="utf-8")
+
+    def test_no_item_with_needs_means_no_section(self):
+        self.assertNotIn(self.SECTION, self.rendered())
+
+    def test_set_needs_inserts_it_after_the_gate_and_keeps_updated(self):
+        code, out, err = self.edit("set", "A-2", "--needs", "mac,keyboard")
+        self.assertEqual(code, 0, err)
+        item = self.item("A-2")
+        self.assertEqual(item["needs"], ["mac", "keyboard"])
+        keys = list(item)
+        self.assertEqual(keys.index("needs"), keys.index("gate") + 1)
+        self.assertEqual(item["updated"], "2026-08-01", "a classification alone does not touch the item")
+        self.assertIn("set A-2: needs", out)
+        self.assertConsistent()
+
+    def test_set_needs_replaces_and_none_removes(self):
+        self.assertEqual(self.edit("set", "A-2", "--needs", "mac")[0], 0)
+        self.assertEqual(self.edit("set", "A-2", "--needs", "iphone")[0], 0)
+        self.assertEqual(self.item("A-2")["needs"], ["iphone"])
+        self.assertEqual(self.edit("set", "A-2", "--needs", "none")[0], 0)
+        self.assertNotIn("needs", self.item("A-2"))
+        self.assertNotIn(self.SECTION, self.rendered())
+        self.assertConsistent()
+
+    def test_invalid_needs_are_refused(self):
+        for value in ("laptop", "mac,mac", "mac,,iphone", "", "Mac"):
+            with self.subTest(value=value):
+                self.assertRefused(("set", "A-2", "--needs", value), "--needs takes distinct comma-separated values")
+
+    def test_the_view_groups_items_and_names_the_other_needs(self):
+        self.assertEqual(self.edit("set", "A-2", "--needs", "mac,iphone")[0], 0)
+        self.assertEqual(self.edit("set", "A-3", "--needs", "mac")[0], 0)
+        self.assertEqual(self.edit("set", "B-1", "--needs", "keyboard")[0], 0)
+        text = self.rendered()
+        self.assertIn(self.SECTION, text)
+        mac = text.index("### Mac, remotely (2)")
+        keyboard = text.index("### At the keyboard (1)")
+        iphone = text.index("### iPhone (1)")
+        self.assertLess(mac, keyboard)
+        self.assertLess(keyboard, iphone)
+        self.assertLess(mac, text.index("- `A-2` (planned) second (also: iPhone)"), "A-2 sits under the Mac heading")
+        self.assertIn("- `A-2` (planned) second (also: iPhone)", text[mac:keyboard])
+        self.assertIn("- `A-3` (parked) third", text[mac:keyboard])
+        self.assertIn("- `B-1` (parked) elsewhere", text[keyboard:iphone])
+        self.assertIn("- `A-2` (planned) second (also: Mac, remotely)", text[iphone:])
+        self.assertNotIn("`A-1`", text[mac:text.index("## ", iphone)], "an untagged item is not listed")
+        self.assertConsistent()
+
+    def test_closing_an_item_drops_its_needs(self):
+        self.assertEqual(self.edit("set", "A-2", "--needs", "mac")[0], 0)
+        code, _, err = self.edit("close", "A-2", "--status", "declined", "--reason", "not needed")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("needs", self.archived()[-1])
+        self.assertNotIn(self.SECTION, self.rendered())
+        self.assertConsistent()
 
 
 class NoteTests(EditHarness):

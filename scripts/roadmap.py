@@ -50,7 +50,8 @@ Usage:
     python3 scripts/roadmap.py status [--plan ID] [--json]
 
     python3 scripts/roadmap.py set ID [--status planned|in-flight|parked] [--due YYYY-MM-DD|none]
-        [--title T] [--gate G] [--blocked-by ID,ID|none] [--unpark-when TEXT|none] [--touch]
+        [--title T] [--gate G] [--blocked-by ID,ID|none] [--unpark-when TEXT|none]
+        [--needs mac,keyboard,iphone|none] [--touch]
     python3 scripts/roadmap.py note ID TEXT | --append TEXT  [--touch]
     python3 scripts/roadmap.py close ID [--status done|declined|superseded] [--superseded-by ID]
         [--evidence KIND:VALUE ...] [--reason TEXT] [--note TEXT]
@@ -94,6 +95,19 @@ IN_FLIGHT_STALE_DAYS = 14
 # Notes state the current position; history lives in git. Longer notes read as
 # narrative and stop being checked.
 NOTES_MAX_CHARS = 1200
+# What an open item needs before it can close, so work can be matched to the session that can do it.
+# An item may need more than one (a fix coded on the Mac and confirmed on the iPhone).
+NEEDS = ("mac", "keyboard", "iphone")
+NEEDS_HEADINGS = {
+    "mac": ("Mac, remotely",
+            "Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run "
+            "unattended once the Mac is handed over."),
+    "keyboard": ("At the keyboard",
+                 "Needs the maintainer present: a permission prompt, a keychain or password, a release or "
+                 "account action only they may perform."),
+    "iphone": ("iPhone",
+               "Needs the paired iPhone, in a window the maintainer announces."),
+}
 LIVE_STATUSES = ("planned", "in-flight")
 SHA = re.compile(r"[0-9a-f]{7,40}")
 
@@ -484,6 +498,14 @@ def validate(root: pathlib.Path, today: _dt.date | None = None,
             errors.append(f"item {iid}: parked requires unparkWhen")
         if status == "superseded" and not item.get("supersededBy"):
             errors.append(f"item {iid}: superseded requires supersededBy")
+        if "needs" in item:
+            needs = item["needs"]
+            if (not isinstance(needs, list) or not needs or len(set(needs)) != len(needs)
+                    or any(need not in NEEDS for need in needs)):
+                errors.append(f"item {iid}: needs must be a non-empty list of distinct values from "
+                              f"{', '.join(NEEDS)}")
+            elif status in TERMINAL:
+                errors.append(f"item {iid}: a closed item needs nothing; remove needs")
 
         for reference in evidence:
             problem = resolve_evidence(root, reference)
@@ -638,6 +660,8 @@ def render(root: pathlib.Path, data: dict | None = None, archive: dict | None = 
         lines.append(f"| `{plan['id']}` | {plan['status']} | {plan['owner']} | {done}{percent} |")
     lines.append("")
 
+    lines += _needs_section(data)
+
     for plan in plans:
         row = summary[plan["id"]]
         lines += [f"## {plan['title']}", "",
@@ -683,6 +707,27 @@ def render(root: pathlib.Path, data: dict | None = None, archive: dict | None = 
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _needs_section(data: dict) -> list[str]:
+    """Open items grouped by what they need, so a session can pick work it is able to do."""
+    tagged = [item for item in data["items"] if item.get("needs") and item.get("status") not in TERMINAL]
+    if not tagged:
+        return []
+    lines = ["## Open work by what it needs", "",
+             "Only items that carry a `needs` tag are listed: the backlog and the release items added with it. "
+             "An item that needs more than one appears under each, with the others named. Each item's "
+             "plan and gate are in its plan's section below.", ""]
+    for need in NEEDS:
+        heading, meaning = NEEDS_HEADINGS[need]
+        members = sorted((item for item in tagged if need in item["needs"]), key=lambda i: _item_sort_key(i["id"]))
+        lines += [f"### {heading} ({len(members)})", "", meaning, ""]
+        for item in members:
+            also = [NEEDS_HEADINGS[other][0] for other in item["needs"] if other != need]
+            suffix = f" (also: {', '.join(also)})" if also else ""
+            lines.append(f"- `{item['id']}` ({item['status']}) {item['title']}{suffix}")
+        lines.append("")
+    return lines
+
+
 def _item_sort_key(item_id: str):
     """Numeric-aware id ordering: DP-2 sorts before DP-10."""
     match = re.match(r"^([A-Za-z]+)-(\d+)$", item_id)
@@ -703,7 +748,7 @@ ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # ledger's items already keep it and the diff stays one small hunk. Keys outside this
 # order keep their place; what `close` adds (evidence, reason, supersededBy, and the
 # winner's legacyIds) goes last, as the archive's own closes do.
-KEY_ORDER = ("id", "plan", "title", "status", "due", "blockedBy", "gate", "sourceOfTruth",
+KEY_ORDER = ("id", "plan", "title", "status", "due", "blockedBy", "gate", "sourceOfTruth", "needs",
              "evidence", "updated", "unparkWhen", "notes")
 
 
@@ -812,12 +857,13 @@ def _changed_keys(before: dict, after: dict) -> list[str]:
 
 def edit_set(data: dict, archive: dict, item_id: str, today: _dt.date, *, status: str | None = None,
              due: str | None = None, title: str | None = None, gate: str | None = None,
-             blocked_by: str | None = None, unpark_when: str | None = None, touch: bool = False) -> dict:
+             blocked_by: str | None = None, unpark_when: str | None = None, needs: str | None = None,
+             touch: bool = False) -> dict:
     """Edit fields of an open item. `updated` moves with a status or gate change, or with `touch`."""
     item = _live_item(data, archive, item_id)
-    if all(value is None for value in (status, due, title, gate, blocked_by, unpark_when)) and not touch:
+    if all(value is None for value in (status, due, title, gate, blocked_by, unpark_when, needs)) and not touch:
         raise EditError("set needs at least one of --status, --due, --title, --gate, --blocked-by, "
-                        "--unpark-when or --touch")
+                        "--unpark-when, --needs or --touch")
     before = copy.deepcopy(item)
     if status is not None:
         if status in TERMINAL:
@@ -852,6 +898,15 @@ def edit_set(data: dict, archive: dict, item_id: str, today: _dt.date, *, status
             item.pop("unparkWhen", None)
         else:
             _set_key(item, "unparkWhen", _text(unpark_when, "--unpark-when"))
+    if needs is not None:
+        if needs == NONE:
+            item.pop("needs", None)
+        else:
+            chosen = [part.strip() for part in needs.split(",")]
+            if not all(chosen) or len(set(chosen)) != len(chosen) or any(part not in NEEDS for part in chosen):
+                raise EditError(f"--needs takes distinct comma-separated values from {', '.join(NEEDS)}, "
+                                f"or {NONE}; got {needs!r}")
+            _set_key(item, "needs", chosen)
 
     # The ledger's rule: `updated` records a status, gate or evidence change, so editing a
     # title, a date or a blocker does not make old work look freshly touched.
@@ -929,6 +984,7 @@ def edit_close(root: pathlib.Path, data: dict, archive: dict, item_id: str, toda
     _set_key(item, "status", status)
     _set_key(item, "updated", today.isoformat())
     item.pop("unparkWhen", None)
+    item.pop("needs", None)
     if notes is not None:
         _set_key(item, "notes", notes)
     if added:
@@ -1027,7 +1083,7 @@ def _edit(root: pathlib.Path, args) -> int:
             def mutate(data, archive):
                 return edit_set(data, archive, args.item_id, today, status=args.status, due=args.due,
                                 title=args.title, gate=args.gate, blocked_by=args.blocked_by,
-                                unpark_when=args.unpark_when, touch=args.touch)
+                                unpark_when=args.unpark_when, needs=args.needs, touch=args.touch)
         elif args.command == "note":
             def mutate(data, archive):
                 return edit_note(data, archive, args.item_id, today, text=args.text, append=args.append,
@@ -1077,6 +1133,9 @@ def build_parser() -> argparse.ArgumentParser:
     command.add_argument("--gate")
     command.add_argument("--blocked-by", metavar="ID,ID|none")
     command.add_argument("--unpark-when", metavar="TEXT|none")
+    command.add_argument("--needs", metavar="mac,keyboard,iphone|none",
+                         help="what the item needs before it can close: the Mac alone (remotely), the "
+                              "maintainer at the keyboard, the iPhone")
     command.add_argument("--touch", action="store_true", help="move updated without a status or gate change")
 
     command = commands.add_parser(

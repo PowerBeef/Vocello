@@ -43,6 +43,16 @@ def bash(script: str) -> list[str]:
     return [sys.executable, "-c", _DEFAULT_SIGINT_EXEC, "bash", "-c", script]
 
 
+# How long a case may take before the harness calls it hung. These cases spend
+# fixed seconds in the step's own grace sleeps and the export's 2 s grace, and the
+# full parallel suite slows process work by an order of magnitude, so the old 3-12 s
+# guards could expire on a run that was going to pass (BKL-26). The guard proves
+# nothing itself: the exits, receipts and retired processes do. It stays far below
+# the collector's 300 s watchdog, so a shell whose watchdog keeps it (or its pipes)
+# alive still fails here.
+HANG_GUARD_SECONDS = 60
+
+
 class UIFinalizationTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="ui evidence with spaces ")
@@ -89,7 +99,7 @@ record_lane_ledger() {{ echo ledger >>"$out/order"; }}
         script += "trap cleanup_ui_run EXIT\ntrap 'exit 143' TERM\ntrap 'exit 130' INT\n"
         script += f"kill -{signal} $$\n" if signal else f"exit {code}\n"
         result = subprocess.run(bash(script), text=True, capture_output=True,
-                                env=os.environ, timeout=10)
+                                env=os.environ, timeout=HANG_GUARD_SECONDS)
         receipt = json.loads((self.out / "ui-finalization.json").read_text())
         return result, receipt
 
@@ -140,9 +150,11 @@ record_lane_ledger() {{ echo ledger >>"$out/order"; }}
         # so a SIGINT case would see the script carry on; bash() restores the default.
         script = "trap 'exit 130' INT\nkill -INT $$\nexit 0\n"
         ignored = [sys.executable, "-c", _IGNORED_SIGINT_EXEC]
-        unarmed = subprocess.run([*ignored, "bash", "-c", script], capture_output=True, timeout=10)
+        unarmed = subprocess.run([*ignored, "bash", "-c", script], capture_output=True,
+                                 timeout=HANG_GUARD_SECONDS)
         self.assertEqual(unarmed.returncode, 0, unarmed.stderr)
-        rearmed = subprocess.run([*ignored, *bash(script)], capture_output=True, timeout=10)
+        rearmed = subprocess.run([*ignored, *bash(script)], capture_output=True,
+                                 timeout=HANG_GUARD_SECONDS)
         self.assertEqual(rearmed.returncode, 130, rearmed.stderr)
 
     def test_cleanup_failure_invalidates_provisional_pass(self):
@@ -169,7 +181,7 @@ record_lane_ledger() {{ echo ledger >>"$out/order"; }}
                          [mock.call(timeout=60), mock.call(timeout=2), mock.call()])
 
     def assert_process_retired(self, pid):
-        deadline = time.monotonic() + 3
+        deadline = time.monotonic() + HANG_GUARD_SECONDS
         while time.monotonic() < deadline:
             result = subprocess.run(["ps", "-p", str(pid), "-o", "stat="],
                                     text=True, capture_output=True)
@@ -190,7 +202,7 @@ stuck() {{
 ui_finalization_step stuck stuck
 printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
 '''
-        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=HANG_GUARD_SECONDS)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "status").read_text(), "124\n")
         self.assert_process_retired(int((self.out / "child-pid").read_text()))
@@ -206,7 +218,7 @@ leftover() {{
 ui_finalization_step leftover leftover
 printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
 '''
-        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=HANG_GUARD_SECONDS)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "status").read_text(), "125\n")
         self.assert_process_retired(int((self.out / "child-pid").read_text()))
@@ -225,13 +237,13 @@ printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
                 process = subprocess.Popen([sys.executable, str(LANE_DATA), "export-attachments",
                                             "result", "attachments"], env=env)
                 try:
-                    deadline = time.monotonic() + 3
+                    deadline = time.monotonic() + HANG_GUARD_SECONDS
                     while not (self.out / "exporter-pid").exists():
                         self.assertLess(time.monotonic(), deadline)
                         time.sleep(0.01)
                     descendant = int((self.out / "exporter-pid").read_text())
                     process.send_signal(sig)
-                    self.assertEqual(process.wait(timeout=8), 128 + sig)
+                    self.assertEqual(process.wait(timeout=HANG_GUARD_SECONDS), 128 + sig)
                     self.assert_process_retired(descendant)
                 finally:
                     if process.poll() is None:
@@ -273,7 +285,7 @@ required_step_run "$step_ledger" xcuitest run_xcodebuild bash -c 'echo "Testing 
 ui_finalize_collections
 required_steps_finalize "$step_ledger"
 '''
-        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=HANG_GUARD_SECONDS)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "export-count").read_text(), "export\n")
 
@@ -307,13 +319,13 @@ ui_finalization_step attachments export_attachments
                 process = subprocess.Popen(bash(script), env=env,
                                            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
-                    deadline = time.monotonic() + 3
+                    deadline = time.monotonic() + HANG_GUARD_SECONDS
                     while not (self.out / "exporter-pid").exists():
                         self.assertLess(time.monotonic(), deadline)
                         time.sleep(0.01)
                     descendant = int((self.out / "exporter-pid").read_text())
                     process.send_signal(sig)
-                    stdout, stderr = process.communicate(timeout=10)
+                    stdout, stderr = process.communicate(timeout=HANG_GUARD_SECONDS)
                     self.assertEqual(process.returncode, 128 + sig, stdout + stderr)
                     self.assert_process_retired(descendant)
                     self.assert_process_retired(int((self.out / "watchdog-pid").read_text()))
@@ -358,7 +370,7 @@ trap 'exit 130' INT
 ui_finalize_collections
 '''
                 result = subprocess.run(bash(script), text=True,
-                                        capture_output=True, timeout=12)
+                                        capture_output=True, timeout=HANG_GUARD_SECONDS)
                 self.assertEqual(result.returncode, code, result.stderr)
                 receipt = json.loads((self.out / "ui-finalization.json").read_text())
                 self.assertEqual(receipt["status"], "failed")
@@ -394,7 +406,7 @@ trap 'exit 143' TERM
 run_xcodebuild bash -c 'exit 65'
 '''
         result = subprocess.run(bash(script), text=True,
-                                capture_output=True, timeout=12)
+                                capture_output=True, timeout=HANG_GUARD_SECONDS)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertEqual((self.out / "metadata").read_text(), "failed 65\n")
         self.assertEqual((self.out / "order").read_text(), "cleanup\n")
@@ -413,7 +425,7 @@ cleanup_macos_run() {{ echo cleanup >>"$out/order"; }}
 ui_finalize_collections
 ui_finalize_collections
 '''
-        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=HANG_GUARD_SECONDS)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "order").read_text(), "cleanup\n")
         self.assertEqual(json.loads((self.out / "ui-finalization.json").read_text())["status"], "passed")

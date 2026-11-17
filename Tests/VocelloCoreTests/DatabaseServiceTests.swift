@@ -112,6 +112,24 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
         }
     }
 
+    /// A History cleared before the upgrade copies no rows, so the rebuilt table
+    /// has no sequence row of its own and the carried bound is inserted.
+    func testV3RebuildOfAClearedHistoryKeepsTheDeletedHighWaterMark() throws {
+        for version in ["v1_create_generations", "v2_add_sortOrder"] {
+            let queue = try DatabaseQueue()
+            try GenerationMigrations.makeMigrator().migrate(queue, upTo: version)
+            try insertAndDeleteHighWater(in: queue)
+
+            try GenerationMigrations.makeMigrator().migrate(queue)
+
+            try queue.write { db in
+                XCTAssertEqual(try sequence(in: db), 900, version)
+                try insertNext(in: db)
+                XCTAssertEqual(db.lastInsertedRowID, 901, version)
+            }
+        }
+    }
+
     /// A database with no deleted takes keeps the bound its live rows give, and
     /// an empty one starts from nothing (SQLite may leave a zero sequence row
     /// after the empty copy), so its first take is id 1.

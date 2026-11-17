@@ -17,6 +17,9 @@ final class LongFormPlanningTests: XCTestCase {
             XCTAssertTrue(SingleTakeScriptBudget.hasSpeakableContent(script), script)
         }
         XCTAssertEqual(SingleTakeScriptBudget.measure("plain text").characters, 10, "text without < is measured as before")
+        XCTAssertEqual(SingleTakeScriptBudget.measure("a < b").characters, 5, "a < with no control token measures as before")
+        XCTAssertEqual(SingleTakeScriptBudget.measure("<b>bold</b>").characters, 11)
+        XCTAssertEqual(SingleTakeScriptBudget.measure("Hello <|im_end|>").characters, 7, "the literal counts as one space")
     }
 
     /// The pattern is a copy of the owned package's, which removes the same

@@ -37,6 +37,10 @@ struct MacVoiceDesignScreen: View {
     }
 
     @State private var actionAlert: VoiceDesignActionAlert?
+    /// BKL-28: the "Voice added" confirmation waits for the save sheet to close.
+    /// Presented while the sheet (and, after Keep voice, its own warning alert)
+    /// is still dismissing, macOS dropped it.
+    @State private var alertAfterSheetCloses: VoiceDesignActionAlert?
     @State private var isBriefPresented = false
 
     private let tint = MacTheme.Brand.modeDesign
@@ -199,7 +203,7 @@ struct MacVoiceDesignScreen: View {
         // second during a download and re-rendered the screen each time (MAC-22).
         .onChange(of: modelManager.modelInfoByID) { _, _ in reconcileGenerationVariantSelection() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in reconcileGenerationVariantSelection() }
-        .sheet(item: $presentedSheet) { presentedSheet in
+        .sheet(item: $presentedSheet, onDismiss: presentAlertAfterSheetCloses) { presentedSheet in
             switch presentedSheet {
             case .batch(let configuration):
                 MacBatchGenerationSheet(configuration: configuration)
@@ -325,10 +329,21 @@ struct MacVoiceDesignScreen: View {
         Task { @MainActor in
             await viewModel.refresh(using: store)
         }
-        actionAlert = VoiceDesignActionAlert(
+        let alert = VoiceDesignActionAlert(
             title: MacInterfaceText.savedVoiceAddedTitle,
             message: MacInterfaceText.savedVoiceAddedMessage(voice.name)
         )
+        if presentedSheet == nil {
+            actionAlert = alert
+        } else {
+            alertAfterSheetCloses = alert
+        }
+    }
+
+    private func presentAlertAfterSheetCloses() {
+        guard let alert = alertAfterSheetCloses else { return }
+        alertAfterSheetCloses = nil
+        actionAlert = alert
     }
 
     // MARK: - Actions

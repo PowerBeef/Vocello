@@ -112,9 +112,11 @@ rules they enforce:
   a Mac whose macOS runs only Xcode 27, is the case).
 - **Evidence retention.** Only qualified privacy-safe PASS records enter `benchmarks/runs/` (≤ 256 KB
   each, a language record ≤ 384 KB because it has one cell per take over ten languages; strict
-  allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
-  xcresult and traces stay untracked; publication never stages, commits or pushes. The `benchmark` and
-  `perf` lanes of `scripts/ui_test.sh` (macOS and iPhone) say in one line when they start that a
+  allowlist), then `benchmarks/HISTORY.md` is regenerated. A run whose engine rows were armed with
+  a production-affecting runtime override the lane does not own is refused by `record`, which names
+  the keys (BKL-22; `docs/reference/telemetry-and-benchmarking.md`, Runtime knobs). Raw JSONL, WAV,
+  screenshots, xcresult and traces stay untracked; publication never stages, commits or pushes.
+  The `benchmark` and `perf` lanes of `scripts/ui_test.sh` (macOS and iPhone) say in one line when they start that a
   passing run writes a tracked record and rewrites `benchmarks/HISTORY.md` (a perf run only on the
   canonical hardware profile). `--no-publish` keeps the run local: the artifacts and the verdict
   stay, no file under `benchmarks/` changes, the run directory holds `publication-skipped.json`, and

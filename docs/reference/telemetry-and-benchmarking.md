@@ -290,6 +290,19 @@ Bounded observability and test-target-only keys are separately classified. Gener
 binds active override key names and a digest of their values without retaining raw launch input.
 Never add an undocumented environment reader.
 
+**An armed run never publishes (BKL-22).** Every lane runs under `QWENVOICE_DEBUG=1`, so an
+engine row's `runtimeDebugProvenance.activeOverrideKeys` always names the lane's build paths, run
+IDs and observability keys, which change nothing. A key of a registry group that needs the master
+gate is armed unless the lanes own it (`LANE_OWNED_RUNTIME_OVERRIDES` in
+`scripts/publish_benchmark_history.py`: isolated storage, the benchmarks' cold flag and seed
+policy, warm-up suppression, the CLI bench's preview switch, the ui-perf probe and History seed)
+or it simulates a memory tier the rows stamp as forced, which is exploratory. The engine,
+language and iPhone engine publishers and the macOS and iPhone UI benchmark checkers write the
+armed keys of the run's selected engine rows into `benchmark-evidence.json`
+(`armedRuntimeOverrideKeys`, absent for an unarmed run, whose manifest is unchanged), and
+`benchmark_history.py record` refuses a manifest that names any, naming them: the lane's verdict
+and artifacts stand, and the run stays local.
+
 | Env | Effect |
 |---|---|
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skips proactive prewarm/clone-priming so the first generation records its own **cold** load (`MacGenerationWarmupCoordinator`); use it for accurate Custom/Design cold rows in UI runs. App-process only. |

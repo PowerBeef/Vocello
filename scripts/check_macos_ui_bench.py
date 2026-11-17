@@ -148,6 +148,16 @@ def diagnostic_memory_tier(rows: list[dict]) -> bool:
     return False
 
 
+def armed_runtime_overrides(rows: list[dict]) -> list[str]:
+    """The engine publisher's armed-override rule (BKL-22), on this run's rows."""
+    import publish_benchmark_history as publisher
+
+    try:
+        return publisher.armed_runtime_overrides(rows)
+    except publisher.PublicationError as error:
+        raise SystemExit(str(error)) from error
+
+
 def run_runtime_policy(rows: list[dict]) -> dict | None:
     """The record's memory-tier provenance, `run.runtimePolicy` (audit #19).
 
@@ -1438,6 +1448,10 @@ def build_manifest(
         # The stall contract this run was judged under and what it observed
         # (run artifact only; the tracked record stays on its allowlist).
         **({"stallGate": stall_gate} if stall_gate else {}),
+        # The runtime overrides that keep this run out of history (BKL-22);
+        # `benchmark_history.py record` refuses a manifest that names any. An
+        # unarmed run writes the manifest it always wrote.
+        **({"armedRuntimeOverrideKeys": armed} if (armed := armed_runtime_overrides(all_engine_rows)) else {}),
         "historyRecord": history_record,
     }
 

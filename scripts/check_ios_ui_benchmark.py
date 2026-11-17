@@ -598,8 +598,22 @@ def build_manifest(
             "app": {"count": len(engine_rows), "complete": True},
         },
         "takes": takes,
+        # The runtime overrides that keep this run out of history (BKL-22);
+        # `benchmark_history.py record` refuses a manifest that names any. An
+        # unarmed run writes the manifest it always wrote.
+        **({"armedRuntimeOverrideKeys": armed} if (armed := armed_runtime_overrides(engine_rows)) else {}),
         "historyRecord": history_record,
     }
+
+
+def armed_runtime_overrides(rows: list[dict]) -> list[str]:
+    """The engine publisher's armed-override rule (BKL-22), on this run's rows."""
+    import publish_benchmark_history as publisher
+
+    try:
+        return publisher.armed_runtime_overrides(rows)
+    except publisher.PublicationError as error:
+        raise SystemExit(str(error)) from error
 
 
 def takes_above_load_limit(history_takes: list[dict]) -> list[tuple[int, float]]:

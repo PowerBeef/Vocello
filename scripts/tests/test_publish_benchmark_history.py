@@ -662,6 +662,72 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertEqual(record["toolchain"]["optimization"], "-O")
         self.assertEqual(record["evidence"]["actualTakeCount"], 1)
+        self.assertNotIn("armedRuntimeOverrideKeys", captured["manifest"])
+
+    def test_engine_manifest_names_the_armed_overrides_of_its_selected_rows(self) -> None:
+        """BKL-22: the manifest carries what `benchmark_history.py record` refuses."""
+        diagnostics = self.root / "diagnostics"
+        output_dir = self.root / "outputs"
+        diagnostics.mkdir()
+        self.make_wave(output_dir / "take.wav")
+        results = diagnostics / "bench-results.json"
+        results.write_text(json.dumps({
+            "schemaVersion": 1, "runID": "run-one", "label": "fixture",
+            "startedAt": "2026-07-12T12:00:00Z", "finishedAt": "2026-07-12T12:01:00Z",
+            "telemetryMode": "verbose", "streaming": True,
+            "executableSHA256": "a" * 64, "fixtureDigests": {},
+            "takes": [{
+                "takeIndex": 1, "generationID": "selected", "cell": "custom/speed/medium/warm#0",
+                "mode": "custom", "modelID": "pro_custom_speed", "variant": "speed",
+                "length": "medium", "warmState": "warm", "wallSeconds": 1.0, "audioSeconds": 2.0,
+                "firstChunkMS": 100, "firstChunkUptimeNS": 9_000_004_000_000,
+                "outputFileName": "take.wav",
+            }],
+        }))
+
+        def publish(selected: dict, unrelated: list[dict]) -> dict:
+            selected["streamingTelemetryV9"] = {"chunks": [{
+                "index": 0, "transportSequence": 0, "transportPublishedAtNS": 9_000_000_000_000,
+                "previewDisposition": "not-requested",
+            }]}
+            args = SimpleNamespace(
+                results=results, run_id="run-one", diagnostics=diagnostics,
+                output_dir=output_dir, platform="macos", artifact_dir=diagnostics,
+                snapshot=self.root / "snapshot.json", label="fixture",
+            )
+            captured, write_patch = self.capture_manifest()
+            with (
+                mock.patch.object(publisher, "load_engine_rows", return_value=unrelated + [selected]),
+                mock.patch.object(
+                    publisher, "qualify_memory_rows",
+                    return_value=([SimpleNamespace(
+                        generation_id="selected", metrics={}, sidecar_digest="f" * 64,
+                        status="qualified", warnings=(),
+                    )], {
+                        "memoryContractVersion": 1, "memoryQualified": True,
+                        "sampleSidecarCount": 1, "sampleSidecarsDigest": "e" * 64,
+                        "digestPayload": [{"generationID": "selected", "digest": "f" * 64}],
+                    }),
+                ),
+                mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+                mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+                mock.patch.object(publisher, "validated_macos_cli_optimization", return_value="-O"),
+                self.hardware_patch(),
+                write_patch,
+            ):
+                publisher.engine_command(args)
+            return captured["manifest"]
+
+        canonical = ["QVOICE_MAC_BENCH_RUN_ID", "QWENVOICE_NATIVE_TELEMETRY_MODE", "QWENVOICE_STREAMING_PREVIEW_DATA"]
+        # Only the selected take's row counts: an armed row of another run in
+        # the same telemetry file does not taint this one.
+        other_run = self.armed_row("other", ["QWENVOICE_TALKER_TEMP"])
+        manifest = publish(self.armed_row("selected", canonical), [other_run])
+        self.assertNotIn("armedRuntimeOverrideKeys", manifest)
+        manifest = publish(
+            self.armed_row("selected", [*canonical, "QWENVOICE_FULL_TEXT_CONDITIONING"]), [other_run],
+        )
+        self.assertEqual(manifest["armedRuntimeOverrideKeys"], ["QWENVOICE_FULL_TEXT_CONDITIONING"])
 
     def test_ttfc_definition_follows_the_bench_results_producer(self) -> None:
         with_ttfc = [{"metrics": {"ttfcMS": 400.0}}, {"metrics": {}}]
@@ -1399,6 +1465,71 @@ class PublisherTests(unittest.TestCase):
         emulated = engine_row("emulated")
         emulated["notes"]["simulatedPhysicalMemoryMB"] = "8192"
         self.assertTrue(publisher.uses_forced_memory_profile([emulated]))
+
+    @staticmethod
+    def armed_row(generation_id: str, keys: list[str], *, nesting: str = "summary") -> dict:
+        row = engine_row(generation_id)
+        provenance = {
+            "internalDiagnosticsAvailable": True, "masterGateRequested": True,
+            "activeOverrideKeys": keys, "activeOverrideDigest": "d" * 64 if keys else None,
+        }
+        if nesting == "summary":
+            row["summary"]["runEnvironment"] = {"runtimeDebugProvenance": provenance}
+        elif nesting == "row":
+            row["runEnvironment"] = {"runtimeDebugProvenance": provenance}
+        else:
+            row["runtimeDebugProvenance"] = provenance
+        return row
+
+    def test_armed_runtime_overrides_name_only_keys_that_change_what_a_run_measures(self) -> None:
+        """BKL-22: every lane runs under QWENVOICE_DEBUG, so an engine row names
+        build paths, run IDs and observability keys; only a gated knob the lane
+        does not own is armed."""
+        # What real canonical rows carry: unregistered shell exports, the
+        # bounded-observability keys and the lanes' own harness keys.
+        canonical = [
+            "QVOICE_BUILD_ROOT", "QVOICE_ARTIFACTS_MACOS", "QVOICE_IOS_BENCH_LABEL",
+            "QVOICE_IOS_DEVICE_RUN_ID", "QVOICE_MAC_BENCH_RUN_ID", "QWENVOICE_NATIVE_TELEMETRY_MODE",
+            "QWENVOICE_BENCH_FORCE_COLD", "QWENVOICE_BENCH_SEED_CELLS", "QWENVOICE_BENCH_SEED_POLICY",
+            "QWENVOICE_STREAMING_PREVIEW_DATA", "QWENVOICE_SUPPRESS_WARMUP",
+            "QWENVOICE_UIPERF_FRAME_PROBE",
+        ]
+        self.assertEqual(publisher.armed_runtime_overrides([self.armed_row("a", canonical)]), [])
+        self.assertEqual(publisher.armed_runtime_overrides([self.armed_row("a", [])]), [])
+        self.assertEqual(publisher.armed_runtime_overrides([engine_row("legacy")]), [])
+        # RF-20's control run: an RF-14 A/B arm, plus a sampler override.
+        for nesting in ("summary", "row", "top"):
+            with self.subTest(nesting=nesting):
+                rows = [
+                    self.armed_row("a", [*canonical, "QWENVOICE_FULL_TEXT_CONDITIONING"], nesting=nesting),
+                    self.armed_row("b", ["QWENVOICE_TALKER_TEMP", "QVOICE_MAC_BENCH_RUN_ID"], nesting=nesting),
+                ]
+                self.assertEqual(
+                    publisher.armed_runtime_overrides(rows),
+                    ["QWENVOICE_FULL_TEXT_CONDITIONING", "QWENVOICE_TALKER_TEMP"],
+                )
+        # A memory-tier simulation is accepted only when the rows stamp the
+        # forced tier that makes the record exploratory.
+        unstamped = self.armed_row("a", ["QVOICE_IOS_MEMORY_GUARD_FORCE_BAND"])
+        self.assertEqual(publisher.armed_runtime_overrides([unstamped]), ["QVOICE_IOS_MEMORY_GUARD_FORCE_BAND"])
+        emulated = self.armed_row("a", [
+            "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB", "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND",
+        ])
+        emulated["notes"].update({"deviceClassForced": "true", "simulatedPhysicalMemoryMB": "8192"})
+        self.assertEqual(publisher.armed_runtime_overrides([emulated]), [])
+
+    def test_the_lane_owned_overrides_are_gated_registry_keys(self) -> None:
+        """An allowance for a key the registry no longer gates is dead and hides
+        a rename; both lists name gated registry keys."""
+        gated = publisher.gated_runtime_override_keys()
+        self.assertIn("QWENVOICE_FULL_TEXT_CONDITIONING", gated)
+        self.assertNotIn("QWENVOICE_NATIVE_TELEMETRY_MODE", gated)
+        self.assertNotIn("QVOICE_IOS_DEVICE_RUN_ID", gated)
+        self.assertLessEqual(publisher.LANE_OWNED_RUNTIME_OVERRIDES, gated)
+        self.assertLessEqual(publisher.MEMORY_TIER_SIMULATION_OVERRIDES, gated)
+        missing = self.root / "missing-knobs.json"
+        with self.assertRaises(publisher.PublicationError):
+            publisher.gated_runtime_override_keys(missing)
 
     def test_runtime_policy_provenance_comes_from_the_rows_own_stamps(self) -> None:
         def stamped(generation_id: str, device_class: str | None, forced: str = "false") -> dict:

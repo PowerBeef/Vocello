@@ -476,6 +476,35 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertIn("macos-bench-20260712-120000", self.index.read_text())
         self.assertFalse(any(path.name.startswith(".") for path in first.parent.iterdir()))
 
+    def test_record_refuses_a_run_armed_with_runtime_overrides(self) -> None:
+        """BKL-22: the publisher names the armed overrides of a run's engine
+        rows; the registry refuses it and writes nothing, naming the keys."""
+        armed = {
+            "armedRuntimeOverrideKeys": ["QWENVOICE_FULL_TEXT_CONDITIONING", "QWENVOICE_TALKER_TEMP"],
+            "historyRecord": record_fixture(),
+        }
+        directory = self.write_manifest(armed, "armed")
+        with self.assertRaisesRegex(
+            history.HistoryError, "QWENVOICE_FULL_TEXT_CONDITIONING, QWENVOICE_TALKER_TEMP.*never published",
+        ):
+            history.record_manifest(directory)
+        self.assertFalse((directory / "benchmark-history-record.json").exists())
+        self.assertEqual(history.read_all_records(), [])
+        for malformed in ("QWENVOICE_TALKER_TEMP", [7], ["../private"], ["QWENVOICE_X\n"], None):
+            with self.subTest(malformed=malformed):
+                directory = self.write_manifest(
+                    {"armedRuntimeOverrideKeys": malformed, "historyRecord": record_fixture()},
+                    f"malformed-{len(list(self.root.iterdir()))}",
+                )
+                with self.assertRaisesRegex(history.HistoryError, "malformed"):
+                    history.record_manifest(directory)
+        # An empty list publishes (an unarmed run's manifest omits the field,
+        # as every other manifest in these tests does).
+        path = history.record_manifest(self.write_manifest(
+            {"armedRuntimeOverrideKeys": [], "historyRecord": record_fixture()}, "unarmed",
+        ))
+        self.assertTrue(path.is_file())
+
     def test_full_29_take_memory_record_uses_bounded_canonical_storage(self) -> None:
         # Match the production macOS UI shape: 29 exact takes, 11 aggregate
         # cells, and the complete per-take performance/memory/frontend payload.

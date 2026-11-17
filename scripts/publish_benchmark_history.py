@@ -950,6 +950,86 @@ def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] 
     return policy
 
 
+# BKL-22: a run armed with a runtime diagnostics override that changes what it
+# measures never publishes. An engine row names every QWENVOICE_*/QVOICE_* key
+# its process saw under QWENVOICE_DEBUG (`runtimeDebugProvenance`), which on
+# every lane includes harmless names: the lanes' own build paths and run IDs
+# (unregistered, so no engine code reads them) and the bounded-observability
+# keys. Only a key in a registry group that needs the master gate can change
+# production behavior, and of those the lanes arm a few themselves, each
+# stated by the record it publishes or driving the lane without changing what a
+# take measures. Everything else (a sampler, model, decoder or reference
+# override, an RF-14 A/B arm) is armed. The outer evidence manifest carries the
+# armed keys and `benchmark_history.py record` refuses it, so the lane's own
+# verdict and artifacts stand and the run stays local.
+ARMED_RUNTIME_OVERRIDES_FIELD = "armedRuntimeOverrideKeys"
+RUNTIME_DEBUG_KNOBS_PATH = ROOT / "config" / "runtime-debug-knobs.json"
+LANE_OWNED_RUNTIME_OVERRIDES = frozenset({
+    # Isolated app storage for a UI-test app.
+    "QWENVOICE_APP_SUPPORT_DIR", "QVOICE_APP_SUPPORT_DIR",
+    # The benchmarks' take flags and seed policy, which the record states
+    # (cold-take flags, `run.seedPolicy` and the lineage key).
+    "QWENVOICE_BENCH_FORCE_COLD", "QWENVOICE_BENCH_SEED_CELLS", "QWENVOICE_BENCH_SEED_POLICY",
+    # The macOS UI benchmark keeps the app's own warm-up out of its takes.
+    "QWENVOICE_SUPPRESS_WARMUP",
+    # The CLI bench turns inline preview PCM off for every take.
+    "QWENVOICE_STREAMING_PREVIEW_DATA",
+    # The ui-perf lanes' frame probe and History seed.
+    "QWENVOICE_UIPERF_FRAME_PROBE", "QWENVOICE_UIPERF_SEED_HISTORY",
+})
+# A forced or emulated memory tier: accepted only when the rows' own stamps show
+# the forced tier (`uses_forced_memory_profile`), which makes the record
+# exploratory; without that stamp the key is armed like any other.
+MEMORY_TIER_SIMULATION_OVERRIDES = frozenset({
+    "QWENVOICE_FORCE_MEMORY_CLASS", "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB",
+    "QVOICE_IOS_MEMORY_PROFILE", "QVOICE_IOS_SIMULATED_PROCESS_LIMIT_MB",
+    "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND", "QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE",
+})
+
+
+def gated_runtime_override_keys(path: Path = RUNTIME_DEBUG_KNOBS_PATH) -> frozenset[str]:
+    """Every key of a `config/runtime-debug-knobs.json` group that needs the
+    master gate: the overrides that can change production behavior."""
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8"))
+        groups = registry["groups"]
+        return frozenset(
+            str(key) for group in groups if group.get("gateRequired") is True for key in group["keys"]
+        )
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        raise PublicationError(f"cannot read the runtime override registry {path}: {error}") from error
+
+
+def active_runtime_override_keys(row: dict[str, Any]) -> set[str]:
+    """The override keys one engine row names, wherever its schema nests them."""
+    candidates = [row.get("runtimeDebugProvenance")]
+    for container in (row.get("summary"), row):
+        environment = container.get("runEnvironment") if isinstance(container, dict) else None
+        if isinstance(environment, dict):
+            candidates.append(environment.get("runtimeDebugProvenance"))
+    keys: set[str] = set()
+    for provenance in candidates:
+        if isinstance(provenance, dict) and isinstance(provenance.get("activeOverrideKeys"), list):
+            keys.update(str(key) for key in provenance["activeOverrideKeys"])
+    return keys
+
+
+def armed_runtime_overrides(rows: Iterable[dict[str, Any]]) -> list[str]:
+    """The sorted override keys that keep these engine rows out of history."""
+    rows = list(rows)
+    gated = gated_runtime_override_keys()
+    simulated_tier = uses_forced_memory_profile(rows)
+    armed: set[str] = set()
+    for row in rows:
+        for key in active_runtime_override_keys(row):
+            if key not in gated or key in LANE_OWNED_RUNTIME_OVERRIDES:
+                continue
+            if simulated_tier and key in MEMORY_TIER_SIMULATION_OVERRIDES:
+                continue
+            armed.add(key)
+    return sorted(armed)
+
+
 # The stricter per-take host-load limit (maintainer decision 2026-09-25, BT-02,
 # audit #28): a timing take whose own one-minute load average exceeded this many
 # times the canonical profile's core count marks its record exploratory. The
@@ -1673,6 +1753,7 @@ def record_shell(
     ttfc_definition: str | None = None,
     runtime_policy: dict[str, Any] | None = None,
     toolchain_identity: dict[str, Any] | None = None,
+    engine_rows: Iterable[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     effective_label = label or run_id
     if ttfc_definition is not None and ttfc_definition not in rtf_semantics.TTFC_DEFINITIONS:
@@ -1761,6 +1842,10 @@ def record_shell(
     outer["optimization"] = optimization
     if executable_paths is not None:
         outer["executableRelativePaths"] = executable_paths
+    # BKL-22: only an armed run's manifest names its keys, so an unarmed run
+    # writes the manifest it always wrote.
+    if engine_rows is not None and (armed := armed_runtime_overrides(engine_rows)):
+        outer[ARMED_RUNTIME_OVERRIDES_FIELD] = armed
     return outer
 
 
@@ -2064,6 +2149,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         memory_evidence={**compact_memory_evidence(memory_run), **retention_evidence},
         ttfc_definition=engine_ttfc_definition(args.platform, takes),
         runtime_policy=runtime_policy_provenance(selected),
+        engine_rows=selected,
     )
     return write_and_record(
         args.artifact_dir, manifest,
@@ -2170,6 +2256,7 @@ def ios_engine_command(
         classification=engine_record_classification(kind, "ios", [take], rows),
         memory_evidence=compact_memory_evidence(memory_run),
         runtime_policy=runtime_policy_provenance(rows),
+        engine_rows=rows,
     )
     return write_and_record(
         args.artifact_dir, manifest,
@@ -3524,6 +3611,7 @@ def language_command(args: argparse.Namespace) -> Path:
         ),
         classification=("exploratory" if uses_forced_memory_profile(selected) else None),
         memory_evidence=compact_memory_evidence(memory_run),
+        engine_rows=selected,
     )
     language_verification: dict[str, Any] = dict(language_verification_counts)
     if asr_evidence:

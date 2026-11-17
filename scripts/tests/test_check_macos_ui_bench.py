@@ -510,6 +510,36 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
 
+    def test_the_manifest_names_the_runs_armed_runtime_overrides(self) -> None:
+        """BKL-22: the gate still passes; `benchmark_history.py record` refuses
+        the manifest by the keys it names."""
+        def canonical(layers: dict[str, list[dict]]) -> None:
+            for row in layers["engine"]:
+                row["summary"]["runEnvironment"]["runtimeDebugProvenance"] = {
+                    "internalDiagnosticsAvailable": True, "masterGateRequested": True,
+                    "activeOverrideKeys": ["QVOICE_MAC_BENCH_RUN_ID", "QWENVOICE_BENCH_FORCE_COLD"],
+                    "activeOverrideDigest": "d" * 64,
+                }
+
+        for mutate in (None, canonical):
+            result = self.run_checker(self.expected_order, mutate_layers=mutate, evidence=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("armedRuntimeOverrideKeys", self.last_manifest)
+
+        def armed(layers: dict[str, list[dict]]) -> None:
+            for index, row in enumerate(layers["engine"]):
+                keys = ["QVOICE_MAC_BENCH_RUN_ID", "QWENVOICE_BENCH_FORCE_COLD"]
+                if index == 1:
+                    keys.append("QWENVOICE_SAMPLER_FLOAT32")
+                row["summary"]["runEnvironment"]["runtimeDebugProvenance"] = {
+                    "internalDiagnosticsAvailable": True, "masterGateRequested": True,
+                    "activeOverrideKeys": keys, "activeOverrideDigest": "d" * 64,
+                }
+
+        result = self.run_checker(self.expected_order, mutate_layers=armed, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.last_manifest["armedRuntimeOverrideKeys"], ["QWENVOICE_SAMPLER_FLOAT32"])
+
     def test_an_app_row_must_name_its_engine_rows_take(self) -> None:
         """audit #74: a layer that read the current-take file late names the next take."""
         def stamp(layers: dict[str, list[dict]]) -> None:

@@ -428,6 +428,27 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(record["takes"][1]["metrics"]["loadAverage1M"], limit + 0.5)
         self.assertEqual(record["run"]["classification"], "exploratory")
 
+    def test_the_manifest_names_the_runs_armed_runtime_overrides(self) -> None:
+        """BKL-22 (iPhone): the gate still passes; the record step refuses the
+        manifest by the keys it names."""
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("armedRuntimeOverrideKeys", self.last_manifest)
+
+        def armed(rows: list[dict]) -> None:
+            for row in rows:
+                row["summary"]["runEnvironment"]["runtimeDebugProvenance"] = {
+                    "internalDiagnosticsAvailable": True, "masterGateRequested": True,
+                    "activeOverrideKeys": [
+                        "QVOICE_IOS_DEVICE_RUN_ID", "QWENVOICE_BENCH_SEED_POLICY", "QWENVOICE_MIXED_PRECISION",
+                    ],
+                    "activeOverrideDigest": "d" * 64,
+                }
+
+        result = self.run_checker(self.expected_order, mutate_engine_after_upgrade=armed, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.last_manifest["armedRuntimeOverrideKeys"], ["QWENVOICE_MIXED_PRECISION"])
+
     def test_takes_sample_under_the_seed_policy_the_lane_selected(self) -> None:
         """audit #29: seed = hash(cell) per take; generated seeds differ per take."""
         from lib import bench_seed

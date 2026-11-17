@@ -798,6 +798,11 @@ class HistoryError(RuntimeError):
     pass
 
 
+# The outer evidence manifest's list of the run's armed runtime overrides
+# (publish_benchmark_history.ARMED_RUNTIME_OVERRIDES_FIELD, BKL-22).
+ARMED_RUNTIME_OVERRIDES_FIELD = "armedRuntimeOverrideKeys"
+RUNTIME_OVERRIDE_KEY = re.compile(r"(?:QWENVOICE|QVOICE)_[A-Z0-9_]{1,96}")
+
 canonical_bytes = jsonio.canonical_bytes
 
 
@@ -4550,10 +4555,34 @@ def rebuild_index(*, check: bool = False) -> None:
             raise
 
 
+def refuse_armed_manifest(outer: Any) -> None:
+    """BKL-22: never publish a run armed with a runtime diagnostics override.
+
+    The publishers (`publish_benchmark_history.py`, `check_macos_ui_bench.py`,
+    `check_ios_ui_benchmark.py`) write the override keys of the run's engine
+    rows that change what it measures into the outer manifest; an unarmed run,
+    a manifest that predates the field and a kind without engine rows carry
+    no field."""
+    if not isinstance(outer, dict) or ARMED_RUNTIME_OVERRIDES_FIELD not in outer:
+        return
+    armed = outer[ARMED_RUNTIME_OVERRIDES_FIELD]
+    if not isinstance(armed, list) or not all(
+        isinstance(key, str) and RUNTIME_OVERRIDE_KEY.fullmatch(key) for key in armed
+    ):
+        raise HistoryError(f"benchmark-evidence.json {ARMED_RUNTIME_OVERRIDES_FIELD} is malformed")
+    if armed:
+        raise HistoryError(
+            "the run's engine rows were armed with runtime diagnostics overrides that change "
+            f"what it measures ({', '.join(armed)}); an armed run is never published (BKL-22). "
+            "Its artifacts and verdict stay local; rerun without the overrides to publish."
+        )
+
+
 def record_manifest(artifact_dir: Path) -> Path:
     manifest_path = artifact_dir / "benchmark-evidence.json"
     if not manifest_path.is_file():
         raise HistoryError(f"missing benchmark evidence manifest: {manifest_path}")
+    refuse_armed_manifest(load_json(manifest_path))
     existing_records = read_all_records()
     # Freeze publication-time enrichment beside the raw artifacts. This makes a
     # delayed/idempotent repair use the run's original hardware, toolchain,

@@ -55,7 +55,7 @@ export const Hero = () => (
           width={2080} height={1356}
           priority
           sizes="(max-width: 1199.98px) 92vw, 1040px"
-          alt="The Vocello Studio on a Mac: a Built-in Voice take ready to play, with its speaker, delivery and language chosen"
+          alt="The Vocello Studio on a Mac: a Built-in Voice take playing, with its speaker, delivery and language chosen"
         />
       </div>
       <div className="hero-phone" aria-hidden="true">

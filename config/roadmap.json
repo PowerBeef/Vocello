@@ -2702,24 +2702,6 @@
       "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. Dependency repins need a specific request and a benchmark review; the bump was placed on hold in the 3.0 cycle and must not turn into permanent version rot."
     },
     {
-      "id": "BKL-84",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The Mac images in docs/screenshots predate the one-model screens of 3.1",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "Each Mac image under docs/screenshots that shows the retired model selector or Variation setting, or any other screen 3.1 changed, is recaptured through the marketing capture lane, and the README and the website use the new files.",
-      "sourceOfTruth": [
-        "docs/screenshots",
-        "README.md"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-17",
-      "unparkWhen": "Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.",
-      "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The Mac images date from 2026-09-20; 3.1 retired the model selector (RF-59) and the Variation setting (RF-58). The lane takes over the Mac, so it runs only in a window the maintainer gives. 2026-11-17: the marketing lane (macos-xcui-marketing-20261117-143331-f334603e) recaptured the six Mac images in docs/screenshots, and the rewritten README uses them with generated art. Left for the gate: website/public/assets/screens (PNG and AVIF, full and 1040 px) still shows the 3.0 screens."
-    },
-    {
       "id": "BKL-85",
       "plan": "post-3-0-backlog-2026-10",
       "title": "Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week",

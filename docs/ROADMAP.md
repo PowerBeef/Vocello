@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 47/89 (53%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 48/89 (54%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (84)
+### Mac, remotely (83)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -72,7 +72,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-81` (parked) Split GenerationOutputAdapter and HuggingFaceDownloader by concern
 - `BKL-82` (parked) Dependabot's two grouped updates wait for the 3.1.0 promotion
 - `BKL-83` (parked) The swift-transformers 1.4.0 bump (PR #120) needs a token-ID comparison and a benchmark review
-- `BKL-84` (parked) The Mac images in docs/screenshots predate the one-model screens of 3.1
 - `BKL-85` (parked) Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week
 - `BKL-87` (parked) CI never runs the iOS control-audit tests on a push that changes only iPhone sources
 - `BKL-88` (parked) test_host_preflight's cache-only ownership test failed once under the parallel suite
@@ -804,7 +803,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-81` | parked | Split GenerationOutputAdapter and HuggingFaceDownloader by concern | — |
 | `BKL-82` | parked | Dependabot's two grouped updates wait for the 3.1.0 promotion | — |
 | `BKL-83` | parked | The swift-transformers 1.4.0 bump (PR #120) needs a token-ID comparison and a benchmark review | — |
-| `BKL-84` | parked | The Mac images in docs/screenshots predate the one-model screens of 3.1 | — |
 | `BKL-85` | parked | Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week | — |
 | `BKL-86` | parked | Attended check of the output-device change under a paused live preview | — |
 | `BKL-87` | parked | CI never runs the iOS control-audit tests on a push that changes only iPhone sources | — |
@@ -956,10 +954,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-83`** (parked) — The swift-transformers 1.4.0 bump (PR #120) needs a token-ID comparison and a benchmark review.
   gate: With the maintainer's authorization the 1.3.5 to 1.4.0 move is reviewed as the coupled pin it is (docs/reference/mlx-guide.md section 9): the tokenizer produces identical token IDs on a fixed script set across every mode and language, the engine gate bench stays inside its floor, and #120 is then merged or closed with the reason.
   unparkWhen: The maintainer authorizes the repin after the 3.1.0 promotion.
-
-- **`BKL-84`** (parked) — The Mac images in docs/screenshots predate the one-model screens of 3.1.
-  gate: Each Mac image under docs/screenshots that shows the retired model selector or Variation setting, or any other screen 3.1 changed, is recaptured through the marketing capture lane, and the README and the website use the new files.
-  unparkWhen: Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.
 
 - **`BKL-85`** (parked) — Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week.
   gate: The rise is attributed, to the app or to XCUITest's accessibility snapshots, with a sampler read as BKL-77 read the delivery menu, and the resize scenario's ceiling decision is recorded.

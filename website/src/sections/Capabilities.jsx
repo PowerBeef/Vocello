@@ -27,8 +27,8 @@ export const Capabilities = () => (
         <div className="window">
           <Screenshot
             src="/assets/screens/history.png"
-            width={2080} height={1380}
-            alt="Vocello Generation History listing past takes across Built-in Voice, Voice Design, and Voice Cloning"
+            width={2080} height={1356}
+            alt="Vocello History listing past Built-in Voice and Voice Design takes, with a filter for each mode and a search field"
           />
         </div>
       </figure>

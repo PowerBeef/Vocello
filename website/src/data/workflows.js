@@ -30,7 +30,7 @@ export const WORKFLOWS = [
       "Your brief never leaves your Mac",
     ],
     shot: "/assets/screens/voice-design.png",
-    shotHeight: 1380,
+    shotHeight: 1356,
   },
   {
     id: "clone",
@@ -45,6 +45,6 @@ export const WORKFLOWS = [
       "Only for voices you own or have permission to use",
     ],
     shot: "/assets/screens/voice-cloning.png",
-    shotHeight: 1380,
+    shotHeight: 1356,
   },
 ];

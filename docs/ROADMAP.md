@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 48/89 (54%) |
+| `release-first-3-0-2026-09` | active | release-qa | 49/89 (55%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 28/87 (32%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 41/87 (47%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (113)
+### Mac, remotely (98)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -58,31 +58,17 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-09` (parked) Privacy and security hygiene (also: iPhone)
 - `BKL-18` (parked) iPhone Saved Voices Delete is offered while a Clone take primes its reference
 - `BKL-19` (parked) macOS UI smoke raises a Speech Recognition prompt after every lane rebuild
-- `BKL-20` (parked) A rebuilt prepared overlay trusts model weights that changed in place
-- `BKL-21` (parked) The startup-reliability receipt validator rejects every real receipt's model signature
-- `BKL-22` (parked) Benchmark history publishes runs armed with a runtime diagnostics override
 - `BKL-23` (parked) The Mac language bench fails production on a single recognizer's language call
-- `BKL-24` (parked) The iOS control audit does not count trailing-closure buttons
-- `BKL-25` (parked) The routed check does not select the iOS control-audit tests for an iOS source edit
-- `BKL-26` (parked) The UI-finalization signal tests fail under the parallel full Python suite
 - `BKL-28` (parked) The Mac Voice Design save shows no "Voice added" alert after Keep voice
 - `BKL-32` (parked) Give each shared iOS folder a single group in the generated project
 - `BKL-33` (parked) An unwritable output folder is reported as an internal engine error on the Mac
-- `BKL-37` (parked) Mac History shows the Built-in speaker in lowercase
-- `BKL-46` (parked) UI result retention never prunes three lanes' runs
-- `BKL-47` (parked) The Mac benchmark's script paste skips the pasteboard access check
-- `BKL-48` (parked) Steps recorded without running carry no start time in the lane ledger
 - `BKL-50` (parked) The CLI cancellation package test can time out on the Linux runner
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
 - `BKL-58` (parked) A dependency-graph POST is part of CI required
-- `BKL-60` (parked) Studio's install request is dropped while the model's status is still checking
 - `BKL-61` (parked) pip installs on the signing runners have no hashes
 - `BKL-62` (parked) The GitHub connector's ask rules match no tool in use
 - `BKL-63` (parked) Guard gaps for issue creation, local history rewrites, other remotes and staging spellings
 - `BKL-64` (parked) Private load_json copies beside scripts/lib/jsonio.py
-- `BKL-66` (parked) SECURITY.md has no supported row for the App Store iPhone app
-- `BKL-70` (parked) A diagnostics launch forwards the host's build-path variables into the app on the phone
-- `BKL-73` (parked) A cancelled explicit prewarm unloads the model
 - `BKL-74` (parked) The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework
 - `BKL-76` (parked) Notes from the 3.1 release review of the command line, the MCP server and the player
 - `BKL-77` (parked) The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots
@@ -154,7 +140,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: iPhone)
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: iPhone)
 - `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: iPhone)
-- `RF-64` (planned) An in-app way to contact the developer and report a problem on the iPhone (also: iPhone)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
 ### At the keyboard (16)
@@ -207,6 +192,7 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `BKL-45` (parked) Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild
 - `BKL-49` (parked) The Mirroring capture helper finds no window on a non-English Mac
 - `BKL-59` (parked) Three small iPhone UI defects from the November 9 audit
+- `BKL-60` (parked) Studio's install request is dropped while the model's status is still checking
 - `BKL-68` (parked) The Cancel download dialog may show no Keep Download button on the iPhone
 - `BKL-69` (parked) The iPhone frame-health lane's player scenarios open whatever take is newest in History
 - `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: Mac, remotely)
@@ -240,7 +226,6 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: Mac, remotely)
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: Mac, remotely)
 - `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: Mac, remotely)
-- `RF-64` (planned) An in-app way to contact the developer and report a problem on the iPhone (also: Mac, remotely)
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
@@ -269,7 +254,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-12` | planned | Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.1.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | planned | Submit 3.1.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-64`, `RF-65`, `RF-66` |
+| `RF-16` | planned | Submit 3.1.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-65`, `RF-66` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
@@ -293,7 +278,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-61` | planned | Ship Vocello and the vocello CLI 3.1 on the Mac | — |
 | `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.1.0 | — |
 | `RF-63` | planned | Fit the 3.1 App Review notes into what is left of the 4,000 characters | — |
-| `RF-64` | planned | An in-app way to contact the developer and report a problem on the iPhone | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 
@@ -416,10 +400,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: In App Store Connect the age-rating questionnaire answers Apple's new Shared Location and Dating and Relationships descriptors (no for both, which is what the app does) before submission and well before the January 12, 2027 deadline, the standing rating decision is unchanged, and the read-back is recorded with ASR-11's live audit.
 
 - **`RF-63`** (planned) — Fit the 3.1 App Review notes into what is left of the 4,000 characters.
-  gate: The review notes in docs/reference/app-store-listing.md describe the 3.1 candidate (one model per mode, its exact size), say that the diagnostics are dormant in the shipped build and keep the iPhone 15 Pro preview-pause paragraph, stay at or under 4,000 characters, and are read back from App Store Connect byte-identical.
-
-- **`RF-64`** (planned) — An in-app way to contact the developer and report a problem on the iPhone.
-  gate: iPhone Settings has a Contact and Report a problem row that opens the support contact the listing publishes (config/support-contact.json), carries no prompt, transcript, audio or path, is localized, has stable identifiers registered in config/ios-control-audit.json, is named in the review notes, and passes the generic iPhone compile and its logic tests here; the phone confirms it in the next window.
+  gate: The review notes in docs/reference/app-store-listing.md describe the 3.1 candidate (one model per mode, its exact size), say that the diagnostics are dormant in the shipped build, keep the iPhone 15 Pro preview-pause paragraph, and name Settings > Help & Support (iosSettings_supportRow, which opens the support page and its contact) as the in-app contact and report path Guideline 1.2 asks of AI content creation apps; they stay at or under 4,000 characters and are read back from App Store Connect byte-identical.
 
 - **`RF-65`** (planned) — Measure the shipped hybrid on an iPhone 15 Pro.
   gate: On an iPhone 15 Pro, with the shipped hybrid and a memory-qualified run: real-time factor rested and heat-soaked, a long-form run's heat-pause behavior, and peak memory against the device's budget; the result is recorded whichever way it falls, and a poor one becomes a listing or review-notes statement decided before submission.
@@ -810,13 +791,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
 | `BKL-18` | parked | iPhone Saved Voices Delete is offered while a Clone take primes its reference | — |
 | `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
-| `BKL-20` | parked | A rebuilt prepared overlay trusts model weights that changed in place | — |
-| `BKL-21` | parked | The startup-reliability receipt validator rejects every real receipt's model signature | — |
-| `BKL-22` | parked | Benchmark history publishes runs armed with a runtime diagnostics override | — |
 | `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
-| `BKL-24` | parked | The iOS control audit does not count trailing-closure buttons | — |
-| `BKL-25` | parked | The routed check does not select the iOS control-audit tests for an iOS source edit | — |
-| `BKL-26` | parked | The UI-finalization signal tests fail under the parallel full Python suite | — |
 | `BKL-27` | parked | Import the iOS signing identity non-extractable in the release workflow | — |
 | `BKL-28` | parked | The Mac Voice Design save shows no "Voice added" alert after Keep voice | — |
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
@@ -824,16 +799,12 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-33` | parked | An unwritable output folder is reported as an internal engine error on the Mac | — |
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
 | `BKL-36` | parked | A short drag that starts on an iPhone Settings toggle row can flip the switch | — |
-| `BKL-37` | parked | Mac History shows the Built-in speaker in lowercase | — |
 | `BKL-38` | parked | iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description | — |
 | `BKL-39` | parked | iPhone Voice Models shows a download that waits for Wi-Fi as Downloading, already at 33% | — |
 | `BKL-41` | parked | Release Vocello for iPhone in the EU with trader status | — |
 | `BKL-42` | parked | The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard | — |
 | `BKL-43` | parked | The iPhone crash-baseline pull fails when a download journal is pruned mid-copy | — |
 | `BKL-45` | parked | Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild | — |
-| `BKL-46` | parked | UI result retention never prunes three lanes' runs | — |
-| `BKL-47` | parked | The Mac benchmark's script paste skips the pasteboard access check | — |
-| `BKL-48` | parked | Steps recorded without running carry no start time in the lane ledger | — |
 | `BKL-49` | parked | The Mirroring capture helper finds no window on a non-English Mac | — |
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
@@ -846,11 +817,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-63` | parked | Guard gaps for issue creation, local history rewrites, other remotes and staging spellings | — |
 | `BKL-64` | parked | Private load_json copies beside scripts/lib/jsonio.py | — |
 | `BKL-65` | parked | The App Store privacy and support URLs sit on a vercel.app subdomain | — |
-| `BKL-66` | parked | SECURITY.md has no supported row for the App Store iPhone app | — |
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
-| `BKL-70` | parked | A diagnostics launch forwards the host's build-path variables into the app on the phone | — |
-| `BKL-73` | parked | A cancelled explicit prewarm unloads the model | — |
 | `BKL-74` | parked | The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework | — |
 | `BKL-76` | parked | Notes from the 3.1 release review of the command line, the MCP server and the player | — |
 | `BKL-77` | parked | The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots | — |
@@ -887,32 +855,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: A full macOS smoke run on a freshly rebuilt lane app finishes unattended: no TCC prompt appears, or the lane detects one before it runs and fails fast with a named cause.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
-- **`BKL-20`** (parked) — A rebuilt prepared overlay trusts model weights that changed in place.
-  gate: When the weights change and the overlay is rebuilt, the checkpoint is not trusted until a load succeeds on the new weights, as on the valid-overlay path, and testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt passes without its XCTExpectFailure blocks.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-21`** (parked) — The startup-reliability receipt validator rejects every real receipt's model signature.
-  gate: ios_startup_reliability.validate_receipt accepts a real v3 receipt's modelRuntimeIdentity.runtimeProfileSignature (it contains | and , and runs to about 250 characters), with a test over a real-shaped signature, and every lane that calls it is re-checked.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-22`** (parked) — Benchmark history publishes runs armed with a runtime diagnostics override.
-  gate: benchmark_history.py record (or the publisher before it) refuses, or marks exploratory, a run whose engine rows name runtimeDebugProvenance.activeOverrideKeys, with a test over an armed row, and every lane that publishes is re-checked.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-23`** (parked) — The Mac language bench fails production on a single recognizer's language call.
   gate: A take both families transcribe accurately is not failed by one family's language identification alone (or the cell's expectation says why it should be), with a test over that case, and a production Mac language bench passes.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-24`** (parked) — The iOS control audit does not count trailing-closure buttons.
-  gate: scripts/ios_control_audit.py counts a `Button { … } label:` control as it counts `Button(…)`, the contract's interactiveOccurrenceCount values are re-baselined in the same change, and a test covers both spellings.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-25`** (parked) — The routed check does not select the iOS control-audit tests for an iOS source edit.
-  gate: scripts/dev.sh check selects scripts/tests/test_ios_control_audit.py when a Sources/iOS or Sources/SharedSupport/Views Swift file changes, with a selection test pinning it.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-26`** (parked) — The UI-finalization signal tests fail under the parallel full Python suite.
-  gate: scripts/tests/test_ui_failure_finalization.py passes reliably inside the full parallel suite (check_project_inputs.sh, pytest -n auto), shown by repeated full runs, without weakening what the signal cases prove.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-27`** (parked) — Import the iOS signing identity non-extractable in the release workflow.
@@ -943,10 +887,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: A drag that starts on a Settings toggle row's label never changes the switch, at any scroll position, while a tap on the row still does.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
-- **`BKL-37`** (parked) — Mac History shows the Built-in speaker in lowercase.
-  gate: Every History row names its Built-in Voice speaker as Studio does (Aiden, not aiden), on the Mac and the iPhone.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-38`** (parked) — iPhone Voice Design gives no visible reason when Generate is dimmed for a missing voice description.
   gate: When Design's Generate is dimmed because the voice description is empty, Studio shows why: the empty voice brief chip reads as an action, or a visible hint names the missing description, in all ten interface languages, with the other modes unchanged.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
@@ -969,18 +909,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-45`** (parked) — Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild.
   gate: A routed check's unsigned generic compile of the iOS UI bundles (scripts/build_ui_test_bundles.sh) no longer overwrites the products an iPhone lane's build skip relies on, so a lane after a check that touched test code skips its build when nothing it ships changed.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-46`** (parked) — UI result retention never prunes three lanes' runs.
-  gate: config/build-output-policy.json's childRetention.uiResults.lanes covers delivery-cohort, enroll-clone-fixture and saved-voice-lifecycle (candidate-smoke stays pinned on purpose), and a passing focused smoke scenario no longer compacts the previous full-smoke pass.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-47`** (parked) — The Mac benchmark's script paste skips the pasteboard access check.
-  gate: VocelloMacBenchmarkUITests' pasteScript checks the general pasteboard's accessBehavior as the shared paste helper does before reading it.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-48`** (parked) — Steps recorded without running carry no start time in the lane ledger.
-  gate: Steps recorded with required_step_record (a skipped ui-build, result-retention) carry startedAt like the steps that run.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`BKL-49`** (parked) — The Mirroring capture helper finds no window on a non-English Mac.
@@ -1031,24 +959,12 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: The listing's privacy, support and marketing URLs are on a domain the maintainer controls, and the app's links match.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
-- **`BKL-66`** (parked) — SECURITY.md has no supported row for the App Store iPhone app.
-  gate: SECURITY.md's supported-versions table covers the iPhone app distributed through the App Store and TestFlight.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-68`** (parked) — The Cancel download dialog may show no Keep Download button on the iPhone.
   gate: Cancelling a model download offers both Cancel Download and Keep Download on the iPhone, seen in a device screenshot.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-69`** (parked) — The iPhone frame-health lane's player scenarios open whatever take is newest in History.
   gate: The sheet and scrub scenarios of ui_test.sh ios perf open a seeded row, so their result no longer depends on what ran before; and the player's frame health with a two-minute take open is measured on purpose.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-70`** (parked) — A diagnostics launch forwards the host's build-path variables into the app on the phone.
-  gate: A diagnostics launch forwards only the tuning and run-identity variables a lane sets, not the QVOICE_* build-output paths and the worker session the host exports.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-73`** (parked) — A cancelled explicit prewarm unloads the model.
-  gate: A prewarm that ends in CancellationError leaves a loaded model loaded (and its clone state intact), pinned by a NativeEngineRuntime test; other prewarm failures still unload.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-74`** (parked) — The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework.

@@ -6167,6 +6167,239 @@
       "evidence": [
         "run:43925421015"
       ]
+    },
+    {
+      "id": "RF-64",
+      "plan": "release-first-3-0-2026-09",
+      "title": "An in-app way to contact the developer and report a problem on the iPhone",
+      "status": "superseded",
+      "blockedBy": [],
+      "gate": "iPhone Settings has a Contact and Report a problem row that opens the support contact the listing publishes (config/support-contact.json), carries no prompt, transcript, audio or path, is localized, has stable identifiers registered in config/ios-control-audit.json, is named in the review notes, and passes the generic iPhone compile and its logic tests here; the phone confirms it in the next window.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSSettingsViews.swift",
+        "config/ios-control-audit.json",
+        "config/support-contact.json"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. Guideline 1.2 (strengthened 2026-10-16) names AI content creation apps and expects a reporting or contact path in the app; Settings has none today (the support URL lives only in the listing). Code and tests need only the Mac; the on-device check needs the phone. Superseded 2026-11-16 on review: the premise was wrong. iPhone Settings already has a localized Help & Support row (iosSettings_supportRow, Sources/iOS/Settings/SettingsScreen.swift), registered in config/ios-control-audit.json, which opens the support page with the contact; what is left is naming it in the review notes, now part of RF-63's gate.",
+      "supersededBy": "RF-63"
+    },
+    {
+      "id": "BKL-73",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A cancelled explicit prewarm unloads the model",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A prewarm that ends in CancellationError leaves a loaded model loaded (and its clone state intact), pinned by a NativeEngineRuntime test; other prewarm failures still unload.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-12, seen while reading the prewarm path for RF-52's A-26: the explicit prewarm's catch-all unloads the model, clears clone state and Qwen3 caches on any error, CancellationError included, so a superseded warm costs the next take a full reload. Slower, not wrong: no crash, hang or data loss. Not investigated. Done 2026-11-16: both warm catches keep the model on a cancellation unless MLX recorded a runtime failure while the warm unwound (fb1cca22); B-02's strict expected-failure wrapper is gone and the cancelled-after-failure case is pinned.",
+      "evidence": [
+        "commit:fb1cca22"
+      ]
+    },
+    {
+      "id": "BKL-37",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Mac History shows the Built-in speaker in lowercase",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Every History row names its Built-in Voice speaker as Studio does (Aiden, not aiden), on the Mac and the iPhone.",
+      "sourceOfTruth": [
+        "Sources/Views/History/MacHistoryItemCard.swift"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Seen 2026-10-25 in the visual review of macOS smoke run 20261025-221609-c2191179 (screenshot 043-mac-smoke-history-completed): the History metadata line reads \"aiden · Built-in Voice\" while Studio's chip and player read \"Aiden\". iPhone not checked. Not investigated (focus rules). Done 2026-11-16: Generation.voiceDisplayName names a Built-in Voice speaker from the registry (capitalized ID as Studio's fallback) in Mac History, the iPhone History row and its player sheet (9fc2a97e); unit-tested, not yet seen in a lane screenshot.",
+      "evidence": [
+        "commit:9fc2a97e"
+      ]
+    },
+    {
+      "id": "BKL-20",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A rebuilt prepared overlay trusts model weights that changed in place",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "When the weights change and the overlay is rebuilt, the checkpoint is not trusted until a load succeeds on the new weights, as on the valid-overlay path, and testChangedWeightsAreNotTrustedWhenTheOverlayIsRebuilt passes without its XCTExpectFailure blocks.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift",
+        "Tests/VocelloCoreTests/MLXModelLoadCoordinatorSeamTests.swift"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-19 by the DW-03 seam tests (94dc16cd, 7fe58fa2). With the overlay marker missing or stale, readPersistedSourceQwenPreparedCheckpointTrust re-hashes the changed weights and rewrites the source trust file to the new digest. The rebuild then marks the checkpoint trusted before the loader runs, so weight verification relaxes to noUnusedKeys, and that trust survives a failed load. With a valid overlay, the same change is distrusted. Installed weights are SHA-256-verified at download, so this needs weights that change in place, then an overlay invalidation such as a descriptor bump or an iOS cache purge. Parked without investigation under the focus lock: hardening, not a release blocker. Done 2026-11-16: changed bytes get no trust until a load succeeds on them, a touch that keeps the bytes keeps it, and the seam test runs without its expected-failure blocks (4e9d2ca4).",
+      "evidence": [
+        "commit:4e9d2ca4"
+      ]
+    },
+    {
+      "id": "BKL-47",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac benchmark's script paste skips the pasteboard access check",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "VocelloMacBenchmarkUITests' pasteScript checks the general pasteboard's accessBehavior as the shared paste helper does before reading it.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-10-28 from item 25 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only. Done 2026-11-16: pasteScript uses the shared pasteIntoEditor helper (9fa997a3).",
+      "evidence": [
+        "commit:9fa997a3"
+      ]
+    },
+    {
+      "id": "BKL-66",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "SECURITY.md has no supported row for the App Store iPhone app",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "SECURITY.md's supported-versions table covers the iPhone app distributed through the App Store and TestFlight.",
+      "sourceOfTruth": [
+        "SECURITY.md"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, D-1. Done 2026-11-16 (76d631b4).",
+      "evidence": [
+        "commit:76d631b4"
+      ]
+    },
+    {
+      "id": "BKL-21",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The startup-reliability receipt validator rejects every real receipt's model signature",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "ios_startup_reliability.validate_receipt accepts a real v3 receipt's modelRuntimeIdentity.runtimeProfileSignature (it contains | and , and runs to about 250 characters), with a test over a real-shaped signature, and every lane that calls it is re-checked.",
+      "sourceOfTruth": [
+        "scripts/ios_startup_reliability.py",
+        "scripts/auto_language_check.py"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-20 while building the macos auto-language lane: validate_receipt allows only [A-Za-z0-9._:-] up to 256 characters for runtimeProfileSignature, so all 22 real Mac receipts in the debug store failed it. scripts/auto_language_check.py checks that one field with its own pattern and passes the rest to validate_receipt. Other lanes that call validate_receipt on receipts carrying modelRuntimeIdentity likely share the gap. Parked without investigation under the focus lock: test tooling, not a release blocker. Done 2026-11-16 by a worktree agent, integrated and checked on main: runtimeProfileSignature has its own bounded pattern ([A-Za-z0-9._:|,-], up to 1,024), tested over the three real signature shapes; auto_language_check.py's duplicate special case is gone (9732cde4).",
+      "evidence": [
+        "commit:9732cde4"
+      ]
+    },
+    {
+      "id": "BKL-22",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Benchmark history publishes runs armed with a runtime diagnostics override",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "benchmark_history.py record (or the publisher before it) refuses, or marks exploratory, a run whose engine rows name runtimeDebugProvenance.activeOverrideKeys, with a test over an armed row, and every lane that publishes is re-checked.",
+      "sourceOfTruth": [
+        "scripts/benchmark_history.py",
+        "scripts/publish_benchmark_history.py"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-20 running RF-20's Mac language bench with QWENVOICE_FULL_TEXT_CONDITIONING=on: nothing in the publishers reads activeOverrideKeys, so a passing armed run would have published as a production record. That run failed, so nothing was published. Parked without investigation under the focus lock: evidence tooling, not a release blocker. Done 2026-11-16 (c12afdfb): a key is armed when its runtime-debug-knobs group needs the master gate and no lane sets it itself (LANE_OWNED_RUNTIME_OVERRIDES); the publishers write armedRuntimeOverrideKeys and benchmark_history.py record refuses such a run naming the keys. Refusing any non-empty activeOverrideKeys was impossible: every lane runs with QWENVOICE_DEBUG=1.",
+      "evidence": [
+        "commit:c12afdfb"
+      ]
+    },
+    {
+      "id": "BKL-24",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iOS control audit does not count trailing-closure buttons",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "scripts/ios_control_audit.py counts a `Button { … } label:` control as it counts `Button(…)`, the contract's interactiveOccurrenceCount values are re-baselined in the same change, and a test covers both spellings.",
+      "sourceOfTruth": [
+        "scripts/ios_control_audit.py",
+        "config/ios-control-audit.json"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-20 in RF-22: INTERACTIVE_RE matches `Button(` and `Link(` but not `Button {`, so the export sheet's close, restore and Try Again buttons are not counted (the row's count fell from 5 to 1 with the same controls). Parked without investigation under the focus lock: the identifiers are still bound by the control families. Done 2026-11-16 (ddc6f02a): Button { and NavigationLink { count; the contract re-baselined from 114 occurrences over 24 sources to 175 over 29.",
+      "evidence": [
+        "commit:ddc6f02a"
+      ]
+    },
+    {
+      "id": "BKL-25",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The routed check does not select the iOS control-audit tests for an iOS source edit",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "scripts/dev.sh check selects scripts/tests/test_ios_control_audit.py when a Sources/iOS or Sources/SharedSupport/Views Swift file changes, with a selection test pinning it.",
+      "sourceOfTruth": [
+        "scripts/development_workflow.py",
+        "scripts/tests/test_development_workflow.py"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-20 in RF-22: the routed check passed on the export sheet redesign, and only the full gate (scripts/dev.sh ci, RF-09's freeze checks) caught the drifted interactive count. Parked without investigation under the focus lock. Done 2026-11-16 (7fe4e468). CI has the same gap (the test is research-marked, so an iOS-only push never runs it); not parked separately yet.",
+      "evidence": [
+        "commit:7fe4e468"
+      ]
+    },
+    {
+      "id": "BKL-26",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The UI-finalization signal tests fail under the parallel full Python suite",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "scripts/tests/test_ui_failure_finalization.py passes reliably inside the full parallel suite (check_project_inputs.sh, pytest -n auto), shown by repeated full runs, without weakening what the signal cases prove.",
+      "sourceOfTruth": [
+        "scripts/tests/test_ui_failure_finalization.py",
+        "scripts/lib/ui_finalization.sh"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Found 2026-10-20 in RF-09's freeze checks on 029427c9: three SIGINT cases failed in the full parallel run (a 10 s subprocess deadline, exit 0 or 1 for 130, and record_lane_ledger not found on one signal path), then passed 15/15 three times alone and in the next full run. Parked without investigation under the focus lock. Done 2026-11-16: the suite had started with SIGINT ignored (a background job), which bash cannot trap; every shell under test now starts with SIGINT at its default, and the hang guards share one 60 s bound (381dc4ca, e95d99dc). Three full parallel runs by the agent and one on main passed these cases.",
+      "evidence": [
+        "commit:381dc4ca",
+        "commit:e95d99dc"
+      ]
+    },
+    {
+      "id": "BKL-70",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A diagnostics launch forwards the host's build-path variables into the app on the phone",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A diagnostics launch forwards only the tuning and run-identity variables a lane sets, not the QVOICE_* build-output paths and the worker session the host exports.",
+      "sourceOfTruth": [
+        "scripts/ios_device.sh"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-11 from the phone window: device_diagnostics_env_json forwards every QVOICE_* and QWENVOICE_* variable, which includes the absolute build-output paths that scripts/lib/build_paths.sh exports and QVOICE_WORKER_SESSION. They reach only the development app's environment on the maintainer's own phone; no file or record was seen to carry them. Not investigated. Done 2026-11-16 (eb1ba3ed): a diagnostics launch forwards only keys config/runtime-debug-knobs.json registers, plus the three MLX keys; the test sources the real script.",
+      "evidence": [
+        "commit:eb1ba3ed"
+      ]
+    },
+    {
+      "id": "BKL-48",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Steps recorded without running carry no start time in the lane ledger",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Steps recorded with required_step_record (a skipped ui-build, result-retention) carry startedAt like the steps that run.",
+      "sourceOfTruth": [
+        "scripts/lib/required_steps.sh"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-10-28 from item 26 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only. Done 2026-11-16 (10e1dbff).",
+      "evidence": [
+        "commit:10e1dbff"
+      ]
+    },
+    {
+      "id": "BKL-46",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "UI result retention never prunes three lanes' runs",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "config/build-output-policy.json's childRetention.uiResults.lanes covers delivery-cohort, enroll-clone-fixture and saved-voice-lifecycle (candidate-smoke stays pinned on purpose), and a passing focused smoke scenario no longer compacts the previous full-smoke pass.",
+      "sourceOfTruth": [
+        "config/build-output-policy.json",
+        "scripts/build_cleanup.py"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-10-28 from item 23 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only. Done 2026-11-16 (029ad767): the three lanes are covered, candidate-smoke stays pinned, and retention groups by platform, lane and scenario.",
+      "evidence": [
+        "commit:029ad767"
+      ]
     }
   ]
 }

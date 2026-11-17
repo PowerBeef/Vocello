@@ -41,8 +41,8 @@ UNSAFE_GLOBALS = {"--git-dir", "--work-tree", "--namespace", "--super-prefix"}
 # Config keys that change which command runs, what a push publishes or which hooks run, or make a
 # later `git pull` rebase local commits.
 UNSAFE_CONFIG = re.compile(
-    r"^(alias\.|remote\..*\.(push|mirror|url|pushurl)|push\.|branch\..*\.(merge|rebase)|core\.hookspath|url\.|"
-    r"include|pull\.rebase)",
+    r"^(alias\.|remote\..*\.(push|mirror|url|pushurl)|remote\.pushdefault|push\.|"
+    r"branch\..*\.(merge|rebase|remote|pushremote)|core\.hookspath|url\.|include|pull\.rebase)",
     re.I,
 )
 # A command word that is a variable (`$G`, `"${GIT}"`, `${GIT:-git}`): git when the command assigned it
@@ -50,7 +50,11 @@ UNSAFE_CONFIG = re.compile(
 VARIABLE_WORD = re.compile(r"^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:[:]?[-=?+][^}]*)?\}|([A-Za-z_][A-Za-z0-9_]*))$")
 JUDGED_SUBCOMMANDS = {"add", "stage", "stash", "commit", "push", "send-pack", "subtree", "config", "checkout",
                       "switch", "branch", "fetch", "pull", "worktree", "tag", "update-ref", "symbolic-ref", "reset",
-                      "rebase", "filter-branch", "filter-repo"}
+                      "rebase", "filter-branch", "filter-repo", "remote"}
+# `git-<subcommand>` binaries run that subcommand (`$(git --exec-path)/git-push`, `git-filter-repo`).
+DASHED_GIT = re.compile(r"^git-([a-z][a-z-]*)$")
+# `git remote` verbs that change where a remote points, or which remote a name means (BKL-63).
+REMOTE_RETARGETS = {"add", "rename", "remove", "rm", "set-url"}
 # The backtick substitution stand-in: a computed word, never a literal name.
 SUBSTITUTED = "$SUBST"
 REDIRECT = re.compile(r"^[0-9]*[<>]")
@@ -198,6 +202,13 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             at_start, env_unsafe, env_config = True, exported_unsafe, exported_config
             index += 1
             continue
+        # A git environment assignment anywhere before git in the same simple command counts, not
+        # only at its start: `timeout 60 env GIT_DIR=x git push`, `env -i GIT_CONFIG_COUNT=1 ... git`
+        # (BKL-63). It fails closed: a word that only looks like one is judged as one.
+        if not at_start and GIT_ENV.match(token):
+            env_unsafe = env_unsafe or token.split("=", 1)[0]
+        if not at_start and GIT_CONFIG_ENV.match(token):
+            env_config = env_config or token.split("=", 1)[0]
         if token == "(":
             stack.append(directory)
             at_start = True
@@ -263,6 +274,19 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 cursor += 1
             found.extend(git_invocations(" ".join(words), directory or cwd, depth + 1))
         following = tokens[index + 1] if index + 1 < len(tokens) else ""
+        dashed = DASHED_GIT.match(name)
+        if dashed:
+            # `git-push origin x` is `git push origin x`: no global options come between.
+            cursor = index + 1
+            args: list[str] = []
+            while cursor < len(tokens) and tokens[cursor] not in SEPARATORS | {"(", ")"}:
+                args.append(tokens[cursor])
+                cursor += 1
+            found.append(GitInvocation(directory, dashed.group(1), _without_redirections(args), [],
+                                       env_unsafe, env_config))
+            at_start = False
+            index = cursor
+            continue
         if not (_is_git(token) or (at_start and _variable_git(token, following, git_variables))):
             at_start = False
             index += 1
@@ -432,7 +456,7 @@ def _history_violation(invocation: GitInvocation) -> str:
             return f"`git reset ... {target}` moves the branch to another commit"
     elif sub == "pull":
         for argument in args:
-            if argument == "-r" or (_long(argument, "--rebase") == "--rebase"
+            if _short_has(argument, "r") or (_long(argument, "--rebase") == "--rebase"
                                     and argument.partition("=")[2].lower() not in ("false", "no", "0")):
                 return "`git pull --rebase` rewrites local commits onto the remote's"
     return ""
@@ -463,7 +487,37 @@ def _config_violation(args: list[str]) -> str:
     return ""
 
 
+def _upstream_violation(args: list[str]) -> str:
+    """`git branch -u <upstream>` / `--set-upstream-to`: an upstream on another remote makes a later
+    bare `git push` or `git pull` use that remote (BKL-63); origin's branches are fine."""
+    for index, argument in enumerate(args):
+        value = ""
+        if argument == "-u" or _long(argument, "--set-upstream-to") == "--set-upstream-to":
+            value = (argument.split("=", 1)[1] if "=" in argument
+                     else (args[index + 1] if index + 1 < len(args) else ""))
+        elif argument.startswith("-u") and len(argument) > 2 and not argument.startswith("--"):
+            value = argument[2:]
+        else:
+            continue
+        if not value.startswith("origin/"):
+            spelled = argument if ("=" in argument or argument != "-u") else f"{argument} {value}"
+            return f"`git branch {spelled}` sets an upstream on a remote other than origin"
+    return ""
+
+
+def _remote_violation(args: list[str]) -> str:
+    """`git remote add`, `set-url`, `rename`, `remove`: each changes where a remote name points, so
+    an approved `git push origin main` could publish elsewhere (BKL-63). Listing and `get-url` read."""
+    verbs = [a for a in args if not a.startswith("-")]
+    if verbs and verbs[0] in REMOTE_RETARGETS:
+        return f"`git remote {verbs[0]}` changes where a remote points; only origin is published"
+    return ""
+
+
 def _branch_violation(args: list[str]) -> str:
+    upstream = _upstream_violation(args)
+    if upstream:
+        return upstream
     deleting = any(a in ("-d", "-D") or _long(a, "--delete") for a in args)
     listing = any(a == "-l" or _long(a, "--list") for a in args)
     for index, argument in enumerate(args):
@@ -628,6 +682,10 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
     reason = _history_violation(invocation)
     if reason:
         return "history", reason
+    if sub in ("push", "send-pack") and invocation.unsafe:
+        # `GIT_DIR`, `--git-dir` or `--work-tree` (at a command's start or after a wrapper such as
+        # `timeout 60 env`): the push publishes another repository's refs (BKL-63).
+        return "push", f"`{invocation.unsafe}` points the push at another repository"
     if sub in ("push", "send-pack") or (sub == "subtree" and "push" in args):
         reason = _push_violation(args if sub == "push" else ["origin", *args])
         if sub == "push" and any("$" in a or "`" in a for a in args if not a.startswith("-")):
@@ -640,6 +698,10 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
         reason = _config_violation(args)
         if reason:
             return "config", reason
+    elif sub == "remote":
+        reason = _remote_violation(args)
+        if reason:
+            return "push", reason
     elif sub == "checkout" and any(a in ("-b", "-B", "-t") or _short_has(a, "bBt")
                                    or _long(a, "--orphan", "--track") for a in args if a != "--"):
         return "branch", "`git checkout -b/-B/--orphan/--track` creates a hand-made branch"

@@ -1018,6 +1018,20 @@ class PolicyGuardTests(unittest.TestCase):
             f"$GIT {push} -f origin main", f"${{GIT:-git}} {push} origin topic", f"$X {push} origin topic",
             f"git `echo {push}` origin topic", "git config pull.rebase true", "git -c pull.rebase=true pull",
             "git config branch.main.rebase true",
+            # BKL-63 review: retargeting a remote, push config, upstreams on another remote, git
+            # environment after a wrapper word, dashed git binaries and a clustered pull -r
+            "git remote set-url origin https://example.invalid/r.git",
+            "git remote set-url --push origin https://example.invalid/r.git",
+            "git remote add fork https://example.invalid/r.git", "git remote rename origin old",
+            "git remote rm origin", "git config remote.pushDefault fork",
+            "git config branch.main.pushRemote fork", "git config branch.main.remote fork",
+            "git branch -u fork/main", "git branch --set-upstream-to=fork/main",
+            f"timeout 60 env GIT_DIR=/other/.git git {push} origin main",
+            f"GIT_DIR=/other/.git git {push} origin main", f"git --git-dir=/other/.git {push} origin main",
+            "env -i GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.url "
+            f"GIT_CONFIG_VALUE_0=https://example.invalid git {push} origin main",
+            f'"$(git --exec-path)/git-{push}" --force origin main', "/opt/homebrew/bin/git-filter-repo --force",
+            "git-rebase -i HEAD~3", "git pull -qr", "git pull -vr",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -1029,6 +1043,9 @@ class PolicyGuardTests(unittest.TestCase):
                         f"git {push} origin main && git status", "git -C website status",
                         "git fetch origin", "git fetch origin main:refs/remotes/origin/main", "git tag -l",
                         "git config --get alias.x", "git branch --sort=refname", f"grep -rn {push} scripts",
+                        "git remote -v", "git remote get-url origin", "git remote show origin",
+                        "git branch -u origin/main", "git config --get remote.origin.url", "git pull --ff-only",
+                        "timeout 60 git status",
                         f"git commit -F - <<'EOF'\nmention git {push} origin topic\nEOF"):
             with self.subTest(command=command):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)

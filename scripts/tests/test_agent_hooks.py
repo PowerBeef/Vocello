@@ -1032,6 +1032,14 @@ class PolicyGuardTests(unittest.TestCase):
             f"GIT_CONFIG_VALUE_0=https://example.invalid git {push} origin main",
             f'"$(git --exec-path)/git-{push}" --force origin main', "/opt/homebrew/bin/git-filter-repo --force",
             "git-rebase -i HEAD~3", "git pull -qr", "git pull -vr",
+            # the re-review: a git variable exported after a plain assignment, env -S, and section
+            # renames that drop origin
+            f"GIT_DIR=/tmp/o/.git; export GIT_DIR; git {push} origin main",
+            f"declare -x GIT_DIR=/tmp/o/.git; git {push} origin main",
+            f"set -a; GIT_DIR=/tmp/o/.git; git {push} origin main",
+            f'env -S "git {push} --force origin main"', f"env --split-string='git {push} --force origin main'",
+            f"xargs git-{push} --force origin main",
+            "git config --rename-section remote.origin remote.old", "git config --remove-section remote.origin",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -1045,7 +1053,9 @@ class PolicyGuardTests(unittest.TestCase):
                         "git config --get alias.x", "git branch --sort=refname", f"grep -rn {push} scripts",
                         "git remote -v", "git remote get-url origin", "git remote show origin",
                         "git branch -u origin/main", "git config --get remote.origin.url", "git pull --ff-only",
-                        "timeout 60 git status",
+                        "timeout 60 git status", f'grep -rn "git-{push}" .github', "grep -rn git-rebase docs",
+                        "rg git-filter-branch", "which git-filter-repo", f"man git-{push}",
+                        "env FOO=1 scripts/dev.sh status", "git config --list",
                         f"git commit -F - <<'EOF'\nmention git {push} origin topic\nEOF"):
             with self.subTest(command=command):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)

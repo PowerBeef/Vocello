@@ -205,10 +205,17 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
         # A git environment assignment anywhere before git in the same simple command counts, not
         # only at its start: `timeout 60 env GIT_DIR=x git push`, `env -i GIT_CONFIG_COUNT=1 ... git`
         # (BKL-63). It fails closed: a word that only looks like one is judged as one.
-        if not at_start and GIT_ENV.match(token):
-            env_unsafe = env_unsafe or token.split("=", 1)[0]
-        if not at_start and GIT_CONFIG_ENV.match(token):
-            env_config = env_config or token.split("=", 1)[0]
+        # The assignment also stands for the rest of the command, failing closed: a later `export
+        # GIT_DIR`, `declare -x`, `set -a`, or a variable the environment already exports makes it
+        # reach every later git.
+        if GIT_ENV.match(token):
+            exported_unsafe = exported_unsafe or token.split("=", 1)[0]
+            if not at_start:
+                env_unsafe = env_unsafe or token.split("=", 1)[0]
+        if GIT_CONFIG_ENV.match(token):
+            exported_config = exported_config or token.split("=", 1)[0]
+            if not at_start:
+                env_config = env_config or token.split("=", 1)[0]
         if token == "(":
             stack.append(directory)
             at_start = True
@@ -241,6 +248,24 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             index += 1
             continue
         name = token.rsplit("/", 1)[-1]
+        if name == "env":
+            # `env -S "git push ..."` splits its string into a command, as `bash -c` runs one.
+            cursor = index + 1
+            while cursor < len(tokens) and tokens[cursor] not in SEPARATORS:
+                option = tokens[cursor]
+                split = ""
+                if option in ("-S", "--split-string") and cursor + 1 < len(tokens):
+                    split = tokens[cursor + 1]
+                elif option.startswith("--split-string="):
+                    split = option.split("=", 1)[1]
+                elif re.fullmatch(r"-[A-Za-z]*S.*", option) and not option.startswith("--"):
+                    split = option[option.index("S") + 1:] or (tokens[cursor + 1] if cursor + 1 < len(tokens) else "")
+                if split:
+                    found.extend(git_invocations(split, directory or cwd, depth + 1))
+                    break
+                if not option.startswith("-") and not ASSIGNMENT.match(option):
+                    break
+                cursor += 1
         if at_start and (name in TRANSPARENT_PREFIXES or name == "env"):
             index += 1
             continue
@@ -274,7 +299,10 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 cursor += 1
             found.extend(git_invocations(" ".join(words), directory or cwd, depth + 1))
         following = tokens[index + 1] if index + 1 < len(tokens) else ""
-        dashed = DASHED_GIT.match(name)
+        # A `git-<sub>` word runs git only where a command name stands, or as a path to the binary
+        # (`$(git --exec-path)/git-push`, `/opt/homebrew/bin/git-filter-repo`); as an argument
+        # (`grep -rn git-push .github`, `man git-rebase`) it is only text.
+        dashed = DASHED_GIT.match(name) if (at_start or "/" in token) else None
         if dashed:
             # `git-push origin x` is `git push origin x`: no global options come between.
             cursor = index + 1
@@ -484,6 +512,10 @@ def _config_violation(args: list[str]) -> str:
         writes = len(positional) > 1 or any(_long(a, *CONFIG_WRITE_FLAGS) for a in args)
     if writes and UNSAFE_CONFIG.match(key):
         return f"`git config {key}` changes what git runs or publishes"
+    sections = verb in ("rename-section", "remove-section") or any(
+        _long(a, "--rename-section", "--remove-section") for a in args)
+    if sections and re.match(r"^(remote|branch|url)(\.|$)", key, re.I):
+        return f"`git config` renames or removes the `{key}` section, which names where git publishes"
     return ""
 
 

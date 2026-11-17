@@ -32,6 +32,14 @@ enum GenerationMigrations {
         }
 
         migrator.registerMigration("v3_drop_sortOrder") { db in
+            // DA-14: the rebuild copies the live rows, but a deleted take's higher
+            // id lived only in sqlite_sequence, which the drop discards; carrying
+            // the bound over keeps ids monotonic, so a new take never reuses the id
+            // of one that was deleted (and that a journal may still name).
+            let deletedHighWater = try Int64.fetchOne(
+                db,
+                sql: "SELECT seq FROM sqlite_sequence WHERE name = 'generations'"
+            )
             try db.create(table: "generations_v3") { t in
                 t.autoIncrementedPrimaryKey("id")
                 t.column("text", .text).notNull()
@@ -54,6 +62,20 @@ enum GenerationMigrations {
 
             try db.drop(table: "generations")
             try db.rename(table: "generations_v3", to: "generations")
+            if let deletedHighWater {
+                try db.execute(
+                    sql: "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'generations'",
+                    arguments: [deletedHighWater]
+                )
+                try db.execute(
+                    sql: """
+                        INSERT INTO sqlite_sequence (name, seq)
+                        SELECT 'generations', ? WHERE NOT EXISTS
+                            (SELECT 1 FROM sqlite_sequence WHERE name = 'generations')
+                        """,
+                    arguments: [deletedHighWater]
+                )
+            }
         }
 
         migrator.registerMigration("v4_index_generations_createdAt") { db in

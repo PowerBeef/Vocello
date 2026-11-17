@@ -94,10 +94,10 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
         }
     }
 
-    /// Characterizes the shipped v3 rebuild; this is a documented upgrade
-    /// limitation, not a claim that old deleted ids remain reserved. The
-    /// rebuild retains live ids but copies no deleted sqlite_sequence bound.
-    func testV3RebuildCurrentlyResetsDeletedHighWaterToLargestRetainedID() throws {
+    /// DA-14: the v3 rebuild retains the live ids and carries the deleted
+    /// take's sqlite_sequence bound over, so the first take after the upgrade
+    /// takes a new id rather than one a deleted take held.
+    func testV3RebuildKeepsTheDeletedHighWaterMark() throws {
         for version in ["v1_create_generations", "v2_add_sortOrder"] {
             let queue = try seededQueue(upTo: version)
             try insertAndDeleteHighWater(in: queue)
@@ -105,10 +105,29 @@ final class GenerationMigrationUpgradeTests: XCTestCase {
             try GenerationMigrations.makeMigrator().migrate(queue)
 
             try queue.write { db in
-                XCTAssertEqual(try sequence(in: db), 41, version)
+                XCTAssertEqual(try sequence(in: db), 900, version)
                 try insertNext(in: db)
-                XCTAssertEqual(db.lastInsertedRowID, 42, "\(version): v3 currently loses the deleted high-water mark")
+                XCTAssertEqual(db.lastInsertedRowID, 901, "\(version): ids stay monotonic across the v3 rebuild")
             }
+        }
+    }
+
+    /// A database with no deleted takes keeps the bound its live rows give, and
+    /// an empty one gets no sequence row until its first take.
+    func testV3RebuildWithoutADeletedTakeKeepsTheLiveBound() throws {
+        let seeded = try seededQueue(upTo: "v2_add_sortOrder")
+        try GenerationMigrations.makeMigrator().migrate(seeded)
+        try seeded.write { db in
+            XCTAssertEqual(try sequence(in: db), 41)
+        }
+
+        let empty = try DatabaseQueue()
+        try GenerationMigrations.makeMigrator().migrate(empty, upTo: "v2_add_sortOrder")
+        try GenerationMigrations.makeMigrator().migrate(empty)
+        try empty.write { db in
+            XCTAssertNil(try sequence(in: db))
+            try insertNext(in: db)
+            XCTAssertEqual(db.lastInsertedRowID, 1)
         }
     }
 

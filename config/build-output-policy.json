@@ -20,7 +20,10 @@
         "screen-protection",
         "purchase",
         "perf",
-        "auto-language"
+        "auto-language",
+        "delivery-cohort",
+        "enroll-clone-fixture",
+        "saved-voice-lifecycle"
       ],
       "keepPassingPerPlatformLane": 1,
       "keepUnresolvedFailuresPerPlatformLane": 1

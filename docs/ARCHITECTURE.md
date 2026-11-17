@@ -1143,9 +1143,10 @@ The website has an independent Vite lifecycle: `website/dist/` is website-owned 
 not a native DerivedData, evidence, symbol, or distribution path in the build-output manifest.
 
 The same manifest owns lifecycle rules below artifact roots and minimum free-space floors for heavy
-lanes. UI retention keeps the latest passing result per platform/lane, preserves matching benchmark
+lanes. UI retention keeps the latest passing result per platform, lane and focused scenario (a
+focused smoke pass never supersedes the full lane's), preserves matching benchmark
 publication-repair evidence, compacts resolved failures and unrepairable unpublished runs, and
-includes the opt-in model-download lane. Failed Instruments traces remain explicit diagnostics:
+includes the opt-in model-download lane; a preinstalled-candidate smoke is never pruned. Failed Instruments traces remain explicit diagnostics:
 the status inventory reports them separately and only `--compact-profile-failure RUN_ID` (or a
 newer profile of the same platform/kind) may remove their raw trace. Persistent caches can be
 reclaimed independently with `--cache macos|macos-optimized|macos-tsan|ios|packages|runtime|all`;

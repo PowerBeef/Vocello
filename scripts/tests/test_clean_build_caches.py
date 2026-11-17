@@ -103,21 +103,22 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
             check=True,
         )
 
-    def ui_run(self, platform: str, lane: str, suffix: str, status: str) -> Path:
+    def ui_run(
+        self, platform: str, lane: str, suffix: str, status: str, *, scenario: str | None = None
+    ) -> Path:
         run_id = f"{platform}-xcui-{lane}-{suffix}"
         run = self.root / "build" / "artifacts" / "ui-tests" / platform / run_id
-        self.write(
-            run / "run.json",
-            json.dumps(
-                {
-                    "schemaVersion": 2,
-                    "platform": platform,
-                    "lane": lane,
-                    "runID": run_id,
-                    "status": status,
-                }
-            ),
-        )
+        metadata = {
+            "schemaVersion": 2,
+            "platform": platform,
+            "lane": lane,
+            "runID": run_id,
+            "status": status,
+        }
+        if scenario is not None:
+            # As scripts/lib/ui_lane_data.py run_metadata writes a focused smoke run.
+            metadata |= {"scenario": scenario, "evidenceClass": "focused-smoke"}
+        self.write(run / "run.json", json.dumps(metadata))
         self.write(run / "result.xcresult" / "payload", b"result")
         return run
 
@@ -396,6 +397,45 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         self.assertTrue((old_fail / "retention-summary.json").is_file())
         self.assertFalse(old_pass.exists())
         self.assertTrue(newest_pass.exists())
+
+    def test_a_focused_smoke_pass_keeps_the_previous_full_smoke_evidence(self) -> None:
+        # BKL-46: retention groups by platform, lane and scenario, so a focused scenario's
+        # pass neither removes the last full pass nor resolves a full run's failure.
+        full_fail = self.ui_run("macos", "smoke", "20260713-000001-a", "failed")
+        full_pass = self.ui_run("macos", "smoke", "20260713-000002-b", "passed")
+        newer_full_fail = self.ui_run("macos", "smoke", "20260713-000003-c", "failed")
+        old_focused = self.ui_run("macos", "smoke", "20260713-000004-d", "passed", scenario="layout")
+        focused = self.ui_run("macos", "smoke", "20260713-000005-e", "passed", scenario="layout")
+        other = self.ui_run("macos", "smoke", "20260713-000006-f", "passed", scenario="long-form")
+
+        self.run_clean("--prune-ui-results", "--ui-keep", "1", "--quick")
+
+        self.assertTrue((full_pass / "result.xcresult").exists())
+        self.assertTrue((newer_full_fail / "result.xcresult").exists())
+        self.assertFalse((full_fail / "result.xcresult").exists())  # resolved by the full pass
+        self.assertTrue((full_fail / "retention-summary.json").is_file())
+        self.assertFalse(old_focused.exists())  # superseded by the same scenario's newer pass
+        self.assertTrue((focused / "result.xcresult").exists())
+        self.assertTrue((other / "result.xcresult").exists())
+
+    def test_every_ui_lane_but_the_candidate_smoke_is_pruned(self) -> None:
+        lanes = json.loads(POLICY.read_text(encoding="utf-8"))["childRetention"]["uiResults"]["lanes"]
+        for lane in ("delivery-cohort", "enroll-clone-fixture", "saved-voice-lifecycle"):
+            with self.subTest(lane=lane):
+                self.assertIn(lane, lanes)
+                old = self.ui_run("ios", lane, "20260713-000001-a", "passed")
+                newest = self.ui_run("ios", lane, "20260713-000002-b", "passed")
+                self.run_clean("--prune-ui-results", "--quick")
+                self.assertFalse(old.exists())
+                self.assertTrue(newest.exists())
+        # A preinstalled-candidate smoke (run.json lane `candidate-smoke`) is release
+        # evidence: it stays outside routine pruning on purpose.
+        self.assertNotIn("candidate-smoke", lanes)
+        old = self.ui_run("ios", "candidate-smoke", "20260713-000001-a", "passed")
+        self.ui_run("ios", "candidate-smoke", "20260713-000002-b", "passed")
+        result = self.run_clean("--prune-ui-results", "--dry-run")
+        self.assertTrue((old / "result.xcresult").exists())
+        self.assertIn("reason=legacy-or-malformed-metadata", result.stdout)
 
     def test_selective_cache_cleanup_preserves_other_platforms(self) -> None:
         mac = self.write(self.root / "build" / "cache" / "xcode" / "macos" / "cache")

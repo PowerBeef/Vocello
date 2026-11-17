@@ -131,6 +131,16 @@ def _repairable_benchmark(run_dir: Path, run_id: str, platform: str) -> bool:
     return False
 
 
+def _scenario(metadata: dict[str, Any]) -> str:
+    """The run's focused scenario; "" for a full lane run (and legacy metadata).
+
+    Retention groups runs by platform, lane and scenario: a focused smoke scenario
+    exercises a slice of the lane, so its pass must not supersede the previous full
+    pass (or resolve its failure), nor another scenario's (BKL-46)."""
+    scenario = metadata.get("scenario")
+    return scenario if isinstance(scenario, str) else ""
+
+
 def _run_sort_key(metadata: dict[str, Any], run_id: str) -> tuple[str, str]:
     timestamp = metadata.get("finishedAt") or metadata.get("startedAt") or ""
     return (timestamp if isinstance(timestamp, str) else "", run_id)
@@ -176,7 +186,7 @@ def analyze_ui_artifacts(
     )
     decisions: list[UIArtifactDecision] = []
     groups: dict[
-        tuple[str, str], list[tuple[tuple[str, str], Path, dict[str, Any]]]
+        tuple[str, str, str], list[tuple[tuple[str, str], Path, dict[str, Any]]]
     ] = {}
 
     if not ui_root.is_dir() or ui_root.is_symlink():
@@ -252,11 +262,11 @@ def analyze_ui_artifacts(
                     )
                 )
                 continue
-            groups.setdefault((platform_root.name, lane), []).append(
+            groups.setdefault((platform_root.name, lane, _scenario(metadata)), []).append(
                 (_run_sort_key(metadata, run_id), run_dir, metadata)
             )
 
-    for (platform, lane), candidates in sorted(groups.items()):
+    for (platform, lane, _), candidates in sorted(groups.items()):
         candidates.sort(key=lambda item: item[0], reverse=True)
         successes = [item for item in candidates if item[2]["status"] in UI_SUCCESS_STATUSES]
         failures = [item for item in candidates if item[2]["status"] in UI_FAILURE_STATUSES]

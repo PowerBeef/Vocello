@@ -2307,7 +2307,7 @@ if [[ "$final_run_status" == "diagnosedFailure" ]]; then
   note "retained correctly classified diagnostic failure evidence"
 elif "$ROOT_DIR/scripts/clean_build_caches.sh" --prune-ui-results --ui-keep 1 --quick \
     >"$out/result-retention.log" 2>&1; then
-  note "pruned superseded XCUITest results (latest passing result retained per platform/lane)"
+  note "pruned superseded XCUITest results (latest passing result retained per platform, lane and scenario)"
 else
   retention_status=1
   warn "could not prune superseded XCUITest results (see $out/result-retention.log)"

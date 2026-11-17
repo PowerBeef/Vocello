@@ -1039,6 +1039,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-16 | [`macos-engine-20261116-145238-b3fffea8`](runs/engine-generation/macos-engine-20261116-145238-b3fffea8.json) | focused | focused | passed | qualified | 5 | 0.30 | `5dc4be0aa762` | `5450b2687f95` | baseline | promo-delivery |
+| 2026-11-16 | [`macos-engine-20261116-220421-6c6226b3`](runs/engine-generation/macos-engine-20261116-220421-6c6226b3.json) | focused | focused | passed | qualified | 5 | 0.30 | `693f13d164da` | `5450b2687f95` | vs macos-engine-20261116-145238-b3fffea8: no cell with ≥3 takes (not trended) | promo-delivery |
 
 ## engine-generation / macos / mac-mini-m6-16gb / config `7ede380f740e`
 
@@ -1055,6 +1056,7 @@ their harness files differ from the baseline's.
 | 2026-11-14 | [`mac-gate-bench-20261114-175243-f2d075fe`](runs/engine-generation/mac-gate-bench-20261114-175243-f2d075fe.json) | focused | focused | passed | qualified | 6 | 0.29 | `7a0506863f97` | `860db4679490` | vs mac-gate-bench-20261114-175017-adc12718: RTF -0.1% (within noise), TTFC -0.3% (within noise), RAM +0.0% (within noise) | mac-gate-bench |
 | 2026-11-14 | [`mac-gate-bench-20261114-175506-9d5c0487`](runs/engine-generation/mac-gate-bench-20261114-175506-9d5c0487.json) | focused | focused | passed | qualified | 6 | 0.29 | `7a0506863f97` | `860db4679490` | vs mac-gate-bench-20261114-175243-f2d075fe: RTF -0.9% (within noise), TTFC +0.0% (within noise), RAM -0.3% (within noise) | mac-gate-bench |
 | 2026-11-16 | [`mac-gate-bench-20261116-024328-2dc84ba4`](runs/engine-generation/mac-gate-bench-20261116-024328-2dc84ba4.json) | focused | focused | passed | qualified | 6 | 0.29 | `e397d3023fd6` | `860db4679490` | vs mac-gate-bench-20261114-175506-9d5c0487: RTF +2.0% (within noise), TTFC +0.9% (within noise), RAM +0.0% (within noise), harness changed | mac-gate-bench |
+| 2026-11-16 | [`mac-gate-bench-20261116-220213-9eace02f`](runs/engine-generation/mac-gate-bench-20261116-220213-9eace02f.json) | focused | focused | passed | qualified | 6 | 0.29 | `693f13d164da` | `860db4679490` | vs mac-gate-bench-20261116-024328-2dc84ba4: RTF -0.2% (within noise), TTFC +0.0% (within noise), RAM +0.3% (within noise) | mac-gate-bench |
 
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 
@@ -1146,6 +1148,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-16 | [`mac-lang-bench-20261116-143641-abf41ae2`](runs/language/mac-lang-bench-20261116-143641-abf41ae2.json) | focused | focused | passedWithWarnings | qualified | 23 | 0.29 | `047a125b84f3` | `a15677ea8b87` | baseline | mac-lang-bench-20261116-143641-abf41ae2 |
+| 2026-11-16 | [`mac-lang-bench-20261116-222829-f1b6f4ab`](runs/language/mac-lang-bench-20261116-222829-f1b6f4ab.json) | focused | focused | passedWithWarnings | qualified | 23 | 0.29 | `693f13d164da` | `a15677ea8b87` | vs mac-lang-bench-20261116-143641-abf41ae2: no cell with ≥3 takes (not trended) | mac-lang-bench-20261116-222829-f1b6f4ab |
 
 ## language / macos / mac-mini-m6-16gb / config `da2ede623b98`
 
@@ -1278,6 +1281,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-16 | [`mac-memory-qualification-20261116-145341-abe17f56`](runs/memory-qualification/mac-memory-qualification-20261116-145341-abe17f56.json) | focused | focused | passed | qualified | 11 | 0.29 | `a960e28d9d91` | `a04b77a16c46` | baseline | memory-qualification |
+| 2026-11-16 | [`mac-memory-qualification-20261116-223138-dc5abae6`](runs/memory-qualification/mac-memory-qualification-20261116-223138-dc5abae6.json) | focused | focused | passed | qualified | 11 | 0.29 | `693f13d164da` | `a04b77a16c46` | vs mac-memory-qualification-20261116-145341-abe17f56: RTF +0.2% (within noise), TTFC -0.4% (within noise), RAM -1.4% (within noise) | memory-qualification |
 
 ## memory-qualification / macos / mac-mini-m6-16gb / config `af84ca583018`
 
@@ -1788,6 +1792,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-15 | [`macos-xcui-benchmark-20261115-233746-ecd24c7b`](runs/ui-generation/macos-xcui-benchmark-20261115-233746-ecd24c7b.json) | canonical | canonical | passed | qualified | 29 | 0.31 | `12f87e4a0138` | `98e0d9b394d3` | baseline | macos-xcui-benchmark-20261115-233746-ecd24c7b |
+| 2026-11-16 | [`macos-xcui-benchmark-20261116-220447-0b6bc26b`](runs/ui-generation/macos-xcui-benchmark-20261116-220447-0b6bc26b.json) | canonical | canonical | passed | qualified | 29 | 0.31 | `693f13d164da` | `98e0d9b394d3` | vs macos-xcui-benchmark-20261115-233746-ecd24c7b: RTF -0.4% (within noise), TTFC +0.5% (within noise), RAM -1.6% (within noise), harness changed | macos-xcui-benchmark-20261116-220447-0b6bc26b |
 
 ## ui-generation / macos / mac-mini-m6-16gb / config `d1c935e54ac5`
 
@@ -1972,3 +1977,4 @@ their harness files differ from the baseline's.
 | 2026-11-16 | [`macos-xcui-perf-20261116-000214-b26d443d`](runs/ui-perf/macos-xcui-perf-20261116-000214-b26d443d.json) | canonical | canonical | passed | not-applicable | 12 | — | `962c2cd05ba9` | `bfddc9ec378c` | vs macos-xcui-perf-20261115-234925-dae0f970: compatible | macos-xcui-perf-20261116-000214-b26d443d |
 | 2026-11-16 | [`macos-xcui-perf-20261116-001436-4d575c18`](runs/ui-perf/macos-xcui-perf-20261116-001436-4d575c18.json) | canonical | canonical | passed | not-applicable | 12 | — | `a443c49b30c1` | `bfddc9ec378c` | vs macos-xcui-perf-20261116-000214-b26d443d: compatible | macos-xcui-perf-20261116-001436-4d575c18 |
 | 2026-11-16 | [`macos-xcui-perf-20261116-040404-5f7cf75d`](runs/ui-perf/macos-xcui-perf-20261116-040404-5f7cf75d.json) | canonical | canonical | passed | not-applicable | 12 | — | `a14dd079d540` | `bfddc9ec378c` | vs macos-xcui-perf-20261116-001436-4d575c18: compatible | macos-xcui-perf-20261116-040404-5f7cf75d |
+| 2026-11-16 | [`macos-xcui-perf-20261116-221550-845d6880`](runs/ui-perf/macos-xcui-perf-20261116-221550-845d6880.json) | canonical | canonical | passed | not-applicable | 12 | — | `693f13d164da` | `bfddc9ec378c` | vs macos-xcui-perf-20261116-040404-5f7cf75d: harness changed | macos-xcui-perf-20261116-221550-845d6880 |

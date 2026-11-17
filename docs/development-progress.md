@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-16
+reviewed: 2026-11-17
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,13 +17,28 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 16, night: the follow-up release's Mac backlog, first wave (resume here)
+### November 17: Vocello 3.1.0 is public on the Mac (resume here)
 
-The 3.1.0 promotion still waits on the maintainer: upload
-`build/artifacts/quality-promotion/quality-promotion.json` to the draft, then dispatch **Promote
-verified release** (below). Nothing was pushed since `b8bf2037`; the six promotion records stay
-untracked until the chart refresh that follows promotion, which is also why a routed `--since`
-check fails its README-chart validator in this tree while a clean export of `HEAD` passes it.
+The maintainer uploaded the promotion manifest to the v3.1.0 draft and dispatched **Promote verified
+release** from the tag (run 44036811898, approved on the `release` environment). Every step passed,
+and at 07:17 UTC the release went public as the latest: 13 assets, and `releases/latest`'s
+`appcast.xml` now resolves to v3.1.0, so Sparkle offers it. Two stray drafts that a release-edit
+link had created on the phone were deleted first. `main` was pushed through `f99b5c33` with CI and
+the release rehearsal green.
+
+The post-promotion refresh is committed on local `main` (`ac173582`): the six promotion records,
+and the README chart, performance art and website pooled over the two build-31 records through
+`0b6bc26b` (0.29 to 0.41 warm RTF). It is not pushed; pushing deploys the website.
+
+Left on RF-61: the CLI's signed-candidate qualification (`cli_package.py qualify`) has no 3.1.0
+record, and the website deploys with the next push.
+
+### November 16, night: the follow-up release's Mac backlog, first wave
+
+The 3.1.0 promotion then waited on the maintainer (done November 17, above). The six promotion
+records stayed untracked until the chart refresh that follows promotion, which is also why a routed
+`--since` check failed its README-chart validator in this tree while a clean export of `HEAD`
+passed it.
 
 At the maintainer's request (work for a follow-up release, Mac-only, no lanes on the screen), the
 roadmap gained a `needs` tag (mac, keyboard, iphone) on every open item and the work below landed

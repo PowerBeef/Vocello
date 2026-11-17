@@ -18,8 +18,8 @@ sourceOfTruth:
 # iOS physical-device testing
 
 Vocello's iOS runtime and UI acceptance run on a paired physical iPhone. Simulator build, launch,
-and UI automation are unsupported. XCUITest is the only automated UI evidence; computer use through
-iPhone Mirroring is the default route for checks it cannot cover ([below](#checks-xcuitest-does-not-cover)).
+and UI automation are unsupported. Every UI check is an XCUITest lane; what XCUITest cannot drive is
+the maintainer's, by hand ([below](#checks-xcuitest-does-not-cover)).
 
 ## Ordinary development
 
@@ -109,13 +109,9 @@ attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [d
 app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
 [--count N]]` emits machine-readable reachability and lock state, optionally polling. A diagnostics spec is
 `<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
-`mirroring status [--json]|session LABEL|capture LABEL --step TEXT [--observed TEXT]|stop` runs
-the computer-use records ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)):
-`status` says whether iPhone Mirroring runs and whether the phone is reachable and locked,
-`session` starts a record bound to the source commit and the installed version and build,
-`capture` saves the Mirroring window with one step line, and `stop` quits iPhone Mirroring, which
-`ui-preflight` requires before any XCUITest lane. Records stay untracked under
-`build/artifacts/ios/mirroring` and are never lane evidence.
+`mirroring status [--json]|stop`: `status` says whether iPhone Mirroring runs and whether the phone
+is reachable and locked, and `stop` quits iPhone Mirroring, which `ui-preflight` requires before any
+XCUITest lane ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)).
 
 ### Explicit screen protection after device work
 
@@ -498,26 +494,30 @@ protection procedure below, not an implicit global Settings mutation.
 
 ### Checks XCUITest does not cover
 
-Since 2026-10-25 computer use through iPhone Mirroring is the default route for these, inside an
-announced window (`/vocello-ui-autonomy`; [development-workflow.md](development-workflow.md), Computer
-use). Mirroring needs the phone locked, Wi-Fi and Bluetooth on, routes the phone's audio to the Mac and
-disables the microphone, camera and Face ID, so a check that depends on any of those stays the
-maintainer's. A computer-use record closes a row only when the maintainer confirms it.
+Since 2026-11-17 every UI-driven check runs as an XCUITest lane (maintainer decision, which retires
+the computer-use and iPhone Mirroring route of 2026-10-25); a check no lane covers yet gets its own
+scenario. What XCUITest cannot drive stays the maintainer's, by hand:
 
 | Check | Route |
 | --- | --- |
-| AUD-01, a file opened during onboarding | Computer use on a fresh install; the deletion and reinstall, and any permission prompt, are the maintainer's |
-| AUD-02 hand checks (music through launch, Silent switch, interruptions, Control Center mid-recording, startup Retry) | Maintainer: audio routing and interruptions change under Mirroring |
-| Hand VoiceOver row | Maintainer: VoiceOver is a system setting and speaks through the Mac under Mirroring |
-| Offline relaunch | Maintainer: airplane mode is a system setting, and Mirroring needs Wi-Fi |
-| RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off ends Mirroring |
+| AUD-01, a file opened during onboarding | Maintainer: a fresh install and the system share sheet |
+| AUD-02 hand checks (music through launch, Silent switch, interruptions, Control Center mid-recording, startup Retry) | Maintainer: audio routing and interruptions |
+| Hand VoiceOver row | Maintainer: VoiceOver is a system setting |
+| Offline relaunch | Maintainer: airplane mode is a system setting |
+| RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off is a system setting |
 | RF-35 navigation row and Wi-Fi reinstall, the ~30-take machine screen | XCUITest (`first-launch`, `navigation`, `modes`) |
 | Purchase rows | XCUITest; the purchase confirmation sheet is the maintainer's |
-| ASR-06 file protection and backup proof | [privacy-storage.md](privacy-storage.md), "Device proof on the signed candidate": the maintainer makes the backups, locks and restarts the phone; Claude reads the backup manifest and drives the app |
-| TestFlight installs, removing a model before a reinstall row, in-app settings, reproductions, visual inspection | Computer use |
+| ASR-06 file protection and backup proof | [privacy-storage.md](privacy-storage.md), "Device proof on the signed candidate": the maintainer makes the backups, locks and restarts the phone; Claude reads the backup manifest and drives the app through XCUITest |
+| TestFlight installs | Maintainer, in the TestFlight app |
+| Removing a model before a reinstall row, in-app settings, reproductions | XCUITest: an existing lane's scenario or a new one |
+
+The iOS `ui-preflight` refuses a lane while iPhone Mirroring is open, because XCUITest breaks under it
+even while CoreDevice reports the phone unlocked; `scripts/ios_device.sh mirroring stop` quits it, and
+the maintainer then unlocks the phone, which Mirroring keeps locked.
 
 After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the
-test, time and failure flag), report-only.
+test, time and failure flag), report-only: each failure frame and each named state the row asserts,
+for clipping, overlap, a wrong state, untranslated text or an unexpected dialog.
 
 ### Control audit
 

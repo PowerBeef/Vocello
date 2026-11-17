@@ -21,6 +21,10 @@ Explain the lane and expected device interaction, then run `scripts/ui_test.sh i
 Use installed models; new large downloads need specific authorization. Preserve failed artifacts.
 Read `scripts/dev.sh triage <run-directory> --json` (the read-only `vocello-xcresult-triage` agent can
 take the run directory); report the actual verdict and evidence path.
-Never retry silently; a justified rerun gets a new ID and explanation. No Simulator or third-party
-UI-automation MCP; computer use through iPhone Mirroring covers what XCUITest cannot, never during a
-lane (`/vocello-ui-autonomy`). After the lane, review `<run>/screenshots/index.json`.
+Never retry silently; a justified rerun gets a new ID and explanation. No Simulator, third-party
+UI-automation MCP, computer use or iPhone Mirroring session: every UI check is an XCUITest lane
+(maintainer decision 2026-11-17), a check no lane covers gets its own scenario, and what XCUITest
+cannot drive (system settings, permission prompts, the passcode, TestFlight installs) is the
+maintainer's, by hand. After the lane, review `<run>/screenshots/index.json`: each failure frame and each named state
+the row asserts, for clipping, overlap, a wrong state, untranslated text or an unexpected dialog;
+report-only, each finding classified as a release blocker or a backlog line.

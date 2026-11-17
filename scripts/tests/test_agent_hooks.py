@@ -1951,7 +1951,7 @@ class SessionStartTests(unittest.TestCase):
 
 class ProjectSkillTests(unittest.TestCase):
     SKILLS = {"vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",
-              "vocello-benchmark", "vocello-debug", "vocello-release-readiness", "vocello-ui-autonomy"}
+              "vocello-benchmark", "vocello-debug", "vocello-release-readiness"}
 
     def test_skills_use_claude_discovery_and_supported_metadata(self):
         skills = sorted((ROOT / ".claude/skills").glob("*/SKILL.md"))

@@ -164,14 +164,14 @@ Lanes, learned on the 3.1 run (2026-11-14):
   the matching iOS platform component (a multi-GB download: ask first;
   `scripts/lib/ios_platform_preflight.py check` reports it), and the phone may need UI automation
   allowed again ("Timed out while enabling automation mode").
-- **Native UI evidence comes only from XCUITest** via `scripts/ui_test.sh`: genuine shipped controls,
-  no hidden test UI or committed coordinates. Computer use (maintainer decisions 2026-10-24 and
-  2026-10-25) is the default route for what XCUITest cannot cover (`/vocello-ui-autonomy`): from the
-  lead only, never while a native lane or measurement runs, and the iPhone only in an announced
-  window. It is never a lane verdict or automated evidence; an attended row closes only when the
-  maintainer confirms its local record. iPhone system settings, permissions, passcodes and purchases
-  stay the maintainer's. Scope, the Mirroring order and limits:
-  `docs/reference/development-workflow.md`, "The Claude desktop app".
+- **Every UI check is an XCUITest lane** via `scripts/ui_test.sh` (maintainer decision 2026-11-17,
+  which retires the computer-use and iPhone Mirroring route of 2026-10-24 and 2026-10-25): genuine
+  shipped controls, no hidden test UI or committed coordinates, and a check no lane covers gets its own
+  scenario. The iPhone only in an announced window, with iPhone Mirroring quit (XCUITest breaks under
+  it). What XCUITest cannot drive (iPhone system settings, permission prompts, the passcode, audio
+  routing, VoiceOver, purchase confirmations, macOS privacy grants) is the maintainer's, by hand.
+  Claude reviews each lane's screenshots. Detail: `docs/reference/development-workflow.md`, "The
+  Claude desktop app".
 - **Runtime:** MLX only, in-process, actor-owned lifecycle, typed cancellation barrier, serialized
   prewarm, request-local sampling and memory, suspending bounded audio. Register unsafe concurrency in
   `config/concurrency-safety.json`.
@@ -208,7 +208,7 @@ the tool-routing table and the desktop app's rules are in `docs/reference/develo
   refuse unknown or active agent leases and other live sessions in this repository. If tracking is
   unavailable, join every agent and side session, then run the lane with `QVOICE_LEAD_ONLY=1`.
 - **Skills** (`.claude/skills`, invoked as `/vocello-*`): `vocello-ios-validation`, `vocello-macos-ui`,
-  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, `vocello-ui-autonomy`, read-only
+  `vocello-device-diagnostics`, `vocello-benchmark`, `vocello-debug`, read-only
   `vocello-release-readiness`. They wrap the scripts and add no gate or permission.
 - **Agents** (`.claude/agents`, read-only): `vocello-swift-review` for Swift diffs and
   `vocello-xcresult-triage` for a finished run directory. Editing agents are general-purpose agents

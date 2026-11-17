@@ -338,7 +338,7 @@ diagnostics build never stands in for the candidate. So the proof uses what the 
 
 | Step | Proves | Who |
 |---|---|---|
-| 1. Baseline storage | The starting size, to measure deletion against | Claude through iPhone Mirroring, or the maintainer |
+| 1. Baseline storage | The starting size, to measure deletion against | The maintainer, in iPhone Settings |
 | 2. Backup read | Which governed paths are in the backup and which are left out, and the protection class of every backed-up file | The maintainer makes the backup; Claude reads it |
 | 3. Locked delivery | Downloads keep writing while the phone is locked, which the chosen class allows and `NSFileProtectionComplete` would not | The maintainer locks and unlocks the phone |
 | 4. Deletion | Deleting a model, a take and a saved voice frees and removes their files | Claude, with a second backup read |

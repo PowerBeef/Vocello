@@ -375,8 +375,8 @@ tone, 10 languages, reproducible takes). Both apps run the same model per mode (
 
 ### Test infrastructure (XCUITest)
 
-`VocelloMacUITests` is the only automated macOS frontend evidence (computer use covers, between
-lanes, what it cannot: `/vocello-ui-autonomy`). It launches its configured
+`VocelloMacUITests` is the only macOS frontend evidence; a check no lane covers gets its own
+scenario. It launches its configured
 Vocello test host, uses the shared UI automation support, and re-queries stable accessibility state
 before and after each logical action. There is no hidden test-marker surface.
 

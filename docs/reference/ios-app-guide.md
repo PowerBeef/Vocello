@@ -26,8 +26,8 @@ initialize on the iOS Simulator.
 > String Catalog ownership, typed presentation text, and pseudo-localization acceptance are in
 > [`localization.md`](localization.md).
 > The compact UI state map and lane assumptions are [§7](#7-compact-ui-state-map); the export
-> purchase is [last](#ios-export-purchase). XCUITest is the only automated UI evidence; computer use
-> through iPhone Mirroring covers what it cannot (`/vocello-ui-autonomy`).
+> purchase is [last](#ios-export-purchase). Every UI check is an XCUITest lane; what XCUITest cannot
+> drive is the maintainer's, by hand.
 
 ---
 
@@ -735,8 +735,8 @@ in-session Studio mode, and the Studio selector changes the composer in place.
 | Physical-device deterministic/runtime diagnostic | `scripts/ios_device.sh gate` |
 
 Never validate with an iOS Simulator, Simulator Browser, a third-party UI-automation driver, or a
-committed coordinate table. Computer use through iPhone Mirroring covers what XCUITest cannot, and its
-records close an attended row only on the maintainer's confirmation (`CLAUDE.md`, `/vocello-ui-autonomy`).
+committed coordinate table. A check no lane covers gets its own XCUITest scenario; what XCUITest
+cannot drive is the maintainer's, by hand (`CLAUDE.md`).
 
 ---
 

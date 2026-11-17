@@ -27,10 +27,10 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Task | Authoritative procedure | Boundary |
 | --- | --- | --- |
 | Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, scoped commit on `main`; push on explicit request; targeted acceptance at checkpoints |
-| macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes at coherent checkpoints; computer use only between lanes |
+| macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes at coherent checkpoints |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
-| Checks XCUITest cannot cover (system dialogs, installs, Finder, visual inspection) | [Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover), `/vocello-ui-autonomy` | Computer use (iPhone through iPhone Mirroring, the Mac directly) in announced windows, never during a lane; a record closes a row only when the maintainer confirms it; never automated evidence |
+| Checks XCUITest cannot cover (system settings, permission prompts, installs, audio routing) | [Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover) | Every UI-driven check is an XCUITest lane (a new scenario when none covers it); the rest is the maintainer's, by hand |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |
 | Model download lifecycle | [Model delivery](model-delivery.md) | Explicit isolated root; preserve canonical data and failed evidence |
 | Benchmark operation / publication | [Benchmarking procedure](telemetry-and-benchmarking.md) | Exact-source qualified PASS only; no automatic Git changes; the UI `benchmark` and `perf` lanes publish on a PASS and say so when they start, `--no-publish` keeps a probe run local |
@@ -42,9 +42,9 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 
 ## Claude Code QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. The seven `/vocello-*` skills select the
-existing iOS, macOS UI, device diagnostics, benchmark, debugging, computer-use
-(`vocello-ui-autonomy`) and read-only release-readiness procedures; they add no gate or authority
+Routine edits use `scripts/dev.sh`; no skill is required. The six `/vocello-*` skills select the
+existing iOS, macOS UI, device diagnostics, benchmark, debugging and read-only release-readiness
+procedures; they add no gate or authority
 ([tool routing](development-workflow.md#claude-code-setup-and-tool-routing)).
 
 ### Read a finished run

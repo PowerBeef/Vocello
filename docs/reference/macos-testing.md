@@ -20,8 +20,8 @@ sourceOfTruth:
 # macOS testing
 
 Vocello separates routine deterministic development verification from explicit native-app UI
-acceptance. XCUITest is the only automated UI evidence; computer use, between lanes, is the default
-route for checks it cannot cover (`/vocello-ui-autonomy`).
+acceptance. Every UI check is an XCUITest lane (maintainer decision 2026-11-17); what XCUITest cannot
+drive is the maintainer's, by hand.
 
 Clone/enrollment parity is part of ordinary deterministic verification. The core suite exercises
 the shared transcription-review/evidence policy and the pure macOS Design/Clone request factory,

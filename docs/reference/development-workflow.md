@@ -191,8 +191,7 @@ rather than from this list:
   claude-md-management, asc and huggingface-skills (25 skills and its own Hugging Face MCP server).
 - **MCP servers:** MobileBuildMCP and sosumi.
 - **Skills:** the swift-mlx skills.
-- **Desktop app:** the Claude desktop app's Code tab, with its browser pane, Terminal panel and
-  computer use.
+- **Desktop app:** the Claude desktop app's Code tab, with its browser pane and Terminal panel.
 - **Browser and connectors:** Claude in Chrome and the claude.ai GitHub connector.
 - **CLIs:** `hf`, `asc` and `gh`.
 
@@ -660,8 +659,9 @@ variable in command position that holds git or precedes a judged subcommand (`$G
 as git ([The commit lint](#the-commit-lint)). It
 also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
 desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
-simulator/test agents. Computer use is not denied (maintainer decision 2026-10-24); the app asks the
-maintainer to approve each application it controls. Ask rules still prompt in auto mode and deny
+simulator/test agents. Computer use is not denied, but it is no route for UI checks, which are
+XCUITest lanes (maintainer decision 2026-11-17); the app asks the maintainer to approve each
+application it controls. Ask rules still prompt in auto mode and deny
 wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
 overrides and cannot lift a tracked deny.
 
@@ -706,7 +706,7 @@ tool is offered.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
-| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; computer use for what XCUITest cannot cover, never as automated evidence ([The Claude desktop app](#the-claude-desktop-app)) |
+| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; Claude's review of lane screenshots ([The Claude desktop app](#the-claude-desktop-app)) |
 | Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Axiom skills and read-only auditor agents; sosumi; Xcode's bundled documentation |
 | Libraries | Pinned versions in `config/toolchain.json` and package manifests | Context7 |
 | MLX runtime | Owned facade, exact pins and mlx-guide.md | Installed swift-mlx / swift-mlx-lm skills |
@@ -755,26 +755,20 @@ is named `claude`, so worker tracking works unchanged. What it adds, and the rul
   `get_page_text` reads the page before any screenshot. Claude in Chrome stays for pages behind the
   maintainer's sign-ins, chrome-devtools for Lighthouse, performance traces and heap snapshots. The pane
   supplements `npm --prefix website run check`, never replaces it.
-- **Computer use** (maintainer decisions 2026-10-24 and 2026-10-25). Computer use is the default route
-  for checks XCUITest cannot cover, run through the `/vocello-ui-autonomy` skill. It drives the Mac app
-  (a development build or the installed release), Xcode, Device Hub and the paired iPhone through
-  iPhone Mirroring: exploration before an XCUITest exists, reproductions, blocking dialogs before a UI
-  lane, setup chores such as installing a TestFlight candidate, in-app operations, and the attended
-  rows that survive Mirroring's conditions. Only the lead uses it, never while a native, device or
-  measured lane runs (it shares the display, the phone and the host's load), and the iPhone only in a
-  window the maintainer announced. Inside a window the order is lanes first, with iPhone Mirroring
-  quit (`scripts/ios_device.sh mirroring stop`), then Mirroring once the maintainer locks the phone:
-  XCUITest breaks under Mirroring even while CoreDevice reports the phone unlocked (RF-15 runs 221807,
-  222059 and 222344), so the iOS `ui-preflight` refuses a lane while it runs, and Mirroring needs the
-  phone locked, so going back to lanes needs the maintainer to unlock it. A session keeps a local
-  record (`scripts/ios_device.sh mirroring session|capture`, under `build/artifacts/ios/mirroring`):
-  never a lane verdict or automated evidence, and an attended row closes only when the maintainer
-  confirms it. Computer use never signs in, enters a credential or passcode, accepts terms, grants a
-  privacy permission, deletes the app, confirms a purchase or changes a system or security setting
-  (the TCC grants in [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc), Developer
-  Mode, UI Automation, Wi-Fi, airplane mode, Auto-Lock): those go on the window's setup card or a
-  paused notification, and stay the maintainer's. The app asks the maintainer to approve each
-  application it controls. Simulator routes stay unsupported.
+- **UI checks are XCUITest lanes** (maintainer decision 2026-11-17, which retires the computer-use
+  route of 2026-10-24 and 2026-10-25 and its iPhone Mirroring sessions). Every UI-driven check, on the
+  Mac and on the paired iPhone, runs through `scripts/ui_test.sh`; a check no lane covers gets its
+  own scenario rather than a hand-driven session. The iOS `ui-preflight` refuses a lane while iPhone
+  Mirroring is open: XCUITest breaks under it even while CoreDevice reports the phone unlocked (RF-15
+  runs 221807, 222059 and 222344), and Mirroring holds the phone locked, so after
+  `scripts/ios_device.sh mirroring stop` the maintainer unlocks it. What XCUITest cannot drive stays
+  the maintainer's, by hand: iPhone system settings (Wi-Fi, airplane mode, Auto-Lock, Developer Mode,
+  UI Automation), permission prompts, the passcode or Face ID, audio routing and interruptions,
+  VoiceOver, app deletion, purchase confirmations, TestFlight installs and the macOS privacy grants
+  ([`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc)). After every lane Claude
+  reviews its screenshots (`<run>/screenshots/index.json`): each failure frame and each named state
+  the row asserts, for clipping, overlap, a wrong state, untranslated text or an unexpected dialog,
+  report-only, each finding a release blocker or a backlog line. Simulator routes stay unsupported.
 - **Terminal panel.** A command the maintainer must run (a login such as `asc auth login` or
   `hf auth login`, a model install, a publication step) goes in a `bash` block, whose Run button runs it,
   or in a Terminal panel tab; any secret is typed there, never in chat. A watcher the maintainer wants to
@@ -787,7 +781,7 @@ is named `claude`, so worker tracking works unchanged. What it adds, and the rul
   sleeps, and a macOS UI lane still needs the session unlocked.
 - **Notifications and Remote Control.** The maintainer may follow a session from the phone.
   `PushNotification` is for what they must act on now (a `release` approval, a failed lane, a phone to
-  unlock or lock in an announced window, a system step a computer-use session paused on), never
+  unlock in an announced window, a system step a lane waits on), never
   routine progress; `SendUserFile` hands over a finished report.
 - **Artifacts.** An artifact is hosted on claude.ai, so publish one only on request. Artifacts, file
   cards and notifications follow the privacy rule: no raw diagnostics, private paths, prompts,
@@ -811,7 +805,7 @@ Missing pinned tools require the existing authorized installation workflow befor
 do not repin dependencies or change global settings to make the inventory green.
 
 For macOS XCUITest, keep one stable interactive desktop session and avoid simultaneous UI work.
-Check visible blocking dialogs and competing automation before starting (a computer-use screenshot may
-look; computer use stops before the lane starts), then leave the desktop available until collection
+Check visible blocking dialogs and competing automation before starting, then leave the desktop
+available until collection
 finishes. Report XCTest display or screenshot errors from retained evidence. Do not automatically
 close unrelated apps or modify display settings. Failed UI runs retain their original identities.

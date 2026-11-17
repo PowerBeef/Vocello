@@ -128,7 +128,7 @@ Between September 4 and October 12 the release did not move:
     full device campaign is for engine-scale changes. For RF-35 that is the RF-15 navigation row,
     one model reinstall over Wi-Fi, and one attended download over cellular.
 - **2026-10-25.** Computer use becomes the default route for device and UI checks XCUITest cannot
-  cover, with as much autonomy as an announced window allows (`/vocello-ui-autonomy`). Inside a
+  cover, with as much autonomy as an announced window allows (retired on 2026-11-17). Inside a
   window Claude runs the XCUITest lanes, then drives the locked phone through iPhone Mirroring, and
   stops only for the maintainer's steps: iPhone system settings, permission prompts, the passcode,
   app deletion and purchase confirmations, which go on a setup card or a paused notification.
@@ -195,6 +195,12 @@ Between September 4 and October 12 the release did not move:
   that carries both the overhaul and the remediation. The tooling, test procedures, benchmark
   harness and audio QC analysis the remediation leans on are audited as part of it (RF-57): each
   screen is first run against itself so that its noise floor is known.
+- **2026-11-17.** Every UI check is an XCUITest lane, on the Mac and on the iPhone: the computer-use
+  route of 2026-10-25 and its iPhone Mirroring sessions are retired. A check no lane covers gets
+  its own scenario; what XCUITest cannot drive (system settings, permission prompts, the passcode,
+  audio routing, VoiceOver, purchase confirmations, TestFlight installs) is the maintainer's, by
+  hand. The iOS lanes still refuse to start while iPhone Mirroring is open, because XCUITest breaks
+  under it.
 
 ## The path
 

@@ -462,7 +462,7 @@ keeps the take; VoiceOver reads the primary controls; the largest Dynamic Type d
 Most of these are rows of the candidate acceptance (RF-15): run them on the processed build with
 `scripts/ui_test.sh ios smoke --preinstalled-candidate` ([Already installed distribution
 candidate](ios-device-testing.md#already-installed-distribution-candidate)). What XCUITest cannot drive
-goes to computer use or the maintainer ([Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover));
+goes to the maintainer ([Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover));
 permission prompts, calls and VoiceOver stay the maintainer's.
 
 ## 6. Submit

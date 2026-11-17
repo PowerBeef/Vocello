@@ -70,8 +70,8 @@ release-readiness and artifact checks.
    silent.
    If the visible Settings state is incomplete, run `scripts/macos_test.sh models ensure` only as
    an explicit repair/bootstrap action, then start a fresh smoke run.
-   XCUITest is the only automated UI evidence and targets its configured native test host; computer
-   use, between lanes, covers what it cannot (`/vocello-ui-autonomy`). What smoke's sixteen
+   XCUITest is the only UI evidence and targets its configured native test host; what it cannot
+   drive is the maintainer's, by hand. What smoke's sixteen
    journeys (about 11 minutes) and the 29-take benchmark prove is in
    [`macos-testing.md`](macos-testing.md#explicit-xcuitest-lanes). Both lanes fail on a new crash.
    On PASS, the benchmark publishes one compact `ui-generation` record; raw `.xcresult`,

@@ -230,6 +230,10 @@ public final class GenerationFailureDiagnosticLogger: Sendable {
             }
         }
 
+        if error is GenerationOutputStorageError {
+            return ErrorMetadata(code: "storage.output_unavailable", classification: .storage)
+        }
+
         if let rejection = error as? CloneReferenceQuality.Rejection {
             // The code names what the user can act on, so the apps show the
             // matching reason and the CLI's `detail.reason` says which it was.

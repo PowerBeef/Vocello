@@ -665,6 +665,27 @@ private enum PCM16WAVWriter {
     }
 }
 
+/// The final WAV could not be staged because its folder refuses writes or no
+/// longer exists (BKL-33). AVAudioFile reports that as a bare OSStatus (-54),
+/// which says nothing about storage; this type carries it to the storage copy
+/// and the CLI's output-unavailable exit instead of the engine's runtime failure.
+enum GenerationOutputStorageError: LocalizedError, Equatable, Sendable {
+    case outputFolderNotWritable
+
+    var errorDescription: String? {
+        "The output folder cannot be written."
+    }
+
+    /// The error to report when a staging file could not be created next to
+    /// its destination: this type when the folder refuses writes or is gone,
+    /// otherwise the creation error unchanged.
+    static func forStagingFailure(_ error: any Error, temporaryURL: URL) -> any Error {
+        let directory = temporaryURL.deletingLastPathComponent().path
+        guard !FileManager.default.isWritableFile(atPath: directory) else { return error }
+        return GenerationOutputStorageError.outputFolderNotWritable
+    }
+}
+
 private enum AtomicFilePublisher {
     static func temporaryURL(for finalURL: URL) -> URL {
         let extensionName = finalURL.pathExtension
@@ -869,7 +890,10 @@ enum AtomicPCM16WAVWriter {
         to url: URL
     ) throws {
         guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
-            throw MLXTTSEngineError.generationFailed("Could not create the native WAV output file.")
+            throw GenerationOutputStorageError.forStagingFailure(
+                MLXTTSEngineError.generationFailed("Could not create the native WAV output file."),
+                temporaryURL: url
+            )
         }
         let handle = try FileHandle(forWritingTo: url)
         do {
@@ -1464,12 +1488,16 @@ final class IncrementalPCM16WAVFileWriter {
                 "\(self.signpostCorrelation.message, privacy: .public)"
             )
         }
-        self.file = try AVAudioFile(
-            forWriting: temporaryURL,
-            settings: format.settings,
-            commonFormat: format.commonFormat,
-            interleaved: format.isInterleaved
-        )
+        do {
+            self.file = try AVAudioFile(
+                forWriting: temporaryURL,
+                settings: format.settings,
+                commonFormat: format.commonFormat,
+                interleaved: format.isInterleaved
+            )
+        } catch {
+            throw GenerationOutputStorageError.forStagingFailure(error, temporaryURL: temporaryURL)
+        }
     }
 
     func append(pcmSamples: [Int16]) throws {

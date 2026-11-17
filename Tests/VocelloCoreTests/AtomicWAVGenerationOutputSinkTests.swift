@@ -21,6 +21,49 @@ final class AtomicWAVGenerationOutputSinkTests: XCTestCase {
         XCTAssertEqual(try fm.contentsOfDirectory(atPath: output.deletingLastPathComponent().path), ["output.wav"])
     }
 
+    /// BKL-33: an output folder that refuses writes fails the writer with a
+    /// typed storage error, which reaches the storage copy (and the journal's
+    /// storage code) through the runtime's wrapping, and leaves the engine
+    /// ready; a failure that is not about storage still marks it failed.
+    func testAnUnwritableOutputFolderIsAStorageFailureNotAnEngineFault() throws {
+        let output = temporaryOutputURL()
+        let folder = output.deletingLastPathComponent()
+        let fm = FileManager.default
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        try fm.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer {
+            try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+            try? fm.removeItem(at: folder)
+        }
+
+        var thrown: (any Error)?
+        XCTAssertThrowsError(try IncrementalPCM16WAVFileWriter(sampleRate: 24_000, outputURL: output)) { thrown = $0 }
+        let error = try XCTUnwrap(thrown)
+        XCTAssertEqual(error as? GenerationOutputStorageError, .outputFolderNotWritable)
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: error).code, "storage.output_unavailable")
+
+        let wrapped = NativeRuntimeError.wrapping(error, stage: .streamStartup, message: "The take could not start.")
+        XCTAssertEqual(GenerationFailurePresentationReason(wrapped), .storageUnavailable)
+        XCTAssertTrue(MLXTTSEngine.isStorageFailure(wrapped))
+        XCTAssertEqual(try fm.contentsOfDirectory(atPath: folder.path), [], "nothing is staged in the folder")
+
+        struct EngineFault: Error {}
+        let fault = NativeRuntimeError.wrapping(EngineFault(), stage: .streamStartup, message: "The take could not start.")
+        XCTAssertFalse(MLXTTSEngine.isStorageFailure(fault))
+    }
+
+    /// A creation failure in a writable folder keeps its own error: only a
+    /// folder that refuses writes becomes the storage failure.
+    func testAWritableFolderKeepsTheWritersOwnError() {
+        let folder = FileManager.default.temporaryDirectory
+        struct CreationFault: Error {}
+        let error = GenerationOutputStorageError.forStagingFailure(
+            CreationFault(),
+            temporaryURL: folder.appendingPathComponent(".take.tmp.wav")
+        )
+        XCTAssertTrue(error is CreationFault)
+    }
+
     func testTwoWritersCommitAtomicallyAndLateDiscardCannotDeleteWinner() throws {
         let output = temporaryOutputURL()
         let fm = FileManager.default

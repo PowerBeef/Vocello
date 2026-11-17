@@ -1712,7 +1712,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
                         throw CancellationError()
                     }
-                    await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+                    let unloadedAfterRetry = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                     let surfacedError = Self.surfacedGenerationError(
                         error,
                         allocationRetryAttempted: true
@@ -1732,7 +1732,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         ),
                         appSupportDirectory: diagnosticAppSupportBox.url
                     )
-                    handle(surfacedError)
+                    handleGenerationFailure(surfacedError, request: request, unloaded: unloadedAfterRetry)
                     let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
                     await yieldEvent(failureEvent, generationID: deliveryGenerationID)
                     latestEvent = failureEvent
@@ -1742,7 +1742,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     throw surfacedError
                 }
             }
-            await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+            let unloadedAfterFailure = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             let surfacedError = Self.surfacedGenerationError(
                 error,
                 allocationRetryAttempted: false
@@ -1762,7 +1762,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 ),
                 appSupportDirectory: diagnosticAppSupportBox.url
             )
-            handle(surfacedError)
+            handleGenerationFailure(surfacedError, request: request, unloaded: unloadedAfterFailure)
             let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
             await yieldEvent(failureEvent, generationID: deliveryGenerationID)
             latestEvent = failureEvent
@@ -2564,6 +2564,37 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// Whether `stop()` ran since `generation` was read from `stopGeneration`.
     private func wasStopped(since generation: UInt64) -> Bool {
         stopGeneration != generation
+    }
+
+    /// A take that failed for want of storage (a full disk, an output folder
+    /// that refuses writes) leaves the engine ready: the visible error names
+    /// the storage and the load state keeps the model, so Studio does not say
+    /// the engine needs attention (BKL-33). Every other generation failure
+    /// marks the engine failed, as before.
+    private func handleGenerationFailure(_ error: Error, request: GenerationRequest, unloaded: Bool) {
+        guard Self.isStorageFailure(error) else {
+            handle(error)
+            return
+        }
+        visibleErrorMessage = presentedDescription(of: error)
+        guard !unloaded else {
+            loadState = .idle
+            return
+        }
+        loadState = .loaded(modelID: request.modelID)
+        // The take cancelled the idle unload, and the failure path re-arms it
+        // only over a failed or idle state, so the model kept here arms it.
+        scheduleIdleUnloadIfNeeded(modelID: request.modelID, isBatch: request.batchTotal != nil)
+    }
+
+    /// Whether `error` is about where the take goes rather than the engine.
+    nonisolated static func isStorageFailure(_ error: Error) -> Bool {
+        switch GenerationFailurePresentationReason(error) {
+        case .storageFull?, .storageUnavailable?:
+            return true
+        default:
+            return false
+        }
     }
 
     private func handle(_ error: Error) {

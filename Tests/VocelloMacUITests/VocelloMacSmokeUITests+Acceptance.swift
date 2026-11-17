@@ -31,6 +31,9 @@ extension VocelloMacSmokeUITests {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 20))
             let error = button("textInput_generationError")
             XCTAssertTrue(VocelloUIWait.exists(error, timeout: 180), "An unwritable destination must expose a retryable error")
+            // BKL-33: the failure names the output folder, not an engine fault.
+            let message = error.value as? String ?? ""
+            XCTAssertTrue(message.contains("output folder"), "An unwritable destination shows the storage message: \(message)")
             assertStaysAbsent(button("studio_inlinePlayer_playPause"), "A failed attempt must not publish a result",
                               settle: 1.5)
             assertStaysAbsent(button("textInput_generateButton"), "An idle failure has one retry action, matching iOS")

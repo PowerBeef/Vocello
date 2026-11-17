@@ -86,7 +86,7 @@ class IOSReleaseAnalyzerWarningPolicyTests(unittest.TestCase):
         ])
 
     def test_a_shared_folder_in_two_groups_is_no_longer_allowed(self) -> None:
-        # BKL-32: project.yml gives each shared folder one group (createIntermediateGroups),
+        # BKL-32: the generated project gives each shared folder one group (createIntermediateGroups),
         # so the warning class left the policy and the warning fails a Release log again.
         line = (
             "2026-10-24 16:48:20.089 xcodebuild[1:2] warning:  The file reference for "

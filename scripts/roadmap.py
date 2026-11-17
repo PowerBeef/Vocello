@@ -713,7 +713,7 @@ def _needs_section(data: dict) -> list[str]:
     if not tagged:
         return []
     lines = ["## Open work by what it needs", "",
-             "Only items that carry a `needs` tag are listed: the backlog and the release items added with it. "
+             "Every open item is tagged with what it needs; an untagged item is not shown here. "
              "An item that needs more than one appears under each, with the others named. Each item's "
              "plan and gate are in its plan's section below.", ""]
     for need in NEEDS:

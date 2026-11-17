@@ -37,12 +37,24 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 ## Open work by what it needs
 
-Only items that carry a `needs` tag are listed: the backlog and the release items added with it. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
+Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (41)
+### Mac, remotely (113)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
+- `ASR-06` (planned) Define and verify sensitive-file protection and backup policy (also: iPhone)
+- `ASR-09` (planned) Prove reviewer access to immutable model hosting
+- `AUD-03` (parked) Studio screens stop owning generation Tasks
+- `AUD-04` (parked) Clone readiness reflects the context it actually has (also: iPhone)
+- `AUD-06` (parked) iOS modals hide their background from VoiceOver (also: iPhone)
+- `AUD-09` (planned) Smoke test01 owns the fixture it depends on
+- `AUD-11` (parked) Use constant-time sampler membership without changing token order
+- `AUD-12` (parked) Migrate off the deprecated audio-session interruption keys (also: iPhone)
+- `AV-08` (parked) P2 — qualify multilingual output beyond a single cohort (also: iPhone)
+- `AV-13` (parked) XCUITest coverage for the identifiers never exercised (82 macOS, 38 iOS at the 2026-09-22 recount) (also: iPhone)
+- `AV-14` (parked) re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)
+- `AV-17` (parked) First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs)
 - `BKL-09` (parked) Privacy and security hygiene (also: iPhone)
 - `BKL-18` (parked) iPhone Saved Voices Delete is offered while a Clone take primes its reference
 - `BKL-19` (parked) macOS UI smoke raises a Speech Recognition prompt after every lane rebuild
@@ -82,25 +94,106 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-83` (parked) The swift-transformers 1.4.0 bump (PR #120) needs a token-ID comparison and a benchmark review
 - `BKL-84` (parked) The Mac images in docs/screenshots predate the one-model screens of 3.1
 - `BKL-85` (parked) Window resize in the Mac perf lane rose from 34 to 50-61 ms per action inside one week
+- `BT-01` (parked) Trustworthy memory evidence
+- `BT-03` (parked) UI benchmark and ui-perf lanes ready for the M6
+- `BT-04` (parked) Lineage identity, history and CI evidence tests
+- `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: iPhone)
+- `DA-02` (parked) Studio state and window ownership
+- `DA-03` (parked) Accessibility, localization and glass gating (also: iPhone)
+- `DA-07` (parked) Playback and recording defects that need a device (also: iPhone)
+- `DA-12` (parked) Guard, tooling, docs and website hygiene
+- `DA-13` (parked) Follow-ups from the audit's second fix pass (also: iPhone)
+- `DA-14` (parked) Preserve historical History ID high-water across legacy upgrades
+- `DP-20` (parked) External delivery-control lever watch list (audit R8)
+- `DW-03` (parked) Development workflow: product-side quality (audit Phase 2)
+- `DW-04` (parked) Development workflow: longer-term modernization (audit Phase 3)
+- `ER-01` (parked) Measurement and test scaffolding
+- `ER-02` (parked) Crash and hang class
+- `ER-03` (parked) Long-form and text-conditioning parity
+- `ER-04` (parked) Clone pipeline parity
+- `ER-05` (parked) Sampling and input normalization parity
+- `ER-06` (parked) Lifecycle, cancellation and memory
+- `ER-07` (parked) iPhone memory budget from measured limits (also: iPhone)
+- `ER-08` (parked) Identity-safe performance (also: iPhone)
+- `ER-09` (parked) Numerically shifting performance
+- `ER-10` (parked) Delivery, storage and persistence
+- `ER-11` (parked) Fast QC and output-path hygiene
+- `ER-12` (parked) Tests, dead code, docs and registry
+- `F-06` (parked) Medium — durably couple audio publication and History persistence
+- `F-15` (parked) P1 — preserve macOS Voice Design language, seed, and variation at launch
+- `F-18` (parked) P1 — preserve pre-existing generation destinations across failure and cancellation
+- `F-20` (parked) P2 — make CLI signal cancellation graceful and bounded
+- `F-21` (parked) P1 — restore CLI batch admission and preserve partial outcomes
+- `F-23` (parked) P2 — preserve explicit Play intent across live-to-file finalization
+- `ICA-05` (parked) Publish the evidence-linked device findings checkpoint
+- `PA-08` (parked) Consolidate duplicated platform logic and misleading names
+- `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: At the keyboard)
+- `PA-16` (parked) Speech-tokenizer attention honors the model's sliding windows
+- `PA-18` (parked) Public claims match what each download ships (also: iPhone)
+- `PA-20` (parked) Accessibility and localization reach every surface (also: iPhone)
+- `PA-25` (parked) Docs and tooling stay proportional
+- `PA-26` (parked) Low-severity backlog from the external audit
+- `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: iPhone)
+- `PA-33` (parked) Engine-side lease for model deletion
+- `QC-04` (parked) Lanes on QC v2
+- `QC-06` (parked) Product follow-ups surfaced by QC
+- `QC-08` (parked) In-app Fast QC v9: relative silence, ending fade and loudness
 - `RF-06` (parked) characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred)
+- `RF-30` (parked) Cross-process History for the app and the CLI
+- `RF-31` (parked) CLI parity record, documentation and qualification
+- `RF-44` (planned) Core overhaul, stage 0: instruments and the regression net (also: iPhone)
+- `RF-45` (planned) Core overhaul, stage 1: submission layer (also: iPhone)
+- `RF-46` (planned) Core overhaul, stage 2a: the frame pipeline, identity-preserving
+- `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
+- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
+- `RF-51` (planned) Quality remediation, stage 1: clone input correctness (also: iPhone)
+- `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
+- `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
+- `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model (also: iPhone)
+- `RF-57` (planned) Audit the tooling the quality remediation relies on
+- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: iPhone)
+- `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: iPhone)
+- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: iPhone)
 - `RF-64` (planned) An in-app way to contact the developer and report a problem on the iPhone (also: iPhone)
+- `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (7)
+### At the keyboard (16)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
+- `ASR-02` (planned) Resolve Hugging Face processing and App Privacy disclosure
+- `ASR-05` (planned) Refresh reviewer notes, metadata guidance, and App Store screenshots (also: iPhone)
+- `ASR-11` (planned) Audit live App Store Connect and regional compliance read-only
 - `BKL-27` (parked) Import the iOS signing identity non-extractable in the release workflow
 - `BKL-41` (parked) Release Vocello for iPhone in the EU with trader status
 - `BKL-54` (parked) A farm runner restart drops the test filter and reruns the whole UI bundle
 - `BKL-65` (parked) The App Store privacy and support URLs sit on a vercel.app subdomain
 - `BKL-86` (parked) Attended check of the output-device change under a paused live preview
+- `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: Mac, remotely)
+- `RF-02` (planned) complete Apple prerequisites and the consolidated qualified-decision packet
+- `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
+- `RF-16` (planned) Submit 3.1.0 for App Review on the maintainer's explicit go
+- `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
+- `RF-61` (planned) Ship Vocello and the vocello CLI 3.1 on the Mac
 - `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.1.0
 - `RF-63` (planned) Fit the 3.1 App Review notes into what is left of the 4,000 characters
 
-### iPhone (18)
+### iPhone (62)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
+- `ASR-05` (planned) Refresh reviewer notes, metadata guidance, and App Store screenshots (also: At the keyboard)
+- `ASR-06` (planned) Define and verify sensitive-file protection and backup policy (also: Mac, remotely)
+- `ASR-12` (parked) Complete current signed-candidate physical-device acceptance
+- `AUD-01` (planned) iOS launch and deep-link dead ends
+- `AUD-02` (planned) One owner for the iOS audio session
+- `AUD-04` (parked) Clone readiness reflects the context it actually has (also: Mac, remotely)
+- `AUD-06` (parked) iOS modals hide their background from VoiceOver (also: Mac, remotely)
+- `AUD-07` (planned) Verify recovery from an unverified StoreKit purchase
+- `AUD-12` (parked) Migrate off the deprecated audio-session interruption keys (also: Mac, remotely)
+- `AV-08` (parked) P2 — qualify multilingual output beyond a single cohort (also: Mac, remotely)
+- `AV-09` (parked) P2 — make stateful physical-device lanes independently repeatable
+- `AV-13` (parked) XCUITest coverage for the identifiers never exercised (82 macOS, 38 iOS at the 2026-09-22 recount) (also: Mac, remotely)
 - `BKL-08` (parked) iOS energy hygiene
 - `BKL-09` (parked) Privacy and security hygiene (also: Mac, remotely)
 - `BKL-16` (parked) iOS UI text replacement cannot clear an editor whose caret lands at the start
@@ -116,9 +209,41 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `BKL-59` (parked) Three small iPhone UI defects from the November 9 audit
 - `BKL-68` (parked) The Cancel download dialog may show no Keep Download button on the iPhone
 - `BKL-69` (parked) The iPhone frame-health lane's player scenarios open whatever take is newest in History
+- `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: Mac, remotely)
+- `DA-03` (parked) Accessibility, localization and glass gating (also: Mac, remotely)
+- `DA-07` (parked) Playback and recording defects that need a device (also: Mac, remotely)
+- `DA-13` (parked) Follow-ups from the audit's second fix pass (also: Mac, remotely)
+- `ER-07` (parked) iPhone memory budget from measured limits (also: Mac, remotely)
+- `ER-08` (parked) Identity-safe performance (also: Mac, remotely)
+- `ICA-04` (parked) Execute the complete physical-device campaign
+- `ICA-06` (parked) P1 — localize the long-Chinese non-EOS generation failure and terminal message
+- `ICA-15` (parked) P1 — bound deterministic CustomVoice over-continuation without truncating valid speech
+- `ISR-04` (parked) Complete staged exact-request characterization
+- `ISR-06` (parked) Complete exact-script and broader closure evidence
+- `ISU-4` (parked) Refine Settings hub and shared purchase sheet; qualify the new navigation
+- `ISU-5` (parked) AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows
+- `PA-18` (parked) Public claims match what each download ships (also: Mac, remotely)
+- `PA-20` (parked) Accessibility and localization reach every surface (also: Mac, remotely)
+- `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: Mac, remotely)
+- `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
+- `RF-15` (planned) Risk-based acceptance of the processed 3.1.0 candidate on the iPhone
+- `RF-17` (planned) Exact-tag iOS quality promotion
+- `RF-35` (in-flight) iPhone model downloads may use cellular data, off by default with an opt-in switch
+- `RF-41` (in-flight) iPhone model downloads show their size and ask before they start
+- `RF-42` (in-flight) Decide how Vocello behaves on the iPads that can install it
+- `RF-44` (planned) Core overhaul, stage 0: instruments and the regression net (also: Mac, remotely)
+- `RF-45` (planned) Core overhaul, stage 1: submission layer (also: Mac, remotely)
+- `RF-47` (planned) Core overhaul, stage 3: memory (also: Mac, remotely)
+- `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: Mac, remotely)
+- `RF-51` (planned) Quality remediation, stage 1: clone input correctness (also: Mac, remotely)
+- `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model (also: Mac, remotely)
+- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does (also: Mac, remotely)
+- `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired (also: Mac, remotely)
+- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation (also: Mac, remotely)
 - `RF-64` (planned) An in-app way to contact the developer and report a problem on the iPhone (also: Mac, remotely)
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
+- `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
 ## Vocello 3.1 — the Mac and CLI release, then the iOS App Store submission
 

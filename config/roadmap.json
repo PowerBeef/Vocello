@@ -181,6 +181,9 @@
         "docs/reference/ios-appstore-submission.md",
         "docs/reference/content-rights-review.md"
       ],
+      "needs": [
+        "keyboard"
+      ],
       "updated": "2026-11-01",
       "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music); free and iPhone only; age rating 4+; App Privacy Data Not Collected; the export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: 3.0 ships outside the EU (148 of 175 territories); the EU release is BKL-41. Left: the maintainer's account steps that activate the Paid Apps agreement. Their status and details stay in the maintainer's private record outside the repository (maintainer decision 2026-11-01). The purchase's review screenshot comes from the phone (RF-12). 2026-11-04, maintainer decision: the secondary category changed from Music to Utilities. 2026-11-07, maintainer decision: due moved from 2026-11-06 to 2026-11-09; the remaining account step waits on Revenu Québec."
     },
@@ -228,6 +231,9 @@
         "Sources/iOSSupport/Services/DatabaseService.swift",
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-10-21",
       "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). Touches iPhone-compiled files, so it waits for the submission. From RF-27 (2026-10-21): CLI single takes adopt the shared IOSSingleTakeGenerationExecutor with headless History hooks when History writes land here; until then the CLI writes no History (no opt-in interim). From RF-29 (2026-10-22): MCP generate_speech writes no History row until here; delete_history_item joins the MCP tools with History delete.",
       "unparkWhen": "The iOS 3.0 submission is done."
@@ -242,6 +248,9 @@
       "sourceOfTruth": [
         "scripts/cli_package.py",
         "docs/audits/2026-10-21-cli-overhaul-plan.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-10-21",
       "notes": "Opened 2026-10-21 for the CLI overhaul (docs/audits/2026-10-21-cli-overhaul-plan.md). From RF-28's review (2026-10-22), for the CLI's qualification: models remove checks then deletes without holding a lease, so a concurrent CLI install of the same model can lose its staging; its freedBytes counts hard-linked shared components; the app's reload on a models notice re-digests every model (consider a sizes-only pass). From RF-29 (2026-10-22): cancel a generate_speech interactively from Claude Code (Esc; stdio cancel already proven); the MCP server holds the engine lease for its life (consider releasing it at idle unload).",
@@ -260,6 +269,9 @@
         "scripts/release.sh",
         ".github/workflows/release.yml"
       ],
+      "needs": [
+        "keyboard"
+      ],
       "updated": "2026-11-01",
       "unparkWhen": "After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.",
       "notes": "Opened 2026-10-20 at the maintainer's request: Sparkle over a notify-only check, built after the iPhone freeze, asking on the second launch. Users on 2.4.0 have no updater, so prompts start with the release after Mac 3.0. EdDSA key (keychain account vocello; SUPublicEDKey 0Lowc/RlE87KDi4CMQ+0KTU99cYD0PvXejaZU4FqD/0=) generated 2026-10-20 with Sparkle 2.10.0; the private key is the release secret SPARKLE_ED_PRIVATE_KEY, backed up by the maintainer. Landed cc12c271 to 8a9c52c5: the app, the Updates category, signed-feed and pre-extraction checks, nested-code and feed signing in a minimal job, the build-number check, the privacy page. Swift and security reviews done (M1-M3, L1-L4 fixed). Mac layout lane PASS (macos-xcui-smoke-20261021-033712-87e8ba53). Back to planned 2026-10-21 so the CLI items fit the cap of two; what is left waits on the maintainer: the GitHub release rehearsal and one end-to-end update between two signed builds. Open questions: a per-job second approval of the release environment, Sparkle's 20-day signed-feed fallback (kept), GitHub immutable releases."
@@ -277,6 +289,10 @@
         "scripts/verify_ios_release_artifacts.py",
         "docs/reference/ios-appstore-submission.md"
       ],
+      "needs": [
+        "keyboard",
+        "iphone"
+      ],
       "updated": "2026-11-01",
       "notes": "2026-10-24: the maintainer fast-tracked the 3.0 candidate to TestFlight; the agent approves the release gate and distributes once Apple ends processing. Candidates are cut by python3 scripts/ios_candidate_tag.py (a v<version>-ios.N push archives and uploads only the iPhone app). Builds: 24 (v3.0.0-ios.3); 25 (v3.0.0-ios.4 at 3f1d2bda, beta review APPROVED); 26 (v3.0.0-ios.5 at e0feaf2c, build 25's product plus a test-only fix, run 40391931937, beta review APPROVED, Internal and Public Beta IN_BETA_TESTING under the RF-17 waiver of 2026-10-26). 2026-10-27, install over the development build: the maintainer installed build 26 from TestFlight; its first launch showed TestFlight's What to Test sheet for 3.0.0 (26), CoreDevice saw a new bundle path in the same data container (it reports the team's TestFlight build as a developer app), and RF-15's navigation row (ios-xcui-candidate-smoke-20261027-135949-5fe567b6) showed History and Saved Voices intact. Voice Design shows Not Installed because the maintainer removed it for RF-35's cellular check (2026-10-25), so no data was lost: this row is done. Still open: the owned-export Airplane Mode row, waiting on RF-02. History: git log -p."
     },
@@ -293,6 +309,9 @@
         "docs/reference/release-first-execution-2026-09.md",
         "scripts/ui_test.sh",
         "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "needs": [
+        "iphone"
       ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-10-12 (risk-based gate). Rows run on the TestFlight candidate with --candidate-origin-attestation; with-purchase export, Restore and Cancel wait for RF-02; startup Retry and the unverified purchase use development evidence (ios-xcui-smoke-20261024-115441-08eddecc, ios-xcui-purchase-20261024-120821-ad3c8846). Run IDs drop the ios-xcui-candidate-smoke- prefix. Build 24 passed every row but accessibility (accepted, BKL-31); builds 25 and 26 reran navigation and modes (git log -p). Build 29, 2026-11-01, PASS with no new crash reports: clone-voice 20261102-040529-6a19725b (handoff), navigation 040613-c1623ff9 (About reads 3.0.0 (29)), modes 040643-928766e6 (a take per mode in English and French). Three non-product failures are retained before them (035555, 035645, 035846; git log -p). RF-41 needs a new candidate, which reruns these rows. DA-04, F-01, F-16 closed. Open: the ~30-take machine screen and the purchase rows (RF-02); attended, AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver and the offline relaunch."
@@ -320,6 +339,9 @@
         "config/quality-promotion-contract.json",
         "scripts/quality_promotion.py"
       ],
+      "needs": [
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-10-12. Skipped for the Public Beta on builds 26 and 27 (maintainer); still gates App Review (RF-16). iPhone delivery evaluation is declared not applicable (2026-10-30, e7377511): six iOS records. Build 28's attempt is in git log. 2026-11-03, build 29 (v3.0.0-ios.8, a60dd204), unattended: model download receipt PASS (ios-xcui-model-download-20261103-175437-7f3faed5); ui-benchmark 181710-c657e53a, memory 184038-a1004c76, engine 184249-911ada42 (Design and Clone passed too) and ui-perf 184800-069eab23 PASS and validate against the contract. ui-perf's first run (180207-ad49e02b) failed in teardown on a harness defect (BKL-42) and reran under a new ID. Language failed (ios-lang-bench-20261103-183237-3c5b79f2): hint gate PASS; on-device Speech is unavailable for es, ja, ru, pt, it and ko (their dictation languages are not on the phone); Apple Speech failed custom-fr-pinned (WER 0.22) and design-en-pinned (coverage), which both Mac ASR families pass; both families fail custom-ja-auto (CER about 0.45), a fixed seed. Those records expired on 2026-11-10, and RF-41 needs a new candidate, so all six rerun on its tag."
     },
@@ -334,6 +356,9 @@
         "Sources/iOS/IOSModelDownloadCoordinator.swift",
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/iOS/Settings/VoiceModelsScreen.swift"
+      ],
+      "needs": [
+        "iphone"
       ],
       "updated": "2026-11-01",
       "notes": "Opened 2026-10-24 after the freeze at e7a8e2ae, at the maintainer's request: Wi-Fi only (IOS-08, PA-21) kept people without Wi-Fi from installing any model; Wi-Fi Assist had rerouted flaky-Wi-Fi transfers over LTE, so per-request permission keeps that protection while the switch is off. Build 25, 2026-10-25: navigation row PASS (ios-xcui-candidate-smoke-20261025-030310-db58b35b) and the unattended Wi-Fi reinstall PASS (184700-55cd4a7d, switch off). Attended, 2026-10-27 on build 26 (maintainer): on 5G with no Wi-Fi and the switch off, a Voice Design download waits. It shows 682.3 MB (33%) from the start because speech_tokenizer/model.safetensors (682,293,092 bytes, the same SHA-256 in every model) is reused from the shared component store when an installed model holds it; reuse counts as progress with no network transfer. That matches the 682 MB seen on 2026-10-25, so those bytes were not cellular. The display is parked as BKL-39. With the switch on, a download started afterwards progressed over cellular (maintainer, 2026-10-27), then was stopped before it finished because coverage there is weak; a completion over cellular is not yet observed."
@@ -350,6 +375,9 @@
         "Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift",
         "Sources/iOS/IOSSettingsViews.swift"
       ],
+      "needs": [
+        "iphone"
+      ],
       "updated": "2026-11-07",
       "notes": "Opened 2026-11-07 at the maintainer's request, from G2 of docs/audits/2026-11-04-app-review-readiness.md: Studio's install button started a download of about 2 GB with no size and no prompt, and onboarding never stated the size. A release blocker as an App Review rejection risk. 2026-11-07: code, ten-language copy, deterministic tests and the UI-test confirmations landed (f3689d2a); the routed check passed and the Swift review found no blocker. 2026-11-10, iPhone: the first build showed the prompt as a popover with no Cancel (ios-xcui-model-download-20261110-143248-035dcccd, failed at the dismiss step), so it became an alert with Cancel and Download (37c16b91); the isolated model-download lane then passed (150336-4c1eddec, no new crash reports), proving the prompt from Studio and from a row, that Cancel starts nothing, and that nothing transfers before Download. 2026-11-10: candidate v3.0.0-ios.9 (build 30) cut at 14c51659; release run 42872878302 passed and build 30 is processed VALID in TestFlight. Left: RF-17's model-download record and RF-15's rows on build 30, in a phone window. It replaced build 29 on version 3.0.0 the same day."
     },
@@ -365,6 +393,9 @@
         "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
         "Sources/iOS/IOSAppBootstrap.swift"
       ],
+      "needs": [
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10 from N-1 of docs/audits/2026-11-09-project-audit.md, a release blocker as an App Review rejection risk (Guideline 2.4.1). Apple's Required Device Capabilities data, read 2026-11-10, lists 13 iPad models for the capability: iPad Pro 11-inch (3rd generation) and 12.9-inch (5th generation) and later, iPad Air (5th generation) and later, and iPad mini (A17 Pro). IOSDeviceEligibilityPolicy rejects every identifier that does not start with iPhone, so those iPads show the unsupported-device screen: its title is localized in ten languages, and its body line (IOSDeviceSupport.unsupportedReason in IOSAppBootstrap.swift) is English and prints the raw machine identifier. No iPad has been tried. 2026-11-10, maintainer decision: keep the wall. The body line is now localized in ten languages, names the iPhone 15 Pro floor and iPad, and no longer prints the machine identifier; the App Review notes ask for review on an iPhone 15 Pro or later (read back byte-identical). The screen cannot be shown on the paired iPhone, so it is unseen on a device. Left: the candidate that carries it. 2026-11-10: candidate v3.0.0-ios.9 (build 30) carries it."
     },
@@ -379,6 +410,10 @@
         "docs/audits/2026-11-10-apple-silicon-performance-research.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "scripts/macos_test.sh"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10. Mac half done (0c081a9b to 76fa18e7): scripts/pcm_identity.py is the regression net (fixed-seed PCM digests, paired A/B against a preserved build, an efficiency-core clamp as a host-bound proxy). The M6 is GPU-bound (a frame is 20 ms); TF32 off changes every take with no speed difference; Quality is 46 to 57% slower than Speed. Watermark check 2026-11-11 (Meta's detector, sha256 8a78e8a8, read at 24 kHz): Mac takes read 0.998 to 1.0 with payload 0x56C0 exact; detection depends on the mark's 320-sample frame, and long-form assembly v3 keeps segments on it (0.993 to 0.998, c6a80dcb). iPhone 17 Pro, 2026-11-11 at 3119a745: 23 fixed-seed takes are PCM-identical to the 2026-11-03 build (ios-lang-bench-20261111-162231-d118b261 against 20261103-183237-3c5b79f2), read 0.999 to 1.0 with the payload exact, and keep the same language-gate lines. The app's CPU is busy 0.56 of a take at QoS high, about 600 context switches per frame. Open: a user-cropped file needs realigning to verify; the Mac numbers as published records; an Instruments CPU profile (needs the phone on a cable); no iPhone 15 Pro is paired."
@@ -396,6 +431,10 @@
         "docs/audits/2026-11-10-apple-silicon-performance-research.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10 with the overhaul. Reopens BKL-53's decision of 2026-11-02. Nothing to ship: no constant is set and the per-chunk clear stays. M6: MLX's default of 40 operations per buffer is fastest; the clear costs 1.7% host-bound. iPhone 17 Pro, 2026-11-11 at 3119a745, cooled interleaved fixed-seed takes (three per arm, nominal heat, identical PCM): the default is 35.5 ms per frame (RTF 0.477); MLX_MAX_OPS_PER_BUFFER=40 is 0.8% slower and halves context switches per frame; QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=off (5 clears instead of 39) changes nothing. Back to back without pauses heat dominates: 20 takes drift from RTF 0.55 to 0.75 at thermal state fair. Interface: the frame-health lane passed twice at f6d78880 (ios-xcui-perf-20261111-175155-f5267c25, 180357-2d245d6e); the first warned on two player scenarios because History's newest row was a 2-minute project (BKL-69), and the rerun matches 2026-11-03; with a take generating, hitch time is 91 ms per second against 76. Full smoke passed (ios-xcui-smoke-20261111-174409-5a3c5a46). Open: core placement (an Instruments profile needs the phone on a cable); residency sets, not tried; no iPhone 15 Pro is paired."
@@ -415,6 +454,9 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10 with the overhaul; draws on ER-08's PERF-2 to PERF-6. Landed, each PCM-identical on fixed-seed takes: the rotary step and the fused projections (9209cf5d), the code predictor's frame as one compiled function that samples on keys the request resolves (0dc10a5a, f22cd9b2), and the split of the runtime's 6,800-line file into eight by pure moves (76fa18e7). About 13% faster where the host bounds a frame (the M6 clamped to the efficiency cores, RTF 0.747 to 0.652) and under 1% where the GPU does. iPhone 17 Pro, 2026-11-11 at 3119a745: 52 fixed-seed takes are PCM-identical (23 against the 2026-11-03 build, 29 across diagnostic arms), so the compiled forms hold on the phone's GPU; a frame takes 3.5% less time on the 14 takes that ran cool in both runs (39.5 to 37.6 ms), which puts the 17 Pro near the GPU-bound end like the M6. Not done: the lagged token read (neither the M6 nor the 17 Pro shows a regime in which it pays; the iPhone 15 Pro is unmeasured, none is paired) and a compiled talker sampler (one draw in sixteen)."
     },
@@ -431,6 +473,10 @@
         "docs/audits/2026-11-10-apple-silicon-performance-research.md",
         "Sources/QwenVoiceCore/IOSMemorySnapshot.swift",
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10 with the overhaul; draws on ER-07, whose premise of an 8,192 MB budget the shipped builds do not have. Game Mode stays off. Landed: the text embedding read by row from the checkpoint file (2ba30b2e); the two footprint bands stated at a 6,144 MiB budget and scaled to the measured budget, and a loaded model kept two minutes in the foreground, shortened under memory pressure (eb0775f0). iPhone 17 Pro, 2026-11-11: retained-memory qualification PASS at 3119a745 (ios-memory-qualification-20261111-170450-503cb136). Against 2026-11-03, MLX's peak is 316 MB lower in each mode (Custom and Design 1,827 to 1,511 MB, Clone 2,066 to 1,750), the footprint held after a take about 215 MB lower, and the UI benchmark's exact footprint peaks 313 to 415 MB lower (Clone 3,182 to 2,870). The process limit reads 6,144 MB; peak budget use is 0.28 to 0.47. Under the iPhone 15 Pro profile (5,000 MB limit; GPU and heat not simulated) Custom, Design and Clone peak at 2,132, 2,472 and 2,767 MB, band healthy, at least 2,233 MB of headroom, same samples. Open: reloads with the two-minute window (no lane holds a process idle) and a real 8 GB phone."
@@ -449,6 +495,10 @@
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
         "Sources/iOS/TTSEngineStore.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-11-10 with the overhaul (D-01 and B-09 in ER-08). Landed: the watermark pass without its per-window cache clears (093a092c, 901749f1); the live preview started from the take's measured pace (af8ca492); long-form waits between segments while the thermal state is serious or critical, at most three minutes, and says why (fd019b81). Left out: holding the watermark's weights and marking as chunks arrive (it would raise a take's peak). M6: finalization a fifth shorter, first sound 0.44 s sooner. iPhone 17 Pro, 2026-11-11: the UI benchmark passed at 3f8fa144 (ios-xcui-benchmark-20261111-172017-636b2dd5). Against 2026-11-03 the preview starts 0.5 to 0.8 s sooner after the first chunk on medium and long takes (medium Custom 1.40 to 0.63 s) and 0.1 to 0.2 s on short ones, with no underrun in 29 takes; RTF is unchanged (0.53 to 0.52) and finalization 1 to 5% shorter. The kernel's footprint high-water mark does not rise during finalization on 36 headless takes. The long-form journey passed (ios-xcui-smoke-20261111-173732-88218ccb). Open: the heat pause at serious heat (the 17 Pro reached fair), the iPhone 15 Pro's preview, and the App Review notes, which say nothing about heat."
     },
@@ -464,6 +514,10 @@
         "Sources/QwenVoiceCore/NativeCloneSupport.swift",
         "Sources/QwenVoiceCore/AudioPreparation.swift",
         "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-11",
       "notes": "Opened 2026-11-11 at the maintainer's request, from the findings verified in the review of 2026-11-11 (ER-04's G-01, G-02, G-08 to G-13 and G-15; ER-05's A-18). Code complete 2026-11-11: G-02 (b876e29d), G-01 (b308c609; on 20 real clips with Whisper word times 19 complete transcripts pass and 39 of 39 truncated ones are caught) and a5bf4add for the rest (one reference check on the original clip for every surface, unreadable and silent clips block, the engine refuses a one-off clip before a model load, one transcript shape, NFC template text, the preparation version, the padding comment). No sample change: 11 fixed-seed takes (three modes, seven languages, a transcript-backed and an audio-only clone) are PCM-identical between the CLI built before a5bf4add and at it, and the earlier build reproduces itself 11 of 11. The punctuation half of G-15 moved to RF-52. Left, all for a phone window: Apple Speech's word times against the coverage rule (this terminal has no Speech permission), the iPhone recorder's Stop under 10 seconds, and the review dialogs' new warnings and partial-transcript state."
@@ -482,6 +536,9 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSVoiceClonePrompt.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-13",
       "notes": "Opened 2026-11-11 (ER-04's A-02, G-03, A-04, A-26, A-11, A-12, G-07, G-15). Decided by rules recorded before their arms (config/quality-screens.json): preparation v2 (a715b2ae) and the two-channel average v3 (fffcc709) ADOPT; split-half rotary (A-02) INCONCLUSIVE, stays adjacent; reference unpadded (A-12, a144a489) ADOPT; streamed clones primed with the reference's history (A-04, 1a308d7e) ADOPT on its confirmation (similarity +0.056). A-26 (321d6c77): the primed state is kept per prompt; 191 of 191 takes equal the per-process arm, restored in at most 1 ms against 1.07 s to prime. A-11: no space before a Han or kana clone target, ADOPT (0b7465a2). G-07: a transcript-backed reference's edges trimmed and faded, ADOPT (9db958fd; conditioning version icl-ref-edges-trimmed-v4). G-15: enrollment asks the recognizer for punctuation, transcript-punctuation ADOPT on the attn hybrid (similarity -0.003, error rate +0.003, within the margins); enrollment algorithm v3, verification unchanged. Left: one Mac enrollment with recognition (Speech is not allowed for the agent's shell), and the iPhone's in the next phone window."
     },
@@ -497,6 +554,9 @@
       "sourceOfTruth": [
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-11",
       "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up PA-16's decoder half (A-03); PA-16's encoder-window clause is not taken up. The window is selectable behind QWENVOICE_DECODER_WINDOW=on (c4bfee76); the clone-long screen (2236c3cb: 48 references, two four-sentence takes each) decided it under decoder-window-72: INCONCLUSIVE, default stays unwindowed. Every take kept its length; similarity +0.002 whole, -0.0015 late; trailing silence -0.1 ms. Open: the error-rate interval, carried by one take that is a gross failure in both arms (german-07, both recognizers running away), and the screen's own trailing-silence floor (34 ms, over 0.71 of 40). Next if pursued: fresh seeds, a bounded per-take edit rate and a decoder-only floor, recorded first."
@@ -514,6 +574,10 @@
         "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
         "docs/reference/qwen3-tts-guide.md"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-13",
       "notes": "Opened 2026-11-11 (the review's pre-screen). An 8-bit code predictor costs about 20% on a GPU-bound frame with no repeatable gain. QWENVOICE_MIXED_PRECISION screens a recipe; scripts/build_hybrid_model.py builds it. Decided 2026-11-12 (config/quality-screens.json; docs/reference/hybrid-model.md): attn, the talker's attention at 8 bits (+176 MB), ADOPT on clones and single takes against both models and on long-form (65 of 72 projects; Speed 56, Quality 68); the built artifact reproduces its arm (192 of 192 clone takes, 21 of 21 projects). It beats Speed everywhere and does not match Quality (clone similarity -0.026, long-form error rate about twice Quality's). 2026-11-13, maintainer: attn replaces both models (RF-59), Korean long-form gets a caution (RF-60); published that day. Formal speed lane 2026-11-14 (9236f175, four alternating captures, 36 warm takes per model): median RTF Speed 0.279, attn 0.303, Quality 0.412. Left: the iPhone's memory and speed."
     },
@@ -529,6 +593,9 @@
         "scripts/qc.py",
         "scripts/clone_fidelity_lane.py",
         "docs/reference/qc.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-11",
       "notes": "Opened 2026-11-11 at the maintainer's request. Done 2026-11-11. The deterministic suites repeated at a6e501eb: XCTest 8 of 8 runs clean; Python 5 of 5 with one failure that is environmental (BKL-72); BKL-71's test did not fail again. Two read-only audits of the take lanes found them unfit to decide: qc-takes passes when scoring fails, no lane scores both speaker and content, refused takes leave the averages, arms share a data directory, asr.edit_rate_min counts no substitutions, WAV digests include a timestamp. scripts/quality_screen.py replaces them for decisions (RF-50); the lane's resume after a QC refusal is fixed (317bd340). The screen's own evidence reader had a bug its guard exposed (identifier case), fixed. Left for the long-form screen: QC v2 has never scored a long take (the phone model stops at 120 s, Whisper fixes the language from the first 30 s, seam pauses read as dropouts)."
@@ -550,6 +617,10 @@
         "config/ios-control-audit.json",
         "config/quality-screens.json"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-12",
       "notes": "Opened 2026-11-12 at the maintainer's request. Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) lowered the talker's temperature; long-form projects refused 18 of 32 under Consistent against 4 of 32 under Expressive, and no measurement showed a benefit. Implemented 2026-11-12 (0e248d2c): requests carry no variation and sample as the reference; both Settings pickers, their strings and the take-variation lane are gone; vocello --variation parses and warns (variation_retired); device plans, the control audit (191 takes) and voice reliability (117) run Expressive only; the long-form screen is version 2. Proof: scripts/pcm_identity.py, 14 of 14 fixed-seed takes in three modes PCM-identical between the builds of 734e3766 and 0e248d2c; a generate take keeps its request, session and prewarm identity digests. The macOS localization lane passed (its Audio page and overview show Playback only). Left: the iPhone settings and control-audit lanes in the next phone window; the website and release notes change with the release that ships it."
     },
@@ -569,6 +640,10 @@
         "scripts/build_hybrid_model.py",
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-14",
       "notes": "Opened 2026-11-13 at the maintainer's request: the attn hybrid replaces Speed and Quality (clone similarity -0.026, long-form error rate about twice Quality's, RTF x1.05 to x1.06, +176 MB). Published 2026-11-13: PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-hybrid-attn at c36e22ed, 6bcae41e and 5af70b5c. Implemented in 41693f7f, b3b09d3c, d50e860b and dbe59080. Model update for 3.0 users (2026-11-13): the modes an earlier build installed read Update required and update themselves (the Mac on an unmetered network, the iPhone after one consent alert); Cancel, Not Now and Later stop it; a failure is kept and waits for Update or Retry; a short disk offers to remove the earlier models first. Proven on a clone of real 3.0 Mac data (76 s, tokenizer reused, History and voices intact) and by the Mac model-update scenario; the review's phone-free follow-ups are done (2026-11-14). Left: the iPhone flow, memory and speed on a phone, the speed lane, memory bands, baselines, and the README, website and public facts with the release. The 3.0 packages live in QwenVoice-Research for the screens (run --stock)."
     },
@@ -583,6 +658,10 @@
         "Sources/QwenVoiceCore/LongFormPlanning.swift",
         "Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift",
         "docs/reference/qwen3-tts-guide.md"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-13",
       "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment. Implemented 2026-11-13: GenerationSemantics.resolvesToKorean (Auto's East Asian branch, so digits do not count and a Latin run is one word) drives a caution under the Studio script on both apps, hidden while a take runs, and before Generate All in the Mac batch sheet, in all ten interface languages; vocello adds long_form_korean (generate before boot; batch names its lines). Left: the iPhone view in the next announced phone window."
@@ -600,6 +679,9 @@
         "docs/reference/hybrid-model.md",
         "project.yml",
         "config/public-product-facts.json"
+      ],
+      "needs": [
+        "keyboard"
       ],
       "updated": "2026-11-15",
       "notes": "Opened 2026-11-14: no iOS 3.0 release; the Mac and the CLI 3.1 ship first. The audit of 2026-11-15 and its plan (docs/audits/2026-11-15-remediation-plan.md) are implemented except steps 40, 41, 46, 50 and the rest of 43. Xcode: the pin stays at 26.6; the lanes run on this Mac's Xcode 27.2 and promotion accepts that difference only by name. Pushed 2026-11-16: CI required is green on 571b968e and the release rehearsal passed. Lanes on the 3.1 tree, all PASS: UI benchmark (canonical, cell-hash-v2), UI perf with ceilings enforced, smoke 16 of 16 on 571b968e, gate bench, language (ten languages), delivery, retained memory, model download, release-readiness, dev.sh ci. Fixed on the way: the language record's size cap, promotion's advisory-warning families, the lanes' signing (BKL-19), a flaky hook test (BKL-71), one Xcode 26.6 compile error. Next: the maintainer's signed v3.1.0 tag on a green commit, then the seven promotion lanes on the tag checkout and the assembly, which has never run end to end. Only docs, roadmap and records may be committed until promotion ends. docs/development-progress.md, Resume now, has the detail."
@@ -737,6 +819,9 @@
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md"
       ],
+      "needs": [
+        "keyboard"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-10-13: on hold by maintainer decision while development continued. 2026-11-01: the maintainer resumed it with a dated path (docs/reference/release-first-execution-2026-09.md): App Review by November 12, on the maintainer's go. 2026-11-04: the App Review readiness audit (docs/audits/2026-11-04-app-review-readiness.md) ranks the remaining review risks against Apple's current guidelines."
     },
@@ -751,6 +836,9 @@
         "docs/audits/2026-10-06-deep-audit.md",
         "Sources/ContentView.swift",
         "Sources/Services/MacLineBatchRunner.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
@@ -768,6 +856,10 @@
         "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
         "Sources/iOS/IOSShellPrimitives.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "Fixed in code on 2026-10-06 (1662434c, e62747f0, 2b2b7bf4, 53e77deb, 201194a6, 86fd0afe), reviewed and green in CI. Left: the layouts were read from code and need a device check; A13-06 (contrast over the edge-to-edge sheet) needs a device measurement; that Glass.identity under the generation gate costs nothing is Apple's documented behavior, unmeasured here (next consented gate or ui-perf run). PA-20 owns accessibility and localization reach."
@@ -784,6 +876,10 @@
         "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
         "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "A7-02 needs a new catalog key in ten languages; A7-03 needs a forced underrun on a device. 2026-11-10 review: A7-05 is in the deep audit's refuted list, so A7-02 and A7-03 remain. The 2026-11-09 audit's A-1 is A7-02."
@@ -799,6 +895,9 @@
         "docs/audits/2026-10-06-deep-audit.md",
         "scripts/hooks/policy_guard.sh",
         "project.yml"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
@@ -818,6 +917,10 @@
         "Sources/ContentView.swift",
         "docs/audits/2026-10-10-codex-workflow-audit.md"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "Test gaps DA-09 left: a cancel after the terminal or after publish (needs the real streaming path), the CLI Batch, Bench and Models commands (not compiled into VocelloCoreTests), the trim early return when the prewarm slot throws, and the glue inside GenerationOutputAdapter.run around the tested choreography. 2026-10-10 Codex audit CW-06/CW-07 refines remaining coverage: GenerationOutputAdapter.runReservedTake already has scripted production-helper choreography tests; add a bounded seam for concrete run/EngineReservedTake integration. Add app-host-free dependency injection for IOSModelDownloadCoordinator background restore/adoption, cancel/progress fencing, durable background completion and stale operation generations. Keep physical-device model-download proof separate. These are coverage gaps, not reproduced product failures. Recovery of 32654a87 fixes prompt publication with private staging, source/transcript revalidation and atomic adoption under the replacement/delete lock, covered by suspension and cross-process tests. Normalized-audio cache ownership and all other gates remain open; phone acceptance stays deferred."
@@ -831,6 +934,9 @@
       "sourceOfTruth": [
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "notes": "Planned behind RF-10: source and behavioral tests are complete (VRA-001 at 2f392484; the coordinator captures the complete immutable Design draft and variation before asynchronous preparation; 7/7 deterministic tests and the production macOS app build passed on 2026-09-04, no model or device used). The only open clause is visible selection-to-engine parity on a packaged candidate, which RF-10 owns. Source implementation, candidate verification and release authorization are separate milestones (docs/reference/release-first-execution-2026-09.md). (Earlier history: git log -p -- config/roadmap.json.)",
@@ -848,6 +954,9 @@
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "Sources/VocelloCLI/GenerateCommand.swift",
         "Tests/VocelloCoreTests/AtomicWAVGenerationOutputSinkTests.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-10. Source correction and native sentinel fixtures are complete; the only open clause is corrected-app and copied-CLI qualification under RF-10 (parked). No source work is pending on this item until the blocker moves; status reflects that, not a regression. September 4 source correction implemented: only UUID staging is removed on failure; successful output replacement uses one same-directory rename. Engine cancellation/allocation-retry paths no longer remove caller-owned destinations. Clone rejects canonical-path/symlink/hardlink reference aliases. Native sentinel fixtures pass for QC rejection, abort, publication failure, atomic replacement and late cleanup by a competing writer. Corrected app/copied-CLI acceptance remains RF-10/RF-12; no user audio was used. 2026-10-16 engine audit: fixed in source; the RF-10/RF-12 qualification remains.",
       "plan": "engineering-review-remediation-2026-08",
@@ -872,6 +981,9 @@
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "scripts/cli_package.py"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-10. Supervisor, deterministic and native-signal fixtures are complete; the only open clause is copied-package qualification of the affected paths under RF-10 (parked). The playback-child and signal-window gaps found on 2026-09-11 are F-26. No source work is pending on this item until the blocker moves; status reflects that, not a regression. September 4 implementation adds a Dispatch-signal/Mutex command supervisor: first SIGINT/SIGTERM cancels the owned task and waits; second signal or 30-second deadline explicitly reports forced termination. Deterministic tests cover before-attach, first/second signals and cleanup/deadline states, and native child-process SIGINT/SIGTERM fixtures passing. Package qualification now requires a cleanup acknowledgement and absent final/staging output; it never deletes artifacts to manufacture PASS. Native OS signals exposed a Swift 6 actor-isolation trap in the Dispatch callback; explicit Sendable callback isolation corrected it and both signal fixtures now pass. (Earlier history: git log -p -- config/roadmap.json.)",
       "plan": "engineering-review-remediation-2026-08",
       "status": "parked",
@@ -895,6 +1007,9 @@
         "Sources/VocelloCLI/VocelloMain.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "docs/reference/cli.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-10. Admission repair, partial-outcome reporting and package qualifier are complete; the only open clause is one two-item batch from the copied signed CLI under RF-10 (parked). No source work is pending on this item until the blocker moves; status reflects that, not a regression. September 4 follow-up confirmed the external audit: batchIndex/batchTotal on ordinary generate requests rejected every mode before synthesis. A regression using the production request builder and real engine supportDecision reproduced 18 assertions across six requests. The CLI now owns batch metadata outside the requests; the engine guard is unchanged. All 10 CLIExecutionTests and 29 package tests pass, covering actual admission, identities, partial outcomes, cancellation and negative policy controls. The schema-v2 copied-package qualifier requires one two-item batch with ordered legacy JSON, distinct WAVs, EOS, finite duration/PCM integrity and no leftover outputs, retaining failure rows privately. Per-item strict-QC receipts are not invented from legacy JSON. (Earlier history: git log -p -- config/roadmap.json.)",
       "plan": "engineering-review-remediation-2026-08",
@@ -927,6 +1042,9 @@
         "Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "evidence": [
         "file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift",
         "file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift",
@@ -941,6 +1059,9 @@
       "plan": "delivery-prompting-2026-08",
       "title": "External delivery-control lever watch list (audit R8)",
       "status": "parked",
+      "needs": [
+        "mac"
+      ],
       "unparkWhen": "Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.",
       "updated": "2026-11-10",
       "gate": "Re-verify the R8 watch list against primary sources; if a lever runs on-device at the 8 GB floor, open a measured DP item with a pre-registered holdout comparison, else re-park with the reason.",
@@ -959,6 +1080,9 @@
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "config/ios-control-audit.json"
       ],
+      "needs": [
+        "iphone"
+      ],
       "evidence": [
         "file:scripts/tests/test_check_ios_smoke_acceptance.py",
         "doc:docs/reference/ios-app-guide.md",
@@ -976,6 +1100,10 @@
       "title": "P2 — qualify multilingual output beyond a single cohort",
       "status": "parked",
       "gate": "Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell. Recognizer families: the Mac takes QC v2's two ASR families (QC-04, a new language measurement version); publish the first two-family iOS language records (Apple Speech in the app plus a QC v2 family); a single-family record is never consensus.",
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "evidence": [
         "commit:ae446132",
         "file:scripts/tests/test_language_metrics.py"
@@ -1001,6 +1129,9 @@
       "title": "P2 — make stateful physical-device lanes independently repeatable",
       "status": "parked",
       "gate": "Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes. The controllable-clock clause moved to AV-15 on 2026-09-13.",
+      "needs": [
+        "iphone"
+      ],
       "evidence": [
         "commit:ae446132",
         "commit:5029a348"
@@ -1031,6 +1162,9 @@
         "Sources/QwenVoiceCore/IOSUnloadQuiescence.swift",
         "config/ios-startup-reliability-result-schema-v2.json"
       ],
+      "needs": [
+        "iphone"
+      ],
       "evidence": [
         "file:Tests/VocelloCoreTests/StartupReliabilityDiagnosticsV2Tests.swift",
         "file:scripts/tests/test_ios_startup_reliability.py"
@@ -1048,6 +1182,9 @@
       "sourceOfTruth": [
         "docs/reference/ios-built-in-startup-reliability.md",
         "scripts/ios_startup_reliability.py"
+      ],
+      "needs": [
+        "iphone"
       ],
       "updated": "2026-09-13",
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by ISR-04. The closure grid presupposes the ISR-04 affected-seed matrix and the original script bytes. No source work is pending on this item until the blocker moves; status reflects that, not a regression. Open. The original script bytes have not been supplied and the broader predecessor, preparation, platform, repetition, and grid evidence is incomplete. The earlier forced-unload successor remains a represented process termination without a correlated system-crash report; after the bounded quality-first fix, the tracked sentinel completed five full unload/quiescence/reload cycles with 10/10 passes, healthy 2.78-3.19 GiB per-take peaks, no crash delta, and successful cleanup. The same five-cycle proof is still required for the unavailable original script. Exact codec replay classifies the observed 38112006 word spacing as sampled-output cadence, not decoder corruption, and does not waive the existing acceptance gate.",
@@ -1069,6 +1206,9 @@
         "docs/reference/ios-appstore-submission.md",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
+      "needs": [
+        "keyboard"
+      ],
       "evidence": [
         "commit:87636935"
       ],
@@ -1088,6 +1228,10 @@
         "docs/reference/ios-appstore-submission.md",
         "Sources/iOS/IOSSettingsViews.swift",
         "docs/screenshots"
+      ],
+      "needs": [
+        "keyboard",
+        "iphone"
       ],
       "evidence": [
         "commit:87636935"
@@ -1113,6 +1257,10 @@
         "docs/reference/privacy-storage.md",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "evidence": [
         "commit:87636935"
       ],
@@ -1136,6 +1284,9 @@
         "config/model-host-availability-policy.json",
         "scripts/model_host_availability.py"
       ],
+      "needs": [
+        "mac"
+      ],
       "evidence": [
         "commit:87636935"
       ],
@@ -1153,6 +1304,9 @@
       "gate": "Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.",
       "sourceOfTruth": [
         "docs/reference/ios-appstore-submission.md"
+      ],
+      "needs": [
+        "keyboard"
       ],
       "evidence": [
         "commit:87636935",
@@ -1173,6 +1327,9 @@
         "scripts/ios_device.sh",
         "Tests/VocelloiOSUITests",
         "docs/reference/ios-device-testing.md"
+      ],
+      "needs": [
+        "iphone"
       ],
       "evidence": [
         "commit:87636935",
@@ -1198,6 +1355,9 @@
         "scripts/ios_control_audit.py",
         "docs/reference/ios-device-testing.md"
       ],
+      "needs": [
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "retentionCheckpoint": "September 5 device generation/collection stopped with failed smoke 101844 preserved and supplemental telemetry collected. Final screen-protection 104057 passed with French 3-minute readback. No historical source cursor may resume across the source/docs checkpoint. Next phone window requires preflight, retained-state inspection and a new source-bound bounded pilot; preserve unrelated History, voices and models.",
       "notes": "September 11 reconciliation: config/ios-control-audit.json gained five control families after the September 5 notes (app-language-options, export-purchase-actions, export-purchase-settings, history-unqueued, settings-navigation); config/ios-control-audit-contract-20260904.json stays the frozen snapshot for validating the historical plan and intentionally diverges from the live contract. Every retained run bundle and diagnostics directory under build/artifacts was removed by a host cleanup on 2026-09-11, so no cited run id is inspectable locally and scripts/ui_test.sh --resume has nothing to validate: the campaign restarts from take 1 on the frozen source. September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-09. The campaign runs only on one frozen source identity; RF-09 has not frozen it. No source work is pending on this item until the blocker moves; status reflects that, not a regression. Later September 5 pilot 133921-8541d6f1: two genuine generation/player/History journeys, restoration and crash collection completed; host correlation failed missing warm coverage. (Earlier history: git log -p -- config/roadmap.json.)",
@@ -1219,6 +1379,9 @@
         "config/roadmap.json",
         "scripts/ios_control_audit.py"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-09-14",
       "notes": "Planned behind ICA-04: the report is re-pinned only after every campaign row is terminal, and it will cite the new frozen campaign because the September run bundles were removed from build/artifacts on 2026-09-11. The September 5 pilot 133921-8541d6f1 is recorded without laundering: XCTest/UI shard pass, runner/correlation failure, ledger optional-step gap, cold-only coverage, Chinese cadence warning, ten authentic observations, absent generation screenshots/WAVs reported. Pinned historical reports stay unchanged. (Earlier history: git log -p -- config/roadmap.json.)",
       "blockedBy": [
@@ -1237,6 +1400,9 @@
         "Sources/QwenVoiceCore",
         "Sources/iOS",
         "scripts/ios_control_audit.py"
+      ],
+      "needs": [
+        "iphone"
       ],
       "evidence": [
         "commit:343635cb"
@@ -1257,6 +1423,9 @@
         "config/ios-startup-reliability-result-schema-v2.json",
         "scripts/ios_startup_reliability.py",
         "docs/reference/ios-device-testing.md"
+      ],
+      "needs": [
+        "iphone"
       ],
       "evidence": [
         "doc:docs/audits/2026-08-29-ios-control-audit-remediation.md",
@@ -1279,6 +1448,9 @@
         "scripts/voice_identity_language_reliability.py",
         "docs/reference/ios-device-testing.md"
       ],
+      "needs": [
+        "iphone"
+      ],
       "evidence": [
         "commit:a919f3c3",
         "commit:5029a348"
@@ -1298,6 +1470,9 @@
         "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
         "Tests/VocelloCoreTests/AudioPlaybackResumePolicyTests.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "notes": "September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-10. Shared resume-policy correction and fixtures are complete and the September 5 pilot supplied structured playback evidence; the remaining clauses are a clean long-clip pilot and packaged macOS playback under RF-10 (parked). No source work is pending on this item until the blocker moves; status reflects that, not a regression. Later September 5 pilot 133921-8541d6f1 supplies genuine explicit Play/Pause and paused-scrub evidence on 2.88 s English and 18.8 s long-corpus Chinese output, including Chinese paused position changing 0:15 to 0:02. The Chinese audio has a cadence warning and the runner fails missing warm coverage; no generation screenshot was exported. This advances structured playback evidence, not a complete pilot, clean audio or packaged-macOS acceptance. Old automatic-drain policy could use queued duration instead of heard position for explicit Play. Narrow shared correction and four fixtures pass. Short iPhone playback/History passes; long-player observation and independent audio failures still prevent full pilot qualification. RF-07/RF-10 retain frontend/candidate gates.",
       "evidence": [
@@ -1313,6 +1488,9 @@
       "plan": "ios-settings-2026-08",
       "title": "AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows",
       "status": "parked",
+      "needs": [
+        "iphone"
+      ],
       "updated": "2026-10-10",
       "gate": "Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.",
       "notes": "Reviewed 2026-10-10 at 38d295c4. TabDock caps accessibility-size growth, IOSSettingsViews uses semantic toggles and SettingsScreen adapts App Language rows. The captured-bounds scroll regression and September 21 localization/control geometry checks exist; the final variation label wraps. Remaining gate is current-source physical English/French AX-XXXL and pseudo reachability/mutation, plus actual spoken VoiceOver switch-role acceptance. Existing geometry and system audits are historical evidence, not spoken acceptance. Phone work is deferred; retain failures and obtain new source-bound evidence when resumed. See ISU-4 and docs/reference/localization.md.",
@@ -1343,6 +1521,10 @@
         "config/ios-control-audit.json",
         "scripts/ios_control_audit.py"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "notes": "Opened from the 2026-09-11 review of the XCUITest suites (commits 458a7410 onward); the iOS half was ICA-20 until 2026-09-13. The label-dependent iOS sites are VocelloiOSControlAuditUITests (History clear and delete dialogs, seed unpin, inline player Play/Pause) and VocelloiOSPurchaseUITests (player Play/Pause; the system share sheet's close button stays a system control). Tests written without a lane run stay unproven, so both halves wait for explicit UI QA scope. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-14: blocked behind CONV-17 so coverage is written against the converged macOS screens. Recounted 2026-09-22 (external audit TEST-05): 82 of 145 macOS and 38 of 113 iOS literal identifiers are unexercised.",
       "legacyIds": [
@@ -1364,6 +1546,9 @@
         "config/ui-perf-thresholds.json",
         "config/ui-perf-thresholds-ios.json",
         "scripts/lib/host_preflight.sh"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c. September 21: the paired phone was available, but smoke observed Update Available for Custom, Design and Clone. No iOS benchmark or perf run was launched against stale catalog readiness; no new timing, RAM, QC or threshold claims are made.",
@@ -1389,6 +1574,9 @@
         "benchmarks/baselines/mac-gate-bench.json",
         "config/qc/models.json"
       ],
+      "needs": [
+        "mac"
+      ],
       "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
       "notes": "M6 canonical since 2026-09-22 (maintainer decision). Step (1) done 2026-09-25: three seeded gate runs seeded the M6 baseline (RTF 0.265, first chunk 145 ms, 52 tokens/s); gate compares pass after waves 8-11 (mac-gate-bench-20260926-180734-fe43583b). Step (4) done 2026-09-25: mac-memory-qualification-20260926-011258-82f5f55c calibrated the gap bound and retained-memory v2. Step (2) done 2026-09-27: macos-xcui-benchmark-20260927-101957-c37aa311 is the first canonical M6 UI record (29 takes with played-audio capture; warm RTF 0.26-0.32 by mode and length), with the README charts, prose and website figures moved to it in the same commit; the M2 record 379db820 stays an earlier series. The same run calibrated the stall gate at 600 ms. Step (3) done 2026-09-27: three M6 ui-perf sessions re-derived the warn-only ceilings (spread-v1). Step (6) emulation passed (exploratory). Step (5) retired 2026-10-01 with the v1 audio QC and its judge panel; QC v2's models ran on the M6 within budget (QC-01, archived). Open: the 8 GB floor decision beyond emulation.",
       "updated": "2026-10-02"
@@ -1402,6 +1590,9 @@
         "Sources/iOS/QVoiceiOSApp.swift",
         "Sources/iOS/App/RootView.swift",
         "Sources/iOSSupport/Services/IOSStartupRecovery.swift"
+      ],
+      "needs": [
+        "iphone"
       ],
       "notes": "Revalidated 2026-09-18 (P1); see docs/audits/2026-09-18-project-review.md. Startup Retry landed 2026-09-24 (a32a0f7f); 7bf815d6 queued opened files at the app root until onboarding is gone (a cold-launch open was otherwise lost while async startup ran). 2026-10-13 remediation: IOSStartupRunner owns each pass (fail, Retry, succeed is tested over fakes; the container only adapts iOS); the registered knob QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE with scripts/ui_test.sh ios smoke --scenario startup-retry proves Retry on the device build (distribution builds compile the knob out); RootView imports one opened file at a time: the copy comes first (a failure closes nothing), then it closes its own sheet, recorder, picker and earlier import and presents only once nothing is presented over the root, so the cover is never dropped. 2026-10-13 device proof of Retry: scripts/ui_test.sh ios smoke --scenario startup-retry PASS on the paired iPhone (ios-xcui-smoke-20261013-202516-b175375f, clean crash delta). Still unproven on a device: a file opened while the player sheet or the recorder is up. Closure needs RF-15's device run.",
       "plan": "release-first-3-0-2026-09",
@@ -1421,6 +1612,9 @@
         "Sources/SharedSupport/ViewModels/ClipReviewPlayer.swift",
         "Sources/iOS/Sheets/IOSPlayerSheet.swift",
         "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+      ],
+      "needs": [
+        "iphone"
       ],
       "notes": "2026-09-24: PA-21 gives the session one owner (IOSAudioSessionOwner); the shared player claims playback before playing. 2026-10-14: every AVAudioPlayer owner pauses for a call, Siri, an alarm or a lost output through one observer (IOSPlaybackExclusivity.handle), with deterministic tests; the shared player resumes a file after a call. Record-then-play (a clip recorded from Clone's reference plays to its end) PASS on the development build (ios-xcui-smoke-20261014-182117-a8bd7902) and on TestFlight build 24 (ios-xcui-candidate-smoke-20261024-223803-96564112, 2026-10-24); audibility stays unverified, since nobody listens for 3.0. Hand checks left: Music keeps playing through launch and return until Vocello plays; first playback with the Silent switch on; sheet expand and close pause and resume; voice samples mix, Studio does not; Control Center mid-recording keeps the category; the background lets Music resume; call and Siri interruptions; startup Retry after a real failure. History: git log -p -- config/roadmap.json.",
       "plan": "release-first-3-0-2026-09",
@@ -1442,6 +1636,9 @@
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. All three Mac Studio screens delegate immutable generation plans to MacStudioSingleTakeRunner over StudioGenerationCoordinator; fake-driven lifecycle tests pass. Clean-source full Mac smoke macos-xcui-smoke-20261010-081219-7d9d4c81 passed, including cancellation, resolving the previous Automation Mode verification block. Open implementation: IOSGenerationModeViews still constructs generation tasks in all three modes. Move construction across the existing lifecycle boundary while preserving request snapshots, cancellation and prewarm ownership; verify deterministically. This local code work does not require a phone. Physical iOS acceptance is deferred until device work resumes; no independent critical race is asserted.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-10-12",
@@ -1455,6 +1652,10 @@
       "sourceOfTruth": [
         "Sources/iOS/IOSGenerationModeViews.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "notes": "Revalidated 2026-09-18 (P2): canGenerate ignores cloneContextStatus and optional prime uses try?, but preparation/fallback copy already exists and the generation request retains transcript and prepared-voice identity. Silent audio-only degradation is not established. Test failed hydration/priming and final request conditioning before deciding the readiness policy. Phone UI acceptance remains parked. See project-review-2026-09-18.md.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-11-10",
@@ -1467,6 +1668,10 @@
       "gate": "With a panel presented, VoiceOver focus cannot reach a control behind it.",
       "sourceOfTruth": [
         "Sources/iOS/App/RootView.swift"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "notes": "Revalidated 2026-09-18 (P2): custom panels dim/blur the background without explicit accessibility exclusion. The privacy-cover modifier is unrelated. Focus escaping into obscured controls remains a device hypothesis; verify VoiceOver entry, containment and return before declaring the behavioral defect reproduced. See project-review-2026-09-18.md.",
       "plan": "audit-remediation-2026-09",
@@ -1483,6 +1688,9 @@
         "Sources/iOSSupport/Services/IOSExportPurchaseState.swift",
         "Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift"
       ],
+      "needs": [
+        "iphone"
+      ],
       "notes": "Revalidated 2026-09-18 (P2 investigation): only verified eligible transactions are retained/finished; tests explicitly require unverified purchases to remain locked and unfinished. Permanent redelivery and an ineffective Restore are not proven. Apple PurchaseResult guidance does not prescribe unconditional finish for verification failure. Replaces the earlier unsupported correction, retaining this identifier and parked status. See docs/audits/2026-09-18-project-review.md.",
       "plan": "release-first-3-0-2026-09",
       "updated": "2026-11-10"
@@ -1496,6 +1704,9 @@
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
         "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift",
         "scripts/ui_test.sh"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "Revalidated 2026-09-18 (P2): test01 asserts the benchmark saved voice but does not create it; runner fixture preflight covers the clone benchmark rather than smoke. A fresh store can fail for absent test data. A read-only journey can leave no new persisted state while depending on existing state, so the prior wording overstated that contradiction. No native UI lane was run here. See docs/audits/2026-09-18-project-review.md. 2026-10-13: the fixture preflights landed. Full smoke and the macOS localization walk now stop before the build when the debug store lacks the current benchmark clone voice (scripts/ui_test.sh, naming scripts/macos_test.sh models ensure); the iPhone smoke journey probes Saved Voices before it changes any setting or History and fails with the enrollment route. The clean-store outcome is that actionable stop with nothing changed. Closure needs RF-15's device smoke. 2026-10-18: due moved from 2026-10-21 to 2026-10-30; it cannot start before RF-15 (due 2026-10-29).",
       "plan": "release-first-3-0-2026-09",
@@ -1513,6 +1724,9 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. Commit 814b664b implements set membership with ordered token storage/cache invalidation preserved; focused sampler and seeded production generate-loop tests pass in the full native suite. Qualified M6 gate benches already exist, so the old claim that none ran is obsolete. However mac-gate-bench-20260925-200552-0c056a16 compares sources that both contain the dedup change; pre-change retained evidence uses different M2 hardware/lineage. Open: a compatible pre/post-change gate comparison establishing no regression, with clean source identities and normal benchmark safeguards. October 10 telemetry parity compares telemetry modes on the same sampler and cannot close this clause. No measured optimization benefit is claimed. 2026-10-13 core engine review: the sampler is already Set-backed; only the gate evidence is open. 2026-10-16 engine audit: the sampler is Set-backed in code; ER-01 records the gate-bench evidence.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-10-16",
@@ -1528,6 +1742,10 @@
         "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
         "Sources/SharedSupport/ViewModels/ClipReviewPlayer.swift",
         "Sources/iOS/IOSAudioSessionOwner.swift"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "notes": "Revalidated 2026-09-18 (P3 API debt): installed Xcode 27 headers deprecate the interruption-type key/model, but the generic iOS app and logic-bundle compilation passed with current warning policy. Not a present build failure. Availability-gated inactive/resumption notifications change behavior and require interruption/route/cancellation tests on the phone. See project-review-2026-09-18.md.",
       "plan": "audit-remediation-2026-09",
@@ -1546,6 +1764,9 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. Clean committed 2d25ab98 smoke macos-xcui-smoke-20261010-081219-7d9d4c81 passed 13/13 and all seven ledger steps, with matching source fingerprints, ten languages/pseudo, window sizes, Cmd+,, missing models, genuine Studio links and error/retry journeys. UIInteractionPolicyTests contains the captured Pseudo-AX-XXXL anchor regression. Open local proof: the gate requires Mac perf on the same committed source; September 22 consolidated smoke/perf was dirty/exploratory, and October 10 CLI telemetry overhead is a different lane. Preserve that qualification limit and run the smallest missing Mac lane at a coherent checkpoint. Physical iOS scroll/localization acceptance, including Pseudo-AX-XXXL, is deferred until the phone is available. See docs/reference/macos-ios-ui-reset-2026-09.md for historical evidence and retained failures.",
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
@@ -1559,6 +1780,9 @@
         "Sources/ViewModels/ModelManagerViewModel.swift",
         "Sources/ContentView.swift",
         "Packages/VocelloQwen3Core/OWNERSHIP.json"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request. External audit ENG-14: MLXAudioMark is also missing from COMPATIBILITY.json and RUNTIME_MANIFEST.json target lists; qwen3_core_contract.py checks one direction only. MAC-23 is the root-view construction item. 2026-09-24: OWNERSHIP.json, COMPATIBILITY.json and RUNTIME_MANIFEST.json list MLXAudioMark, and the package contract checks every target both ways (ENG-14). 2026-11-10 review: the @Observable model managers (1406ebaf) and the Cmd-6 Settings title (12248d3e) are done.",
       "plan": "project-audit-2026-09",
@@ -1575,6 +1799,10 @@
         ".github/workflows/promote-release.yml",
         "scripts/release_source_authority.py"
       ],
+      "needs": [
+        "mac",
+        "keyboard"
+      ],
       "notes": "External audit SEC-01, SEC-02 and SEC-07, confirmed 2026-09-22. Workflow side landed 2026-09-22: release-trigger job (tag ref only, contract-shaped output_name), environment: release on package and archive-ios, keychain -T /usr/bin/codesign with a 9000 s lock, no Actions cache in signing jobs, persist-credentials false, signing cleanup right after release.sh. Maintainer 2026-09-25: the release environment (required reviewer, v* tag deployment policy) and the active 'Release tags' ruleset on refs/tags/v* with an admin bypass. GitHub never returns stored values, so the M6 got new identities 2026-09-25: Apple Distribution (to 2027-09) and a Developer ID Application (unused). The Developer ID pair stays at repository level (its G2 certificate runs to 2031). 2026-09-26: the other 11 are set in the release environment (team ID pair, the App Store Connect key for notarization and upload, the Apple Distribution .p12 and its password, and the App Store profile 'Vocello App Store 2026-09' with increased-memory-limit, to 2027-09-25); the exported .p12 was deleted. Open: deleting the 11 repository copies after a release succeeds on the environment ones, build/sign split, signer pinning.",
       "plan": "project-audit-2026-09",
       "updated": "2026-10-12",
@@ -1589,6 +1817,9 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
         "docs/reference/mimi-codec-guide.md",
         "docs/audits/2026-10-13-core-engine-review.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output. 2026-10-13 core engine review: the gate should add that no encoder KV stays resident after an encode; a window alone does not fix MEM-1 (BKL-03). 2026-10-16: re-homed into engine-remediation-2026-10; audit A-03 refines it (the decoder's fp32 KV grows for the whole take) and the MLX refresh goes first. 2026-11-11: RF-54 takes up the decoder's window before the iOS submission; the encoder clause is not taken up.",
       "plan": "engine-remediation-2026-10",
@@ -1605,6 +1836,10 @@
         "website/src/sections/Engineering.jsx",
         "config/public-product-facts.json"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. README/site claims are build-scoped, source facts and AudioSeal revision attribution are maintained, and website security-header configuration plus local browser/contracts checks pass. This does not prove deployed headers. The README and Hero explicitly disclose the historical 2.x iPhone capture. Open: replace those historical screenshots with genuine current-source physical-iPhone captures, then review the assets and update the disclosure. Keep the version-scoped claims and historical label until replacement; do not imply 3.0 device acceptance. Phone capture is deferred by the maintainer. Evidence: ORIGINS.md, NOTICES.md, generated attributions, website/vercel.json and the October 10 audit. 2026-11-10 review: the README and Hero no longer carry the historical-capture disclosure; the Hero still shows ios-studio.png from 2026-08-01.",
       "plan": "project-audit-2026-09",
       "updated": "2026-11-10",
@@ -1619,6 +1854,10 @@
         "Sources/Services/MacInterfaceText.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
         "website/src/tokens.css"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. Typed engine/persistence errors, interface-locale formatting, scalable controls, persistent action banners, state announcements and website contrast checks are implemented. Narrow the old blanket History finding: typed HistoryPersistenceError now maps through MacInterfaceText. Open code: untyped localizedDescription paths in MacHistoryFileActions, ModelManagerViewModel, MacLineBatchRunner, IOSModelDownloadCoordinator, IOSVoicesView and HistoryScreen; the untyped generation fallback in VocelloPresentationText; and multi-count catalog substitutions (cancelledPartial/clipsCompleted still take formatted Strings and ordinary stringUnit values). Finish typed localized mappings/plurals with deterministic coverage. Physical spoken VoiceOver and Dynamic Type acceptance remains deferred; source announcements and system audits do not prove spoken behavior.",
       "plan": "project-audit-2026-09",
@@ -1635,6 +1874,9 @@
         "docs/reference",
         "scripts/tests"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "External audit DOC-03, DOC-04, CI-08, CI-10, TEST-06 and TEST-07, confirmed 2026-09-22 (maintainer decision to adopt the diet the same day). development-progress.md is 1,132 lines with 30 dated sections under Resume now; docs/reference holds 13 dated files; test_bench_command_contract.py asserts whitespace-exact Swift source against the testing runbook's own rule. 2026-11-10 review: docs/development-progress.md is 101 lines and docs/reference holds 2 dated files (902b6dff), and a research lane exists. Left: the whitespace-exact source-text test and the retire-one-contract rule.",
       "plan": "project-audit-2026-09",
       "updated": "2026-11-10",
@@ -1647,6 +1889,9 @@
       "gate": "Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.",
       "sourceOfTruth": [
         "docs/audits/2026-09-22-project-audit.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows no other item covers (ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02 to WEB-08, UX-01, REPO-01 to REPO-05), worked in batches by area; the verification addendum lists rows that are wrong or already fixed. Landed 2026-09-26: B5 (website, scanner, checkout credentials, CI-11, CI-14, CI-15, CI-18, DOC-05, DOC-09), B4 (iOS), B3 (macOS; deletion unloads first, per-process recording folders), B2 (startup sweeps of stale staging, off-main import with a 250 MiB cap, best-effort sidecar, document types, microphone text, privacy cover window, non-WAV enrollments stored as WAV, a save sheet that cannot close mid-save; path-free saved-voice errors) and B1 (CRLF, script-proportion Auto, segment peak cap, bit-exact marking, single-take budget refusal, downloader allowlist on final and resume URLs, size ceilings, staging lock, ledger set-aside, CLI trust anchors and argument tests; review fixes for CLI error text and cancel-then-download). Open: B6 (engine package), CORE-20 part, CI-16, CI-21, DOC-10, MAC-05 with PA-08.",
       "plan": "project-audit-2026-09",
@@ -1666,6 +1911,10 @@
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. Failed/pending History clear copy, suspension/resume outbox handling, long-form audio preservation and unreadable-removal notices are implemented and tested. IOSLeftoverAudioCleanup is wired into Settings; deterministic tests protect references, regular-file boundaries, changed/unreadable state and root-scoped review. Open local design/code: ENG-06 owner-scoped resident tokenizer release; Qwen3TTS still uses a process-global residentSpeechTokenizer cache. A new ownership design may duplicate about 218 MB on iOS and must not land as qualified without the gate's device-memory requalification. Phone-dependent cleanup acceptance and tokenizer memory qualification are deferred. Keep the Mac outputs-folder exclusion and fail-closed cleanup policy; previous memory runs cannot qualify a new ownership design.",
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
@@ -1684,6 +1933,9 @@
         "config/memory-qualification-policy.json",
         "docs/audits/2026-10-13-core-engine-review.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. One-process unsummed memory and routine policy-clear behavior have deterministic tests; 357 registry records validate and the peak-miss report preserves historical undersampling. M6 mac-memory-qualification-20260926-011258-82f5f55c passed 11 takes with kernel peak >= MLX peak; 235a205d calibrated general gap and Mac retained-memory-v2 bounds, closing the old AV-17 step-4 note. Open local evidence: the original exact-eight-record offline UI replay was not found retained; reproduce/document it or reconcile that historical clause with equivalent explicit evidence before closure. Phone budget/retained-v2 qualification is deferred. Physical iPhone/8GB gap bounds stay provisional until unforced hardware evidence exists; floor-emulated exploratory results do not calibrate them. October 10 telemetry parity is not memory qualification. 2026-10-13 core engine review: the v1 bound cannot see constant retention such as MEM-1, and the quiescence evaluator has no post-unload baseline (BKL-03). 2026-10-16: ER-01 publishes the post-unload baseline.",
       "updated": "2026-10-16",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
@@ -1701,6 +1953,9 @@
         "config/ui-perf-thresholds.json",
         "scripts/ui_test.sh"
       ],
+      "needs": [
+        "mac"
+      ],
       "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Landed (waves 7-9): stall contract, censored heartbeats, Speed per take, spread ceilings, floor knob, per-take load, pacing, seed policy cell-hash-v1, cell aggregate 2 and ui_bench_allocation, one capture per cell, harness-control and warms scenarios, window heartbeats, the M2 ceilings marked stale, iOS load and sampler interval. 2026-09-26/27 on the M6: two harness fixes (a take finishing between polls; the Studio identifier hiding the card's), the runner's System Audio Recording grant, and capture that follows the grant. The first canonical M6 UI benchmark validates in one pass on Speed with capture (macos-xcui-benchmark-20260927-101957-c37aa311) and calibrates the stall contract (median 188, p90 259, max 480 ms; limit 600 ms, the maximum x 1.25); three M6 ui-perf sessions re-derive the ceilings, so M6 perf records carry M6 verdicts. Open: two seeded runs for seed determinism, a measured matrix reallocation, iPhone runs.",
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
@@ -1716,6 +1971,9 @@
         "scripts/benchmark_history.py",
         "scripts/publish_benchmark_history.py",
         "scripts/ci/classify_changes.py"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "Reviewed 2026-10-10 at 38d295c4. Lineage replay now links 7 of 18 canonical Mac UI records (one source unavailable), with legacy keys frozen. benchmark_history has 88 tests, producers have 16 round-trip tests plus profile coverage, and probes are mocked. Existing Linux CI 37525535415 at 30e803a passed product/tooling and research suites; this is historical remote evidence, not current unpushed-source CI. Completed lineage/Linux/producer work stays recorded. Remaining #76 cells-free record format was deliberately reverted/deferred: trend-v1 deltas and the canonical cap test currently keep valid records below 256 KiB. Do not implement an irreversible format change merely to clear a stale item. Retain legacy records/keys and require versioned offline compatibility proof if the cap trigger is reached.",
       "updated": "2026-10-10",
@@ -1733,6 +1991,10 @@
         "Sources/QwenVoiceCore/NativeTelemetry.swift",
         "scripts/ios_device.sh"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Landed (waves 8-9): the token read's own timer and signpost, all per-step intervals on the allocation-free os_signpost path, v9 mlxInstantProvenance and outputAdapterIdentityVersion 4, sink hand-off totals (#61), ttfcObserverLagMS from a per-chunk stamp (#48), TOC duration (#96), profile --kind witness (#99/#50), cpuPlausibility (#97), early stop and SIGINT (#51/#52), tail decode (#60), trace.instrumented (#69), predicted-end probes (#87), crash classification (#45). M6: the witness profile passes the 36x(tokens+1) interval check; gate drift is between sessions (instrumentation +0.3-0.6%). 2026-09-26: CPU Profiler needs root for kpc on macOS 27, so Mac CPU and memory profiles sample with Time Profiler (instrument-profile v4); the first v4 CPU profile publishes 4,332 samples and 12,036 intervals (mac-cpu-profile-20260926-181200-bfb871c8). The memory profile timed out: the bench sat blocked after its tokenizer loaded under Allocations + VM Tracker (mac-memory-profile-20260926-181312-6c30ec6a, 567 CPU samples in 180 s). Open: that stall; #98 GPU trace kind; #106 gate noise; iPhone memory profile, VM guard and device waits.",
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
@@ -1747,6 +2009,9 @@
         "Sources/SharedSupport/Services/ModelDeletionSequence.swift",
         "Sources/iOS/IOSModelInstallerViewModel.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "notes": "Found by the PA-26 B3 review on 2026-09-26. The deletion sequence (ModelDeletionSequence, shared by both apps since DA-08) unloads the engine first unless another model is reported loaded, re-reads the engine after every await and removes the files in the same main-actor turn, but a model-only warm (ensureModelLoadedIfNeeded) publishes no state while it loads, so one that starts after the unload returns is invisible to the store. Closing that needs the engine to own the deletion as an operation. 2026-10-16: re-homed into engine-remediation-2026-10; audit B-06 adds that the deletion gate trusts a load state B-02 can make stale.",
       "updated": "2026-11-10",
@@ -1764,6 +2029,9 @@
       "sourceOfTruth": [
         "docs/reference/qc.md",
         "docs/audits/2026-10-10-generation-quality-investigation.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-10-12",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
@@ -1790,6 +2058,9 @@
         "docs/audits/2026-10-10-local-audio-candidate-implementation.md",
         "docs/audits/2026-10-12-audio-qc-tooling-research.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-11",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "Implemented: strict NOT_ASSESSED coverage, signed Clone evidence, transcript review, French starter, actual-audio enrollment, private receipts and bounded replay. CTC/DSP evidence now includes phonation, unaligned-fragment and reviewed-boundary producers; review corrected availability/export-loss coverage. Clean d52d5ae9 completed thirteen retained development clips in four runs, all strict gate 4. New candidates overlap Dylan whisper (IoU .474) and missed false start (.75), but acceptable clips also nominate. Existing measurements/model bindings are unchanged; thirteen held-out confirmations stay excluded. Next: independent class definitions/localized labels, complete negatives, genuine reviewed boundary paths, exact failing Clone pairs, accent and causal qualification. No qualified acceptance, shipping decoder repair or regeneration. QC-08/RF-14 remain separate. Linked audits preserve failed checks and initial pressure refusals. The 2026-10-12 tooling research puts class/span labels and generator-divergence A/B tests first; no phase started."
@@ -1809,6 +2080,9 @@
         "scripts/lib/audio_qc.py",
         "docs/audits/2026-10-10-generation-quality-investigation.md"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-10-16",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
       "notes": "From the 2026-10-02 external review: on fr-0101--dylan the per-sample silence rule (|x| < 0.001) sees one 236 ms run and flags nothing, though the take has two pauses over 350 ms against one comma (cadence:excess1 with frame-based silence). Touches GenerationOutputAdapter.swift (silence state, persisted pass, report), GenerationTelemetryRecord currentAlgorithmVersion 8 -> 9, config/audio-qc-stage0-{calibration,observations}.json, scripts/lib/audio_qc.py, the Swift tests that hard-code version 8 and the sample-exact dropout tests, test_audio_qc*.py, and the M6 gate baseline. Single takes have no fade, tail or gain today; only LongFormAssembly shapes joins. 2026-10-16: lands together with ER-11 (engine audit C-05, C-07, C-08)."
@@ -1824,6 +2098,9 @@
         "Sources/SharedSupport/Database/GenerationMigrations.swift",
         "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
         "docs/audits/2026-10-10-codex-workflow-audit.md"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-10-16",
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
@@ -2888,6 +3165,9 @@
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests",
         "scripts/macos_test.sh"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "Absorbs BKL-11 (TEST P1.3 to P2) and PA-19. Also delivers BT-06's metal profile (#98) and BT-01's post-unload baseline. 2026-11-10 review: the MLXModelLoadCoordinator seam tests (B-30) landed with DW-03 (94dc16cd, 7fe58fa2); profile --kind metal is still missing. 2026-11-10: RF-44 (core overhaul, stage 0) takes up the measurement items the overhaul needs before the iOS submission, F-17 included.",
@@ -2908,6 +3188,9 @@
         "Sources/Services/AppStateRestorationPolicy.swift",
         "Sources/VocelloCLI/CLIProcessSupervisor.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "B-12 refines F-20 (kept in engineering-review-remediation-2026-08). B-04 (the loader still runs after an unload that came before it) is pinned as current behaviour in MLXModelLoadCoordinatorSeamTests.testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad (DW-03). 2026-11-10 review: A-15 was fixed in 54842e39. The 2026-11-09 audit's E-1 fix (count a proactive model load in the background-time request and await it in the exit barrier) is not in this gate yet.",
@@ -2926,6 +3209,9 @@
         "Sources/QwenVoiceCore/LongFormPlanning.swift",
         "Sources/QwenVoiceCore/LongFormAssembly.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "A-09: ICA-06, ICA-15 and RF-06 share A-01's post-text regime; they stay in their plans and are re-measured here. 2026-11-10 review: the baseline is RF-18 plus RF-21 (9cd075bd gave single streamed takes their whole script). 2026-11-11: RF-53 takes up the long-form D1 screen before the iOS submission."
@@ -2942,6 +3228,9 @@
         "Sources/QwenVoiceCore/NativeCloneSupport.swift",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "The maintainer kept clone conditioning out of the pre-freeze set on 2026-10-16. 2026-11-11: RF-51 and RF-52 take up G-01 to G-03, G-07 to G-13, G-15, A-02, A-04, A-11, A-12 and A-26 before the iOS submission; G-04 to G-06 and G-16 to G-21 stay here."
@@ -2956,6 +3245,9 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Sources/QwenVoiceCore/GenerationSemantics.swift",
         "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
@@ -2974,6 +3266,9 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
@@ -2999,6 +3294,10 @@
         "Sources/QwenVoiceCore/IOSMemorySnapshot.swift",
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"
       ],
+      "needs": [
+        "mac",
+        "iphone"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "iOS 27 reports an 8,192 MB limit on the 12 GB iPhone 17 Pro (retained Oct 14/16 samples); the fixed 4,500/5,200 MiB bands trip at about 55%/63% of it. 2026-11-10: RF-47 takes up the budget before the iOS submission. The shipped builds read 6,144 MB on the 12 GB iPhone (8,192 MB only before the Game Mode opt-out), so the premise above is superseded.",
@@ -3016,6 +3315,10 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Sources/SharedSupport/Services/LivePreviewEstimate.swift",
         "benchmarks/OPTIMIZATION.md"
+      ],
+      "needs": [
+        "mac",
+        "iphone"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
@@ -3037,6 +3340,9 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "Blocked by the MLX refresh, PA-16 and ER-03/ER-08 so baselines are re-pooled once. 2026-11-10 review: the MLX refresh is no longer a blocker (CONV-21, 2026-10-20).",
@@ -3057,6 +3363,9 @@
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
@@ -3082,6 +3391,9 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
       "notes": "Lands together with QC-08 (qc-v2-2026-10)."
@@ -3096,6 +3408,9 @@
         "docs/audits/2026-10-16-engine-runtime-audit.md",
         "config/concurrency-safety.json",
         "Packages/VocelloQwen3Core/FACADE_API_BASELINE.json"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
@@ -3114,6 +3429,9 @@
         "Packages/VocelloQwen3Core/Package.swift",
         "Tests/VocelloCoreTests"
       ],
+      "needs": [
+        "mac"
+      ],
       "updated": "2026-10-20",
       "unparkWhen": "The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.",
       "notes": "Maintainer 2026-10-18: runs now; P2-5, then P2-3. Landed: P2-1 owned-target optimization variables (a2147383). P2-6 MemberImportVisibility and project Swift 6 (a2147383), no first-party @preconcurrency imports (42b15022), SwiftLint gate (1a4aaf6e), nightly migrate-mode report (8f9bdbeb, e32fb52f). P2-4 Swift Testing in the owned package (c406eea2, 54842e39). P2-7 signposts, Logger, macOS MetricKit (adb556a2, 25192b69, 82c921a7, dcfdcf07). P2-5 (2026-10-19): allocator seam keeping core tests off MLX (e124f375); load-coordinator and runtime seam suites, fakes failing inside warm and prime bodies (7fe58fa2; mutation-checked; B-02 and BKL-20 strict expected failures); nightly shipped-configuration run (dfb51453). P2-3 step 1 (2026-10-19): VocelloCLICore, the CLI's tested files compiled once and imported @testable (cd4843eb). Step 2 waits for the submission: the Mac-only files need shared code the Mac app compiles by path from the iOS folders, so the shared set moves first, and that changes the iOS app. Declined: P2-2 dwarf test builds and the compilation cache. Open: P2-3 steps 2-4; package warnings-as-errors waits on the MLXArray Sendable warnings."
@@ -3129,6 +3447,9 @@
         "docs/audits/2026-10-18-dev-workflow-audit.md",
         "config/toolchain.json",
         "Sources/"
+      ],
+      "needs": [
+        "mac"
       ],
       "updated": "2026-11-01",
       "unparkWhen": "After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.",

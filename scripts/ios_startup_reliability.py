@@ -24,6 +24,11 @@ RESULT_SCHEMA_VERSIONS = {1, 2}
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DELIVERY = re.compile(r"^(neutral|happy|sad|angry|fearful|surprised|calm|whisper)\.(normal|strong)$")
+# Qwen3TTSRuntimeProfile.validationSignature joins its fields with "|" (an empty
+# speaker list leaves "||") and each list with ","; a real one runs to about 250
+# characters. No "/", "\", space, "@" or control character, so it cannot carry a
+# path, an address or a newline; the bound is four times the longest real one.
+RUNTIME_PROFILE_SIGNATURE = re.compile(r"[A-Za-z0-9._:|,-]{1,1024}")
 SPEAKERS = {"aiden", "ryan", "vivian", "serena", "uncle_fu", "dylan", "eric", "ono_anna", "sohee"}
 LANGUAGES = {"auto", "english", "chinese", "japanese", "korean", "french", "german", "spanish", "portuguese", "russian", "italian"}
 # A plan asks only for Expressive, the only variation since RF-58; a receipt
@@ -292,6 +297,10 @@ def validate_receipt(value: Any, field: str) -> None:
             raise ContractError(f"{field}.modelRuntimeIdentity has invalid fields")
         for key, child in identity.items():
             if child is None and key != "resolvedModelID":
+                continue
+            if key == "runtimeProfileSignature":
+                if not isinstance(child, str) or not RUNTIME_PROFILE_SIGNATURE.fullmatch(child):
+                    raise ContractError(f"{field}.modelRuntimeIdentity.runtimeProfileSignature is invalid")
                 continue
             if not isinstance(child, str) or not child or len(child) > 256:
                 raise ContractError(f"{field}.modelRuntimeIdentity.{key} is invalid")

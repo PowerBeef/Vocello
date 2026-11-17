@@ -68,9 +68,6 @@ MANIFEST_KEYS = {
 CHIP_KEYS = {"expectedValue", "observedValue", "stable"}
 MENU_KEYS = {"opened", "recommendedSeen", "autoItemSeen", "valueUnchanged"}
 QUALITY_OUTCOMES_PASSING = {"pass", "warning"}
-# The engine's runtime profile signature joins its fields with "|" and lists
-# with ","; ios_startup_reliability's identity pattern predates that format.
-PROFILE_SIGNATURE = re.compile(r"[A-Za-z0-9._:|,-]{1,2048}")
 
 
 class ContractError(startup.ContractError):
@@ -459,14 +456,6 @@ def read_run_rows(diagnostics: Path, run_id: str) -> list[tuple[str, dict[str, A
 
 
 def validate_engine_receipt(receipt: Any) -> None:
-    """ios_startup_reliability.validate_receipt, with the runtime profile signature checked here."""
-    identity = receipt.get("modelRuntimeIdentity") if isinstance(receipt, dict) else None
-    if isinstance(identity, dict) and identity.get("runtimeProfileSignature") is not None:
-        signature = identity["runtimeProfileSignature"]
-        if not isinstance(signature, str) or not PROFILE_SIGNATURE.fullmatch(signature):
-            raise ContractError("requestReceipt.modelRuntimeIdentity.runtimeProfileSignature is invalid")
-        remainder = {key: value for key, value in identity.items() if key != "runtimeProfileSignature"}
-        receipt = {**receipt, "modelRuntimeIdentity": remainder}
     startup.validate_receipt(receipt, "requestReceipt")
 
 

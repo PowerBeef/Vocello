@@ -299,7 +299,12 @@ class AutoLanguageValidationTests(unittest.TestCase):
             # The engine's real signature format: "|"-joined fields, ","-joined lists.
             "modelRuntimeIdentity": {
                 "resolvedModelID": MODELS[take["mode"]], "modelRepository": "fixture/model",
-                "runtimeProfileSignature": f"qwen3_tts|{CONDITIONING[take['mode']]}|8bit|24000|auto,english,french",
+                "runtimeProfileSignature": (
+                    f"qwen3_tts|{CONDITIONING[take['mode']]}|8bit|24000|qwen3_tts_tokenizer_12hz"
+                    "|auto,chinese,english,french,german,italian,japanese,korean,portuguese,russian,spanish"
+                    "|aiden,dylan,eric,ono_anna,ryan,serena,sohee,uncle_fu,vivian|pro1b7|instruction"
+                    "|no_x_vector_only_clone"
+                ),
             },
         }
         # The recognizer names the script's own language, which an explicit selection may override.

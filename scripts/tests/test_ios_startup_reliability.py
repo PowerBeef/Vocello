@@ -274,6 +274,61 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 with self.assertRaises(MODULE.ContractError):
                     MODULE.validate_receipt(invalid, "fixture")
 
+    def test_receipt_accepts_real_runtime_profile_signatures_and_refuses_unsafe_ones(self):
+        # BKL-21: the engine's Qwen3TTSRuntimeProfile.validationSignature, as real
+        # receipts and published benchmark records carry it: "|"-joined fields,
+        # ","-joined lists, an empty speaker list as "||", about 250 characters.
+        languages = "chinese,english,french,german,italian,japanese,korean,portuguese,russian,spanish"
+        speakers = "aiden,dylan,eric,ono_anna,ryan,serena,sohee,uncle_fu,vivian"
+        real_signatures = [
+            f"qwen3_tts|custom_voice|8bit|24000|qwen3_tts_tokenizer_12hz|auto,{languages}|{speakers}"
+            "|pro1b7|instruction|no_x_vector_only_clone",
+            f"qwen3_tts|voice_design|4bit|24000|qwen3_tts_tokenizer_12hz|{languages}||pro1b7"
+            "|instruction|no_x_vector_only_clone",
+            f"qwen3_tts|base_clone|4bit|24000|qwen3_tts_tokenizer_12hz|{languages}||pro1b7"
+            "|no_instruction|x_vector_only_clone",
+        ]
+        self.assertGreater(len(real_signatures[0]), 240)
+        result, _, _ = self.result_fixture()
+        receipt = dict(result["takes"][0]["requestReceipt"])
+        receipt.update(
+            schemaVersion=3, storedLanguageSelection="english", finalModelLanguage="english",
+            languageTokenMode="think", conditioningMode="custom_voice",
+            normalizedTargetTextDigest=self.plan["scriptSHA256"],
+            normalizedTargetTextCharacters=self.plan["scriptCharacters"], referenceTranscriptCharacters=0,
+            modelFacingInstructionLanguage="english",
+        )
+        for signature in real_signatures:
+            with self.subTest(signature=signature[:40]):
+                receipt["modelRuntimeIdentity"] = {
+                    "resolvedModelID": receipt["modelID"], "modelRepository": "fixture/model",
+                    "runtimeProfileSignature": signature,
+                }
+                MODULE.validate_receipt(receipt, "fixture")
+        unsafe = [
+            "",
+            "qwen3_tts|/Users/example/models",
+            "qwen3_tts|C:\\models",
+            "qwen3_tts|custom voice",
+            "qwen3_tts|someone@example.com",
+            "qwen3_tts|custom_voice\n",
+            "qwen3_tts|custom_voice\x00",
+            "qwen3_tts|custom_voice\t",
+            "qwen3_tts|" + "a" * 1024,
+            42,
+        ]
+        for signature in unsafe:
+            with self.subTest(unsafe=repr(signature)[:40]):
+                invalid = json.loads(json.dumps(receipt))
+                invalid["modelRuntimeIdentity"]["runtimeProfileSignature"] = signature
+                with self.assertRaisesRegex(MODULE.ContractError, "runtimeProfileSignature"):
+                    MODULE.validate_receipt(invalid, "fixture")
+        # The signature's wider alphabet stays its own: other identity fields keep theirs.
+        other = json.loads(json.dumps(receipt))
+        other["modelRuntimeIdentity"]["artifactVersion"] = "v1|v2"
+        with self.assertRaisesRegex(MODULE.ContractError, "artifactVersion"):
+            MODULE.validate_receipt(other, "fixture")
+
     def test_read_only_validation_preserves_files_and_failed_outcome(self):
         result, artifacts, result_path = self.result_fixture()
         for take in result["takes"]:

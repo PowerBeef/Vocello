@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 45/88 (51%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 46/88 (52%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (85)
+### Mac, remotely (84)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -63,7 +63,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-50` (parked) The CLI cancellation package test can time out on the Linux runner
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
 - `BKL-61` (parked) pip installs on the signing runners have no hashes
-- `BKL-62` (parked) The GitHub connector's ask rules match no tool in use
 - `BKL-63` (parked) Guard gaps for issue creation, local history rewrites, other remotes and staging spellings
 - `BKL-74` (parked) The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework
 - `BKL-76` (parked) Notes from the 3.1 release review of the command line, the MCP server and the player
@@ -798,7 +797,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-59` | parked | Three small iPhone UI defects from the November 9 audit | — |
 | `BKL-60` | parked | Studio's install request is dropped while the model's status is still checking | — |
 | `BKL-61` | parked | pip installs on the signing runners have no hashes | — |
-| `BKL-62` | parked | The GitHub connector's ask rules match no tool in use | — |
 | `BKL-63` | parked | Guard gaps for issue creation, local history rewrites, other remotes and staging spellings | — |
 | `BKL-65` | parked | The App Store privacy and support URLs sit on a vercel.app subdomain | — |
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
@@ -914,10 +912,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-61`** (parked) — pip installs on the signing runners have no hashes.
   gate: The native-toolchain action installs its Python packages from a hashed requirements file with --require-hashes.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-62`** (parked) — The GitHub connector's ask rules match no tool in use.
-  gate: A GitHub connector write (create, update, delete, push, merge or fork) asks or is blocked whatever the connector's server name.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-63`** (parked) — Guard gaps for issue creation, local history rewrites, other remotes and staging spellings.

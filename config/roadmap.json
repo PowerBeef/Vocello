@@ -2507,23 +2507,6 @@
       "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, S-1: versions are pinned without hashes and transitive packages float, in jobs that later import the distribution certificate."
     },
     {
-      "id": "BKL-62",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The GitHub connector's ask rules match no tool in use",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "A GitHub connector write (create, update, delete, push, merge or fork) asks or is blocked whatever the connector's server name.",
-      "sourceOfTruth": [
-        ".claude/settings.json"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-10",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-1: the six ask rules name mcp__claude_ai_Github__*, while the connector's tools arrive under another server name, so no repository-side rule covers its writes."
-    },
-    {
       "id": "BKL-63",
       "plan": "post-3-0-backlog-2026-10",
       "title": "Guard gaps for issue creation, local history rewrites, other remotes and staging spellings",
@@ -2539,7 +2522,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-2, G-3, G-5 and the part of G-4 that DA-12 does not record (a push to another remote or URL, and a variable holding git)."
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-2, G-3, G-5 and the part of G-4 that DA-12 does not record (a push to another remote or URL, and a variable holding git). 2026-11-16: 01666f6f landed most of it; a security review found gaps that keep it open. Medium: a remote's target is never judged (remote set-url or add, remote.pushDefault, branch.*.remote or pushRemote, branch -u), so push origin main can publish elsewhere; GIT_DIR or GIT_CONFIG_* after a wrapper (timeout, env -i) go unseen. Low: dashed binaries (git-push, git-filter-repo) pass; scripts/ci/./failure_issue.py beats the ask rules; git pull -qr passes; a single-quoted commit -m naming git rebase is a false block."
     },
     {
       "id": "BKL-65",

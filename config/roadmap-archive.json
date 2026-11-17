@@ -6485,6 +6485,22 @@
       "evidence": [
         "commit:2992a321"
       ]
+    },
+    {
+      "id": "BKL-62",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The GitHub connector's ask rules match no tool in use",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A GitHub connector write (create, update, delete, push, merge or fork) asks or is blocked whatever the connector's server name.",
+      "sourceOfTruth": [
+        ".claude/settings.json"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-1: the six ask rules name mcp__claude_ai_Github__*, while the connector's tools arrive under another server name, so no repository-side rule covers its writes. Done 2026-11-16 (c89b4ebc, worktree agent, security-reviewed): mcp__*__<tool> ask rules plus connector_write_guard.py, which asks for a GitHub write under any server name and refuses a subagent's. Review notes left for later: a linked-worktree side session gets ask, not a refusal (agent_guard screens it by cwd), and mcp__ccd_pr__set_auto_merge is in neither list.",
+      "evidence": [
+        "commit:c89b4ebc"
+      ]
     }
   ]
 }

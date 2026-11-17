@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 41/87 (47%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 43/87 (49%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (88)
+### Mac, remotely (86)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -56,11 +56,9 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `AV-14` (parked) re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)
 - `AV-17` (parked) First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs)
 - `BKL-09` (parked) Privacy and security hygiene (also: iPhone)
-- `BKL-18` (parked) iPhone Saved Voices Delete is offered while a Clone take primes its reference
 - `BKL-19` (parked) macOS UI smoke raises a Speech Recognition prompt after every lane rebuild
 - `BKL-23` (parked) The Mac language bench fails production on a single recognizer's language call
 - `BKL-28` (parked) The Mac Voice Design save shows no "Voice added" alert after Keep voice
-- `BKL-32` (parked) Give each shared iOS folder a single group in the generated project
 - `BKL-33` (parked) An unwritable output folder is reported as an internal engine error on the Mac
 - `BKL-50` (parked) The CLI cancellation package test can time out on the Linux runner
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
@@ -780,13 +778,11 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-08` | parked | iOS energy hygiene | — |
 | `BKL-09` | parked | Privacy and security hygiene | — |
 | `BKL-16` | parked | iOS UI text replacement cannot clear an editor whose caret lands at the start | — |
-| `BKL-18` | parked | iPhone Saved Voices Delete is offered while a Clone take primes its reference | — |
 | `BKL-19` | parked | macOS UI smoke raises a Speech Recognition prompt after every lane rebuild | — |
 | `BKL-23` | parked | The Mac language bench fails production on a single recognizer's language call | — |
 | `BKL-27` | parked | Import the iOS signing identity non-extractable in the release workflow | — |
 | `BKL-28` | parked | The Mac Voice Design save shows no "Voice added" alert after Keep voice | — |
 | `BKL-31` | parked | Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping | — |
-| `BKL-32` | parked | Give each shared iOS folder a single group in the generated project | — |
 | `BKL-33` | parked | An unwritable output folder is reported as an internal engine error on the Mac | — |
 | `BKL-35` | parked | A failed iPhone model download shows the raw system error, in the phone's language | — |
 | `BKL-36` | parked | A short drag that starts on an iPhone Settings toggle row can flip the switch | — |
@@ -838,10 +834,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: VocelloUITextEntry.replace on iOS clears existing text wherever the tap leaves the caret and verifies the result, and the control audit's Design brief restore observes the restored value.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
-- **`BKL-18`** (parked) — iPhone Saved Voices Delete is offered while a Clone take primes its reference.
-  gate: On the iPhone, Delete waits while a Studio take holds its mode, including a Clone take still priming its reference before the engine reserves it, as the Mac does since BKL-13; a deterministic test covers it.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-19`** (parked) — macOS UI smoke raises a Speech Recognition prompt after every lane rebuild.
   gate: A full macOS smoke run on a freshly rebuilt lane app finishes unattended: no TCC prompt appears, or the lane detects one before it runs and fails fast with a named cause.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
@@ -860,10 +852,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-31`** (parked) — Build 24's accessibility audit: Dynamic Type, purchase-sheet contrast and AX-XXXL clipping.
   gate: The RF-15 accessibility row (scripts/ui_test.sh ios smoke --preinstalled-candidate DIR --scenario accessibility) passes on a candidate: no Dynamic Type, contrast or clipping issue on Studio, the purchase sheet or Settings.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-32`** (parked) — Give each shared iOS folder a single group in the generated project.
-  gate: An iOS Release Analyze and the macOS build emit no "is a member of multiple groups" warning for Sources/iOS/Studio or Sources/iOSSupport/{Models,Services,ViewModels}, and the generated-project-shared-folder-groups class leaves config/ios-release-analyzer-warning-policy.json.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-33`** (parked) — An unwritable output folder is reported as an internal engine error on the Mac.

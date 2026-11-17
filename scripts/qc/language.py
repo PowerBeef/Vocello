@@ -320,6 +320,8 @@ def build_evidence(layout: Layout, run_id: str) -> dict[str, Any]:
                 "status": verdict["status"],
                 "issues": verdict["issues"],
                 "channels": (verdict["consensus"] or {}).get("statuses"),
+                # A language split both families' accurate transcripts settled (BKL-23).
+                **({"settledBy": settled} if (settled := (verdict["consensus"] or {}).get("settledBy")) else {}),
                 "families": {
                     family: {"detectedLanguage": recognition_.get("detectedLanguage"),
                              "languagePass": bool(verdict["verdicts"][family]["languagePass"]),
@@ -361,8 +363,9 @@ def summary_lines(evidence: dict[str, Any]) -> list[str]:
             for family, item in sorted(verdict["families"].items())
         )
         issues = "; ".join(f"{family}: {','.join(found)}" for family, found in sorted(verdict["issues"].items()))
+        settled = f" ({verdict['settledBy']})" if verdict.get("settledBy") else ""
         lines.append(f"  {take_id:<52} {verdict['status']:<12} expected={cell['expectedLanguage']}"
-                     f"/{cell['expectedOutcome']} {families}{(' issues ' + issues) if issues else ''}")
+                     f"/{cell['expectedOutcome']} {families}{(' issues ' + issues) if issues else ''}{settled}")
     for item in evidence.get("missing") or []:
         lines.append(f"  missing recognition: {item}")
     lines.append(f"spoken content: {evidence['status']} · {len(evidence['cells'])} takes · families "

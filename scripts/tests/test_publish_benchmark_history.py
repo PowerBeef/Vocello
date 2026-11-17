@@ -2460,14 +2460,15 @@ class PublisherTests(unittest.TestCase):
             ):
                 publisher.language_command(drift_args)
 
-        # A failing transcript or a wrong detected language in one family (the
-        # families then disagree), audio bound to other bytes, a missing family
-        # or a truncated decode each refuses publication; a supplied score never helps.
+        # A failing transcript in one family (the families then disagree), audio
+        # bound to other bytes, a missing family or a truncated decode each
+        # refuses publication; a supplied score never helps.
         for label, mutate in (
             ("did not agree.*accuracy=inconclusive", lambda c: c["recognitions"][0].__setitem__(
                 "transcript", "neuf huit sept six cinq quatre trois deux")),
-            ("did not agree.*language=inconclusive",
-             lambda c: c["recognitions"][0].__setitem__("detectedLanguage", "english")),
+            ("did not agree.*language=inconclusive", lambda c: (
+                c["recognitions"][0].__setitem__("detectedLanguage", "english"),
+                c["recognitions"][0].__setitem__("transcript", "neuf huit sept six cinq quatre trois deux"))),
             ("other audio", lambda c: c.__setitem__("audioSHA256", "b" * 64)),
             ("unqualified", lambda c: c["recognitions"][0].__setitem__("audioSHA256", "b" * 64)),
             ("unqualified", lambda c: c["recognitions"][0].__setitem__("fullFileProcessed", False)),
@@ -2484,6 +2485,31 @@ class PublisherTests(unittest.TestCase):
                     stack.enter_context(item)
                 with self.assertRaisesRegex(publisher.PublicationError, label):
                     publisher.language_command(args)
+
+        # BKL-23: one family's language call alone, on a take both families
+        # transcribe accurately, publishes; its language channel stays split.
+        payload = json.loads(recognitions.read_text())
+        payload["cells"][child]["recognitions"][0]["detectedLanguage"] = "english"
+        split = self.root / "split.json"
+        split.write_text(json.dumps(payload))
+        args.recognitions = split
+        captured, write_patch = self.capture_manifest()
+        with (
+            mock.patch.object(publisher, "load_engine_rows", return_value=[fr]),
+            mock.patch.object(publisher, "qualify_memory_rows", return_value=qualified_memory_fixture(["fr-id"])),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+        ):
+            publisher.language_command(args)
+        record = captured["manifest"]["historyRecord"]
+        self.assertEqual(record["takes"][0]["channelConsensus"], {"language": "inconclusive", "accuracy": "pass"})
+        self.assertEqual(record["takes"][0]["detectedLanguages"], {"qwen3-asr": "english", "whisper": "french"})
+        self.assertEqual(
+            record["evidence"]["languageVerification"]["channelVerdicts"],
+            {"language": "inconclusive", "accuracy": "pass"},
+        )
 
     def test_pinned_and_auto_takes_of_one_group_must_be_one_audio(self) -> None:
         """Audit #86: the group shares prompt and seed, so its WAVs are byte-identical."""

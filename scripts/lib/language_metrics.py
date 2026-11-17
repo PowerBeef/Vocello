@@ -997,6 +997,17 @@ NEGATIVE_CONTROL_KIND = "accuracy-control"
 # is reported only; the language channel sees it, since both families must
 # identify a language other than the pinned one.
 LANGUAGE_CONTROL_KIND = "language-control"
+# BKL-23 (2026-11-16), QC v2 votes only: one family's language identification
+# alone does not fail a take both families transcribe accurately. A take that
+# must pass, whose accuracy channel passes by consensus and whose language
+# channel the two families split on (one heard the expected language, the other
+# another), meets its outcome: two accurate transcripts of the script against
+# one language call. The language channel still publishes `inconclusive`. Both
+# families hearing another language still fails the take, content either family
+# transcribes wrongly still fails it or leaves it inconclusive, and the language
+# control is untouched. Found on custom-es-auto, where Whisper labelled a
+# correct Spanish take English (its WER 0.048) and Qwen3-ASR heard Spanish (0).
+LANGUAGE_SPLIT_SETTLED_BY_ACCURACY = "language-split-settled-by-accuracy-consensus"
 
 
 def expected_channel_outcomes(
@@ -1030,6 +1041,7 @@ def single_family_meets_expectation(
 def channel_consensus(
     family_channels: dict[str, dict[str, bool]], *, expect_failure: bool,
     control_kind: str = NEGATIVE_CONTROL_KIND, algorithm: str = CHANNEL_CONSENSUS_ALGORITHM,
+    settle_language_split_by_accuracy: bool = False,
 ) -> dict[str, Any]:
     """Vote each channel through the family rule and judge the take's expectation.
 
@@ -1037,6 +1049,10 @@ def channel_consensus(
     verdicts. `outcome` is `met` when every constrained channel reached its
     expected status by consensus, `contradicted` when one reached the opposite
     status, and `inconclusive` otherwise (one family, or disagreement).
+    `settle_language_split_by_accuracy` (QC v2 votes) applies
+    `LANGUAGE_SPLIT_SETTLED_BY_ACCURACY`: a take that must pass whose accuracy
+    passes by consensus and whose language the families split on is `met`, and
+    the result names the rule in `settledBy`.
     """
     channels: dict[str, dict[str, Any]] = {}
     for channel in LANGUAGE_CHANNELS:
@@ -1047,10 +1063,17 @@ def channel_consensus(
         channels[channel] = consensus(votes)
     expected = expected_channel_outcomes(expect_failure, control_kind)
     statuses = {channel: channels[channel]["status"] for channel in LANGUAGE_CHANNELS}
+    settled = False
     if all(statuses[channel] == status for channel, status in expected.items()):
         outcome = "met"
     elif any(statuses[channel] not in {status, "inconclusive"} for channel, status in expected.items()):
         outcome = "contradicted"
+    elif (
+        settle_language_split_by_accuracy and not expect_failure
+        and statuses["accuracy"] == "pass"
+        and channels["language"]["reasons"] == ["independent-asr-disagreement"]
+    ):
+        outcome, settled = "met", True
     else:
         outcome = "inconclusive"
     return {
@@ -1060,6 +1083,7 @@ def channel_consensus(
         "statuses": statuses,
         "expected": expected,
         "outcome": outcome,
+        **({"settledBy": LANGUAGE_SPLIT_SETTLED_BY_ACCURACY} if settled else {}),
     }
 
 
@@ -1123,10 +1147,11 @@ def qc_take_verdict(
     `recognitions` must hold exactly one recognition per QC family. Every
     transcript is scored here (`score_recognition`); nothing the producer wrote
     is trusted as a verdict. `status` is `pass` when the two families met the
-    take's declared outcome per channel (the control is a language control),
-    `fail` when a channel contradicted it by consensus, `inconclusive` when the
-    families disagreed, and `unqualified` when a recognition is missing or
-    may not witness."""
+    take's declared outcome per channel (the control is a language control;
+    a language split on a take both transcribe accurately is settled by
+    `LANGUAGE_SPLIT_SETTLED_BY_ACCURACY`), `fail` when a channel contradicted
+    it by consensus, `inconclusive` when the families disagreed otherwise, and
+    `unqualified` when a recognition is missing or may not witness."""
     by_family: dict[str, list[dict[str, Any]]] = {}
     for recognition in recognitions if isinstance(recognitions, list) else []:
         if isinstance(recognition, dict):
@@ -1157,7 +1182,7 @@ def qc_take_verdict(
         {family: {"language": bool(verdict["languagePass"]), "accuracy": bool(verdict["accuracyPass"])}
          for family, verdict in verdicts.items()},
         expect_failure=expect_failure, control_kind=LANGUAGE_CONTROL_KIND,
-        algorithm=QC_CHANNEL_CONSENSUS_ALGORITHM,
+        algorithm=QC_CHANNEL_CONSENSUS_ALGORITHM, settle_language_split_by_accuracy=True,
     )
     status = {"met": "pass", "contradicted": "fail"}.get(agreement["outcome"], "inconclusive")
     return {"status": status, "issues": {}, "verdicts": verdicts, "consensus": agreement}

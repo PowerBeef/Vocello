@@ -1070,6 +1070,57 @@ class BenchmarkHistoryTests(unittest.TestCase):
         iphone["takes"][0]["detectedLanguages"]["apple-speech"] = "english"
         self.publish(iphone, "qc-language-iphone")
 
+    def test_a_qc_v2_take_both_families_transcribe_accurately_survives_one_language_call(self) -> None:
+        """BKL-23: the validator recomputes the settled language split, and only that."""
+        def record(run_id: str, *, whisper_rate: float = 0.048) -> dict:
+            families = ("qwen3-asr", "whisper")
+            value = self._schema_v3_language_record(run_id)
+            value["evidence"]["languageVerification"] = {
+                **history.QC_VERIFICATION_IDENTITY,
+                "families": list(families),
+                "qcRecognitionAlgorithm": "qc-v2-free-decode-asr-v1",
+                "qcRecognizers": {
+                    "qwen3-asr": {"modelID": "asr.qwen3-asr-1.7b", "modelIdentitySHA256": "2" * 64,
+                                  "runtimeSHA256": "1" * 64},
+                    "whisper": {"modelID": "asr.whisper-large-v3", "modelIdentitySHA256": "5" * 64,
+                                "runtimeSHA256": "4" * 64},
+                },
+                "languageCheckKinds": {family: "audio-language-identification" for family in families},
+                "hintCellsPassed": 1, "hintCellsExpected": 1,
+                "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 0,
+                "channelConsensusAlgorithm": "qc-v2-family-consensus-v1",
+                "channelVerdicts": {"language": "inconclusive", "accuracy": "pass"},
+            }
+            take = value["takes"][0]
+            take.update({
+                "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15,
+                "channelConsensus": {"language": "inconclusive", "accuracy": "pass"},
+                "detectedLanguages": {"qwen3-asr": "spanish", "whisper": "english"},
+            })
+            take["metrics"].update({
+                **self._qc_family_metrics("qcQwen3Asr", language_pass=1.0, rate=0.0),
+                **self._qc_family_metrics("qcWhisper", language_pass=0.0, rate=whisper_rate),
+            })
+            return value
+
+        # custom-es-auto: Whisper called the Spanish take English at 0.048, Qwen3-ASR heard Spanish.
+        self.publish(record("qc-language-settled"), "qc-language-settled")
+        # A split the families' accuracy does not settle is still refused.
+        unsettled = record("qc-language-unsettled", whisper_rate=0.5)
+        unsettled["takes"][0]["metrics"]["qcWhisperAccuracyPass"] = 0.0
+        unsettled["takes"][0]["channelConsensus"]["accuracy"] = "inconclusive"
+        unsettled["evidence"]["languageVerification"]["channelVerdicts"] = {
+            "language": "inconclusive", "accuracy": "inconclusive",
+        }
+        with self.assertRaisesRegex(history.HistoryError, "declared outcome"):
+            self.publish(unsettled, "qc-language-unsettled")
+        # A record that claims the language channel passed when the families split.
+        claimed = record("qc-language-claimed")
+        claimed["takes"][0]["channelConsensus"]["language"] = "pass"
+        claimed["evidence"]["languageVerification"]["channelVerdicts"]["language"] = "pass"
+        with self.assertRaisesRegex(history.HistoryError, "does not follow"):
+            self.publish(claimed, "qc-language-claimed")
+
     def test_language_take_accuracy_gate_is_bounded_and_paired(self) -> None:
         valid = record_fixture(run_id="accuracy-valid", kind="language")
         provenance = {

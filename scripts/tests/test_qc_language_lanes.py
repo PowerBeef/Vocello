@@ -312,6 +312,25 @@ class LanguageEvidenceTests(unittest.TestCase):
         self.assertEqual((evidence["status"], language.exit_code(evidence)), ("error", 2))
         self.assertEqual(len(evidence["missing"]), 2)
 
+    def test_one_familys_language_call_does_not_fail_spoken_content(self):
+        """BKL-23: Whisper calls the accurate French take English, Qwen3-ASR hears French."""
+        for take in self.manifest["takes"]:
+            control = take["languageBench"]["expectedOutcome"] == "fail"
+            for model_id in ("asr.qwen3-asr-1.7b", "asr.whisper-large-v3"):
+                english = model_id == "asr.whisper-large-v3" and not control
+                write_result(self.layout, model_id, take["audioSHA256"], {
+                    "text": self.FRENCH, "language": "English" if english else "French",
+                    "languageProbs": {"french": 0.3, "english": 0.7} if english else {"french": 0.96, "english": 0.04},
+                    "words": None, "truncated": False})
+        evidence = language.build_evidence(self.layout, self.run_id)
+        self.assertEqual((evidence["status"], language.exit_code(evidence)), ("pass", 0))
+        verdict = evidence["cells"]["lang-run--fr"]["verdict"]
+        self.assertEqual(verdict["channels"], {"language": "inconclusive", "accuracy": "pass"})
+        self.assertEqual(verdict["settledBy"], metrics.LANGUAGE_SPLIT_SETTLED_BY_ACCURACY)
+        self.assertNotIn("settledBy", evidence["cells"]["lang-run--control"]["verdict"])
+        line = next(line for line in language.summary_lines(evidence) if "lang-run--fr" in line)
+        self.assertIn(metrics.LANGUAGE_SPLIT_SETTLED_BY_ACCURACY, line)
+
     def test_a_run_of_another_kind_or_a_changed_recognizer_is_refused(self):
         with self.assertRaises(language.LanguageBenchError):
             language.build_evidence(self.layout, "../escape")
@@ -343,8 +362,9 @@ class QCTakeVerdictTests(unittest.TestCase):
 
     def test_statuses(self):
         self.assertEqual(self.verdict(self.recognitions())["status"], "pass")
+        # One family's language call alone no longer fails an accurate take (BKL-23).
         self.assertEqual(self.verdict(self.recognitions(whisper={"detectedLanguage": "english"}))["status"],
-                         "inconclusive")
+                         "pass")
         both = self.recognitions(**{family: {"detectedLanguage": "english"} for family in ("qwen3-asr", "whisper")})
         self.assertEqual(self.verdict(both)["status"], "fail")
         self.assertEqual(self.verdict(both, expect_failure=True)["status"], "pass")
@@ -352,6 +372,65 @@ class QCTakeVerdictTests(unittest.TestCase):
         self.assertEqual((unqualified["status"], unqualified["issues"]["whisper"]), ("unqualified",
                                                                                    ["language-score-invalid"]))
         self.assertEqual(self.verdict(self.recognitions()[:1])["issues"], {"whisper": ["missing"]})
+
+    def test_one_familys_language_call_alone_does_not_fail_an_accurate_take(self):
+        """BKL-23, custom-es-auto: Whisper labelled a correct Spanish take English at a
+        word error rate of 0.048 while Qwen3-ASR heard Spanish at 0."""
+        script = ("el sol de la mañana entra por la ventana y la casa despierta "
+                  "mientras el café se enfría sobre la mesa")
+        words = script.split()
+        self.assertEqual(len(words), 21)
+        misheard = " ".join(["ventanas" if word == "ventana" else word for word in words])
+
+        def recognitions(qwen: dict, whisper: dict) -> list[dict]:
+            out = []
+            for family, overrides in (("qwen3-asr", qwen), ("whisper", whisper)):
+                out.append({
+                    "schemaVersion": metrics.QC_RECOGNITION_SCHEMA, "algorithmVersion": metrics.QC_ASR_ALGORITHM,
+                    "modelFamily": family, "audioSHA256": "a" * 64, "inputTextSHA256": metrics.text_sha256(script),
+                    "status": "complete", "outputLanguage": "spanish", "detectedLanguage": "spanish",
+                    "languageMatchScore": 0.9, "fullFileProcessed": True, "processedDurationSeconds": 6.0,
+                    "transcript": script,
+                    "provenance": {"runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64,
+                                   "configSHA256": "3" * 64},
+                    **overrides,
+                })
+            return out
+
+        def verdict(qwen: dict, whisper: dict, *, expect_failure: bool = False) -> dict:
+            return metrics.qc_take_verdict(
+                recognitions(qwen, whisper), audio_sha256="a" * 64, script=script, language="spanish",
+                duration_seconds=6.0, expect_failure=expect_failure)
+
+        english = {"detectedLanguage": "english", "languageMatchScore": 0.1}
+        settled = verdict({}, {**english, "transcript": misheard})
+        self.assertAlmostEqual(settled["verdicts"]["whisper"]["errorRate"], 1 / 21)
+        self.assertEqual(settled["verdicts"]["qwen3-asr"]["errorRate"], 0.0)
+        self.assertEqual(settled["status"], "pass")
+        self.assertEqual(settled["consensus"]["statuses"], {"language": "inconclusive", "accuracy": "pass"})
+        self.assertEqual(settled["consensus"]["outcome"], "met")
+        self.assertEqual(settled["consensus"]["settledBy"], metrics.LANGUAGE_SPLIT_SETTLED_BY_ACCURACY)
+        # Every other failure path stands. Both families hear another language:
+        self.assertEqual(verdict(english, english)["status"], "fail")
+        # content both transcribe wrongly, under a split language call:
+        wrong = " ".join(reversed(words))
+        self.assertEqual(verdict({"transcript": wrong}, {**english, "transcript": wrong})["status"], "fail")
+        # content one family transcribes wrongly, with or without a language split:
+        for whisper in ({"transcript": wrong}, {**english, "transcript": wrong}):
+            with self.subTest(whisper=sorted(whisper)):
+                result = verdict({}, whisper)
+                self.assertEqual(result["status"], "inconclusive")
+                self.assertNotIn("settledBy", result["consensus"])
+        # and the language control is never settled by accuracy.
+        control = verdict({}, english, expect_failure=True)
+        self.assertEqual(control["status"], "inconclusive")
+        self.assertNotIn("settledBy", control["consensus"])
+        # Legacy votes (Apple Speech and whisper-small) keep the old rule.
+        legacy = metrics.channel_consensus({
+            "apple-speech": {"language": True, "accuracy": True},
+            "whisper": {"language": False, "accuracy": True},
+        }, expect_failure=False)
+        self.assertEqual(legacy["outcome"], "inconclusive")
 
     def test_the_language_control_constrains_the_language_channel(self):
         self.assertEqual(metrics.expected_channel_outcomes(True, metrics.LANGUAGE_CONTROL_KIND), {"language": "fail"})

@@ -2585,8 +2585,9 @@ def validate_channel_consensus(
     per-family verdicts it publishes, channel by channel, and must meet the
     take's declared outcome; the run's `channelVerdicts` must follow from them.
     Legacy records vote every cited family and their control is an accuracy
-    control; QC v2 records vote the two QC families on every scored take, and
-    their control is a language control.
+    control; QC v2 records vote the two QC families on every scored take, their
+    control is a language control, and a take that must pass meets it when its
+    accuracy passes and its language is split (BKL-23).
     """
     verification = language_verification if isinstance(language_verification, dict) else {}
     qc = qc_language_verification(verification)
@@ -2623,7 +2624,12 @@ def validate_channel_consensus(
                 channel: metrics[keys[channel]] == 1.0 for channel in LANGUAGE_CHANNELS
             }
         expect_failure = take.get("expectedOutcome") == "fail"
-        agreement = channel_consensus(family_channels, expect_failure=expect_failure, control_kind=control_kind)
+        # QC v2 votes settle a language split on a take both families
+        # transcribe accurately (LANGUAGE_SPLIT_SETTLED_BY_ACCURACY, BKL-23).
+        agreement = channel_consensus(
+            family_channels, expect_failure=expect_failure, control_kind=control_kind,
+            settle_language_split_by_accuracy=qc,
+        )
         if agreement["statuses"] != statuses:
             raise HistoryError("take.channelConsensus does not follow from its families' verdicts")
         if agreement["outcome"] != "met":

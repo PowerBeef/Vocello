@@ -1394,7 +1394,18 @@ recommendation on 2026-09-25). A verdict has a `language` channel and an `accura
 `scripts/lib/language_metrics.py` `channel_consensus` votes each one separately through the family
 rule, so two families that fail a take for different reasons no longer read as agreement and a
 channel the families split on is `inconclusive`. A take that must pass needs both channels to pass
-by consensus. A two-family record publishes each scored take's `channelConsensus` (`pass`, `fail`
+by consensus, with one exception for the QC v2 families (BKL-23, 2026-11-16): one family's
+language identification alone does not fail a take both families transcribe accurately. When the
+accuracy channel passes by consensus and the families split on the language channel (one heard the
+expected language, the other another), the take meets its outcome
+(`LANGUAGE_SPLIT_SETTLED_BY_ACCURACY`, `channel_consensus(settle_language_split_by_accuracy=True)`):
+two accurate transcripts of the script outweigh one language call. Its language channel still
+publishes `inconclusive`, and the evidence names the rule (`settledBy`). Both families hearing
+another language still fails the take, content either family transcribes wrongly still fails it
+or leaves it inconclusive, the language control is unchanged, and legacy records keep the old
+rule; no threshold moved. The case was `custom-es-auto` in RF-20's control run, where Whisper
+labelled a correct Spanish take English (its word error rate 0.048) and Qwen3-ASR heard Spanish
+(0). A two-family record publishes each scored take's `channelConsensus` (`pass`, `fail`
 or `inconclusive` per channel) and the run's `languageVerification.channelVerdicts` (a channel is
 `pass` when every take that constrains it reached its expected status) with
 `channelConsensusAlgorithm: per-channel-family-consensus-v1`; QC v2 records vote the two QC families
@@ -1496,9 +1507,10 @@ seeds (15 takes). It performs no retry and never publishes benchmark history. QC
 score the cohort too (takes are keyed by child run ID, so a cell repeated across seeds is five
 takes), and `qc.py language-bench evidence` prints each take's two-family verdict: the cohort passes
 only when both families meet every take's expected outcome per channel, beside the in-app Apple
-Speech gate. A take the families split on is `inconclusive`, and one with a missing or disqualified
-recognition (truncated, empty, wrong digest) is `unqualified`; either fails the lane, so a broken
-decode never confirms a negative control. Passing the diagnostic cohort prints its verdict locally
+Speech gate. A take the families split on is `inconclusive` (except a language split on a take
+both transcribe accurately, which passes, [§5.4](#54-language-checks-consensus-and-the-negative-control)),
+and one with a missing or disqualified recognition (truncated, empty, wrong digest) is
+`unqualified`; either fails the lane, so a broken decode never confirms a negative control. Passing the diagnostic cohort prints its verdict locally
 and intentionally creates no record.
 
 Gates:

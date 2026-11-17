@@ -712,20 +712,27 @@ cmd_speech_assets() {
 
 device_diagnostics_env_json() {
   local spec="$1" run_id="$2"
-  QV_SPEC="$spec" QV_RUNID="$run_id" python3 -c '
+  QV_SPEC="$spec" QV_RUNID="$run_id" QV_KNOBS="$ROOT_DIR/config/runtime-debug-knobs.json" python3 -c '
 import json, os
 env = {
     "QWENVOICE_DEBUG": "1",
     "QVOICE_IOS_DEVICE_RUN_ID": os.environ["QV_RUNID"],
     "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC": os.environ["QV_SPEC"],
 }
+# BKL-70: only what the app can read crosses to the phone. The registry names
+# every key production Swift reads, tuning and run identity alike, and
+# scripts/runtime_security_contract.py holds it equal to them, so the host
+# build-output paths (scripts/lib/build_paths.sh), its worker session and its
+# own timeouts stay on the Mac, and RuntimeDebugGate, which lists every QVOICE_
+# and QWENVOICE_ key it is given, names none of them. An unreadable registry
+# fails the launch rather than dropping a tuning key.
+with open(os.environ["QV_KNOBS"], encoding="utf-8") as handle:
+    registered = {key for group in json.load(handle)["groups"] for key in group["keys"]}
 # MLX reads these three itself, before the app code runs: the command-buffer
-# limits (performance-guide.md, 12.1) and the float32 mode. Named, not a prefix,
-# so nothing else of the host environment reaches the phone.
+# limits (performance-guide.md, 12.1) and the float32 mode.
 mlx_keys = ("MLX_MAX_OPS_PER_BUFFER", "MLX_MAX_MB_PER_BUFFER", "MLX_ENABLE_TF32")
 for key, value in os.environ.items():
-    forwarded = key.startswith("QWENVOICE_") or key.startswith("QVOICE_") or key in mlx_keys
-    if forwarded and key not in env:
+    if (key in registered or key in mlx_keys) and key not in env:
         env[key] = value
 print(json.dumps(env))'
 }
@@ -763,9 +770,10 @@ cmd_launch() {
     local run_id="${QVOICE_LAUNCH_RUN_ID:-ios-$(date +%Y%m%d-%H%M%S)}"
     note "launching device diagnostics ($spec), runID=$run_id"
     local env_json
-    # Benchmark A/B passthrough: any caller-set QWENVOICE_*/QVOICE_* tuning env
-    # (e.g. QWENVOICE_STREAMING_PREVIEW_DATA=off, QWENVOICE_FORCE_MEMORY_CLASS)
-    # is forwarded into the launched app's env so on-device benches are reproducible.
+    # Benchmark A/B passthrough: any caller-set tuning key that
+    # config/runtime-debug-knobs.json registers (e.g. QWENVOICE_STREAMING_PREVIEW_DATA=off,
+    # QWENVOICE_FORCE_MEMORY_CLASS) is forwarded into the launched app's env so
+    # on-device benches are reproducible; no other host variable is.
     env_json="$(device_diagnostics_env_json "$spec" "$run_id")"
     # DEVICE_LAUNCH_JSON (a plain, never-exported shell variable, so the
     # QVOICE_* passthrough above cannot forward a host path into the app): where

@@ -15,7 +15,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
-from shell_stubs import LaneShell, quote
+from shell_stubs import ROOT, LaneShell, quote
 
 DEVICE_LIST = r'''
 [[ "$1 $2 $3" == "devicectl list devices" ]] || exit 97
@@ -91,6 +91,39 @@ class DiagnosticsLaunchEnvironmentTests(unittest.TestCase):
         self.assertNotIn("MLX_SOMETHING_ELSE", environment)
         self.assertNotIn("HOME_SECRET", environment)
         self.assertNotIn("PATH", environment)
+
+    def test_forwards_only_registered_keys_never_the_build_paths_or_worker_session(self) -> None:
+        # BKL-70: sourcing the lane exports scripts/lib/build_paths.sh's absolute build-output
+        # paths (QVOICE_BUILD_ROOT, QVOICE_ARTIFACTS_IOS, ...); with the worker session and the
+        # lane's own host-side knobs they stay on the Mac. Only registered keys cross.
+        registry = json.loads((ROOT / "config/runtime-debug-knobs.json").read_text(encoding="utf-8"))
+        registered = {key for group in registry["groups"] for key in group["keys"]}
+        environment = self.launch_environment({
+            "QVOICE_WORKER_SESSION": "f" * 64,
+            "QVOICE_IOS_BENCH_TIMEOUT": "900",
+            "QWENVOICE_DEVELOPMENT_TEAM": "TEAMID",
+            "QVOICE_LAUNCH_RUN_ID": "host-only",
+            "QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID": "run-identity",
+            "QWENVOICE_FORCE_MEMORY_CLASS": "constrained",
+        })
+        for key in ("QVOICE_WORKER_SESSION", "QVOICE_IOS_BENCH_TIMEOUT", "QWENVOICE_DEVELOPMENT_TEAM",
+                    "QVOICE_LAUNCH_RUN_ID", "QVOICE_BUILD_ROOT", "QVOICE_ARTIFACTS_IOS",
+                    "QVOICE_XCODE_IOS_DERIVED", "QVOICE_NATIVE_LOCK"):
+            with self.subTest(key=key):
+                self.assertNotIn(key, environment)
+        self.assertEqual(environment["QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"], "run-identity")
+        self.assertEqual(environment["QWENVOICE_FORCE_MEMORY_CLASS"], "constrained")
+        mlx = {"MLX_MAX_OPS_PER_BUFFER", "MLX_MAX_MB_PER_BUFFER", "MLX_ENABLE_TF32"}
+        self.assertLessEqual(set(environment), registered | mlx)
+        self.assertFalse([value for value in environment.values() if value.startswith("/")])
+
+    def test_the_build_paths_were_exported_where_the_launch_reads_its_environment(self) -> None:
+        # The case above proves something only if the sourced lane really exports them.
+        shell = LaneShell(self, "ios_device.sh")
+        result = shell.run('printf "%s\\n" "${QVOICE_BUILD_ROOT:?}" "$(printenv QVOICE_ARTIFACTS_IOS)"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        root, artifacts = result.stdout.splitlines()
+        self.assertTrue(root.startswith("/") and artifacts.startswith("/"), result.stdout)
 
 
 class ResolveDeviceTests(unittest.TestCase):

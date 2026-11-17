@@ -711,9 +711,11 @@ host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint pol
 
 `bench`, `lang-bench`, `speech-assets`, `profile`, `memory`, and the deliberate crash diagnostic launch
 `IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts. A
-diagnostics launch also forwards every `QWENVOICE_*` and `QVOICE_*` variable the caller set, and
-three keys MLX reads itself: `MLX_MAX_OPS_PER_BUFFER`, `MLX_MAX_MB_PER_BUFFER` and
-`MLX_ENABLE_TF32` (RF-45). Nothing else of the host's environment reaches the phone. `bench`
+diagnostics launch also forwards the caller's value of every key `config/runtime-debug-knobs.json`
+registers (the keys the app reads, tuning and run identity alike), and three keys MLX reads itself:
+`MLX_MAX_OPS_PER_BUFFER`, `MLX_MAX_MB_PER_BUFFER` and `MLX_ENABLE_TF32` (RF-45). Nothing else of
+the host's environment reaches the phone: not the build-output paths `scripts/lib/build_paths.sh`
+exports, the worker session or the lane's own timeouts (BKL-70). `bench`
 builds the app with `build --optimized` (`-O`, the shipped topology); every build writes a receipt
 naming the app executable and its digest, and publication binds `toolchain.optimization` to that
 receipt instead of a literal. While a headless take runs, the host copies only the run's completion

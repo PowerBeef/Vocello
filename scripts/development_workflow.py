@@ -42,6 +42,20 @@ ROUTING_SOURCES = ("scripts/development_workflow.py", "scripts/ci/classify_chang
 ROUTING_TESTS = ("scripts/tests/test_classify_changes.py", "scripts/tests/test_development_workflow.py")
 # Owned Swift that every test bundle links; a change here runs the whole macOS lane.
 CORE_SWIFT_PREFIXES = ("Sources/QwenVoiceCore/", "Sources/SharedSupport/", "Packages/", "project.yml")
+# Python tests that read Swift sources by scanning a tree, which neither the
+# import graph nor name matching can see: the iOS control audit counts every
+# interactive control under these trees against config/ios-control-audit.json
+# (scripts/ios_control_audit.py interactive_sources), so an edit there can make
+# its contract test fail (BKL-25).
+SWIFT_SOURCE_SCANNERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("Sources/iOS/", "Sources/SharedSupport/Views/"), "scripts/tests/test_ios_control_audit.py"),
+)
+
+
+def swift_source_scanner_tests(paths: list[str]) -> set[str]:
+    """The Python tests that scan a changed (added, edited or deleted) Swift source."""
+    return {test for path in paths if path.endswith(".swift")
+            for prefixes, test in SWIFT_SOURCE_SCANNERS if path.startswith(prefixes)}
 
 
 class WorkflowError(RuntimeError):
@@ -191,9 +205,12 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     contracts = [p for p in paths if p.startswith("benchmarks/") and p.count("/") == 1 and p.endswith(".json")]
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
               or p in {"project.yml", "Package.resolved"}] + contracts + agent_inputs
+    scanners = swift_source_scanner_tests(paths)
     if any(p.startswith(FULL_PYTHON_PATTERNS) for p in paths):
         return {"mode": "full", "tests": [], "reason": "shared tooling changed"}
     if not inputs:
+        if scanners:
+            return {"mode": "selected", "tests": sorted(scanners), "reason": "tests that scan the changed Swift sources"}
         return {"mode": "none", "tests": [], "reason": "no tooling inputs changed"}
     test_texts = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
                   for p in sorted(root.glob("scripts/tests/**/test_*.py"))}
@@ -208,7 +225,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
                 for p in (root / "scripts").rglob("*") if p.suffix in {".py", ".sh"} and p.is_file()
                 and "__pycache__" not in p.parts and not p.relative_to(root).as_posix().startswith("scripts/tests/")}
 
-    selected: set[str] = set()
+    selected: set[str] = set(scanners)
     if agent_inputs:
         selected.add("scripts/tests/test_agent_hooks.py")
     for changed in inputs:
@@ -494,7 +511,10 @@ def check_plan(paths: list[str], *, scoped: bool = False) -> dict:
     bundles = ui_bundle_mode(paths)
     if bundles:
         commands.append(["./scripts/build_ui_test_bundles.sh", bundles])
+    # The gate's `--local` run selects these Python tests for the same paths
+    # (`development_workflow.py py`); the plan names them so a dry run shows them.
     return {"changedPaths": paths, "lanes": lanes, "commands": commands,
+            "pythonTests": python_test_selection(paths),
             "lineageReviewPaths": lineage_review_paths(paths), "projectGeneration": generation}
 
 
@@ -706,6 +726,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")
                 for entry in plan["commands"]:
                     print(f"  {_display(entry)}")
+                python = plan["pythonTests"]
+                print(f"Python tests in the contract gate: {python['mode']}"
+                      + (f" ({', '.join(python['tests'])})" if python["tests"] else ""))
             else:
                 run_commands(plan["commands"])
         elif command == "lint":

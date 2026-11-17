@@ -367,9 +367,34 @@ class PythonSelectionTests(unittest.TestCase):
                 self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 
     def test_no_tooling_input_selects_nothing(self) -> None:
-        selection = MODULE.python_test_selection(["Sources/iOS/A.swift"])
-        self.assertEqual(selection["mode"], "none")
-        self.assertEqual(MODULE.python_test_commands(selection), [])
+        for path in ("Sources/Views/SidebarView.swift", "Sources/SharedSupport/Services/A.swift",
+                     "Sources/iOS/Localizable.xcstrings"):
+            with self.subTest(path=path):
+                selection = MODULE.python_test_selection([path])
+                self.assertEqual(selection["mode"], "none")
+                self.assertEqual(MODULE.python_test_commands(selection), [])
+
+    def test_an_ios_or_shared_view_source_selects_the_control_audit_tests(self) -> None:
+        # BKL-25: the control audit counts the controls under these trees against its
+        # contract, so an added, edited or deleted Swift file there runs its tests.
+        audit = "scripts/tests/test_ios_control_audit.py"
+        for path in ("Sources/iOS/IOSStudioCanvas.swift", "Sources/iOS/Sheets/Deleted.swift",
+                     "Sources/SharedSupport/Views/VocelloCapsuleSelector.swift"):
+            with self.subTest(path=path):
+                selection = MODULE.python_test_selection([path])
+                self.assertEqual(selection["mode"], "selected")
+                self.assertEqual(selection["tests"], [audit])
+                self.assertEqual(MODULE.python_test_commands(selection), [[*MODULE.PYTEST, audit]])
+        # Beside a tooling input it joins that input's consumers.
+        selection = MODULE.python_test_selection(["Sources/iOS/IOSStudioCanvas.swift", "scripts/roadmap.py"])
+        self.assertEqual(selection["mode"], "selected")
+        self.assertIn(audit, selection["tests"])
+        self.assertIn("scripts/tests/test_roadmap.py", selection["tests"])
+        # The routed plan the dry run prints carries the same selection.
+        plan = MODULE.check_plan(["Sources/iOS/IOSStudioCanvas.swift"], scoped=True)
+        self.assertEqual(plan["pythonTests"]["tests"], [audit])
+        self.assertIn(["./scripts/check_project_inputs.sh", "--local"], plan["commands"])
+        self.assertTrue((ROOT / audit).is_file())
 
 
 class PrimaryPlanStatusTests(unittest.TestCase):

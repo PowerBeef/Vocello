@@ -24,6 +24,24 @@ from lib import ui_lane_data  # noqa: E402
 HELPER = ROOT / "scripts/lib/ui_finalization.sh"
 LANE_DATA = ROOT / "scripts/lib/ui_lane_data.py"
 
+# A suite started as a background job of a non-interactive shell (`… &`) inherits
+# SIGINT ignored, and bash can neither trap nor reset a signal ignored on entry: its
+# `trap … INT` and `kill -INT $$` then do nothing, so every SIGINT case here failed
+# with exit 0 or 1 for 130 or ran into its deadline (BKL-26). A lane starts from a
+# terminal, where SIGINT has its default action, so every shell under test starts
+# that way whatever launched the suite; the cases still prove the same exits.
+_DEFAULT_SIGINT_EXEC = (
+    "import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); "
+    "os.execvp(sys.argv[1], sys.argv[1:])"
+)
+# The launch that caused BKL-26, for the test that pins the re-arm.
+_IGNORED_SIGINT_EXEC = _DEFAULT_SIGINT_EXEC.replace("SIG_DFL", "SIG_IGN")
+
+
+def bash(script: str) -> list[str]:
+    """`bash -c script` with SIGINT at its default action (exec keeps the PID)."""
+    return [sys.executable, "-c", _DEFAULT_SIGINT_EXEC, "bash", "-c", script]
+
 
 class UIFinalizationTests(unittest.TestCase):
     def setUp(self):
@@ -61,6 +79,7 @@ cleanup_macos_run() {{ echo cleanup >>"$out/order"; exit {cleanup}; }}
 export_attachments() {{ echo attachments >>"$out/order"; return {attachment}; }}
 required_steps_finalize() {{ echo finalize >>"$out/order"; return 1; }}
 write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
+record_lane_ledger() {{ echo ledger >>"$out/order"; }}
 {function("write_test_summary")}
 {function("collect_ui_evidence")}
 {function("cleanup_ui_run")}
@@ -69,7 +88,7 @@ write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
             script += f'write_test_summary() {{ return {summary}; }}\n'
         script += "trap cleanup_ui_run EXIT\ntrap 'exit 143' TERM\ntrap 'exit 130' INT\n"
         script += f"kill -{signal} $$\n" if signal else f"exit {code}\n"
-        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True,
+        result = subprocess.run(bash(script), text=True, capture_output=True,
                                 env=os.environ, timeout=10)
         receipt = json.loads((self.out / "ui-finalization.json").read_text())
         return result, receipt
@@ -82,7 +101,7 @@ write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
         self.assertEqual(tests[0]["verdict"], "failed")
         self.assertEqual((self.out / "metadata").read_text(), "failed 65\n")
         self.assertEqual((self.out / "order").read_text().splitlines(),
-                         ["crash", "attachments", "cleanup", "finalize"])
+                         ["crash", "attachments", "cleanup", "finalize", "ledger"])
 
     def test_collection_failure_cannot_convert_native_success_to_pass(self):
         result, receipt = self.run_fixture(code=0, attachment=7)
@@ -113,6 +132,18 @@ write_run_metadata() {{ printf '%s %s\\n' "$1" "$3" >"$out/metadata"; }}
                 self.assertEqual(result.returncode, code, result.stderr)
                 self.assertEqual(receipt["status"], "failed")
                 self.assertEqual((self.out / "metadata").read_text(), f"failed {code}\n")
+                # The signal path still records the lane ledger last.
+                self.assertEqual((self.out / "order").read_text().splitlines()[-1], "ledger")
+
+    def test_shells_under_test_trap_sigint_even_when_the_suite_ignores_it(self):
+        # BKL-26: launched with SIGINT ignored (a background job), bash cannot trap it,
+        # so a SIGINT case would see the script carry on; bash() restores the default.
+        script = "trap 'exit 130' INT\nkill -INT $$\nexit 0\n"
+        ignored = [sys.executable, "-c", _IGNORED_SIGINT_EXEC]
+        unarmed = subprocess.run([*ignored, "bash", "-c", script], capture_output=True, timeout=10)
+        self.assertEqual(unarmed.returncode, 0, unarmed.stderr)
+        rearmed = subprocess.run([*ignored, *bash(script)], capture_output=True, timeout=10)
+        self.assertEqual(rearmed.returncode, 130, rearmed.stderr)
 
     def test_cleanup_failure_invalidates_provisional_pass(self):
         result, receipt = self.run_fixture(code=0, cleanup=8, finalized=1)
@@ -159,7 +190,7 @@ stuck() {{
 ui_finalization_step stuck stuck
 printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
 '''
-        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "status").read_text(), "124\n")
         self.assert_process_retired(int((self.out / "child-pid").read_text()))
@@ -175,7 +206,7 @@ leftover() {{
 ui_finalization_step leftover leftover
 printf '%s\\n' "$ui_finalization_last_status" >"$out/status"
 '''
-        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "status").read_text(), "125\n")
         self.assert_process_retired(int((self.out / "child-pid").read_text()))
@@ -242,7 +273,7 @@ required_step_run "$step_ledger" xcuitest run_xcodebuild bash -c 'echo "Testing 
 ui_finalize_collections
 required_steps_finalize "$step_ledger"
 '''
-        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "export-count").read_text(), "export\n")
 
@@ -273,7 +304,7 @@ trap 'exit 143' TERM
 trap 'exit 130' INT
 ui_finalization_step attachments export_attachments
 '''
-                process = subprocess.Popen(["bash", "-c", script], env=env,
+                process = subprocess.Popen(bash(script), env=env,
                                            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
                     deadline = time.monotonic() + 3
@@ -326,7 +357,7 @@ trap 'exit 143' TERM
 trap 'exit 130' INT
 ui_finalize_collections
 '''
-                result = subprocess.run(["bash", "-c", script], text=True,
+                result = subprocess.run(bash(script), text=True,
                                         capture_output=True, timeout=12)
                 self.assertEqual(result.returncode, code, result.stderr)
                 receipt = json.loads((self.out / "ui-finalization.json").read_text())
@@ -362,7 +393,7 @@ trap cleanup_ui_run EXIT
 trap 'exit 143' TERM
 run_xcodebuild bash -c 'exit 65'
 '''
-        result = subprocess.run(["bash", "-c", script], text=True,
+        result = subprocess.run(bash(script), text=True,
                                 capture_output=True, timeout=12)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertEqual((self.out / "metadata").read_text(), "failed 65\n")
@@ -382,7 +413,7 @@ cleanup_macos_run() {{ echo cleanup >>"$out/order"; }}
 ui_finalize_collections
 ui_finalize_collections
 '''
-        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True, timeout=10)
+        result = subprocess.run(bash(script), text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.out / "order").read_text(), "cleanup\n")
         self.assertEqual(json.loads((self.out / "ui-finalization.json").read_text())["status"], "passed")

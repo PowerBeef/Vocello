@@ -1040,6 +1040,13 @@ class PolicyGuardTests(unittest.TestCase):
             f'env -S "git {push} --force origin main"', f"env --split-string='git {push} --force origin main'",
             f"xargs git-{push} --force origin main",
             "git config --rename-section remote.origin remote.old", "git config --remove-section remote.origin",
+            # the second re-review: a dashed binary after a wrapper and its arguments, and env -S
+            # after an option that takes a value
+            "timeout 60 git-filter-repo --force", "nice -n 5 git-filter-repo --force",
+            f"env -i git-{push} --force origin main", f"sudo -u me git-{push} --force origin main",
+            f"xargs -n1 git-{push} --force origin main", "timeout 60 /opt/homebrew/bin/git-filter-repo --force",
+            f"env -u HOME -S 'git {push} --force origin main'", f"env -C /tmp -S 'git {push} --force origin main'",
+            f"local -x GIT_DIR=/tmp/o/.git; git {push} origin main",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
@@ -1056,6 +1063,9 @@ class PolicyGuardTests(unittest.TestCase):
                         "timeout 60 git status", f'grep -rn "git-{push}" .github', "grep -rn git-rebase docs",
                         "rg git-filter-branch", "which git-filter-repo", f"man git-{push}",
                         "env FOO=1 scripts/dev.sh status", "git config --list",
+                        f"grep -rn 'GIT_DIR=' scripts/hooks; git {push} origin main",
+                        f"rg 'GIT_CONFIG_COUNT=' scripts && git {push} origin main",
+                        "ls /opt/homebrew/bin/git-filter-repo", "xargs grep -n foo", "nice -n 5 scripts/dev.sh check",
                         f"git commit -F - <<'EOF'\nmention git {push} origin topic\nEOF"):
             with self.subTest(command=command):
                 self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)

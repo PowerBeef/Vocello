@@ -53,6 +53,10 @@ JUDGED_SUBCOMMANDS = {"add", "stage", "stash", "commit", "push", "send-pack", "s
                       "rebase", "filter-branch", "filter-repo", "remote"}
 # `git-<subcommand>` binaries run that subcommand (`$(git --exec-path)/git-push`, `git-filter-repo`).
 DASHED_GIT = re.compile(r"^git-([a-z][a-z-]*)$")
+# A wrapper's own arguments (`timeout 60`, `nice -n 5`, `sudo -u me`, `env -i`) keep the next word in
+# command position; `env` options that take a value, so a later `-S` is still found.
+DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
+ENV_VALUE_OPTIONS = {"-u", "--unset", "-C", "--chdir", "-P"}
 # `git remote` verbs that change where a remote points, or which remote a name means (BKL-63).
 REMOTE_RETARGETS = {"add", "rename", "remove", "rm", "set-url"}
 # The backtick substitution stand-in: a computed word, never a literal name.
@@ -195,27 +199,15 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
     env_unsafe = exported_unsafe = ""
     env_config = exported_config = ""
     git_variables: set[str] = set()                  # `G=git`, `export GIT=/usr/bin/git`
+    in_wrapper = after_option = False                # inside a wrapper's arguments (`timeout 60 ...`)
     index = 0
     while index < len(tokens):
         token = tokens[index]
         if token in SEPARATORS:
             at_start, env_unsafe, env_config = True, exported_unsafe, exported_config
+            in_wrapper = after_option = False
             index += 1
             continue
-        # A git environment assignment anywhere before git in the same simple command counts, not
-        # only at its start: `timeout 60 env GIT_DIR=x git push`, `env -i GIT_CONFIG_COUNT=1 ... git`
-        # (BKL-63). It fails closed: a word that only looks like one is judged as one.
-        # The assignment also stands for the rest of the command, failing closed: a later `export
-        # GIT_DIR`, `declare -x`, `set -a`, or a variable the environment already exports makes it
-        # reach every later git.
-        if GIT_ENV.match(token):
-            exported_unsafe = exported_unsafe or token.split("=", 1)[0]
-            if not at_start:
-                env_unsafe = env_unsafe or token.split("=", 1)[0]
-        if GIT_CONFIG_ENV.match(token):
-            exported_config = exported_config or token.split("=", 1)[0]
-            if not at_start:
-                env_config = env_config or token.split("=", 1)[0]
         if token == "(":
             stack.append(directory)
             at_start = True
@@ -225,7 +217,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             directory = stack.pop() if stack else directory
             index += 1
             continue
-        if at_start and token == "export":
+        if at_start and token in ("export", "declare", "typeset", "local", "readonly"):
             cursor = index + 1
             while cursor < len(tokens) and tokens[cursor] not in SEPARATORS:
                 if GIT_ENV.match(tokens[cursor]):
@@ -239,10 +231,17 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             index = cursor
             continue
         if at_start and ASSIGNMENT.match(token):
+            # In command position (at a command's start or among a wrapper's arguments, as in
+            # `timeout 60 env GIT_DIR=x git push`). The assignment also stands for the rest of the
+            # command, failing closed: a later `export GIT_DIR`, `set -a`, or a variable the
+            # environment already exports makes it reach every later git (BKL-63). A search
+            # pattern such as `grep 'GIT_DIR='` is an argument, not an assignment.
             if GIT_ENV.match(token):
                 env_unsafe = token.split("=", 1)[0]
+                exported_unsafe = exported_unsafe or env_unsafe
             if GIT_CONFIG_ENV.match(token):
                 env_config = token.split("=", 1)[0]
+                exported_config = exported_config or env_config
             if _is_git(token.split("=", 1)[1]):
                 git_variables.add(token.split("=", 1)[0])
             index += 1
@@ -263,10 +262,14 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 if split:
                     found.extend(git_invocations(split, directory or cwd, depth + 1))
                     break
+                if option in ENV_VALUE_OPTIONS:
+                    cursor += 2                       # `env -u HOME -S ...`: the value, then on
+                    continue
                 if not option.startswith("-") and not ASSIGNMENT.match(option):
                     break
                 cursor += 1
         if at_start and (name in TRANSPARENT_PREFIXES or name == "env"):
+            in_wrapper, after_option = True, False
             index += 1
             continue
         if at_start and name == "cd":
@@ -299,10 +302,18 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
                 cursor += 1
             found.extend(git_invocations(" ".join(words), directory or cwd, depth + 1))
         following = tokens[index + 1] if index + 1 < len(tokens) else ""
-        # A `git-<sub>` word runs git only where a command name stands, or as a path to the binary
-        # (`$(git --exec-path)/git-push`, `/opt/homebrew/bin/git-filter-repo`); as an argument
-        # (`grep -rn git-push .github`, `man git-rebase`) it is only text.
-        dashed = DASHED_GIT.match(name) if (at_start or "/" in token) else None
+        # A `git-<sub>` word runs git only where a command name stands, after a wrapper and its
+        # arguments included (`timeout 60 git-filter-repo`, `sudo -u me git-push`,
+        # `"$(git --exec-path)/git-push"`); as an argument (`grep -rn git-push .github`,
+        # `ls /opt/homebrew/bin/git-filter-repo`) it is only text.
+        dashed = DASHED_GIT.match(name) if at_start else None
+        if at_start and in_wrapper and not dashed and not _is_git(token) and not VARIABLE_WORD.match(token) and (
+                token.startswith("-") or DURATION.match(token) or after_option):
+            # A wrapper's option, its value or a duration: the command is still to come. A value
+            # that is itself a dashed git word is judged above, failing closed.
+            after_option = token.startswith("-") and "=" not in token
+            index += 1
+            continue
         if dashed:
             # `git-push origin x` is `git push origin x`: no global options come between.
             cursor = index + 1

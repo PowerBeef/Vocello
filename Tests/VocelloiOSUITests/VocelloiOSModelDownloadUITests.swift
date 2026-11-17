@@ -315,7 +315,9 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: install, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceModels"), timeout: 30))
         // RF-41: Studio's button opens Voice Models with the download confirmation, size shown.
-        XCTAssertTrue(VocelloUIWait.exists(element("iosModelDownloadConfirmButton"), timeout: 30))
+        XCTAssertTrue(VocelloUIWait.condition("the download confirmation", timeout: 30) {
+            self.alertButton(id: "iosModelDownloadConfirmButton", englishLabel: "Download").exists
+        })
         VocelloUIScreenshot.attach(app, named: "ios-studio-install-confirmation-\(modelID)")
         assertNoModelTransferStarts(modelID)
         confirmModelDownload()

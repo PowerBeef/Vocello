@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 50/89 (56%) |
+| `release-first-3-0-2026-09` | active | release-qa | 52/89 (58%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 48/89 (54%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 49/90 (54%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -149,7 +149,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.1.0
 - `RF-63` (planned) Fit the 3.1 App Review notes into what is left of the 4,000 characters
 
-### iPhone (61)
+### iPhone (59)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -176,11 +176,11 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `BKL-42` (parked) The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard
 - `BKL-43` (parked) The iPhone crash-baseline pull fails when a download journal is pruned mid-copy
 - `BKL-45` (parked) Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild
-- `BKL-49` (parked) The Mirroring capture helper finds no window on a non-English Mac
 - `BKL-59` (parked) Three small iPhone UI defects from the November 9 audit
 - `BKL-60` (parked) Studio's install request is dropped while the model's status is still checking
 - `BKL-68` (parked) The Cancel download dialog may show no Keep Download button on the iPhone
 - `BKL-69` (parked) The iPhone frame-health lane's player scenarios open whatever take is newest in History
+- `BKL-89` (parked) The iPhone Settings reveal cannot scroll a page whose only free text is its title
 - `BT-06` (parked) Timing attribution, profiles and device-lane observers (also: Mac, remotely)
 - `DA-03` (parked) Accessibility, localization and glass gating
 - `DA-07` (parked) Playback and recording defects that need a device (also: Mac, remotely)
@@ -208,9 +208,7 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: At the keyboard)
 - `RF-51` (planned) Quality remediation, stage 1: clone input correctness
 - `RF-55` (planned) Quality remediation, stage 5: model precision and the hybrid model
-- `RF-58` (planned) One take variation: the Variation setting is retired and every take samples as the model's reference does
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired
-- `RF-60` (planned) Korean long-form: a caution before the project starts, and a documented known limitation
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
@@ -257,9 +255,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
-| `RF-58` | planned | One take variation: the Variation setting is retired and every take samples as the model's reference does | — |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
-| `RF-60` | planned | Korean long-form: a caution before the project starts, and a documented known limitation | — |
 | `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.1.0 | — |
 | `RF-63` | planned | Fit the 3.1 App Review notes into what is left of the 4,000 characters | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
@@ -309,7 +305,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate. On that build, an owned export unlock still saves and shares Design and Clone audio with the phone in Airplane Mode (moved from RF-13, 2026-10-16: only the live App Store's offline cache was left untested).
 
 - **`RF-15`** (planned) — Risk-based acceptance of the processed 3.1.0 candidate on the iPhone.
-  gate: On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand, or a computer-use record the maintainer confirms; decision 2026-10-25) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.
+  gate: On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand; decision 2026-11-17) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.
 
 - **`RF-16`** (planned) — Submit 3.1.0 for App Review on the maintainer's explicit go.
   gate: Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.
@@ -368,14 +364,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
   gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.
 
-- **`RF-58`** (planned) — One take variation: the Variation setting is retired and every take samples as the model's reference does.
-  gate: Neither app's Settings shows a Variation control; a saved Balanced or Consistent preference reads as Expressive; vocello accepts --variation balanced or consistent with a notice and generates as Expressive; History still shows an old take's recorded variation; fixed-seed Expressive takes are PCM-identical before and after (scripts/pcm_identity.py, the three modes); the routed check and the macOS settings UI lane pass; the long-form screen runs one variation. The iPhone settings and control-audit lanes run in the next announced phone window.
-
 - **`RF-59`** (planned) — One model: the attn hybrid replaces Speed and Quality, and the model selector is retired.
   gate: The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app shows a Speed/Quality choice; every mode's installed Speed and Quality folders are removed once any mode's model verifies (maintainer decision 2026-11-13); vocello accepts --variant quality, models use and prefer-lower-memory with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, the README, website copy and benchmark baselines (a new lineage) follow with the release.
-
-- **`RF-60`** (planned) — Korean long-form: a caution before the project starts, and a documented known limitation.
-  gate: Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.
 
 - **`RF-62`** (planned) — Answer the new App Store age-rating descriptors when filing 3.1.0.
   gate: In App Store Connect the age-rating questionnaire answers Apple's new Shared Location and Dating and Relationships descriptors (no for both, which is what the app does) before submission and well before the January 12, 2027 deadline, the standing rating decision is unchanged, and the read-back is recorded with ASR-11's live audit.
@@ -783,7 +773,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-42` | parked | The iPhone composer-typing perf test hangs restoring a non-System App Language under the keyboard | — |
 | `BKL-43` | parked | The iPhone crash-baseline pull fails when a download journal is pruned mid-copy | — |
 | `BKL-45` | parked | Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild | — |
-| `BKL-49` | parked | The Mirroring capture helper finds no window on a non-English Mac | — |
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
 | `BKL-57` | parked | Every iPhone candidate waits on Swift CodeQL and a website npm audit | — |
@@ -807,6 +796,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-86` | parked | Attended check of the output-device change under a paused live preview | — |
 | `BKL-87` | parked | CI never runs the iOS control-audit tests on a push that changes only iPhone sources | — |
 | `BKL-88` | parked | test_host_preflight's cache-only ownership test failed once under the parallel suite | — |
+| `BKL-89` | parked | The iPhone Settings reveal cannot scroll a page whose only free text is its title | — |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 
 ### Open items in detail
@@ -873,10 +863,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-45`** (parked) — Compiles that share the iPhone lanes' DerivedData make the next iPhone lane rebuild.
   gate: A routed check's unsigned generic compile of the iOS UI bundles (scripts/build_ui_test_bundles.sh) no longer overwrites the products an iPhone lane's build skip relies on, so a lane after a check that touched test code skips its build when nothing it ships changed.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
-
-- **`BKL-49`** (parked) — The Mirroring capture helper finds no window on a non-English Mac.
-  gate: scripts/ios_device.sh mirroring capture finds the iPhone Mirroring window by bundle id or process, not by the English owner name, and a test covers a localized owner name.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.
 
 - **`BKL-50`** (parked) — The CLI cancellation package test can time out on the Linux runner.
@@ -970,6 +956,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`BKL-88`** (parked) — test_host_preflight's cache-only ownership test failed once under the parallel suite.
   gate: scripts/tests/test_host_preflight.py::HostPreflightTests::test_cache_only_analysis_retains_worker_ownership_checks passes under pytest -n auto in repeated full runs, or its dependence on the host's real worker leases is removed.
   unparkWhen: Authorized now (it needs no iPhone); fix it when it recurs or with the next host-preflight change.
+
+- **`BKL-89`** (parked) — The iPhone Settings reveal cannot scroll a page whose only free text is its title.
+  gate: VocelloUISettingsReveal scrolls a Settings page whose only text outside a control is its title (it drags from that title toward a text that does not exist), with a test of that page shape, and scripts/ui_test.sh ios localization passes, its AX-L phase included.
+  unparkWhen: Authorized backlog; fix it in the next phone window that runs the localization lane.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
   gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.

@@ -28,6 +28,11 @@ class VocelloiOSUITestCase: XCTestCase {
     /// Whether this session walked the onboarding pages, which only a fresh install shows.
     private(set) var didWalkFirstLaunch = false
     private var pendingJourneyRestores: [() -> Void] = []
+    /// RF-59: a launch over an earlier Vocello's models opens on the model-update prompt, which
+    /// covers the tab dock. Only the update journey accepts it; any other session fails on it.
+    private var acceptsModelUpdatePrompt = false
+    /// Whether this session's launch accepted the model-update prompt.
+    private(set) var didAcceptModelUpdatePrompt = false
 
     var app: XCUIApplication { session.app }
 
@@ -38,7 +43,8 @@ class VocelloiOSUITestCase: XCTestCase {
 
     func beginSession(
         additionalEnvironment: [String: String] = [:],
-        additionalArguments: [String] = []
+        additionalArguments: [String] = [],
+        acceptingModelUpdatePrompt: Bool = false
     ) {
         continueAfterFailure = false
         VocelloUIWait.resetCadence(steady: Self.keepsSteadyWaitCadence)
@@ -48,6 +54,8 @@ class VocelloiOSUITestCase: XCTestCase {
         isCandidateSession = false
         isFirstLaunchAuthorized = false
         didWalkFirstLaunch = false
+        acceptsModelUpdatePrompt = acceptingModelUpdatePrompt
+        didAcceptModelUpdatePrompt = false
         session = VocelloUIApplicationSession()
         launchApp(
             additionalEnvironment: additionalEnvironment,
@@ -88,6 +96,8 @@ class VocelloiOSUITestCase: XCTestCase {
         isCandidateSession = true
         isFirstLaunchAuthorized = firstLaunch
         didWalkFirstLaunch = false
+        acceptsModelUpdatePrompt = false
+        didAcceptModelUpdatePrompt = false
         session = VocelloUIApplicationSession(
             app: XCUIApplication(bundleIdentifier: Self.candidateBundleIdentifier)
         )
@@ -192,8 +202,23 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIWait.exists(option, timeout: 20))
         // Until the new choice is confirmed, the session's restore must not be skipped.
         selectedInterfaceLanguage = nil
+        var swipedOptionsUp = false
         if !option.isSelected {
-            XCTAssertTrue(revealSettingsElement(option, swipingUp: true))
+            // The page's only text outside a control is its title, so the bounded reveal finds
+            // no text to drag it toward and never scrolls (ios-xcui-localization-20261117-161921-
+            // 89c62b0a and 162702-4c15d69f, the 日本語 row 5 pt under the dock's edge). A swipe on
+            // the scroll view holding the options lifts the lower ones (a swipe on the 20-point
+            // title moves too little: 163118-1d3d5704); a choice then needs to be tappable, its
+            // centre clear above the dock, not fully visible.
+            var revealed = VocelloUISettingsReveal.perform(option, in: app, swipingUp: true, requirement: .navigation)
+            if !revealed {
+                appLanguageOptions.swipeUp(velocity: .slow)
+                swipedOptionsUp = true
+                revealed = VocelloUISettingsReveal.perform(option, in: app, swipingUp: true, requirement: .navigation)
+            }
+            let dock = element("rootTabDock")
+            let tappableInPlace = option.isHittable && (!dock.exists || option.frame.midY < dock.frame.minY - 4)
+            XCTAssertTrue(revealed || tappableInPlace, "The \(language) option must be revealed or tappable in place")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: option, timeout: 20))
         }
         XCTAssertTrue(VocelloUIWait.condition("interface language selected", timeout: 10) {
@@ -201,9 +226,25 @@ class VocelloiOSUITestCase: XCTestCase {
         })
         selectedInterfaceLanguage = language
         let back = element("iosSettings_appLanguageBackButton")
-        XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
+        // Once a swipe has lifted the lower options, Back sits above the window and the bounded
+        // reveal has no text to drag (163600-8de8348d), so the page swipes back down first. A swipe
+        // the page cannot follow lands as a tap on the option under it, so only a page that swiped
+        // up swipes down, and the choice is confirmed again before Back.
+        if !revealSettingsElement(back, swipingUp: false) {
+            XCTAssertTrue(swipedOptionsUp, "Back must be revealed on a page that was not swiped")
+            appLanguageOptions.swipeDown(velocity: .slow)
+            XCTAssertTrue(VocelloUIWait.condition("the \(language) choice to stay selected", timeout: 5) {
+                option.exists && option.isSelected
+            })
+            XCTAssertTrue(revealSettingsElement(back, swipingUp: false))
+        }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
         XCTAssertTrue(VocelloUIWait.disappears(element("screen_settings_appLanguage"), timeout: 20))
+    }
+
+    /// The App Language page's scroll view, found by the options it holds.
+    private var appLanguageOptions: XCUIElement {
+        app.scrollViews.containing(.button, identifier: "iosSettings_appLanguageOption_en").firstMatch
     }
 
     /// A failed test keeps a named screenshot of the screen as it was when it stopped
@@ -342,11 +383,21 @@ class VocelloiOSUITestCase: XCTestCase {
     func completeVisibleOnboardingIfNeeded() {
         let skip = element("onboarding_skip")
         let studio = element(VocelloiOSTab.studio.identifier)
+        let alert = app.alerts.firstMatch
         XCTAssertTrue(
-            VocelloUIWait.condition("visible onboarding or the main tab dock", timeout: 30) {
-                skip.exists || (studio.exists && studio.isHittable)
+            VocelloUIWait.condition("visible onboarding, the main tab dock or an alert", timeout: 30) {
+                skip.exists || (studio.exists && studio.isHittable) || alert.exists
             }
         )
+        // The app decides on the update prompt in a launch task, so it can follow the dock: the
+        // update journey gives it a moment before the session's own tab taps run under it.
+        if !skip.exists, !alert.exists, acceptsModelUpdatePrompt {
+            _ = VocelloUIWait.settles("the model-update prompt", timeout: 10) { alert.exists }
+        }
+        if !skip.exists, alert.exists {
+            acceptModelUpdatePromptAtLaunch(alert: alert, dock: studio)
+            return
+        }
         guard skip.exists else { return }
         // A candidate is upgrade-tested; first-launch acceptance is its own approved session.
         guard !isCandidateSession || isFirstLaunchAuthorized else {
@@ -360,6 +411,50 @@ class VocelloiOSUITestCase: XCTestCase {
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: skip, timeout: 15))
         XCTAssertTrue(VocelloUIWait.disappears(element("onboarding_cta"), timeout: 20))
+    }
+
+    /// An alert's button by its accessibility identifier where the platform keeps it, else by
+    /// its English label inside the open alert, optionally only the alert that also holds the
+    /// `sibling` button. iOS 27 drops the identifiers of SwiftUI alert buttons: the model-update
+    /// prompt in ios-xcui-smoke-20261117-155308-d2c20ab5 exposes only its labels. The fallback is
+    /// English only: development launches pin `-AppleLanguages en`, but a saved App Language wins
+    /// over it, and candidate launches pin nothing, so on another language it finds nothing.
+    func alertButton(id: String, englishLabel: String, inAlertWith sibling: String? = nil) -> XCUIElement {
+        let byIdentifier = element(id)
+        if byIdentifier.exists { return byIdentifier }
+        let alerts = sibling.map {
+            app.alerts.containing(NSPredicate(format: "elementType == %lu AND label == %@",
+                                              XCUIElement.ElementType.button.rawValue, $0))
+        } ?? app.alerts
+        return alerts.buttons[englishLabel].firstMatch
+    }
+
+    /// RF-59: the update journey accepts the launch prompt, which starts every mode's update;
+    /// any other session stops here rather than start a multi-gigabyte download it never asked for,
+    /// and an unexpected alert at launch fails with its title rather than a timeout.
+    private func acceptModelUpdatePromptAtLaunch(alert: XCUIElement, dock: XCUIElement) {
+        let prompt = alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update")
+        guard prompt.exists, acceptsModelUpdatePrompt else {
+            VocelloUIScreenshot.attach(app, named: "ios-launch-alert")
+            if !prompt.exists {
+                XCTFail("An alert covers the app at launch: \(alert.label) (the update prompt is matched in English only)")
+            } else if isCandidateSession {
+                XCTFail("The model-update prompt covers the candidate: models from an earlier Vocello are "
+                    + "installed. Answer the prompt in the installed candidate, then run the journey again.")
+            } else {
+                XCTFail("The model-update prompt covers the app: models from an earlier Vocello are installed. "
+                    + "Run scripts/ui_test.sh ios smoke --scenario update-models first.")
+            }
+            return
+        }
+        VocelloUIScreenshot.attach(app, named: "ios-update-models-prompt")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: prompt, timeout: 10))
+        didAcceptModelUpdatePrompt = true
+        XCTAssertTrue(
+            VocelloUIWait.condition("the main tab dock after the model-update prompt", timeout: 30) {
+                dock.exists && dock.isHittable
+            }
+        )
     }
 
     /// RF-15 first launch: every onboarding page through its primary action, never Skip. Each
@@ -457,15 +552,19 @@ class VocelloiOSUITestCase: XCTestCase {
     /// Install, Update and Studio's install button ask before a model download starts (RF-41,
     /// Guideline 4.2.3(ii)); this confirms the alert the tap just presented.
     func confirmModelDownload() {
-        let confirm = element("iosModelDownloadConfirmButton")
-        XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 30), "The download confirmation must appear")
+        XCTAssertTrue(VocelloUIWait.condition("the download confirmation", timeout: 30) {
+            self.alertButton(id: "iosModelDownloadConfirmButton", englishLabel: "Download").exists
+        }, "The download confirmation must appear")
+        let confirm = alertButton(id: "iosModelDownloadConfirmButton", englishLabel: "Download")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
     }
 
     /// Dismisses the download confirmation with its Cancel button (RF-41).
     func dismissModelDownloadConfirmation() {
-        let dismiss = element("iosModelDownloadDismissButton")
-        XCTAssertTrue(VocelloUIWait.exists(dismiss, timeout: 30), "The download confirmation must appear")
+        XCTAssertTrue(VocelloUIWait.condition("the download confirmation", timeout: 30) {
+            self.alertButton(id: "iosModelDownloadDismissButton", englishLabel: "Cancel", inAlertWith: "Download").exists
+        }, "The download confirmation must appear")
+        let dismiss = alertButton(id: "iosModelDownloadDismissButton", englishLabel: "Cancel", inAlertWith: "Download")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: dismiss, timeout: 20))
     }
 

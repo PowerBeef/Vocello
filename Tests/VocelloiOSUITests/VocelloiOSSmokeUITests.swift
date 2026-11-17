@@ -632,15 +632,21 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
     /// accepts that genuine prompt. Otherwise it taps each row's Update and
     /// confirms. No generation.
     func testUpdateInstalledModels() {
-        beginSession()
+        // RF-59: over an earlier Vocello's models the prompt opens at launch, covering the dock, so
+        // the session accepts it there (it also waits a moment for one that follows the dock); a
+        // prompt that arrives after the session has started is accepted below.
+        beginSession(acceptingModelUpdatePrompt: true)
         defer { endSession() }
         let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
         var updated: [String] = []
-        let prompt = app.buttons["iosModelUpdatePromptConfirm"]
-        let promptAccepted = VocelloUIWait.settles("model update prompt", timeout: 15, evaluate: { prompt.exists })
-        if promptAccepted {
+        var promptAccepted = didAcceptModelUpdatePrompt
+        if !promptAccepted, VocelloUIWait.settles("model update prompt", timeout: 15, evaluate: {
+            self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+        }) {
             VocelloUIScreenshot.attach(app, named: "ios-update-models-prompt")
+            let prompt = alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: prompt, timeout: 10))
+            promptAccepted = true
         }
         openVoiceModels()
         for modelID in modelIDs {
@@ -682,6 +688,20 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         }
         print("[update-models] updated=\(updated.joined(separator: ","))")
         VocelloUIScreenshot.attach(app, named: "ios-update-models-ready")
+        // The update ends on a note of the space the earlier models freed, above every tab until it
+        // is tapped; on 2026-11-17 it took the tap meant for Back (ios-xcui-smoke-20261117-155556-
+        // 1f3a0484), so the journey dismisses it through its own control first.
+        // The note follows only a launch-planned update, and it appears after the earlier models
+        // are reclaimed, so it is required after the prompt and otherwise given a moment.
+        let done = element("iosModelUpdateBanner_done")
+        let noteShown = promptAccepted
+            ? VocelloUIWait.exists(done, timeout: 30)
+            : VocelloUIWait.settles("the update's completion note", timeout: 15) { done.exists }
+        XCTAssertTrue(noteShown || !promptAccepted, "The update must end on its completion note")
+        if noteShown {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: done, timeout: 10))
+            XCTAssertTrue(VocelloUIWait.disappears(done, timeout: 10))
+        }
         leaveVoiceModels()
     }
 
@@ -772,6 +792,18 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
                 !self.element("voiceCloning_transcriptInput").exists
             }
         )
+
+        // RF-60: a script past the single-take budget that resolves to Korean shows its caution
+        // under the script beside the long-form marker, before Generate; clearing it removes both.
+        select(mode: .custom)
+        let korean = String(repeating: "오늘은 날씨가 맑고 바람이 시원해서 산책하기 좋은 날입니다. ", count: 40)
+        replaceScript(with: korean)
+        let caution = element("textInput_koreanLongFormCaution")
+        XCTAssertTrue(VocelloUIWait.exists(caution, timeout: 20), "A Korean long-form script must show its caution")
+        XCTAssertTrue(element("textInput_longFormIndicator").exists, "The Korean script must route to long form")
+        VocelloUIScreenshot.attach(app, named: "ios-studio-korean-long-form-caution")
+        replaceScript(with: "")
+        XCTAssertTrue(VocelloUIWait.disappears(caution, timeout: 20), "Clearing the script must remove the caution")
     }
 
     /// AUD-02: record a clip from Clone's reference, then play it in the review the save sheet shows,

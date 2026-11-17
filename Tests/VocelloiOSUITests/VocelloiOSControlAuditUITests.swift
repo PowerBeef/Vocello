@@ -429,8 +429,11 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let clearInspected = clearMenu.exists && clearMenu.isHittable && clearMenu.isEnabled
         if clearInspected {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
-            XCTAssertTrue(VocelloUIWait.exists(element("historyClearConfirm"), timeout: 20))
-            let cancel = element("historyClearCancel")
+            // iOS 27 drops SwiftUI alert-button identifiers; `alertButton` falls back to the label.
+            XCTAssertTrue(VocelloUIWait.condition("the clear-and-delete confirmation", timeout: 20) {
+                self.alertButton(id: "historyClearConfirm", englishLabel: "Delete Everything").exists
+            })
+            let cancel = alertButton(id: "historyClearCancel", englishLabel: "Cancel", inAlertWith: "Delete Everything")
             XCTAssertTrue(VocelloUIWait.exists(cancel, timeout: 20))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cancel, timeout: 20))
             XCTAssertTrue(VocelloUIWait.disappears(cancel, timeout: 20))

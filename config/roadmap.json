@@ -304,7 +304,7 @@
       "blockedBy": [
         "RF-12"
       ],
-      "gate": "On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand, or a computer-use record the maintainer confirms; decision 2026-10-25) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
+      "gate": "On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand; decision 2026-11-17) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.",
       "sourceOfTruth": [
         "docs/reference/release-first-execution-2026-09.md",
         "scripts/ui_test.sh",
@@ -313,7 +313,7 @@
       "needs": [
         "iphone"
       ],
-      "updated": "2026-11-10",
+      "updated": "2026-11-17",
       "notes": "Opened 2026-10-12 (risk-based gate). Rows run on the TestFlight candidate with --candidate-origin-attestation; with-purchase export, Restore and Cancel wait for RF-02; startup Retry and the unverified purchase use development evidence (ios-xcui-smoke-20261024-115441-08eddecc, ios-xcui-purchase-20261024-120821-ad3c8846). Run IDs drop the ios-xcui-candidate-smoke- prefix. Build 24 passed every row but accessibility (accepted, BKL-31); builds 25 and 26 reran navigation and modes (git log -p). Build 29, 2026-11-01, PASS with no new crash reports: clone-voice 20261102-040529-6a19725b (handoff), navigation 040613-c1623ff9 (About reads 3.0.0 (29)), modes 040643-928766e6 (a take per mode in English and French). Three non-product failures are retained before them (035555, 035645, 035846; git log -p). RF-41 needs a new candidate, which reruns these rows. DA-04, F-01, F-16 closed. Open: the ~30-take machine screen and the purchase rows (RF-02); attended, AUD-01's onboarding file, AUD-02's hand checks, hand VoiceOver and the offline relaunch."
     },
     {
@@ -599,29 +599,6 @@
       "notes": "Opened 2026-11-11 at the maintainer's request. Done 2026-11-11. The deterministic suites repeated at a6e501eb: XCTest 8 of 8 runs clean; Python 5 of 5 with one failure that is environmental (BKL-72); BKL-71's test did not fail again. Two read-only audits of the take lanes found them unfit to decide: qc-takes passes when scoring fails, no lane scores both speaker and content, refused takes leave the averages, arms share a data directory, asr.edit_rate_min counts no substitutions, WAV digests include a timestamp. scripts/quality_screen.py replaces them for decisions (RF-50); the lane's resume after a QC refusal is fixed (317bd340). The screen's own evidence reader had a bug its guard exposed (identifier case), fixed. Left for the long-form screen: QC v2 has never scored a long take (the phone model stops at 120 s, Whisper fixes the language from the first 30 s, seam pauses read as dropouts)."
     },
     {
-      "id": "RF-58",
-      "plan": "release-first-3-0-2026-09",
-      "title": "One take variation: the Variation setting is retired and every take samples as the model's reference does",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Neither app's Settings shows a Variation control; a saved Balanced or Consistent preference reads as Expressive; vocello accepts --variation balanced or consistent with a notice and generates as Expressive; History still shows an old take's recorded variation; fixed-seed Expressive takes are PCM-identical before and after (scripts/pcm_identity.py, the three modes); the routed check and the macOS settings UI lane pass; the long-form screen runs one variation. The iPhone settings and control-audit lanes run in the next announced phone window.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift",
-        "Sources/QwenVoiceCore/SemanticTypes.swift",
-        "Sources/VocelloCLI/GenerateCommand.swift",
-        "Sources/Views/Settings/MacSettingsScreen.swift",
-        "Sources/iOS/IOSSettingsViews.swift",
-        "Sources/VocelloCLI/Core/CommandModel/VocelloCommandTree.swift",
-        "config/ios-control-audit.json",
-        "config/quality-screens.json"
-      ],
-      "needs": [
-        "iphone"
-      ],
-      "updated": "2026-11-12",
-      "notes": "Opened 2026-11-12 at the maintainer's request. Balanced (0.8 / 0.95) and Consistent (0.7 / 0.9) lowered the talker's temperature; long-form projects refused 18 of 32 under Consistent against 4 of 32 under Expressive, and no measurement showed a benefit. Implemented 2026-11-12 (0e248d2c): requests carry no variation and sample as the reference; both Settings pickers, their strings and the take-variation lane are gone; vocello --variation parses and warns (variation_retired); device plans, the control audit (191 takes) and voice reliability (117) run Expressive only; the long-form screen is version 2. Proof: scripts/pcm_identity.py, 14 of 14 fixed-seed takes in three modes PCM-identical between the builds of 734e3766 and 0e248d2c; a generate take keeps its request, session and prewarm identity digests. The macOS localization lane passed (its Audio page and overview show Playback only). Left: the iPhone settings and control-audit lanes in the next phone window; the website and release notes change with the release that ships it."
-    },
-    {
       "id": "RF-59",
       "plan": "release-first-3-0-2026-09",
       "title": "One model: the attn hybrid replaces Speed and Quality, and the model selector is retired",
@@ -641,25 +618,7 @@
         "iphone"
       ],
       "updated": "2026-11-14",
-      "notes": "Opened 2026-11-13 at the maintainer's request: the attn hybrid replaces Speed and Quality (clone similarity -0.026, long-form error rate about twice Quality's, RTF x1.05 to x1.06, +176 MB). Published 2026-11-13: PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-hybrid-attn at c36e22ed, 6bcae41e and 5af70b5c. Implemented in 41693f7f, b3b09d3c, d50e860b and dbe59080. Model update for 3.0 users (2026-11-13): the modes an earlier build installed read Update required and update themselves (the Mac on an unmetered network, the iPhone after one consent alert); Cancel, Not Now and Later stop it; a failure is kept and waits for Update or Retry; a short disk offers to remove the earlier models first. Proven on a clone of real 3.0 Mac data (76 s, tokenizer reused, History and voices intact) and by the Mac model-update scenario; the review's phone-free follow-ups are done (2026-11-14). Left: the iPhone flow, memory and speed on a phone, the speed lane, memory bands, baselines, and the README, website and public facts with the release. The 3.0 packages live in QwenVoice-Research for the screens (run --stock)."
-    },
-    {
-      "id": "RF-60",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Korean long-form: a caution before the project starts, and a documented known limitation",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Both apps show a caution under a long-form script that Auto sends as Korean, before Generate and in the Mac batch sheet, in all ten interface languages; vocello adds a long_form_korean warning before any model work; the model guide documents the measured rates; unit tests cover the detection and the CLI path. The iPhone view is checked in the next announced phone window.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/LongFormPlanning.swift",
-        "Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift",
-        "docs/reference/qwen3-tts-guide.md"
-      ],
-      "needs": [
-        "iphone"
-      ],
-      "updated": "2026-11-13",
-      "notes": "Opened 2026-11-13 at the maintainer's request (options a and b: document it and warn up front; a richer recipe was not chosen). Of the 12 Korean long-form projects of seed sets 13 to 15 (Mac, Expressive), Speed generated 3, the attn hybrid 6 and Quality 9; an 8-bit code predictor showed nothing. A refused segment stops its project, which Resume continues with a new take of that segment. Implemented 2026-11-13: GenerationSemantics.resolvesToKorean (Auto's East Asian branch, so digits do not count and a Latin run is one word) drives a caution under the Studio script on both apps, hidden while a take runs, and before Generate All in the Mac batch sheet, in all ten interface languages; vocello adds long_form_korean (generate before boot; batch names its lines). Left: the iPhone view in the next announced phone window."
+      "notes": "Opened 2026-11-13 at the maintainer's request: the attn hybrid replaces Speed and Quality (clone similarity -0.026, long-form error rate about twice Quality's, RTF x1.05 to x1.06, +176 MB). Published 2026-11-13: PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-hybrid-attn at c36e22ed, 6bcae41e and 5af70b5c. Implemented in 41693f7f, b3b09d3c, d50e860b and dbe59080. Model update for 3.0 users (2026-11-13): the modes an earlier build installed read Update required and update themselves (the Mac on an unmetered network, the iPhone after one consent alert); Cancel, Not Now and Later stop it; a failure is kept and waits for Update or Retry; a short disk offers to remove the earlier models first. Proven on a clone of real 3.0 Mac data and by the Mac model-update scenario (2026-11-14). 2026-11-17, iPhone 17 Pro: the 3.0 models updated after the consent alert, freeing 4.13 GB (ios-xcui-smoke-20261117-155556-1f3a0484, which then failed on its own Back tap); smoke PASSed on them (161024-9ce94fa8). Left: the iPhone's memory and speed, on the candidate tag. 3.0 packages: QwenVoice-Research."
     },
     {
       "id": "RF-62",
@@ -2345,23 +2304,6 @@
       "notes": "Parked 2026-10-28 from item 22 of docs/audits/2026-10-25-ui-test-documentation-scan.md (scanned at 6f9fe5ff), which was tracked nowhere; not investigated (focus rules). Not a release blocker: test tooling only. The same overwrite left the candidate runner unsealed on 2026-10-25 (repaired at lane time since); RF-38's scripts/farm_smoke.sh package shares that DerivedData the same way."
     },
     {
-      "id": "BKL-49",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The Mirroring capture helper finds no window on a non-English Mac",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "scripts/ios_device.sh mirroring capture finds the iPhone Mirroring window by bundle id or process, not by the English owner name, and a test covers a localized owner name.",
-      "sourceOfTruth": [
-        "scripts/lib/iphone_mirroring.py"
-      ],
-      "needs": [
-        "iphone"
-      ],
-      "updated": "2026-10-30",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan, or the maintainer makes it a release blocker.",
-      "notes": "Parked 2026-10-30 from the RF-37 Mirroring check: on this Mac the window owner is \"Recopie de l'iPhone\", so capture refused every step and the record holds copied computer-use screenshots instead; not investigated (focus rules). Not a release blocker: test tooling only."
-    },
-    {
       "id": "BKL-50",
       "plan": "post-3-0-backlog-2026-10",
       "title": "The CLI cancellation package test can time out on the Linux runner",
@@ -2773,6 +2715,24 @@
       "updated": "2026-11-17",
       "unparkWhen": "Authorized now (it needs no iPhone); fix it when it recurs or with the next host-preflight change.",
       "notes": "Seen 2026-11-17 in a scripts/dev.sh check of the README change: the test expected exit 1 and got 2 (\"worker tracking has unreadable ownership\"). It passed alone and in the next full run (3,132 passed). Parked without investigation."
+    },
+    {
+      "id": "BKL-89",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The iPhone Settings reveal cannot scroll a page whose only free text is its title",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "VocelloUISettingsReveal scrolls a Settings page whose only text outside a control is its title (it drags from that title toward a text that does not exist), with a test of that page shape, and scripts/ui_test.sh ios localization passes, its AX-L phase included.",
+      "sourceOfTruth": [
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift"
+      ],
+      "needs": [
+        "iphone"
+      ],
+      "updated": "2026-11-17",
+      "unparkWhen": "Authorized backlog; fix it in the next phone window that runs the localization lane.",
+      "notes": "Found 2026-11-17 on build 31 (iOS 27): the App Language walk could not reveal the 日本語, 한국어 and Русский rows (ios-xcui-localization-20261117-161921-89c62b0a, 162702-4c15d69f, 163118-1d3d5704, 163600-8de8348d). A swipe on the options' scroll view now covers that page, and every language passed (164638-2f2ddbb5); the same limit then failed the AX-L phase on a Settings category row (VocelloiOSUITestCase.swift, openSettingsPage). Test tooling only; RF-58's iPhone proof came from smoke and the control audit."
     },
     {
       "id": "ER-01",

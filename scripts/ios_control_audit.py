@@ -43,8 +43,14 @@ LEGACY_PLAN_V1_PLAN_DIGESTS = {
     "d49456e622ad6491965f988648da1407ec1e966d7404ccac125c1e05a4f3ddce",
 }
 
+# A control is counted in either spelling: the call form `Button(…)` and the
+# trailing-closure form `Button { action } label: { … }` (also NavigationLink's
+# `NavigationLink { destination } label:`). Only the controls whose initializer
+# can start with a trailing closure get the second spelling; a container such
+# as `Menu {` is not a control here, and `Button(role:)` is the call form.
 INTERACTIVE_RE = re.compile(
     r"\b(?:Button|Toggle|Picker|NavigationLink|Link|TextEditor|TextField|Slider)\s*\("
+    r"|\b(?:Button|NavigationLink)\s*\{"
     r"|\.(?:onTapGesture|fileImporter|confirmationDialog|alert)\b"
 )
 SWIFT_CASE_RE = re.compile(r"^\s*case\s+([a-z][A-Za-z0-9_]*)\b", re.MULTILINE)

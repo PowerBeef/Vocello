@@ -38,15 +38,15 @@
       "path": "Sources/iOS/Commerce/IOSExportGate.swift",
       "screen": "Export purchase and share sheet",
       "scenario": "stateful",
-      "reason": "Visible purchase, restore, status, privacy/support and dismissal. Buy is the shared primary CTA (VocelloPrimaryCTAButton, separately bound by export-purchase-actions); close, restore and Try Again are trailing-closure buttons and the two footer links share one Link. Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
-      "interactiveOccurrenceCount": 1
+      "reason": "Visible purchase, restore, status, privacy/support and dismissal. Buy is the shared primary CTA (VocelloPrimaryCTAButton, separately bound by export-purchase-actions); close, restore and Try Again are trailing-closure buttons, counted since BKL-24, and the two footer links share one Link. Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
+      "interactiveOccurrenceCount": 4
     },
     {
       "path": "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift",
       "screen": "App-wide History save warning",
       "scenario": "stateful",
       "reason": "Shared visible retry/export warning; only naturally occurring storage failures may be inspected on user devices.",
-      "interactiveOccurrenceCount": 1
+      "interactiveOccurrenceCount": 2
     },
     {
       "path": "Sources/iOS/App/RootView.swift",
@@ -74,14 +74,14 @@
       "screen": "History",
       "scenario": "stateful",
       "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here. Discarding recovery records that cannot be verified (A2-02), or long-form recovery data Retry cannot resolve (F-16), is confirmed first, and a Discard that set nothing aside says why; only naturally damaged records may be inspected on user devices. A single delete that could not record its audio removal reports that nothing was deleted.",
-      "interactiveOccurrenceCount": 23
+      "interactiveOccurrenceCount": 29
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",
       "screen": "Shared sheets and controls",
       "scenario": "inventory",
       "reason": "Shared bottom-sheet dismissal and selection primitives are exercised by each owning screen.",
-      "interactiveOccurrenceCount": 5
+      "interactiveOccurrenceCount": 9
     },
     {
       "path": "Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift",
@@ -102,14 +102,14 @@
       "screen": "Voice enrollment",
       "scenario": "stateful",
       "reason": "Name, transcript and reference-language review, audio-only fallback, and Save Voice controls are test-owned.",
-      "interactiveOccurrenceCount": 2
+      "interactiveOccurrenceCount": 5
     },
     {
       "path": "Sources/iOS/IOSGenerationModeViews.swift",
       "screen": "Studio generation modes",
       "scenario": "stateful",
       "reason": "Mode-specific warnings and Voice Design enrollment are governed by visible controls; Clone's transcript review/audio-only decisions moved to the Reference panel (RF-24).",
-      "interactiveOccurrenceCount": 4
+      "interactiveOccurrenceCount": 6
     },
     {
       "path": "Sources/iOS/IOSGenerationSetupCards.swift",
@@ -123,14 +123,14 @@
       "screen": "Settings and model rows",
       "scenario": "stateful",
       "reason": "Model lifecycle, progress, version, and dynamic model actions are identified.",
-      "interactiveOccurrenceCount": 3
+      "interactiveOccurrenceCount": 4
     },
     {
       "path": "Sources/iOS/IOSVoicesView.swift",
       "screen": "Voices",
       "scenario": "stateful",
       "reason": "Search, filters, speaker rows, previews, saved voice menus, deletion, and the Saved Voices load-failure Retry are identified.",
-      "interactiveOccurrenceCount": 12
+      "interactiveOccurrenceCount": 14
     },
     {
       "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
@@ -144,42 +144,42 @@
       "screen": "Reference recording",
       "scenario": "external",
       "reason": "Record, stop, retake, use, and close actions are permission-dependent visible controls.",
-      "interactiveOccurrenceCount": 4
+      "interactiveOccurrenceCount": 5
     },
     {
       "path": "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
       "screen": "Open Source and licenses",
       "scenario": "external",
       "reason": "Attribution rows, source links, and back navigation are identified and externally verified.",
-      "interactiveOccurrenceCount": 1
+      "interactiveOccurrenceCount": 5
     },
     {
       "path": "Sources/iOS/Settings/SettingsScreen.swift",
       "screen": "Settings",
       "scenario": "stateful",
       "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified. Both value-based Models & Files and Voice Models links retain their existing control identifiers. The PA-30 one-time removal of audio earlier History clears left adds its confirmation and failure alerts, and a Files folder that cannot be kept for saved outputs raises its own alert (IOS-25).",
-      "interactiveOccurrenceCount": 14
+      "interactiveOccurrenceCount": 19
     },
     {
       "path": "Sources/iOS/Settings/VoiceModelsScreen.swift",
       "screen": "Voice Models",
       "scenario": "stateful",
       "reason": "Back navigation and cancel confirmation layer over isolated model lifecycle controls. A removal the busy engine refused raises its own alert (A5-01). Install, Update and Studio's install button ask before a download starts, with Download and Cancel (RF-41).",
-      "interactiveOccurrenceCount": 8
+      "interactiveOccurrenceCount": 9
     },
     {
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
       "screen": "Studio selector sheets",
       "scenario": "inventory",
       "reason": "All speaker, delivery, language, reference, and model selector options, and the reference picker's Saved Voices load-failure Retry use stable families; the Reference panel also carries Clone's transcript review and audio-only decisions (RF-24), identified voiceCloning_* and checked by ios smoke --scenario studio-layout.",
-      "interactiveOccurrenceCount": 6
+      "interactiveOccurrenceCount": 20
     },
     {
       "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift",
       "screen": "Full player",
       "scenario": "stateful",
       "reason": "Player, scrubber, save, download, transcript, and close actions use stable identifiers.",
-      "interactiveOccurrenceCount": 1
+      "interactiveOccurrenceCount": 3
     },
     {
       "path": "Sources/iOS/Studio/IOSLongFormSegmentsPanel.swift",
@@ -193,7 +193,7 @@
       "screen": "Studio inline player",
       "scenario": "generation",
       "reason": "Live cancel, playback, scrub, retry, dismissal, and save-as-voice actions are identified.",
-      "interactiveOccurrenceCount": 6
+      "interactiveOccurrenceCount": 9
     },
     {
       "path": "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
@@ -201,6 +201,41 @@
       "scenario": "stateful",
       "reason": "Quality-warning decisions are exercised only on test-owned candidates.",
       "interactiveOccurrenceCount": 4
+    },
+    {
+      "path": "Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
+      "screen": "Studio mode selector",
+      "scenario": "inventory",
+      "reason": "The shared capsule selector (shared with macOS) renders each Studio mode as a trailing-closure button with the generateSection_ identifiers the studio-modes family exercises.",
+      "interactiveOccurrenceCount": 1
+    },
+    {
+      "path": "Sources/iOS/IOSModelUpdateBanner.swift",
+      "screen": "App root (RF-59 model update)",
+      "scenario": "stateful",
+      "reason": "The done note after the one-time model update dismisses with a tap (iosModelUpdateBanner_done, model-update-prompt family); it appears only on an isolated profile holding an earlier Vocello's model.",
+      "interactiveOccurrenceCount": 1
+    },
+    {
+      "path": "Sources/iOS/IOSOnboardingCard.swift",
+      "screen": "First-run Studio card",
+      "scenario": "inventory",
+      "reason": "Open Settings (onboarding_openSettings) switches to the Settings tab; the card shows only before a first voice model is installed.",
+      "interactiveOccurrenceCount": 1
+    },
+    {
+      "path": "Sources/iOS/IOSStudioCanvas.swift",
+      "screen": "Studio",
+      "scenario": "generation",
+      "reason": "Clear, the generation-error retry, the background-notice dismissal and live Cancel carry the composer family's textInput_ identifiers.",
+      "interactiveOccurrenceCount": 4
+    },
+    {
+      "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift",
+      "screen": "Voice Design brief sheet",
+      "scenario": "inventory",
+      "reason": "Confirm (voiceBrief_confirm) and the starting-point suggestions (voiceBrief_starter_N) close the brief sheet that studioChip_voiceBrief opens.",
+      "interactiveOccurrenceCount": 2
     }
   ],
   "controlFamilies": [

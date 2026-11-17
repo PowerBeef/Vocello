@@ -44,6 +44,45 @@ class IOSControlAuditContractTests(unittest.TestCase):
             any("NewUnownedControl.swift" in error for error in report["errors"])
         )
 
+    def test_call_and_trailing_closure_spellings_both_count(self) -> None:
+        # BKL-24: `Button { … } label:` is a control exactly as `Button(…)` is;
+        # a container (`Menu {`), a role argument and a look-alike name are not
+        # miscounted, and one line counts once.
+        source = "\n".join(
+            [
+                'Button("Save") { save() }',  # 1 call form
+                "Button {",  # 2 trailing closure
+                "    close()",
+                "} label: {",
+                '    Text("Close")',
+                "}",
+                "return Button { restore() } label: { Text(title) }",  # 7
+                "Button(role: .destructive) {",  # 8 call form with a role
+                "Menu {",  # container only: not a control
+                "    Button { retry() } label: { Text(tryAgain) }",  # 10
+                "}",
+                "NavigationLink { LicensesView() } label: { Text(title) }",  # 12
+                'NavigationLink(value: route) { Text("Models") }',  # 13
+                "IOSPrimaryButton {",  # look-alike name: not a control
+                "let buttonStyle = ButtonStyle {",  # neither
+                "Menu { Button {",  # 16: counted once, for the button
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            swift = root / "Sources/iOS/Spellings.swift"
+            swift.parent.mkdir(parents=True)
+            swift.write_text(source + "\n", encoding="utf-8")
+            hits = audit.interactive_sources(root)
+        self.assertEqual(hits, {"Sources/iOS/Spellings.swift": [1, 2, 7, 8, 10, 12, 13, 16]})
+
+    def test_trailing_closure_buttons_of_the_export_sheet_are_counted(self) -> None:
+        hits = audit.interactive_sources()["Sources/iOS/Commerce/IOSExportGate.swift"]
+        lines = (ROOT / "Sources/iOS/Commerce/IOSExportGate.swift").read_text(encoding="utf-8").splitlines()
+        trailing = [index for index in hits if "Button {" in lines[index - 1]]
+        # Close, restore and Try Again.
+        self.assertEqual(len(trailing), 3)
+
     def test_required_family_without_source_token_fails(self) -> None:
         contract = copy.deepcopy(self.contract)
         contract["controlFamilies"][0]["sourceToken"] = "definitely_missing_control_token"

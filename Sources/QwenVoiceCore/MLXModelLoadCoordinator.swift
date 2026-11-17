@@ -97,6 +97,18 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
                 && modelArtifact.matchesQuickly(quickState.modelArtifact)
                 && speechTokenizerModelArtifact.matchesQuickly(quickState.speechTokenizerModelArtifact)
         }
+
+        /// Same configs and the same bytes in both artifacts, whatever their
+        /// modification times: a copy or a touch refreshes the quick state,
+        /// a weight change does not (BKL-20).
+        fileprivate func hasSameContent(as other: QwenPreparedCheckpointTrust) -> Bool {
+            topLevelConfigHash == other.topLevelConfigHash
+                && speechTokenizerConfigHash == other.speechTokenizerConfigHash
+                && modelArtifact.relativePath == other.modelArtifact.relativePath
+                && modelArtifact.contentDigest == other.modelArtifact.contentDigest
+                && speechTokenizerModelArtifact.relativePath == other.speechTokenizerModelArtifact.relativePath
+                && speechTokenizerModelArtifact.contentDigest == other.speechTokenizerModelArtifact.contentDigest
+        }
     }
 
     fileprivate struct QuickPreparedArtifactTrust: Sendable {
@@ -1120,6 +1132,13 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
             return nil
         }
 
+        // BKL-20: the source trust records weights a load succeeded on. Weights
+        // that changed in place have no such load yet, so they get no trust and
+        // the record keeps the old digest; a successful load on the new weights
+        // writes it (`resolveSourceQwenPreparedCheckpointTrustForPersistence`).
+        guard currentTrust.hasSameContent(as: storedTrust) else {
+            return nil
+        }
         if currentTrust != storedTrust {
             try? writeSourceQwenPreparedCheckpointTrust(currentTrust, at: sourceDirectory)
         }

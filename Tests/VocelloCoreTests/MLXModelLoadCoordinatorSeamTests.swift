@@ -288,21 +288,46 @@ final class MLXModelLoadCoordinatorSeamTests: XCTestCase {
         let loaderSawTrust = try XCTUnwrap(probes.loader.calls.last).trustedPreparedCheckpoint
         let sourceDigest = modelDigest(inTrust: jsonObject(at: sourceTrustURL(Self.folderA)))
         let markerDigest = modelDigest(inTrust: markerTrust(Self.folderA))
-        let defect = "Known defect (DW-03): with the overlay invalid, readPersistedSourceQwenPreparedCheckpointTrust"
-            + " re-hashes changed weights and rewrites .qvoice_qwen_checkpoint_trust.json to the new digest, and the"
-            + " rebuild marks the checkpoint trusted (relaxed weight-key verification) before any load succeeded"
-            + " on it; the trust survives the failed load. The valid-overlay path distrusts the same change."
-        await MainActor.run {
-            expectKnownDefect(defect) {
-                XCTAssertFalse(loaderSawTrust, "changed weights reached the loader as trusted")
-            }
-            expectKnownDefect(defect) {
-                XCTAssertNotEqual(sourceDigest, changedDigest, "the source trust file trusts weights no load succeeded on")
-            }
-            expectKnownDefect(defect) {
-                XCTAssertNotEqual(markerDigest, changedDigest, "the overlay marker trusts weights no load succeeded on")
-            }
-        }
+        // BKL-20 (found by DW-03): with the overlay invalid, changed weights are
+        // not trusted before a load succeeds on them, as on the valid-overlay
+        // path, and neither trust record moves to their digest.
+        XCTAssertFalse(loaderSawTrust, "changed weights reached the loader as trusted")
+        XCTAssertNotEqual(sourceDigest, changedDigest, "the source trust file trusts weights no load succeeded on")
+        XCTAssertNotEqual(markerDigest, changedDigest, "the overlay marker trusts weights no load succeeded on")
+
+        // A load that succeeds on the new weights is what earns their trust.
+        probes.loader.enqueue(.init(outcome: .succeed))
+        _ = try await coordinator.loadModel(id: Self.idA, capabilityProfile: .customOnly)
+        let trustedDigest = modelDigest(inTrust: jsonObject(at: sourceTrustURL(Self.folderA)))
+        XCTAssertEqual(trustedDigest, changedDigest, "a successful load records the weights it loaded")
+    }
+
+    /// BKL-20: a touch that leaves the weights' bytes alone (a copy or a
+    /// restore) keeps their trust when the overlay is rebuilt, and the source
+    /// record keeps their digest; only changed bytes lose it.
+    @concurrent func testTouchedWeightsKeepTheirTrustWhenTheOverlayIsRebuilt() async throws {
+        let descriptor = try installModel(id: Self.idA, folder: Self.folderA)
+        let probes = Probes()
+        let coordinator = makeCoordinator([descriptor], probes: probes)
+        _ = try await coordinator.loadModel(id: Self.idA, capabilityProfile: .customOnly)
+        await coordinator.unloadModel()
+        let digestBefore = try XCTUnwrap(modelDigest(inTrust: jsonObject(at: sourceTrustURL(Self.folderA))))
+
+        let weights = sourceDirectory(Self.folderA).appendingPathComponent("model.safetensors")
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 3_600)],
+            ofItemAtPath: weights.path
+        )
+        try FileManager.default.removeItem(at: markerURL(Self.folderA))
+        _ = try await coordinator.loadModel(id: Self.idA, capabilityProfile: .customOnly)
+
+        XCTAssertEqual(
+            probes.diagnostics.details(of: "coordinator-load-after-prepare-local-cache").last?["rebuiltPreparedCache"],
+            "true"
+        )
+        let loaderSawTrust = try XCTUnwrap(probes.loader.calls.last).trustedPreparedCheckpoint
+        XCTAssertTrue(loaderSawTrust, "the same bytes keep their trust")
+        XCTAssertEqual(modelDigest(inTrust: jsonObject(at: sourceTrustURL(Self.folderA))), digestBefore)
     }
 
     // MARK: - Failures

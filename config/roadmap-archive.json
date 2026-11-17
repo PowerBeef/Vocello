@@ -6452,6 +6452,39 @@
       "evidence": [
         "commit:9f7d2296"
       ]
+    },
+    {
+      "id": "BKL-58",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "A dependency-graph POST is part of CI required",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A GitHub dependency-graph API failure does not turn CI required red.",
+      "sourceOfTruth": [
+        ".github/workflows/ci.yml"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-3: ci-required needs dependency-submission, which posts a snapshot with no continue-on-error. Done 2026-11-16 (abf03ed7, worktree agent, integrated on main): the dependency-graph POST runs under a 120 s timeout and a failure leaves a warning annotation; a snapshot that cannot be generated still fails CI required. Pinned by PushWorkflowTests with stand-in gh; the next push's CI is the first live run.",
+      "evidence": [
+        "commit:abf03ed7"
+      ]
+    },
+    {
+      "id": "BKL-64",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Private load_json copies beside scripts/lib/jsonio.py",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The scripts that still carry their own JSON loader use scripts/lib/jsonio.py, and ruff's rule selection is reviewed.",
+      "sourceOfTruth": [
+        "scripts/lib/jsonio.py",
+        "ruff.toml"
+      ],
+      "updated": "2026-11-16",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, T-1, corrected on review: of 19 definitions about 7 are real copies and 12 already delegate to jsonio; ruff selects only E9 and F. Done 2026-11-16 (2992a321): the seven real copies call jsonio.load_json with their old error class and exit codes (message wording now jsonio's); ruff adds W6, PLE, B006 and T10, with no findings, reasons in ruff.toml.",
+      "evidence": [
+        "commit:2992a321"
+      ]
     }
   ]
 }

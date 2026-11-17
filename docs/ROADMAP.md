@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 43/87 (49%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 45/87 (52%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (86)
+### Mac, remotely (84)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -62,11 +62,9 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-33` (parked) An unwritable output folder is reported as an internal engine error on the Mac
 - `BKL-50` (parked) The CLI cancellation package test can time out on the Linux runner
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
-- `BKL-58` (parked) A dependency-graph POST is part of CI required
 - `BKL-61` (parked) pip installs on the signing runners have no hashes
 - `BKL-62` (parked) The GitHub connector's ask rules match no tool in use
 - `BKL-63` (parked) Guard gaps for issue creation, local history rewrites, other remotes and staging spellings
-- `BKL-64` (parked) Private load_json copies beside scripts/lib/jsonio.py
 - `BKL-74` (parked) The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework
 - `BKL-76` (parked) Notes from the 3.1 release review of the command line, the MCP server and the player
 - `BKL-77` (parked) The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots
@@ -796,13 +794,11 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-50` | parked | The CLI cancellation package test can time out on the Linux runner | — |
 | `BKL-54` | parked | A farm runner restart drops the test filter and reruns the whole UI bundle | — |
 | `BKL-57` | parked | Every iPhone candidate waits on Swift CodeQL and a website npm audit | — |
-| `BKL-58` | parked | A dependency-graph POST is part of CI required | — |
 | `BKL-59` | parked | Three small iPhone UI defects from the November 9 audit | — |
 | `BKL-60` | parked | Studio's install request is dropped while the model's status is still checking | — |
 | `BKL-61` | parked | pip installs on the signing runners have no hashes | — |
 | `BKL-62` | parked | The GitHub connector's ask rules match no tool in use | — |
 | `BKL-63` | parked | Guard gaps for issue creation, local history rewrites, other remotes and staging spellings | — |
-| `BKL-64` | parked | Private load_json copies beside scripts/lib/jsonio.py | — |
 | `BKL-65` | parked | The App Store privacy and support URLs sit on a vercel.app subdomain | — |
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
@@ -906,10 +902,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: An -ios.N candidate's archive no longer waits on the full Security workflow, or the maintainer records that the exact-source rule keeps it.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
-- **`BKL-58`** (parked) — A dependency-graph POST is part of CI required.
-  gate: A GitHub dependency-graph API failure does not turn CI required red.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
 - **`BKL-59`** (parked) — Three small iPhone UI defects from the November 9 audit.
   gate: A saved voice with no transcript shows no invented transcript; a voice whose audio file is missing says so when its preview is tapped; the delivery picker's back chevron has an accessibility label.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
@@ -928,10 +920,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-63`** (parked) — Guard gaps for issue creation, local history rewrites, other remotes and staging spellings.
   gate: The guards or permission rules cover scripts/ci/failure_issue.py creating issues, local history rewrites (amend, rebase, soft reset, filter-branch), pushes to another remote or URL, and the stash and broad-add spellings the deny rules miss.
-  unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
-
-- **`BKL-64`** (parked) — Private load_json copies beside scripts/lib/jsonio.py.
-  gate: The scripts that still carry their own JSON loader use scripts/lib/jsonio.py, and ruff's rule selection is reviewed.
   unparkWhen: The 3.0 submission is done and the maintainer picks the next plan.
 
 - **`BKL-65`** (parked) — The App Store privacy and support URLs sit on a vercel.app subdomain.

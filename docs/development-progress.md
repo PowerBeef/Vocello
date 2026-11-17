@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-14
+reviewed: 2026-11-16
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,38 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 15, late evening: the 3.1 Mac release waits for the push (resume here)
+### November 16, night: the follow-up release's Mac backlog, first wave (resume here)
+
+The 3.1.0 promotion still waits on the maintainer: upload
+`build/artifacts/quality-promotion/quality-promotion.json` to the draft, then dispatch **Promote
+verified release** (below). Nothing was pushed since `b8bf2037`; the six promotion records stay
+untracked until the chart refresh that follows promotion, which is also why a routed `--since`
+check fails its README-chart validator in this tree while a clean export of `HEAD` passes it.
+
+At the maintainer's request (work for a follow-up release, Mac-only, no lanes on the screen), the
+roadmap gained a `needs` tag (mac, keyboard, iphone) on every open item and the work below landed
+on `main` with tests; the routed check, the full macOS deterministic suite, the CLI, the iPhone
+compiles and the UI-test bundles pass.
+
+- **Closed:** BKL-18, 20, 21, 22, 24, 25, 26, 32, 37, 46, 47, 48, 58, 64, 66, 70 and 73; DA-14;
+  RF-64, superseded by RF-63 (iPhone Settings already has a Help & Support row).
+- **Guards (BKL-62, BKL-63):** a GitHub connector write now asks under any server name (a new
+  PreToolUse hook beside `mcp__*__<tool>` ask rules), and the policy guard refuses history
+  rewrites outright (amend, rebase, a reset to another commit, filter-branch), pushes to another
+  remote or URL, a variable holding git and computed staging; `failure_issue.py` asks.
+- **Engine-remediation parts done:** B-02 (BKL-73), B-12 (`_exit` in the CLI's forced exit), C-13
+  (the QC observer above 102.4 kHz) and BKL-01 (control-token-only scripts have nothing to speak).
+- **Fixed, waiting on a run:** BKL-33 and BKL-19 on the next macOS smoke, BKL-28 on the marketing
+  lane, BKL-23 on a production Mac language bench, BKL-50 on the next Linux CI run, BKL-60 on the
+  phone.
+- **Not done:** BKL-74's Sparkle ordering (reproduced live; XcodeGen's `codeSign: false` does not
+  reach a package product, which Xcode embeds and signs itself), BKL-79 (the digest is optional
+  through receipts and manifests; it pairs with BKL-81's split), BKL-76's other notes, and the
+  programme items that need lanes, screens, decisions or the phone.
+- The read-only triage of the 73 non-backlog Mac items is not in Git; its findings that change an
+  item are in the items' notes and `needs`.
+
+### November 15, late evening: the 3.1 Mac release waits for the push
 
 Every local step of the Mac and CLI 3.1 release is done and committed on local `main`, far ahead
 of `origin` (`8f85011b`). Nothing is pushed, nothing is running, the tree is clean and no agent

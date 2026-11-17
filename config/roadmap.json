@@ -2453,23 +2453,6 @@
       "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-2: source-authority needs security, and archive-ios needs source-authority; Security runs Swift CodeQL (about an hour) and npm audit --package-lock-only at high. Changing it changes the exact-source rule, so it is a maintainer decision."
     },
     {
-      "id": "BKL-58",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "A dependency-graph POST is part of CI required",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "A GitHub dependency-graph API failure does not turn CI required red.",
-      "sourceOfTruth": [
-        ".github/workflows/ci.yml"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-10",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, C-3: ci-required needs dependency-submission, which posts a snapshot with no continue-on-error."
-    },
-    {
       "id": "BKL-59",
       "plan": "post-3-0-backlog-2026-10",
       "title": "Three small iPhone UI defects from the November 9 audit",
@@ -2557,24 +2540,6 @@
       "updated": "2026-11-10",
       "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
       "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-2, G-3, G-5 and the part of G-4 that DA-12 does not record (a push to another remote or URL, and a variable holding git)."
-    },
-    {
-      "id": "BKL-64",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "Private load_json copies beside scripts/lib/jsonio.py",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "The scripts that still carry their own JSON loader use scripts/lib/jsonio.py, and ruff's rule selection is reviewed.",
-      "sourceOfTruth": [
-        "scripts/lib/jsonio.py",
-        "ruff.toml"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-10",
-      "unparkWhen": "The 3.0 submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, T-1, corrected on review: of 19 definitions about 7 are real copies and 12 already delegate to jsonio; ruff selects only E9 and F."
     },
     {
       "id": "BKL-65",

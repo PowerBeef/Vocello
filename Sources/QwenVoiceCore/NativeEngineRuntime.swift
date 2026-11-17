@@ -1741,6 +1741,27 @@ actor NativeEngineRuntime {
         }
     }
 
+    /// Whether a prewarm that ended in `error` gives up the model it warmed.
+    /// A cancelled warm (a superseded or abandoned one) leaves the weights, the
+    /// clone state and the runtime caches as they were, so the next take does
+    /// not pay a full reload for a warm nobody waits on; nothing it would have
+    /// marked is marked, so the next request warms again (BKL-73). Every other
+    /// failure releases the model, as before.
+    static func prewarmFailureReleasesModel(_ error: any Error) -> Bool {
+        NativeGenerationTerminalClassifier.disposition(of: error) != .cancellation
+    }
+
+    /// The question both warm catches ask: a cancelled warm still gives up its
+    /// model when MLX recorded a runtime failure while the warm unwound, so no
+    /// later take runs on a half-evaluated model (the package contract the
+    /// generation path keeps through `unloadAfterCapturedRuntimeFailureIfNeeded`).
+    private func warmFailureReleasesModel(_ error: any Error) async -> Bool {
+        if Self.prewarmFailureReleasesModel(error) {
+            return true
+        }
+        return await loadCoordinator.requiresUnloadAfterRuntimeFailure()
+    }
+
     private func ensureWarmStateIfNeeded(
         for request: GenerationRequest,
         model: UnsafeSpeechGenerationModel,
@@ -1868,10 +1889,12 @@ actor NativeEngineRuntime {
             timings["native_explicit_prewarm_ms"] = explicitPrewarmStartedAt.elapsedMilliseconds
             return timings
         } catch {
-            await loadCoordinator.unloadModel()
-            activeModelID = nil
-            await clearCloneState()
-            await clearQwen3MemoryCachesIfNeeded()
+            if await warmFailureReleasesModel(error) {
+                await loadCoordinator.unloadModel()
+                activeModelID = nil
+                await clearCloneState()
+                await clearQwen3MemoryCachesIfNeeded()
+            }
             throw NativeRuntimeError.wrapping(
                 error,
                 stage: .prewarm,
@@ -2255,10 +2278,12 @@ actor NativeEngineRuntime {
                 prewarmSlotWaitMS: prewarmSlotWaitMS
             )
         } catch {
-            await loadCoordinator.unloadModel()
-            activeModelID = nil
-            await clearCloneState()
-            await clearQwen3MemoryCachesIfNeeded()
+            if await warmFailureReleasesModel(error) {
+                await loadCoordinator.unloadModel()
+                activeModelID = nil
+                await clearCloneState()
+                await clearQwen3MemoryCachesIfNeeded()
+            }
             throw NativeRuntimeError.wrapping(
                 error,
                 stage: .prewarm,

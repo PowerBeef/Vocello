@@ -398,6 +398,32 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         }
     }
 
+    // MARK: - Prewarm failure
+
+    /// A warm that ends cancelled keeps the model, its clone state and the
+    /// runtime caches, whichever cancellation type carries it; every other
+    /// failure still releases the model (BKL-73). The catch blocks of both
+    /// prewarm paths ask this one question.
+    func testOnlyAPrewarmThatFailsForAReasonOtherThanCancellationReleasesTheModel() {
+        struct Unrelated: Error {}
+        let cancellations: [any Error] = [
+            CancellationError(),
+            NativeRuntimeError.wrapping(CancellationError(), stage: .prewarm, message: "warm"),
+            VocelloQwen3SessionError.audioChannelCancelled(.superseded),
+        ]
+        for error in cancellations {
+            XCTAssertFalse(NativeEngineRuntime.prewarmFailureReleasesModel(error), "\(error)")
+        }
+        let failures: [any Error] = [
+            Unrelated(),
+            NativeRuntimeError(stage: .prewarm, message: "the warm failed"),
+            NativeRuntimeError.wrapping(Unrelated(), stage: .prewarm, message: "warm"),
+        ]
+        for error in failures {
+            XCTAssertTrue(NativeEngineRuntime.prewarmFailureReleasesModel(error), "\(error)")
+        }
+    }
+
     // MARK: - Runtime-failure query
 
     /// The runtime returns the coordinator's verdict unchanged, and asking

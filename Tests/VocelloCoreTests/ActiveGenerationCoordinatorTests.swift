@@ -999,6 +999,9 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             (.cancelBodyLoad, ["load", "capabilities", "load", "unload"], false),
             (.failBodyLoad, ["load", "capabilities", "load", "unload"], true),
             (.failPrewarmStep, ["load", "capabilities", "load", "capabilities", "unload"], true),
+            // BKL-73: a cancelled warm keeps its model, except when MLX recorded a
+            // runtime failure while it unwound; it is still not a failure.
+            (.cancelPrewarmStepAfterRuntimeFailure, ["load", "capabilities", "load", "capabilities", "unload"], false),
         ]
         for (warmRequests, expectedEvents, fails) in endings {
             try await withResidentEngine(resident: "pro_custom", warmRequests: warmRequests) { engine, coordinator, published in
@@ -1020,11 +1023,10 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         }
     }
 
-    /// B-02 (engine audit, open): a prewarm cancelled at its own prewarm
-    /// step is not a failure and should keep the model it loaded. Every warm
-    /// catch in `NativeEngineRuntime` unloads on any error, cancellation
-    /// included, so today the step releases the weights (the engine then
-    /// truthfully publishes `.idle`) and the next take reloads them.
+    /// B-02 (engine audit), fixed by BKL-73: a prewarm cancelled at its own
+    /// prewarm step is not a failure and keeps the model it loaded. The warm
+    /// catches in `NativeEngineRuntime` unload only for a failure that is not
+    /// a cancellation, so the next take does not reload the weights.
     @MainActor
     func testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel() async throws {
         try await withResidentEngine(resident: "pro_custom", warmRequests: .cancelPrewarmStep) { engine, coordinator, published in
@@ -1038,18 +1040,12 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             )
             XCTAssertNil(engine.visibleErrorMessage, "a cancelled prewarm is not a failure")
             XCTAssertFalse(published.includesAFailure, "a cancelled prewarm is not a failure")
-            let settled = engine.loadState
-            // One strict block per assertion, so a partial B-02 fix cannot stay green.
-            XCTExpectFailure("B-02: a cancelled warm still unloads the model; remove this wrapper once B-02 lands") {
-                XCTAssertEqual(
-                    events,
-                    ["load", "capabilities", "load", "capabilities"],
-                    "a cancelled prewarm step unloads nothing"
-                )
-            }
-            XCTExpectFailure("B-02: a cancelled warm still unloads the model; remove this wrapper once B-02 lands") {
-                XCTAssertEqual(settled, .loaded(modelID: "pro_custom"), "the warmed model stays resident")
-            }
+            XCTAssertEqual(
+                events,
+                ["load", "capabilities", "load", "capabilities"],
+                "a cancelled prewarm step unloads nothing"
+            )
+            XCTAssertEqual(engine.loadState, .loaded(modelID: "pro_custom"), "the warmed model stays resident")
         }
     }
 
@@ -1257,6 +1253,9 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         case cancelPrewarmStep
         /// The second lookup, a warm's prewarm step, fails.
         case failPrewarmStep
+        /// As `cancelPrewarmStep`, with MLX reporting a runtime failure the
+        /// cancelled warm recorded while it unwound.
+        case cancelPrewarmStepAfterRuntimeFailure
     }
 
     /// The failure the `fail…` modes end with.
@@ -1301,7 +1300,7 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         switch (warmRequests, lookups) {
         case (.failDescriptorLookup, _):
             throw WarmRequestFailure()
-        case (.cancelPrewarmStep, 2):
+        case (.cancelPrewarmStep, 2), (.cancelPrewarmStepAfterRuntimeFailure, 2):
             throw CancellationError()
         case (.failPrewarmStep, 2):
             throw WarmRequestFailure()
@@ -1371,7 +1370,9 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
     func markPrewarmed(identityKey: String) async {}
     func clearPrewarmState() async {}
     func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
-    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+    func requiresUnloadAfterRuntimeFailure() async -> Bool {
+        warmRequests == .cancelPrewarmStepAfterRuntimeFailure
+    }
 
     /// The clone model declares Voice Cloning, so a prime passes the
     /// runtime's capability check and runs its body.

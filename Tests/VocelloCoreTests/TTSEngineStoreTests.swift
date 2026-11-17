@@ -1487,8 +1487,8 @@ final class TTSEngineStoreTests: XCTestCase {
     /// flight: the prime through its preparation token (leaving Clone), the
     /// prewarm through its task. The runtime's own check after the load ends
     /// each, so the coordinator's log shows nothing unloaded before the idle
-    /// window. (A cancellation at the prewarm step itself still unloads,
-    /// B-02: `testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel`.)
+    /// window. (A cancellation at the prewarm step itself keeps the model
+    /// too since BKL-73: `testAPrewarmCancelledAtItsPrewarmStepKeepsItsModel`.)
     func testACancelledPrimeOrPrewarmIsNotAFailure() async throws {
         try skipIfThermalGateBlocksProactiveWarm()
         try await withResidentWeights("pro_clone", warmRequests: .holdBodyLoad) { weights in

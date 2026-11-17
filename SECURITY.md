@@ -26,7 +26,9 @@ both tracked `Package.resolved` files (the `dependency-submission` job in `ci.ym
 visible to GitHub's dependency graph and advisory matching without uploading source, credentials,
 absolute paths, or local device data.
 
-`security.yml` runs the website npm advisory audit (high severity, lock-only) and CodeQL for
+`security.yml` runs the website npm advisory audit (high severity, lock-only; an advisory that
+cannot reach a shipped product may be excepted for at most 30 days, by a dated maintainer decision in
+`config/npm-audit-exceptions.json`, through `scripts/npm_audit_gate.py`) and CodeQL for
 JavaScript/TypeScript and Swift on a weekly schedule, on manual dispatch, and inside `release.yml` on
 the tagged commit. `Security required` aggregates those jobs into one exact-commit verdict. Every
 push to `main` runs `ci.yml`; a push that touches the release path (the release workflows, packaging

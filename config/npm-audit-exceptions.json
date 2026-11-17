@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "boundary": "Maintainer-approved, dated exceptions to the website npm advisory audit that security.yml runs through scripts/npm_audit_gate.py. Each names one GitHub advisory and the reason it does not reach anything Vocello ships, and expires at most 30 days after it was decided; an expired exception fails the audit until it is renewed by a new decision or removed. Moderate and lower advisories never fail the audit, so they need no exception.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "decided": "2026-11-17",
+      "expires": "2026-12-01",
+      "reason": "Maintainer decision 2026-11-17: ReDoS through single-branch repeated extglobs in picomatch <=4.0.7, which has no patched release yet. picomatch reaches the website only through Vite's build tooling (fdir, tinyglobby), which matches glob patterns committed to this repository; no user input reaches it, and nothing from it ships in the apps, the CLI or the built site. Remove this exception with the lockfile update that takes a fixed picomatch."
+    }
+  ]
+}

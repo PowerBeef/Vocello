@@ -40,7 +40,9 @@ jobs:
           cache-dependency-path: website/package-lock.json
 
       - name: Audit locked website dependencies
-        run: npm --prefix website audit --package-lock-only --audit-level=high
+        # Fails on high and critical advisories, as --audit-level=high did, except one named with
+        # an unexpired, maintainer-dated exception in config/npm-audit-exceptions.json.
+        run: python3 scripts/npm_audit_gate.py
 
   codeql:
     name: CodeQL (${{ matrix.language }})

@@ -31,7 +31,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
 | `post-3-0-backlog-2026-10` | parked | release-qa | 41/87 (47%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
-| `project-audit-2026-10` | parked | backend-and-platform | 8/14 (57%) |
+| `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
 | `voice-identity-language-reliability-2026-08` | parked | backend-and-platform | 9/10 (90%) |
 
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (98)
+### Mac, remotely (97)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -89,7 +89,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `DA-07` (parked) Playback and recording defects that need a device (also: iPhone)
 - `DA-12` (parked) Guard, tooling, docs and website hygiene
 - `DA-13` (parked) Follow-ups from the audit's second fix pass (also: iPhone)
-- `DA-14` (parked) Preserve historical History ID high-water across legacy upgrades
 - `DP-20` (parked) External delivery-control lever watch list (audit R8)
 - `DW-03` (parked) Development workflow: product-side quality (audit Phase 2)
 - `DW-04` (parked) Development workflow: longer-term modernization (audit Phase 3)
@@ -1082,7 +1081,6 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 | `DA-07` | parked | Playback and recording defects that need a device | — |
 | `DA-12` | parked | Guard, tooling, docs and website hygiene | — |
 | `DA-13` | parked | Follow-ups from the audit's second fix pass | — |
-| `DA-14` | parked | Preserve historical History ID high-water across legacy upgrades | — |
 
 ### Open items in detail
 
@@ -1104,10 +1102,6 @@ Narrative authority: [`docs/audits/2026-10-06-deep-audit.md`](audits/2026-10-06-
 
 - **`DA-13`** (parked) — Follow-ups from the audit's second fix pass.
   gate: Each follow-up the second pass's reviews found is fixed with a test or declined with a reason: the iPhone download-cancel dead ends (a final cancel record that cannot be written leaves Retry, which reinstalls; the kept-cancellable message is overwritten by the next progress tick and is English), a corrupt clear-History marker with no exit, set-aside History records kept forever, a blocked iPhone deletion losing its partial download, Mac drafts owned by the window, an engine-cancelled batch that does not say why, a refused Voices tap with no announcement, untyped English busy refusals in the engine, the voice-picker filter row at large text sizes, staging files left in a Files folder by a killed copy, the normalized clone cache outside the voice-store lock, and the release group's queued-run replacement.
-  unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
-
-- **`DA-14`** (parked) — Preserve historical History ID high-water across legacy upgrades.
-  gate: Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.
   unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
 
 ## Vocello QC v2: lean audio QC calibrated on human speech (report-only)

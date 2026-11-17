@@ -2071,25 +2071,6 @@
       "notes": "From the 2026-10-02 external review: on fr-0101--dylan the per-sample silence rule (|x| < 0.001) sees one 236 ms run and flags nothing, though the take has two pauses over 350 ms against one comma (cadence:excess1 with frame-based silence). Touches GenerationOutputAdapter.swift (silence state, persisted pass, report), GenerationTelemetryRecord currentAlgorithmVersion 8 -> 9, config/audio-qc-stage0-{calibration,observations}.json, scripts/lib/audio_qc.py, the Swift tests that hard-code version 8 and the sample-exact dropout tests, test_audio_qc*.py, and the M6 gate baseline. Single takes have no fade, tail or gain today; only LongFormAssembly shapes joins. 2026-10-16: lands together with ER-11 (engine audit C-05, C-07, C-08)."
     },
     {
-      "id": "DA-14",
-      "plan": "project-audit-2026-10",
-      "title": "Preserve historical History ID high-water across legacy upgrades",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.",
-      "sourceOfTruth": [
-        "Sources/SharedSupport/Database/GenerationMigrations.swift",
-        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
-        "docs/audits/2026-10-10-codex-workflow-audit.md"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-10-16",
-      "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.",
-      "notes": "CW-05 characterization: retained id 41 and deleted id 900 become sqlite_sequence 41 after the v3 rebuild; the next inserted ID is 42. v5-to-current preserves the high-water. Workflow migration adds an explicitly named characterization test and leaves shipped migrations unchanged. Assess repair and actual outbox reachability separately. 2026-10-16: scheduled with ER-10."
-    },
-    {
       "id": "BKL-08",
       "plan": "post-3-0-backlog-2026-10",
       "title": "iOS energy hygiene",
@@ -2947,7 +2928,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "B-12 refines F-20 (kept in engineering-review-remediation-2026-08). B-04 (the loader still runs after an unload that came before it) is pinned as current behaviour in MLXModelLoadCoordinatorSeamTests.testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad (DW-03). 2026-11-10 review: A-15 was fixed in 54842e39. The 2026-11-09 audit's E-1 fix (count a proactive model load in the background-time request and await it in the exit barrier) is not in this gate yet. 2026-11-16: B-12 done by BKL-76's _exit note (a8784430).",
+      "notes": "B-12 refines F-20 (kept in engineering-review-remediation-2026-08). B-04 (the loader still runs after an unload that came before it) is pinned as current behaviour in MLXModelLoadCoordinatorSeamTests.testAnUnloadBeforeTheLoaderRunsVetoesPublicationButNotTheLoad (DW-03). 2026-11-10 review: A-15 was fixed in 54842e39. The 2026-11-09 audit's E-1 fix (count a proactive model load in the background-time request and await it in the exit barrier) is not in this gate yet. 2026-11-16: B-12 done by BKL-76's _exit note (a8784430). 2026-11-16: C-13 done (the QC observer skips into the next block when its hop exceeds the FFT).",
       "blockedBy": [
         "ER-01"
       ]
@@ -3005,7 +2986,7 @@
       ],
       "updated": "2026-11-10",
       "unparkWhen": "Right after the 3.0 iOS submission lifts the focus lock (the earlier re-homing route ended with the RF-09 freeze on 2026-10-23).",
-      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls. 2026-10-17: RF-18's follow-up screen supports it: C1 (Consistent with the subtalker on reference values) failed 2 of 56 long-form projects against 9 for C0; adoption goes with RF-18 once E4 finishes. 2026-10-20: done with RF-18 (7a125aaf): the subtalker keeps the reference sampling for every variation and D2 (EOS filtered) is production, both by the follow-up screen's pre-registered rules. Left here: D6, A-17, A-18, A-10 and BKL-01. 2026-11-11: RF-51 takes up A-18 and RF-53 takes up D6 before the iOS submission.",
+      "notes": "Absorbs BKL-01. RF-18 hypothesis (2026-10-16, not investigated): every failure in RF-18's screen ran under Consistent, whose talker values (0.7/0.9) the subtalker also takes, while the reference keeps it at 0.9/50/1.0; a screen arm with the subtalker on reference values would test whether that independence removes Consistent's long-form stalls. 2026-10-17: RF-18's follow-up screen supports it: C1 (Consistent with the subtalker on reference values) failed 2 of 56 long-form projects against 9 for C0; adoption goes with RF-18 once E4 finishes. 2026-10-20: done with RF-18 (7a125aaf): the subtalker keeps the reference sampling for every variation and D2 (EOS filtered) is production, both by the follow-up screen's pre-registered rules. Left here: D6, A-17, A-18, A-10 and BKL-01. 2026-11-11: RF-51 takes up A-18 and RF-53 takes up D6 before the iOS submission. 2026-11-16: BKL-01 done (control-token-only scripts have nothing to speak).",
       "legacyIds": [
         "BKL-01"
       ]

@@ -6400,6 +6400,24 @@
       "evidence": [
         "commit:029ad767"
       ]
+    },
+    {
+      "id": "DA-14",
+      "plan": "project-audit-2026-10",
+      "title": "Preserve historical History ID high-water across legacy upgrades",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Design and verify a compatible repair for v1/v2 upgrades whose v3 table rebuild resets sqlite_sequence after a higher-ID row was deleted. Populated migration fixtures must prove retained data, journal/identity semantics, signed seeds and monotonic historical IDs without rewriting shipped migration checksums or claiming a current-user data-loss incident.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Database/GenerationMigrations.swift",
+        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
+        "docs/audits/2026-10-10-codex-workflow-audit.md"
+      ],
+      "updated": "2026-11-16",
+      "notes": "CW-05 characterization: retained id 41 and deleted id 900 become sqlite_sequence 41 after the v3 rebuild; the next inserted ID is 42. v5-to-current preserves the high-water. Workflow migration adds an explicitly named characterization test and leaves shipped migrations unchanged. Assess repair and actual outbox reachability separately. 2026-10-16: scheduled with ER-10. Done 2026-11-16 (493365ed): the v3 rebuild carries the deleted bound over for a database still at v1 or v2; one that passed v3 earlier keeps the bound it lost, which no later migration can recover. Migration identifiers unchanged; journal reachability of a reused id was not assessed further.",
+      "evidence": [
+        "commit:493365ed"
+      ]
     }
   ]
 }

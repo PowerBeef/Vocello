@@ -36,8 +36,8 @@ compiles and the UI-test bundles pass.
   PreToolUse hook beside `mcp__*__<tool>` ask rules), and the policy guard refuses history
   rewrites outright (amend, rebase, a reset to another commit, filter-branch), pushes to another
   remote or URL, a variable holding git and computed staging; `failure_issue.py` asks. A security
-  review found two medium bypasses, fixed in `b46203e9` (a remote's target and push config are
-  judged; git environment after a wrapper word counts). BKL-63 stays open for two lows: a
+  review found two medium bypasses, fixed in `b46203e9` and `05ecbd21` (a remote's target and push
+  config are judged; a git environment assignment anywhere in a command counts). BKL-63 stays open for two lows: a
   `scripts/ci/./failure_issue.py` spelling beats the ask rules, and a false block on a
   single-quoted commit message that names `git rebase`.
 - **Engine-remediation parts done:** B-02 (BKL-73), B-12 (`_exit` in the CLI's forced exit), C-13

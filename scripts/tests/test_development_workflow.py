@@ -6,9 +6,11 @@ import datetime
 import importlib.util
 import io
 import json
+import os
 import re
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -640,6 +642,75 @@ class CommandRunnerTests(unittest.TestCase):
         self.assertIn("Changed paths: 0; lanes: none", stdout.getvalue())
         self.assertIn("nothing committed since HEAD", stderr.getvalue())
         self.assertNotIn("--since origin/main", stderr.getvalue())
+
+
+def workflow_step_script(workflow: str, job: str, step: str) -> str:
+    """The `run: |` body of a named step of a job, dedented. The runners have no YAML parser,
+    and the shipped shell is what the tests below execute."""
+    lines = workflow.splitlines()
+    start = lines.index(f"  {job}:")
+    end = next((i for i in range(start + 1, len(lines)) if re.match(r"^  \S", lines[i])), len(lines))
+    body_lines = lines[start:end]
+    named = next(i for i, line in enumerate(body_lines) if line.strip() == f"- name: {step}")
+    run = next(i for i in range(named + 1, len(body_lines)) if body_lines[i].strip() == "run: |")
+    indent = len(body_lines[run]) - len(body_lines[run].lstrip())
+    body: list[str] = []
+    for line in body_lines[run + 1:]:
+        if line.strip() and len(line) - len(line.lstrip()) <= indent:
+            break
+        body.append(line)
+    return textwrap.dedent("\n".join(body)) + "\n"
+
+
+class PushWorkflowTests(unittest.TestCase):
+    """BKL-58: the dependency-graph POST reports; it never turns `CI required` red."""
+
+    WORKFLOW = ROOT / ".github/workflows/ci.yml"
+
+    def run_step(self, job: str, step: str, *, gh_status: int = 0,
+                 env: dict[str, str] | None = None) -> tuple[subprocess.CompletedProcess, str]:
+        script = workflow_step_script(self.WORKFLOW.read_text(encoding="utf-8"), job, step)
+        with tempfile.TemporaryDirectory() as tmp:
+            stubs, calls = Path(tmp) / "bin", Path(tmp) / "calls"
+            stubs.mkdir()
+            (stubs / "gh").write_text(f'#!/bin/sh\necho "gh $*" >> "{calls}"\nexit {gh_status}\n')
+            # GNU `timeout` on the runner; the stand-in records the bound and runs the command.
+            (stubs / "timeout").write_text(f'#!/bin/sh\necho "timeout $1" >> "{calls}"\nshift\nexec "$@"\n')
+            for stub in stubs.iterdir():
+                stub.chmod(0o755)
+            (Path(tmp) / "step.sh").write_text(script)
+            result = subprocess.run(
+                ["bash", "--noprofile", "--norc", "-eo", "pipefail", str(Path(tmp) / "step.sh")],
+                capture_output=True, text=True, timeout=20,
+                env=dict(os.environ, PATH=f"{stubs}{os.pathsep}{os.environ['PATH']}", RUNNER_TEMP=tmp,
+                         GITHUB_REPOSITORY="owner/repo", GH_TOKEN="fixture", **(env or {})))
+            return result, calls.read_text() if calls.exists() else ""
+
+    def test_a_failed_or_stalled_dependency_graph_post_warns_and_the_job_passes(self) -> None:
+        for status in (1, 124):                       # an API error, and the two-minute bound expiring
+            with self.subTest(status=status):
+                result, calls = self.run_step("dependency-submission", "Submit Swift dependency snapshot",
+                                              gh_status=status)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("::warning title=Dependency graph not updated::", result.stdout)
+                self.assertIn(f"(exit {status})", result.stdout)
+                self.assertIn("timeout 120", calls)
+                self.assertIn("gh api --method POST", calls)
+                self.assertIn("repos/owner/repo/dependency-graph/snapshots", calls)
+        result, _ = self.run_step("dependency-submission", "Submit Swift dependency snapshot")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dependency snapshot submitted", result.stdout)
+        self.assertNotIn("::warning", result.stdout)
+
+    def test_the_aggregate_reads_the_submission_job_like_any_other(self) -> None:
+        # The job still gates when its snapshot cannot be generated; a POST failure leaves it passing.
+        jobs = ("changes", "contracts", "python", "website", "dependency-submission")
+        for submission, expected in (("success", 0), ("skipped", 0), ("failure", 1)):
+            with self.subTest(submission=submission):
+                results = {job: {"result": "success"} for job in jobs} | {"dependency-submission": {"result": submission}}
+                result, _ = self.run_step("ci-required", "Aggregate required results",
+                                          env={"RESULTS": json.dumps(results, indent=2), "EVENT_NAME": "push"})
+                self.assertEqual(result.returncode, expected, result.stdout)
 
 
 if __name__ == "__main__":

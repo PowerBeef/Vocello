@@ -414,7 +414,7 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `macos-tsan` | macos-26 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
 | `ios-compile` | macos-26 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
-| `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
+| `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required`, which it fails only when the snapshot cannot be generated: a failed or stalled POST (bounded at two minutes) is a warning annotation (BKL-58) |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
 
 `ci.yml` triggers on `push` to `main`, on `workflow_dispatch` and on `pull_request` against `main`.

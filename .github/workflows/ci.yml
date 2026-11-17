@@ -666,17 +666,26 @@ jobs:
             --job-url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             > "$RUNNER_TEMP/swift-dependency-snapshot.json"
 
+      # The POST reports to GitHub; it is not a gate (BKL-58). A dependency-graph API
+      # failure or stall leaves a warning annotation and the job passes, so `CI required`
+      # never turns red for it. A snapshot that cannot be generated (the step above) is a
+      # repository defect and still fails the job.
       - name: Submit Swift dependency snapshot
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2026-03-10" \
-            "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" \
-            --input "$RUNNER_TEMP/swift-dependency-snapshot.json"
+          if timeout 120 gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" \
+              --input "$RUNNER_TEMP/swift-dependency-snapshot.json"; then
+            echo "dependency snapshot submitted"
+          else
+            status=$?
+            echo "::warning title=Dependency graph not updated::the snapshot POST failed or timed out (exit $status); CI required does not depend on the GitHub dependency-graph API"
+          fi
 
   ci-required:
     name: CI required
@@ -686,7 +695,8 @@ jobs:
     timeout-minutes: 5
     steps:
       # On a pull request the macOS jobs and the dependency submission are
-      # skipped by event, so this aggregates the Linux lanes only.
+      # skipped by event, so this aggregates the Linux lanes only. The dependency
+      # submission fails only when its snapshot cannot be generated; its POST warns.
       - name: Aggregate required results
         env:
           RESULTS: ${{ toJSON(needs) }}

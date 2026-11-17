@@ -85,15 +85,20 @@ class IOSReleaseAnalyzerWarningPolicyTests(unittest.TestCase):
             {"source": "dependency:swift-transformers", "message": "unsafe behavior"},
         ])
 
-    def test_generated_project_group_warning_is_bounded(self) -> None:
+    def test_a_shared_folder_in_two_groups_is_no_longer_allowed(self) -> None:
+        # BKL-32: project.yml gives each shared folder one group (createIntermediateGroups),
+        # so the warning class left the policy and the warning fails a Release log again.
         line = (
             "2026-10-24 16:48:20.089 xcodebuild[1:2] warning:  The file reference for "
             '"Sources/iOS/Studio" is a member of multiple groups ("iOS" and "")\n'
         )
-        row = next(r for r in self.policy["allowedWarnings"] if r["id"] == "generated-project-shared-folder-groups")
-        self.assertEqual(module.analyze_log(line * row["maximumCount"], self.policy)["status"], "PASS")
-        result = module.analyze_log(line * (row["maximumCount"] + 1), self.policy)
-        self.assertEqual(result["exceeded"][0]["id"], row["id"])
+        self.assertNotIn(
+            "generated-project-shared-folder-groups",
+            [row["id"] for row in self.policy["allowedWarnings"]],
+        )
+        result = module.analyze_log(line, self.policy)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(len(result["unexpected"]), 1)
 
     def test_legacy_audio_event_warning_is_not_covered_by_completion_allowance(self) -> None:
         result = module.analyze_log(

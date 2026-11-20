@@ -188,6 +188,13 @@ VALIDATORS: tuple[Validator, ...] = (
         "scripts/ios_release_analyzer_warnings.py", "config/ios-release-analyzer-warning-policy.json",
         # Each warning's source must resolve.
         "Sources/", "Packages/")),
+    _reads(PYTHON, "scripts/ios_control_audit.py", "validate", inputs=(
+        "scripts/ios_control_audit.py", *JSONIO, "config/ios-control-audit.json",
+        "config/ios-control-audit-schema-v1.json", SPEAKER_CONTRACT,
+        "Sources/Resources/qwenvoice_production_model_catalog.json",
+        "Sources/QwenVoiceCore/EmotionPreset.swift", "Sources/QwenVoiceCore/SemanticTypes.swift",
+        "Sources/iOS/", "Sources/SharedSupport/Views/",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift")),
 
     # Release evidence, supply chain and benchmark history.
     _reads(PYTHON, "scripts/supply_chain_contract.py", inputs=(

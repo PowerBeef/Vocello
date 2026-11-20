@@ -102,5 +102,32 @@ class CommandLineTests(unittest.TestCase):
         self.assertIn("GITHUB_REPOSITORY", result.stderr)
 
 
+class WorkflowReportTriggerTests(unittest.TestCase):
+    """BKL-90: scheduled report jobs must catch abandoned/skipped upstream jobs, not only failure()."""
+
+    WORKFLOWS = {
+        ".github/workflows/nightly.yml": ("tsan", "python-full", "foundation-cold"),
+        ".github/workflows/release-rehearsal.yml": (
+            "macos-package", "sparkle-feed", "evidence", "ios-release-prerequisites",
+        ),
+    }
+
+    def test_scheduled_report_jobs_trigger_on_any_non_success_except_cancelled(self) -> None:
+        for rel_path, expected_needs in self.WORKFLOWS.items():
+            with self.subTest(workflow=rel_path):
+                text = (ROOT / rel_path).read_text(encoding="utf-8")
+                self.assertIn("\n  report:\n", text)
+                report_block = text.split("\n  report:\n", 1)[1]
+                if_line = next(
+                    (line.strip() for line in report_block.splitlines() if line.strip().startswith("if:")),
+                    "",
+                )
+                self.assertIn("always()", if_line)
+                self.assertIn("!cancelled()", if_line)
+                self.assertNotEqual(if_line, "if: failure()")
+                for job in expected_needs:
+                    self.assertIn(f"needs.{job}.result != 'success'", if_line)
+
+
 if __name__ == "__main__":
     unittest.main()

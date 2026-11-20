@@ -275,7 +275,8 @@ jobs:
   report:
     name: Open or refresh the nightly issue
     needs: [tsan, python-full, foundation-cold]
-    if: failure()
+    # BKL-90: failure() alone skips report when a runner abandons a job without emitting failure.
+    if: ${{ always() && !cancelled() && (needs.tsan.result != 'success' || needs.python-full.result != 'success' || needs.foundation-cold.result != 'success') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

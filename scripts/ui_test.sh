@@ -1624,13 +1624,21 @@ run_preinstalled_candidate() {
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
       --device "$device" --output "$out/system-crashes-before" || return 1
   candidate_collection_needed=1
+  local candidate_build_status=0
   required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
     -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
     -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
     DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-    >"$out/candidate-runner-build.log" 2>&1 || return 1
+    >"$out/candidate-runner-build.log" 2>&1 || candidate_build_status=$?
+  if (( candidate_build_status != 0 )); then
+    ui_primary_native_exit_code="$candidate_build_status"
+    cp "$out/candidate-runner-build.log" "$out/xcodebuild.log" 2>/dev/null || true
+    warn "iOS candidate runner build-for-testing failed (see $out/candidate-runner-build.log)"
+    tail -n 40 "$out/candidate-runner-build.log" >&2 || true
+    return "$candidate_build_status"
+  fi
   runner="$IOS_DERIVED/Build/Products/Release-iphoneos/VocelloiOSCandidateUITests-Runner.app"
   xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
 import pathlib, sys

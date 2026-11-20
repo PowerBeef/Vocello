@@ -156,10 +156,12 @@ class SelectionTests(unittest.TestCase):
     def test_a_product_source_change_runs_the_validators_that_read_it(self) -> None:
         ran = self.ran(["Sources/iOS/Settings/SettingsScreen.swift"])
         for expected in ("scripts/localization_contract.py validate", "scripts/support_contact_contract.py validate",
-                         "scripts/ios_storage_protection_policy.py validate", "scripts/check_qwen3_backend_only.sh"):
+                         "scripts/ios_storage_protection_policy.py validate", "scripts/ios_control_audit.py validate",
+                         "scripts/check_qwen3_backend_only.sh"):
             self.assertIn(expected, ran)
         self.assertNotIn("scripts/benchmark_history.py validate --all", ran)
         self.assertNotIn("scripts/roadmap.py render --check", ran)
+        self.assertNotIn("scripts/ios_control_audit.py validate", self.ran(ROADMAP_ONLY))
 
     def test_a_document_change_runs_the_docs_index_check(self) -> None:
         index = "scripts/docs_index.py render --check"

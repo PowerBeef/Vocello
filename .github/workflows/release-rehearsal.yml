@@ -420,7 +420,8 @@ jobs:
   report:
     name: Open or refresh the rehearsal issue
     needs: [macos-package, sparkle-feed, evidence, ios-release-prerequisites]
-    if: failure()
+    # BKL-90: failure() alone skips report when a runner abandons a job without emitting failure.
+    if: ${{ always() && !cancelled() && (needs.macos-package.result != 'success' || needs.sparkle-feed.result != 'success' || needs.evidence.result != 'success' || needs.ios-release-prerequisites.result != 'success') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -541,7 +541,8 @@ branches and worktrees stay denied. Read-only subagents (`Workspace: "inherit"`)
 checkout unscreened, so their prompt must state that they edit nothing.
 
 **Guards.** `agy_hook_adapter.py` prepends the agent rules on `SessionStart` when a session starts in a
-linked worktree, and `agent_guard.py` screens every call whose `cwd` is a linked worktree. It refuses
+linked worktree, and runs `agent_guard` in-process on every `run_command` / `edit_file` / `write_file`
+call whose `cwd` is a linked worktree. It refuses
 pushes, commits in the main checkout, native builds and tests, device, model and measured-lane scripts
 (sourcing a lane script or a `scripts/lib` shell library included) and writes to the roadmap files or
 `docs/development-progress.md`. It is a guardrail, not a sandbox. The commit lint accepts `subagent-*`,
@@ -552,24 +553,29 @@ pushes, commits in the main checkout, native builds and tests, device, model and
 used by a running lane. Note that `manage_subagents kill` does not delete `Workspace: "share"`
 worktrees or branches: after integration, remove the worktree with `git worktree remove <path>` and its
 branch with `git branch -d <branch>` (preserving needed ignored evidence first; `--force` and
-`git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
+`git branch -D` `force_ask` first). A cherry-picked branch is never merged, so `-d` refuses it: when
 `git cherry main <branch>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
 
-**Worker tracking.** Antigravity does not expose `SubagentStart`/`SubagentStop`/`SessionEnd` hooks or
-`CLAUDE_ENV_FILE`, and the default terminal sandbox blocks `ps`. Before any source-bound measurement,
-join or stop every subagent and swarm worker (`manage_subagents list`, `swarm status`), confirm no
-other sessions are active in this repository, and explicitly pass `QVOICE_LEAD_ONLY=1` to the measured
-lane. Never use `QVOICE_LEAD_ONLY=1` to bypass a known active worker or unknown lease. The host checks
-a measured lane runs before any model loads (`require_quiet_host`, `check_cache_only_host`,
-`QVOICE_ALLOW_BUSY_HOST`) are in [`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
+**Worker tracking.** `scripts/active_workers.py` recognizes live `Antigravity` and `agy` host process
+ancestry (`OWNER_NAMES = ("antigravity", "agy", "claude")`), and `agy_hook_adapter.py` registers
+best-effort linked-worktree worker leases on `SessionStart`/`PreToolUse` and clears them on `Stop`
+when `fullyIdle` is true (skipped silently when the default terminal sandbox blocks `ps`). Because
+Antigravity does not propagate `CLAUDE_ENV_FILE` into `run_command`, the lead still joins or stops
+every subagent and swarm worker (`manage_subagents list`, `swarm status`), confirms no other sessions
+are active in this repository, and explicitly passes `QVOICE_LEAD_ONLY=1` to measured lanes. Never use
+`QVOICE_LEAD_ONLY=1` to bypass a known active worker or unknown lease. The host checks a measured lane
+runs before any model loads (`require_quiet_host`, `check_cache_only_host`, `QVOICE_ALLOW_BUSY_HOST`)
+are in [`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
 
 ## Antigravity setup and tool routing
 
 Antigravity reads `AGENTS.md` at the repository root and `website/AGENTS.md` when website files are
 touched. `.agents/plugins/vocello/` packages the glob-triggered domain rules (`rules/native.md`,
 `rules/tooling.md`), the six `vocello-*` skills (`skills/`) and the two read-only subagents
-(`agents/vocello-swift-review.md`, `agents/vocello-xcresult-triage.md`). No skill grants external-write
-authority.
+(`agents/vocello-swift-review.md`, `agents/vocello-xcresult-triage.md`). Reusable `run_workflow`
+orchestration scripts live in `.agents/workflows/` (excluded from Ruff/Pyright because they use
+top-level `await` and runtime-injected workflow primitives; see `.agents/workflows/README.md`). No
+skill or workflow grants external-write authority.
 
 `.agents/hooks.json` is the sole lifecycle hook definition, dispatching to
 `scripts/hooks/agy_hook_adapter.py` (working directory `.agents/`, so relative paths never depend on
@@ -577,16 +583,43 @@ the agent's `cwd`). Opening a session installs nothing and never builds or touch
 
 | Event | Tool matcher | Handler (`agy_hook_adapter.py`) | Effect |
 | --- | --- | --- | --- |
-| SessionStart | — | `session-start` (`session_start.sh`) | Bounded local Git/status/cache-health/checkpoint `injectSteps` banner, plus agent rules when starting in a linked worktree |
-| PreToolUse | `run_command` | `pre-command` (`policy_guard.sh`, `commit_lint.sh`, `agent_guard.py`, command policy) | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device hard denies; subagent worktree limits; explicit `ask` on pushes, destructive Git, downloads, installers, external writes (`gh`, `hf`, `asc`, `vercel`, `failure_issue.py`) |
-| PreToolUse | `edit_file\|write_file` | `pre-edit` (`generated_file_guard.sh`, `agent_guard.py`) | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
-| PreToolUse | `call_mcp_tool` | `pre-mcp` | Hard-denies `cua-driver`, Simulator MCP routes, MobileBuildMCP build/UI/clean/`persist: true` calls and Axiom `xcui`/simulator agents; prompts (`ask`) on Hugging Face Space runs (`dynamic_space`, `gr*`) and GitHub connector writes (denied in worktrees) |
+| SessionStart | — | `session-start` (`session_start.sh`) | Bounded local Git/status/cache-health/checkpoint `injectSteps` banner, plus agent rules and best-effort worker lease when starting in a linked worktree |
+| PreToolUse | `run_command` | `pre-command` (`policy_guard.sh`, `commit_lint.sh`, in-process `agent_guard`, command policy) | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device hard denies; subagent worktree limits; `force_ask` (uncacheable by Always Allow) on pushes, live `ios_candidate_tag.py`, destructive Git, `sudo`, `asc`, `vercel`, `gh`/`hf` writes and `failure_issue.py`; `ask` on local/reversible resets, installs and downloads |
+| PreToolUse | `edit_file\|write_file` | `pre-edit` (`generated_file_guard.sh`, in-process `agent_guard`) | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
+| PreToolUse | `call_mcp_tool` | `pre-mcp` | Hard-denies `cua-driver`, Simulator MCP routes, MobileBuildMCP build/UI/clean/`persist: true` calls and Axiom `xcui`/simulator agents; `force_ask` on Hugging Face Space runs (`dynamic_space`, `gr*`) and GitHub connector writes (denied in worktrees) |
+| PostInvocation | — | `post-invocation` | Main checkout only, silent unless drift exists: injects one concise notice when Swift membership under `Sources/`/`Tests/` changes without `project.pbxproj` or when `config/roadmap*.json` drifts from `docs/ROADMAP.md` |
+| Stop | — | `stop` | Releases linked-worktree worker leases when `fullyIdle`; on the main checkout (only when `terminationReason == "NO_TOOL_CALL"`, `fullyIdle == true`, and `continuationActive == false` so it never loops), returns `continue` if `git diff --cached --check` finds staged whitespace or conflict markers |
 
 `agy_hook_adapter.py` translates Antigravity's camelCase `toolCall` payloads into the repository's
-tested guard scripts and converts exit-2 blocks into `{"decision": "deny", "reason": ...}` and
-authorization-bound commands into `{"decision": "ask", "reason": ...}`. These cooperative guards
-cannot sandbox interpreter indirection or arbitrary external programs; `policy_guard.sh` fails closed
-when a command parser cannot read a shell command.
+tested guard scripts and converts exit-2 blocks into `{"decision": "deny", "reason": ...}`,
+irreversible external/destructive commands into `{"decision": "force_ask", "reason": ...}` (ignoring
+Always Allow cache), and local installs/downloads/resets into `{"decision": "ask", "reason": ...}`.
+These cooperative guards cannot sandbox interpreter indirection or arbitrary external programs;
+`policy_guard.sh` fails closed when a command parser cannot read a shell command.
+
+### Model routing (Gemini 4) and reusable `run_workflow` scripts
+
+Use the lightest model tier that preserves engineering rigor (`AGENTS.md`: editing subagents inherit
+the lead's model; read-only research/visual/policy sweeps may use a lighter tier):
+
+- **Gemini 4 Carbon (`model="pro"` / lead):** architecture changes, MLX runtime and concurrency fixes,
+  root-cause crash/Instruments triage, release-critical and adversarial Swift reviews.
+- **Gemini 4 Neon (`model="inherit"`):** daily Swift/Python/website implementation, editing worktree
+  subagents (`Workspace: "share"`), contract/test authoring, CI maintenance.
+- **Gemini 4 Hydrogen (`model="flash"` / `"flash_lite"`):** parallel multimodal XCUITest screenshot QA,
+  read-only codebase discovery, privacy/release-policy sweeps, QC v2 metric fan-out, log summarization.
+
+Reusable `.agents/workflows/` scripts (invoked via `run_workflow(ScriptPath=..., Args={...})`):
+
+- `swift_adversarial_review.py` — collects the exact Swift diff in Python and fans out `vocello-swift-review`
+  (solving its shell-free diff visibility), an Apple/Swift 6 auditor (`axiom` + `sosumi` MCP), and a
+  Hydrogen privacy/release-policy sweep.
+- `xcuitest_visual_qa.py` — combines `vocello-xcresult-triage` with parallel Hydrogen multimodal checks
+  of `<run>/screenshots/index.json` PNGs.
+- `debt_burndown_pipeline.py` — runs at most 3 disjoint `workspace="share"` editing workers on the
+  inherited model and hands their worktree branches/SHAs back to the lead for cherry-pick integration.
+- `qc_experiment_synthesizer.py` — synthesizes retained QC v2 metrics, `RF-57` self-test/seed compliance,
+  and MLX/Instruments traces (`axiom_xcprof_*` when a `.trace` bundle is supplied).
 
 Safeguards remain directly callable without hook activation:
 

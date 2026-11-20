@@ -22,7 +22,9 @@ target-version = "py310"
 # Hooks and the interpreter bootstrap run under the host's bare python3, often the macOS
 # system Python 3.9 (pyrightconfig.json declares the same split).
 per-file-target-version = { "scripts/hooks/**/*.py" = "py39", "scripts/select_python.py" = "py39" }
-extend-exclude = ["build", "website"]
+# Antigravity run_workflow scripts (.agents/workflows/) use top-level await and
+# runtime-injected workflow primitives (agent, parallel, pipeline, phase, args).
+extend-exclude = ["build", "website", ".agents/workflows"]
 
 [lint]
 select = ["E9", "F", "W6", "PLE", "B006", "T10"]

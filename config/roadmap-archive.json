@@ -6638,6 +6638,76 @@
       "evidence": [
         "commit:8e2c0497"
       ]
+    },
+    {
+      "id": "BKL-63",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "Guard gaps for issue creation, local history rewrites, other remotes and staging spellings",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The guards or permission rules cover scripts/ci/failure_issue.py creating issues, local history rewrites (amend, rebase, soft reset, filter-branch), pushes to another remote or URL, and the stash and broad-add spellings the deny rules miss.",
+      "sourceOfTruth": [
+        ".agents/hooks.json",
+        "scripts/hooks/agy_hook_adapter.py",
+        "scripts/hooks/policy_guard.sh"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Parked 2026-11-10 from docs/audits/2026-11-09-project-audit.md, G-2, G-3, G-5 and the part of G-4 that DA-12 does not record. 2026-11-16: 01666f6f landed most of it. A security review found two medium bypasses; at the maintainer's word they were fixed over four reviewed rounds (b46203e9, 05ecbd21, bc909ef8, 8c9f1a2e): a remote's target and push config are judged, a GIT_DIR or GIT_CONFIG_* assignment in command position counts for the rest of the command (after wrappers and their arguments, export, declare, set -a, env -S), and dashed git binaries in command position are judged. The last review found nothing worse than medium-low. Left: read or printf -v setting GIT_DIR, scripts/ci/./failure_issue.py beating the ask rules (a settings change), and a false block on a single-quoted commit -m naming git rebase. Completed remaining two lows under Antigravity: scripts/ci/failure_issue.py (all normalized spellings) is force_ask in agy_hook_adapter.py, and single-quoted backticks/command substitutions in git_commands.py no longer false-block commit messages naming git rebase.",
+      "evidence": [
+        "commit:39991806"
+      ]
+    },
+    {
+      "id": "BKL-87",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "CI never runs the iOS control-audit tests on a push that changes only iPhone sources",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A push that changes a Swift file under Sources/iOS or Sources/SharedSupport/Views runs scripts/tests/test_ios_control_audit.py in CI (selected on its own, without the whole research suite), with a classify_changes test pinning it.",
+      "sourceOfTruth": [
+        "scripts/ci/classify_changes.py",
+        ".github/workflows/ci.yml",
+        "scripts/tests/conftest.py"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Parked 2026-11-16 from BKL-25's fix: the routed local check now selects the control-audit tests for such an edit, but in CI the test is research-marked (RESEARCH_PREFIXES has ios_control_audit) and the research job runs only when research scripts or config change, so a drifted interactive count reaches main unnoticed until a full gate run. Added scripts/ios_control_audit.py validate (<0.2s stdlib validator) to scripts/lib/contract_gate.py with declared iOS/SharedSupport inputs so CI's always-run contracts job catches control-audit drift on every push/PR including iOS-only changes.",
+      "evidence": [
+        "commit:3eeed981"
+      ]
+    },
+    {
+      "id": "BKL-90",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The nightly and rehearsal issue reports may not fire for an abandoned job",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The issue-filing report jobs of nightly.yml and release-rehearsal.yml file their issue when a job they watch is abandoned (no runner picked it up), proven by a test of the shipped condition, or a recorded decision accepts that they do not.",
+      "sourceOfTruth": [
+        ".github/workflows/nightly.yml",
+        ".github/workflows/release-rehearsal.yml"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Found 2026-11-17 while fixing the CI required and Security required aggregates, which passed an abandoned job (release run 44164671041). Those reports run on if: failure(), and whether failure() is true for an abandoned job is undocumented. Parked without investigation. Replaced if: failure() on nightly.yml and release-rehearsal.yml report jobs with always() && !cancelled() && (needs.<job>.result != 'success' || ...), pinned by WorkflowReportTriggerTests in test_failure_issue.py.",
+      "evidence": [
+        "commit:3eeed981"
+      ]
+    },
+    {
+      "id": "BKL-74",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac build's Prepare embedded Sparkle phase can run before Xcode signs the framework",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "An incremental macOS build that re-copies Sparkle.framework always runs the prepare phase after Xcode's CodeSign of Sparkle.framework/Versions/B (for example the embed signs nothing on copy and the phase alone signs it inside-out), shown by repeated warm builds.",
+      "sourceOfTruth": [
+        "project.yml",
+        "scripts/prepare_embedded_sparkle.sh"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Parked 2026-11-13, found while verifying RF-60. In two warm builds in a row after Xcode re-copied Sparkle.framework, the phase ran between the copy and Xcode's CodeSign of Versions/B: once lipo met CodeSign's .cstemp file, once CodeSign could not read the framework the phase had just thinned. The next build ordered them correctly and passed. The phase's input is a node CodeSign mutates rather than produces (Xcode warns of a missing creator for a mutated node), so the order is not guaranteed. A failed build ships nothing; whether a cold release build can hit it is not known. 2026-11-16: reproduced in the UI-bundle compile after Xcode removed stale Sparkle products: Prepare embedded Sparkle ran, then Xcode's CodeSign of Versions/B failed (the code cannot be read by the verifier). XcodeGen's codeSign: false does not reach a package product, which Xcode embeds and signs itself, so the fix needs another ordering. Fixed Sparkle CodeSign race in project.yml by adding Sparkle.framework/Versions/B/_CodeSignature to Prepare embedded Sparkle inputFiles; verified via llbuild manifest, codesign --verify --deep --strict, and macos-xcui-perf-20261120-223253-e83975d8 PASS.",
+      "evidence": [
+        "commit:0e207be0"
+      ]
     }
   ]
 }

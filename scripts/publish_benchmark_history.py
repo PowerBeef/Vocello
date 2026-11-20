@@ -12,7 +12,6 @@ the registry directly so the frozen evidence is never regenerated.
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import hashlib
 import importlib.util
 import json
@@ -58,7 +57,6 @@ from delivery_quality_gate import CELL_ADHERENCE_ALGORITHM  # noqa: E402
 from benchmark_memory import (  # noqa: E402
     MLX_END_OF_TAKE_STAGES,
     MemoryEvidenceError,
-    REQUIRED_TELEMETRY_SCHEMA,
     UNOBSERVED_GAP_POLICY_KEY,
     qualify_memory_rows,
 )
@@ -92,7 +90,7 @@ from lib.language_metrics import (  # noqa: E402
     recomputed_accuracy,
     run_channel_verdicts,
     single_family_meets_expectation,
-    text_sha256,
+    text_sha256 as text_sha256,
 )
 from lib import jsonio  # noqa: E402
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}

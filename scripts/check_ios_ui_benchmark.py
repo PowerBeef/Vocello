@@ -8,11 +8,9 @@ from collections import Counter
 import datetime as dt
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import TypeGuard
 import sys
-import tempfile
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:

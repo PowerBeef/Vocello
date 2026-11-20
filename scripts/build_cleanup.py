@@ -14,7 +14,6 @@ import contextlib
 import datetime as dt
 import fcntl
 import fnmatch
-import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -24,7 +23,6 @@ import stat
 import subprocess
 import time
 import sys
-import tempfile
 from typing import Any, Iterable, Iterator
 
 

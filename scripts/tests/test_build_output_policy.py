@@ -12,7 +12,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
 

@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import copy
 import plistlib
-import re
 from pathlib import Path
 import sys
 import tempfile

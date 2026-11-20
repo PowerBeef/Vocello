@@ -2,14 +2,12 @@
 """Offline fixture tests for scripts/check_language_output.py (no device)."""
 
 import json
-import hashlib
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from language_bench_evidence import build_plan, write_json_atomic

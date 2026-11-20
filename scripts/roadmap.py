@@ -1178,7 +1178,7 @@ def main(argv=None) -> int:
                     print(f"error: {RENDER_PATH} is stale; run: "
                           "python3 scripts/roadmap.py render", file=sys.stderr)
                     return 1
-                print(f"Roadmap render: fresh")
+                print("Roadmap render: fresh")
                 return 0
             target.write_text(text, encoding="utf-8")
             print(f"Wrote {RENDER_PATH}")

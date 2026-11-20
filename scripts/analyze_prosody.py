@@ -48,7 +48,6 @@ from dataclasses import dataclass
 import json
 import math
 import os
-import sys
 import wave
 from typing import Callable, Iterable, Iterator, Sequence
 

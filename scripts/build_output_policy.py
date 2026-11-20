@@ -21,7 +21,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 
 LIB_DIRECTORY = Path(__file__).resolve().parent / "lib"

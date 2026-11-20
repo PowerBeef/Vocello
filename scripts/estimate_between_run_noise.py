@@ -51,7 +51,6 @@ from summarize_generation_telemetry import (  # noqa: E402
     MINIMUM_POOLED_RUNS,
     compare_summaries,
     mad,
-    metric_threshold,
     pooled_cells,
 )
 

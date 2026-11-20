@@ -16,7 +16,7 @@ Usage:
 import sys, json, argparse, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analyze_prosody import ANALYZER_ALGORITHM_VERSION, analyze
-from prosody_profile import PROSODY_GATE_FLAGS, builtin_profile, load_profile, threshold
+from prosody_profile import builtin_profile, load_profile, threshold
 
 # The gate's thresholds sit outside the observed data: one flag in 902 delivery
 # takes, and the only calibration used 2+2 clips with a true-positive rate of

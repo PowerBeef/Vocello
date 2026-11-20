@@ -21,7 +21,6 @@ import json
 import math
 import os
 from pathlib import Path
-import re
 import sys
 from typing import Any
 
@@ -43,9 +42,7 @@ from lib.language_metrics import (  # noqa: E402
     MIN_LANGUAGE_MATCH_SCORE,
     SEGMENTATION_AWARE_METRIC_VERSIONS,
     edge_allowance_seconds,
-    edit_metrics,
     locale_matches_expected_language,
-    normalized_word_tokens,
     primary_accuracy_metric,
     primary_accuracy_score,
     recomputed_accuracy,

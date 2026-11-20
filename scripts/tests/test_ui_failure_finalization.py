@@ -134,11 +134,11 @@ record_lane_ledger() {{ echo ledger >>"$out/order"; }}
         self.assertFalse((self.out / "test-results.json").exists())
 
     def test_term_and_int_preserve_signal_exit_while_collecting(self):
-        for signal, code in (("TERM", 143), ("INT", 130)):
-            with self.subTest(signal=signal):
+        for sig, code in (("TERM", 143), ("INT", 130)):
+            with self.subTest(signal=sig):
                 if (self.out / "result.xcresult").exists():
                     (self.out / "result.xcresult").rmdir()
-                result, receipt = self.run_fixture(signal=signal, cleanup=4)
+                result, receipt = self.run_fixture(signal=sig, cleanup=4)
                 self.assertEqual(result.returncode, code, result.stderr)
                 self.assertEqual(receipt["status"], "failed")
                 self.assertEqual((self.out / "metadata").read_text(), f"failed {code}\n")

@@ -20,7 +20,6 @@ import sys
 import struct
 import wave
 import zlib
-from dataclasses import dataclass
 from typing import Any, Iterable
 from lib import jsonio  # noqa: E402
 

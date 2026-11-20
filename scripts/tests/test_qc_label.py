@@ -153,7 +153,7 @@ class SamplerTests(unittest.TestCase):
             run_dir = Path(directory) / "qc-takes-run-a"
             run_dir.mkdir()
             sources = {str(run_dir.resolve()): "run-a"}
-            lead_shape = {f"a:fr-0001--dylan": {"run": str(run_dir), "takeID": "fr-0001--dylan",
+            lead_shape = {"a:fr-0001--dylan": {"run": str(run_dir), "takeID": "fr-0001--dylan",
                                                 "reasons": ["asr-disagreement", "named"]},
                           "b:fr-0002--aiden": {"run": "/elsewhere/unknown-run", "takeID": "fr-0002--aiden",
                                                "reasons": ["x"]}}

@@ -18,7 +18,6 @@ from pathlib import Path
 import re
 import shutil
 import sys
-import tempfile
 from typing import Any
 try:  # imported as `lib.<module>` from scripts/, or by bare name from scripts/lib
     from lib import jsonio

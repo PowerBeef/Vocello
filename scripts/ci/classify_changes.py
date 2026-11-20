@@ -63,11 +63,11 @@ LANE_COMPANION_JOBS = {
     "swift": ("macOS ThreadSanitizer subset",),
 }
 
-# Tracked Claude Code settings, skills, read-only agents and rules. The retired
-# Codex prefixes stay so a deletion or reintroduction still runs the hook tests.
-AGENT_CONFIG_PREFIXES = (".claude/", ".codex/", ".agents/")
+# Tracked Antigravity hooks, plugin skills, read-only agents and rules. The retired
+# Claude Code and Codex prefixes stay so a deletion or reintroduction still runs the hook tests.
+AGENT_CONFIG_PREFIXES = (".agents/", ".claude/", ".codex/")
 AGENT_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml")
-# Reference rules whose `paths:` front matter Claude Code loads through .claude/rules.
+# Reference rules loaded through .agents/plugins/vocello/rules/.
 RULE_SOURCES = ("docs/reference/native-engineering.md", "docs/reference/tooling-and-evidence.md")
 
 # Owned sources that no iOS target compiles. Anything else under Sources/ or

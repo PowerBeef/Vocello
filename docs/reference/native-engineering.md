@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-summary: Native engineering rule for the engine, macOS app and iOS app; Claude Code loads it through .claude/rules/native.md when matching files are touched.
+summary: Native engineering rule for the engine, macOS app and iOS app; Antigravity loads it on demand through .agents/plugins/vocello/rules/native.md when matching files are touched.
 reviewed: 2026-11-10
 paths:
   - "Sources/**"

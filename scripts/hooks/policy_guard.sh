@@ -57,7 +57,7 @@ block() {
 # git grep, git log), git commit/tag/merge messages and heredoc bodies are text, not use.
 sim_violation="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" simulator-policy)"
 if [[ -n "$sim_violation" ]]; then
-  block "Simulator destinations are unsupported (CLAUDE.md: Physical iPhone only): $sim_violation." \
+  block "Simulator destinations are unsupported (AGENTS.md: Physical iPhone only): $sim_violation." \
     "Use the paired iPhone through scripts/ui_test.sh ios <lane> or scripts/ios_device.sh, or the macOS lanes."
 fi
 
@@ -66,7 +66,7 @@ fi
 # directory it runs in; it also reports a copy onto the generated project file.
 file_violation="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" file-policy)"
 if [[ "$file_violation" == build ]]; then
-  block "whole build-output deletion bypasses config/build-output-policy.json (CLAUDE.md: Owned output)." \
+  block "whole build-output deletion bypasses config/build-output-policy.json (AGENTS.md: Owned output)." \
     "Use scripts/clean_build_caches.sh with one selective --cache target, or the retention pruning it owns."
 fi
 
@@ -79,27 +79,27 @@ if [[ -n "$git_violation" ]]; then
   reason="${git_violation#*"$tab"}"
   case "$category" in
     force)
-      block "$reason (CLAUDE.md: Main is the only published branch)." \
+      block "$reason (AGENTS.md: Main is the only published branch)." \
         "Push fast-forward commits only; CI required protects main." ;;
     push|config)
-      block "$reason; only main is ever pushed (CLAUDE.md: Main is the only published branch)." \
+      block "$reason; only main is ever pushed (AGENTS.md: Main is the only published branch)." \
         "Integrate agent branches into main locally, then push main; release tags are maintainer-run, and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
     staging)
-      block "$reason (CLAUDE.md: stage explicit paths, never stash or broadly stage)." \
+      block "$reason (AGENTS.md: stage explicit paths, never stash or broadly stage)." \
         "Stage the assigned files by name (git add <path> ...) and commit the index; set work aside with a commit on the branch, never the stash." ;;
     history)
-      block "$reason (CLAUDE.md: preserve prior commits; Main is the only published branch)." \
+      block "$reason (AGENTS.md: preserve prior commits; Main is the only published branch)." \
         "Record a follow-up commit (or git revert) instead; integrate with git cherry-pick or git merge --ff-only; unstage a path with git reset -- <path>. A rewrite the maintainer wants is theirs to run." ;;
     *)
-      block "$reason (CLAUDE.md: Main is the only published branch)." \
-        "Work on main, or use a Claude Code agent worktree (Agent isolation, EnterWorktree or a desktop app session); the lead integrates it." ;;
+      block "$reason (AGENTS.md: Main is the only published branch)." \
+        "Work on main, or use an Antigravity shared-workspace subagent/swarm worktree; the lead integrates it." ;;
   esac
 fi
 
 # 4. Generated project.
 re_pbxproj_write='(sed[[:space:]]+-[A-Za-z]*i|perl[[:space:]]+-[A-Za-z]*i|tee[[:space:]]|>>?[[:space:]]*)[^|;&]*project\.pbxproj'
 if [[ "$command_text" =~ $re_pbxproj_write ]] || [[ "$file_violation" == pbxproj ]]; then
-  block "QwenVoice.xcodeproj/project.pbxproj is generated (CLAUDE.md: Generated project)." \
+  block "QwenVoice.xcodeproj/project.pbxproj is generated (AGENTS.md: Generated project)." \
     "Edit project.yml and run ./scripts/regenerate_project.sh --fast."
 fi
 

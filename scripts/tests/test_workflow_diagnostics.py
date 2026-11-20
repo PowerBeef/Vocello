@@ -259,8 +259,10 @@ class DoctorTests(unittest.TestCase):
     def test_inventory_uses_only_readonly_probes_and_does_not_claim_active_hooks(self):
         with tempfile.TemporaryDirectory(prefix="vocello doctor ") as directory:
             root = Path(directory)
-            (root / ".claude").mkdir()
-            (root / ".claude/settings.json").write_text('{"hooks": {"SessionStart": []}}')
+            (root / ".agents").mkdir()
+            (root / ".agents/hooks.json").write_text(
+                '{"vocello-guards": {"SessionStart": [{"type": "command", "command": "true"}]}}'
+            )
             calls = []
             def fake_run(command, **kwargs):
                 calls.append(command)
@@ -272,24 +274,30 @@ class DoctorTests(unittest.TestCase):
                     mock.patch.object(MODULE.Path, "home", return_value=root):
                 report = MODULE.doctor(root)
             self.assertTrue(report["readOnly"])
-            self.assertTrue(report["claudeCode"]["hooksConfigured"])
-            self.assertEqual(report["claudeCode"]["hookActivation"], "unconfirmed")
-            self.assertIn("session-only", report["claudeCode"]["mcpAvailability"])
-            self.assertEqual(sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()), [".claude/settings.json"])
+            self.assertTrue(report["antigravity"]["hooksConfigured"])
+            self.assertEqual(report["antigravity"]["hookActivation"], "unconfirmed")
+            self.assertIn("session-only", report["antigravity"]["mcpAvailability"])
+            self.assertEqual(sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()), [".agents/hooks.json"])
             self.assertTrue(calls)
 
     def test_malformed_or_hookless_settings_do_not_claim_hooks(self):
-        for content in ("not JSON", "[]", '{"permissions": {}}', '{"hooks": {}}'):
+        for content in (
+            "not JSON",
+            "[]",
+            "{}",
+            '{"vocello-guards": {"enabled": false, "SessionStart": [{"type": "command", "command": "true"}]}}',
+            '{"vocello-guards": {"SessionStart": []}}',
+        ):
             with self.subTest(content=content), tempfile.TemporaryDirectory() as directory, \
                     mock.patch.object(MODULE.shutil, "which", return_value=None), \
                     mock.patch.object(MODULE.Path, "home", return_value=Path(directory)):
                 root = Path(directory)
-                (root / ".claude").mkdir()
-                (root / ".claude/settings.json").write_text(content)
+                (root / ".agents").mkdir()
+                (root / ".agents/hooks.json").write_text(content)
                 report = MODULE.doctor(root)
-                self.assertTrue(report["claudeCode"]["settingsPresent"])
-                self.assertFalse(report["claudeCode"]["hooksConfigured"])
-                self.assertEqual(report["claudeCode"]["settingsError"] is not None, content in ("not JSON", "[]"))
+                self.assertTrue(report["antigravity"]["hooksFilePresent"])
+                self.assertFalse(report["antigravity"]["hooksConfigured"])
+                self.assertEqual(report["antigravity"]["hooksError"] is not None, content in ("not JSON", "[]"))
 
     def test_missing_optional_tools_are_reported_without_installing(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -297,10 +305,10 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(MODULE.Path, "home", return_value=Path(directory)), \
                 mock.patch.object(MODULE.subprocess, "run", side_effect=AssertionError("nothing to probe")):
             report = MODULE.doctor(Path(directory))
-        self.assertFalse(report["tools"]["claude"]["available"])
+        self.assertFalse(report["tools"]["agy"]["available"])
         self.assertFalse(report["xcode"]["available"])
-        self.assertFalse(report["claudeCode"]["hooksConfigured"])
-        self.assertFalse(report["claudeCode"]["settingsPresent"])
+        self.assertFalse(report["antigravity"]["hooksConfigured"])
+        self.assertFalse(report["antigravity"]["hooksFilePresent"])
 
     def test_running_python_and_package_versions_are_reported(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -320,19 +328,12 @@ class DoctorTests(unittest.TestCase):
             self.assertFalse(report["pythonModuleDetails"]["numpy"]["matchesPin"])
             self.assertEqual(problems, ["numpy 2.0.0 (required 2.4.6)"])
 
-    def test_major_pins_and_usage_nonzero_helpers_have_explicit_semantics(self):
+    def test_major_pins_report_matching_and_drifting_versions(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "config").mkdir()
             (root / "config/toolchain.json").write_text(json.dumps({"website": {"node": {"version": "24"}, "npm": {"version": "11"}}}))
-            for version in ("9.0.0", "27.3.1"):
-                helper = root / ".claude/plugins/cache/axiom-marketplace/axiom" / version / "bin/xclog"
-                helper.parent.mkdir(parents=True)
-                helper.write_text("#!/bin/sh\n")
-                helper.chmod(0o755)
             def fake_run(command, **kwargs):
-                if command[-1] == "--help":
-                    return subprocess.CompletedProcess(command, 1, "", "Usage: xclog COMMAND\n")
                 return subprocess.CompletedProcess(command, 0, "v24.21.0" if command[0].endswith("node") else "12.0.0", "")
             with mock.patch.object(MODULE.shutil, "which", side_effect=lambda tool: f"/tools/{tool}" if tool in {"node", "npm"} else None), \
                     mock.patch.object(MODULE.Path, "home", return_value=root), \
@@ -341,11 +342,6 @@ class DoctorTests(unittest.TestCase):
             self.assertTrue(report["tools"]["node"]["matchesPin"])
             self.assertEqual(report["tools"]["node"]["pinPolicy"], "major")
             self.assertFalse(report["tools"]["npm"]["matchesPin"])
-            helper = report["axiomHelpers"]["xclog"]
-            self.assertIn("27.3.1", helper["path"])
-            self.assertFalse(helper["helpProbePassed"])
-            self.assertEqual(helper["helpProbeStatus"], "usage-nonzero")
-            self.assertEqual(helper["helpProbeExitCode"], 1)
 
     def test_playwright_browser_cache_follows_the_override_then_the_platform(self):
         root, home = Path("/repository"), Path("/home/someone")

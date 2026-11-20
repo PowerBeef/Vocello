@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-17
+reviewed: 2026-11-20
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,7 +17,28 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 17: Vocello 3.1.0 is public on the Mac (resume here)
+### November 20: Antigravity harness takeover (resume here)
+
+The repository-owned agent harness moved from Claude Code (`.claude/`, `CLAUDE.md`,
+`website/CLAUDE.md`) to Antigravity (`AGENTS.md`, `website/AGENTS.md`, `.agents/hooks.json`,
+`.agents/plugins/vocello/` and `scripts/hooks/agy_hook_adapter.py`) under `RF-67`, with zero Swift
+or product-binary changes. `main` stays on the iOS 3.1.0 TestFlight candidate track (`v3.1.0-ios.3`,
+`focusLock` active; `RF-35`, `RF-41`, `RF-42` remain in flight awaiting an iPhone window).
+
+- **Guards active in `.agents/hooks.json`:** `SessionStart` injects the bounded status/checkpoint
+  banner (`session_start.sh`); `PreToolUse` routes `run_command`, `edit_file|write_file` and
+  `call_mcp_tool` through `agy_hook_adapter.py` and the existing guard scripts, hard-denying
+  Simulator tools, `cua-driver`, MobileBuildMCP build/UI/clean/`persist: true` calls, Axiom
+  `xcui`/simulator agents, releases and credential leaks, while prompting (`ask`) on pushes,
+  destructive Git, downloads, installers and external writes (`gh`, `hf`, `asc`, `vercel`,
+  `scripts/ci/failure_issue.py`).
+- **Worker tracking:** Antigravity has no `SubagentStart`/`SubagentStop`/`SessionEnd` hooks or
+  `CLAUDE_ENV_FILE`, and its default terminal sandbox blocks `ps`; join all subagents
+  (`manage_subagents list`, `swarm status`) and declare `QVOICE_LEAD_ONLY=1` before measured lanes.
+- **Next:** start a fresh Antigravity session at the repository root to complete Phase 4 live hook
+  activation verification, then resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/`RF-35`–`RF-42`).
+
+### November 17: Vocello 3.1.0 is public on the Mac
 
 The maintainer uploaded the promotion manifest to the v3.1.0 draft and dispatched **Promote verified
 release** from the tag (run 44036811898, approved on the `release` environment). Every step passed,

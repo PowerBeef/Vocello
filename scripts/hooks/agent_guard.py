@@ -62,7 +62,7 @@ XCODEBUILD_REPORT_VALUES = {"-sdk"}
 QC_MODEL_VERBS = {"run", "language-bench"}
 CLI_MODEL_VERBS = {"generate", "gen", "custom", "design", "clone", "batch", "bench", "benchmark"}
 PYTHONS = re.compile(r"^python(3(\.\d+)?)?$")
-RULE = "CLAUDE.md: Agents and side sessions"
+RULE = "AGENTS.md: Subagents and worktrees"
 
 
 def _script(word: str) -> str:
@@ -280,7 +280,7 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0
-    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
+    root = Path(os.environ.get("VOCELLO_PROJECT_ROOT") or os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
     cwd = Path(payload.get("cwd") or root)
     if not payload.get("agent_id") and not (cwd.is_absolute() and adapter.linked_worktree(cwd)):
         return 0

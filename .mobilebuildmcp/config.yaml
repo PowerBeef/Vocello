@@ -1,13 +1,14 @@
 # MobileBuildMCP (formerly XcodeBuildMCP) configuration for the Vocello (QwenVoice) monorepo.
 # The server reads this file from the repository root; .xcodebuildmcp/ is no longer read.
 #
-# Discovery only (CLAUDE.md: Claude Code harness). Repository scripts own every build, test,
+# Discovery only (AGENTS.md: Antigravity harness). Repository scripts own every build, test,
 # device and UI route under the host-wide native lock, so the build-capable workflows stay off:
 #   - macos / device: build, install, launch and test tools that bypass the native lock and
 #     the evidence scripts (scripts/dev.sh, scripts/macos_test.sh, scripts/ios_device.sh);
 #   - debugging: its only attach tool targets the Simulator (unsupported here);
 #   - simulator / simulator-management / ui-automation: unsupported destinations.
-# .claude/settings.json still denies the unsupported-destination tools as a backstop.
+# .agents/hooks.json (agy_hook_adapter.py) denies the unsupported-destination, build and UI tools
+# as a backstop even if global MCP environment variables enable extra workflows.
 # Never call session_set_defaults with persist: true; it writes into this tracked file, and a
 # physical-device ID must never be committed. Restart the session after editing this file.
 schemaVersion: 1

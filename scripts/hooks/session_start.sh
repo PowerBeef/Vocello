@@ -138,7 +138,7 @@ print_first_checkpoint() {
   ' docs/development-progress.md 2>/dev/null
 }
 
-echo "== Vocello session start (CLAUDE.md: Start here) =="
+echo "== Vocello session start (AGENTS.md: Start here) =="
 echo "Repository hook reached this session. Run scripts/dev.sh doctor for configuration/trust limitations."
 echo
 echo "-- git --"

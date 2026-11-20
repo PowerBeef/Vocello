@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {"python3": ["--version"], "git": ["--version"], "xcodegen": ["--version"],
          "rg": ["--version"], "shellcheck": ["--version"], "xcbeautify": ["--version"],
          "swiftlint": ["version"], "node": ["--version"], "npm": ["--version"],
-         "gh": ["--version"], "claude": ["--version"]}
+         "gh": ["--version"], "agy": ["--version"]}
 
 
 def _probe(command: list[str]) -> dict:
@@ -134,49 +134,40 @@ def doctor(root: Path = ROOT) -> dict:
     xcode["pinnedVersion"] = manifest.get("native", {}).get("xcode", {}).get("version")
     xcode["matchesPin"] = (xcode["version"] == xcode["pinnedVersion"]
                             if xcode["version"] and xcode["pinnedVersion"] else None)
-    # Capability presence is not proof that a plugin/server is exposed to this chat.
-    helper_root = Path.home() / ".claude/plugins/cache/axiom-marketplace/axiom"
-    helpers = {}
-    versions = sorted(helper_root.glob("*/bin"), key=lambda path: tuple(
-        int(part) for part in re.findall(r"\d+", path.parent.name))) if helper_root.is_dir() else []
-    for name in ("axbuild", "xclog", "xcprof", "xcproject", "xcsym", "xcui"):
-        candidates = [directory / name for directory in versions if (directory / name).is_file()]
-        path = candidates[-1] if candidates else None
-        executable = bool(path and os.access(path, os.X_OK))
-        probe = _probe([os.fspath(path), "--help"]) if executable else {"exitCode": None}
-        probe_status = ("missing" if path is None else "not-executable" if not executable
-                        else "success" if probe["exitCode"] == 0
-                        else "usage-nonzero" if probe.get("usageDisplayed")
-                        else "failed" if probe["exitCode"] is not None else "unavailable")
-        helpers[name] = {"path": os.fspath(path) if path else None, "executable": executable,
-                         "helpProbePassed": probe["exitCode"] == 0, "helpProbeExitCode": probe["exitCode"],
-                         "helpProbeStatus": probe_status}
-    settings, settings_error = root / ".claude/settings.json", None
+    hooks_path, hooks_error = root / ".agents/hooks.json", None
     hooks_configured = False
-    if settings.is_file():
+    hook_events = ("SessionStart", "PreToolUse", "PostToolUse", "PreInvocation", "PostInvocation", "Stop")
+    if hooks_path.is_file():
         try:
-            configured = json.loads(settings.read_text(encoding="utf-8")).get("hooks")
-            hooks_configured = isinstance(configured, dict) and bool(configured)
+            configured = json.loads(hooks_path.read_text(encoding="utf-8"))
+            if not isinstance(configured, dict):
+                raise ValueError("hooks.json must be a JSON object")
+            hooks_configured = any(
+                isinstance(spec, dict) and spec.get("enabled", True) is not False
+                and any(isinstance(spec.get(event), list) and bool(spec[event]) for event in hook_events)
+                for spec in configured.values()
+            )
         except (OSError, ValueError, AttributeError) as error:
-            settings_error = type(error).__name__
+            hooks_error = type(error).__name__
+    plugin_root = root / ".agents/plugins/vocello"
     return {"schemaVersion": 1, "readOnly": True, "tools": tools, "xcode": xcode,
             "pythonModules": {name: entry["available"] for name, entry in python_module_inventory(manifest).items()},
             "pythonModuleDetails": python_module_inventory(manifest),
             "pythonSelection": {"executable": sys.executable, "override": os.environ.get("VOCELLO_PYTHON"),
                                 "minimumVersion": "3.10", "meetsMinimum": sys.version_info >= (3, 10)},
-            "claudeCode": {"instructionsPresent": (root / "CLAUDE.md").is_file(),
-                           "websiteInstructionsPresent": (root / "website/CLAUDE.md").is_file(),
-                           "skills": sorted(path.parent.name for path in (root / ".claude/skills").glob("*/SKILL.md")),
-                           "agentDefinitions": sorted(path.name for path in (root / ".claude/agents").glob("*.md")),
-                           "rules": sorted(path.name for path in (root / ".claude/rules").glob("*.md")),
-                           "settingsPresent": settings.is_file(), "settingsError": settings_error,
-                           "hooksConfigured": hooks_configured, "hookActivation": "unconfirmed",
-                           "hookActivationNote": "A fresh Claude Code session must confirm hook activation (/hooks and the SessionStart output); file presence is insufficient.",
-                           "mcpAvailability": "session-only; inspect exposed tools in the active Claude Code session"},
-            "axiomHelpers": helpers,
+            "antigravity": {"instructionsPresent": (root / "AGENTS.md").is_file(),
+                            "websiteInstructionsPresent": (root / "website/AGENTS.md").is_file(),
+                            "pluginPresent": (plugin_root / "plugin.json").is_file(),
+                            "skills": sorted(path.parent.name for path in (plugin_root / "skills").glob("*/SKILL.md")),
+                            "agentDefinitions": sorted(path.name for path in (plugin_root / "agents").glob("*.md")),
+                            "rules": sorted(path.name for path in (plugin_root / "rules").glob("*.md")),
+                            "hooksFilePresent": hooks_path.is_file(), "hooksError": hooks_error,
+                            "hooksConfigured": hooks_configured, "hookActivation": "unconfirmed",
+                            "hookActivationNote": "A fresh Antigravity session must confirm hook activation (SessionStart banner and PreToolUse guards); file presence is insufficient.",
+                            "mcpAvailability": "session-only; inspect exposed MCP servers and skills in the active Antigravity session"},
             "websiteBrowsers": playwright_browsers(root),
             "notes": ["No installations, downloads, package resolution, native builds or device probes were performed.",
-                      "Optional plugins and helpers never replace repository checks or their native lock."]}
+                      "Optional plugins, MCP servers and helpers never replace repository checks or their native lock."]}
 
 
 def _digest(path: Path) -> str:
@@ -435,8 +426,8 @@ def print_report(report: dict) -> None:
             print(f"Playwright browsers: missing {', '.join(browsers['missing'])} in {browsers['cache']}; "
                   f"npm --prefix website run check cannot run its browser tests. Install: "
                   f"{browsers['installCommand']} ({browsers['installNote']})")
-        print(f"Claude Code hooks: {'configured' if report['claudeCode']['hooksConfigured'] else 'missing'}; activation unconfirmed")
-        print(report["claudeCode"]["hookActivationNote"])
-        print(f"MCP availability: {report['claudeCode']['mcpAvailability']}")
+        print(f"Antigravity hooks: {'configured' if report['antigravity']['hooksConfigured'] else 'missing'}; activation unconfirmed")
+        print(report["antigravity"]["hookActivationNote"])
+        print(f"MCP availability: {report['antigravity']['mcpAvailability']}")
         for note in report["notes"]:
             print(note)

@@ -1,15 +1,15 @@
 ---
 status: active
 owner: release-qa
-summary: Tooling, CI, packaging, benchmark and evidence rule; Claude Code loads it through .claude/rules/tooling.md when matching files are touched.
-reviewed: 2026-11-15
+summary: Tooling, CI, packaging, benchmark and evidence rule; Antigravity loads it on demand through .agents/plugins/vocello/rules/tooling.md when matching files are touched.
+reviewed: 2026-11-20
 paths:
   - "scripts/**"
   - ".github/**"
   - "config/**"
   - "benchmarks/**"
-  - ".claude/**"
-  - "CLAUDE.md"
+  - ".agents/**"
+  - "AGENTS.md"
 ---
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 

@@ -1,0 +1,6 @@
+{
+  "name": "vocello",
+  "displayName": "Vocello Engineering Harness",
+  "version": "1.0.0",
+  "description": "Domain rules, validation skills, and read-only review/triage subagents for the Vocello monorepo."
+}

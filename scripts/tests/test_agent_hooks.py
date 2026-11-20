@@ -1,4 +1,4 @@
-"""Exercise repository safeguards through Claude Code payloads and checked-in configuration."""
+"""Exercise repository safeguards through Antigravity and hook payloads and checked-in configuration."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 HOOKS = ROOT / "scripts/hooks"
-SETTINGS = ROOT / ".claude/settings.json"
+HOOKS_CONFIG = ROOT / ".agents/hooks.json"
+PLUGIN = ROOT / ".agents/plugins/vocello"
 EDIT_TOOLS = {"Edit": "file_path", "Write": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
 EDIT_MATCHER = "^(Edit|Write|MultiEdit|NotebookEdit)$"
 
@@ -333,52 +334,51 @@ class EditGuardTests(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
 
 
-class SettingsWiringTests(unittest.TestCase):
-    EXPECTED = {
-        ("SessionStart", "startup|resume|clear|compact|fork"): {"worker_lifecycle.py", "session_start.sh"},
-        ("PreToolUse", "^Bash$"): {"commit_lint.sh", "policy_guard.sh", "agent_guard.py"},
-        ("PreToolUse", EDIT_MATCHER): {"generated_file_guard.sh", "agent_guard.py"},
-        ("PreToolUse", "^mcp__"): {"simulator_tool_guard.py", "connector_write_guard.py"},
-        ("PostToolUse", EDIT_MATCHER): {"project_yml_reminder.sh"},
-        ("SubagentStart", "*"): {"worker_lifecycle.py"},
-        ("SubagentStop", "*"): {"worker_lifecycle.py"},
-        ("SessionEnd", "*"): {"worker_lifecycle.py"},
+def invoke_agy(mode, payload, *, cwd=None, root=ROOT):
+    hooks = fixture_hooks(root)
+    return subprocess.run(
+        ["python3", str(hooks / "agy_hook_adapter.py"), mode],
+        input=json.dumps(payload), text=True, capture_output=True,
+        cwd=cwd or root, timeout=20,
+        env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(root)),
+    )
+
+
+class HooksWiringTests(unittest.TestCase):
+    EXPECTED_PRETOOL = {
+        "run_command": "python3 ../scripts/hooks/agy_hook_adapter.py pre-command",
+        "edit_file|write_file": "python3 ../scripts/hooks/agy_hook_adapter.py pre-edit",
+        "call_mcp_tool": "python3 ../scripts/hooks/agy_hook_adapter.py pre-mcp",
     }
 
     def setUp(self):
-        self.settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
+        self.config = json.loads(HOOKS_CONFIG.read_text(encoding="utf-8"))
 
-    def resolve(self, command: str, cwd: Path) -> tuple[str, Path]:
-        # Expand the trusted checked-in command as Claude Code would, without
-        # running the hook itself. Each configured command is interpreter+path.
-        result = subprocess.run(["bash", "-c", 'printf "%s\\n" ' + command], cwd=cwd,
-                                env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)),
-                                capture_output=True, text=True, check=True)
-        interpreter, path = result.stdout.splitlines()
-        return interpreter, Path(path)
+    def test_the_hook_matrix_is_exact_and_commands_resolve_from_agents_dir(self):
+        self.assertEqual(set(self.config), {"vocello-guards"})
+        spec = self.config["vocello-guards"]
+        self.assertEqual(spec.get("enabled", True), True)
+        self.assertEqual(len(spec["SessionStart"]), 1)
+        start = spec["SessionStart"][0]
+        self.assertEqual(start["type"], "command")
+        self.assertEqual(start["command"], "python3 ../scripts/hooks/agy_hook_adapter.py session-start")
+        self.assertLessEqual(start["timeout"], 15)
 
-    def test_the_hook_matrix_is_exact_and_commands_do_not_depend_on_the_working_directory(self):
-        matrix = {}
-        with tempfile.TemporaryDirectory() as outside:
-            for event, entries in self.settings["hooks"].items():
-                for entry in entries:
-                    matcher = entry.get("matcher", "")
-                    if matcher != "*":
-                        re.compile(matcher)
-                    for hook in entry["hooks"]:
-                        self.assertEqual(hook["type"], "command")
-                        self.assertLessEqual(hook.get("timeout", 600), 5 if event == "SessionEnd" else 15)
-                        for cwd in (ROOT, ROOT / "website", Path(outside)):
-                            interpreter, path = self.resolve(hook["command"], cwd)
-                            self.assertEqual(hook["command"],
-                                             f'{interpreter} "$CLAUDE_PROJECT_DIR/scripts/hooks/{path.name}"')
-                            self.assertEqual(interpreter, "python3" if path.suffix == ".py" else "bash")
-                            self.assertEqual(path.parent, HOOKS)
-                            self.assertTrue(path.is_file())
-                        matrix.setdefault((event, matcher), set()).add(path.name)
-        self.assertEqual(matrix, self.EXPECTED)
-        wired = set().union(*matrix.values())
-        self.assertEqual({p.name for p in HOOKS.glob("*.sh")}, {name for name in wired if name.endswith(".sh")})
+        seen = {}
+        for group in spec["PreToolUse"]:
+            matcher = group["matcher"]
+            re.compile(matcher)
+            self.assertEqual(len(group["hooks"]), 1)
+            hook = group["hooks"][0]
+            self.assertEqual(hook["type"], "command")
+            self.assertLessEqual(hook["timeout"], 15)
+            seen[matcher] = hook["command"]
+            parts = hook["command"].split()
+            self.assertEqual(parts[0], "python3")
+            resolved = (HOOKS_CONFIG.parent / parts[1]).resolve()
+            self.assertEqual(resolved, (HOOKS / "agy_hook_adapter.py").resolve())
+            self.assertTrue(resolved.is_file())
+        self.assertEqual(seen, self.EXPECTED_PRETOOL)
 
     def test_python_hooks_run_under_the_host_default_interpreter(self):
         # Hook commands run bare `python3`, which on macOS is often the system 3.9: a hook that
@@ -413,6 +413,19 @@ class SettingsWiringTests(unittest.TestCase):
                     self.assertNotIn("Traceback", result.stderr)
                     if name == "worker_lifecycle.py":
                         json.loads(result.stdout)
+            for mode, agy_payload, expected_decision in (
+                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}, "cwd": str(ROOT)}, "allow"),
+                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git switch -c smoke"}}, "cwd": str(ROOT)}, "deny"),
+                ("pre-edit", {"toolCall": {"name": "edit_file", "args": {"Path": str(ROOT / "docs/ROADMAP.md")}}, "cwd": str(ROOT)}, "deny"),
+                ("pre-mcp", {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "boot" + SIM_SUFFIX}}, "cwd": str(ROOT)}, "deny"),
+            ):
+                with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
+                    result = subprocess.run(
+                        [interpreter, str(HOOKS / "agy_hook_adapter.py"), mode],
+                        input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["decision"], expected_decision)
             for mode, command, expected in (("git-policy", "git status", ""),
                                             ("simulator-policy", "rg 'simctl boot' && xcrun simctl list", ""),
                                             ("simulator-policy", "xcrun simctl boot 1234", "`simctl boot`\n")):
@@ -422,60 +435,32 @@ class SettingsWiringTests(unittest.TestCase):
                                             input=json.dumps(payload), text=True, capture_output=True, timeout=20)
                     self.assertEqual((result.returncode, result.stdout, result.stderr), (0, expected, ""))
 
-    def test_matchers_select_only_the_intended_tool_family(self):
-        simulator_tool = "mcp__MobileBuildMCP__build" + SIM_SUFFIX
-        for event in ("PreToolUse", "PostToolUse"):
-            for entry in self.settings["hooks"][event]:
-                matcher = entry["matcher"]
-                for tool in (*EDIT_TOOLS, "Bash", "Read", "NotebookRead", "TodoWrite", "WebFetch",
-                             "mcp__x__Write", simulator_tool):
-                    with self.subTest(matcher=matcher, tool=tool):
-                        expected = ((matcher == EDIT_MATCHER and tool in EDIT_TOOLS)
-                                    or (matcher == "^Bash$" and tool == "Bash")
-                                    or (matcher == "^mcp__" and tool.startswith("mcp__")))
-                        self.assertEqual(matches(matcher, tool), expected)
-
-    def test_configured_pretool_hooks_allow_and_block_from_root_and_website(self):
+    def test_configured_pretool_hooks_allow_ask_and_deny_from_root_and_website(self):
         for cwd in (ROOT, ROOT / "website"):
             prefix = "../" if cwd.name == "website" else ""
-            cases = [("Bash", {"command": "git push --force origin main"}, True),
-                     ("Bash", {"command": "git push origin worktree-agent-1"}, True),
-                     ("Bash", {"command": "git status --short"}, False),
-                     ("Edit", edit(f"{prefix}docs/ROADMAP.md"), True),
-                     ("NotebookEdit", edit(f"{prefix}benchmarks/runs/x.ipynb", "NotebookEdit"), True),
-                     ("Write", edit(f"{prefix}docs/note.md", "Write"), False),
-                     ("mcp__MobileBuildMCP__build" + SIM_SUFFIX, {}, True),
-                     ("mcp__MobileBuildMCP__list_schemes", {}, False)]
-            for name, tool_input, blocked in cases:
-                with self.subTest(cwd=cwd, tool=name, blocked=blocked):
-                    payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": name,
-                                          "tool_input": tool_input, "cwd": str(cwd)})
-                    results = []
-                    for entry in self.settings["hooks"]["PreToolUse"]:
-                        if matches(entry["matcher"], name):
-                            for hook in entry["hooks"]:
-                                results.append(subprocess.run(
-                                    ["bash", "-c", hook["command"]], cwd=cwd, input=payload,
-                                    env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)),
-                                    capture_output=True, text=True, timeout=20))
-                    self.assertTrue(results)
-                    self.assertEqual(any(r.returncode == 2 for r in results), blocked)
-                    self.assertTrue(all(r.returncode in (0, 2) for r in results))
+            cases = [
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push --force origin main"}}, "deny"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin subagent-1"}}, "deny"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "ask"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git status --short"}}, "allow"),
+                ("pre-edit", {"name": "edit_file", "args": {"Path": f"{prefix}docs/ROADMAP.md"}}, "deny"),
+                ("pre-edit", {"name": "write_file", "args": {"Path": f"{prefix}docs/note.md"}}, "allow"),
+                ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "build" + SIM_SUFFIX}}, "deny"),
+                ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "cua-driver_cua-driver", "ToolName": "list_apps"}}, "deny"),
+                ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "list_schemes"}}, "allow"),
+            ]
+            for mode, tool_call, expected in cases:
+                with self.subTest(cwd=cwd, mode=mode, tool_call=tool_call):
+                    result = invoke_agy(mode, {"hookEventName": "PreToolUse", "toolCall": tool_call, "cwd": str(cwd)}, cwd=cwd)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["decision"], expected, result.stdout)
 
-
-class LaunchConfigurationTests(unittest.TestCase):
-    def test_the_browser_pane_serves_only_the_website_off_playwrights_port(self):
-        """`.claude/launch.json` feeds the desktop app's preview_start; native apps never run from it."""
-        launch = json.loads((ROOT / ".claude/launch.json").read_text(encoding="utf-8"))
-        self.assertEqual({entry["name"] for entry in launch["configurations"]}, {"website", "website-preview"})
-        for entry in launch["configurations"]:
-            with self.subTest(name=entry["name"]):
-                args = entry["runtimeArgs"]
-                self.assertEqual((entry["runtimeExecutable"], args[:3]), ("npm", ["--prefix", "website", "run"]))
-                self.assertEqual(args[args.index("--port") + 1], str(entry["port"]))
-                self.assertIn("--strictPort", args)
-                # `npm run check` starts Playwright's own preview on 4173 with strictPort.
-                self.assertNotEqual(entry["port"], 4173)
+    def test_session_start_adapter_returns_inject_steps(self):
+        result = invoke_agy("session-start", {"hookEventName": "SessionStart", "cwd": str(ROOT)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        text = data["injectSteps"][0]["systemMessage"]["systemMessage"]
+        self.assertIn("AGENTS.md: Start here", text)
 
 
 class AgentGuardTests(unittest.TestCase):
@@ -564,153 +549,110 @@ class AgentGuardTests(unittest.TestCase):
                                         root=root).returncode, 0)
 
 
-class PermissionTests(unittest.TestCase):
+class AntigravityPolicyTests(unittest.TestCase):
     def setUp(self):
-        self.settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
-        self.allow, self.ask, self.deny = (self.settings["permissions"][kind] for kind in ("allow", "ask", "deny"))
+        self.adapter = importlib_module(HOOKS / "agy_hook_adapter.py")
 
-    def test_pushes_always_ask_and_only_fast_forward_main_can_be_pushed(self):
-        self.assertEqual([rule for rule in self.allow if rule.startswith("Bash(git push")], [])
-        for rule in ("Bash(git push)", "Bash(git push *)"):
-            self.assertIn(rule, self.ask)
-        for rule in ("Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push --tags*)",
-                     "Bash(git push origin HEAD*)", "Bash(git push origin worktree-*)",
-                     "Bash(git push origin claude/*)", "Bash(git push -u*)",
-                     "Bash(git checkout -b*)", "Bash(git switch -c*)", "Bash(git worktree add*)",
-                     "Bash(git update-ref*)", "Bash(git add -A*)", "Bash(git add .)",
-                     "Bash(git commit -a*)"):
-            self.assertIn(rule, self.deny)
+    def cmd(self, command: str) -> str:
+        decision, _ = self.adapter.command_policy_decision(command)
+        return decision
 
-    def test_stash_mutations_are_denied_but_its_reads_are_not(self):
-        def denied(command: str) -> bool:
-            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
-                       for rule in self.deny)
+    def mcp(self, server: str, tool: str, arguments: dict | None = None, *, cwd: Path = ROOT) -> str:
+        payload = {
+            "hookEventName": "PreToolUse",
+            "toolCall": {"name": "call_mcp_tool", "args": {"ServerName": server, "ToolName": tool, "Arguments": arguments or {}}},
+            "cwd": str(cwd),
+        }
+        return self.adapter.handle_pre_mcp(payload, ROOT)["decision"]
 
-        for command in ("git stash", "git stash -u", "git stash --include-untracked", "git stash -m wip",
-                        "git stash -- scripts/x.py", "git stash push -u -m tag", "git stash save wip",
-                        "git stash pop", "git stash apply abc1234", "git stash drop stash@{0}", "git stash clear",
-                        "git stash create", "git stash store abc1234", "git stash branch topic"):
-            with self.subTest(mutation=command):
-                self.assertTrue(denied(command))
-        for command in ("git stash list", "git stash list --format=%H", "git stash show", "git stash show -p"):
-            with self.subTest(read=command):
-                self.assertFalse(denied(command))
+    def test_pushes_ask_and_releases_and_credentials_are_denied(self):
+        self.assertEqual(self.cmd("git push"), "ask")
+        self.assertEqual(self.cmd("git push origin main"), "ask")
+        for denied in ("scripts/release.sh", "./scripts/release.sh --tag v3.1.0", "bash scripts/release.sh",
+                       "sudo scripts/release.sh", "git push origin main && scripts/release.sh",
+                       "gh release create v3.1.0", "gh release upload v3.1.0 a.dmg", "hf auth token"):
+            with self.subTest(denied=denied):
+                self.assertEqual(self.cmd(denied), "deny")
+        self.assertEqual(self.cmd("sudo echo hi"), "ask")
+        for allowed in ("python3 scripts/ios_candidate_tag.py", "scripts/dev.sh check",
+                        "git status --short", "git stash list"):
+            with self.subTest(allowed=allowed):
+                self.assertEqual(self.cmd(allowed), "allow")
 
-    def test_releases_generated_project_and_authorization_bound_actions(self):
-        for rule in ("Edit(/QwenVoice.xcodeproj/**)", "Bash(scripts/release.sh*)", "Bash(gh release create*)",
-                     "Bash(gh release upload*)", "Bash(rm -rf build/cache*)"):
-            self.assertIn(rule, self.deny)
-        # iPhone TestFlight candidates are the one tag the lead writes, and only through the vetted script.
-        self.assertEqual([rule for rule in self.allow if "ios_candidate_tag" in rule],
-                         ["Bash(python3 scripts/ios_candidate_tag.py)", "Bash(python3 scripts/ios_candidate_tag.py *)"])
-        self.assertEqual([rule for rule in self.allow if rule.startswith("Bash(git tag")], [])
-        for rule in ("Bash(scripts/macos_test.sh models install*)", "Bash(scripts/macos_test.sh models ensure*)",
-                     "Bash(scripts/ui_test.sh * model-download*)", "Bash(scripts/clean_build_caches.sh*)",
-                     "Bash(scripts/install_pinned_tools.sh*)", "Bash(python3 scripts/publish_benchmark_history.py*)",
-                     "Bash(python3 scripts/benchmark_history.py record*)", "Bash(*scripts/benchmark_history.py record*)",
-                     "Bash(gh workflow run*)", "Bash(git branch -D*)", "Bash(git worktree remove --force*)",
-                     "Bash(git reset --hard*)", "Bash(hf download*)"):
-            self.assertIn(rule, self.ask)
+    def test_authorization_bound_commands_ask(self):
+        for command in (
+            "scripts/macos_test.sh models install", "scripts/macos_test.sh models ensure",
+            "scripts/ui_test.sh macos model-download", "scripts/clean_build_caches.sh --cache macos",
+            "scripts/install_pinned_tools.sh", "python3 scripts/publish_benchmark_history.py",
+            "python3 scripts/benchmark_history.py record a.json",
+            "gh workflow run ci.yml", "gh pr create --title x", "gh issue create --title x",
+            "gh api -X POST repos/o/r/issues", "gh api --method DELETE repos/o/r/issues/1",
+            "git branch -D worktree-old", "git worktree remove --force /tmp/w", "git reset --hard HEAD",
+            "brew install ripgrep", "npm --prefix website install", "swift package update",
+            "vercel deploy", "asc apps list", "defaults write com.qwenvoice.app foo bar",
+        ):
+            with self.subTest(ask=command):
+                self.assertEqual(self.cmd(command), "ask")
 
-    def test_the_failure_issue_script_asks_although_the_ci_scripts_are_allowed(self):
-        """BKL-63 (audit G-2): `Bash(python3 scripts/ci/*)` approved failure_issue.py, which files and comments
-        on GitHub issues, while `gh issue create` itself asks. An ask rule outranks an allow rule."""
-        def matches(command: str, rules: list[str]) -> bool:
-            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
-                       for rule in rules)
-
+    def test_the_failure_issue_script_asks_including_normalized_spellings(self):
         arguments = "--label nightly --title 'Nightly lane failing' --heading 'Nightly run failed'"
-        for command in (f"python3 scripts/ci/failure_issue.py {arguments}",
-                        f"python3 scripts/ci/failure_issue.py --dry-run {arguments}",
-                        f'"$(python3 scripts/select_python.py)" scripts/ci/failure_issue.py {arguments}',
-                        f"./scripts/ci/failure_issue.py {arguments}",
-                        f"RESULTS='{{}}' RUN_URL=x python3 scripts/ci/failure_issue.py {arguments}"):
+        for command in (
+            f"python3 scripts/ci/failure_issue.py {arguments}",
+            f"python3 scripts/ci/./failure_issue.py {arguments}",
+            f'"$(python3 scripts/select_python.py)" scripts/ci/failure_issue.py {arguments}',
+            f"./scripts/ci/failure_issue.py {arguments}",
+            f"RESULTS='{{}}' RUN_URL=x python3 scripts/ci/failure_issue.py {arguments}",
+        ):
             with self.subTest(command=command):
-                self.assertTrue(matches(command, self.ask))
+                self.assertEqual(self.cmd(command), "ask")
         for command in ("python3 scripts/ci/classify_changes.py --base origin/main",
-                        "python3 scripts/ci/summarize_test_failures.py build/x"):
+                        "python3 scripts/ci/summarize_test_failures.py build/x",
+                        "cat scripts/ci/failure_issue.py"):
             with self.subTest(allowed=command):
-                self.assertTrue(matches(command, self.allow))
-                self.assertFalse(matches(command, self.ask))
-        self.assertFalse(matches("cat scripts/ci/failure_issue.py", self.ask))
+                self.assertEqual(self.cmd(command), "allow")
 
-    def test_hugging_face_cli_and_mcp_reads_are_allowed_while_writes_ask_and_the_token_stays_hidden(self):
-        def matches(command: str, rules: list[str], tool: str = "Bash") -> bool:
-            if tool != "Bash":
-                return any(fnmatch.fnmatchcase(command, rule) for rule in rules)
-            return any(rule.startswith("Bash(") and fnmatch.fnmatchcase(command, rule[len("Bash("):-1])
-                       for rule in rules)
-
-        reads = ("hf version", "hf auth whoami", "hf models info Qwen/Qwen3-ForcedAligner-0.6B",
-                 "hf models card nvidia/parakeet-tdt-0.6b-v3", "hf datasets info owner/corpus",
-                 "hf papers read 2609.16989", "hf cache ls", "hf cache verify owner/model")
-        writes = ("hf download owner/model", "hf upload owner/model .", "hf repos create owner/model",
-                  "hf repos delete owner/model", "hf cp ./a hf://owner/model/a", "hf sync ./a hf://buckets/o/b",
-                  "hf jobs run python:3.12 python -c 1", "hf endpoints deploy x", "hf spaces restart owner/space",
-                  "hf collections create Vocello", "hf discussions comment owner/model 1", "hf auth login",
-                  "hf cache rm model/owner/model", "hf skills add owner/skill", "hf update")
-        for command in reads:
+    def test_hugging_face_reads_allow_writes_ask_and_token_denies(self):
+        for command in ("hf version", "hf auth whoami", "hf models info Qwen/Qwen3-ForcedAligner-0.6B",
+                        "hf models card nvidia/parakeet-tdt-0.6b-v3", "hf datasets info owner/corpus",
+                        "hf papers read 2609.16989", "hf cache ls", "hf cache verify owner/model"):
             with self.subTest(read=command):
-                self.assertTrue(matches(command, self.allow))
-                self.assertFalse(matches(command, self.ask) or matches(command, self.deny))
-        for command in writes:
+                self.assertEqual(self.cmd(command), "allow")
+        for command in ("hf download owner/model", "hf upload owner/model .", "hf repos create owner/model",
+                        "hf cp ./a hf://owner/model/a", "hf sync ./a hf://buckets/o/b",
+                        "hf jobs run python:3.12 python -c 1", "hf endpoints deploy x",
+                        "hf spaces restart owner/space", "hf collections create Vocello",
+                        "hf discussions comment owner/model 1", "hf auth login",
+                        "hf cache rm model/owner/model", "hf skills add owner/skill", "hf update"):
             with self.subTest(write=command):
-                self.assertTrue(matches(command, self.ask))
-                self.assertFalse(matches(command, self.allow))
-        self.assertTrue(matches("hf auth token", self.deny))
-        # The huggingface-skills plugin's own MCP server (2026-11-02); the standalone
-        # hf-mcp-server is gone, so no rule may still name it.
-        server = "mcp__plugin_huggingface-skills_huggingface-skills__"
+                self.assertEqual(self.cmd(command), "ask")
+        self.assertEqual(self.cmd("hf auth token"), "deny")
         for tool in ("hf_fs", "hub_repo_search", "hub_repo_details", "hf_whoami"):
-            self.assertIn(server + tool, self.allow)
-            self.assertFalse(matches(server + tool, self.ask, tool="mcp"))
+            self.assertEqual(self.mcp("huggingface", tool), "allow")
         for tool in ("dynamic_space", "gr1_z_image_turbo_generate"):
-            self.assertTrue(matches(server + tool, self.ask, tool="mcp"), tool)
-        for rules in (self.allow, self.ask, self.deny):
-            self.assertFalse([rule for rule in rules if rule.startswith("mcp__hf-mcp-server__")])
+            self.assertEqual(self.mcp("huggingface", tool), "ask")
 
-    def test_unsupported_destination_and_ui_driving_tools_are_denied_but_device_tools_are_not(self):
-        server = "mcp__MobileBuildMCP__"
-        denied = [server + name for name in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",
-                                             f"test{SIM_SUFFIX}", f"list{SIM_SUFFIX}s", f"record{SIM_SUFFIX}_video",
-                                             f"get{SIM_SUFFIX}_app_path", f"install_app{SIM_SUFFIX}",
-                                             f"launch_app{SIM_SUFFIX}", f"open{SIM_SUFFIX}", f"stop_app{SIM_SUFFIX}",
-                                             "screenshot", "snapshot_ui", "clean", "tap")]
-        denied.append(f"mcp__XcodeBuildMCP__debug_attach{SIM_SUFFIX}")
-        denied += [f"mcp__Claude_Code_iOS_{SIM}__control", f"mcp__Claude_Code_iOS_{SIM}__build"]
-        retained = [server + name for name in ("list_schemes", "discover_projs", "show_build_settings",
-                                               "get_coverage_report", "session_show_defaults")]
-        retained += ["mcp__XcodeBuildMCP__build_device", "mcp__XcodeBuildMCP__test_macos",
-                     "mcp__claude-in-chrome__computer", "mcp__sosumi__searchAppleDocumentation",
-                     "mcp__Claude_Browser__navigate", "mcp__computer-use__request_access",
-                     "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot"]
-        patterns = [rule for rule in self.deny if rule.startswith("mcp__")]
-        for name in denied:
-            with self.subTest(denied=name):
-                self.assertTrue(any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns))
-        for name in retained:
-            with self.subTest(retained=name):
-                self.assertFalse(any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns))
-        for rule in (*self.allow, *self.ask):
-            self.assertIsNone(re.search(r"_sims?($|_)", rule), rule)
-        for agent in ("simulator-tester", "test-runner", "test-debugger"):
-            self.assertIn(f"Agent(axiom:{agent})", self.deny)
-
-    def test_worktrees_follow_local_head_and_allowed_scripts_exist(self):
-        self.assertEqual(self.settings["worktree"], {"baseRef": "head"})
-        self.assertNotIn("EnterWorktree", self.deny)
-        self.assertFalse([rule for rule in self.deny if rule.startswith(("Agent(Explore", "Agent(general"))])
-        for rule in ("Bash(git worktree remove .claude/worktrees/*)", "Bash(git merge --ff-only worktree-*)",
-                     "Bash(git branch -d worktree-*)", "Bash(git merge --ff-only claude/*)",
-                     "Bash(git branch -d claude/*)", "Bash(git cherry-pick *)"):
-            self.assertIn(rule, self.allow)
-        for rule in self.allow:
-            words = rule[len("Bash("):-1].split() if rule.startswith("Bash(") else []
-            if words[:1] == ["python3"] and len(words) > 1:
-                words = words[1:]
-            if words and words[0].removeprefix("./").startswith("scripts/"):
-                with self.subTest(rule=rule):
-                    self.assertTrue(list(ROOT.glob(words[0].removeprefix("./"))), rule)
+    def test_mcp_guard_denies_simulators_cua_driver_and_mobilebuild_writes(self):
+        for tool in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",
+                     f"test{SIM_SUFFIX}", f"list{SIM_SUFFIX}s", f"record{SIM_SUFFIX}_video",
+                     f"get{SIM_SUFFIX}_app_path", f"install_app{SIM_SUFFIX}",
+                     f"launch_app{SIM_SUFFIX}", f"open{SIM_SUFFIX}", f"stop_app{SIM_SUFFIX}",
+                     "screenshot", "snapshot_ui", "clean", "tap", "build_macos", "test_device"):
+            with self.subTest(denied_mobilebuild=tool):
+                self.assertEqual(self.mcp("mobilebuildmcp", tool), "deny")
+        self.assertEqual(self.mcp("mobilebuildmcp", "session_set_defaults", {"persist": True}), "deny")
+        self.assertEqual(self.mcp("mobilebuildmcp", "session_set_defaults", {"persist": False}), "allow")
+        for tool in ("list_schemes", "discover_projs", "show_build_settings",
+                     "get_coverage_report", "session_show_defaults"):
+            with self.subTest(allowed_mobilebuild=tool):
+                self.assertEqual(self.mcp("mobilebuildmcp", tool), "allow")
+        for tool in ("list_apps", "click", "get_desktop_state", "browser_navigate"):
+            with self.subTest(denied_cua=tool):
+                self.assertEqual(self.mcp("cua-driver_cua-driver", tool), "deny")
+        self.assertEqual(self.mcp("axiom", "axiom_xcui_tap"), "deny")
+        for agent in (f"{SIM.lower()}-tester", "test-runner", "test-debugger"):
+            self.assertEqual(self.mcp("axiom", "axiom_get_agent", {"name": agent}), "deny")
+        self.assertEqual(self.mcp("axiom", "axiom_xcsym_crash"), "allow")
+        self.assertEqual(self.mcp("sosumi", "searchAppleDocumentation"), "allow")
 
 
 class SimulatorToolGuardTests(unittest.TestCase):
@@ -766,18 +708,14 @@ class ConnectorWriteGuardTests(unittest.TestCase):
     """BKL-62: a GitHub connector write asks or is blocked whatever the connector's server name."""
 
     def setUp(self):
-        settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
-        self.permissions = settings["permissions"]
-        self.mcp_hooks = [hook["command"] for entry in settings["hooks"]["PreToolUse"]
-                          if matches(entry["matcher"], "mcp__x__push_files") for hook in entry["hooks"]]
+        self.adapter = importlib_module(HOOKS / "agy_hook_adapter.py")
 
     def guard(self, tool_name, *, agent=False):
         payload = {"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": {}, "cwd": str(ROOT),
                    **({"agent_id": "agent-1"} if agent else {})}
-        # Every hook the settings wire to the tool, as Claude Code runs them.
-        return [subprocess.run(["bash", "-c", command], input=json.dumps(payload), text=True, capture_output=True,
-                               cwd=ROOT, timeout=20, env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
-                for command in self.mcp_hooks]
+        return [subprocess.run(["python3", str(HOOKS / "connector_write_guard.py")],
+                               input=json.dumps(payload), text=True, capture_output=True,
+                               cwd=ROOT, timeout=20)]
 
     @staticmethod
     def decision(results):
@@ -817,21 +755,14 @@ class ConnectorWriteGuardTests(unittest.TestCase):
                                         capture_output=True, timeout=20)
                 self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
 
-    def test_the_ask_rules_name_the_writes_under_any_server_and_no_read(self):
-        rules = [rule for rule in self.permissions["ask"] if rule.startswith("mcp__")]
-        for server in GITHUB_SERVERS:
+    def test_antigravity_adapter_asks_on_github_writes_and_allows_reads(self):
+        for server in ("github", "0f1e2d3c-4b5a-4697-8877-665544332211"):
             for tool, write in GITHUB_CONNECTOR_TOOLS.items():
-                with self.subTest(tool=server + tool):
-                    self.assertEqual(any(fnmatch.fnmatchcase(server + tool, rule) for rule in rules), write)
-                    self.assertFalse(any(fnmatch.fnmatchcase(server + tool, rule)
-                                         for rule in (*self.permissions["allow"], *self.permissions["deny"])))
-        self.assertFalse([rule for rule in rules if rule.startswith("mcp__claude_ai_Github__")])
-        guard = importlib_module(HOOKS / "connector_write_guard.py")
-        for rule in rules:
-            if rule.startswith("mcp__*__"):
-                with self.subTest(rule=rule):
-                    tool = rule[len("mcp__*__"):]
-                    self.assertTrue(tool == "*_write" or tool in guard.GITHUB_WRITE_TOOLS, rule)
+                with self.subTest(server=server, tool=tool):
+                    payload = {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": server, "ToolName": tool}},
+                               "cwd": str(ROOT)}
+                    decision = self.adapter.handle_pre_mcp(payload, ROOT)["decision"]
+                    self.assertEqual(decision, "ask" if write else "allow")
 
 
 class PolicyGuardTests(unittest.TestCase):
@@ -1479,7 +1410,7 @@ class ReviewTrailerLintTests(unittest.TestCase):
                     self.assertIn(f"`{self.TRAILER}`", advice)
                     self.assertIn("vocello-swift-review agent", advice)
             # The trailer the hook asks for is the one the reviewer and the workflow tell the lead to record.
-            for document in (".claude/agents/vocello-swift-review.md", "docs/reference/development-workflow.md"):
+            for document in (".agents/plugins/vocello/agents/vocello-swift-review.md", "docs/reference/development-workflow.md"):
                 with self.subTest(document=document):
                     self.assertIn(f"`{self.TRAILER}`", (ROOT / document).read_text(encoding="utf-8"))
 
@@ -1680,33 +1611,35 @@ class WorktreeCommitLintTests(unittest.TestCase):
     commit = "git com" "mit -m x"
 
     def test_agent_worktree_on_its_branch_may_commit(self):
-        agent = self.worktree(".claude/worktrees/agent-1", "worktree-agent-1")
+        agent = self.worktree("wt/agent-1", "subagent-agent-1")
         self.stage(agent)
         result = self.lint(self.commit, agent)
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self.lint("git -C .claude/worktrees/agent-1 com" "mit -m x", self.root)
+        result = self.lint("git -C wt/agent-1 com" "mit -m x", self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_desktop_session_worktree_on_its_claude_branch_may_commit(self):
-        side = self.worktree(".claude/worktrees/side-1", "claude/side-1")
+    def test_swarm_worktree_on_its_branch_may_commit_but_never_push(self):
+        side = self.worktree("wt/swarm-1", "swarm-worker-1")
         self.stage(side)
         result = self.lint(self.commit, side)
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self.lint("git push origin claude/side-1", side)
+        result = self.lint("git push origin swarm-worker-1", side)
         self.assertEqual(result.returncode, 2, result.stderr)
 
-    def test_retired_codex_branches_cannot_commit_in_a_linked_worktree(self):
-        legacy = self.worktree(".claude/worktrees/legacy", "codex/legacy")
-        self.stage(legacy)
-        result = self.lint(self.commit, legacy)
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("worktree-* or claude/* branch", result.stderr)
+    def test_retired_legacy_branches_cannot_commit_in_a_linked_worktree(self):
+        for branch in ("codex/legacy", "claude/legacy"):
+            with self.subTest(branch=branch):
+                legacy = self.worktree(f"wt/{branch.replace('/', '-')}", branch)
+                self.stage(legacy)
+                result = self.lint(self.commit, legacy)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("subagent-*, swarm-* or worktree-* branch", result.stderr)
 
     def test_wrong_branch_and_unrelated_repository_worktrees_are_blocked(self):
         checkout = self.worktree("wt/wrong-branch", "topic")
         result = self.lint(self.commit, checkout)
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("worktree-* or claude/* branch", result.stderr)
+        self.assertIn("subagent-*, swarm-* or worktree-* branch", result.stderr)
         unrelated = self.root.parent / "unrelated repository"
         initialize_repo(unrelated)
         foreign = unrelated.parent / "foreign agent"
@@ -1807,7 +1740,7 @@ class SessionStartTests(unittest.TestCase):
                                                 env=dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}"),
                                                 capture_output=True, text=True, timeout=15)
                         self.assertEqual(result.returncode, 0, result.stderr)
-                        self.assertIn("CLAUDE.md: Start here", result.stdout)
+                        self.assertIn("AGENTS.md: Start here", result.stdout)
                         self.assertIn("local-status", result.stdout)
                         self.assertIn("Checkpoint", result.stdout)
                         self.assertIn("cache health: ", result.stdout)
@@ -1953,74 +1886,78 @@ class ProjectSkillTests(unittest.TestCase):
     SKILLS = {"vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",
               "vocello-benchmark", "vocello-debug", "vocello-release-readiness"}
 
-    def test_skills_use_claude_discovery_and_supported_metadata(self):
-        skills = sorted((ROOT / ".claude/skills").glob("*/SKILL.md"))
+    def test_skills_use_antigravity_plugin_discovery_and_supported_metadata(self):
+        skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
         self.assertEqual({p.parent.name for p in skills}, self.SKILLS)
         for path in skills:
             with self.subTest(skill=path.parent.name):
                 metadata = frontmatter(path)
-                self.assertTrue({"name", "description", "argument-hint"} <= set(metadata))
-                self.assertTrue(set(metadata) <= {"name", "description", "argument-hint", "disable-model-invocation"})
+                self.assertEqual(set(metadata), {"name", "description"})
                 self.assertEqual(metadata["name"], path.parent.name)
                 self.assertTrue(metadata["description"])
-                self.assertTrue(metadata["argument-hint"].strip('"'))
-                # Local validation is authorized, so no skill is hidden from the model.
-                self.assertIn(metadata.get("disable-model-invocation", "false"), ("false",))
                 body = path.read_text(encoding="utf-8")
-                self.assertIn("$ARGUMENTS", body)
+                self.assertNotIn("$ARGUMENTS", body)
                 self.assertIn("scripts/", body)
                 self.assertEqual([p.name for p in path.parent.iterdir()], ["SKILL.md"])
 
 
 class SubagentTests(unittest.TestCase):
-    WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"}
+    WRITE_TOOLS = {"edit_file", "write_file", "invoke_subagent", "swarm", "Edit", "Write"}
 
-    def test_project_subagents_are_read_only_and_inherit_the_selected_model(self):
-        agents = sorted((ROOT / ".claude/agents").glob("*.md"))
+    def test_project_subagents_are_read_only_antigravity_definitions(self):
+        agents = sorted((PLUGIN / "agents").glob("*.md"))
         self.assertEqual({p.stem for p in agents}, {"vocello-swift-review", "vocello-xcresult-triage"})
         for path in agents:
             with self.subTest(agent=path.stem):
                 metadata = frontmatter(path)
                 self.assertEqual(metadata["name"], path.stem)
                 self.assertTrue(metadata["description"])
-                self.assertEqual(metadata["model"], "inherit")
-                tools = {tool.strip() for tool in metadata["tools"].split(",")}
+                self.assertEqual(metadata["subagent"], "true")
+                self.assertEqual(metadata["mainAgent"], "false")
+                tools = {tool.strip() for tool in metadata["tools"].strip("[]").split(",") if tool.strip()}
                 self.assertFalse(tools & self.WRITE_TOOLS)
-                self.assertTrue({"Read", "Grep", "Glob"} <= tools)
-                for key in ("isolation", "permissionMode", "memory", "hooks", "mcpServers"):
-                    self.assertNotIn(key, metadata)
+                self.assertIn("read_file", tools)
                 if path.stem == "vocello-swift-review":
-                    self.assertNotIn("Bash", tools)
+                    self.assertNotIn("run_command", tools)
 
 
 class RuleTests(unittest.TestCase):
     RULES = {"native.md": "docs/reference/native-engineering.md",
              "tooling.md": "docs/reference/tooling-and-evidence.md"}
 
-    def test_domain_guidance_is_linked_and_path_scoped(self):
-        instructions = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-        self.assertTrue(instructions.startswith("# CLAUDE.md\n"))
+    def test_domain_guidance_is_glob_scoped_and_under_size_budget(self):
+        manifest = json.loads((PLUGIN / "plugin.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["name"], "vocello")
+        instructions = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertTrue(instructions.startswith("# AGENTS.md\n"))
+        self.assertLess(len(instructions.encode("utf-8")), 24000)
         tracked = set(subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True,
                                      check=True).stdout.splitlines())
         for rule, relative in self.RULES.items():
             with self.subTest(rule=rule):
                 self.assertIn(relative, instructions)
-                link = ROOT / ".claude/rules" / rule
-                self.assertTrue(link.is_symlink())
-                self.assertEqual(link.resolve(), (ROOT / relative).resolve())
-                patterns = [line.strip()[2:].strip().strip('"')
-                            for line in frontmatter(ROOT / relative)["paths"].splitlines() if line.strip()]
+                rule_path = PLUGIN / "rules" / rule
+                self.assertTrue(rule_path.is_file())
+                meta = frontmatter(rule_path)
+                self.assertEqual(meta["trigger"], "glob")
+                patterns = [p.strip() for p in meta["globs"].strip('"').split(",") if p.strip()]
                 self.assertTrue(patterns)
                 for pattern in patterns:
+                    rel_pattern = pattern.removeprefix("**/")
                     with self.subTest(pattern=pattern):
-                        self.assertTrue(any(fnmatch.fnmatch(name, pattern) for name in tracked), pattern)
-        self.assertEqual({p.name for p in (ROOT / ".claude/rules").iterdir()}, set(self.RULES))
-        website = (ROOT / "website/CLAUDE.md").read_text(encoding="utf-8")
-        self.assertIn("../CLAUDE.md", website)
+                        self.assertTrue(any(fnmatch.fnmatch(name, rel_pattern) for name in tracked)
+                                        or rel_pattern in ("AGENTS.md", ".agents/**"), pattern)
+                self.assertIn(relative, rule_path.read_text(encoding="utf-8"))
+        self.assertEqual({p.name for p in (PLUGIN / "rules").iterdir()}, set(self.RULES))
+        website = (ROOT / "website/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("../AGENTS.md", website)
+        self.assertLess(len(website.encode("utf-8")), 24000)
 
-    def test_retired_codex_harness_is_not_tracked(self):
-        tracked = subprocess.run(["git", "ls-files", "--", ".codex", ".agents", "AGENTS.md", "website/AGENTS.md"],
-                                 cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+    def test_retired_legacy_harnesses_are_not_tracked(self):
+        tracked = subprocess.run(
+            ["git", "ls-files", "--", ".claude", ".codex", "CLAUDE.md", "website/CLAUDE.md"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
         self.assertEqual([name for name in tracked if (ROOT / name).exists()], [])
 
 

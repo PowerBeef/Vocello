@@ -688,8 +688,6 @@
     {"file": "scripts/voice_identity_language_reliability.py", "code": "reportArgumentType", "fingerprint": "c24aa8266bc37c35", "count": 1},
     {"file": "scripts/voice_identity_language_reliability.py", "code": "reportArgumentType", "fingerprint": "c8d25374310eb0de", "count": 1},
     {"file": "scripts/voice_identity_language_reliability.py", "code": "reportArgumentType", "fingerprint": "d2f9d1f28d0b9581", "count": 1},
-    {"file": "scripts/voice_identity_language_reliability.py", "code": "reportOptionalMemberAccess", "fingerprint": "906177e23a2459d0", "count": 1},
-    {"file": "scripts/workflow_diagnostics.py", "code": "reportArgumentType", "fingerprint": "f5a9f5891e20d48a", "count": 1},
-    {"file": "scripts/workflow_diagnostics.py", "code": "reportCallIssue", "fingerprint": "f5a9f5891e20d48a", "count": 1}
+    {"file": "scripts/voice_identity_language_reliability.py", "code": "reportOptionalMemberAccess", "fingerprint": "906177e23a2459d0", "count": 1}
   ]
 }

@@ -265,10 +265,11 @@ class LintTests(unittest.TestCase):
 
 class PythonSelectionTests(unittest.TestCase):
     def test_agent_configuration_selects_agent_hook_tests_even_when_added_or_deleted(self) -> None:
-        for path in (".claude/settings.json", ".claude/skills/vocello-ios-validation/SKILL.md",
-                     ".claude/agents/vocello-xcresult-triage.md", ".claude/rules/native.md",
-                     "docs/reference/tooling-and-evidence.md", ".claude/removed.yaml",
-                     ".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md"):
+        for path in (".agents/hooks.json", ".agents/plugins/vocello/skills/vocello-ios-validation/SKILL.md",
+                     ".agents/plugins/vocello/agents/vocello-xcresult-triage.md",
+                     ".agents/plugins/vocello/rules/native.md",
+                     "docs/reference/tooling-and-evidence.md", ".agents/removed.yaml",
+                     ".claude/settings.json", ".codex/hooks.json"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")
@@ -364,7 +365,7 @@ class PythonSelectionTests(unittest.TestCase):
             self.assertEqual(MODULE.python_test_selection(["config/orphan.json"], root=root)["mode"], "full")
 
     def test_instruction_changes_do_not_select_python(self) -> None:
-        for path in ("CLAUDE.md", "website/CLAUDE.md", "docs/reference/development-workflow.md"):
+        for path in ("AGENTS.md", "website/AGENTS.md", "docs/reference/development-workflow.md"):
             with self.subTest(path=path):
                 self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 

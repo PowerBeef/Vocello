@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-15
+reviewed: 2026-11-20
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -21,7 +21,7 @@ Local verification is fast and advisory; CI on `main` is the gate. Nothing block
 ## New Mac setup
 
 A fresh clone contains the whole project: source, the tracked Xcode project and schemes, contracts,
-scripts, CI, `CLAUDE.md` and the Claude Code configuration. What it cannot contain is the machine:
+scripts, CI, `AGENTS.md` and the Antigravity configuration. What it cannot contain is the machine:
 Xcode and its downloadable components, command-line tools, Python and Node toolchains, credentials,
 signing identities, privacy grants, downloaded models and caches. This guide sets those up in order.
 Versions are never repeated here; `config/toolchain.json` is the pin authority and the commands below
@@ -103,7 +103,7 @@ venvs under `build/cache/qc/runtimes/`, never in this interpreter; see [`qc.md`]
 
 ```sh
 npm --prefix website ci
-npx --prefix website playwright install --with-deps chromium webkit  # as CI and website/CLAUDE.md do
+npx --prefix website playwright install --with-deps chromium webkit  # as CI and website/AGENTS.md do
 npm --prefix website run check
 ```
 
@@ -126,7 +126,7 @@ another Playwright version counts and Playwright itself names the revision it wa
 
 Set a global identity (`git config --global user.name …` and `user.email …`) and do not add a
 repository-local override. HTTPS credentials come from `gh auth login` or the macOS keychain. There
-are no Git hooks, submodules or LFS files; the guards are supplementary Claude Code hooks. Release tags must be
+are no Git hooks, submodules or LFS files; the guards are supplementary Antigravity hooks. Release tags must be
 signed and GitHub-verified (`git tag -s`), so configure a signing key only if you cut releases
 ([`macos-release-qa.md`](macos-release-qa.md)).
 
@@ -165,43 +165,45 @@ Never copy `build/` from another machine; rebuild it.
   (`scripts/ios_device.sh device-state`). With the Apple ID signed in under Xcode → Settings →
   Accounts, the first `scripts/ios_device.sh build` creates the team development provisioning profile.
 
-### 8. Claude Code
+### 8. Antigravity
 
-Open the clone with `claude` at the repository root and trust the workspace; Claude Code reads
-`CLAUDE.md`. The tracked `.claude/settings.json` holds the supplementary hooks, permissions and
-`worktree.baseRef`; skills live in `.claude/skills`, read-only agents in `.claude/agents` and the
-path-scoped rules in `.claude/rules`. Check `/hooks` and `/permissions` in the first session and follow
-the [fresh-session procedure](#claude-code-setup-and-tool-routing).
-Personal overrides go in the untracked `.claude/settings.local.json`; do not change global trust or
-settings automatically. Agent worktrees under `.claude/worktrees` stay untracked. The Claude desktop
-app's Code tab runs the same Claude Code with the same hooks, permissions, skills and agents: open
-the lead session on the repository folder itself, without a worktree
-([The Claude desktop app](#the-claude-desktop-app)).
+Open the clone in Antigravity at the repository root; Antigravity automatically discovers `AGENTS.md`,
+`website/AGENTS.md` (when touching website files), `.agents/hooks.json` and the workspace plugin
+under `.agents/plugins/vocello/` (glob-triggered domain rules, six `vocello-*` skills and two
+read-only subagents). Verify hooks and discovery in a fresh session following the
+[fresh-session procedure](#antigravity-setup-and-tool-routing).
 
 `scripts/dev.sh doctor --json` inventories prerequisites without installing anything, downloading
-models or touching devices: tools and their pins, the selected Python and its test packages, and
-Playwright's browser builds for the website check. Detect MCP tools in the live session.
+models or touching devices: tools and their pins, the selected Python and its test packages,
+Playwright's browser builds for the website check and the repository's Antigravity harness files.
+Detect MCP tools in the live session.
 
-The maintainer's toolset is optional assistance, never a CI dependency. The list below is the
-repository-relevant part as of 2026-11-02; the desktop app and the maintainer's account add other
-plugins, connectors and skills that this workflow does not use, so detect tools in the live session
-rather than from this list:
+The maintainer's global Antigravity toolset is optional assistance, never a CI dependency. Detect
+tools in the live session rather than assuming installation means connection:
 
-- **Plugins:** axiom, context7, swift-lsp, clangd-lsp, chrome-devtools-mcp, skill-creator,
-  claude-md-management, asc and huggingface-skills (25 skills and its own Hugging Face MCP server).
-- **MCP servers:** MobileBuildMCP and sosumi.
-- **Skills:** the swift-mlx skills.
-- **Desktop app:** the Claude desktop app's Code tab, with its browser pane and Terminal panel.
-- **Browser and connectors:** Claude in Chrome and the claude.ai GitHub connector.
+- **MCP servers:** `axiom` (skills, read-only auditors, `xcsym`, `xcprof`, `xclog`), `mobilebuildmcp`
+  (discovery and coverage only; Simulator, build and UI tools are denied by `.agents/hooks.json`),
+  `sosumi`, `context7_context7` and `huggingface` (`hf_fs`, `hub_repo_search`, `hub_repo_details`,
+  `hf_whoami`; Space-running tools ask).
+- **Plugins & skills:** `asc` (App Store Connect CLI skills and rule), `chrome-devtools-plugin`
+  (browser/a11y/perf debugging), `axiom` and `mobilebuildmcp` skills. `cua-driver` is denied in
+  Vocello (UI checks are XCUITest-only); `vercel-plugin` does not authorize direct CLI deploys
+  (Vercel deploys from Git).
+- **Built-in surfaces:** the `browser` subagent for local website inspection and `invoke_subagent` /
+  `swarm` for bounded parallel work.
 - **CLIs:** `hf`, `asc` and `gh`.
+- **Terminal sandbox:** Antigravity's default sandbox hides host paths outside the repository.
+  Allowlist read access to `~/.qwenvoice-pinned-tools`, `~/Library/Python`,
+  `~/Library/Caches/ms-playwright` and `~/Library/Application Support/QwenVoice`, plus read/write
+  access to `~/Library/Caches/Vocello` (`native-build.lock`), so deterministic checks run smoothly
+  inside the sandbox; commands needing Xcode, CoreDevice, Keychain or network run outside the sandbox
+  with prefix-matchable command shapes.
 
-The Vercel, Unity and playground plugins are uninstalled, and the standalone `hf-mcp-server` and the
-claude.ai Hugging Face connector are removed (2026-11-02). Hugging Face work goes through the
-huggingface-skills plugin's skills and MCP tools and the `hf` CLI (signed in as the maintainer). Use
-existing plugins when connected; no duplicate servers or automatic global installs. Uninstall an unwanted plugin rather than disabling it in settings.
 `.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
 with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
-canonical builds and host serialization. Native UI evidence comes only from XCUITest.
+canonical builds and host serialization, and `.agents/hooks.json` hard-denies Simulator, build, UI
+and `persist: true` calls even if global MCP environment variables expose extra workflows. Native UI
+evidence comes only from XCUITest.
 
 For a symbol server, `buildServer.json` is ignored because it holds machine paths. The swift-lsp
 plugin's sourcekit-lsp reads it for the LSP tool. When explicitly setting up an installed
@@ -280,11 +282,11 @@ be missed locally; the Linux CI job still runs the whole suite.
 
 ## The commit lint
 
-`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires branch `main` in the main
-checkout, or a `worktree-*` (agent) or `claude/*` (desktop side session) branch in a registered
-linked worktree; pushes only from `main` in the main checkout; a whitespace-clean staged diff
-(`git diff --cached --check`); and a clean `scripts/privacy_scan.py --staged` (no developer home path,
-no credential-shaped token, no key file). It never builds or tests.
+`scripts/hooks/commit_lint.sh` (invoked via `.agents/hooks.json` and `agy_hook_adapter.py`) requires
+branch `main` in the main checkout, or a `subagent-*`, `swarm-*` or `worktree-*` branch in a
+registered linked worktree; pushes only from `main` in the main checkout; a whitespace-clean staged
+diff (`git diff --cached --check`); and a clean `scripts/privacy_scan.py --staged` (no developer home
+path, no credential-shaped token, no key file). It never builds or tests.
 
 Two checks only advise. Each returns a warning, never a block, and a message the hook cannot read
 (an editor, a computed or reused message) skips it:
@@ -502,11 +504,10 @@ selects its image's newest Xcode 27 instead.
 
 ## Operating defaults
 
-`CLAUDE.md` owns the working agreement: the edit-verify-commit loop, push and authorization rules and
+`AGENTS.md` owns the working agreement: the edit-verify-commit loop, push and authorization rules and
 the review routing. `native-engineering.md` (Swift/runtime) and `tooling-and-evidence.md` (contracts,
-CI, debugging, benchmarks, release) are path-scoped rules: their `paths:` front matter loads them
-through the `.claude/rules` symlinks when matching files are touched. Read them directly when
-planning.
+CI, debugging, benchmarks, release) are referenced by glob-triggered domain rules under
+`.agents/plugins/vocello/rules/` when matching files are touched. Read them directly when planning.
 
 The Swift review (`vocello-swift-review`) checks the policy boundaries, then test adequacy for every
 behavioural change: a test that fails when the fix is reverted, fakes that reach the changed code,
@@ -519,159 +520,75 @@ warns, never blocks, when a commit of Swift under `Sources/QwenVoiceCore`, `Sour
 `Sources/Services`, `Sources/ViewModels` or `Packages/*/Sources` lacks it.
 
 A script's structural permission to push `main` is not conversational authorization: pushes still
-need the explicit request `CLAUDE.md` requires. Preserve the original failure and investigate it
+need the explicit request `AGENTS.md` requires. Preserve the original failure and investigate it
 before a rerun; record the reason and the new run ID.
 
 ## Parallel agents and worktrees
 
 Use selective parallelism for disjoint editing, research, review or triage. At most four agents may be
-active including the lead, inheriting the selected model; desktop app side sessions count. The limit
-is an instruction, not a hook cap: a cap would count a subagent that died without SubagentStop as
-active until its session ends. Run one full Python suite and one browser acceptance run at a time on
-the 16 GB development host. Agents stay code-only; the lead owns native builds and every measured
-lane.
+active including the lead, inheriting the selected model for editing work (read-only research subagents
+may use a lighter model). Run one full Python suite and one browser acceptance run at a time on the
+16 GB development host. Subagents stay code-only; the lead owns native builds and every measured lane.
 
-**Agents.** Create editing agents with the Agent tool and `isolation: "worktree"`. Claude Code creates
-`.claude/worktrees/<name>` on branch `worktree-<name>` from local HEAD (`worktree.baseRef: head` in
-`.claude/settings.json`), so commit the lead checkpoint first: dirty files do not carry over. An
-unchanged agent worktree is removed automatically. Inspect Git metadata and commit identity; a
-directory name is not proof of repository identity. Give each worker a disjoint file set and clear
-validation limits. Agents make scoped commits on their `worktree-*` branch and never push, edit the
-roadmap or checkpoint, or run models, devices, native UI or native builds. Hand-made branches and
-worktrees stay denied.
+**Subagents and swarms.** Create editing subagents with `invoke_subagent(..., Workspace: "share")` (or
+`swarm(..., workspace: "share")`). Antigravity creates a registered linked worktree under
+`~/.gemini/antigravity/worktrees/<conversation-id>/subagent-*` on a `subagent-*` (or `swarm-*`) branch
+from local HEAD, so commit the lead checkpoint first: dirty files do not carry over. Inspect Git
+metadata and commit identity; a directory name is not proof of repository identity. Give each worker a
+disjoint file set and clear validation limits. Subagents make scoped commits on their branch and never
+push, edit the roadmap or checkpoint, or run models, devices, native UI or native builds. Hand-made
+branches and worktrees stay denied. Read-only subagents (`Workspace: "inherit"`) share the main
+checkout unscreened, so their prompt must state that they edit nothing.
 
-**Side sessions.** The Claude desktop app adds sessions the lead starts (`start_session`) or the
-maintainer opens, each with its own transcript. They follow the agent rules, and the lead stays in
-the main checkout. A read-only side session (CI or release watching, triage, research) shares the main
-checkout (`use_worktree: false`) and may use a cheaper model, and its brief says it edits nothing.
-Agents and editing side sessions inherit the lead's model. An
-editing side session gets the app's own worktree (`use_worktree: true`): `.claude/worktrees/<name>`
-on `claude/<name>`, cut from local HEAD, so commit the checkpoint first. Keep the Code tab's default
-branch prefix `claude` and its in-project worktree location. Without `use_worktree`, a side session of
-a lead in a plain folder shares that folder, where no guard can tell it from the lead.
-
-**Guards.** The SubagentStart hook repeats the agent rules to every subagent, and the SessionStart
-hook tells a session that starts in a linked worktree that it is a side session. `agent_guard.py`
-screens every call whose hook input carries `agent_id` (only a subagent's does) or whose `cwd` is a
-linked worktree (a side session, or a lead that `cd`s into a worktree until it leaves). It refuses
-pushes, commits in the main checkout, native builds and tests, device, model and measured-lane
-scripts (sourcing a lane script or a `scripts/lib` shell library included, since that leaves `build`
-or `xcb_run` callable by bare name) and writes to the roadmap files or `docs/development-progress.md`
-through an edit tool, `roadmap.py`'s writing verbs or a recognisable shell or inline-script write. It
-is a guardrail, not a sandbox. The commit lint accepts the `worktree-*` and `claude/*` branches there.
+**Guards.** `agy_hook_adapter.py` prepends the agent rules on `SessionStart` when a session starts in a
+linked worktree, and `agent_guard.py` screens every call whose `cwd` is a linked worktree. It refuses
+pushes, commits in the main checkout, native builds and tests, device, model and measured-lane scripts
+(sourcing a lane script or a `scripts/lib` shell library included) and writes to the roadmap files or
+`docs/development-progress.md`. It is a guardrail, not a sandbox. The commit lint accepts `subagent-*`,
+`swarm-*` and `worktree-*` branches there.
 
 **Integration.** The lead reviews each commit, integrates with `git cherry-pick` or
 `git merge --ff-only`, and validates the combined result on the warm main cache. Do not edit scripts
-used by a running lane. Archive an integrated side session in the app. Remove an integrated worktree
-with `git worktree remove .claude/worktrees/<name>` and its branch with `git branch -d`, preserving
-needed ignored evidence first; never discard unintegrated work to tidy the workspace (`--force` and
+used by a running lane. Note that `manage_subagents kill` does not delete `Workspace: "share"`
+worktrees or branches: after integration, remove the worktree with `git worktree remove <path>` and its
+branch with `git branch -d <branch>` (preserving needed ignored evidence first; `--force` and
 `git branch -D` ask first). A cherry-picked branch is never merged, so `-d` refuses it: when
 `git cherry main <branch>` prints only `-` lines, every commit is on `main` and `-D` loses nothing.
 
-**Worker tracking.** Before source-bound measurements join or stop all delegated work.
-`scripts/active_workers.py` uses the SessionStart/SubagentStart/SubagentStop/SessionEnd hook events,
-host-wide leases and the live start identity of the native `claude` process. Dead, reused-PID and
-non-Claude ownership records (including retired Codex leases and Node-hosted clients) cannot establish
-activity. Unknown ownership blocks measurements; a locked Git worktree may be idle and is never
-counted. Another live session in this repository (a desktop side session, a second terminal) counts
-like a worker: `active_workers.py check` reports `other-sessions(N)` and the lane waits until those
-sessions are stopped or archived; `--agents-allowed` lanes tolerate them. Root interruption or
-teardown does not prove workers stopped, so live worker leases remain conservative.
+**Worker tracking.** Antigravity does not expose `SubagentStart`/`SubagentStop`/`SessionEnd` hooks or
+`CLAUDE_ENV_FILE`, and the default terminal sandbox blocks `ps`. Before any source-bound measurement,
+join or stop every subagent and swarm worker (`manage_subagents list`, `swarm status`), confirm no
+other sessions are active in this repository, and explicitly pass `QVOICE_LEAD_ONLY=1` to the measured
+lane. Never use `QVOICE_LEAD_ONLY=1` to bypass a known active worker or unknown lease. The host checks
+a measured lane runs before any model loads (`require_quiet_host`, `check_cache_only_host`,
+`QVOICE_ALLOW_BUSY_HOST`) are in [`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
 
-The SessionStart hook exports the session's opaque `QVOICE_WORKER_SESSION` marker to later Bash calls
-through `CLAUDE_ENV_FILE` and names it in the session context; it establishes *this session's*
-registration, and another session's receipt cannot. If hooks or ownership inventory are unavailable,
-join all known workers, stop or archive side sessions (without the marker no session can be told from
-another) and explicitly use `QVOICE_LEAD_ONLY=1` for the lane. Never use that declaration to bypass a
-known active or unknown worker lease. Registration failures invalidate the session receipt and retain
-a conservative marker; inspect unresolved markers after joining work rather than blindly deleting
-them. Hooks cannot prove all clients on the host are instrumented, so the lead still checks its known
-workers and host posture. The host checks a measured lane runs before any model loads
-(`require_quiet_host`, `check_cache_only_host`, `QVOICE_ALLOW_BUSY_HOST`) are in
-[`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
+## Antigravity setup and tool routing
 
-## Claude Code setup and tool routing
+Antigravity reads `AGENTS.md` at the repository root and `website/AGENTS.md` when website files are
+touched. `.agents/plugins/vocello/` packages the glob-triggered domain rules (`rules/native.md`,
+`rules/tooling.md`), the six `vocello-*` skills (`skills/`) and the two read-only subagents
+(`agents/vocello-swift-review.md`, `agents/vocello-xcresult-triage.md`). No skill grants external-write
+authority.
 
-Claude Code reads `CLAUDE.md` at the repository root and `website/CLAUDE.md` once website files are
-touched. `.claude/rules/native.md` and `.claude/rules/tooling.md` are symlinks to the two reference
-rules above. The seven `/vocello-*` skills in `.claude/skills` and the two read-only agents in
-`.claude/agents` (both `model: inherit`) are listed in `CLAUDE.md`. The model may also select a skill
-for authorized local work; no skill grants external-write authority.
+`.agents/hooks.json` is the sole lifecycle hook definition, dispatching to
+`scripts/hooks/agy_hook_adapter.py` (working directory `.agents/`, so relative paths never depend on
+the agent's `cwd`). Opening a session installs nothing and never builds or touches a phone.
 
-`.claude/settings.json` is the sole hook and permission definition. Opening a session installs nothing
-and never builds or touches a phone.
-
-| Event | Tool/event matcher | Handler | Effect |
+| Event | Tool matcher | Handler (`agy_hook_adapter.py`) | Effect |
 | --- | --- | --- | --- |
-| SessionStart | startup/resume/clear/compact/fork | worker_lifecycle.py, session_start.sh | Session receipt and exported marker; the agent rules for a session started in a linked worktree; bounded local Git/status/checkpoint context |
-| PreToolUse | Bash | commit_lint.sh, policy_guard.sh, agent_guard.py | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device safeguards; subagent and side-session limits |
-| PreToolUse | Edit, Write, MultiEdit, NotebookEdit | generated_file_guard.sh, agent_guard.py | Refuses hand edits of generated and frozen files, naming the generator; subagents and side sessions never edit the roadmap or checkpoint |
-| PreToolUse | MCP tools (`^mcp__`) | simulator_tool_guard.py, connector_write_guard.py | Refuses unsupported-destination tool routes; a GitHub connector write asks under any server name, and a subagent's is refused |
-| PostToolUse | Edit, Write, MultiEdit, NotebookEdit | project_yml_reminder.sh | Reminds to check the shared generation signature after project/source membership edits |
-| SubagentStart / SubagentStop / SessionEnd | all | worker_lifecycle.py | Active-worker registration with agent rules, completion and conservative teardown |
+| SessionStart | — | `session-start` (`session_start.sh`) | Bounded local Git/status/cache-health/checkpoint `injectSteps` banner, plus agent rules when starting in a linked worktree |
+| PreToolUse | `run_command` | `pre-command` (`policy_guard.sh`, `commit_lint.sh`, `agent_guard.py`, command policy) | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device hard denies; subagent worktree limits; explicit `ask` on pushes, destructive Git, downloads, installers, external writes (`gh`, `hf`, `asc`, `vercel`, `failure_issue.py`) |
+| PreToolUse | `edit_file\|write_file` | `pre-edit` (`generated_file_guard.sh`, `agent_guard.py`) | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
+| PreToolUse | `call_mcp_tool` | `pre-mcp` | Hard-denies `cua-driver`, Simulator MCP routes, MobileBuildMCP build/UI/clean/`persist: true` calls and Axiom `xcui`/simulator agents; prompts (`ask`) on Hugging Face Space runs (`dynamic_space`, `gr*`) and GitHub connector writes (denied in worktrees) |
 
-Hook commands resolve through `$CLAUDE_PROJECT_DIR`, so they never depend on the working directory and
-always run the main checkout's copy, while the guards judge each tool action by the payload `cwd`, which
-follows an agent worktree. Bash payloads carry `tool_input.command`; file tools carry
-`tool_input.file_path` (`notebook_path` for NotebookEdit). Any other tool, including the retired Codex
-patch tool, fails closed in the file guard. Tokenized Git parsing handles global options, literal `-C`,
-chains, subshells and heredocs. `policy_guard.sh` refuses a command its parsers cannot read (exit 2
-with the reason); `agent_guard.py` allows one on a defect of its own parser and prints the error.
-These cooperative guards cannot sandbox interpreter indirection or arbitrary external programs.
+`agy_hook_adapter.py` translates Antigravity's camelCase `toolCall` payloads into the repository's
+tested guard scripts and converts exit-2 blocks into `{"decision": "deny", "reason": ...}` and
+authorization-bound commands into `{"decision": "ask", "reason": ...}`. These cooperative guards
+cannot sandbox interpreter indirection or arbitrary external programs; `policy_guard.sh` fails closed
+when a command parser cannot read a shell command.
 
-The same file holds the permissions, mirroring the policy rather than replacing review. `allow` covers
-the routine loop: read-only Git, scoped staging and commits, worktree integration (`worktree-*` and
-`claude/*` branches), `scripts/dev.sh`,
-contract and privacy scripts, the website check and the local `macos_test.sh`, `ui_test.sh` and
-`ios_device.sh` lanes. It also covers read-only Hugging Face queries: the `hf` CLI's `version`,
-`auth whoami`, `models` and `datasets` card/info/list, `papers`, and `cache` list/verify, plus the
-huggingface-skills plugin's MCP read tools (`hf_fs`, `hub_repo_search`, `hub_repo_details`,
-`hf_whoami`); its `dynamic_space` and `gr*` Space tools ask. No rule
-allows pytest by itself: run it through `scripts/dev.sh py` or
-`"$(python3 scripts/select_python.py)" -m pytest`.
-
-`ask` covers pushes, destructive Git, model installs and downloads, cache cleanup, pinned-tool
-installation, benchmark publication, workflow dispatch, installers, global settings and external writes.
-External writes include GitHub, the Vercel CLI and App Store Connect; `scripts/ci/failure_issue.py`,
-which files and comments on issues, asks although `python3 scripts/ci/*` is allowed (an ask rule
-outranks an allow rule). The GitHub connector arrives
-under a server name the client chooses (`claude_ai_Github` in the CLI, a per-install UUID in the
-desktop app), so its ask rules name the writing tools under any server (`mcp__*__push_files`,
-`mcp__*__*_write` and the rest), and `connector_write_guard.py` asks on the same tools by their own
-name whatever the server, without depending on how a rule's wildcard meets a server name (BKL-62);
-neither touches its reads (`get_*`, `list_*`, `search_*`, `*_read`). On Hugging Face they include
-`hf download`/`upload`, `repos`, `cp`/`sync`/`buckets`, `jobs`/`sandbox`/`endpoints`, `spaces`,
-`collections`, `discussions`, `webhooks`, CLI `extensions`/`skills`/`update`, `auth login`/`logout`/
-`switch` and cache removal, and the MCP's Space-running tools (`dynamic_space`, `gr*`).
-
-`deny` covers force pushes and the named non-main push forms (`origin HEAD`, `origin worktree-*`,
-`origin claude/*`), `checkout -b`, `switch -c` and `worktree add`, `update-ref`, stashing, broad
-staging, whole-cache deletion (`rm -rf build`, `build/cache`), releases, `.xcodeproj` edits and
-`hf auth token`, which prints the stored credential. Any other non-main push, a push to any
-repository but `origin` (another remote, a URL, a path) and `git branch <name>` are refused by the
-`policy_guard.sh` hook, not by a permission rule, and so are local history rewrites (BKL-63):
-`git commit --amend`, `--fixup` and `--squash`, `git rebase` (but `--abort` and `--quit`),
-`git pull --rebase`, a `git reset` that moves the branch to another commit (unstaging a path and
-resetting to `HEAD` stay open; `git reset --hard` asks), `git filter-branch` and `filter-repo`. The
-deny rules match literal prefixes (`git add -A`, `git stash`); the hook refuses every other spelling of
-broad staging (a pathspec a substitution computes included), `git commit -a` and stashing, and a
-variable in command position that holds git or precedes a judged subcommand (`$G push`) is judged
-as git ([The commit lint](#the-commit-lint)). It
-also covers unsupported-destination and UI-driving MCP tools (the simulator tools by wildcard, the
-desktop app's iOS Simulator server, a dozen MobileBuildMCP UI tools by name) and the Axiom
-simulator/test agents. Computer use is not denied, but it is no route for UI checks, which are
-XCUITest lanes (maintainer decision 2026-11-17); the app asks the maintainer to approve each
-application it controls. Ask rules still prompt in auto mode and deny
-wins in every mode. Rules merge with the untracked `.claude/settings.local.json`, which holds personal
-overrides and cannot lift a tracked deny.
-
-Claude Code applies edits to the tracked settings to the running session immediately, so change them
-deliberately and in the same commit as their tests. `/hooks` and `/permissions` show what is active. Do
-not self-approve trust prompts or modify global settings to make a check pass; report inactive or
-unverified hooks. `scripts/dev.sh doctor --json` inventories configuration, tools and Axiom helpers; it
-cannot establish MCP availability or hook activation.
-
-Safeguards are also callable without activation:
+Safeguards remain directly callable without hook activation:
 
 ```sh
 scripts/hooks/commit_lint.sh --staged
@@ -682,116 +599,64 @@ python3 scripts/build_output_policy.py validate
 scripts/dev.sh py scripts/tests/test_agent_hooks.py scripts/tests/test_active_workers.py
 ```
 
-`policy_guard.sh` and `generated_file_guard.sh` can read a fixture hook JSON on stdin; their tests
-exercise allowed and blocked operations without running destructive commands. CI classification,
-Python consumer selection and reference scanners include `.claude/`, `CLAUDE.md` and the two rule
-sources, and still route the retired `.codex/` and `.agents/` prefixes so a deletion runs the hook
-tests; config-only edits exercise behavioral checks without triggering native builds.
+CI classification, Python consumer selection and reference scanners include `.agents/`, `AGENTS.md`,
+`website/AGENTS.md` and the two rule sources, and keep the retired `.claude/` and `.codex/` prefixes
+routed so a deletion or reintroduction still runs the hook tests; harness-only edits exercise
+behavioral checks without triggering native builds.
 
-For a fresh-session smoke check, start a new `claude` session at the repository root. Confirm the
-SessionStart output ("CLAUDE.md: Start here"), `/memory` (CLAUDE.md and no AGENTS.md), `/hooks` (the
-project hooks), `/permissions` (no invalid rules), a non-empty `QVOICE_WORKER_SESSION` and
-`python3 scripts/active_workers.py status` reporting `trackingAvailable: true`, a trivial subagent moving
-`activeWorkers` to 1 and back, harmless guard fixtures refused (`git switch -c smoke`, an Edit of a
-generated file), no unsupported-destination MobileBuildMCP tools offered, a rule loading when a matching
-file is read, and the seven skills and two agents listed. Record the client version and anything
-unavailable. Without restarting the interactive session (for example when working remotely), a headless
-`claude -p '<prompt>' --model haiku --max-turns 4 --allowedTools 'Bash(echo *)'
-'Bash(python3 scripts/active_workers.py status)' --output-format stream-json --verbose < /dev/null`
-from the repository root exercises the same SessionStart and SessionEnd hooks in a fresh session; its
-init message lists the tools, agents and skills it received. In the desktop app, run the same check in
-a new session opened on the repository folder without a worktree, and also confirm that
-`preview_start` with `website` serves the home page and that no `mcp__Claude_Code_iOS_Simulator__*`
-tool is offered.
+For a fresh-session smoke check, start a new Antigravity conversation at the repository root. Confirm:
+the `SessionStart` banner ("AGENTS.md: Start here"); `AGENTS.md` loaded (and no `CLAUDE.md`); the six
+`vocello-*` skills and both read-only subagents discoverable; harmless guard fixtures denied
+(`git switch -c smoke`, an `edit_file` on `docs/ROADMAP.md`, `call_mcp_tool` to `mobilebuildmcp`
+`list_sims` or `cua-driver_cua-driver` `list_apps`); an external write (`git push --dry-run` or
+`huggingface` `dynamic_space`) triggering an `ask` prompt; and `scripts/dev.sh doctor --json` reporting
+the Antigravity harness configured.
 
 | Work | Authoritative route | Optional assistance |
 | --- | --- | --- |
-| Builds/tests/native UI | Repository scripts, owned caches and XCUITest | MobileBuildMCP discovery and coverage reads; Claude's review of lane screenshots ([The Claude desktop app](#the-claude-desktop-app)) |
-| Apple architecture/APIs | Source, Apple primary docs and retained artifacts | Axiom skills and read-only auditor agents; sosumi; Xcode's bundled documentation |
-| Libraries | Pinned versions in `config/toolchain.json` and package manifests | Context7 |
-| MLX runtime | Owned facade, exact pins and mlx-guide.md | Installed swift-mlx / swift-mlx-lm skills |
-| Code review | The actual diff and the reference rules | vocello-swift-review; `/code-review`; `/security-review` for hooks, security, persistence and release |
-| Finished native run | `scripts/dev.sh triage <run-directory> --json` and testing-runbook.md | Read-only vocello-xcresult-triage agent, xcresulttool, LLDB when indicated |
-| Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | Verified Axiom axbuild, xcsym and xcprof helpers and the crash-analyzer agent, with script-only fallback |
-| Website | `npm --prefix website run check` | The desktop app's browser pane (`.claude/launch.json`), Claude in Chrome or chrome-devtools for local rendered inspection; Vercel deploys from Git (no Vercel plugin; the `vercel` CLI asks) |
-| Repository/CI | Exact-commit checks and repository release scripts | GitHub connector or gh reads; `gh run watch` in the background after an authorized push |
-| App Store/deployment/publication | Explicitly requested release workflow | The `asc` plugin skills over the Homebrew `asc` CLI, and the `vercel` CLI; reads do not authorize writes |
-| Model research | Receipts, exact pins and maintenance contracts | The huggingface-skills plugin's MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`) and its read-side skills (`hf-cli` reads, `hf-mem` weight-memory estimates, `huggingface-papers`, `huggingface-datasets`, `huggingface-best`) and the `hf` CLI for hub search, cards, file sizes, licenses and papers. Downloads, Space runs, Jobs, Inference Endpoints, SageMaker, training, uploads and publishing need a specific request, and the paid ones also go against the no-paid-services preference; no implied repin |
-| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. Claude cannot hear audio and never issues listening verdicts |
-| Code navigation | Source, tests and the reference rules | swift-lsp (clangd-lsp for C) through the LSP tool when a symbol server is configured (New Mac setup, above) |
-| Claude Code configuration | Tracked `.claude/`, `CLAUDE.md` and `scripts/tests/test_agent_hooks.py` | skill-creator for project skills; claude-md-management for `CLAUDE.md` upkeep; `/update-config` for settings |
+| Builds/tests/native UI | Repository scripts, owned caches and XCUITest (`scripts/ui_test.sh`) | `mobilebuildmcp` discovery and coverage reads only; agent review of lane screenshots (`<run>/screenshots/index.json`) |
+| Apple architecture/APIs | Source, Apple primary docs and retained artifacts | `axiom` MCP skills and read-only auditor agents; `sosumi`; Xcode's bundled documentation |
+| Libraries | Pinned versions in `config/toolchain.json` and package manifests | `context7_context7` |
+| MLX runtime | Owned facade, exact pins and `docs/reference/mlx-guide.md` | Installed MLX guidance |
+| Code review | The actual diff and the reference rules | Read-only `vocello-swift-review` subagent (`Reviewed-by: vocello-swift-review`) |
+| Finished native run | `scripts/dev.sh triage <run-directory> --json` and `testing-runbook.md` | Read-only `vocello-xcresult-triage` subagent, `xcresulttool`, LLDB when indicated |
+| Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | `axiom` MCP `xcsym`, `xcprof` and `xclog` tools, with script-only fallback |
+| Website | `npm --prefix website run check` | Local Vite dev/preview (`IsDaemon: true`) + Antigravity `browser` subagent or `chrome-devtools` skills; Vercel deploys from Git (`vercel` CLI asks) |
+| Repository/CI | Exact-commit checks and repository release scripts | `gh` CLI reads; `gh run watch` in the background after an authorized push |
+| App Store/deployment/publication | Explicitly requested release workflow | `asc` plugin skills over Homebrew `/opt/homebrew/bin/asc`, and `vercel` CLI (both ask on writes) |
+| Model research | Receipts, exact pins and maintenance contracts | `huggingface` MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`) and `hf` CLI reads; downloads, Space runs and writes ask |
+| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. The agent cannot hear audio and never issues listening verdicts |
+| Antigravity configuration | Tracked `.agents/`, `AGENTS.md`, `website/AGENTS.md` and `scripts/tests/test_agent_hooks.py` | Built-in `agy-customizations` skill |
 
 Detect capabilities in the current session rather than assuming installation means connection.
-MobileBuildMCP (the renamed XcodeBuildMCP) reads only `.mobilebuildmcp/config.yaml`, which enables its
-project-discovery and coverage workflows. Its macOS and device workflows are build, install, launch and
-test tools that bypass repository serialization and the evidence scripts, and its debugging workflow
-attaches only to the Simulator, so all three stay off; the unsupported-destination tools are also
-denied in the permissions. Never persist session defaults (`persist: true` writes the tracked file). If
-a diagnosis ever needs an MCP build, enable it deliberately and hold the native lock for the whole
-operation. Never run it alongside another
-native action/evidence lane. Optional helpers must exist, be executable and pass a non-mutating
-help/version probe from their installed Axiom location
-(`~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/bin`). Keep raw native logs, original exit
-status, optimization flags and evidence manifests; compact helper output cannot replace their
-contracts. Use xcsym for retained crash symbolication and xcprof for existing trace inspection. Do not
-use xcui or the Axiom simulator-tester, test-runner and test-debugger agents (denied): their simulator
-and rerun routes conflict with this project's physical-iPhone/XCUITest rules. Missing optional tools
-never block the script workflow; personal plugins, skills, accounts and credentials are not CI
-dependencies. Never install or change global configuration simply to satisfy a routing table.
+`mobilebuildmcp` reads `.mobilebuildmcp/config.yaml`, which enables only its project-discovery and
+coverage workflows; if global MCP environment variables expose Simulator, build or UI tools anyway,
+`.agents/hooks.json` hard-denies them as a backstop. Never persist session defaults (`persist: true`
+writes the tracked file and is denied by the hook). Never use `cua-driver`, Axiom `xcui`, or Axiom's
+simulator/test-runner agents. Keep raw native logs, original exit status, optimization flags and
+evidence manifests; compact helper output cannot replace their contracts. Missing optional tools never
+block the script workflow; personal plugins, skills, accounts and credentials are not CI dependencies.
+Never install or change global configuration simply to satisfy a routing table.
 
-### The Claude desktop app
+### UI checks, waiting and privacy in Antigravity
 
-The Code tab of the Claude desktop app is the maintainer's client since 2026-10-24. It runs the same
-Claude Code and loads the same `CLAUDE.md`, hooks, permissions, skills and agents; its session process
-is named `claude`, so worker tracking works unchanged. What it adds, and the rules for each:
-
-- **Sessions.** The lead opens the repository folder without a worktree. Side sessions follow
-  [Parallel agents and worktrees](#parallel-agents-and-worktrees). The task list, chapters, diff pane
-  and next-step box belong to the app and change nothing in the repository's loop.
-- **Browser pane.** `.claude/launch.json` defines `website` (the Vite dev server on 127.0.0.1:5173) and
-  `website-preview` (the built site on 4174, after `npm --prefix website run build`; 4173 stays free
-  for the preview Playwright starts in `npm run check`). `preview_start` with either name opens the
-  pane; `resize_window` sets the widths `website/CLAUDE.md` asks for, and `read_page` or
-  `get_page_text` reads the page before any screenshot. Claude in Chrome stays for pages behind the
-  maintainer's sign-ins, chrome-devtools for Lighthouse, performance traces and heap snapshots. The pane
-  supplements `npm --prefix website run check`, never replaces it.
-- **UI checks are XCUITest lanes** (maintainer decision 2026-11-17, which retires the computer-use
-  route of 2026-10-24 and 2026-10-25 and its iPhone Mirroring sessions). Every UI-driven check, on the
-  Mac and on the paired iPhone, runs through `scripts/ui_test.sh`; a check no lane covers gets its
-  own scenario rather than a hand-driven session. The iOS `ui-preflight` refuses a lane while iPhone
-  Mirroring is open: XCUITest breaks under it even while CoreDevice reports the phone unlocked (RF-15
-  runs 221807, 222059 and 222344), and Mirroring holds the phone locked, so after
-  `scripts/ios_device.sh mirroring stop` the maintainer unlocks it. What XCUITest cannot drive stays
-  the maintainer's, by hand: iPhone system settings (Wi-Fi, airplane mode, Auto-Lock, Developer Mode,
-  UI Automation), permission prompts, the passcode or Face ID, audio routing and interruptions,
-  VoiceOver, app deletion, purchase confirmations, TestFlight installs and the macOS privacy grants
-  ([`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc)). After every lane Claude
-  reviews its screenshots (`<run>/screenshots/index.json`): each failure frame and each named state
-  the row asserts, for clipping, overlap, a wrong state, untranslated text or an unexpected dialog,
-  report-only, each finding a release blocker or a backlog line. Simulator routes stay unsupported.
-- **Terminal panel.** A command the maintainer must run (a login such as `asc auth login` or
-  `hf auth login`, a model install, a publication step) goes in a `bash` block, whose Run button runs it,
-  or in a Terminal panel tab; any secret is typed there, never in chat. A watcher the maintainer wants to
-  see may also run in a tab.
-- **Waiting.** A background Bash command re-invokes the session when it exits: wait for one event (a run
-  finishing, a deployment waiting for approval) with an `until` loop in the background, and use Monitor
-  for a stream of events; never poll with `sleep`. The app keeps the Mac from idle-sleeping while a
-  session works; before a wait that outlasts the turn (a release run, a lane checked later) call
-  `request_keep_awake` with `until: "session_idle"`. It prevents idle sleep only: a closed lid still
-  sleeps, and a macOS UI lane still needs the session unlocked.
-- **Notifications and Remote Control.** The maintainer may follow a session from the phone.
-  `PushNotification` is for what they must act on now (a `release` approval, a failed lane, a phone to
-  unlock in an announced window, a system step a lane waits on), never
-  routine progress; `SendUserFile` hands over a finished report.
-- **Artifacts.** An artifact is hosted on claude.ai, so publish one only on request. Artifacts, file
-  cards and notifications follow the privacy rule: no raw diagnostics, private paths, prompts,
-  transcripts, reference audio or credentials; failure text goes through `DiagnosticPrivacy` summaries,
-  and screenshots showing any of these stay local and untracked.
-- **iOS Simulator panel.** Denied (`mcp__Claude_Code_iOS_Simulator__*` in the permissions, and
-  `simulator_tool_guard.py`); the physical-iPhone lanes stay the only iOS route.
-
-The Code tab's settings (branch prefix, worktree location, keep-awake, notifications) are the
-maintainer's: Claude proposes a change through the app and never changes one to make a check pass.
+- **UI checks are XCUITest lanes** (maintainer decision 2026-11-17, retiring computer-use and iPhone
+  Mirroring routes). Every Mac and iPhone UI check runs through `scripts/ui_test.sh`; a check no lane
+  covers gets its own scenario. Never use `cua-driver`. The iOS `ui-preflight` refuses a lane while
+  iPhone Mirroring is open (`scripts/ios_device.sh mirroring stop`, then the maintainer unlocks the
+  phone). What XCUITest cannot drive stays the maintainer's, by hand (iPhone system settings,
+  permission prompts, passcode/Face ID, audio routing, VoiceOver, app deletion, purchase confirmations,
+  TestFlight installs, macOS privacy grants in [`macos-app-guide.md` §7](macos-app-guide.md#7-macos-permissions-tcc)).
+  Review `<run>/screenshots/index.json` after every lane (report-only).
+- **Waiting and background lanes.** Use `run_command`'s native async execution (`WaitMsBeforeAsync: 500`,
+  or `IsDaemon: true` for Vite dev/preview servers) and reactive wakeup instead of shell `&` or `sleep`
+  polling loops.
+- **Maintainer-run commands.** Commands requiring interactive secrets or logins (`asc auth login`,
+  `hf auth login`, release tags, model installs) go in a plain `sh` block for the maintainer to run in
+  their terminal; never type secrets in chat.
+- **Artifacts and privacy.** Antigravity artifacts, screenshots and summaries carry no raw diagnostics,
+  private paths, prompts, transcripts, reference audio or credentials; failure text goes through
+  `DiagnosticPrivacy` summaries, and screenshots showing any of these stay local and untracked.
 
 ### Host and release prerequisites
 

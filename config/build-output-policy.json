@@ -842,8 +842,8 @@
   ],
   "referencePolicy": {
     "scanRoots": [
-      "CLAUDE.md",
-      ".claude",
+      "AGENTS.md",
+      ".agents",
       ".github",
       ".mobilebuildmcp",
       "README.md",

@@ -11,9 +11,8 @@
 # closed.
 #
 # Commits are allowed in exactly two places: the main checkout on `main`, and a
-# registered linked worktree on a `worktree-*` branch (a Claude Code agent
-# worktree under .claude/worktrees) or a `claude/*` branch (a desktop app
-# session's worktree, the app's default branch prefix), which the lead integrates.
+# registered linked worktree on a `subagent-*`, `swarm-*`, or `worktree-*` branch
+# (an Antigravity shared-workspace subagent or swarm worktree), which the lead integrates.
 # Pushes are allowed only from the main checkout on `main`. Commits also need
 # clean whitespace in the staged diff and no private path or credential in the
 # staged blobs; a commit that takes more than the index holds when the hook runs
@@ -360,13 +359,13 @@ while IFS= read -r line; do
   if (( in_main_checkout )); then
     [[ "$branch" == main ]] || block \
       "commits in the main checkout are made directly on main (current: ${branch:-detached HEAD})." \
-      "Return to main without discarding work; agent work belongs in a Claude Code agent worktree (.claude/worktrees/<name>)."
+      "Return to main without discarding work; subagent work belongs in a registered Antigravity shared worktree."
   elif (( in_agent_worktree )); then
-    [[ "$branch" == worktree-* || "$branch" == claude/* ]] || block \
-      "agent and side-session worktrees commit only on their worktree-* or claude/* branch (current: ${branch:-detached HEAD})." \
-      "Create worktrees through Agent isolation, EnterWorktree or a desktop app session; the lead integrates them."
+    [[ "$branch" == subagent-* || "$branch" == swarm-* || "$branch" == worktree-* ]] || block \
+      "agent worktrees commit only on their subagent-*, swarm-* or worktree-* branch (current: ${branch:-detached HEAD})." \
+      "Create worktrees through Antigravity subagent/swarm Workspace: share; the lead integrates them."
   else
-    block "commits happen on main or in a registered Claude Code agent worktree (CLAUDE.md: Main is the only published branch)." \
+    block "commits happen on main or in a registered agent worktree (AGENTS.md: Main is the only published branch)." \
       "Use a registered worktree in this repository."
   fi
 

@@ -32,7 +32,7 @@ GITHUB_WRITE_TOOLS = frozenset({
     "submit_pending_pull_request_review", "unstar_repository", "update_gist", "update_issue",
     "update_issue_comment", "update_project_item", "update_pull_request", "update_pull_request_branch",
 })
-RULE = "CLAUDE.md: Claude Code harness, every write through an optional tool needs an explicit request"
+RULE = "AGENTS.md: Antigravity harness, every write through an optional tool needs an explicit request"
 
 
 def github_write(tool_name: str) -> str:

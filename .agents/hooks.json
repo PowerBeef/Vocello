@@ -1,0 +1,43 @@
+{
+  "vocello-guards": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python3 ../scripts/hooks/agy_hook_adapter.py session-start",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../scripts/hooks/agy_hook_adapter.py pre-command",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "edit_file|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../scripts/hooks/agy_hook_adapter.py pre-edit",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "call_mcp_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../scripts/hooks/agy_hook_adapter.py pre-mcp",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

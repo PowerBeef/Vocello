@@ -93,6 +93,7 @@ scripts/dev.sh check --since <ref>    # also everything committed since <ref>
 scripts/dev.sh check --paths <p...>   # plan, lint and gate only these paths while unrelated dirty work waits
 scripts/dev.sh test --only Class      # targeted XCTest (also Class/testMethod and A,B); --repeat N hunts flakes
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
+scripts/dev.sh qc <args...>           # QC v2 harness (scripts/qc.py) on the selected Python
 "$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
 scripts/dev.sh build | run            # warm incremental macOS development build / launch
 scripts/dev.sh ios                    # generic device-SDK compile; no phone involved
@@ -107,8 +108,9 @@ Edit while running targeted deterministic tests; run the routed `check` before c
 checkpoint run the smallest relevant existing model, UI, device or performance lane. Adding, moving or
 deleting Swift files needs `./scripts/regenerate_project.sh --fast` and the regenerated project in the
 same commit. Local Xcode may be newer than the CI pin (`config/toolchain.json`); a local build does not
-prove the pinned compiler accepts the change. Observe CI (`gh run watch` in the background) only after an
-authorized push. For QC v2 use `"$(python3 scripts/select_python.py)" scripts/qc.py ...`.
+prove the pinned compiler accepts the change. Observe CI (`gh run watch` in the background) only after an authorized push. For QC v2 use
+`scripts/dev.sh qc ...` (which selects the pinned Python automatically). For measured lanes pass
+`--lead-only` (or `QVOICE_LEAD_ONLY=1`) after confirming zero active workers.
 
 Lanes, learned on the 3.1 run (2026-11-14):
 

@@ -111,7 +111,7 @@ AGENT_REFUSED = (
     "scripts/macos_test.sh test", "bash scripts/ui_test.sh ios smoke", "scripts/ios_device.sh doctor",
     "./scripts/build.sh cli", "scripts/build_ui_test_bundles.sh macos", "scripts/dead_code_report.sh",
     "xcrun devicectl device process launch x", "python3 scripts/qc.py run --x",
-    '"$(python3 scripts/select_python.py)" scripts/qc.py run --x', "build/vocello custom --text hi",
+    '"$(python3 scripts/select_python.py)" scripts/qc.py run --x', "scripts/dev.sh qc run --x", "build/vocello custom --text hi",
     "build/vocello models install pro_custom", "env QVOICE_LEAD_ONLY=1 scripts/macos_test.sh qc-takes",
     "echo ok && scripts/dev.sh build", "bash -c 'xcodebuild build'",
     "sh <<'EOF'\nscripts/dev.sh build\nEOF\n", "git pu" "sh origin main",
@@ -581,7 +581,8 @@ class AntigravityPolicyTests(unittest.TestCase):
 
     def test_authorization_bound_commands_ask(self):
         for command in (
-            "scripts/macos_test.sh models install", "scripts/macos_test.sh models ensure",
+            "scripts/macos_test.sh models install", "scripts/macos_test.sh --lead-only models install",
+            "scripts/macos_test.sh models ensure",
             "scripts/ui_test.sh macos model-download", "scripts/clean_build_caches.sh --cache macos",
             "scripts/install_pinned_tools.sh", "python3 scripts/publish_benchmark_history.py",
             "python3 scripts/benchmark_history.py record a.json",

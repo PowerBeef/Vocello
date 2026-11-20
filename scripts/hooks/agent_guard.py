@@ -151,6 +151,8 @@ def command_violation(command: str, depth: int = 0) -> str:
             return f"`{script}` builds, tests, drives devices or runs models or measured lanes"
         if script == "dev.sh" and (verb in DEV_NATIVE_VERBS or (verb == "check" and "--dry-run" not in args)):
             return f"`scripts/dev.sh {verb}` can run native builds or tests"
+        if script == "dev.sh" and verb == "qc" and len(operands) >= 2 and operands[1] in QC_MODEL_VERBS:
+            return f"`scripts/dev.sh qc {operands[1]}` runs scoring models"
         roadmap_verb = next((word for word in operands if word in ROADMAP_WRITE_VERBS), "")
         if (script == "roadmap.py" and roadmap_verb and "--dry-run" not in args and not HELP_WORDS & set(args)
                 and not (roadmap_verb == "render" and "--check" in args)):

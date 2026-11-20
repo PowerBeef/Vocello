@@ -122,7 +122,7 @@ _qvoice_check_host() {
     if [ "$posture_policy" = "cache-only" ]; then
         posture_note=" posture=record-only"
     fi
-    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level$posture_note$agents_note" >&2
+    echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level$posture_note${agents_note:+ $agents_note}" >&2
     return 0
 }
 

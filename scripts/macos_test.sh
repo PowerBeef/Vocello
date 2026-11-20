@@ -46,6 +46,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$ROOT_DIR/scripts"
 # shellcheck source=lib/build_paths.sh
 . "$SCRIPT_DIR/lib/build_paths.sh"
+# shellcheck source=lib/python.sh
+. "$SCRIPT_DIR/lib/python.sh"
 # shellcheck source=lib/build_cache.sh
 . "$SCRIPT_DIR/lib/build_cache.sh"
 . "$SCRIPT_DIR/lib/host_preflight.sh"
@@ -2039,7 +2041,15 @@ cmd_release_readiness() {
 }
 
 main() {
+  if [[ "${1:-}" == "--lead-only" ]]; then
+    export QVOICE_LEAD_ONLY=1
+    shift
+  fi
   local sub="${1:-help}"; shift || true
+  case "$sub" in
+    help|-h|--help) ;;
+    *) vocello_use_selected_python "$ROOT_DIR" ;;
+  esac
   case "$sub" in
     crashes) cmd_crashes "$@" ;;
     debug)   cmd_debug "$@" ;;

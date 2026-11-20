@@ -6,6 +6,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
 . "$ROOT_DIR/scripts/lib/host_preflight.sh"
 . "$ROOT_DIR/scripts/lib/shared.sh"
@@ -147,10 +149,15 @@ EOF
   exit 2
 }
 
+if [[ "${1:-}" == "--lead-only" ]]; then
+  export QVOICE_LEAD_ONLY=1
+  shift
+fi
 [[ $# -ge 2 ]] || usage
 platform="$1"
 lane="$2"
 shift 2
+vocello_use_selected_python "$ROOT_DIR"
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
 [[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "purchase" || "$lane" == "auto-language" ]] || usage
 [[ "$lane" != "marketing" || "$platform" == "macos" ]] || usage
@@ -235,6 +242,7 @@ while [[ $# -gt 0 ]]; do
     --long-form-segments=*) long_form_segments="${1#*=}"; shift ;;
     --retain-result) retain_result=1; shift ;;
     --no-publish) no_publish=1; shift ;;
+    --lead-only) export QVOICE_LEAD_ONLY=1; shift ;;
     -h|--help|help) usage ;;
     *) die "unknown flag: $1" ;;
   esac

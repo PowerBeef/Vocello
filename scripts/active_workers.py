@@ -176,7 +176,7 @@ def main() -> int:
         print(f"active-workers({report['activeWorkers']})", file=sys.stderr)
         return 1
     if report["otherSessions"] and not args.agents_allowed:
-        print(f"other-sessions({report['otherSessions']}): stop or archive the other Claude Code sessions "
+        print(f"other-sessions({report['otherSessions']}): stop or archive the other sessions "
               "in this repository first", file=sys.stderr)
         return 1
     if not report["trackingAvailable"] and os.environ.get("QVOICE_LEAD_ONLY") != "1":

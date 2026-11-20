@@ -84,6 +84,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
 . "$ROOT_DIR/scripts/lib/dev_signing.sh"
 . "$ROOT_DIR/scripts/lib/test_models.sh"
@@ -3254,7 +3256,15 @@ cmd_gate() {
 }
 
 main() {
+  if [[ "${1:-}" == "--lead-only" ]]; then
+    export QVOICE_LEAD_ONLY=1
+    shift
+  fi
   local sub="${1:-help}"; shift || true
+  case "$sub" in
+    help|-h|--help) ;;
+    *) vocello_use_selected_python "$ROOT_DIR" ;;
+  esac
   case "$sub" in
     doctor)  cmd_doctor "$@" ;;
     build)   cmd_build "$@" ;;

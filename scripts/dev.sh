@@ -24,6 +24,10 @@ case "${1:-}" in
     # Read-only and run by the SessionStart hook: no build-path policy subprocess.
     exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
     ;;
+  qc)
+    shift
+    exec python3 "$ROOT_DIR/scripts/qc.py" "$@"
+    ;;
   *)
     cat >&2 <<'EOF'
 usage: scripts/dev.sh <command>
@@ -35,6 +39,7 @@ usage: scripts/dev.sh <command>
   contracts                product and repository contracts
   py [--all | --lane product|research | tests...]
                            Python tests via pytest (changed consumers by default)
+  qc <args...>             QC v2 audio quality harness (scripts/qc.py) on the selected Python
   test [--only A,B [--repeat N] | --all]
                            macOS XCTest bundles (--repeat: until the first failure)
   ios                      generic device-SDK compile (incremental)
